@@ -1,10 +1,7 @@
 import sys,os
-sys.path.append('e:/work')
-sys.path.append('e:/work/syringe.git/lib')
-sys.path.append('e:/work/syringe.git/work')
 sys.path.append('f:/work')
-sys.path.append('f:/work/syringe.git/lib')
-sys.path.append('f:/work/syringe.git/work')
+sys.path.append('f:/work/syringe/lib')
+#sys.path.append('f:/work/syringe/work')
 
 import idc
 import database,function,segment
@@ -69,9 +66,10 @@ def iscallinfunction(ea):
 
     return False
 
+import pedram
 def markallleafnodes():
     '''label functions that don't call anything'''
-    for ea in database.fetchLeaves():
+    for ea in pedram.FetchLeafs():
         if iscallinfunction(ea):
             continue
         function.tag(ea, 'node-type', 'leaf', repeatable=1)
@@ -1093,3 +1091,25 @@ class remote(object):
         offset = ea - self.lbase
         return offset + self.rbase
 
+def markfuckinghits(addresses, prefix='ht-', color=0x004000):
+    sourcetag = '%ssource'% prefix
+    destinationtag = '%sdestination'% prefix
+    counttag = '%scount'% prefix
+    for ea in addresses:
+        target = database.cxdown(ea)[-1]
+        database.tag(target, sourcetag, ea)
+        database.tag(ea, destinationtag, target)
+        database.color(ea, color)
+
+        try:
+            count = database.tag(ea, counttag) + 1
+        except KeyError:
+            count = 0
+        database.tag(ea, counttag, count)
+
+        try:
+            count = database.tag(target, counttag) + 1
+        except KeyError:
+            count = 0
+        database.tag(target, counttag, count)
+    return
