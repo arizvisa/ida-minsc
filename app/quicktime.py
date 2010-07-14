@@ -14,6 +14,7 @@ import idc, comment
 
 import idc,idautils
 import function,comment,database
+import __quicktime
 
 def nextMnemonic(ea, mnem, maxaddr=0xc0*0x1000000):
     res = idc.GetMnem(ea)
@@ -94,8 +95,13 @@ def nameDispatch(address):
         print '%08x - Unable to find dispatch code'% address
         return
 
-    idc.MakeName(start, 'dispatch_%08x'% code)
-    function.tag(start, 'code', code, repeatable=True)
+    function.setName(start, 'dispatch_%08x'% code)
+    function.tag(start, 'code', code)
+    try:
+        function.tag(start, 'realname', __quicktime.qt_fv_list[code])
+    except KeyError:
+        pass
+
     try:
         function.tag(start, 'address', resolveDispatcher(code), repeatable=True)
     except:
@@ -105,4 +111,4 @@ def nameAllDispatches(ea):
     '''Using the address of {theQuickTimeDispatcher}, name and tag all discovered dispatch calls'''
     for address in idautils.DataRefsTo(ea):
         nameDispatch(address)
-
+    return
