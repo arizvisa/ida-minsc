@@ -212,3 +212,18 @@ def baseaddress():
 
     inputfile.close()
     return imagebase
+
+import function
+def select(tag):
+    result = []
+    for ea in functions():
+        try:
+            function.tag(ea, tag)
+            result.append(ea)
+        except KeyError:
+            pass
+        continue
+    return result
+
+def query(tag, value):
+    return [ ea for ea in select(tag) if function.tag(ea, tag) == value ]
