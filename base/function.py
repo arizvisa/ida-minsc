@@ -29,6 +29,7 @@ def chunks(ea):
     while res != idc.BADADDR:
         yield res
         res = idc.NextFuncFchunk(ea, res)
+    return
 
 def getRange(ea):
     '''tuple containing function start and end'''
@@ -46,6 +47,9 @@ def make(start, end=idc.BADADDR):
 def tag_read(address, key=None, repeatable=1):
     res = getComment(address, repeatable)
     dict = comment.toDict(res)
+    if 'name' not in dict:
+        dict['name'] = getName(address)
+
     if key:
         return dict[key]
     return dict
@@ -85,25 +89,6 @@ def top(ea=None):
     min,max = getRange(ea)
     return min
 
-def fetchtag(function, tag):
-    '''Fetch all instances of the specified tag located within function'''
-    result = []
-    for x in chunks(function):
-        (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
-        result.extend( __fetchtag_chunk(start, end, tag) )
-    return result
-
-def __fetchtag_chunk(start, end, tag):
-    result = []
-    for ea in database.iterate(start, end):
-        try:
-            database.tag(ea, tag)
-            result.append(ea)
-        except KeyError:
-            pass
-        continue
-    return result
-
 def marks(function=None):
     if function is None:
         function = idc.ScreenEA()
@@ -114,6 +99,29 @@ def marks(function=None):
             if top(ea) == function:
                 result.append( (ea,comment) )
         except ValueError:
+            pass
+        continue
+    return result
+
+# tag related
+def select(function, tag):
+    '''Fetch all instances of the specified tag located within function'''
+    result = []
+    for x in chunks(function):
+        (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
+        result.extend( __fetchtag_chunk(start, end, tag) )
+    return result
+
+def query(function, tag, value):
+    return [ ea for ea in select(function, tag) if database.tag(ea, tag) == value ]
+
+def __fetchtag_chunk(start, end, tag):
+    result = []
+    for ea in database.iterate(start, end):
+        try:
+            database.tag(ea, tag)
+            result.append(ea)
+        except KeyError:
             pass
         continue
     return result
@@ -130,14 +138,18 @@ def __getchunk_tags(start, end):
         continue
     return result
 
-def gettags(function):
+def fetch(function=None):
+    '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
+    if function is None:
+        function = idc.ScreenEA()
     result = []
     for x in chunks(function):
         (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
         result.append(__getchunk_tags(start, end))
     return result
 
-def puttags(function, list):
+def store(function, list):
+    '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
     count  = 0
     for ea,records in zip(chunks(function), list):
         (start, end) = idc.GetFchunkAttr(ea, idc.FUNCATTR_START), idc.GetFchunkAttr(ea, idc.FUNCATTR_END)
@@ -151,3 +163,28 @@ def puttags(function, list):
             count += 1
         continue
     return count
+
+# function frame attributes
+def getFrameId(function=None):
+    '''Returns the structure id of the frame'''
+    if function is None:
+        function = idc.ScreenEA()
+    return idc.GetFunctionAttr(function, idc.FUNCATTR_FRAME)
+def getArgsSize(function=None):
+    '''Return the number of bytes occupying argument space'''
+    if function is None:
+        function = idc.ScreenEA()
+    return idc.GetFunctionAttr(function, idc.FUNCATTR_ARGSIZE)
+def getLvarSize(function=None):
+    '''Return the number of bytes occupying local variable space'''
+    if function is None:
+        function = idc.ScreenEA()
+    return idc.GetFunctionAttr(function, idc.FUNCATTR_FRSIZE)
+def getRvarSize(function=None):
+    '''Return the number of bytes occupying any saved registers'''
+    if function is None:
+        function = idc.ScreenEA()
+    return idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS)
+def getSpDelta(ea):
+    '''Gets the stack delta at the specified address'''
+    return idc.GetSpd(ea)
