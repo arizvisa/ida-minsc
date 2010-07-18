@@ -83,9 +83,11 @@ def guessRange(ea):
         return (idc.GetFchunkAttr(ea, idc.FUNCATTR_START), idc.GetFchunkAttr(ea, idc.FUNCATTR_END))
     return start,end
 
-def decode(ea):
+def decode(ea=None):
     import ia32
     '''Disassemble instruction at specified address'''
+    if ea is None:
+        ea = h()
     def bytegenerator(ea):
         while True:
             yield chr(idc.Byte(ea))
@@ -161,13 +163,30 @@ def mark(ea, message):
     nextmark = len(list(marks())) + 1
     idc.MarkPosition(ea, 0, 0, 0, nextmark, message)
 
-def color_write(ea, bgr, what=1):
-    if bgr is None:
-        bgr = 0xffffffff
+def color_write(ea, rgb, what=1):
+    if rgb is None:
+        return idc.SetColor(ea, what, 0xffffffff)
+
+    a = rgb & 0xff000000
+    rgb &= 0x00ffffff
+
+    bgr = 0
+    for i in range(3):
+        bgr,rgb = ((bgr*0x100) + (rgb&0xff), rgb/0x100)
     return idc.SetColor(ea, what, bgr)
 
 def color_read(ea, what=1):
-    return idc.GetColor(ea, what)
+    bgr = idc.GetColor(ea, what)
+    if bgr == 0xffffffff:
+        return None
+
+    a = bgr&0xff000000
+    bgr &= 0x00ffffff
+
+    rgb = 0
+    for i in range(3):
+        rgb,bgr = ((rgb*0x100) + (bgr&0xff), bgr/0x100)
+    return rgb
 
 def color(ea, *args, **kwds):
     '''color(address, rgb?) -> fetches or stores a color to the specified address'''
@@ -193,25 +212,14 @@ def h():
 def filename():
     return idc.GetInputFile()
 
+import idaapi
 def baseaddress():
-    import struct
-    inputfile = file( filename(), mode='rb' )
+    return idaapi.get_imagebase()
 
-    mz = inputfile.read(2)
-    assert mz == 'MZ', "Not a MZ executable"
-
-    inputfile.seek(60)
-    peoffset, = struct.unpack('L', inputfile.read(4))
-
-    inputfile.seek(peoffset)
-    pe = inputfile.read(4)
-    assert pe == 'PE\x00\x00', "Not a PE executable"
-
-    inputfile.seek(peoffset + 52)
-    imagebase, = struct.unpack('L', inputfile.read(4))
-
-    inputfile.close()
-    return imagebase
+def getOffset(ea=None):
+    if ea == None:
+        ea = h()
+    return ea - baseaddress()
 
 import function
 def select(tag):
