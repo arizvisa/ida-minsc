@@ -58,10 +58,8 @@ def dumpIDB(path, tablename):
     createSchema(db, tablename)
 
     import idautils, idc
-#    base = idc.MinEA()      # XXX: this doesn't really calculate the base address of the executable
-    base = 0
-
     import function,database
+    base = database.baseaddress()
 
     # regular comments
     print "Exporting regular comments..."
@@ -76,7 +74,7 @@ def dumpIDB(path, tablename):
 
     # function comments
     print "Exporting function comments..."
-    for x in database.Functions():
+    for x in database.functions():
         d = function.tag(x)    
         if d:
             d = dict([('function-%s'%k, v) for k,v in d.items()])
