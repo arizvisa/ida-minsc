@@ -9,8 +9,26 @@ import ia32,pecoff,ndk
 import ptypes,ctypes
 from ptypes import *
 
+class IdaProvider(ptypes.provider.provider):
+    offset = 0xffffffff
+    def seek(self, offset):
+        '''Seek to a particular offset'''
+        self.offset = offset
+    def consume(self, amount):
+        '''Read some number of bytes'''
+        left,right = self.offset,self.offset+amount
+        self.offset = right
+        return database.getBlock(left,right)
+    def write(self, data):
+        '''Write some number of bytes'''
+        for count,x in enumerate(data):
+            idc.PatchByte(self.offset, x)
+            self.offset += 1
+        return count
+
+ptypes.setsource(IdaProvider())
+
 from database import log
-def log(*args,**kwds): pass
 
 kernel32 = ctypes.WinDLL('kernel32.dll')
 ntdll = ctypes.WinDLL('ntdll.dll')
@@ -81,46 +99,38 @@ def byteproducer(ea):
         ea += 1
     #return
 
-def addressfailure(fn):
-    def new_fn(self, *args, **kwds):
-        me = hex(id(self))
-        try:
-            return fn(self, *args, **kwds)
-        except Exception, e:
-            log('%x %s fail', self.pc, me)
-            raise
-        return
-    return new_fn
-
 class Ia32BranchState(object):
     pc = reader = None
     def __init__(self, ea, reader=byteproducer):
         self.pc = ea
         self.reader = reader
 
-    @addressfailure
+    def __addressfailure(fn):
+        def new_fn(self, *args, **kwds):
+            me = hex(id(self))
+            try:
+                return fn(self, *args, **kwds)
+            except Exception, e:
+                log('%x %s fail', self.pc, me)
+                raise
+            return
+        return new_fn
+
+    @__addressfailure
     def goto(self, ea):
         self.pc = ea    #heh
     
-    @addressfailure
+    @__addressfailure
     def next(self):
         insn = self.get()
         self.pc += ia32.length(insn)
         return self.pc
 
-    @addressfailure
+    @__addressfailure
     def follow(self):
-        insn = self.get()
+        return ia32.getRelativeAddress(self.pc, self.get())
 
-        ihatepython = { 1:'b', 2:'h', 4:'l' }
-        immediate = ia32.getImmediate(insn)
-        res, = struct.unpack(ihatepython[ len(immediate) ], immediate)
-
-        self.pc += ia32.length(insn)
-        self.pc += res
-        return self.pc
-
-    @addressfailure
+    @__addressfailure
     def get(self):
         return ia32.consume(self.reader(self.pc))
 
@@ -133,18 +143,22 @@ class Ia32Emulator(object):
 
     result = []
 
-    def __init__(self, pc):
+    def __init__(self, pc, **attrs):
         self.state = Ia32BranchState(pc)
+        self.setcolor = False
+        if 'color' in attrs:
+            self.setcolor = True
+            self.color = attrs['color']
+        return
 
     def run(self):
         self.start()
         self.result = []
         while self.running:
             insn = self.state.get()
+            if self.setcolor:
+                database.color(self.state.pc, self.color)
             res = self.execute(insn)
-            if res == False:        # instruction was unhandled
-                pass
-            self.state.next()
         return self.result
 
     def start(self):
@@ -153,39 +167,24 @@ class Ia32Emulator(object):
     def stop(self):
         self.running = False
 
-    def __forkandfollow(self):
-        cls = self.__class__
-        res = Ia32BranchState(self.state.pc)
-        res.follow()
-        return res
-
-    def __forkjmp(self, ea):
+    def fork(self, ea):
         return Ia32BranchState(ea)
-
-    def fork(self, ea=None):
-        if ea is None:
-            return self.__forkandfollow()
-        return self.__forkjmp(ea)
 
     def store(self, value):
         self.result.append(value)
 
     def execute(self, insn):
-        # skip through all branches that join blocks
-        if ia32.isUnconditionalBranch(insn):
-            self.state.follow()
-            return True
-
         if ia32.isReturn(insn):
             self.stop()
             return True
+        self.state.next()
         return False
 
 class ForkingEmulator(Ia32Emulator):
     Machines = list
     __machinestats = dict
-    def __init__(self, pc):
-        super(ForkingEmulator, self).__init__(pc)
+    def __init__(self, pc, **attrs):
+        super(ForkingEmulator, self).__init__(pc, **attrs)
         self.Machines = []
         self.__stats = {
             'peakmachines' : 0,
@@ -194,9 +193,9 @@ class ForkingEmulator(Ia32Emulator):
     def addMachine(self, machinestate):
         self.Machines.append(machinestate)
 
-    def fork(self, *args, **kwds):
+    def fork(self, ea):
         me = hex(id(self.state))
-        res = super(ForkingEmulator, self).fork(*args, **kwds)
+        res = super(ForkingEmulator, self).fork(ea)
         log('%x %s forked to %x. %d other machines left to run', self.state.pc, me, id(res), len(self.Machines)+1)
         return res
 
@@ -228,72 +227,104 @@ class ForkingEmulator(Ia32Emulator):
         return
 
     def execute(self, insn):
-        # resolve sib branches (for switch statements usually)
-        disp = ia32.getDisplacement(insn)
-        if ia32.isSibBranch(insn) and len(disp) == 4:
-            me = hex(id(self.state))
-            ea, = struct.unpack('L', disp)
-            for v in makepointerarray(ea).l:
-                self.addMachine( self.fork(int(v)) )
-            return True
-        return super(ForkingEmulator, self).execute(insn)
+        if ia32.isBranch(insn):
+            # resolve sib branches (for switch statements usually)
+            disp = ia32.getDisplacement(insn)
+            if ia32.isSibBranch(insn) and len(disp) == 4:
+                me = hex(id(self.state))
+                ea = ia32.stringToNumber(disp)
+                for target in makepointerarray(ea).l:
+                    self.addMachine( self.fork(int(target)) )
+                self.stop()
+                return
 
-class FunctionEmulator(ForkingEmulator):
-    '''Executes every instruction in a function. Will fork at split branches.'''
-    def execute(self, insn):
-        res = super(FunctionEmulator, self).execute(insn)
-#        print '%x %x %s'%(self.state.pc, id(self.state), repr(insn))
+            if ia32.isUnconditionalBranch(insn):
+                me = hex(id(self.state))
+                target = ia32.getRelativeAddress(self.state.pc, insn)
+                self.state.goto(target)
+                return
 
-        if ia32.isConditionalBranch(insn):
-            me = hex(id(self.state))
-#            print '%x %s cbranch %s'% (self.state.pc, me, insn)
-            self.addMachine(self.fork())
-            return True
+            if ia32.isConditionalBranch(insn):
+                me = hex(id(self.state))
+                target = ia32.getRelativeAddress(self.state.pc, insn)
+                self.addMachine( self.fork(target) )
+                return super(ForkingEmulator, self).execute(insn)
 
-        # catch something uncaught
-        if not res and ia32.isBranch(insn) and not ia32.isUnconditionalBranch(insn):
             me = hex(id(self.state))
             print '%x %s missed a branch instruction %s'% (self.state.pc, me, repr(insn))
             self.stop()
-            return True
-            
-        return False
+            return
 
-    def addMachine(self, machinestate):
-        me = hex(id(self.state))
-        them = hex(id(machinestate))
-        print '%x %s starting %s:%x'% (self.state.pc, me, them, machinestate.pc)
-        return super(FunctionEmulator, self).addMachine(machinestate)
+        return super(ForkingEmulator, self).execute(insn)
 
-    def stop(self):
-        me = hex(id(self.state))
-        print '%x %s finished'% (self.state.pc, me)
-        return super(FunctionEmulator, self).stop()
-
-class ColoredEmulator(FunctionEmulator):
-    '''Really horrible way of preventing loops'''
-    def __init__(self, pc):
-        super(ColoredEmulator, self).__init__(pc)
-        self.__colored = set()
+class LoopEmulator(ForkingEmulator):
+    def start(self):
+        self.blocks = set()
+        self.blocks.add(self.state.pc)  # XXX: assume we're at the beginning of a block
+        return super(LoopEmulator, self).start()
 
     def execute(self, insn):
-        # XXX: slow? memory intensive??
-        if self.state.pc in self.__colored:
-            log('%x previous instruction has already been executed', self.state.pc)
-            self.stop()
-            return True
+        if ia32.isConditionalBranch(insn):
+            next = self.state.pc+ia32.length(insn)
+            target = ia32.getRelativeAddress(self.state.pc, insn)
 
-        self.__colored.add(self.state.pc)
-#        print '%x %x %s'%(self.state.pc, id(self.state), repr(insn))
+            if target in self.blocks and next in self.blocks:
+                self.stop()
+                return
 
-        return super(ColoredEmulator, self).execute(insn)
+            if target not in self.blocks:
+                self.blocks.add(target)
+                self.addMachine(self.fork(target))
+            if next not in self.blocks:
+                self.blocks.add(next)
+                self.state.next()
+            return
 
-import struct
-def getBranchInstructionOffset(n):
-    ihatepython = { 1:'b', 2:'h', 4:'l' }
-    immediate = ia32.getImmediate(n)
-    res, = struct.unpack(ihatepython[ len(immediate) ], immediate)
-    return res
+        if ia32.isUnconditionalBranch(insn):
+            target = ia32.getRelativeAddress(self.state.pc, insn)
+            if target in self.blocks:
+#                print '%x already executed'% (self.state.pc)
+                self.stop()
+                return
+
+            self.blocks.add(target)
+            super(LoopEmulator, self).execute(insn)
+            return
+
+        if ia32.isCall(insn):
+            target = ia32.getRelativeAddress(self.state.pc, insn)
+
+        super(LoopEmulator, self).execute(insn)
+
+    def stop(self):
+        return super(LoopEmulator, self).stop()
+
+if False:
+    class ColoredEmulator(FunctionEmulator):
+        '''Really horrible way of preventing loops'''
+        def __init__(self, pc):
+            super(ColoredEmulator, self).__init__(pc)
+            self.__colored = set()
+
+        def execute(self, insn):
+            # XXX: slow? memory intensive??
+            if self.state.pc in self.__colored:
+                log('%x previous instruction has already been executed', self.state.pc)
+                self.stop()
+                return True
+
+            self.__colored.add(self.state.pc)
+    #        print '%x %x %s'%(self.state.pc, id(self.state), repr(insn))
+
+            return super(ColoredEmulator, self).execute(insn)
+
+if False:
+    import struct
+    def getBranchInstructionOffset(n):
+        ihatepython = { 1:'b', 2:'h', 4:'l' }
+        immediate = ia32.getImmediate(n)
+        res, = struct.unpack(ihatepython[ len(immediate) ], immediate)
+        return res
 
 def getExtents(block):
     '''Return all basic block boundaries inside a string'''
@@ -313,19 +344,20 @@ def getBlocks(start, end):
         yield database.getBlock(x[0]+start, x[1]+start)
     return
 
-def markallbranchoffsets_function(ea):
-    for ea in function.chunks(ea):
-        start,end = database.guessRange(ea)
+if False:
+    def markallbranchoffsets_function(ea):
+        for ea in function.chunks(ea):
+            start,end = database.guessRange(ea)
 
-        for x in ia32.disassemble(database.getBlock(start,end)):
-            database.tag(x, 'branch-offset', hex(ali.getBranchInstructionOffset(n)))
-        continue
-    return
+            for x in ia32.disassemble(database.getBlock(start,end)):
+                database.tag(x, 'branch-address', hex(ia32.getRelativeAddress(self.state.pc,n)))
+            continue
+        return
 
-def markallbranchoffsets(ea):
-    for x in database.functions():
-        markallbranchoffsets_function(x)
-    return
+    def markallbranchoffsets(ea):
+        for x in database.functions():
+            markallbranchoffsets_function(x)
+        return
 
 if False:
     # XXX: to convert from this, we can also just use idc.GetLocByName
@@ -778,15 +810,16 @@ def writeaddresses(list, filename):
     f.write('\n'.join(map(hex, list)))
     f.close()
 
-def relocatetoprocess(list):
-    '''Relocate the addresses from IDA's addressspace to the thread's'''
-    remote = getremote()
-    return [ remote.put(ea) for ea in list ]
-    
-def relocatetodatabase(list):
-    '''Relocate the addresses from the thread's addressspace to IDA's'''
-    remote = getremote()
-    return [ remote.get(address) for address in list ]
+if False:
+    def relocatetoprocess(list):
+        '''Relocate the addresses from IDA's addressspace to the thread's'''
+        remote = getremote()
+        return [ remote.put(ea) for ea in list ]
+        
+    def relocatetodatabase(list):
+        '''Relocate the addresses from the thread's addressspace to IDA's'''
+        remote = getremote()
+        return [ remote.get(address) for address in list ]
 
 if False:
     # need to figure out some fast way of identifying functions
@@ -814,7 +847,10 @@ def makeptypefragment(id, offset, maxsize):
 
     if maxsize > 0:
         fieldarray.append( ( dyn.block(maxsize), '__unknown_%x'% offset) )
-    return dyn.clone(pstruct.type, _fields_=fieldarray)
+
+    class structfragment(pstruct.type):
+        _fields_ = fieldarray
+    return structfragment
 
 def makeptype(id):
     name = idc.GetStrucName(id)
@@ -903,13 +939,12 @@ def colorAllMarks():
     return
 
 if False:
-    class DebugCallEmulator(ColoredEmulator):
+    class DebugCallEmulator(LoopEmulator):
         def execute(self, insn):
             me = '%x'% id(self.state)
 
             if ia32.isRelativeCall(insn):
-                offset = getBranchInstructionOffset(insn)
-                address = self.state.pc + ia32.length(insn) + offset
+                address = ia32.getRelativeAddress(self.state.pc, insn)
                 print hex(self.state.pc), me, 'rel', hex(address), database.demangle(idc.Name(address))
 
             elif ia32.isMemoryCall(insn):
@@ -934,15 +969,14 @@ if False:
 
             return super(DebugCallEmulator, self).execute(insn)
 
-    class TestEmulator(ColoredEmulator):
+    class TestEmulator(LoopEmulator):
         def __init__(self, pc):
             super(TestEmulator, self).__init__(pc)
             self.calls = []
 
         def execute(self, insn):
             if ia32.isRelativeCall(insn):
-                offset = getBranchInstructionOffset(insn)
-                address = self.state.pc + ia32.length(insn) + offset
+                address = ia32.getRelativeAddress(self.sate.pc, insn)
                 database.tag(self.state.pc, '_type', 'relative-call')
                 database.tag(self.state.pc, '_target', '%x'% address)
                 self.calls.append(self.state.pc)
@@ -968,50 +1002,46 @@ if False:
 
     #        if ia32.isRelativeBranch(insn):
     #            database.tag(self.state.pc, '_type', 'branch')
-    #            database.tag(self.state.pc, '_branchoffset', hex(getBranchInstructionOffset(insn)))
+    #            database.tag(self.state.pc, '_branchoffset', hex(ia32.getBranchOffset(insn)))
 
     #        if ia32.isConditionalBranch(insn):
     #            print hex(self.state.pc)
 
             return
 
-class MyBranchCollector(ColoredEmulator):
+class MyBranchCollector(LoopEmulator):
     def execute(self, insn):
         if ia32.isConditionalBranch(insn) or ia32.isUnconditionalBranch(insn):
             self.store( self.state.pc )
 
         return super(MyBranchCollector, self).execute(insn)
 
-class MyCallCollector(ColoredEmulator):
+class MyChildCollector(LoopEmulator):
+    def execute(self, insn):
+        if ia32.isCall(insn):
+            address = ia32.getRelativeAddress(self.state.pc, insn)
+
+            if ia32.isRelativeCall(insn):
+                self.addMachine( self.fork(address) )
+
+                me = hex(id(self.state))
+                if address in self.result:
+                    log('%x %s duplicate function call to %x', self.state.pc, me, address)
+                    self.stop()
+                    return
+
+                self.store(address)
+                log('%x %s descending into %x', self.state.pc, me, address)
+                return
+        return super(MyChildCollector, self).execute(insn)
+
+class MyCallCollector(LoopEmulator):
     def execute(self, insn):
         if ia32.isRelativeCall(insn):
-            offset = getBranchInstructionOffset(insn)
-            address = self.state.pc + ia32.length(insn) + offset
-            self.addMachine( self.fork(address) )
-
-            me = hex(id(self.state))
-            log('%x %s descending into %x', self.state.pc, me, address)
-
-            self.store(address)
-            return True
+            self.store(self.state.pc)
+        elif ia32.isCall(insn):
+            print '%x unknown call with opcode %s found'%( self.state.pc, repr(ia32.getOpcode(insn)) )
         return super(MyCallCollector, self).execute(insn)
-
-class IdaProvider(ptypes.provider.provider):
-    offset = 0xffffffff
-    def seek(self, offset):
-        '''Seek to a particular offset'''
-        self.offset = offset
-    def consume(self, amount):
-        '''Read some number of bytes'''
-        left,right = self.offset,self.offset+amount
-        self.offset = right
-        return database.getBlock(left,right)
-    def write(self, data):
-        '''Write some number of bytes'''
-        for count,x in enumerate(data):
-            idc.PatchByte(self.offset, x)
-            self.offset += 1
-        return count
 
 class autopointerarray(parray.terminated):
     _object_ = pint.uint32_t
@@ -1037,38 +1067,38 @@ def makepointerarray(ea):
     res.setoffset(ea)
     return res
 
-class MyInstructionCollector(ColoredEmulator):
-    def execute(self, insn):
-        if ia32.isRelativeCall(insn):
-            offset = getBranchInstructionOffset(insn)
-            address = self.state.pc + ia32.length(insn) + offset
-            self.addMachine( self.fork(address) )
+if False:
+    class MyInstructionCollector(LoopEmulator):
+        def execute(self, insn):
+            if ia32.isRelativeCall(insn):
+                address = ia32.getRelativeAddress(self.state.pc, insn)
+                self.addMachine( self.fork(address) )
 
-            me = hex(id(self.state))
-            log('%x %s descending into %x', self.state.pc, me, address)
-            return True
+                me = hex(id(self.state))
+                log('%x %s descending into %x', self.state.pc, me, address)
+                return True
 
-        im = ia32.getImmediate(insn)
-        if im:
-            z = dyn.clone(pint.uint32_t, value=im)()
-            if int(z) == 0x30f0a6e0:
-                self.store(self.state.pc)
-            pass
-            
-        return super(MyInstructionCollector, self).execute(insn)
-"""
-    z = dyn.clone(pint.uint32_t, value=ia32.getImmediate(db.decode(h())))()
+            im = ia32.getImmediate(insn)
+            if im:
+                z = dyn.clone(pint.uint32_t, value=im)()
+                if int(z) == 0x30f0a6e0:
+                    self.store(self.state.pc)
+                pass
+                
+            return super(MyInstructionCollector, self).execute(insn)
+    """
+        z = dyn.clone(pint.uint32_t, value=ia32.getImmediate(db.decode(h())))()
 
-    001363a0 30556966 053d591c 00000184 0550afe0 oart!Ordinal3227+0x79
-    001363c8 30429c4f 04989624 04989510 00000001 EXCEL!Ordinal40+0x556966
-    001363e8 3027d966 04989510 04989908 00000000 EXCEL!Ordinal40+0x429c4f
-    0013641c 3027ed79 00000000 00136fc7 000000a6 EXCEL!Ordinal40+0x27d966
-    00136984 3027e91a 00000000 000004f5 00000000 EXCEL!Ordinal40+0x27ed79
-    00137008 3027de6f ffffffff 049892e4 00000000 EXCEL!Ordinal40+0x27e91a
-    0013708c 30284080 00000000 ffffffff 00000001 EXCEL!Ordinal40+0x27de6f
-    0013712c 3027b8da 052b1400 020bdd40 3cf3a9a5 EXCEL!Ordinal40+0x284080
+        001363a0 30556966 053d591c 00000184 0550afe0 oart!Ordinal3227+0x79
+        001363c8 30429c4f 04989624 04989510 00000001 EXCEL!Ordinal40+0x556966
+        001363e8 3027d966 04989510 04989908 00000000 EXCEL!Ordinal40+0x429c4f
+        0013641c 3027ed79 00000000 00136fc7 000000a6 EXCEL!Ordinal40+0x27d966
+        00136984 3027e91a 00000000 000004f5 00000000 EXCEL!Ordinal40+0x27ed79
+        00137008 3027de6f ffffffff 049892e4 00000000 EXCEL!Ordinal40+0x27e91a
+        0013708c 30284080 00000000 ffffffff 00000001 EXCEL!Ordinal40+0x27de6f
+        0013712c 3027b8da 052b1400 020bdd40 3cf3a9a5 EXCEL!Ordinal40+0x284080
 
-"""
+    """
 
 def writebreakpoints(list, filename, command="r;g"):
     '''Write the specified list to the file represented by filename'''
@@ -1091,7 +1121,7 @@ class remote(object):
         offset = ea - self.lbase
         return offset + self.rbase
 
-def markfuckinghits(addresses, prefix='ht-', color=0x004000):
+def markhits(addresses, prefix='ht-', color=0x004000):
     sourcetag = '%ssource'% prefix
     destinationtag = '%sdestination'% prefix
     counttag = '%scount'% prefix
@@ -1113,3 +1143,49 @@ def markfuckinghits(addresses, prefix='ht-', color=0x004000):
             count = 0
         database.tag(target, counttag, count)
     return
+
+def getLvar(f):
+    return makeptypefragment(function.getFrameId(f), 0, function.getLvarSize(f))
+def getRvar(f):
+    return makeptypefragment(function.getFrameId(f), function.getLvarSize(f), function.getRvarSize(f)+4)
+def getArgs(f):
+    return makeptypefragment(function.getFrameId(f), function.getLvarSize(f) + function.getRvarSize(f)+4, function.getArgsSize(f))
+
+def ptypedefinition(p, address):
+    name = '%s_%x'% (p.__name__, database.getOffset(address))
+    if issubclass(p, pstruct.type):
+        fields = ["(%s.%s, '%s')"% (t.__module__,t.__name__, n) for t,n in p._fields_]
+        s = 'class %s(pstruct.type): _fields_=[%s]'% (name, ','.join(fields))
+        return s
+    if issubclass(p, parray.type):
+        fields = ["(%s, '%s')"% (t.__name__, n) for t,n in p._fields]
+        s = 'class %s(parray.type): _object_=[%s]; length=%d'% (name, p._object_.__name__, p.length)
+        return s
+    raise NotImplementedError
+        
+class MyExternalCollector(LoopEmulator):
+    def execute(self, insn):
+        if ia32.isMemoryCall(insn):
+            res = ia32.stringToNumber( ia32.getDisplacement(insn) )
+            self.store(res)
+        if ia32.isMemoryBranch(insn):
+            res = ia32.stringToNumber( ia32.getDisplacement(insn) )
+            self.store(res)
+        return super(MyExternalCollector, self).execute(insn)
+
+def tagExternals(f):
+    l = set(MyExternalCollector(f).run())
+    externals = [ database.tag(ea, 'name') for ea in l ]
+    if externals:
+        function.tag(f, 'externals', repr(externals))
+    return
+
+if False:
+    import ia32,ali
+    for n in ali.MyChildCollector(h()).run():
+        t = []
+        for c in ali.MyCallCollector(n).run():
+            target = ia32.getRelativeAddress(c, db.decode(c))
+            t.append(target)
+        fn.tag(n, 'calls', repr(map(hex,t)))
+    pass
