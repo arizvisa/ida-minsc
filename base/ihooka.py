@@ -38,14 +38,13 @@ def getCallablePrototypeComponents(callableobject):
 
     elif type(res) is instancemethod:
         name, parameters = getCallablePrototypeComponents(res.im_func)
-        name = '%s.%s'% ( res.im_class.__name__, name )
-        return name, parameters
+        defaults = res.im_func.func_defaults
 
     elif type(res) is builtin:
         name, parameters = (res.__name__, ("..."))
 
     else:
-        raise TypeError, type(res)
+        raise TypeError, (res.__name__, repr(res), type(res))
 
     res = parameters
     if defaults:
@@ -69,30 +68,56 @@ def prototype(object):
 def head(string, lines=5):
     return '\n'.join(string.split('\n')[:lines])
 
-def documentFunctions(list):
-    functiondesc =  lambda n: '%s.%s'% (n.__module__,prototype(n))
+def documentFunction(object):
+    modulename = object.__module__
 
-    def iwantmultilinelambdasorconditionalassignmentsinoneline(object):
-        modulename = object.__module__
+    # XXX: we only care about 1 level worth of modulename
+    #      this could break formatting. oh well.
+    try:
+        idx = modulename.rindex('.')
+        modulename = modulename[idx+1:]
+    except ValueError:
+        pass
+    res = '%s.%s'% (modulename,prototype(object))
 
-        # XXX: we only care about 1 level worth of modulename
-        #      this could break formatting. oh well.
-        try:
-            idx = modulename.rindex('.')
-            modulename = modulename[idx+1:]
-        except ValueError:
-            pass
-        res = '%s.%s'% (modulename,prototype(object))
+    doc = object.__doc__
+    if doc and head(doc, 1).strip():
+        res += ' -> ' + doc
+    return res
 
-        doc = object.__doc__
-        if doc and head(doc, 1).strip():
-            res += ' -> ' + doc
-        return res
-        
-    return [iwantmultilinelambdasorconditionalassignmentsinoneline(n) for n in list if type(n) is type(documentFunctions)]
+def documentMethod(object):
+    res = prototype(object)
+    doc = object.__doc__
+    if doc and head(doc, 1).strip():
+        res += ' -> ' + doc
+    return res
+
+def documentClass(cls):
+    result = []
+    if type(cls.__init__) is instancemethod:
+        result.append( documentMethod( cls.__init__ ) )
+
+    if False:
+        for k in dir(cls):
+            v = getattr(cls, k)
+            if k.startswith('_'):       # forget anything that starts with '_'
+                continue
+            if type(v) == instancemethod:
+                result.append(documentMethod(v) )
+            continue
+
+    s = 'class %s.%s(%s):'% (cls.__module__, cls.__name__, '')
+    if cls.__doc__:
+        s += '    # %s'% (cls.__doc__)
+    return '%s\n%s\n'% (s, indent('\n'.join(result),4))
+
+def documentAllClasses(list):
+    return [documentClass(n) for n in list if (hasattr(n, '__class__') and ('__dict__' in dir(n) or hasattr(n, '__slots_')))]
+
+def documentAllFunctions(list):
+    return [documentFunction(n) for n in list if type(n) is function]
 
 def dumpModule(module, file, filename, info):
-
     try:
         exports = module.EXPORT
         exports = [getattr(module, n) for n in exports]
@@ -100,19 +125,35 @@ def dumpModule(module, file, filename, info):
 
     except AttributeError:
         exports = [getattr(module, n) for n in dir(module)]
-        exports = [n for n in exports if type(n) is type(dumpModule)]
+        exports = [n for n in exports if callable(n)]
         exports = [n for n in exports if n.__module__ == module.__name__]
         log("loaded untagged module '%s' (%s)", module, filename)
+
+    functions = [n for n in exports if (type(n) is function)]
+    classes = [n for n in exports if (hasattr(n, '__class__') and ('__dict__' in dir(n)) or hasattr(n, '__slots_'))]
+    classes = [n for n in classes if n not in functions ]
 
     if module.__doc__:
         log(module.__doc__)
     
     # try REALLY hard to output useful stuff
-    try:
-        log("    providing ->\n%s", indent('\n'.join( documentFunctions(exports) ), 8))
+    if len(classes) > 0:
+        try:
+            defined = documentAllClasses(classes)
+            log("    defining ->\n%s", indent('\n'.join(defined), 8))
+        except Exception, e:
+            log("    exception %s raised during class provide() output", repr(e))
+        pass
 
-    except Exception, e:
-        log("    exception %s raised during provide() output", repr(e))
+    if len(functions) > 0:
+        try:
+            defined = documentAllFunctions(functions)
+            log("    providing ->\n%s", indent('\n'.join(defined), 8))
+        except Exception, e:
+            log("    exception %s raised during function provide() output", repr(e))
+        pass
+
+    return
 
 ## loader import
 # mostly copied from here-> http://quixote.python.ca/quixote.dev/quixote/ptl/ptl_import.py

@@ -158,8 +158,7 @@ def store(function, list):
             data = records[offset]
             ea = start+offset
             for k,v in data.items():
-                db.tag(ea, k, v)
-
+                database.tag(ea, k, v)
             count += 1
         continue
     return count

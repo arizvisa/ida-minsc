@@ -15,11 +15,14 @@ for h in ['base','app', 'misc', 'user']:
 h,go = (db.h, db.go)
 hex = lambda i: '%x'% i
 
-'''
-todo:
-
-need utils for searching for specific instructions
-x need way of navigating blocks
-  x need to also navigate multiple code paths in a function for searching
-    need to figure out how to merge emulator into this thing
-'''
+# try and execute our user's idapythonrc.py
+try:
+    if os.getenv('HOME'):
+        execfile( '%s%cidapythonrc.py'% (os.getenv('HOME'), os.sep) )
+    elif os.getenv('USERPROFILE'):
+        execfile( '%s%cidapythonrc.py'% (os.getenv('USERPROFILE'), os.sep) )
+    else:
+        raise OSError('Unable to figure out home directory')
+    pass
+except IOError:
+    print 'warning: No idapythonrc.py file found in home directory'

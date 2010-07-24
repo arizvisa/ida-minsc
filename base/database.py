@@ -36,6 +36,11 @@ def tag_read(address, key=None, repeatable=0):
     name = idc.Name(address)
     if name:
         dict['name'] = name
+
+    c = color(address)
+    if c is not None:
+        dict['color'] = c
+
     if key:
         return dict[key]
     return dict
@@ -43,9 +48,15 @@ def tag_read(address, key=None, repeatable=0):
 def tag_write(address, key, value, repeatable=0):
     dict = tag_read(address, repeatable=repeatable)
     dict[key] = value
+
+    if key == 'color':
+        color(address, value)
+        del(dict[key])
+
     res = comment.toString(dict)
     if repeatable:
         return idc.MakeRptCmt(address, res)
+
     return idc.MakeComm(address, res)
 
 def tag(address, *args, **kwds):
