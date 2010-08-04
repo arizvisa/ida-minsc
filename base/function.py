@@ -4,13 +4,16 @@ function-context
 
 generic tools for working in the context of a function.
 '''
-EXPORT = ['getComment', 'setComment', 'chunks', 'getName', 'setName', 'getRange', 'make', 'tag', 'contains', 'getBranches']
+#EXPORT = ['getComment', 'setComment', 'chunks', 'getName', 'setName', 'getRange', 'make', 'tag', 'contains', 'getBranches']
 
+@database.__here
 def getComment(ea, repeatable=1):
     return idc.GetFunctionCmt(int(ea), repeatable)
+@database.__here
 def setComment(ea, string, repeatable=1):
     return idc.SetFunctionCmt(int(ea), string, repeatable)
 
+@database.__here
 def getName(ea):
     '''fetches the function name, returns None on no function'''
     res = idc.GetFunctionName(ea)
@@ -60,6 +63,7 @@ def tag_write(address, key, value, repeatable=1):
     res = comment.toString(dict)
     return setComment(address, res, repeatable)
 
+@database.__here
 def tag(address, *args, **kwds):
     '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
     if len(args) < 2:
@@ -82,16 +86,14 @@ def contains(function, address):
 
     return False
 
-def top(ea=None):
+@database.__here
+def top(ea):
     '''Jump to the top of the specified function'''
-    if ea is None:
-        ea = idc.ScreenEA()
     min,max = getRange(ea)
     return min
 
-def marks(function=None):
-    if function is None:
-        function = idc.ScreenEA()
+@database.__here
+def marks(function):
     result = []
     function = top(function)
     for ea,comment in database.marks():
@@ -138,10 +140,9 @@ def __getchunk_tags(start, end):
         continue
     return result
 
-def fetch(function=None):
+@database.__here
+def fetch(function):
     '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
-    if function is None:
-        function = idc.ScreenEA()
     result = []
     for x in chunks(function):
         (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
@@ -164,26 +165,26 @@ def store(function, list):
     return count
 
 # function frame attributes
-def getFrameId(function=None):
+@database.__here
+def getFrameId(function):
     '''Returns the structure id of the frame'''
-    if function is None:
-        function = idc.ScreenEA()
     return idc.GetFunctionAttr(function, idc.FUNCATTR_FRAME)
-def getArgsSize(function=None):
+
+@database.__here
+def getArgsSize(function):
     '''Return the number of bytes occupying argument space'''
-    if function is None:
-        function = idc.ScreenEA()
     return idc.GetFunctionAttr(function, idc.FUNCATTR_ARGSIZE)
-def getLvarSize(function=None):
+
+@database.__here
+def getLvarSize(function):
     '''Return the number of bytes occupying local variable space'''
-    if function is None:
-        function = idc.ScreenEA()
     return idc.GetFunctionAttr(function, idc.FUNCATTR_FRSIZE)
-def getRvarSize(function=None):
+
+@database.__here
+def getRvarSize(function):
     '''Return the number of bytes occupying any saved registers'''
-    if function is None:
-        function = idc.ScreenEA()
     return idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS)
+
 def getSpDelta(ea):
     '''Gets the stack delta at the specified address'''
     return idc.GetSpd(ea)

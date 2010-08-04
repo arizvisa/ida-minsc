@@ -34,7 +34,13 @@ def getCallablePrototypeComponents(callableobject):
     if type(res) is function:
         name, parameters = getCodeParameters(res.func_code)
         defaults = res.func_defaults
-        assert name == res.func_name
+        if name != res.func_name:
+            # this is something that was decorated
+            decoratee = res.func_closure[0].cell_contents
+            name, parameters = getCodeParameters(decoratee.func_code)
+            name = decoratee.func_name
+            defaults = decoratee.func_defaults
+        pass
 
     elif type(res) is instancemethod:
         name, parameters = getCallablePrototypeComponents(res.im_func)
@@ -112,10 +118,10 @@ def documentClass(cls):
     return '%s\n%s\n'% (s, indent('\n'.join(result),4))
 
 def documentAllClasses(list):
-    return [documentClass(n) for n in list if (hasattr(n, '__class__') and ('__dict__' in dir(n) or hasattr(n, '__slots_')))]
+    return [documentClass(n) for n in list if hasattr(n, '__class__') and ('__dict__' in dir(n) or hasattr(n, '__slots_')) and not n.__name__.startswith('__')]
 
 def documentAllFunctions(list):
-    return [documentFunction(n) for n in list if type(n) is function]
+    return [documentFunction(n) for n in list if type(n) is function and not n.func_name.startswith('__')]
 
 def dumpModule(module, file, filename, info):
     try:
