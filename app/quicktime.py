@@ -97,6 +97,7 @@ def nameDispatch(address):
 
     function.setName(start, 'dispatch_%08x'% code)
     function.tag(start, 'code', code)
+    function.tag(start, 'group', 'dispatch')
     try:
         function.tag(start, 'realname', __quicktime.qt_fv_list[code])
     except KeyError:

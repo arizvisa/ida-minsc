@@ -4,7 +4,7 @@ import comment
 def __here(fn):
     '''If the first argument is an address, substitute it with the current address'''
     def _fn(ea=None, *args, **kwds):
-        if (type(ea) is not int) and (ea is not None):
+        if (type(ea) is not int) and (ea is not None) and len(args) > 1:
             args = list(args) 
             args.insert(0, ea)
             args = tuple(args)
@@ -69,7 +69,7 @@ def tag_read(address, key=None, repeatable=0):
 
     c = color(address)
     if c is not None:
-        dict['color'] = c
+        dict['__color__'] = c
 
     if key:
         return dict[key]
@@ -79,9 +79,10 @@ def tag_write(address, key, value, repeatable=0):
     dict = tag_read(address, repeatable=repeatable)
     dict[key] = value
 
-    if key == 'color':
+    if '__color__' in dict:
+        value = dict['__color__']
         color(address, value)
-        del(dict[key])
+        del(dict['__color__'])
 
     res = comment.toString(dict)
     if repeatable:
@@ -89,6 +90,7 @@ def tag_write(address, key, value, repeatable=0):
 
     return idc.MakeComm(address, res)
 
+@__here
 def tag(address, *args, **kwds):
     '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
     try:

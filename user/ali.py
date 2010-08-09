@@ -902,7 +902,7 @@ if False:
     print ia32.isMemoryCall(insn),ia32.isRegisterCall(insn)
     raise NotImplementedError
 
-def checkMarkLocality():
+def checkmarks():
     res = []
     for a,m in database.marks():
         try:
@@ -931,12 +931,26 @@ def checkMarkLocality():
         print '%x function %s'% (k,function.getName(k))
         print '\n'.join( ('%x - %s'%(a,m) for a,m in v) )
     return
+checkMarkLocality = checkmarks
 
-def colorAllMarks():
+def colormarks():
+    # tag and color
+    f = set()
     for ea,m in database.marks():
         database.tag(ea, 'mark', m)
         database.color(ea, 0x7f007f)
+        try:
+            f.add(function.top(ea))
+        except ValueError:
+            pass
+        continue
+
+    # tag the functions too
+    for ea in list(f):
+        m = function.marks(ea)
+        database.tag(ea, 'marks', ','.join([hex(a) for a,b in m]))
     return
+colorAllMarks = colormarks
 
 if False:
     class DebugCallEmulator(LoopEmulator):
@@ -1189,3 +1203,17 @@ if False:
             t.append(target)
         fn.tag(n, 'calls', repr(map(hex,t)))
     pass
+
+class MyInstructionCollector(LoopEmulator):
+    def run(self, **kwds):
+        self.comparison = kwds['cmp']
+        return super(MyInstructionCollector, self).run()
+
+    def execute(self,insn):
+        if self.comparison(insn):
+            self.store(self.state.pc)
+
+        return super(MyInstructionCollector, self).execute(insn)
+
+def cmp_displacement(integer):
+    return lambda i: ia32.stringToNumber(ia32.getDisplacement(i)) == integer

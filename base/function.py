@@ -106,6 +106,7 @@ def marks(function):
     return result
 
 # tag related
+@database.__here
 def select(function, tag):
     '''Fetch all instances of the specified tag located within function'''
     result = []
@@ -114,6 +115,7 @@ def select(function, tag):
         result.extend( __fetchtag_chunk(start, end, tag) )
     return result
 
+@database.__here
 def query(function, tag, value):
     return [ ea for ea in select(function, tag) if database.tag(ea, tag) == value ]
 
@@ -149,6 +151,7 @@ def fetch(function):
         result.append(__getchunk_tags(start, end))
     return result
 
+@database.__here
 def store(function, list):
     '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
     count  = 0
