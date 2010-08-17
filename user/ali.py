@@ -1028,6 +1028,8 @@ class MyBranchCollector(LoopEmulator):
         if ia32.isConditionalBranch(insn) or ia32.isUnconditionalBranch(insn):
             self.store( self.state.pc )
 
+        # XXX: should probably also catch branches like:  FF 24 85 74 29 55 30 
+
         return super(MyBranchCollector, self).execute(insn)
 
 class MyChildCollector(LoopEmulator):
@@ -1055,6 +1057,7 @@ class MyCallCollector(LoopEmulator):
             self.store(self.state.pc)
         elif ia32.isCall(insn):
             print '%x unknown call with opcode %s found'%( self.state.pc, repr(ia32.getOpcode(insn)) )
+            self.store(self.state.pc)
         return super(MyCallCollector, self).execute(insn)
 
 class autopointerarray(parray.terminated):
@@ -1217,3 +1220,18 @@ class MyInstructionCollector(LoopEmulator):
 
 def cmp_displacement(integer):
     return lambda i: ia32.stringToNumber(ia32.getDisplacement(i)) == integer
+
+class DynamicCallCollector(LoopEmulator):
+    def execute(self,insn):
+        if isdynamiccall(insn):
+            self.store(self.state.pc)
+        return super(DynamicCallCollector, self).execute(insn)
+
+def tagdynamiccalls(startea, key, value, color=None):
+    collection = DynamicCallCollector(startea).run()
+    for ea in collection:
+        database.tag(ea, key, value)
+        if color is not None:
+            database.color(ea, color)
+        continue
+    database.tag(startea, 'dynamic-calls', repr(map(hex,collection)))
