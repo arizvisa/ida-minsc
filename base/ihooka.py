@@ -36,7 +36,7 @@ def getCallablePrototypeComponents(callableobject):
         defaults = res.func_defaults
         if name != res.func_name:
             # this is something that was decorated
-            decoratee = res.func_closure[0].cell_contents
+            decoratee = res.func_closure[-1].cell_contents
             name, parameters = getCodeParameters(decoratee.func_code)
             name = decoratee.func_name
             defaults = decoratee.func_defaults
@@ -157,6 +157,7 @@ def dumpModule(module, file, filename, info):
             log("    providing ->\n%s", indent('\n'.join(defined), 8))
         except Exception, e:
             log("    exception %s raised during function provide() output", repr(e))
+            raise
         pass
 
     return
