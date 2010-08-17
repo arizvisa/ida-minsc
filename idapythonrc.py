@@ -26,3 +26,10 @@ try:
     pass
 except IOError:
     print 'warning: No idapythonrc.py file found in home directory'
+
+except Exception, e:
+    print 'warning: Exception %s raised'% repr(e)
+    import traceback
+#    tb = traceback.format_stack()
+#    print ''.join(tb)
+    traceback.print_exc()
