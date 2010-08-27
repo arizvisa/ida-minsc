@@ -6,14 +6,11 @@ generic tools for working in the context of a function.
 '''
 #EXPORT = ['getComment', 'setComment', 'chunks', 'getName', 'setName', 'getRange', 'make', 'tag', 'contains', 'getBranches']
 
-@database.__here
 def getComment(ea, repeatable=1):
     return idc.GetFunctionCmt(int(ea), repeatable)
-@database.__here
 def setComment(ea, string, repeatable=1):
     return idc.SetFunctionCmt(int(ea), string, repeatable)
 
-@database.__here
 def getName(ea):
     '''fetches the function name, returns None on no function'''
     res = idc.GetFunctionName(ea)
@@ -63,7 +60,6 @@ def tag_write(address, key, value, repeatable=1):
     res = comment.toString(dict)
     return setComment(address, res, repeatable)
 
-@database.__here
 def tag(address, *args, **kwds):
     '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
     if len(args) < 2:
@@ -86,13 +82,11 @@ def contains(function, address):
 
     return False
 
-@database.__here
 def top(ea):
     '''Jump to the top of the specified function'''
     min,max = getRange(ea)
     return min
 
-@database.__here
 def marks(function):
     result = []
     function = top(function)
@@ -106,7 +100,6 @@ def marks(function):
     return result
 
 # tag related
-@database.__here
 def select(function, tag):
     '''Fetch all instances of the specified tag located within function'''
     result = []
@@ -115,7 +108,6 @@ def select(function, tag):
         result.extend( __fetchtag_chunk(start, end, tag) )
     return result
 
-@database.__here
 def query(function, tag, value):
     return [ ea for ea in select(function, tag) if database.tag(ea, tag) == value ]
 
@@ -142,7 +134,6 @@ def __getchunk_tags(start, end):
         continue
     return result
 
-@database.__here
 def fetch(function):
     '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
     result = []
@@ -151,7 +142,6 @@ def fetch(function):
         result.append(__getchunk_tags(start, end))
     return result
 
-@database.__here
 def store(function, list):
     '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
     count  = 0
@@ -168,22 +158,18 @@ def store(function, list):
     return count
 
 # function frame attributes
-@database.__here
 def getFrameId(function):
     '''Returns the structure id of the frame'''
     return idc.GetFunctionAttr(function, idc.FUNCATTR_FRAME)
 
-@database.__here
 def getArgsSize(function):
     '''Return the number of bytes occupying argument space'''
     return idc.GetFunctionAttr(function, idc.FUNCATTR_ARGSIZE)
 
-@database.__here
 def getLvarSize(function):
     '''Return the number of bytes occupying local variable space'''
     return idc.GetFunctionAttr(function, idc.FUNCATTR_FRSIZE)
 
-@database.__here
 def getRvarSize(function):
     '''Return the number of bytes occupying any saved registers'''
     return idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS)
