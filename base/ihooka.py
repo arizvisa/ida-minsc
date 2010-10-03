@@ -1,4 +1,4 @@
-import os,ihooks,idc
+import os,ihooks,idc,imp
 
 '''
 this hooks python 'import' and exports the functions a module provides to the ida log window.
@@ -167,8 +167,7 @@ def dumpModule(module, file, filename, info):
 class moduleloader(ihooks.ModuleLoader):
     def load_module(self, module, stuff):
         file, filename, info = stuff
-
-        res = ihooks.ModuleLoader.load_module(self, module, stuff)
+        res = imp.load_module(module, file, filename, info)
 
         if 'IDA Pro' not in filename.split(os.sep): #XXX: heh...
             return res
@@ -179,5 +178,4 @@ class moduleloader(ihooks.ModuleLoader):
         dumpModule(res, file, filename, info)
         return res
 
-importer = ihooks.ModuleImporter(moduleloader())
-ihooks.install(importer)
+ihooks.install( ihooks.ModuleImporter(moduleloader()) )

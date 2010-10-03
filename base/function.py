@@ -177,3 +177,19 @@ def getRvarSize(function):
 def getSpDelta(ea):
     '''Gets the stack delta at the specified address'''
     return idc.GetSpd(ea)
+
+def iterate(function):
+    '''Iterate through all the instructions in each chunk of the specified function'''
+    for x in chunks(function):
+        (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
+        for ea in database.iterate(start, end):
+            yield ea
+        continue
+    return
+
+def searchinstruction(function, match=lambda insn: True):
+    for ea in iterate(function):
+        if match( database.decode(ea) ):
+            yield ea
+        continue
+    return

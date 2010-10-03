@@ -248,3 +248,6 @@ def select(tag):
 def query(tag, value):
     '''Select all functions in a database that contain the specified tag,value'''
     return [ ea for ea in select(tag) if function.tag(ea, tag) == value ]
+
+def searchname(name):
+    return idc.LocByName(name)

@@ -71,9 +71,7 @@ def iscallinfunction(ea):
     '''go through all of a function's chunks and check to see if there's a call in there'''
     result = []
 
-    for ea in function.chunks(ea):
-        start,end = database.guessRange(ea)
-
+    for start,end in function.chunks(ea):
         block = database.getBlock(start,end)
         try:
             if iscallinblock(block):
@@ -233,7 +231,7 @@ class ForkingEmulator(Ia32Emulator):
             if ia32.isSibBranch(insn) and len(disp) == 4:
                 me = hex(id(self.state))
                 ea = ia32.stringToNumber(disp)
-                for target in makepointerarray(ea).l:
+                for target in autopointerarray(offset=ea).l:
                     self.addMachine( self.fork(int(target)) )
                 self.stop()
                 return
@@ -346,9 +344,7 @@ def getBlocks(start, end):
 
 if False:
     def markallbranchoffsets_function(ea):
-        for ea in function.chunks(ea):
-            start,end = database.guessRange(ea)
-
+        for start,end in function.chunks(ea):
             for x in ia32.disassemble(database.getBlock(start,end)):
                 database.tag(x, 'branch-address', hex(ia32.getRelativeAddress(self.state.pc,n)))
             continue
@@ -853,6 +849,7 @@ def makeptypefragment(id, offset, maxsize):
     return structfragment
 
 def makeptype(id):
+    '''Convert a structure id into a ptype'''
     name = idc.GetStrucName(id)
     size = idc.GetStrucSize(id)
     return dyn.clone( makeptypefragment(id, 0, size), name=lambda x: 'structure %s'% name)
@@ -1024,6 +1021,7 @@ if False:
             return
 
 class MyBranchCollector(LoopEmulator):
+    '''Collect the addresses of all the branches in the current function'''
     def execute(self, insn):
         if ia32.isConditionalBranch(insn) or ia32.isUnconditionalBranch(insn):
             self.store( self.state.pc )
@@ -1033,6 +1031,7 @@ class MyBranchCollector(LoopEmulator):
         return super(MyBranchCollector, self).execute(insn)
 
 class MyChildCollector(LoopEmulator):
+    '''Collect all the child functions by following known branches in the current function'''
     def execute(self, insn):
         if ia32.isCall(insn):
             address = ia32.getRelativeAddress(self.state.pc, insn)
@@ -1052,6 +1051,7 @@ class MyChildCollector(LoopEmulator):
         return super(MyChildCollector, self).execute(insn)
 
 class MyCallCollector(LoopEmulator):
+    '''Collect the addresses of all the calls in the current function'''
     def execute(self, insn):
         if ia32.isRelativeCall(insn):
             self.store(self.state.pc)
@@ -1078,11 +1078,6 @@ class autopointerarray(parray.terminated):
 
     def name(self):
         return 'vt_%x'% self.getoffset()
-
-def makepointerarray(ea):
-    res = autopointerarray()
-    res.setoffset(ea)
-    return res
 
 if False:
     class MyInstructionCollector(LoopEmulator):
@@ -1168,19 +1163,23 @@ def getRvar(f):
 def getArgs(f):
     return makeptypefragment(function.getFrameId(f), function.getLvarSize(f) + function.getRvarSize(f)+4, function.getArgsSize(f))
 
-def ptypedefinition(p, address):
-    name = '%s_%x'% (p.__name__, database.getOffset(address))
+def ptypedefinition(p, address=None):
+    '''Given a ptype definition, output the string representation of it'''
+    name = p.__name__
+    if address is not None:
+        name += '_%x'% database.getoffset(address)
+
     if issubclass(p, pstruct.type):
         fields = ["(%s.%s, '%s')"% (t.__module__,t.__name__, n) for t,n in p._fields_]
         s = 'class %s(pstruct.type): _fields_=[%s]'% (name, ','.join(fields))
         return s
     if issubclass(p, parray.type):
-        fields = ["(%s, '%s')"% (t.__name__, n) for t,n in p._fields]
         s = 'class %s(parray.type): _object_=[%s]; length=%d'% (name, p._object_.__name__, p.length)
         return s
     raise NotImplementedError
         
 class MyExternalCollector(LoopEmulator):
+    '''Collect the addresses of all the external calls in the specified function'''
     def execute(self, insn):
         if ia32.isMemoryCall(insn):
             res = ia32.stringToNumber( ia32.getDisplacement(insn) )
@@ -1208,6 +1207,7 @@ if False:
     pass
 
 class MyInstructionCollector(LoopEmulator):
+    '''Collect the addresses of all instructions matching the /cmp/ argument'''
     def run(self, **kwds):
         self.comparison = kwds['cmp']
         return super(MyInstructionCollector, self).run()
@@ -1222,6 +1222,7 @@ def cmp_displacement(integer):
     return lambda i: ia32.stringToNumber(ia32.getDisplacement(i)) == integer
 
 class DynamicCallCollector(LoopEmulator):
+    '''Collect the addresses of all the dynamic calls in the current function'''
     def execute(self,insn):
         if isdynamiccall(insn):
             self.store(self.state.pc)
@@ -1235,3 +1236,50 @@ def tagdynamiccalls(startea, key, value, color=None):
             database.color(ea, color)
         continue
     database.tag(startea, 'dynamic-calls', repr(map(hex,collection)))
+
+def tagfsinstructions(startea, key, color=None):
+    collection = MyInstructionCollector(startea).run(cmp=lambda x: ia32.getPrefix(x) == 'd')
+    for ea in collection:
+        database.tag(ea, key, True)
+        if color is not None:
+            database.color(ea, color)
+        continue
+    if collection:
+        database.tag(startea, 'fs-insns', repr(map(hex,collection)))
+    return
+
+def findpreviousdataref(ea):
+    a = ea
+    while True:
+        a = database.prev(a)
+        if database.dxup(a):
+            return a
+        continue
+    return
+
+def findnextdataref(ea):
+    a = ea
+    while True:
+        a = database.next(a)
+        if database.dxup(a):
+            return a
+        continue
+    return
+
+def makevtable(ea):
+    a = findpreviousdataref(ea)
+    a = autopointerarray(offset=a)
+    return a.l
+
+def dump(l):
+    print '\n'.join( ( hex(int(x)) for x in l ) )
+
+def breaker(addresses):
+    def do(control, command='r;g'):
+        for x in addresses:
+            b = control.AddBreakpoint()
+            b.Offset = x
+            b.Command = command
+            b.Enable()
+        return
+    return do
