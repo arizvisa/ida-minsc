@@ -4,10 +4,11 @@ sys.path.append('f:/work/syringe/lib')
 #sys.path.append('f:/work/syringe/work')
 
 import idc
-import database,function,segment
+import database,function,segment,structure
 import ia32,pecoff,ndk
 import ptypes,ctypes
 from ptypes import *
+pint.setbyteorder(pint.littleendian)
 
 class IdaProvider(ptypes.provider.provider):
     offset = 0xffffffff
@@ -18,13 +19,15 @@ class IdaProvider(ptypes.provider.provider):
         '''Read some number of bytes'''
         left,right = self.offset,self.offset+amount
         self.offset = right
-        return database.getBlock(left,right)
+        return database.getblock(left,right)
     def write(self, data):
         '''Write some number of bytes'''
         for count,x in enumerate(data):
             idc.PatchByte(self.offset, x)
             self.offset += 1
         return count
+    def baseaddress(self):
+        return database.baseaddress()
 
 ptypes.setsource(IdaProvider())
 
@@ -72,7 +75,7 @@ def iscallinfunction(ea):
     result = []
 
     for start,end in function.chunks(ea):
-        block = database.getBlock(start,end)
+        block = database.getblock(start,end)
         try:
             if iscallinblock(block):
                 return True
@@ -178,6 +181,25 @@ class Ia32Emulator(object):
         self.state.next()
         return False
 
+class switch(parray.terminated):
+    _object_ = pint.uint32_t
+    source = IdaProvider()
+    def isTerminator(self, value):
+        offset = value.getoffset()
+        if len(self) == 0:
+            return False
+
+        # if the value of the currently read object doesn't point to code, then bail.
+        ea = int(value)
+        if not database.isCode(ea):
+            del(self.value[-1])
+            return True
+
+        return False
+
+    def shortname(self):
+        return 'vt_%x'% self.getoffset()
+
 class ForkingEmulator(Ia32Emulator):
     Machines = list
     __machinestats = dict
@@ -231,7 +253,7 @@ class ForkingEmulator(Ia32Emulator):
             if ia32.isSibBranch(insn) and len(disp) == 4:
                 me = hex(id(self.state))
                 ea = ia32.stringToNumber(disp)
-                for target in autopointerarray(offset=ea).l:
+                for target in switch(offset=ea).l:
                     self.addMachine( self.fork(int(target)) )
                 self.stop()
                 return
@@ -324,28 +346,29 @@ if False:
         res, = struct.unpack(ihatepython[ len(immediate) ], immediate)
         return res
 
-def getExtents(block):
-    '''Return all basic block boundaries inside a string'''
-    offset = last = 0
-    for n in ia32.disassemble(block):
-        offset += len(''.join(n))
-        if ia32.isRelativeBranch(n) or ia32.isAbsoluteBranch(n) or ia32.isReturn(n):
-            yield (last, offset)
-            last = offset
-        continue
-    return
+if False:
+    def getExtents(block):
+        '''Return all basic block boundaries inside a string'''
+        offset = last = 0
+        for n in ia32.disassemble(block):
+            offset += len(''.join(n))
+            if ia32.isRelativeBranch(n) or ia32.isAbsoluteBranch(n) or ia32.isReturn(n):
+                yield (last, offset)
+                last = offset
+            continue
+        return
 
-def getBlocks(start, end):
-    '''Get all the basic blocks between 2 addresses'''
-    block = database.getBlock(start,end)
-    for x in getExtents(block):
-        yield database.getBlock(x[0]+start, x[1]+start)
-    return
+    def getblocks(start, end):
+        '''Get all the basic blocks between 2 addresses'''
+        block = database.getblock(start,end)
+        for x in getExtents(block):
+            yield database.getblock(x[0]+start, x[1]+start)
+        return
 
 if False:
     def markallbranchoffsets_function(ea):
         for start,end in function.chunks(ea):
-            for x in ia32.disassemble(database.getBlock(start,end)):
+            for x in ia32.disassemble(database.getblock(start,end)):
                 database.tag(x, 'branch-address', hex(ia32.getRelativeAddress(self.state.pc,n)))
             continue
         return
@@ -824,54 +847,55 @@ if False:
     # branch to code outside of the function's boundaries
     pass
 
-def makeptypefragment(id, offset, maxsize):
-    fieldarray = []
-    while maxsize > 0:
-        m_size = idc.GetMemberSize(id, offset)
-        if m_size is None:      # should prolly check the flag, but whatever
-            break
-        m_flag = idc.GetMemberFlag(id, offset)
-        m_name = idc.GetMemberName(id, offset)
-        if m_name is None:
-            m_name = '__unknown_%x'% offset
-        m_structureid = idc.GetMemberStrId(id, offset)
-        ptype = generateptype(m_flag, m_size, m_structureid)
-        fieldarray.append( (ptype, m_name) )
+if False:
+    def makeptypefragment(id, offset, maxsize):
+        fieldarray = []
+        while maxsize > 0:
+            m_size = idc.GetMemberSize(id, offset)
+            if m_size is None:      # should prolly check the flag, but whatever
+                break
+            m_flag = idc.GetMemberFlag(id, offset)
+            m_name = idc.GetMemberName(id, offset)
+            if m_name is None:
+                m_name = '__unknown_%x'% offset
+            m_structureid = idc.GetMemberStrId(id, offset)
+            ptype = generateptype(m_flag, m_size, m_structureid)
+            fieldarray.append( (ptype, m_name) )
 
-        offset += m_size
-        maxsize -= m_size
+            offset += m_size
+            maxsize -= m_size
 
-    if maxsize > 0:
-        fieldarray.append( ( dyn.block(maxsize), '__unknown_%x'% offset) )
+        if maxsize > 0:
+            fieldarray.append( ( dyn.block(maxsize), '__unknown_%x'% offset) )
 
-    class structfragment(pstruct.type):
-        _fields_ = fieldarray
-    return structfragment
+        class structfragment(pstruct.type):
+            _fields_ = fieldarray
+        return structfragment
 
-def makeptype(id):
-    '''Convert a structure id into a ptype'''
-    name = idc.GetStrucName(id)
-    size = idc.GetStrucSize(id)
-    return dyn.clone( makeptypefragment(id, 0, size), name=lambda x: 'structure %s'% name)
-    
-def generateptype(flag, size, structureid):
-    '''produces a ptype from an ida structure member's flag,size, and structureid'''
-    flag &= idc.DT_TYPE
-    lookup = {
-        idc.FF_BYTE : pint.uint8_t,
-        idc.FF_WORD : pint.uint16_t,
-        idc.FF_DWRD : pint.uint32_t,
-        idc.FF_QWRD : pint.uint64_t,
-    }
+    def makeptype(id):
+        '''Convert a structure id into a ptype'''
+        name = idc.GetStrucName(id)
+        size = idc.GetStrucSize(id)
+        return dyn.clone( makeptypefragment(id, 0, size), name=lambda x: 'structure %s'% name)
+        
+    def generateptype(flag, size, structureid):
+        '''produces a ptype from an ida structure member's flag,size, and structureid'''
+        flag &= idc.DT_TYPE
+        lookup = {
+            idc.FF_BYTE : pint.uint8_t,
+            idc.FF_WORD : pint.uint16_t,
+            idc.FF_DWRD : pint.uint32_t,
+            idc.FF_QWRD : pint.uint64_t,
+        }
 
-    try:
-        return lookup[flag]
-    except KeyError, e:
-        pass
+        try:
+            return lookup[flag]
+        except KeyError, e:
+            pass
 
-    if flag == idc.FF_STRU:
-        return makeptype(structureid)
-    return dyn.block(size)
+        if flag == idc.FF_STRU:
+            return makeptype(structureid)
+        return dyn.block(size)
 
 if False:
     ea = idc.ScreenEA()
@@ -1060,25 +1084,6 @@ class MyCallCollector(LoopEmulator):
             self.store(self.state.pc)
         return super(MyCallCollector, self).execute(insn)
 
-class autopointerarray(parray.terminated):
-    _object_ = pint.uint32_t
-    source = IdaProvider()
-    def isTerminator(self, value):
-        offset = value.getoffset()
-        if len(self) > 1:
-            address = int(value)
-
-            # if this doesn't point to code, then bail
-            if not database.isCode(address):
-                del(self.value[-1])
-                return True
-#            insn = database.decode(address)
-
-        return False
-
-    def name(self):
-        return 'vt_%x'% self.getoffset()
-
 if False:
     class MyInstructionCollector(LoopEmulator):
         def execute(self, insn):
@@ -1156,28 +1161,6 @@ def markhits(addresses, prefix='ht-', color=0x004000):
         database.tag(target, counttag, count)
     return
 
-def getLvar(f):
-    return makeptypefragment(function.getFrameId(f), 0, function.getLvarSize(f))
-def getRvar(f):
-    return makeptypefragment(function.getFrameId(f), function.getLvarSize(f), function.getRvarSize(f)+4)
-def getArgs(f):
-    return makeptypefragment(function.getFrameId(f), function.getLvarSize(f) + function.getRvarSize(f)+4, function.getArgsSize(f))
-
-def ptypedefinition(p, address=None):
-    '''Given a ptype definition, output the string representation of it'''
-    name = p.__name__
-    if address is not None:
-        name += '_%x'% database.getoffset(address)
-
-    if issubclass(p, pstruct.type):
-        fields = ["(%s.%s, '%s')"% (t.__module__,t.__name__, n) for t,n in p._fields_]
-        s = 'class %s(pstruct.type): _fields_=[%s]'% (name, ','.join(fields))
-        return s
-    if issubclass(p, parray.type):
-        s = 'class %s(parray.type): _object_=[%s]; length=%d'% (name, p._object_.__name__, p.length)
-        return s
-    raise NotImplementedError
-        
 class MyExternalCollector(LoopEmulator):
     '''Collect the addresses of all the external calls in the specified function'''
     def execute(self, insn):
@@ -1248,31 +1231,59 @@ def tagfsinstructions(startea, key, color=None):
         database.tag(startea, 'fs-insns', repr(map(hex,collection)))
     return
 
-def findpreviousdataref(ea):
-    a = ea
-    while True:
-        a = database.prev(a)
+if False:
+    def findpreviousdataref(ea):
+        a = ea
         if database.dxup(a):
             return a
-        continue
-    return
 
-def findnextdataref(ea):
-    a = ea
-    while True:
-        a = database.next(a)
+        while True:
+            a = database.prev(a)
+            if database.dxup(a):
+                return a
+            continue
+        return
+
+    def findnextdataref(ea):
+        a = ea
         if database.dxup(a):
             return a
-        continue
-    return
+
+        while True:
+            a = database.next(a)
+            if database.dxup(a):
+                return a
+            continue
+        return
+
+class vtable(parray.terminated):
+    _object_ = pint.uint32_t
+    source = IdaProvider()
+    def isTerminator(self, value):
+        offset = value.getoffset()
+        if len(self) <= 1:
+            return False
+
+        # if the value of the currently read object doesn't point to code, then bail.
+        ea = int(value)
+        if not database.isCode(ea):
+            del(self.value[-1])
+            return True
+
+        # if the offset of the read object contains a reference to it, then also bail
+        if database.up(offset):
+            del(self.value[-1])
+            return True
+
+        return False
+
+    def shortname(self):
+        return 'vt_%x'% (self.getoffset()-self.source.baseaddress())
 
 def makevtable(ea):
-    a = findpreviousdataref(ea)
-    a = autopointerarray(offset=a)
+    a = database.prevdata(ea)   # assume we'll hit the dataref that ida has figured out for us
+    a = vtable(offset=a)
     return a.l
-
-def dump(l):
-    print '\n'.join( ( hex(int(x)) for x in l ) )
 
 def breaker(addresses):
     def do(control, command='r;g'):
@@ -1283,3 +1294,108 @@ def breaker(addresses):
             b.Enable()
         return
     return do
+
+### structure <-> ptype stuff
+def makeFragmentPtype(flag, size, structureid):
+    '''produces a ptype from an ida structure member's flag, size, and structureid'''
+    flag &= idc.DT_TYPE
+    lookup = {
+        idc.FF_BYTE : pint.uint8_t,
+        idc.FF_WORD : pint.uint16_t,
+        idc.FF_DWRD : pint.uint32_t,
+        idc.FF_QWRD : pint.uint64_t,
+    }
+    # FIXME: can probably add floats and stuff too
+
+    # lookup the type according to the flag
+    try:
+        t = lookup[flag]
+
+    except KeyError, e:
+        # FIXME: I can't figure out how to identify if a member is an array
+        if flag == idc.FF_STRU:
+            return getfragment(structureid, 0, structure.size(structureid))
+        return dyn.block(size)
+
+    # found a match
+    if t().size() == size:
+        return t
+
+    # catch everything that was missed
+    return dyn.block(size)
+
+def getframe(ea):
+    '''Given a function address, return it's frame in a pstruct form'''
+    ea = function.top(ea)
+    ofs = database.getoffset(ea)
+
+    id = function.getFrameId(ea)
+    a,b,c = function.getAvarSize(ea), function.getRvarSize(ea), function.getLvarSize(ea)
+
+    s = getfragment(id)
+    class frame(s):
+        offset = -c
+        def setoffset(self, ofs):
+            return super(frame, self).setoffset( ofs - c )
+
+    return frame
+
+def getfragment(id, offset=0, size=None, baseoffset=0):
+    '''Given a structure id, return the fragment in ptype form'''
+    if size is None:
+        size = structure.size(id)
+
+    fieldarray = []
+    for (o,s),(m_name, m_cmt) in structure.fragment(id, offset, size):
+        if m_name is None:
+            m_name = '__unknown_%x'% abs(o+baseoffset)
+
+        m_sid = idc.GetMemberStrId(id, o)
+        m_flag = idc.GetMemberFlag(id, o)
+
+        ptype = makeFragmentPtype(m_flag, s, m_sid)
+        fieldarray.append( (ptype,m_name) )
+
+    class fragment(pstruct.type):
+        _fields_ = fieldarray
+    return fragment
+
+if False:
+    def getLvar(f):
+        return makeptypefragment(function.getFrameId(f), 0, function.getLvarSize(f))
+    def getRvar(f):
+        return makeptypefragment(function.getFrameId(f), function.getLvarSize(f), function.getRvarSize(f)+4)
+    def getArgs(f):
+        return makeptypefragment(function.getFrameId(f), function.getLvarSize(f) + function.getRvarSize(f)+4, function.getArgsSize(f))
+
+def ptypedefinition(p, address=None):
+    '''Given a ptype, attempt to output the string definition of it...'''
+    name = p.__name__
+    if address is not None:
+        name += '_%x'% database.getoffset(address)
+
+    if issubclass(p, pstruct.type):
+        fields = ["(%s.%s, '%s')"% (t.__module__,t.__name__, n) for t,n in p._fields_]
+        s = 'class %s(pstruct.type): _fields_=[%s]'% (name, ','.join(fields))
+        return s
+    if issubclass(p, parray.type):
+        s = 'class %s(parray.type): _object_=[%s]; length=%d'% (name, p._object_.__name__, p.length)
+        return s
+    raise NotImplementedError
+
+# this is from my idapythonrc.py file...
+def dump(l):
+    result  = []
+    for n in l:
+        try:
+            if type(n) is tuple:
+                n = '\t'.join((hex(int(x)) for x in list(n)))
+
+            elif type(int(n)) is int:
+                n = hex(n)
+
+        except ValueError:
+            n = repr(n)
+
+        result.append(n)
+    return '\n'.join(result)

@@ -1,4 +1,4 @@
-import idc, comment, database
+import idc, comment, database, structure, idautils
 '''
 function-context
 
@@ -27,14 +27,15 @@ def chunks(ea):
     '''enumerates all chunks in a function '''
     res = idc.FirstFuncFchunk(ea)
     while res != idc.BADADDR:
-        yield res
+        (start, end) = idc.GetFchunkAttr(res, idc.FUNCATTR_START), idc.GetFchunkAttr(res, idc.FUNCATTR_END)
+        yield start,end
         res = idc.NextFuncFchunk(ea, res)
     return
 
 def getRange(ea):
     '''tuple containing function start and end'''
     start, end = (idc.GetFunctionAttr(ea, idc.FUNCATTR_START), idc.GetFunctionAttr(ea, idc.FUNCATTR_END))
-    if (start is None) or (end is None):
+    if (start == 0xffffffff) and (end == 0xffffffff):
         raise ValueError, 'address %x is not contained in a function'% ea
     return start, end
 
@@ -73,9 +74,7 @@ def contains(function, address):
     if address >= start and address < end:
         return True
 
-    for x in chunks(function):
-        (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
-
+    for start,end in chunks(function):
         if address >= start and address < end:
             return True
         continue
@@ -103,8 +102,7 @@ def marks(function):
 def select(function, tag):
     '''Fetch all instances of the specified tag located within function'''
     result = []
-    for x in chunks(function):
-        (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
+    for start,end in chunks(function):
         result.extend( __fetchtag_chunk(start, end, tag) )
     return result
 
@@ -137,17 +135,14 @@ def __getchunk_tags(start, end):
 def fetch(function):
     '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
     result = []
-    for x in chunks(function):
-        (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
+    for start,end in chunks(function):
         result.append(__getchunk_tags(start, end))
     return result
 
 def store(function, list):
     '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
     count  = 0
-    for ea,records in zip(chunks(function), list):
-        (start, end) = idc.GetFchunkAttr(ea, idc.FUNCATTR_START), idc.GetFchunkAttr(ea, idc.FUNCATTR_END)
-    
+    for (start,end),records in zip(chunks(function), list):
         for offset in records.keys():
             data = records[offset]
             ea = start+offset
@@ -162,9 +157,11 @@ def getFrameId(function):
     '''Returns the structure id of the frame'''
     return idc.GetFunctionAttr(function, idc.FUNCATTR_FRAME)
 
-def getArgsSize(function):
+def getAvarSize(function):
     '''Return the number of bytes occupying argument space'''
-    return idc.GetFunctionAttr(function, idc.FUNCATTR_ARGSIZE)
+    max = structure.size(getFrameId(function))
+    total = getLvarSize(function) + getRvarSize(function)
+    return max - total
 
 def getLvarSize(function):
     '''Return the number of bytes occupying local variable space'''
@@ -172,7 +169,7 @@ def getLvarSize(function):
 
 def getRvarSize(function):
     '''Return the number of bytes occupying any saved registers'''
-    return idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS)
+    return idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS) + 4   # +4 for the pc
 
 def getSpDelta(ea):
     '''Gets the stack delta at the specified address'''
@@ -180,8 +177,7 @@ def getSpDelta(ea):
 
 def iterate(function):
     '''Iterate through all the instructions in each chunk of the specified function'''
-    for x in chunks(function):
-        (start, end) = idc.GetFchunkAttr(x, idc.FUNCATTR_START), idc.GetFchunkAttr(x, idc.FUNCATTR_END)
+    for start,end in chunks(function):
         for ea in database.iterate(start, end):
             yield ea
         continue
@@ -191,5 +187,13 @@ def searchinstruction(function, match=lambda insn: True):
     for ea in iterate(function):
         if match( database.decode(ea) ):
             yield ea
+        continue
+    return
+
+def blocks(function):
+    '''Returns each block in the specified function'''
+    for start,end in chunks(function):
+        for r in database.blocks(start, end):
+            yield r
         continue
     return

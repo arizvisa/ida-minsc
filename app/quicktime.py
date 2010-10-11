@@ -66,7 +66,7 @@ def getDispatchCode(ea):
     raise ValueError("Search resulted in address %08x, but instruction '%s' does fulfill requested constraints"% (ea, idc.GetMnem(ea)))
 
 def FindLastAssignment(ea, register):
-    start,end = database.guessRange(ea)
+    start,end = database.guessrange(ea)
     while ea > start:
         ea = database.prev(ea)
         m = idc.GetMnem(ea)

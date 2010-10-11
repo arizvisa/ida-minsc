@@ -11,11 +11,16 @@ def mnemonic(ea):
     '''Returns the mnemonic of an instruction'''
     return idc.GetMnem(ea)
 
-def decode(ea):
+try:
     import ia32
-    '''Disassemble instruction at specified address'''
-    def bytegenerator(ea):
-        while True:
-            yield chr(idc.Byte(ea))
-            ea += 1
-    return ia32.consume(bytegenerator(ea))
+
+    def decode(ea):
+        '''Disassemble instruction at specified address'''
+        def bytegenerator(ea):
+            while True:
+                yield chr(idc.Byte(ea))
+                ea += 1
+        return ia32.consume(bytegenerator(ea))
+
+except ImportError:
+    pass

@@ -1,5 +1,5 @@
-import idc,idautils
-import comment,instruction
+import idc,idautils,idaapi as ida
+import comment,instruction,function
 
 def isCode(ea):
     '''True if ea marked as code'''
@@ -31,7 +31,7 @@ def segments():
     '''Returns a list of all segments in the current database'''
     return list(idautils.Segments())
 
-def getBlock(start, end):
+def getblock(start, end):
     '''Return a string of bytes'''
     result = [ idc.Byte(ea) for ea in xrange(start, end) ]
     return ''.join(map(chr, result))
@@ -39,7 +39,8 @@ def getBlock(start, end):
 def tag_read(address, key=None, repeatable=0):
     res = idc.GetCommentEx(address, repeatable)
     dict = comment.toDict(res)
-    name = idc.Name(address)
+
+    name = idc.NameEx(address, address)
     if name:
         dict['name'] = name
 
@@ -93,8 +94,42 @@ def next(ea):
     '''return the next address (instruction or data)'''
     return idc.NextHead(ea, idc.MaxEA())
 
-import function
-def guessRange(ea):
+def walk(ea, next, match):
+    if match(ea):
+        return ea
+
+    while True:
+        ea = next(ea)
+        if match(ea):
+            return ea
+        continue
+    assert False is True
+
+def prevdata(ea):
+    '''return previous address containing data referencing it'''
+    return walk(ea, prev, dxup)
+
+def nextdata(ea):
+    '''return next address containing data referencing it'''
+    return walk(ea, next, dxup)
+
+def prevcode(ea):
+    '''return previous address containing code referencing it'''
+    return walk(ea, prev, cxup)
+
+def nextcode(ea):
+    '''return next address containing code referencing it'''
+    return walk(ea, next, cxup)
+
+def prevref(ea):
+    '''return previous address containing any kind of reference to it'''
+    return walk(ea, prev, up)
+
+def nextref(ea):
+    '''return next address containing any kind of reference to it'''
+    return walk(ea, next, up)
+
+def guessrange(ea):
     '''Try really hard to get boundaries of the block at specified address'''
     start,end = function.getRange(ea)
     if function.contains(start, ea) and not (ea >= start and ea < end):
@@ -104,7 +139,6 @@ def guessRange(ea):
 def decode(ea):
     return instruction.decode(ea)
 
-import idaapi as ida
 # FIXME: there's issues when trying to get xrefs from a structure or array,
 #        if it's not the first address of the item, then it will return no
 #        xrefs for that particular address. it might be possible to fix this
@@ -147,10 +181,22 @@ def dxup(ea):
     return list(drefs(ea, False))
 
 def cxdown(ea):
-    return list(crefs(ea, True))
+    result = set(crefs(ea, True))
+    result.discard(next(ea))
+    return list(result)
 
 def cxup(ea):
-    return list(crefs(ea, False))
+    result = set(crefs(ea, False))
+    result.discard(prev(ea))
+    return list(result)
+
+def up(ea):
+    '''All locations that reference specified address'''
+    return cxup(ea) + dxup(ea)
+
+def down(ea):
+    '''All locations that are referenced by the specified address'''
+    return cxdown(ea) + dxdown(ea)
 
 def demangle(string):
     return idc.Demangle(string, idc.GetLongPrm(idc.INF_LONG_DN))
@@ -222,17 +268,17 @@ def h():
     '''slightly less typing for idc.ScreenEA()'''
     return idc.ScreenEA()
 
+here = h    # alias
+
 def filename():
     return idc.GetInputFile()
 
-import idaapi
 def baseaddress():
-    return idaapi.get_imagebase()
+    return ida.get_imagebase()
 
-def getOffset(ea):
+def getoffset(ea):
     return ea - baseaddress()
 
-import function
 def select(tag):
     '''Select all functions in database that contain the specified tag'''
     result = []
@@ -249,5 +295,56 @@ def query(tag, value):
     '''Select all functions in a database that contain the specified tag,value'''
     return [ ea for ea in select(tag) if function.tag(ea, tag) == value ]
 
-def searchname(name):
+def search(name):
     return idc.LocByName(name)
+
+def searchname(name):
+    print 'database.searchname has been deprecated in favor of database.search'
+    return search(name)
+
+def name(ea, string=None):
+    '''Returns the name at the specified address. (local than global)'''
+    if string is not None:
+        SN_NOCHECK = 0x00
+        SN_NOLIST = 0x80
+        SN_LOCAL = 0x200
+        SN_PUBLIC = 0x02
+
+        n = name(ea)
+        
+        flags = SN_NOCHECK
+        try:
+            function.top(ea)
+            flags |= SN_LOCAL
+        except ValueError:
+            flags |= 0
+
+        idc.MakeNameEx(ea, string, flags)
+        return n
+
+    try:
+        return tag(ea, 'name')
+    except KeyError:
+        pass
+    return None
+
+def blocks(start, end):
+    '''Returns each block between the specified range of instructions'''
+    block = start
+    for ea in iterate(start, end):
+        if idc.GetMnem(ea).startswith('call'):      # FIXME: heh. ;)
+            continue
+
+        if idc.GetMnem(ea).startswith('ret'):       #   whee
+            yield block,next(ea)
+            block = ea
+
+        elif cxdown(ea):
+            yield block,next(ea)
+            block = next(ea)
+
+        elif cxup(ea):
+            yield block,ea
+            block = ea
+        continue
+    return

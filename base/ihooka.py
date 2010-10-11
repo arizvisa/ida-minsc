@@ -1,4 +1,4 @@
-import os,ihooks,idc,imp
+import os,ihooks,idc,imp,base
 
 '''
 this hooks python 'import' and exports the functions a module provides to the ida log window.
@@ -178,4 +178,5 @@ class moduleloader(ihooks.ModuleLoader):
         dumpModule(res, file, filename, info)
         return res
 
-ihooks.install( ihooks.ModuleImporter(moduleloader()) )
+loader = moduleloader()
+ihooks.install( ihooks.ModuleImporter(loader) )
