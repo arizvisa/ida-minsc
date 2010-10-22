@@ -1,7 +1,7 @@
 import sys,os
 sys.path.append('f:/work')
 sys.path.append('f:/work/syringe/lib')
-#sys.path.append('f:/work/syringe/work')
+sys.path.append('f:/work/syringe/work')
 
 import idc
 import database,function,segment,structure
@@ -32,7 +32,6 @@ class IdaProvider(ptypes.provider.provider):
 ptypes.setsource(IdaProvider())
 
 from database import log
-
 kernel32 = ctypes.WinDLL('kernel32.dll')
 ntdll = ctypes.WinDLL('ntdll.dll')
 
@@ -49,6 +48,13 @@ def isregularcall(instruction):
     p,i,m,s,d,imm = instruction   #heh
     if i == '\xe8':
         return True
+    return False
+
+def iscmpconstant(instruction):
+    m = ia32.modrm.extract(instruction)
+    if m:
+        mod,reg,rm = m
+        return reg == 7 and ia32.getOpcode(instruction) == '\x81'
     return False
 
 def isacall(instruction):
@@ -112,7 +118,7 @@ class Ia32BranchState(object):
             try:
                 return fn(self, *args, **kwds)
             except Exception, e:
-                log('%x %s fail', self.pc, me)
+                self.log(None,'%x %s fail', self.pc, me)
                 raise
             return
         return new_fn
@@ -146,19 +152,23 @@ class Ia32Emulator(object):
 
     def __init__(self, pc, **attrs):
         self.state = Ia32BranchState(pc)
-        self.setcolor = False
+
+        self.attrs = {}
+
+        self.attrs['setcolor'] = False
         if 'color' in attrs:
-            self.setcolor = True
-            self.color = attrs['color']
-        return
+            self.attrs['setcolor'] = True
+            self.attrs['color'] = attrs['color']
+
+        self.attrs['log'] = attrs.get('log', None)
 
     def run(self):
         self.start()
         self.result = []
         while self.running:
             insn = self.state.get()
-            if self.setcolor:
-                database.color(self.state.pc, self.color)
+            if self.attrs['setcolor']:
+                database.color(self.state.pc, self.attrs['color'])
             res = self.execute(insn)
         return self.result
 
@@ -181,6 +191,13 @@ class Ia32Emulator(object):
         self.state.next()
         return False
 
+    def log(self, cls, message, *args):
+        if self.attrs['log'] is None:
+            return database.log(message, *args)
+        if cls in self.attrs['log']:
+            return database.log(message, *args)
+        return ''
+
 class switch(parray.terminated):
     _object_ = pint.uint32_t
     source = IdaProvider()
@@ -202,11 +219,10 @@ class switch(parray.terminated):
 
 class ForkingEmulator(Ia32Emulator):
     Machines = list
-    __machinestats = dict
     def __init__(self, pc, **attrs):
         super(ForkingEmulator, self).__init__(pc, **attrs)
         self.Machines = []
-        self.__stats = {
+        self.attrs['stats'] = {
             'peakmachines' : 0,
         }
 
@@ -216,11 +232,11 @@ class ForkingEmulator(Ia32Emulator):
     def fork(self, ea):
         me = hex(id(self.state))
         res = super(ForkingEmulator, self).fork(ea)
-        log('%x %s forked to %x. %d other machines left to run', self.state.pc, me, id(res), len(self.Machines)+1)
+        self.log('fork','%x %s forked to %x. %d other machines left to run', self.state.pc, me, id(res), len(self.Machines)+1)
         return res
 
     def start(self):
-        log('%x machine %x starting', self.state.pc, id(self.state))
+        self.log('fork','%x machine %x starting', self.state.pc, id(self.state))
         return super(ForkingEmulator, self).start()
 
     def stop(self):
@@ -230,20 +246,20 @@ class ForkingEmulator(Ia32Emulator):
 
         # we're done
         if len(self.Machines) == 0:
-            log('%x %s machine %x terminated. emulator done', ea, me, id(state))
-            log('        stats %s', repr(self.__stats))
+            self.log('fork','%x %s machine %x terminated. emulator done', ea, me, id(state))
+            self.log('fork','        stats %s', repr(self.attrs['stats']))
             self.running = False
             return
 
         # update stats
-        if len(self.Machines) > self.__stats['peakmachines']:
-            self.__stats['peakmachines'] = len(self.Machines)
+        if len(self.Machines) > self.attrs['stats']['peakmachines']:
+            self.attrs['stats']['peakmachines'] = len(self.Machines)
 
         # try the next Machine
         if len(self.Machines) > 0:
             self.state = self.Machines.pop()
 
-        log('%x %s machine %x terminated. %d machines left to run', ea, me, id(state), len(self.Machines))
+        self.log('fork','%x %s machine %x terminated. %d machines left to run', ea, me, id(state), len(self.Machines))
         return
 
     def execute(self, insn):
@@ -252,7 +268,7 @@ class ForkingEmulator(Ia32Emulator):
             disp = ia32.getDisplacement(insn)
             if ia32.isSibBranch(insn) and len(disp) == 4:
                 me = hex(id(self.state))
-                ea = ia32.stringToNumber(disp)
+                ea = ia32.decodeInteger(disp)
                 for target in switch(offset=ea).l:
                     self.addMachine( self.fork(int(target)) )
                 self.stop()
@@ -318,33 +334,6 @@ class LoopEmulator(ForkingEmulator):
 
     def stop(self):
         return super(LoopEmulator, self).stop()
-
-if False:
-    class ColoredEmulator(FunctionEmulator):
-        '''Really horrible way of preventing loops'''
-        def __init__(self, pc):
-            super(ColoredEmulator, self).__init__(pc)
-            self.__colored = set()
-
-        def execute(self, insn):
-            # XXX: slow? memory intensive??
-            if self.state.pc in self.__colored:
-                log('%x previous instruction has already been executed', self.state.pc)
-                self.stop()
-                return True
-
-            self.__colored.add(self.state.pc)
-    #        print '%x %x %s'%(self.state.pc, id(self.state), repr(insn))
-
-            return super(ColoredEmulator, self).execute(insn)
-
-if False:
-    import struct
-    def getBranchInstructionOffset(n):
-        ihatepython = { 1:'b', 2:'h', 4:'l' }
-        immediate = ia32.getImmediate(n)
-        res, = struct.unpack(ihatepython[ len(immediate) ], immediate)
-        return res
 
 if False:
     def getExtents(block):
@@ -1065,12 +1054,12 @@ class MyChildCollector(LoopEmulator):
 
                 me = hex(id(self.state))
                 if address in self.result:
-                    log('%x %s duplicate function call to %x', self.state.pc, me, address)
+                    self.log('collector','%x %s duplicate function call to %x', self.state.pc, me, address)
                     self.stop()
                     return
 
                 self.store(address)
-                log('%x %s descending into %x', self.state.pc, me, address)
+                self.log('collector','%x %s descending into %x', self.state.pc, me, address)
                 return
         return super(MyChildCollector, self).execute(insn)
 
@@ -1083,39 +1072,6 @@ class MyCallCollector(LoopEmulator):
             print '%x unknown call with opcode %s found'%( self.state.pc, repr(ia32.getOpcode(insn)) )
             self.store(self.state.pc)
         return super(MyCallCollector, self).execute(insn)
-
-if False:
-    class MyInstructionCollector(LoopEmulator):
-        def execute(self, insn):
-            if ia32.isRelativeCall(insn):
-                address = ia32.getRelativeAddress(self.state.pc, insn)
-                self.addMachine( self.fork(address) )
-
-                me = hex(id(self.state))
-                log('%x %s descending into %x', self.state.pc, me, address)
-                return True
-
-            im = ia32.getImmediate(insn)
-            if im:
-                z = dyn.clone(pint.uint32_t, value=im)()
-                if int(z) == 0x30f0a6e0:
-                    self.store(self.state.pc)
-                pass
-                
-            return super(MyInstructionCollector, self).execute(insn)
-    """
-        z = dyn.clone(pint.uint32_t, value=ia32.getImmediate(db.decode(h())))()
-
-        001363a0 30556966 053d591c 00000184 0550afe0 oart!Ordinal3227+0x79
-        001363c8 30429c4f 04989624 04989510 00000001 EXCEL!Ordinal40+0x556966
-        001363e8 3027d966 04989510 04989908 00000000 EXCEL!Ordinal40+0x429c4f
-        0013641c 3027ed79 00000000 00136fc7 000000a6 EXCEL!Ordinal40+0x27d966
-        00136984 3027e91a 00000000 000004f5 00000000 EXCEL!Ordinal40+0x27ed79
-        00137008 3027de6f ffffffff 049892e4 00000000 EXCEL!Ordinal40+0x27e91a
-        0013708c 30284080 00000000 ffffffff 00000001 EXCEL!Ordinal40+0x27de6f
-        0013712c 3027b8da 052b1400 020bdd40 3cf3a9a5 EXCEL!Ordinal40+0x284080
-
-    """
 
 def writebreakpoints(list, filename, command="r;g"):
     '''Write the specified list to the file represented by filename'''
@@ -1165,10 +1121,10 @@ class MyExternalCollector(LoopEmulator):
     '''Collect the addresses of all the external calls in the specified function'''
     def execute(self, insn):
         if ia32.isMemoryCall(insn):
-            res = ia32.stringToNumber( ia32.getDisplacement(insn) )
+            res = ia32.decodeInteger( ia32.getDisplacement(insn) )
             self.store(res)
         if ia32.isMemoryBranch(insn):
-            res = ia32.stringToNumber( ia32.getDisplacement(insn) )
+            res = ia32.decodeInteger( ia32.getDisplacement(insn) )
             self.store(res)
         return super(MyExternalCollector, self).execute(insn)
 
@@ -1202,7 +1158,7 @@ class MyInstructionCollector(LoopEmulator):
         return super(MyInstructionCollector, self).execute(insn)
 
 def cmp_displacement(integer):
-    return lambda i: ia32.stringToNumber(ia32.getDisplacement(i)) == integer
+    return lambda i: ia32.decodeInteger(ia32.getDisplacement(i)) == integer
 
 class DynamicCallCollector(LoopEmulator):
     '''Collect the addresses of all the dynamic calls in the current function'''
@@ -1399,3 +1355,31 @@ def dump(l):
 
         result.append(n)
     return '\n'.join(result)
+
+import string
+def getFourCCs(functionea, **attrs):
+    if 'log' not in attrs:
+        attrs['log'] = []
+
+    def isfourcc(insn):
+        if not iscmpconstant(insn):
+            return False
+        constant = ia32.getImmediate(insn)
+        a = len(''.join((x for x in constant if x in string.printable)))
+        b = len(constant)
+        
+        return (a == b) or (a-1 == b)
+
+    result = MyInstructionCollector(functionea, **attrs).run(cmp=isfourcc)
+    result = [ ''.join(reversed(ia32.getImmediate(database.decode(x)))) for x in result]
+    result=list(set(result))
+    return result
+
+def tagallfourccs(key='fourcc'):
+    all = db.functions()
+    for i,x in enumerate(all):
+         print hex(x), '%d of %d'%(i, len(all))
+         fourccs = ali.getFourCCs(x)
+         fn.tag(x, key, repr(fourccs))
+    return
+

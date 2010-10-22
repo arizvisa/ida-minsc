@@ -1,12 +1,4 @@
-### for mapping a dispatch call number to a function
-# execute from the context of quicktime.qts
-
-'''
-QuickTime.qts Dispatch Tagger
-[arizvisa@tippingpoint.com]
-
-This module currently only works on quicktime.qts
-'''
+'''QuickTime stuff'''
 
 EXPORT = [ 'nameDispatch', 'nameAllDispatches' ]
 
@@ -79,7 +71,7 @@ def FindLastAssignment(ea, register):
     raise ValueError('FindLastAssignment(0x%x, %s) Found no matches'% (ea, register))
 
 def nameDispatch(address):
-    '''Name the dispatch function at the specified address'''
+    '''Name the dispatch function at the specified address in quicktime.qts'''
     try:
         start, end = function.getRange(address)
 
@@ -109,7 +101,7 @@ def nameDispatch(address):
         pass
 
 def nameAllDispatches(ea):
-    '''Using the address of {theQuickTimeDispatcher}, name and tag all discovered dispatch calls'''
+    '''Using the address of {theQuickTimeDispatcher}, name and tag all discovered dispatch calls in quicktime.qts'''
     for address in idautils.DataRefsTo(ea):
         nameDispatch(address)
     return

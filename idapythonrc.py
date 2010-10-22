@@ -1,6 +1,5 @@
 import sys,os
 import idc,idautils
-from base import *
 
 # store the root path
 import __root__
@@ -9,6 +8,11 @@ root = __root__.__file__[ : __root__.__file__.rfind(os.sep) ]
 # add subdirs to the search path
 for h in ['base','app', 'misc', 'user']:
     sys.path.append('%s%c%s'% (root, os.sep, h))
+
+# import the default modules
+import comment,database,segment,function
+import instruction
+import ihooka
 
 # shortcuts
 (db,fn) = (database,function)
