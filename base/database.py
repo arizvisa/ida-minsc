@@ -34,7 +34,7 @@ def segments():
 def getblock(start, end):
     '''Return a string of bytes'''
     result = [ idc.Byte(ea) for ea in xrange(start, end) ]
-    return ''.join(map(chr, result))
+    return ''.join(__builtins__['map'](chr, result))
 
 def tag_read(address, key=None, repeatable=0):
     res = idc.GetCommentEx(address, repeatable)
@@ -348,3 +348,12 @@ def blocks(start, end):
             block = ea
         continue
     return
+
+def map(l, *args, **kwds):
+    '''Execute provided callback on all functions in database. Synonymous to map(l,db.functions())'''
+    all = functions()
+    result = []
+    for i,x in enumerate(all):
+        print '%x: processing # %d of %d'%( x, i+1, len(all) )
+        result.append( l(x, *args, **kwds) )
+    return result

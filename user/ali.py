@@ -1094,11 +1094,15 @@ class remote(object):
         offset = ea - self.lbase
         return offset + self.rbase
 
+    def go(self, ea):
+        database.go( self.get(ea) )
+
 def markhits(addresses, prefix='ht-', color=0x004000):
     sourcetag = '%ssource'% prefix
     destinationtag = '%sdestination'% prefix
     counttag = '%scount'% prefix
-    for ea in addresses:
+    for i,ea in enumerate(addresses):
+        print '%x: %d of %d'%(ea,i+1,len(addresses))
         target = database.cxdown(ea)[-1]
         database.tag(target, sourcetag, ea)
         database.tag(ea, destinationtag, target)
@@ -1127,13 +1131,6 @@ class MyExternalCollector(LoopEmulator):
             res = ia32.decodeInteger( ia32.getDisplacement(insn) )
             self.store(res)
         return super(MyExternalCollector, self).execute(insn)
-
-def tagExternals(f):
-    l = set(MyExternalCollector(f).run())
-    externals = [ database.tag(ea, 'name') for ea in l ]
-    if externals:
-        function.tag(f, 'externals', repr(externals))
-    return
 
 if False:
     import ia32,ali
@@ -1383,3 +1380,97 @@ def tagallfourccs(key='fourcc'):
          fn.tag(x, key, repr(fourccs))
     return
 
+def ub(ea, count=1):
+    result = []
+    for x in range(count):
+        row = '\t'.join(['%08x'% ea, idc.GetDisasm(ea)])
+        result.append( row )
+        ea = database.prev(ea)
+    return '\n'.join(reversed(result))
+
+def tagLibraryCalls(f):
+    l = set(MyCallCollector(f, log=[]).run())
+    libcalls = []
+    for x in l:
+        try:
+            down = database.down(x)[0]
+        except IndexError:
+            print hex(x), 'failed'
+            continue
+        if idc.GetFunctionFlags(down) & idc.FUNC_LIB:
+            libcalls.append(down)
+        continue
+
+    if libcalls:
+        function.tag(f, 'libcalls', '{ '+','.join(map(hex,set(libcalls)))+' }')
+    return
+
+def tagExternals(f):
+    l = set(MyExternalCollector(f, log=[]).run())
+    print map(hex,l)
+    externals = []
+    for x in l:
+        try:
+            externals.append( database.tag(x, 'name') )
+        except KeyError:
+            externals.append(hex(x))
+    if externals:
+        function.tag(f, 'externals', '{ '+','.join(set(externals))+' }')
+    return
+
+def tagImmediate(functionea, match, key='immediate', **attrs):
+    if 'log' not in attrs:
+        attrs['log'] = []
+
+    def isimmediate(insn):
+        if not iscmpconstant(insn):
+            return False
+        constant = ''.join(reversed(ia32.getImmediate(insn)))
+        return constant == match
+
+    result = MyInstructionCollector(functionea, **attrs).run(cmp=isimmediate)
+    if result:
+        function.tag(functionea, key, match)
+    return
+
+def tagLocalCalls(f):
+    l = set(MyCallCollector(f, log=[]).run())
+    calls = []
+    for x in l:
+        n = database.decode(x)
+        if not isregularcall(n):
+            continue
+        try:
+            down = database.down(x)[0]
+        except IndexError:
+            print hex(x), 'failed'
+            continue
+        calls.append(down)
+
+    if calls:
+        function.tag(f, 'localcalls', '{ '+','.join(map(hex,set(calls)))+' }')
+    return
+
+def dumpfields(list, *names, **filters):
+    '''
+    Returns a pretty table-looking string.
+    Takes a list of function addresses, followed by tagnames.
+    keyword arguments can be used to filter the list by the specified key/value.
+    None is treated as a wildcard for the filter value.
+
+    i.e.
+    print dumpfields( db.functions(), 'name', 'color', note=None )
+    '''
+    def row(ea):
+        fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
+        d = function.tag(ea)
+        return fmt% tuple(( d.get(x, None) for x in names ))
+
+    def has(ea):
+        d = function.tag(ea)
+        for k,v in filters.iteritems():
+            if k not in d or (v is not None and v != d[k]):
+                return False
+        return True
+            
+    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in list if has(x)) )
