@@ -132,14 +132,17 @@ def __getchunk_tags(start, end):
         continue
     return result
 
-def fetch(function):
-    '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
+def __fetch_chunks(function):
     result = []
     for start,end in chunks(function):
         result.append(__getchunk_tags(start, end))
     return result
 
-def store(function, list):
+def fetch(function):
+    '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
+    return { 'head':tag_read(function), 'chunk':__fetch_chunks(function) }
+
+def __store_chunks(function, list):
     '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
     count  = 0
     for (start,end),records in zip(chunks(function), list):
@@ -151,6 +154,13 @@ def store(function, list):
             count += 1
         continue
     return count
+
+def store(function, dict):
+    '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
+    head = dict['head']
+    for k,v in head.items():
+        tag_write(function, k, v)
+    return __store_chunks(function, dict['chunk'])
 
 # function frame attributes
 def getFrameId(function):

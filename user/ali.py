@@ -91,14 +91,6 @@ def iscallinfunction(ea):
 
     return False
 
-import pedram
-def markallleafnodes():
-    '''label functions that don't call anything'''
-    for ea in pedram.FetchLeafs():
-        if iscallinfunction(ea):
-            continue
-        function.tag(ea, 'node-type', 'leaf', repeatable=1)
-
 def byteproducer(ea):
     while True:
         v = idc.Byte(ea)
@@ -1451,6 +1443,18 @@ def tagLocalCalls(f):
         function.tag(f, 'localcalls', '{ '+','.join(map(hex,set(calls)))+' }')
     return
 
+def tagLeafNode(f):
+    if not iscallinfunction(f):
+        function.tag(f, 'node-type', 'leaf', repeatable=1)
+    return
+
+import pedram
+def markallleafnodes():
+    '''label functions that don't call anything'''
+    for ea in pedram.FetchLeafs():
+        tagLeafNode(ea)
+    return
+
 def dumpfields(list, *names, **filters):
     '''
     Returns a pretty table-looking string.
@@ -1474,3 +1478,11 @@ def dumpfields(list, *names, **filters):
         return True
             
     return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in list if has(x)) )
+
+def preprocess():
+    def fuckup(x):
+        ali.tagLeafNode(x)
+        ali.tagLibraryCalls(x)
+        ali.tagExternals(x)
+        ali.tagLocalCalls(x)
+    return database.map(fuckup)
