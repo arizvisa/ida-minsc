@@ -6,6 +6,7 @@ import __root__
 root = __root__.__file__[ : __root__.__file__.rfind(os.sep) ]
 
 # add subdirs to the search path
+# XXX: we might be able to do this via the ihooka module
 for h in ['base','app', 'misc', 'user']:
     sys.path.append('%s%c%s'% (root, os.sep, h))
 

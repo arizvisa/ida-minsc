@@ -1,4 +1,5 @@
-import os,ihooks,idc,imp,base
+import sys,os,imp
+import idc
 
 '''
 this hooks python 'import' and exports the functions a module provides to the ida log window.
@@ -21,6 +22,7 @@ def log(string, *argv):
     '''idc.Message(formatstring, ...)'''
     #XXX: output to a logfile
     return idc.Message('>' + string% argv + '\n')
+#    print ('>' + string% argv + '\n')
 
 def getCodeParameters(code):
     res = list(code.co_varnames)
@@ -164,10 +166,13 @@ def dumpModule(module, file, filename, info):
 
 ## loader import
 # mostly copied from here-> http://quixote.python.ca/quixote.dev/quixote/ptl/ptl_import.py
-class moduleloader(ihooks.ModuleLoader):
-    def load_module(self, module, stuff):
+class moduleloader(object):
+    def find_module(self, module_name, package_path):
+        return self
+
+    def load_module(self, module):
         file, filename, info = stuff
-        res = imp.load_module(module, file, filename, info)
+        res = imp.load_module(module, file, filename)
 
         if 'IDA Pro' not in filename.split(os.sep): #XXX: heh...
             return res
@@ -178,5 +183,29 @@ class moduleloader(ihooks.ModuleLoader):
         dumpModule(res, file, filename, info)
         return res
 
-loader = moduleloader()
-ihooks.install( ihooks.ModuleImporter(loader) )
+class moduleloader(object):
+    # XXX: it might be cool to do the sys.path search through user,app,base,misc here
+    def find_module(self, modulename, path=None):
+        try:
+            res = imp.find_module(modulename, path)
+            self.file,self.pathname,self.description = res
+            return self
+        except ImportError:
+            pass
+        return None
+
+    def load_module(self, modulename):
+        res = imp.load_module(modulename, self.file, self.pathname, self.description)
+            
+        path = os.path.abspath(self.pathname)
+        if 'IDA Pro' not in path.split(os.sep): #XXX: heh...
+            return res
+
+        if res.__name__.startswith('__root__'):
+            return res
+
+        dumpModule(res, self.file, modulename, self.description)
+        return res
+
+sys.meta_path.append(moduleloader())
+
