@@ -104,32 +104,17 @@ class Ia32BranchState(object):
         self.pc = ea
         self.reader = reader
 
-    def __addressfailure(fn):
-        def new_fn(self, *args, **kwds):
-            me = hex(id(self))
-            try:
-                return fn(self, *args, **kwds)
-            except Exception, e:
-                self.log(None,'%x %s fail', self.pc, me)
-                raise
-            return
-        return new_fn
-
-    @__addressfailure
     def goto(self, ea):
         self.pc = ea    #heh
     
-    @__addressfailure
     def next(self):
         insn = self.get()
         self.pc += ia32.length(insn)
         return self.pc
 
-    @__addressfailure
     def follow(self):
         return ia32.getRelativeAddress(self.pc, self.get())
 
-    @__addressfailure
     def get(self):
         return ia32.consume(self.reader(self.pc))
 
@@ -144,28 +129,26 @@ class Ia32Emulator(object):
 
     def __init__(self, pc, **attrs):
         self.state = Ia32BranchState(pc)
+        self.attrs = {'log' : attrs.get('log', None)}
 
-        self.attrs = {}
-
-        self.attrs['setcolor'] = False
-        if 'color' in attrs:
-            self.attrs['setcolor'] = True
-            self.attrs['color'] = attrs['color']
-
-        self.attrs['log'] = attrs.get('log', None)
-
-    def run(self):
-        self.start()
-        self.result = []
-        while self.running:
-            insn = self.state.get()
-            if self.attrs['setcolor']:
-                database.color(self.state.pc, self.attrs['color'])
-            res = self.execute(insn)
+    def run(self, **attrs):
+        try:
+            self.start(**attrs)
+            self.result = []
+            while self.running:
+                insn = self.state.get()
+                if 'color' in attrs:
+                    database.color(self.state.pc, attrs['color'])
+                res = self.execute(insn)
+        except Exception:
+            me = hex(id(self.state))
+            self.log('fail', '%x %s', self.state.pc, me)
+            raise
         return self.result
 
-    def start(self):
+    def start(self, **attrs):
         self.running = True
+        self.attrs.update(**attrs)
 
     def stop(self):
         self.running = False
@@ -1394,7 +1377,8 @@ def tagLibraryCalls(f):
         continue
 
     if libcalls:
-        function.tag(f, 'libcalls', '{ '+','.join(map(hex,set(libcalls)))+' }')
+#        function.tag(f, 'libcalls', '{ '+','.join(map(hex,set(libcalls)))+' }')
+        function.tag(f, 'libcalls', list(set(libcalls)))
     return
 
 def tagExternals(f):
@@ -1405,9 +1389,10 @@ def tagExternals(f):
         try:
             externals.append( database.tag(x, 'name') )
         except KeyError:
-            externals.append(hex(x))
+            externals.append(x)
     if externals:
-        function.tag(f, 'externals', '{ '+','.join(set(externals))+' }')
+#        function.tag(f, 'externals', '{ '+','.join(set(externals))+' }')
+        function.tag(f, 'externals', list(set((externals))))
     return
 
 def tagImmediate(functionea, match, key='immediate', **attrs):
@@ -1440,7 +1425,8 @@ def tagLocalCalls(f):
         calls.append(down)
 
     if calls:
-        function.tag(f, 'localcalls', '{ '+','.join(map(hex,set(calls)))+' }')
+#        function.tag(f, 'localcalls', '{ '+','.join(map(hex,set(calls)))+' }')
+        function.tag(f, 'localcalls', list(set((calls))))
     return
 
 def tagLeafNode(f):
@@ -1479,10 +1465,39 @@ def dumpfields(list, *names, **filters):
             
     return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in list if has(x)) )
 
-def preprocess():
-    def fuckup(x):
-        ali.tagLeafNode(x)
-        ali.tagLibraryCalls(x)
-        ali.tagExternals(x)
-        ali.tagLocalCalls(x)
-    return database.map(fuckup)
+def process(x, **attrs):
+    x = function.top(x)
+    LoopEmulator(x).run(**attrs)
+    tagLeafNode(x, **attrs)
+    tagLibraryCalls(x, **attrs)
+    tagExternals(x, **attrs)
+    tagLocalCalls(x, **attrs)
+
+def fnmap(l, functions, *args, **kwds):
+    '''Execute provided callback on all functions in database. Synonymous to map(l,db.functions())'''
+    all = functions
+    result = []
+    for i,x in enumerate(all):
+        print '%x: processing # %d of %d'%( x, i+1, len(all) )
+        result.append( l(x, *args, **kwds) )
+    return result
+
+def processall(**attrs):
+    return fnmap(process, database.functions(), **attrs)
+
+"""
+def dostuff(prefix, z):
+ items = z.items()
+ for i,(k,v) in enumerate(items):
+  print '%d of %d'%( i+1, len(items) )
+  fn.store(k, v, prefix)
+ return
+
+z = dict([(x,fn.fetch(x)) for x in db.functions() if len(fn.tag(x).values()) > 1])
+a = fu.closure(dostuff, z=z)
+
+b = fu.dumps(a)
+
+c = fu.loads(b, namespace=globals())
+c('wtf')
+"""

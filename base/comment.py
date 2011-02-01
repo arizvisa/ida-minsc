@@ -68,10 +68,19 @@ def IntifyString(value):
 def serializeKeyValue(k, v):
     #if k == 'address':
     #    return '%08x'% int(v)
-    try:
+    if type(v) is int:
         return '0x%x'% int(v)
-    except ValueError:
-        return str(v)
+    elif type(v) is list:
+        try:
+            return '[ %s ]'% ','.join(map(hex,v))
+        except:
+            pass
+        return repr(v)
+    elif type(v) is dict:
+        # due to how bad this code is, i'm not allowing myself to add support for various types
+        raise NotImplementedError("Please don't store dicts using this code. Thanks.")
+        
+    return str(v)
 
 def toList(string):
     '''
@@ -94,7 +103,10 @@ def toList(string):
     items = []
     for k,v in stritems:
         try:
-            v = IntifyString(v)
+            if v.startswith('['):
+                v = eval(v)
+            else:
+                v = IntifyString(v)
         except:
             pass
         items.append( (k,v) )
