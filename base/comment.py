@@ -150,3 +150,31 @@ def toString(dict):
     stritems = [(k, serializeKeyValue(k,v)) for k,v in rawitems if v is not None]
     rows = [getStringFromKV(k,v) for k,v in stritems]
     return '\n'.join(rows)
+
+def select_function(list, **where):
+    def has(ea):
+        d = function.tag(ea)
+        for k,v in where.iteritems():
+            if k not in d or (v is not None and v != d[k]):
+                return False
+        return True
+    
+    for x in list:
+        if has(x):
+            yield x
+        continue
+    return
+
+def has_and(dictionary, **where):
+    for k,v in where.iteritems():
+        if k not in dictionary or (v is not None and v != dictionary[k]):
+            return False
+        continue
+    return True
+
+def has_or(dictionary, **where):
+    for k,v in where.iteritems():
+        if k in dictionary or (v is None and v == dictionary[k]):
+            return True
+        continue
+    return False

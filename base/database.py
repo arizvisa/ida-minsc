@@ -279,21 +279,22 @@ def baseaddress():
 def getoffset(ea):
     return ea - baseaddress()
 
-def select(tag):
-    '''Select all functions in database that contain the specified tag'''
-    result = []
-    for ea in functions():
-        try:
-            function.tag(ea, tag)
-            result.append(ea)
-        except KeyError:
-            pass
+def select(**where):
+    '''query all functions in database'''
+    for x in functions():
+        x = function.top(x)
+        if comment.has_and(function.tag(x), **where):
+            yield x
         continue
-    return result
+    return
 
-def query(tag, value):
-    '''Select all functions in a database that contain the specified tag,value'''
-    return [ ea for ea in select(tag) if function.tag(ea, tag) == value ]
+def dump(*names,**where):
+    '''return a formatted table containing the specified query'''
+    def row(ea):
+        fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
+        d = function.tag(ea)
+        return fmt% tuple(( d.get(x, None) for x in names ))
+    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in select(**where)) )
 
 def search(name):
     return idc.LocByName(name)

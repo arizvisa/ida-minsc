@@ -98,27 +98,24 @@ def marks(function):
         continue
     return result
 
-# tag related
-def select(function, tag):
-    '''Fetch all instances of the specified tag located within function'''
-    result = []
+def select(function, **where):
+    '''query all tags associated with a function'''
     for start,end in chunks(function):
-        result.extend( __fetchtag_chunk(start, end, tag) )
-    return result
-
-def query(function, tag, value):
-    return [ ea for ea in select(function, tag) if database.tag(ea, tag) == value ]
-
-def __fetchtag_chunk(start, end, tag):
-    result = []
-    for ea in database.iterate(start, end):
-        try:
-            database.tag(ea, tag)
-            result.append(ea)
-        except KeyError:
-            pass
+        for ea in database.iterate(start, end):
+            d = database.tag(ea)
+            if d and comment.has_and(d, **where):
+                yield ea
+            continue
         continue
-    return result
+    return
+
+def dump(function, *names, **where):
+    '''return a formatted table containing the specified query'''
+    def row(ea):
+        fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
+        d = database.tag(ea)
+        return fmt% tuple(( d.get(x, None) for x in names ))
+    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in select(function, **where)) )
 
 def __getchunk_tags(start, end):
     result = {}
