@@ -204,6 +204,8 @@ class moduleloader(object):
         if res.__name__.startswith('__root__'):
             return res
 
+        sys.modules[modulename] = res   # XXX: i'm pretty sure this isn't the correct way to update the module list in order for reload to work.
+
         dumpModule(res, self.file, modulename, self.description)
         return res
 

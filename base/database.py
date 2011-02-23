@@ -48,7 +48,7 @@ def tag_read(address, key=None, repeatable=0):
     if c is not None:
         dict['__color__'] = c
 
-    if key:
+    if key is not None:
         return dict[key]
     return dict
 
@@ -279,7 +279,7 @@ def baseaddress():
 def getoffset(ea):
     return ea - baseaddress()
 
-def select(**where):
+def query(**where):
     '''query all functions in database'''
     for x in functions():
         x = function.top(x)
@@ -288,13 +288,16 @@ def select(**where):
         continue
     return
 
+def select(**where):
+    return set(query(**where))
+
 def dump(*names,**where):
     '''return a formatted table containing the specified query'''
     def row(ea):
         fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
         d = function.tag(ea)
         return fmt% tuple(( d.get(x, None) for x in names ))
-    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in select(**where)) )
+    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(**where)) )
 
 def search(name):
     return idc.LocByName(name)
@@ -358,3 +361,4 @@ def map(l, *args, **kwds):
         print '%x: processing # %d of %d'%( x, i+1, len(all) )
         result.append( l(x, *args, **kwds) )
     return result
+

@@ -51,7 +51,7 @@ def tag_read(address, key=None, repeatable=1):
     if 'name' not in dict:
         dict['name'] = getName(address)
 
-    if key:
+    if key is not None:
         return dict[key]
     return dict
 
@@ -98,16 +98,19 @@ def marks(function):
         continue
     return result
 
-def select(function, **where):
+def query(function, **where):
     '''query all tags associated with a function'''
     for start,end in chunks(function):
         for ea in database.iterate(start, end):
-            d = database.tag(ea)
+            d = database.tag(ea)        # FIXME: bmn noticed .select yielding empty records
             if d and comment.has_and(d, **where):
                 yield ea
             continue
         continue
     return
+
+def select(function, **where):
+    return set(query(function, **where))
 
 def dump(function, *names, **where):
     '''return a formatted table containing the specified query'''
@@ -115,7 +118,7 @@ def dump(function, *names, **where):
         fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
         d = database.tag(ea)
         return fmt% tuple(( d.get(x, None) for x in names ))
-    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in select(function, **where)) )
+    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(function, **where)) )
 
 def __getchunk_tags(start, end):
     result = {}

@@ -1224,32 +1224,42 @@ def breaker(addresses):
     return do
 
 ### structure <-> ptype stuff
-def makeFragmentPtype(flag, size, structureid):
-    '''produces a ptype from an ida structure member's flag, size, and structureid'''
+def generatePtypeFromFragment(flag, size, structureid):
     flag &= idc.DT_TYPE
     lookup = {
         idc.FF_BYTE : pint.uint8_t,
         idc.FF_WORD : pint.uint16_t,
         idc.FF_DWRD : pint.uint32_t,
         idc.FF_QWRD : pint.uint64_t,
+        idc.FF_FLOAT : pfloat.single,
+        idc.FF_DOUBLE : pfloat.double,
     }
-    # FIXME: can probably add floats and stuff too
 
     # lookup the type according to the flag
     try:
         t = lookup[flag]
+        # found a match
+        if t().size() == size:
+            return t
 
     except KeyError, e:
         # FIXME: I can't figure out how to identify if a member is an array
         if flag == idc.FF_STRU:
             return getfragment(structureid, 0, structure.size(structureid))
-        return dyn.block(size)
+        pass
 
-    # found a match
-    if t().size() == size:
-        return t
+    t = generatePtypeFromSize(size)
+    return t
 
-    # catch everything that was missed
+def generatePtypeFromSize(size):
+    lookup = {
+        1 : pint.uint8_t,
+        2 : pint.uint16_t,
+        4 : pint.uint32_t,
+        8 : pint.uint32_t,
+    }
+    if size in lookup:
+        return lookup[size]
     return dyn.block(size)
 
 def getframe(ea):
@@ -1281,7 +1291,7 @@ def getfragment(id, offset=0, size=None, baseoffset=0):
         m_sid = idc.GetMemberStrId(id, o)
         m_flag = idc.GetMemberFlag(id, o)
 
-        ptype = makeFragmentPtype(m_flag, s, m_sid)
+        ptype = generatePtypeFromFragment(m_flag, s, m_sid)
         fieldarray.append( (ptype,m_name) )
 
     class fragment(pstruct.type):
@@ -1501,3 +1511,21 @@ b = fu.dumps(a)
 c = fu.loads(b, namespace=globals())
 c('wtf')
 """
+
+class pydbgengprovider(object):
+    '''Base provider class. Intended to be Inherited from'''
+    offset = 0
+    def __init__(self, client):
+        self.client = client
+
+    def seek(self, offset):
+        '''Seek to a particular offset'''
+        self.offset = offset
+
+    def consume(self, amount):
+        '''Read some number of bytes'''
+        return str( self.client.DataSpaces.Virtual.Read(self.offset, amount) )
+        
+    def store(self, data):
+        '''Write some number of bytes'''
+        return self.client.DataSpaces.Virtual.Write(self.offset, data)

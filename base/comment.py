@@ -98,7 +98,8 @@ def toList(string):
         stritems = [getKVFromString(n) for n in rows]
 
     except AssertionError:
-        stritems = [('untagged-value', string)]
+#        stritems = [('untagged-value', string)]
+        stritems = [('', string)]
 
     items = []
     for k,v in stritems:
