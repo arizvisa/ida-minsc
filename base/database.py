@@ -1,5 +1,5 @@
 import idc,idautils,idaapi as ida
-import comment,instruction,function
+import comment,instruction,function,segment
 
 def isCode(ea):
     '''True if ea marked as code'''
@@ -230,7 +230,7 @@ def color_write(ea, rgb, what=1):
     rgb &= 0x00ffffff
 
     bgr = 0
-    for i in range(3):
+    for i in xrange(3):
         bgr,rgb = ((bgr*0x100) + (rgb&0xff), rgb/0x100)
     return idc.SetColor(ea, what, bgr)
 
@@ -243,7 +243,7 @@ def color_read(ea, what=1):
     bgr &= 0x00ffffff
 
     rgb = 0
-    for i in range(3):
+    for i in xrange(3):
         rgb,bgr = ((rgb*0x100) + (bgr&0xff), bgr/0x100)
     return rgb
 
@@ -275,6 +275,7 @@ def filename():
 
 def baseaddress():
     return ida.get_imagebase()
+base=baseaddress
 
 def getoffset(ea):
     return ea - baseaddress()
@@ -362,3 +363,18 @@ def map(l, *args, **kwds):
         result.append( l(x, *args, **kwds) )
     return result
 
+def range():
+    '''Return the total address range of the database'''
+    left,right = 0xffffffff,0x00000000
+    for x in segments():
+        l,r = segment.getRange(x)
+        if l < left:
+            left = l
+        if r > right:
+            right = r
+        continue
+    return baseaddress(), right
+
+def contains(ea):
+    l,r = range()
+    return (ea >= l) and (ea < r)

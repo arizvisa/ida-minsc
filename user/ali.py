@@ -29,7 +29,7 @@ class IdaProvider(ptypes.provider.provider):
     def baseaddress(self):
         return database.baseaddress()
 
-ptypes.setsource(IdaProvider())
+#ptypes.setsource(IdaProvider())
 
 from database import log
 kernel32 = ctypes.WinDLL('kernel32.dll')
@@ -602,7 +602,7 @@ if False:
     #    def __repr__(self):
     #        return ' '.join([self.__class__.__name__, repr(self.debugger.getcontext())])
 
-if True:
+if False:
     __remotecontrol = None
     def getremote():
         '''fetch current opened process remote'''
@@ -623,7 +623,6 @@ if True:
 
     # we can wrap a lot of this in an object since it's dealing primarily with ida's interface
     class stackcontext(pstruct.type):
-        source = property(fget=lambda x:getsource(), fset=lambda x,v: setsource(v) )
         def stackblock(self):
             address = int(self['return'].load())
             if getremote().valid(address):
@@ -686,7 +685,6 @@ if True:
 
     class stackarray(parray.terminated):
         _object_ = stackcontext
-        source = property(fget=lambda x:getsource(), fset=lambda x,v: setsource(v) )
         callee = None
 
         def isTerminator(self, value):
@@ -726,7 +724,6 @@ if True:
         pass
 
     class callstack(pstruct.type):
-        source = property(fget=lambda x:getsource(), fset=lambda x,v: setsource(v) )
         callee = None
 
         def stackslack(self):
@@ -1451,29 +1448,30 @@ def markallleafnodes():
         tagLeafNode(ea)
     return
 
-def dumpfields(list, *names, **filters):
-    '''
-    Returns a pretty table-looking string.
-    Takes a list of function addresses, followed by tagnames.
-    keyword arguments can be used to filter the list by the specified key/value.
-    None is treated as a wildcard for the filter value.
+if False:
+    def dumpfields(list, *names, **filters):
+        '''
+        Returns a pretty table-looking string.
+        Takes a list of function addresses, followed by tagnames.
+        keyword arguments can be used to filter the list by the specified key/value.
+        None is treated as a wildcard for the filter value.
 
-    i.e.
-    print dumpfields( db.functions(), 'name', 'color', note=None )
-    '''
-    def row(ea):
-        fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
-        d = function.tag(ea)
-        return fmt% tuple(( d.get(x, None) for x in names ))
+        i.e.
+        print dumpfields( db.functions(), 'name', 'color', note=None )
+        '''
+        def row(ea):
+            fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
+            d = function.tag(ea)
+            return fmt% tuple(( d.get(x, None) for x in names ))
 
-    def has(ea):
-        d = function.tag(ea)
-        for k,v in filters.iteritems():
-            if k not in d or (v is not None and v != d[k]):
-                return False
-        return True
-            
-    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in list if has(x)) )
+        def has(ea):
+            d = function.tag(ea)
+            for k,v in filters.iteritems():
+                if k not in d or (v is not None and v != d[k]):
+                    return False
+            return True
+                
+        return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in list if has(x)) )
 
 def process(x, **attrs):
     x = function.top(x)
@@ -1529,3 +1527,71 @@ class pydbgengprovider(object):
     def store(self, data):
         '''Write some number of bytes'''
         return self.client.DataSpaces.Virtual.Write(self.offset, data)
+
+class registerprovider(object):
+    def __init__(self, client):
+        self.client = client
+
+class stackcontext(pstruct.type):
+    def stackblock(self):
+        ea = int(self['return'].load())
+        delta = idc.GetSpd(ea)
+        assert delta <= 0
+        size = -delta
+#       print hex(self['args'].getoffset()),'stackblock',hex(size),hex(ea),hex(self.getoffset())
+        return dyn.block(size)
+
+    def regblock(self):
+        ea = int(self['return'].load())
+        size = idc.GetFrameRegsSize(ea)
+#       print hex(self['args'].getoffset()),'regblock',hex(size),hex(ea),hex(self.getoffset())
+        return dyn.block(size)
+
+    def argblock(self):
+        ea = int(self['return'].load())
+        size = idc.GetFrameArgsSize(ea)
+#        print hex(self['return'].getoffset()), 'args',hex(size),hex(ea),hex(self.getoffset())
+        return dyn.block(size)
+
+    _fields_ = [
+        (stackblock, 'contents'),
+        (pint.uint32_t, 'return'),
+    ]
+
+class stackcontext(pstruct.type):
+    def stackblock(self):
+        rvars = function.getRvarSize(self.pc)-4
+        delta = function.getSpDelta(self.pc)
+        assert delta <= 0
+        size = -delta
+        return dyn.block(size - rvars)
+
+    def regblock(self):
+        size = function.getRvarSize(self.pc)-4
+        #print hex(self.pc),hex(size),hex(self.getoffset()),hex(function.getSpDelta(self.pc))
+        return dyn.block(size)
+
+    _fields_ = [
+        (stackblock, 'contents'),
+        (regblock, 'registers'),
+        (pint.uint32_t, 'return'),
+    ]
+
+class stackarray(parray.terminated):
+    _object_ = stackcontext
+
+    def isTerminator(self, value):
+        value.pc = self.pc
+        ea = int(value.load()['return'])
+        self.pc = ea - 1
+        if database.contains(ea):
+            return False
+        return True
+
+    def walk(self):
+        for x in self:
+            yield int(x['return'])
+        return
+
+    def __repr__(self):
+        return '%s [%s]'%(self.name(), ','.join(('0x%x'%x for x in self.walk())))
