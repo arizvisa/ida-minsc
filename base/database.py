@@ -83,6 +83,7 @@ def tag(address, *args, **kwds):
 
     if len(args) < 2:
         return tag_read(int(address), *args, **kwds)
+
     key,value = args
     return tag_write(int(address), key, value, **kwds)
 
@@ -262,6 +263,9 @@ def iterate(start, end):
 
 def go(ea):
     '''slightly less typing for idc.Jump'''
+    if not contains(ea):
+        left,right=range()
+        raise ValueError("Unable to goto address %x. (valid range is %x - %x)"% (ea,left,right))
     return idc.Jump(ea)
 
 def h():

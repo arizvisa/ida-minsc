@@ -202,6 +202,8 @@ class ForkingEmulator(Ia32Emulator):
         }
 
     def addMachine(self, machinestate):
+#        me = hex(id(self.state))
+#        self.log('fork','%x %s will resume %x', self.state.pc, me, machinestate.pc)
         self.Machines.append(machinestate)
 
     def fork(self, ea):
@@ -210,9 +212,9 @@ class ForkingEmulator(Ia32Emulator):
         self.log('fork','%x %s forked to %x. %d other machines left to run', self.state.pc, me, id(res), len(self.Machines)+1)
         return res
 
-    def start(self):
+    def start(self, **attrs):
         self.log('fork','%x machine %x starting', self.state.pc, id(self.state))
-        return super(ForkingEmulator, self).start()
+        return super(ForkingEmulator, self).start(**attrs)
 
     def stop(self):
         state = self.state
@@ -269,10 +271,10 @@ class ForkingEmulator(Ia32Emulator):
         return super(ForkingEmulator, self).execute(insn)
 
 class LoopEmulator(ForkingEmulator):
-    def start(self):
+    def start(self, **attrs):
         self.blocks = set()
         self.blocks.add(self.state.pc)  # XXX: assume we're at the beginning of a block
-        return super(LoopEmulator, self).start()
+        return super(LoopEmulator, self).start(**attrs)
 
     def execute(self, insn):
         if ia32.isConditionalBranch(insn):
@@ -1020,6 +1022,24 @@ class MyChildCollector(LoopEmulator):
     def execute(self, insn):
         if ia32.isCall(insn):
             address = ia32.getRelativeAddress(self.state.pc, insn)
+            me = hex(id(self.state))
+
+            if ia32.isRelativeCall(insn):
+                if address not in self.result:
+                    self.log('collector','%x %s descending into %x', self.state.pc, me, address)
+                    self.store(address)
+                    self.addMachine( self.fork(address) )
+                else:
+                    self.log('collector','%x %s skipping already processed call into %x', self.state.pc, me, address)
+                pass
+            pass
+        return super(MyChildCollector, self).execute(insn)
+
+if False:
+    '''Collect all the child functions by following known branches in the current function'''
+    def execute(self, insn):
+        if ia32.isCall(insn):
+            address = ia32.getRelativeAddress(self.state.pc, insn)
 
             if ia32.isRelativeCall(insn):
                 self.addMachine( self.fork(address) )
@@ -1259,20 +1279,88 @@ def generatePtypeFromSize(size):
         return lookup[size]
     return dyn.block(size)
 
-def getframe(ea):
-    '''Given a function address, return it's frame in a pstruct form'''
-    ea = function.top(ea)
-    ofs = database.getoffset(ea)
+if False:
+    def getframe(pc, offset=0, size=None, baseoffset=0):
+        '''Given a function address, return it's frame in a pstruct form'''
+        ea = function.top(pc)
+        ofs = database.getoffset(ea)
 
-    id = function.getFrameId(ea)
-    a,b,c = function.getAvarSize(ea), function.getRvarSize(ea), function.getLvarSize(ea)
+        id = function.getFrameId(ea)
+        a,b,c = function.getAvarSize(ea), function.getRvarSize(ea), function.getLvarSize(ea)
 
-    s = getfragment(id)
-    class frame(s):
-        offset = -c
-        def setoffset(self, ofs):
-            return super(frame, self).setoffset( ofs - c )
+        s = getfragment(id, offset, size, baseoffset)
+        class frame(s):
+            offset = -c
+            def setoffset(self, ofs):
+                return super(frame, self).setoffset( ofs - c + spdelta)
 
+        return frame
+
+    def getframe(pc, spdelta=0):
+        top = function.top(pc)
+        
+        id = function.getFrameId(top)
+        a,b,c = function.getAvarSize(top), function.getRvarSize(top), function.getLvarSize(top)
+        spoffset = (c+spdelta)
+
+        class frame(pstruct.type):
+            _fields_ = [
+                (dyn.block(c-spoffset), 'lvar'),
+                (dyn.block(b), 'rvar'),
+                (dyn.block(a), 'avar'),
+            ]
+            def setoffset(self, ofs):
+                return super(frame, self).setoffset(ofs)
+
+        return frame
+
+    def getframe(pc, spdelta=0):
+        top = function.top(pc)
+        id = function.getFrameId(top)
+        a,r,l = function.getAvarSize(top), function.getRvarSize(top), function.getLvarSize(top) + spdelta
+
+        x = l
+        y = l+x
+        z = r+y
+        l = function.getLvarSize(top) - l
+
+        class frame(pstruct.type):
+            _fields_ = []
+
+        frame._fields_.extend( getfragment(id, offset=x, size=l)._fields_ )
+        frame._fields_.extend( getfragment(id, offset=y, size=r)._fields_ )
+        frame._fields_.extend( getfragment(id, offset=z, size=a)._fields_ )
+
+        print repr((x,y,z)), repr((l,r,a))
+        frame._fields_ = [
+                (getfragment(id, offset=x, size=l), 'lvar'),
+                (getfragment(id, offset=y, size=r), 'rvar'),
+                (getfragment(id, offset=z, size=a), 'avar'),
+            ]
+
+        return frame
+
+def getframe(pc, spdelta=0):
+    top = function.top(pc)
+    id = function.getFrameId(top)
+    a,r,l = function.getAvarSize(top), function.getRvarSize(top), function.getLvarSize(top)
+    o = l + spdelta
+    
+    class frame(pstruct.type):
+        _fields_ = []
+
+    if o < 0:
+        frame._fields_.append(( dyn.block(-o), ''))
+        o = 0
+
+    fragment = getfragment(id, offset=o, size=l-o)
+
+    frame._fields_.extend( fragment._fields_ )
+#    frame._fields_.append( (dyn.block(l-o),'n'))
+    o+=l-o
+    frame._fields_.extend( getfragment(id, offset=o, size=r)._fields_ )
+    o+=r
+    frame._fields_.extend( getfragment(id, offset=o, size=a)._fields_ )
     return frame
 
 def getfragment(id, offset=0, size=None, baseoffset=0):
@@ -1282,6 +1370,10 @@ def getfragment(id, offset=0, size=None, baseoffset=0):
 
     fieldarray = []
     for (o,s),(m_name, m_cmt) in structure.fragment(id, offset, size):
+        if s > size:
+            o += s-size
+            s = size
+
         if m_name is None:
             m_name = '__unknown_%x'% abs(o+baseoffset)
 
@@ -1291,8 +1383,14 @@ def getfragment(id, offset=0, size=None, baseoffset=0):
         ptype = generatePtypeFromFragment(m_flag, s, m_sid)
         fieldarray.append( (ptype,m_name) )
 
+        size -= s
+        if size < 0:
+            break
+        continue
+
     class fragment(pstruct.type):
         _fields_ = fieldarray
+
     return fragment
 
 if False:
@@ -1362,13 +1460,14 @@ def tagallfourccs(key='fourcc'):
          fn.tag(x, key, repr(fourccs))
     return
 
-def ub(ea, count=1):
-    result = []
-    for x in range(count):
-        row = '\t'.join(['%08x'% ea, idc.GetDisasm(ea)])
-        result.append( row )
-        ea = database.prev(ea)
-    return '\n'.join(reversed(result))
+if False:
+    def ub(ea, count=1):
+        result = []
+        for x in range(count):
+            row = '\t'.join(['%08x'% ea, idc.GetDisasm(ea)])
+            result.append( row )
+            ea = database.prev(ea)
+        return '\n'.join(reversed(result))
 
 def tagLibraryCalls(f):
     l = set(MyCallCollector(f, log=[]).run())
@@ -1475,11 +1574,11 @@ if False:
 
 def process(x, **attrs):
     x = function.top(x)
-    LoopEmulator(x).run(**attrs)
-    tagLeafNode(x, **attrs)
-    tagLibraryCalls(x, **attrs)
-    tagExternals(x, **attrs)
-    tagLocalCalls(x, **attrs)
+    LoopEmulator(x).run(log=[], **attrs)
+    tagLeafNode(x)
+    tagLibraryCalls(x)
+    tagExternals(x)
+    tagLocalCalls(x)
 
 def fnmap(l, functions, *args, **kwds):
     '''Execute provided callback on all functions in database. Synonymous to map(l,db.functions())'''
@@ -1510,53 +1609,197 @@ c = fu.loads(b, namespace=globals())
 c('wtf')
 """
 
-class pydbgengprovider(object):
-    '''Base provider class. Intended to be Inherited from'''
-    offset = 0
+import _PyDbgEng,ndk,os
+class windbg(object):
+    class __provider(object):
+        offset = 0
+        def __init__(self, client):
+            self.client = client
+
+        def seek(self, offset):
+            '''Seek to a particular offset'''
+            self.offset = offset
+
+        def consume(self, amount):
+            '''Read some number of bytes'''
+            return str( self.client.DataSpaces.Virtual.Read(self.offset, amount) )
+            
+        def store(self, data):
+            '''Write some number of bytes'''
+            return self.client.DataSpaces.Virtual.Write(self.offset, data)
+
+    class __registers_INT32(object):
+        pc = property(fget=lambda self: self.client.Registers.InstructionOffset)
+        sp = property(fget=lambda self: self.client.Registers.StackOffset)
+
+        def __init__(self, client):
+            self.client = client
+
+        def __getitem__(self, name):
+            registers = self.client.Registers.Registers
+            result = registers[name]
+            return int(result)
+
+        def __setitem__(self, register, value):
+            registers = self.client.Registers.Registers
+            result = registers[name]
+            result.Value = value
+
+        def keys(self):
+            registers = self.client.Registers.Registers
+            INT32 = _PyDbgEng.ValueType.INT32
+
+            return [ x for x in registers.keys() if int(registers[x].Type) == INT32 ]
+
+        def __repr__(self):
+            return repr( dict(((k, self[k]) for k in self.keys())) )
+
+    r = None            # contains the current register state
+    r32 = None          # contains the current 32-bit register state
+    source = None       # contains a ptype source over the available address-space
+    client = None       # the current DebugClient interface
+
     def __init__(self, client):
         self.client = client
+        self.source = self.__provider(client)
+        self.r32 = self.r = self.__registers_INT32(client)
 
-    def seek(self, offset):
-        '''Seek to a particular offset'''
-        self.offset = offset
+        print '[remote.load] loading the peb'
+        self.peb = ndk.PEB(source=self.source,offset=self.client.Control.Evaluate("@$peb")).l
 
-    def consume(self, amount):
-        '''Read some number of bytes'''
-        return str( self.client.DataSpaces.Virtual.Read(self.offset, amount) )
+        print '[remote.load] enumerating modules'
+        ldr = self.peb['Ldr'].d.l
+        self.modules = list(ldr['InLoadOrderModuleList'].walk())
+
+        print '[remote.load] locating current module'
+        self.current = self.getmodulebyfilename( database.filename() )      # search for the current module as specified in the database
+
+        print '[remote.load] loading executable'
+        self.executable = self.current['DllBase'].d.l
+
+    ### addressspace stuff
+    def getmodulebyfilename(self, name):
+        name = os.path.basename(name)   #jic
+
+        def getfilename(m):
+            modulename = os.path.basename(m['FullDllName'].str())
+            return modulename.upper() == name.upper()
+
+        try:
+            return self.getmoduleby(getfilename)
+
+        except KeyError,msg:
+            raise KeyError('Basename %s not found in module list'% name)
+
+    def getmodulebyaddress(self, address):
+        def fn(m):
+            base,size = int(m['DllBase']), int(m['SizeOfImage'])
+            if (address >= base) and (address < base+size):
+                return True
+            return False
+
+        try:
+            return self.getmoduleby(fn)
+        except KeyError,msg:
+            raise KeyError('Address %x not found'% address)
         
-    def store(self, data):
-        '''Write some number of bytes'''
-        return self.client.DataSpaces.Virtual.Write(self.offset, data)
+    def getmoduleby(self, lmb):
+        for m in self.modules:
+            if lmb(m):
+                return m
+            continue
+        raise KeyError('lambda %s did not find match'% repr(lmb))
 
-class registerprovider(object):
-    def __init__(self, client):
-        self.client = client
+    def getmodulebypath(self, path):
+        try:
+            result = self.getmoduleby(lambda m: m['FullDllName'].str() == path)
+        except KeyError,msg:
+            raise KeyError('Path %s not found'% path)
+        return result
+        
+    ### windbg stuff
+    def eval(self, string):
+        return self.client.Control.Evaluate(string)
 
-class stackcontext(pstruct.type):
-    def stackblock(self):
-        ea = int(self['return'].load())
-        delta = idc.GetSpd(ea)
-        assert delta <= 0
-        size = -delta
-#       print hex(self['args'].getoffset()),'stackblock',hex(size),hex(ea),hex(self.getoffset())
-        return dyn.block(size)
+    def execute(self, string):
+        return self.client.Control.Execute(string)
 
-    def regblock(self):
-        ea = int(self['return'].load())
-        size = idc.GetFrameRegsSize(ea)
-#       print hex(self['args'].getoffset()),'regblock',hex(size),hex(ea),hex(self.getoffset())
-        return dyn.block(size)
+    status = property(fget=lambda self: self.client.Control.ExecutionStatus)
 
-    def argblock(self):
-        ea = int(self['return'].load())
-        size = idc.GetFrameArgsSize(ea)
-#        print hex(self['return'].getoffset()), 'args',hex(size),hex(ea),hex(self.getoffset())
-        return dyn.block(size)
+    def bpx(self, address, command=''):
+        b = self.client.Control.AddBreakpoint()
+        b.Offset = address
+        b.Command = command
+        b.Enable()
+        return b.Id
 
-    _fields_ = [
-        (stackblock, 'contents'),
-        (pint.uint32_t, 'return'),
-    ]
+    # FIXME: _PyDbgEng sucks, so these don't work
+    # del( self.client.Control.Breakpoints[id] )
+    # self.client.Control.RemoveBreakpoint(id)
+
+    def bc(self, id):
+        self.execute("bc %d"% id)
+
+    def bd(self, id):
+        self.execute("bd %d"% id)
+
+    def be(self, id):
+        self.execute("be %d"% id)
+
+    def ub(ea, count=1):
+        result = []
+        for x in range(count):
+            row = '\t'.join(['%08x'% ea, idc.GetDisasm(ea)])
+            result.append( row )
+            ea = database.prev(ea)
+        return '\n'.join(reversed(result))
+
+    def backtrace(self):
+        for x in stackarray(source=self.source, pc=self.get(self.r.pc), offset=self.r.sp).l:
+            yield x
+        return
+
+    def calls(self):
+        # FIXME: perhaps use this to dump a prettier output
+        for x in self.backtrace():
+            yield x.fetch()
+        return
+
+    ### remoting
+    def get(self, addr):
+        offset = addr - int(self.current['DllBase'])
+        return offset + database.baseaddress()
+
+    def put(self, ea):
+        offset = ea - database.baseaddress()
+        return offset + int(self.current['DllBase'])
+
+if False:
+    class stackcontext(pstruct.type):
+        def stackblock(self):
+            ea = int(self['return'].load())
+            delta = idc.GetSpd(ea)
+            assert delta <= 0
+            size = -delta
+    #       print hex(self['args'].getoffset()),'stackblock',hex(size),hex(ea),hex(self.getoffset())
+            return dyn.block(size)
+
+        def regblock(self):
+            ea = int(self['return'].load())
+            size = idc.GetFrameRegsSize(ea)
+    #       print hex(self['args'].getoffset()),'regblock',hex(size),hex(ea),hex(self.getoffset())
+            return dyn.block(size)
+
+        def argblock(self):
+            ea = int(self['return'].load())
+            size = idc.GetFrameArgsSize(ea)
+    #        print hex(self['return'].getoffset()), 'args',hex(size),hex(ea),hex(self.getoffset())
+            return dyn.block(size)
+
+        _fields_ = [
+            (stackblock, 'contents'),
+            (pint.uint32_t, 'return'),
+        ]
 
 class stackcontext(pstruct.type):
     def stackblock(self):
@@ -1571,18 +1814,26 @@ class stackcontext(pstruct.type):
         #print hex(self.pc),hex(size),hex(self.getoffset()),hex(function.getSpDelta(self.pc))
         return dyn.block(size)
 
+    def idastackblock(self):
+        ea = int(self[' r'].load())
+        pt = getframe(ea)
+        return pt
+
     _fields_ = [
-        (stackblock, 'contents'),
-        (regblock, 'registers'),
-        (pint.uint32_t, 'return'),
+        (stackblock, '_contents'),
+        (regblock, '_regs'),
+        (pint.uint32_t, ' r'),
     ]
+
+    def fetch(self):
+        return self.newelement(getframe(self.pc, function.getSpDelta(self.pc)), 'struct', self.getoffset()).l
 
 class stackarray(parray.terminated):
     _object_ = stackcontext
 
     def isTerminator(self, value):
         value.pc = self.pc
-        ea = int(value.load()['return'])
+        ea = int(value.load()[' r'])
         self.pc = ea - 1
         if database.contains(ea):
             return False
@@ -1590,7 +1841,7 @@ class stackarray(parray.terminated):
 
     def walk(self):
         for x in self:
-            yield int(x['return'])
+            yield int(x[' r'])
         return
 
     def __repr__(self):
