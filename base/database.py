@@ -266,7 +266,8 @@ def go(ea):
     if not contains(ea):
         left,right=range()
         raise ValueError("Unable to goto address %x. (valid range is %x - %x)"% (ea,left,right))
-    return idc.Jump(ea)
+    idc.Jump(ea)
+    return ea
 
 def h():
     '''slightly less typing for idc.ScreenEA()'''
@@ -341,18 +342,20 @@ def blocks(start, end):
     '''Returns each block between the specified range of instructions'''
     block = start
     for ea in iterate(start, end):
+        nextea = next(ea)
+
         if idc.GetMnem(ea).startswith('call'):      # FIXME: heh. ;)
             continue
 
         if idc.GetMnem(ea).startswith('ret'):       #   whee
-            yield block,next(ea)
+            yield block,nextea
             block = ea
 
         elif cxdown(ea):
-            yield block,next(ea)
-            block = next(ea)
+            yield block,nextea
+            block = nextea
 
-        elif cxup(ea):
+        elif cxup(ea) and block != ea:
             yield block,ea
             block = ea
         continue

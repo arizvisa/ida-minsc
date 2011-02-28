@@ -29,8 +29,6 @@ class IdaProvider(ptypes.provider.provider):
     def baseaddress(self):
         return database.baseaddress()
 
-#ptypes.setsource(IdaProvider())
-
 from database import log
 kernel32 = ctypes.WinDLL('kernel32.dll')
 ntdll = ctypes.WinDLL('ntdll.dll')
@@ -311,38 +309,6 @@ class LoopEmulator(ForkingEmulator):
 
     def stop(self):
         return super(LoopEmulator, self).stop()
-
-if False:
-    def getExtents(block):
-        '''Return all basic block boundaries inside a string'''
-        offset = last = 0
-        for n in ia32.disassemble(block):
-            offset += len(''.join(n))
-            if ia32.isRelativeBranch(n) or ia32.isAbsoluteBranch(n) or ia32.isReturn(n):
-                yield (last, offset)
-                last = offset
-            continue
-        return
-
-    def getblocks(start, end):
-        '''Get all the basic blocks between 2 addresses'''
-        block = database.getblock(start,end)
-        for x in getExtents(block):
-            yield database.getblock(x[0]+start, x[1]+start)
-        return
-
-if False:
-    def markallbranchoffsets_function(ea):
-        for start,end in function.chunks(ea):
-            for x in ia32.disassemble(database.getblock(start,end)):
-                database.tag(x, 'branch-address', hex(ia32.getRelativeAddress(self.state.pc,n)))
-            continue
-        return
-
-    def markallbranchoffsets(ea):
-        for x in database.functions():
-            markallbranchoffsets_function(x)
-        return
 
 if False:
     # XXX: to convert from this, we can also just use idc.GetLocByName
@@ -745,22 +711,22 @@ if False:
         globals()['__remotecontrol'] = remote(dbg)
         return getremote()
 
-def open(pid):
-    globals()['__source'] = ptypes.provider.WindowsProcessId(pid)
-    globals()['__remotecontrol'] = remote(dbg)
-    return getremote()
+    def open(pid):
+        globals()['__source'] = ptypes.provider.WindowsProcessId(pid)
+        globals()['__remotecontrol'] = remote(dbg)
+        return getremote()
 
-def print_backtrace(esp=None):
-    '''Print a backtrace for the current opened thread'''
-    remote = getremote()
-    for x in map(hex, remote.getbacktrace(esp)):
-        print x
-#    print '\n'.join(map(hex, remote.getbacktrace(esp)))
+    def print_backtrace(esp=None):
+        '''Print a backtrace for the current opened thread'''
+        remote = getremote()
+        for x in map(hex, remote.getbacktrace(esp)):
+            print x
+    #    print '\n'.join(map(hex, remote.getbacktrace(esp)))
 
-def dump_backtrace(esp=None):
-    remote = getremote()
-    for x in remote.getcallstack(esp):
-        print x
+    def dump_backtrace(esp=None):
+        remote = getremote()
+        for x in remote.getcallstack(esp):
+            print x
 
 if False:
     # if we want to do name demangling, we can start with code here
@@ -770,7 +736,6 @@ if False:
 
 def readaddresses(filename):
     '''return a list of addresses from a formatted file where the first field is a hex number'''
-    remote = getremote()
     f = file(filename, 'rt')
     data = f.read().strip()
     
@@ -793,98 +758,11 @@ def writeaddresses(list, filename):
     f.close()
 
 if False:
-    def relocatetoprocess(list):
-        '''Relocate the addresses from IDA's addressspace to the thread's'''
-        remote = getremote()
-        return [ remote.put(ea) for ea in list ]
-        
-    def relocatetodatabase(list):
-        '''Relocate the addresses from the thread's addressspace to IDA's'''
-        remote = getremote()
-        return [ remote.get(address) for address in list ]
-
-if False:
     # need to figure out some fast way of identifying functions
     # that have a block that terminates with a jmp esp
     # or at least some way of identifying functions that might
     # branch to code outside of the function's boundaries
     pass
-
-if False:
-    def makeptypefragment(id, offset, maxsize):
-        fieldarray = []
-        while maxsize > 0:
-            m_size = idc.GetMemberSize(id, offset)
-            if m_size is None:      # should prolly check the flag, but whatever
-                break
-            m_flag = idc.GetMemberFlag(id, offset)
-            m_name = idc.GetMemberName(id, offset)
-            if m_name is None:
-                m_name = '__unknown_%x'% offset
-            m_structureid = idc.GetMemberStrId(id, offset)
-            ptype = generateptype(m_flag, m_size, m_structureid)
-            fieldarray.append( (ptype, m_name) )
-
-            offset += m_size
-            maxsize -= m_size
-
-        if maxsize > 0:
-            fieldarray.append( ( dyn.block(maxsize), '__unknown_%x'% offset) )
-
-        class structfragment(pstruct.type):
-            _fields_ = fieldarray
-        return structfragment
-
-    def makeptype(id):
-        '''Convert a structure id into a ptype'''
-        name = idc.GetStrucName(id)
-        size = idc.GetStrucSize(id)
-        return dyn.clone( makeptypefragment(id, 0, size), name=lambda x: 'structure %s'% name)
-        
-    def generateptype(flag, size, structureid):
-        '''produces a ptype from an ida structure member's flag,size, and structureid'''
-        flag &= idc.DT_TYPE
-        lookup = {
-            idc.FF_BYTE : pint.uint8_t,
-            idc.FF_WORD : pint.uint16_t,
-            idc.FF_DWRD : pint.uint32_t,
-            idc.FF_QWRD : pint.uint64_t,
-        }
-
-        try:
-            return lookup[flag]
-        except KeyError, e:
-            pass
-
-        if flag == idc.FF_STRU:
-            return makeptype(structureid)
-        return dyn.block(size)
-
-if False:
-    ea = idc.ScreenEA()
-    id = idc.GetFrame(ea)
-    lvars = idc.GetFrameLvarSize(ea)
-    regs = idc.GetFrameRegsSize(ea)
-    args = idc.GetFrameArgsSize(ea)
-    print map(hex,(ea,id,qty,lvars,regs,args))
-
-if False:
-    def ordinalToAddress(number):
-        # this should be abstracted to some global lookup object
-        x = pecoff.Executable.open('mso.dll')
-        pe = x['Pe']
-        imagebase = int(pe['OptionalHeader']['ImageBase'])
-        exports = pe['OptionalHeader']['DataDirectory'][0].get().load()
-        ordinals = dict(exports.getOrdinalLookup())
-        va = ordinals[number]
-        x.source.close()
-        return va + imagebase
-
-if False:
-    blah = byteproducer(idc.ScreenEA())
-    insn = ia32.decode(blah)
-    print ia32.isMemoryCall(insn),ia32.isRegisterCall(insn)
-    raise NotImplementedError
 
 def checkmarks():
     res = []
@@ -1035,26 +913,6 @@ class MyChildCollector(LoopEmulator):
             pass
         return super(MyChildCollector, self).execute(insn)
 
-if False:
-    '''Collect all the child functions by following known branches in the current function'''
-    def execute(self, insn):
-        if ia32.isCall(insn):
-            address = ia32.getRelativeAddress(self.state.pc, insn)
-
-            if ia32.isRelativeCall(insn):
-                self.addMachine( self.fork(address) )
-
-                me = hex(id(self.state))
-                if address in self.result:
-                    self.log('collector','%x %s duplicate function call to %x', self.state.pc, me, address)
-                    self.stop()
-                    return
-
-                self.store(address)
-                self.log('collector','%x %s descending into %x', self.state.pc, me, address)
-                return
-        return super(MyChildCollector, self).execute(insn)
-
 class MyCallCollector(LoopEmulator):
     '''Collect the addresses of all the calls in the current function'''
     def execute(self, insn):
@@ -1072,6 +930,7 @@ def writebreakpoints(list, filename, command="r;g"):
     f.close()
 
 class remote(object):
+    '''For poor folk without a dbgeng'''
     def __init__(self, localbaseaddress, remotebaseaddress):
         if localbaseaddress is None:
             localbaseaddress = database.baseaddress()
@@ -1176,31 +1035,6 @@ def tagfsinstructions(startea, key, color=None):
         database.tag(startea, 'fs-insns', repr(map(hex,collection)))
     return
 
-if False:
-    def findpreviousdataref(ea):
-        a = ea
-        if database.dxup(a):
-            return a
-
-        while True:
-            a = database.prev(a)
-            if database.dxup(a):
-                return a
-            continue
-        return
-
-    def findnextdataref(ea):
-        a = ea
-        if database.dxup(a):
-            return a
-
-        while True:
-            a = database.next(a)
-            if database.dxup(a):
-                return a
-            continue
-        return
-
 class vtable(parray.terminated):
     _object_ = pint.uint32_t
     source = IdaProvider()
@@ -1230,15 +1064,16 @@ def makevtable(ea):
     a = vtable(offset=a)
     return a.l
 
-def breaker(addresses):
-    def do(control, command='r;g'):
-        for x in addresses:
-            b = control.AddBreakpoint()
-            b.Offset = x
-            b.Command = command
-            b.Enable()
-        return
-    return do
+if False:
+    def breaker(addresses):
+        def do(control, command='r;g'):
+            for x in addresses:
+                b = control.AddBreakpoint()
+                b.Offset = x
+                b.Command = command
+                b.Enable()
+            return
+        return do
 
 ### structure <-> ptype stuff
 def generatePtypeFromFragment(flag, size, structureid):
@@ -1279,67 +1114,6 @@ def generatePtypeFromSize(size):
         return lookup[size]
     return dyn.block(size)
 
-if False:
-    def getframe(pc, offset=0, size=None, baseoffset=0):
-        '''Given a function address, return it's frame in a pstruct form'''
-        ea = function.top(pc)
-        ofs = database.getoffset(ea)
-
-        id = function.getFrameId(ea)
-        a,b,c = function.getAvarSize(ea), function.getRvarSize(ea), function.getLvarSize(ea)
-
-        s = getfragment(id, offset, size, baseoffset)
-        class frame(s):
-            offset = -c
-            def setoffset(self, ofs):
-                return super(frame, self).setoffset( ofs - c + spdelta)
-
-        return frame
-
-    def getframe(pc, spdelta=0):
-        top = function.top(pc)
-        
-        id = function.getFrameId(top)
-        a,b,c = function.getAvarSize(top), function.getRvarSize(top), function.getLvarSize(top)
-        spoffset = (c+spdelta)
-
-        class frame(pstruct.type):
-            _fields_ = [
-                (dyn.block(c-spoffset), 'lvar'),
-                (dyn.block(b), 'rvar'),
-                (dyn.block(a), 'avar'),
-            ]
-            def setoffset(self, ofs):
-                return super(frame, self).setoffset(ofs)
-
-        return frame
-
-    def getframe(pc, spdelta=0):
-        top = function.top(pc)
-        id = function.getFrameId(top)
-        a,r,l = function.getAvarSize(top), function.getRvarSize(top), function.getLvarSize(top) + spdelta
-
-        x = l
-        y = l+x
-        z = r+y
-        l = function.getLvarSize(top) - l
-
-        class frame(pstruct.type):
-            _fields_ = []
-
-        frame._fields_.extend( getfragment(id, offset=x, size=l)._fields_ )
-        frame._fields_.extend( getfragment(id, offset=y, size=r)._fields_ )
-        frame._fields_.extend( getfragment(id, offset=z, size=a)._fields_ )
-
-        print repr((x,y,z)), repr((l,r,a))
-        frame._fields_ = [
-                (getfragment(id, offset=x, size=l), 'lvar'),
-                (getfragment(id, offset=y, size=r), 'rvar'),
-                (getfragment(id, offset=z, size=a), 'avar'),
-            ]
-
-        return frame
-
 def getframe(pc, spdelta=0):
     top = function.top(pc)
     id = function.getFrameId(top)
@@ -1352,6 +1126,9 @@ def getframe(pc, spdelta=0):
     if o < 0:
         frame._fields_.append(( dyn.block(-o), ''))
         o = 0
+
+    # FIXME: sometimes this code doesn't decode the stack correctly. i suspect it's
+    #        something in ida that i'm missing.
 
     fragment = getfragment(id, offset=o, size=l-o)
 
@@ -1392,14 +1169,6 @@ def getfragment(id, offset=0, size=None, baseoffset=0):
         _fields_ = fieldarray
 
     return fragment
-
-if False:
-    def getLvar(f):
-        return makeptypefragment(function.getFrameId(f), 0, function.getLvarSize(f))
-    def getRvar(f):
-        return makeptypefragment(function.getFrameId(f), function.getLvarSize(f), function.getRvarSize(f)+4)
-    def getArgs(f):
-        return makeptypefragment(function.getFrameId(f), function.getLvarSize(f) + function.getRvarSize(f)+4, function.getArgsSize(f))
 
 def ptypedefinition(p, address=None):
     '''Given a ptype, attempt to output the string definition of it...'''
@@ -1459,15 +1228,6 @@ def tagallfourccs(key='fourcc'):
          fourccs = ali.getFourCCs(x)
          fn.tag(x, key, repr(fourccs))
     return
-
-if False:
-    def ub(ea, count=1):
-        result = []
-        for x in range(count):
-            row = '\t'.join(['%08x'% ea, idc.GetDisasm(ea)])
-            result.append( row )
-            ea = database.prev(ea)
-        return '\n'.join(reversed(result))
 
 def tagLibraryCalls(f):
     l = set(MyCallCollector(f, log=[]).run())
@@ -1539,38 +1299,6 @@ def tagLeafNode(f):
     if not iscallinfunction(f):
         function.tag(f, 'node-type', 'leaf', repeatable=1)
     return
-
-import pedram
-def markallleafnodes():
-    '''label functions that don't call anything'''
-    for ea in pedram.FetchLeafs():
-        tagLeafNode(ea)
-    return
-
-if False:
-    def dumpfields(list, *names, **filters):
-        '''
-        Returns a pretty table-looking string.
-        Takes a list of function addresses, followed by tagnames.
-        keyword arguments can be used to filter the list by the specified key/value.
-        None is treated as a wildcard for the filter value.
-
-        i.e.
-        print dumpfields( db.functions(), 'name', 'color', note=None )
-        '''
-        def row(ea):
-            fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
-            d = function.tag(ea)
-            return fmt% tuple(( d.get(x, None) for x in names ))
-
-        def has(ea):
-            d = function.tag(ea)
-            for k,v in filters.iteritems():
-                if k not in d or (v is not None and v != d[k]):
-                    return False
-            return True
-                
-        return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in list if has(x)) )
 
 def process(x, **attrs):
     x = function.top(x)
@@ -1664,18 +1392,32 @@ class windbg(object):
         self.source = self.__provider(client)
         self.r32 = self.r = self.__registers_INT32(client)
 
-        print '[remote.load] loading the peb'
+        self.sync()
+
+    def sync(self):
+        print '[remote.load] syncing view with state at address %x'% self.r.pc
+
+        print '[remote.load] loading the Peb'
         self.peb = ndk.PEB(source=self.source,offset=self.client.Control.Evaluate("@$peb")).l
 
-        print '[remote.load] enumerating modules'
-        ldr = self.peb['Ldr'].d.l
-        self.modules = list(ldr['InLoadOrderModuleList'].walk())
+        print '[remote.load] parsing the Peb.Ldr modules'
+        self.__modules = list(self.peb['Ldr'].d.l['InLoadOrderModuleList'].walk())
 
-        print '[remote.load] locating current module'
-        self.current = self.getmodulebyfilename( database.filename() )      # search for the current module as specified in the database
+        print '[remote.load] locating the current module for %s'% database.filename()
+        try: 
+            self.__current = self.getmodulebyfilename(database.filename())
 
-        print '[remote.load] loading executable'
-        self.executable = self.current['DllBase'].d.l
+            print '[remote.load] loading the executable structure'
+            self.__executable = self.current['DllBase'].d.l
+
+        except KeyError:
+            print '[remote.load] unable to locate module %s in Peb.Ldr'% database.filename()
+        return
+
+    __modules = __current = __executable = None
+    modules = property(fget=lambda x: x.__modules)
+    current = property(fget=lambda x: x.__current)
+    executable = property(fget=lambda x: x.__executable)
 
     ### addressspace stuff
     def getmodulebyfilename(self, name):
@@ -1724,9 +1466,24 @@ class windbg(object):
     def execute(self, string):
         return self.client.Control.Execute(string)
 
-    status = property(fget=lambda self: self.client.Control.ExecutionStatus)
+    status = property(fget=lambda self: self.client.Control.ExecutionStatus)    # XXX: no fset because _PyDbgEng doesn't seem to support it..
+
+    def wait(self, status=_PyDbgEng.ExecutionStatus.BREAK):
+        # FIXME: i tried making a decorator for this, but to no avail due to being
+        #        unable to reference im_self while transforming a function. (function
+        #        is not a method yet) ...try this again
+        status = set( ([status], status)[type(status) in (list,tuple)] )
+
+        if self.status not in status:
+            print '[] waiting for one of the following states: %s'% (repr(status))
+            # there's definitely a more efficient way to do this
+            while self.status not in status:
+                pass
+            pass
+        return self.status
 
     def bpx(self, address, command=''):
+        self.wait()
         b = self.client.Control.AddBreakpoint()
         b.Offset = address
         b.Command = command
@@ -1738,13 +1495,74 @@ class windbg(object):
     # self.client.Control.RemoveBreakpoint(id)
 
     def bc(self, id):
+        self.wait()
         self.execute("bc %d"% id)
 
     def bd(self, id):
+        self.wait()
         self.execute("bd %d"% id)
 
     def be(self, id):
+        self.wait()
         self.execute("be %d"% id)
+
+    def t(self,count=1, command=''):
+        self.wait()
+        if len(command)>0:
+            command = command.replace('\\','\\\\').replace('"','\\"')
+            self.execute('t %d "%s"'% (count, command))
+        else:
+            self.execute('t %d'% count)
+
+        self.wait()
+        print '[] pc=%x:sp=%x | trace'%(self.r.pc,self.r.sp)
+
+    def p(self,count=1, command=''):
+        self.wait()
+        if len(command)>0:
+            command = command.replace('\\','\\\\').replace('"','\\"')
+            self.execute('p %d "%s"'% (count, command))
+        else:
+            self.execute('p %d'% count)
+
+        self.wait()
+        print '[] pc=%x:sp=%x | proceed'%(self.r.pc,self.r.sp)
+
+    def here(self):
+        self.wait()
+        original = database.here()
+        ea = self.get(self.r.pc)
+
+        if ea != original:
+            print '[] visited address changed from %x to %x'%(original, ea )
+
+        return database.go(ea)
+
+    def h(self):
+        self.wait()
+        pc,sp = self.get(self.r.pc),self.get(self.r.sp)
+        print '[] broke on %x with stack at %x'%(pc, sp) 
+
+    def jump(self, address):
+        return database.go(self.get(address))
+
+    def g(self, address=None):
+        self.wait()
+        if address is None:
+            print '[] go'
+            self.execute("g")
+            return
+
+        self.wait()
+        pc,sp = self.get(self.r.pc),self.get(self.r.sp)
+
+        print '[] go from %x to %x with stack at %x'%(pc, address, sp) 
+        self.execute("g %x"% self.put(address))
+        self.h()
+
+    def d(self, address, length, **attrs):
+        pt = dyn.block(length)(source=self.source,offset=address)
+        return pt.l.hexdump(**attrs)
 
     def ub(ea, count=1):
         result = []
@@ -1846,3 +1664,14 @@ class stackarray(parray.terminated):
 
     def __repr__(self):
         return '%s [%s]'%(self.name(), ','.join(('0x%x'%x for x in self.walk())))
+
+def save(list):
+    d = dict( ((x, function.fetch(x)) for x in list) )
+    def execute(function):
+        max = len(d)
+        for i,k in enumerate(d):
+            print '%x: updating %d of %d'% (k,i+1,max)
+            function.store(k, d[k])
+        return set(d.keys())
+    return execute
+
