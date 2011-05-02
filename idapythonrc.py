@@ -17,7 +17,7 @@ import ihooka
 
 # shortcuts
 (db,fn) = (database,function)
-h,go = (db.h, db.go)
+h,go,top = (db.h, db.go, lambda:fn.top(db.h()))
 hex = lambda i: '%x'% i
 
 # try and execute our user's idapythonrc.py

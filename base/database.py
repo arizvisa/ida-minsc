@@ -82,7 +82,12 @@ def tag(address, *args, **kwds):
         pass
 
     if len(args) < 2:
-        return tag_read(int(address), *args, **kwds)
+        try:
+            result = tag_read(int(address), *args, **kwds)
+        except Exception, e:
+            log('database.tag(%x): %s raised'% (address, repr(e)))
+            result = None
+        return result
 
     key,value = args
     return tag_write(int(address), key, value, **kwds)

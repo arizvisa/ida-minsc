@@ -1,14 +1,51 @@
+import _PyDbgEng
 import sys,os
 sys.path.append('f:/work')
 sys.path.append('f:/work/syringe/lib')
 sys.path.append('f:/work/syringe/work')
-
 import idc
 import database,function,segment,structure
 import ia32,pecoff,ndk
 import ptypes,ctypes
 from ptypes import *
 pint.setbyteorder(pint.littleendian)
+
+
+class Marky(object):
+  def __init__(self,case_name,dbg,tuple=0):
+    self.case_name = case_name
+    self.z = dbg
+    if tuple:
+        self.bt = list(self.z.backtrace(tuple))
+    else:
+        self.bt = list(self.z.backtrace())
+  def mark_backtrace(self):
+    if database.contains(self.z.r['eip']):
+        database.mark(self.z.r['eip'], '%s -- 0 -- crash here'%self.case_name)
+    for i,x in enumerate(self.bt):
+      #print x
+      addy = database.prev(int(x[" r"]))
+      database.mark(addy,"%s -- %d"%(self.case_name,(i+1)))  
+      
+  def run(self):
+    self.mark_backtrace()
+    for x in database.marks():
+      print str(hex(x[0]))+":  "+x[1]
+    colormarks()
+
+
+def getRvarSize(function):
+    '''Return the number of bytes occupying any saved registers'''
+    if not database.contains(function):
+        raise ValueError
+    result = idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS) + 4  # +4 for the pc
+    try:
+      z.getmodulebyaddress(function)
+    except KeyError:
+      result = idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS) + 8  # +8 if stack misaligned
+    return result
+
+##############ALI################
 
 class IdaProvider(ptypes.provider.provider):
     offset = 0xffffffff
@@ -137,10 +174,7 @@ class Ia32Emulator(object):
                 insn = self.state.get()
                 if 'color' in attrs:
                     database.color(self.state.pc, attrs['color'])
-                if 'tag' in attrs:
-                    database.tag_write(self.state.pc, attrs['tag'], True)
                 res = self.execute(insn)
-
         except Exception:
             me = hex(id(self.state))
             self.log('fail', '%x %s', self.state.pc, me)
@@ -296,14 +330,6 @@ class LoopEmulator(ForkingEmulator):
 
         if ia32.isUnconditionalBranch(insn):
             target = ia32.getRelativeAddress(self.state.pc, insn)
-
-            # not in a function
-            try:
-                function.top(target)
-            except ValueError:
-                self.stop()
-                return
-
             if target in self.blocks:
 #                print '%x already executed'% (self.state.pc)
                 self.stop()
@@ -320,23 +346,6 @@ class LoopEmulator(ForkingEmulator):
 
     def stop(self):
         return super(LoopEmulator, self).stop()
-
-if False:
-    # XXX: to convert from this, we can also just use idc.GetLocByName
-
-    #QuickTimeImage!FPX_GraphicsImportComponentDispatch+0x65f6   
-    #
-    module,_location = string.split('!')
-    symbol,offset = _location.split('+')     #FIXME: we should use rindex for this
-
-    # XXX: to convert back, we'll need to find the nearest export symbol we know about
-    #      and then calculate the offset
-
-if False:
-    # would be nice to identify if an address is contained inside a loop
-    # that way we can apply it to a backtrace in order to prioritize the
-    # list somehow
-    pass
 
 def detruncate():
     for x in database.functions():
@@ -362,231 +371,6 @@ def getProcessBasicInformation(handle):
     # XXX: we should check res, but this is aaron's code
     return pbi
 
-if False:
-    class remote(object):
-        Peb = None
-        debugger = None
-        def __init__(self,debug):
-            handle = debug.process.handle
-            self.Peb = ndk.PEB()
-            self.Peb.source = ptypes.provider.WindowsProcessHandle(handle)
-            self.Peb.setoffset( getProcessBasicInformation(handle).PebBaseAddress )
-            self.debugger = debug
-
-        def __del__(self):
-            # ...although this might never get called...
-            # hopefully this will prevent handle leaking
-            #  man, i hate python.
-            self.close()
-
-        def close(self):
-            if self.Peb:
-                self.Peb.source = None
-                self.Peb = None
-            if self.debugger:
-                self.debugger.detach()
-                self.debugger = None    # and free it...
-
-        def newtype(self, ptype, **attrs):
-            result = ptype(**attrs)
-            result.source = self.Peb.source     # inherit from the parent
-                # hopefully our handle lasts with all these refs to it bein around
-            return result
-
-        def load(self):
-            print '[remote.load] current module name %s'% os.path.basename( idc.GetInputFile() )
-
-            print '[remote.load] loading Peb'
-            self.Peb.load()
-
-            print '[remote.load] loading Ldr'
-            self.Ldr = self.Peb['Ldr'].d.load()
-
-            print '[remote.load] enumerating Modules'
-            self.Modules = list(self.Ldr['InLoadOrderModuleList'].walk())
-
-            print '[remote.load] saving CurrentModule'
-            self.CurrentModule = self.getmodulebyfilename(idc.GetInputFile())
-
-            print '[remote.load] loading Executable'
-            #self.Executable = dyn.cast(self.CurrentModule['DllBase'], dyn.pointer(pecoff.Executable.File)).get().load()
-            self.Executable = self.CurrentModule['DllBase'].d.load()
-            return self
-
-        def getmodulebyfilename(self, name):
-            name = os.path.basename(name)   #jic
-
-            def getfilename(m):
-                modulename = os.path.basename(m['FullDllName'].get())
-                return modulename.upper() == name.upper()
-
-            try:
-                return self.getmoduleby(getfilename)
-
-            except KeyError,msg:
-                raise KeyError('Basename %s not found in module list'% name)
-
-        def getmodulebyaddress(self, address):
-            def fn(m):
-                base,size = int(m['DllBase']), int(m['SizeOfImage'])
-                if (address >= base) and (address < base+size):
-                    return True
-                return False
-
-            try:
-                return self.getmoduleby(fn)
-            except KeyError,msg:
-                raise KeyError('Address %x not found'% address)
-            
-        def getmoduleby(self, lmb):
-            for m in self.Modules:
-                if lmb(m):
-                    return m
-                continue
-            raise KeyError('lambda %s did not find match'% repr(lmb))
-
-        def getmodulebypath(self, path):
-            try:
-                return self.getmoduleby(lambda m: m['FullDllName'].get() == path)
-            except KeyError,msg:
-                raise KeyError('Path %s not found'% path)
-
-        def get(self, address):
-            '''From remote process to IDA'''
-            module = self.CurrentModule
-            base,size = int(module['DllBase']), int(module['SizeOfImage'])
-            if not((address >= base) and (address < base+size)):
-                raise KeyError('address %x not found in current module'% address)
-
-            executable = self.Executable
-            virtualaddress = address - executable.getoffset()
-
-            section = executable['Pe']['Sections'].getsectionbyaddress(virtualaddress)
-            name,offset = section['Name'].get(), virtualaddress - int(section['VirtualAddress'])
-
-            start,end = segment.getRange( segment.get(name) )
-            return start + offset
-
-        def put(self, address):
-            '''From IDA to remote process'''
-            start,end = segment.getRange(address)
-            name,offset = segment.getName(start), address - start
-
-            executable = self.Executable
-
-            section = executable['Pe']['Sections'].getsectionbyname(name)
-            virtualaddress = int(section['VirtualAddress']) + offset
-            return executable.getoffset() + virtualaddress
-
-        def valid(self, address):
-            '''returns True if specified loaded address is within ida module'''
-            module = self.CurrentModule
-            base,size = int(module['DllBase']), int(module['SizeOfImage'])
-            if (address >= base) and (address < base+size):
-                return True
-            return False
-
-        def __searchcaller(self, eip, esp):
-            if self.valid(eip):
-                # XXX: perhaps check if it's executable while we're at it
-                return eip      # XXX: - length of previous instruction
-
-            # otherwise check to see if it's in a module list
-            try:
-                m = self.getmodulebyaddress(eip)
-                return eip  # - length of previous instruction
-
-            except KeyError, msg:
-                print '[remote.searchcaller] caught exception %s'% msg
-
-            # a totally invalid address, so
-            #     pull the first dword off the stack and pray
-            p = self.CurrentModule.newelement(dyn.addr_t, 'PreviousInstruction?', esp)
-            return self.__searchcaller(int(p.load()), esp+4)
-
-        def __getcallstack(self, eip, esp):
-            ea = self.get(eip)
-            delta = idc.GetSpd(ea-1)    # tail of prev instruction
-            if delta is None:
-                raise ValueError('[remote.getcallstack] previous address from %x is not in a function'% ea)
-            if delta > 0:
-                raise ValueError('[remote.getcallstack] unexpected stack delta %d at address %x'%(delta, ea))
-            size = -delta
-
-            res = callstack()
-            res.callee = eip
-            res.setoffset(esp)
-            res.startsize = size
-    #        print 'startsize',hex(res.startsize),hex(ea),hex(esp),hex(eip)
-            return res
-
-        def _btstart(self, eip, esp):
-            eip = self.__searchcaller(eip, esp)
-            cs = self.__getcallstack(eip,esp).load()
-            yield cs['Current']
-            for x in cs['Next']:
-                yield x
-            return
-
-        def _btcontinue(self, esp):
-            res = self.newtype(stackarray)
-            res.setoffset(esp)
-            for x in res.load():
-                yield x
-            return
-
-        def btstart(self, eip, esp):
-            source = self._btstart(eip, esp)
-            source.next()       # discard current
-            yield self.get(eip)
-            for x in source:
-                try:
-                    yield self.get(int(x['return']))
-                except KeyError, e:
-                    print '[remote.btstart] Stopped at offset %x with error %s'%(x.getoffset(), repr(e))
-            return
-
-        def btcontinue(self, esp):
-            for x in self._btcontinue(esp):
-                try:
-                    yield self.get(int(x['return']))
-                except KeyError, e:
-                    print '[remote.btcontinue] Stopped at offset %x with error %s'%(x.getoffset(), repr(e))
-            return
-            
-        def getbacktrace(self, esp=None):
-            if esp is None:
-                registers = self.debugger.getcontext()
-                eip = registers['Eip']
-                esp = registers['Esp']
-                return self.btstart(eip, esp)
-            return self.btcontinue(esp)
-
-        def getcallstack(self, esp=None):
-            if esp is None:
-                registers = self.debugger.getcontext()
-                eip = registers['Eip']
-                esp = registers['Esp']
-                return self._btstart(eip, esp)
-            return self._btcontinue(esp)
-
-        def keys(self):
-            return self.debugger.getcontext().keys()
-        def __getitem__(self, name):
-            return self.debugger.getcontext()[name]
-        def __setitem__(self, name, value):
-            result = self.debugger.getcontext()
-            result[name] = value
-            self.debugger.setcontext(result)
-    #    def __repr__(self):
-    #        return ' '.join([self.__class__.__name__, repr(self.debugger.getcontext())])
-
-if False:
-    # if we want to do name demangling, we can start with code here
-    # http://code.google.com/p/ctypes-stuff/source/detail?r=122
-    # i think idautils also provides an api
-    pass
-
 def readaddresses(filename):
     '''return a list of addresses from a formatted file where the first field is a hex number'''
     f = file(filename, 'rt')
@@ -609,13 +393,6 @@ def writeaddresses(list, filename):
     f = file(filename, 'wt')
     f.write('\n'.join(map(hex, list)))
     f.close()
-
-if False:
-    # need to figure out some fast way of identifying functions
-    # that have a block that terminates with a jmp esp
-    # or at least some way of identifying functions that might
-    # branch to code outside of the function's boundaries
-    pass
 
 def checkmarks():
     res = []
@@ -667,77 +444,6 @@ def colormarks():
     return
 colorAllMarks = colormarks
 
-if False:
-    class DebugCallEmulator(LoopEmulator):
-        def execute(self, insn):
-            me = '%x'% id(self.state)
-
-            if ia32.isRelativeCall(insn):
-                address = ia32.getRelativeAddress(self.state.pc, insn)
-                print hex(self.state.pc), me, 'rel', hex(address), database.demangle(idc.Name(address))
-
-            elif ia32.isMemoryCall(insn):
-                offset = ia32.getDisplacement(insn)
-                address, = struct.unpack('L', offset)
-                print hex(self.state.pc), me, 'mem', hex(address), database.demangle(idc.Name(address))
-
-            elif ia32.isRegisterCall(insn):
-                print hex(self.state.pc), me, 'reg'
-                # XXX: we can also keep track of immediate register assignments too,
-                #      so we can catch assigns of func addrs, but if we do that, we
-                #      might as well just keep track of the entire state
-
-            elif ia32.isConditionalBranch(insn):
-                #print hex(self.state.pc), me, 'forked'
-                pass
-
-            elif ia32.isSibBranch(insn):
-                print hex(self.state.pc), me, 'encountered unemulateable instruction'
-                self.stop()
-                return
-
-            return super(DebugCallEmulator, self).execute(insn)
-
-    class TestEmulator(LoopEmulator):
-        def __init__(self, pc):
-            super(TestEmulator, self).__init__(pc)
-            self.calls = []
-
-        def execute(self, insn):
-            if ia32.isRelativeCall(insn):
-                address = ia32.getRelativeAddress(self.sate.pc, insn)
-                database.tag(self.state.pc, '_type', 'relative-call')
-                database.tag(self.state.pc, '_target', '%x'% address)
-                self.calls.append(self.state.pc)
-
-            if ia32.isMemoryCall(insn):
-    #            print 'memory'
-                database.tag(self.state.pc, '_type', 'memory-call')
-
-                res = ia32.getDisplacement(insn)
-    #            print repr(insn)
-    #            print hex(self.state.pc),repr(res)
-
-                if res:
-                    v = pint.uint32_t()
-                    v.deserialize(res)
-                    address = int(v)
-                    database.tag(self.state.pc, '_target', '%x'% address)
-
-            if ia32.isRegisterCall(insn):
-    #            print 'register'
-                database.tag(self.state.pc, '_type', 'register-call')
-                database.tag(self.state.pc, '_target', 'register')  # XXX: identify the register via the modrm
-
-    #        if ia32.isRelativeBranch(insn):
-    #            database.tag(self.state.pc, '_type', 'branch')
-    #            database.tag(self.state.pc, '_branchoffset', hex(ia32.getBranchOffset(insn)))
-
-    #        if ia32.isConditionalBranch(insn):
-    #            print hex(self.state.pc)
-
-            return
-
 class MyBranchCollector(LoopEmulator):
     '''Collect the addresses of all the branches in the current function'''
     def execute(self, insn):
@@ -750,10 +456,6 @@ class MyBranchCollector(LoopEmulator):
 
 class MyChildCollector(LoopEmulator):
     '''Collect all the child functions by following known branches in the current function'''
-    def start(self, **attrs):
-        self.store(function.top(self.state.pc))
-        return super(MyChildCollector, self).start(**attrs)
-
     def execute(self, insn):
         if ia32.isCall(insn):
             address = ia32.getRelativeAddress(self.state.pc, insn)
@@ -816,18 +518,16 @@ def markhits(addresses, prefix='ht-', color=0x004000):
         database.tag(ea, destinationtag, target)
         database.color(ea, color)
 
-        result = database.tag(ea, counttag)
-        if result is None:
+        try:
+            count = database.tag(ea, counttag) + 1
+        except KeyError:
             count = 0
-        else:
-            count = result+1
         database.tag(ea, counttag, count)
 
-        result = database.tag(target,counttag)
-        if result is None:
+        try:
+            count = database.tag(target, counttag) + 1
+        except KeyError:
             count = 0
-        else:
-            count = result+1
         database.tag(target, counttag, count)
     return
 
@@ -841,16 +541,6 @@ class MyExternalCollector(LoopEmulator):
             res = ia32.decodeInteger( ia32.getDisplacement(insn) )
             self.store(res)
         return super(MyExternalCollector, self).execute(insn)
-
-if False:
-    import ia32,ali
-    for n in ali.MyChildCollector(h()).run():
-        t = []
-        for c in ali.MyCallCollector(n).run():
-            target = ia32.getRelativeAddress(c, db.decode(c))
-            t.append(target)
-        fn.tag(n, 'calls', repr(map(hex,t)))
-    pass
 
 class MyInstructionCollector(LoopEmulator):
     '''Collect the addresses of all instructions matching the /cmp/ argument'''
@@ -923,18 +613,6 @@ def makevtable(ea):
     a = vtable(offset=a)
     return a.l
 
-if False:
-    def breaker(addresses):
-        def do(control, command='r;g'):
-            for x in addresses:
-                b = control.AddBreakpoint()
-                b.Offset = x
-                b.Command = command
-                b.Enable()
-            return
-        return do
-
-### structure <-> ptype stuff
 def generatePtypeFromFragment(flag, size, structureid):
     flag &= idc.DT_TYPE
     lookup = {
@@ -976,7 +654,7 @@ def generatePtypeFromSize(size):
 def getframe(pc, spdelta=0):
     top = function.top(pc)
     id = function.getFrameId(top)
-    a,r,l = function.getAvarSize(top), function.getRvarSize(top), function.getLvarSize(top)
+    a,r,l = function.getAvarSize(top), getRvarSize(top), function.getLvarSize(top)
     o = l + spdelta
     
     class frame(pstruct.type):
@@ -1173,11 +851,7 @@ def fnmap(l, functions, *args, **kwds):
     result = []
     for i,x in enumerate(all):
         print '%x: processing # %d of %d'%( x, i+1, len(all) )
-        try:
-            result.append( l(x, *args, **kwds) )
-        except Exception,e:
-            print '%x: FAILED', repr(e)
-        continue
+        result.append( l(x, *args, **kwds) )
     return result
 
 def processall(**attrs):
@@ -1200,330 +874,292 @@ c = fu.loads(b, namespace=globals())
 c('wtf')
 """
 
-try:
-    import _PyDbgEng,ndk,os
+import _PyDbgEng,ndk,os
+class windbg(object):
+    class __provider(object):
+        offset = 0
+        def __init__(self, client):
+            self.client = client
 
-    class windbg(object):
-        class __provider(object):
-            offset = 0
-            def __init__(self, client):
-                self.client = client
+        def seek(self, offset):
+            '''Seek to a particular offset'''
+            self.offset = offset
 
-            def seek(self, offset):
-                '''Seek to a particular offset'''
-                self.offset = offset
+        def consume(self, amount):
+            '''Read some number of bytes'''
+            return str( self.client.DataSpaces.Virtual.Read(self.offset, amount) )
+            
+        def store(self, data):
+            '''Write some number of bytes'''
+            return self.client.DataSpaces.Virtual.Write(self.offset, data)
 
-            def consume(self, amount):
-                '''Read some number of bytes'''
-                return str( self.client.DataSpaces.Virtual.Read(self.offset, amount) )
-                
-            def store(self, data):
-                '''Write some number of bytes'''
-                return self.client.DataSpaces.Virtual.Write(self.offset, data)
-
-        class __registers_INT32(object):
-            pc = property(fget=lambda self: self.client.Registers.InstructionOffset)
-            sp = property(fget=lambda self: self.client.Registers.StackOffset)
-            fp = property(fget=lambda self: self.client.Registers.FrameOffset)
-    #        pc = property(fget=lambda self: self['eip'])
-    #        sp = property(fget=lambda self: self['esp'])
-
-            def __init__(self, client):
-                self.client = client
-
-            def __getitem__(self, name):
-                registers = self.client.Registers.Registers
-                result = registers[name]
-                return int(result)
-
-            def __setitem__(self, register, value):
-                registers = self.client.Registers.Registers
-                result = registers[name]
-                result.Value = value
-
-            def keys(self):
-                registers = self.client.Registers.Registers
-                INT32 = _PyDbgEng.ValueType.INT32
-
-                return [ x for x in registers.keys() if int(registers[x].Type) == INT32 ]
-
-            def __repr__(self):
-                return repr( dict(((k, self[k]) for k in self.keys())) )
-
-        r = None            # contains the current register state
-        r32 = None          # contains the current 32-bit register state
-        source = None       # contains a ptype source over the available address-space
-        client = None       # the current DebugClient interface
+    class __registers_INT32(object):
+        pc = property(fget=lambda self: self.client.Registers.InstructionOffset)
+        sp = property(fget=lambda self: self.client.Registers.StackOffset)
+#        pc = property(fget=lambda self: self['eip'])
+#        sp = property(fget=lambda self: self['esp'])
 
         def __init__(self, client):
             self.client = client
-            self.source = self.__provider(client)
-            self.r32 = self.r = self.__registers_INT32(client)
 
-            self.sync()
+        def __getitem__(self, name):
+            registers = self.client.Registers.Registers
+            result = registers[name]
+            return int(result)
 
-        def sync(self):
-            print '[remote.load] syncing view with state at address %x'% self.r.pc
+        def __setitem__(self, register, value):
+            registers = self.client.Registers.Registers
+            result = registers[name]
+            result.Value = value
 
-            print '[remote.load] loading the Peb'
-            self.peb = ndk.PEB(source=self.source,offset=self.client.Control.Evaluate("@$peb")).l
+        def keys(self):
+            registers = self.client.Registers.Registers
+            INT32 = _PyDbgEng.ValueType.INT32
 
-            print '[remote.load] parsing the Peb.Ldr modules'
-            self.__modules = list(self.peb['Ldr'].d.l['InLoadOrderModuleList'].walk())
+            return [ x for x in registers.keys() if int(registers[x].Type) == INT32 ]
 
-            print '[remote.load] locating the current module for %s'% database.filename()
-            try: 
-                self.__current = self.getmodulebyfilename(database.filename())
+        def __repr__(self):
+            return repr( dict(((k, self[k]) for k in self.keys())) )
 
-                print '[remote.load] loading the executable structure'
-                self.__executable = self.current['DllBase'].d.l
+    r = None            # contains the current register state
+    r32 = None          # contains the current 32-bit register state
+    source = None       # contains a ptype source over the available address-space
+    client = None       # the current DebugClient interface
 
-            except KeyError:
-                print '[remote.load] unable to locate module %s in Peb.Ldr'% database.filename()
-            return self
+    def __init__(self, client):
+        self.client = client
+        self.source = self.__provider(client)
+        self.r32 = self.r = self.__registers_INT32(client)
 
-        __modules = __current = __executable = None
-        modules = property(fget=lambda x: x.__modules)
-        current = property(fget=lambda x: x.__current)
-        executable = property(fget=lambda x: x.__executable)
+        self.sync()
 
-        ### addressspace stuff
-        def getmodulebyfilename(self, name):
-            name = os.path.basename(name)   #jic
+    def sync(self):
+        print '[remote.load] syncing view with state at address %x'% self.r.pc
 
-            def getfilename(m):
-                modulename = os.path.basename(m['FullDllName'].str())
-                return modulename.upper() == name.upper()
+        print '[remote.load] loading the Peb'
+        self.peb = ndk.PEB(source=self.source,offset=self.client.Control.Evaluate("@$peb")).l
 
-            try:
-                return self.getmoduleby(getfilename)
+        print '[remote.load] parsing the Peb.Ldr modules'
+        self.__modules = list(self.peb['Ldr'].d.l['InLoadOrderModuleList'].walk())
 
-            except KeyError,msg:
-                raise KeyError('Basename %s not found in module list'% name)
+        print '[remote.load] locating the current module for %s'% database.filename()
+        try: 
+            self.__current = self.getmodulebyfilename(database.filename())
 
-        def getmodulebyaddress(self, address):
-            def fn(m):
-                base,size = int(m['DllBase']), int(m['SizeOfImage'])
-                if (address >= base) and (address < base+size):
-                    return True
-                return False
+            print '[remote.load] loading the executable structure'
+            self.__executable = self.current['DllBase'].d.l
 
-            try:
-                return self.getmoduleby(fn)
-            except KeyError,msg:
-                raise KeyError('Address %x not found'% address)
-            
-        def getmoduleby(self, lmb):
-            for m in self.modules:
-                if lmb(m):
-                    return m
-                continue
-            raise KeyError('lambda %s did not find match'% repr(lmb))
+        except KeyError:
+            print '[remote.load] unable to locate module %s in Peb.Ldr'% database.filename()
+        return
 
-        def getmodulebypath(self, path):
-            try:
-                result = self.getmoduleby(lambda m: m['FullDllName'].str() == path)
-            except KeyError,msg:
-                raise KeyError('Path %s not found'% path)
-            return result
-            
-        ### windbg stuff
-        def eval(self, string):
-            return self.client.Control.Evaluate(string)
+    __modules = __current = __executable = None
+    modules = property(fget=lambda x: x.__modules)
+    current = property(fget=lambda x: x.__current)
+    executable = property(fget=lambda x: x.__executable)
 
-        def execute(self, string):
-            return self.client.Control.Execute(string)
+    ### addressspace stuff
+    def getmodulebyfilename(self, name):
+        name = os.path.basename(name)   #jic
 
-        status = property(fget=lambda self: self.client.Control.ExecutionStatus)    # XXX: no fset because _PyDbgEng doesn't seem to support it..
+        def getfilename(m):
+            modulename = os.path.basename(m['FullDllName'].str())
+            return modulename.upper() == name.upper()
 
-        def write(self, string):
-            return self.client.Control.Output(string)
+        try:
+            return self.getmoduleby(getfilename)
 
-        def wait(self, status=_PyDbgEng.ExecutionStatus.BREAK):
-            # FIXME: i tried making a decorator for this, but to no avail due to being
-            #        unable to reference im_self while transforming a function. (function
-            #        is not a method yet) ...try this again
-            status = set( ([status], status)[type(status) in (list,tuple)] )
+        except KeyError,msg:
+            raise KeyError('Basename %s not found in module list'% name)
 
-            if self.status not in status:
-                print '[] waiting for one of the following states: %s'% (repr(status))
-                # there's definitely a more efficient way to do this
-                while self.status not in status:
-                    pass
+    def getmodulebyaddress(self, address):
+        def fn(m):
+            base,size = int(m['DllBase']), int(m['SizeOfImage'])
+            if (address >= base) and (address < base+size):
+                return True
+            return False
+
+        try:
+            return self.getmoduleby(fn)
+        except KeyError,msg:
+            raise KeyError('Address %x not found'% address)
+        
+    def getmoduleby(self, lmb):
+        for m in self.modules:
+            if lmb(m):
+                return m
+            continue
+        raise KeyError('lambda %s did not find match'% repr(lmb))
+
+    def getmodulebypath(self, path):
+        try:
+            result = self.getmoduleby(lambda m: m['FullDllName'].str() == path)
+        except KeyError,msg:
+            raise KeyError('Path %s not found'% path)
+        return result
+        
+    ### windbg stuff
+    def eval(self, string):
+        return self.client.Control.Evaluate(string)
+
+    def execute(self, string):
+        return self.client.Control.Execute(string)
+
+    status = property(fget=lambda self: self.client.Control.ExecutionStatus)    # XXX: no fset because _PyDbgEng doesn't seem to support it..
+
+    def wait(self, status=_PyDbgEng.ExecutionStatus.BREAK):
+        # FIXME: i tried making a decorator for this, but to no avail due to being
+        #        unable to reference im_self while transforming a function. (function
+        #        is not a method yet) ...try this again
+        status = set( ([status], status)[type(status) in (list,tuple)] )
+
+        if self.status not in status:
+            print '[] waiting for one of the following states: %s'% (repr(status))
+            # there's definitely a more efficient way to do this
+            while self.status not in status:
                 pass
-            return self.status
+            pass
+        return self.status
 
-        def bpx(self, address, command=''):
-            self.wait()
-            b = self.client.Control.AddBreakpoint()
-            b.Offset = address
-            b.Command = command
-            b.Enable()
-            return b.Id
+    def bpx(self, address, command=''):
+        self.wait()
+        b = self.client.Control.AddBreakpoint()
+        b.Offset = address
+        b.Command = command
+        b.Enable()
+        return b.Id
 
-        # FIXME: _PyDbgEng sucks, so these don't work
-        # del( self.client.Control.Breakpoints[id] )
-        # self.client.Control.RemoveBreakpoint(id)
+    # FIXME: _PyDbgEng sucks, so these don't work
+    # del( self.client.Control.Breakpoints[id] )
+    # self.client.Control.RemoveBreakpoint(id)
 
-        def bc(self, id):
-            self.wait()
-            self.execute("bc %d"% id)
+    def bc(self, id):
+        self.wait()
+        self.execute("bc %d"% id)
 
-        def bd(self, id):
-            self.wait()
-            self.execute("bd %d"% id)
+    def bd(self, id):
+        self.wait()
+        self.execute("bd %d"% id)
 
-        def be(self, id):
-            self.wait()
-            self.execute("be %d"% id)
+    def be(self, id):
+        self.wait()
+        self.execute("be %d"% id)
 
-        def t(self,count=1, command=''):
-            self.wait()
-            if len(command)>0:
-                command = command.replace('\\','\\\\').replace('"','\\"')
-                self.execute('t %d "%s"'% (count, command))
-            else:
-                self.execute('t %d'% count)
+    def t(self,count=1, command=''):
+        self.wait()
+        if len(command)>0:
+            command = command.replace('\\','\\\\').replace('"','\\"')
+            self.execute('t %d "%s"'% (count, command))
+        else:
+            self.execute('t %d'% count)
 
-            self.wait()
-            print '[] pc=%x:sp=%x | trace'%(self.r.pc,self.r.sp)
+        self.wait()
+        print '[] pc=%x:sp=%x | trace'%(self.r.pc,self.r.sp)
 
-        def p(self,count=1, command=''):
-            self.wait()
-            if len(command)>0:
-                command = command.replace('\\','\\\\').replace('"','\\"')
-                self.execute('p %d "%s"'% (count, command))
-            else:
-                self.execute('p %d'% count)
+    def p(self,count=1, command=''):
+        self.wait()
+        if len(command)>0:
+            command = command.replace('\\','\\\\').replace('"','\\"')
+            self.execute('p %d "%s"'% (count, command))
+        else:
+            self.execute('p %d'% count)
 
-            self.wait()
-            print '[] pc=%x:sp=%x | proceed'%(self.r.pc,self.r.sp)
+        self.wait()
+        print '[] pc=%x:sp=%x | proceed'%(self.r.pc,self.r.sp)
 
-        def here(self):
-            self.wait()
-            original = database.here()
-            ea = self.get(self.r.pc)
+    def here(self):
+        self.wait()
+        original = database.here()
+        ea = self.get(self.r.pc)
 
-            if ea != original:
-                print '[] visited address changed from %x to %x'%(original, ea )
+        if ea != original:
+            print '[] visited address changed from %x to %x'%(original, ea )
 
-            return database.go(ea)
+        return database.go(ea)
 
-        def h(self):
-            self.wait()
-            pc,sp = self.get(self.r.pc),self.get(self.r.sp)
-            print '[] broke on %x with stack at %x'%(pc, sp) 
+    def h(self):
+        self.wait()
+        pc,sp = self.get(self.r.pc),self.get(self.r.sp)
+        print '[] broke on %x with stack at %x'%(pc, sp) 
 
-        def jump(self, address):
-            return database.go(self.get(address))
+    def jump(self, address):
+        return database.go(self.get(address))
 
-        def g(self, address=None):
-            self.wait()
-            if address is None:
-                print '[] go'
-                self.execute("g")
-                return
-
-            self.wait()
-    #        pc,sp = self.get(self.r.pc),self.get(self.r.sp)
-    #        print '[] go from %x to %x with stack at %x'%(pc, address, sp) 
-            self.execute("g %x"% self.put(address))
-            self.h()
-
-        def d(self, address, length, **attrs):
-            pt = dyn.block(length)(source=self.source,offset=address)
-            return pt.l.hexdump(**attrs)
-
-        def ub(ea, count=1):
-            result = []
-            for x in range(count):
-                row = '\t'.join(['%08x'% ea, idc.GetDisasm(ea)])
-                result.append( row )
-                ea = database.prev(ea)
-            return '\n'.join(reversed(result))
-
-        def backtrace(self, location=None):
-            if location is None:
-                location = self.r.pc,self.r.sp
-            pc,sp = location
-
-            result = []
-            for x in stackarray(source=self.source, pc=self.get(pc), offset=sp).l:
-                result.append(x)
-
-            pc = result[-1][' r']
-    #        m = self.getmodulebyaddress(int(pc))
-    #        print 'stopped at module %s (pc,sp)=location=(0x%x,0x%x)'% (m['FullDllName'].str(), pc, pc.getoffset())
-            print 'stopped at (pc,sp)=location=(0x%x,0x%x)'% (pc, pc.getoffset())
-
-            return result
-
-        def calls(self):
-            # FIXME: perhaps use this to dump a prettier output
-            for x in self.backtrace():
-                yield x.fetch()
+    def g(self, address=None):
+        self.wait()
+        if address is None:
+            print '[] go'
+            self.execute("g")
             return
 
-        def walkfp(self, fp=None):
-            fp = (fp,self.r.fp)[fp is None]
-            class frame(pstruct.type): _fields_ = [(pint.uint32_t, ' s'), (pint.uint32_t, ' r')]
-            a = frame(source=self.source, offset=fp)
-            fp,pc = map(long, a.l.values())
-            while self.current.contains(pc):
-                yield pc
-                a.setoffset(fp)
-                fp,pc = map(long, a.l.values())
-            print 'stopped at (pc,fp)=location=(0x%x,0x%x)'% (pc, fp)
-            return
+        self.wait()
+#        pc,sp = self.get(self.r.pc),self.get(self.r.sp)
+#        print '[] go from %x to %x with stack at %x'%(pc, address, sp) 
+        self.execute("g %x"% self.put(address))
+        self.h()
 
-        ### remoting
-        def get(self, addr):
-            offset = addr - int(self.current['DllBase'])
-            return offset + database.baseaddress()
+    def d(self, address, length, **attrs):
+        pt = dyn.block(length)(source=self.source,offset=address)
+        return pt.l.hexdump(**attrs)
 
-        def put(self, ea):
-            offset = ea - database.baseaddress()
-            return offset + int(self.current['DllBase'])
+    def ub(ea, count=1):
+        result = []
+        for x in range(count):
+            row = '\t'.join(['%08x'% ea, idc.GetDisasm(ea)])
+            result.append( row )
+            ea = database.prev(ea)
+        return '\n'.join(reversed(result))
 
-except ImportError:
-    print 'unable to load _PyDbgEng'
+    def backtrace(self, location=None):
+        new_module = True
+        if location is None:
+            new_module = False
+            location = self.r.pc,self.r.sp
+        pc,sp = location
+        if new_module:
+            sp += 0x4
+            pc = database.prev(pc)
+        result = []
+        pc_2=self.get(pc)
+        for x in stackarray(source=self.source, pc=pc_2, offset=sp).l:
+            result.append(x)
+        pc = result[-1][' r']
+        sp_2 = pc.getoffset()
+        
+        print 'stopped at module (pc,sp)=(0x%x,0x%x)'% ( int(pc),sp_2 )
+        try:
+            print "0x%x is in: %s"%(int(pc),os.path.split(self.getmodulebyaddress( int(pc) )['FullDllName'].str())[1])
+        except:
+            print "0x%x is not in a known module."%int(pc)
+        return result
 
-if False:
-    class stackcontext(pstruct.type):
-        def stackblock(self):
-            ea = int(self['return'].load())
-            delta = idc.GetSpd(ea)
-            assert delta <= 0
-            size = -delta
-    #       print hex(self['args'].getoffset()),'stackblock',hex(size),hex(ea),hex(self.getoffset())
-            return dyn.block(size)
+    def calls(self):
+        # FIXME: perhaps use this to dump a prettier output
+        for x in self.backtrace():
+            yield x.fetch()
+        return
 
-        def regblock(self):
-            ea = int(self['return'].load())
-            size = idc.GetFrameRegsSize(ea)
-    #       print hex(self['args'].getoffset()),'regblock',hex(size),hex(ea),hex(self.getoffset())
-            return dyn.block(size)
+    ### remoting
+    def get(self, addr):
+        offset = addr - int(self.current['DllBase'])
+        return offset + database.baseaddress()
 
-        def argblock(self):
-            ea = int(self['return'].load())
-            size = idc.GetFrameArgsSize(ea)
-    #        print hex(self['return'].getoffset()), 'args',hex(size),hex(ea),hex(self.getoffset())
-            return dyn.block(size)
-
-        _fields_ = [
-            (stackblock, 'contents'),
-            (pint.uint32_t, 'return'),
-        ]
+    def put(self, ea):
+        offset = ea - database.baseaddress()
+        return offset + int(self.current['DllBase'])
 
 class stackcontext(pstruct.type):
     def stackblock(self):
-        rvars = function.getRvarSize(self.pc)-4
+        rvars = getRvarSize(self.pc)-4
         delta = function.getSpDelta(self.pc)
         assert delta <= 0
-        return dyn.block(abs(delta-rvars))
+        size = -delta
+        return dyn.block(abs((0-rvars) - size))
 
     def regblock(self):
-        size = function.getRvarSize(self.pc)-4
+        size = getRvarSize(self.pc)-4
+        #if size > 0:
+        #    size -= 
         #print hex(self.pc),hex(size),hex(self.getoffset()),hex(function.getSpDelta(self.pc))
         return dyn.block(size)
 
@@ -1534,7 +1170,7 @@ class stackcontext(pstruct.type):
 
     _fields_ = [
         (stackblock, '_contents'),
-#        (regblock, '_regs'),
+        #(regblock, '_regs'),
         (pint.uint32_t, ' r'),
     ]
 
@@ -1544,14 +1180,10 @@ class stackcontext(pstruct.type):
 class stackarray(parray.terminated):
     _object_ = stackcontext
 
-    # FIXME: add some heuristics to switch between calculating the sp
-    #        and using bp as the frame pointer
-
     def isTerminator(self, value):
         value.pc = self.pc
         ea = int(value.load()[' r'])
-#        self.pc = ea - 1
-        self.pc = ea
+        self.pc = database.prev(ea)
         if database.contains(ea):
             return False
         return True
@@ -1574,43 +1206,5 @@ def save(list):
         return set(d.keys())
     return execute
 
-import collections
-def frequency(list):
-    result = collections.defaultdict(int)
-    for x in list:
-        result[x]+=1
-    keys = result.keys()
-    keys.sort()
-    sorted = [(k,result[k]) for k in keys]
-    return sorted
-
-def isswitch(insn):
-    disp = ia32.getDisplacement(insn)
-    return ia32.isSibBranch(insn) and len(disp) == 4
-
-def getswitch(insn):
-    disp = ia32.getDisplacement(insn)
-    ea = ia32.decodeInteger(disp)
-    return [target for target in switch(offset=ea).l]
-
-def recreatemarks():
-    '''using any tags found in the database, update all the marks'''
-    result = []
-
-    # collect
-    for x in (x for x in database.functions() if 'marks' in database.tag(x)):
-        for y in function.select(x, mark=None):
-            value = database.tag(y, 'mark')
-            result.append((y, value))
-        continue
-
-    # sort it by name
-    result.sort(cmp=lambda x,y: cmp(x[1],y[1]))
-
-    # XXX: if a mark already exists, remove it from the list.
-
-    # create
-    for x,y in result:
-        database.mark(x, y)
-    colormarks()
-    return
+debug = _PyDbgEng.Connect("tcp:port=4141,server=127.0.0.1")
+z = windbg(debug)

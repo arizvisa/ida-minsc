@@ -64,7 +64,13 @@ def tag_write(address, key, value, repeatable=1):
 def tag(address, *args, **kwds):
     '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
     if len(args) < 2:
-        return tag_read(address, *args, **kwds)
+        try:
+            result = tag_read(address, *args, **kwds)
+        except Exception, e:
+            database.log('function.tag(%x): %s raised'% (address, repr(e)))
+            result = None
+        return result
+
     key,value = args
     return tag_write(address, key, value, **kwds)
 
