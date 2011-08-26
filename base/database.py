@@ -1,5 +1,5 @@
 import idc,idautils,idaapi as ida
-import comment,instruction,function,segment
+import comment,instruction,function,segment,query
 
 def isCode(ea):
     '''True if ea marked as code'''
@@ -290,25 +290,45 @@ base=baseaddress
 def getoffset(ea):
     return ea - baseaddress()
 
-def query(**where):
-    '''query all functions in database'''
+if False:
+    def query(**where):
+        '''query all functions in database'''
+        for x in functions():
+            x = function.top(x)
+            if comment.has_and(function.tag(x), **where):
+                yield x
+            continue
+        return
+
+    def select(**where):
+        return set(query(**where))
+
+    def dump(*names,**where):
+        '''return a formatted table containing the specified query'''
+        def row(ea):
+            fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
+            d = function.tag(ea)
+            return fmt% tuple(( d.get(x, None) for x in names ))
+        return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(**where)) )
+
+def __select(q):
     for x in functions():
         x = function.top(x)
-        if comment.has_and(function.tag(x), **where):
+        if q.has(function.tag(x)):
             yield x
         continue
     return
 
-def select(**where):
-    return set(query(**where))
-
-def dump(*names,**where):
-    '''return a formatted table containing the specified query'''
-    def row(ea):
-        fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
-        d = function.tag(ea)
-        return fmt% tuple(( d.get(x, None) for x in names ))
-    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(**where)) )
+def select(*q, **where):
+    if where:
+        print "database.select's kwd arguments have been deprecated in favor of query"
+    result = list(q)
+    for k,v in where.iteritems():
+        if v is None:
+            result.append( query.hasattr(k) )
+            continue
+        result.append( query.hasvalue(k,v) )
+    return __select( query._and(*result) )
 
 def search(name):
     return idc.LocByName(name)
@@ -335,6 +355,7 @@ def name(ea, string=None):
             flags |= 0
 
         idc.MakeNameEx(ea, string, flags)
+        tag(ea, 'name', string)
         return n
 
     try:
@@ -390,3 +411,8 @@ def range():
 def contains(ea):
     l,r = range()
     return (ea >= l) and (ea < r)
+
+def erase(ea):
+    for x in tag(ea):
+        tag(ea, x, None)
+    color(ea, None)

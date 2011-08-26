@@ -166,16 +166,17 @@ def select_function(list, **where):
         continue
     return
 
-def has_and(dictionary, **where):
-    for k,v in where.iteritems():
-        if k not in dictionary or (v is not None and v != dictionary[k]):
-            return False
-        continue
-    return True
+if True:
+    def has_and(dictionary, **where):
+        for k,v in where.iteritems():
+            if k not in dictionary or (v is not None and v != dictionary[k]):
+                return False
+            continue
+        return True
 
-def has_or(dictionary, **where):
-    for k,v in where.iteritems():
-        if k in dictionary or (v is None and v == dictionary[k]):
-            return True
-        continue
-    return False
+    def has_or(dictionary, **where):
+        for k,v in where.iteritems():
+            if k in dictionary or (v is None and v == dictionary[k]):
+                return True
+            continue
+        return False

@@ -13,7 +13,6 @@ for h in ['base','app', 'misc', 'user']:
 # import the default modules
 import comment,database,segment,function
 import instruction
-import ihooka
 
 # shortcuts
 (db,fn) = (database,function)

@@ -22,6 +22,10 @@ def size(id):
 
 def members(id):
     st = idaapi.get_struc(id)
+    if not st:
+        # empty structure
+        return
+
     size = idaapi.get_struc_size(st)
 
     offset = 0

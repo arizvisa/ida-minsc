@@ -87,8 +87,9 @@ def nameDispatch(address):
         print '%08x - Unable to find dispatch code'% address
         return
 
-    function.setName(start, 'dispatch_%08x'% code)
-    function.tag(start, 'code', code)
+    ofs = database.getoffset(start)
+    function.setName(start, 'dispatch_%08x_%x'% (code, ofs))
+    function.tag(start, 'code', hex(code))
     function.tag(start, 'group', 'dispatch')
     try:
         function.tag(start, 'realname', __quicktime.qt_fv_list[code])
@@ -96,7 +97,7 @@ def nameDispatch(address):
         pass
 
     try:
-        function.tag(start, 'address', resolveDispatcher(code), repeatable=True)
+        function.tag(start, 'address', hex(resolveDispatcher(code)), repeatable=True)
     except:
         pass
 

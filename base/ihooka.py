@@ -165,23 +165,24 @@ def dumpModule(module, file, filename, info):
     return
 
 ## loader import
-# mostly copied from here-> http://quixote.python.ca/quixote.dev/quixote/ptl/ptl_import.py
-class moduleloader(object):
-    def find_module(self, module_name, package_path):
-        return self
+if False:
+    # mostly copied from here-> http://quixote.python.ca/quixote.dev/quixote/ptl/ptl_import.py
+    class moduleloader(object):
+        def find_module(self, module_name, package_path):
+            return self
 
-    def load_module(self, module):
-        file, filename, info = stuff
-        res = imp.load_module(module, file, filename)
+        def load_module(self, module):
+            file, filename, info = stuff
+            res = imp.load_module(module, file, filename)
 
-        if 'IDA Pro' not in filename.split(os.sep): #XXX: heh...
+            if 'IDA Pro' not in filename.split(os.sep): #XXX: heh...
+                return res
+
+            if res.__name__.startswith('__root__'):
+                return res
+
+            dumpModule(res, file, filename, info)
             return res
-
-        if res.__name__.startswith('__root__'):
-            return res
-
-        dumpModule(res, file, filename, info)
-        return res
 
 class moduleloader(object):
     # XXX: it might be cool to do the sys.path search through user,app,base,misc here
@@ -195,7 +196,10 @@ class moduleloader(object):
         return None
 
     def load_module(self, modulename):
+        global sys
+
         res = imp.load_module(modulename, self.file, self.pathname, self.description)
+        sys.modules[modulename] = res
             
         path = os.path.abspath(self.pathname)
         if 'IDA Pro' not in path.split(os.sep): #XXX: heh...
@@ -203,8 +207,6 @@ class moduleloader(object):
 
         if res.__name__.startswith('__root__'):
             return res
-
-        sys.modules[modulename] = res   # XXX: i'm pretty sure this isn't the correct way to update the module list in order for reload to work.
 
         dumpModule(res, self.file, modulename, self.description)
         return res

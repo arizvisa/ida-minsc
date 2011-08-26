@@ -1,4 +1,4 @@
-import idc, comment, database, structure, idautils
+import idc, comment, database, structure, idautils, query
 '''
 function-context
 
@@ -104,27 +104,50 @@ def marks(function):
         continue
     return result
 
-def query(function, **where):
-    '''query all tags associated with a function'''
+if False:
+    def dump(function, *names, **where):
+        '''return a formatted table containing the specified query'''
+        def row(ea):
+            fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
+            d = database.tag(ea)
+            return fmt% tuple(( d.get(x, None) for x in names ))
+        return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(function, **where)) )
+
+    def query(function, **where):
+        '''query all tags associated with a function'''
+        for start,end in chunks(function):
+            for ea in database.iterate(start, end):
+                d = database.tag(ea)        # FIXME: bmn noticed .select yielding empty records
+                if d and comment.has_and(d, **where):
+                    yield ea
+                continue
+            continue
+        return
+
+    def select(function, **where):
+        return set(query(function, **where))
+
+def __select(function, q):
     for start,end in chunks(function):
         for ea in database.iterate(start, end):
             d = database.tag(ea)        # FIXME: bmn noticed .select yielding empty records
-            if d and comment.has_and(d, **where):
+            if d and q.has(d):
                 yield ea
             continue
         continue
     return
 
-def select(function, **where):
-    return set(query(function, **where))
+def select(function, *q, **where):
+    if where:
+        print "function.select's kwd arguments have been deprecated in favor of query"
 
-def dump(function, *names, **where):
-    '''return a formatted table containing the specified query'''
-    def row(ea):
-        fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
-        d = database.tag(ea)
-        return fmt% tuple(( d.get(x, None) for x in names ))
-    return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(function, **where)) )
+    result = list(q)
+    for k,v in where.iteritems():
+        if v is None:
+            result.append( query.hasattr(k) )
+            continue
+        result.append( query.hasvalue(k,v) )
+    return __select(top(function), query._and(*result) )
 
 def __getchunk_tags(start, end):
     result = {}
@@ -185,7 +208,7 @@ def getLvarSize(function):
 
 def getRvarSize(function):
     '''Return the number of bytes occupying any saved registers'''
-    return idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS) + 4   # +4 for the pc
+    return idc.GetFunctionAttr(function, idc.FUNCATTR_FRREGS) + 4   # +4 for the pc because ida doesn't count it
 
 def getSpDelta(ea):
     '''Gets the stack delta at the specified address'''
