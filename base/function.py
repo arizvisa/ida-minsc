@@ -23,6 +23,13 @@ def setName(ea, name):
     res = idc.MakeNameEx(ea, name, 2)
     return [False, True][int(res)]
 
+def name(ea, *args):
+    '''sets/gets the function name'''
+    if args:
+        name, = args
+        return setName(ea, name)
+    return getName(ea)
+
 def chunks(ea):
     '''enumerates all chunks in a function '''
     res = idc.FirstFuncFchunk(ea)
@@ -45,34 +52,38 @@ def make(start, end=idc.BADADDR):
         return idc.MakeFunction(start, end)
     raise ValueError, 'address %x does not contain code'% start
 
-def tag_read(address, key=None, repeatable=1):
-    res = getComment(address, repeatable)
-    dict = comment.toDict(res)
-    if 'name' not in dict:
-        dict['name'] = getName(address)
+if False:
+    def tag_read(address, key=None, repeatable=1):
+        res = getComment(address, repeatable)
+        dict = comment.toDict(res)
+        if 'name' not in dict:
+            dict['name'] = getName(address)
 
-    if key is not None:
-        return dict[key]
-    return dict
+        if '__address__' not in dict:
+            dict['__address__'] = address
 
-def tag_write(address, key, value, repeatable=1):
-    dict = tag_read(address, repeatable=repeatable)
-    dict[key] = value
-    res = comment.toString(dict)
-    return setComment(address, res, repeatable)
+        if key is not None:
+            return dict[key]
+        return dict
 
-def tag(address, *args, **kwds):
-    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
-    if len(args) < 2:
-        try:
-            result = tag_read(address, *args, **kwds)
-        except Exception, e:
-            database.log('function.tag(%x): %s raised'% (address, repr(e)))
-            result = None
-        return result
+    def tag_write(address, key, value, repeatable=1):
+        dict = tag_read(address, repeatable=repeatable)
+        dict[key] = value
+        res = comment.toString(dict)
+        return setComment(address, res, repeatable)
 
-    key,value = args
-    return tag_write(address, key, value, **kwds)
+    def tag(address, *args, **kwds):
+        '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
+        if len(args) < 2:
+            try:
+                result = tag_read(address, *args, **kwds)
+            except Exception, e:
+                database.log('function.tag(%x): %s raised'% (address, repr(e)))
+                result = None
+            return result
+
+        key,value = args
+        return tag_write(address, key, value, **kwds)
 
 def contains(function, address):
     '''Checks if address is contained in function and any of it's chunks'''
@@ -149,47 +160,48 @@ def select(function, *q, **where):
         result.append( query.hasvalue(k,v) )
     return __select(top(function), query._and(*result) )
 
-def __getchunk_tags(start, end):
-    result = {}
-    for ea in database.iterate(start, end):
-        try:
-            res = database.tag(ea)
-            if res:
-                result[ea-start] = res
-        except KeyError:
-            pass
-        continue
-    return result
+if False:
+    def __getchunk_tags(start, end):
+        result = {}
+        for ea in database.iterate(start, end):
+            try:
+                res = database.tag(ea)
+                if res:
+                    result[ea-start] = res
+            except KeyError:
+                pass
+            continue
+        return result
 
-def __fetch_chunks(function):
-    result = []
-    for start,end in chunks(function):
-        result.append(__getchunk_tags(start, end))
-    return result
+    def __fetch_chunks(function):
+        result = []
+        for start,end in chunks(function):
+            result.append(__getchunk_tags(start, end))
+        return result
 
-def fetch(function):
-    '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
-    return { 'head':tag_read(function), 'chunk':__fetch_chunks(function) }
+    def fetch(function):
+        '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
+        return { 'head':tag_read(function), 'chunk':__fetch_chunks(function) }
 
-def __store_chunks(function, list, prefix=''):
-    '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
-    count  = 0
-    for (start,end),records in zip(chunks(function), list):
-        for offset in records.keys():
-            data = records[offset]
-            ea = start+offset
-            for k,v in data.items():
-                database.tag(ea, prefix+k, v)
-            count += 1
-        continue
-    return count
+    def __store_chunks(function, list, prefix=''):
+        '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
+        count  = 0
+        for (start,end),records in zip(chunks(function), list):
+            for offset in records.keys():
+                data = records[offset]
+                ea = start+offset
+                for k,v in data.items():
+                    database.tag(ea, prefix+k, v)
+                count += 1
+            continue
+        return count
 
-def store(function, dict, prefix=''):
-    '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
-    head = dict['head']
-    for k,v in head.items():
-        tag_write(function, prefix+k, v)
-    return __store_chunks(function, dict['chunk'], prefix)
+    def store(function, dict, prefix=''):
+        '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
+        head = dict['head']
+        for k,v in head.items():
+            tag_write(function, prefix+k, v)
+        return __store_chunks(function, dict['chunk'], prefix)
 
 # function frame attributes
 def getFrameId(function):
@@ -236,3 +248,9 @@ def blocks(function):
             yield r
         continue
     return
+
+import store as __datastore
+def tag(address, *args, **kwds):
+    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
+    return __datastore.database.ida.fn_tag(address, *args, **kwds)
+

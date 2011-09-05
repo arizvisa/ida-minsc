@@ -1,5 +1,5 @@
 import idc,idautils,idaapi as ida
-import comment,instruction,function,segment,query
+import instruction,function,segment,query
 
 def isCode(ea):
     '''True if ea marked as code'''
@@ -36,61 +36,66 @@ def getblock(start, end):
     result = [ idc.Byte(ea) for ea in xrange(start, end) ]
     return ''.join(__builtins__['map'](chr, result))
 
-def tag_read(address, key=None, repeatable=0):
-    res = idc.GetCommentEx(address, repeatable)
-    dict = comment.toDict(res)
+if False:
+    import comment
+    def tag_read(address, key=None, repeatable=0):
+        res = idc.GetCommentEx(address, repeatable)
+        dict = comment.toDict(res)
 
-    name = idc.NameEx(address, address)
-    if name:
-        dict['name'] = name
+        name = idc.NameEx(address, address)
+        if name:
+            dict['name'] = name
 
-    c = color(address)
-    if c is not None:
-        dict['__color__'] = c
+        c = color(address)
+        if c is not None:
+            dict['__color__'] = c
 
-    if key is not None:
-        return dict[key]
-    return dict
+        if '__address__' not in dict:
+            dict['__address__'] = address
 
-def tag_write(address, key, value, repeatable=0):
-    dict = tag_read(address, repeatable=repeatable)
-    dict[key] = value
+        if key is not None:
+            return dict[key]
+        return dict
 
-    if '__color__' in dict:
-        value = dict['__color__']
-        color(address, value)
-        del(dict['__color__'])
+    def tag_write(address, key, value, repeatable=0):
+        dict = tag_read(address, repeatable=repeatable)
+        dict[key] = value
 
-    res = comment.toString(dict)
-    if repeatable:
-        return idc.MakeRptCmt(address, res)
+        if '__color__' in dict:
+            value = dict['__color__']
+            color(address, value)
+            del(dict['__color__'])
 
-    return idc.MakeComm(address, res)
+        res = comment.toString(dict)
+        if repeatable:
+            return idc.MakeRptCmt(address, res)
 
-def tag(address, *args, **kwds):
-    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
-    try:
-        # in a function
-        function.top(address)
-        if 'repeatable' not in kwds:
-            kwds['repeatable'] = False
+        return idc.MakeComm(address, res)
 
-    except ValueError:
-        # not in a function, could be a global, so it's now repeatable
-        if 'repeatable' not in kwds:
-            kwds['repeatable'] = True
-        pass
-
-    if len(args) < 2:
+    def tag(address, *args, **kwds):
+        '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
         try:
-            result = tag_read(int(address), *args, **kwds)
-        except Exception, e:
-            log('database.tag(%x): %s raised'% (address, repr(e)))
-            result = None
-        return result
+            # in a function
+            function.top(address)
+            if 'repeatable' not in kwds:
+                kwds['repeatable'] = False
 
-    key,value = args
-    return tag_write(int(address), key, value, **kwds)
+        except ValueError:
+            # not in a function, could be a global, so it's now repeatable
+            if 'repeatable' not in kwds:
+                kwds['repeatable'] = True
+            pass
+
+        if len(args) < 2:
+            try:
+                result = tag_read(int(address), *args, **kwds)
+            except Exception, e:
+                log('database.tag(%x): %s raised'% (address, repr(e)))
+                result = None
+            return result
+
+        key,value = args
+        return tag_write(int(address), key, value, **kwds)
 
 def prev(ea):
     '''return the previous address (instruction or data)'''
@@ -228,36 +233,37 @@ def mark(ea, message):
     nextmark = len(list(marks())) + 1
     idc.MarkPosition(ea, 0, 0, 0, nextmark, message)
 
-def color_write(ea, rgb, what=1):
-    if rgb is None:
-        return idc.SetColor(ea, what, 0xffffffff)
+if False:
+    def color_write(ea, rgb, what=1):
+        if rgb is None:
+            return idc.SetColor(ea, what, 0xffffffff)
 
-    a = rgb & 0xff000000
-    rgb &= 0x00ffffff
+        a = rgb & 0xff000000
+        rgb &= 0x00ffffff
 
-    bgr = 0
-    for i in xrange(3):
-        bgr,rgb = ((bgr*0x100) + (rgb&0xff), rgb/0x100)
-    return idc.SetColor(ea, what, bgr)
+        bgr = 0
+        for i in xrange(3):
+            bgr,rgb = ((bgr*0x100) + (rgb&0xff), rgb/0x100)
+        return idc.SetColor(ea, what, bgr)
 
-def color_read(ea, what=1):
-    bgr = idc.GetColor(ea, what)
-    if bgr == 0xffffffff:
-        return None
+    def color_read(ea, what=1):
+        bgr = idc.GetColor(ea, what)
+        if bgr == 0xffffffff:
+            return None
 
-    a = bgr&0xff000000
-    bgr &= 0x00ffffff
+        a = bgr&0xff000000
+        bgr &= 0x00ffffff
 
-    rgb = 0
-    for i in xrange(3):
-        rgb,bgr = ((rgb*0x100) + (bgr&0xff), bgr/0x100)
-    return rgb
+        rgb = 0
+        for i in xrange(3):
+            rgb,bgr = ((rgb*0x100) + (bgr&0xff), bgr/0x100)
+        return rgb
 
-def color(ea, *args, **kwds):
-    '''color(address, rgb?) -> fetches or stores a color to the specified address'''
-    if len(args) == 0:
-        return color_read(ea, *args, **kwds)
-    return color_write(ea, *args, **kwds)
+    def color(ea, *args, **kwds):
+        '''color(address, rgb?) -> fetches or stores a color to the specified address'''
+        if len(args) == 0:
+            return color_read(ea, *args, **kwds)
+        return color_write(ea, *args, **kwds)
 
 def iterate(start, end):
     '''Iterate through instruction/data boundaries within the specified range'''
@@ -282,6 +288,10 @@ here = h    # alias
 
 def filename():
     return idc.GetInputFile()
+
+def path():
+    filepath = idc.GetIdbPath().replace('\\','/')
+    return filepath[: filepath.rfind('/')] 
 
 def baseaddress():
     return ida.get_imagebase()
@@ -355,11 +365,11 @@ def name(ea, string=None):
             flags |= 0
 
         idc.MakeNameEx(ea, string, flags)
-        tag(ea, 'name', string)
+        tag(ea, '__name__', string)
         return n
 
     try:
-        return tag(ea, 'name')
+        return tag(ea, '__name__')
     except KeyError:
         pass
     return None
@@ -416,3 +426,12 @@ def erase(ea):
     for x in tag(ea):
         tag(ea, x, None)
     color(ea, None)
+
+import store as __datastore
+def tag(address, *args, **kwds):
+    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
+    return __datastore.database.ida.db_tag(address, *args, **kwds)
+
+def color(ea, *args, **kwds):
+    '''color(address, rgb?) -> fetches or stores a color to the specified address'''
+    return __datastore.database.ida.color(ea, *args, **kwds)

@@ -70,16 +70,15 @@ def serializeKeyValue(k, v):
     #    return '%08x'% int(v)
     if type(v) is int:
         return '0x%x'% int(v)
-    elif type(v) is list:
+    elif type(v) is dict:
+        # due to how bad this code is, i'm not allowing myself to add support for various types
+        raise NotImplementedError("Please don't store dicts using this code. Thanks.")
+    elif type(v) in (list,set):
         try:
             return '[ %s ]'% ','.join(map(hex,v))
         except:
             pass
         return repr(v)
-    elif type(v) is dict:
-        # due to how bad this code is, i'm not allowing myself to add support for various types
-        raise NotImplementedError("Please don't store dicts using this code. Thanks.")
-        
     return str(v)
 
 def toList(string):

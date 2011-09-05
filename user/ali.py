@@ -485,7 +485,7 @@ def fnmap(l, functions, *args, **kwds):
         try:
             result.append( l(x, *args, **kwds) )
         except Exception,e:
-            print '%x: FAILED', repr(e)
+            print '%x: FAILED'%x, repr(e)
         continue
     return result
 
@@ -865,15 +865,16 @@ class stackarray(parray.terminated):
     def __repr__(self):
         return '%s [%s]'%(self.name(), ','.join(('0x%x'%x for x in self.walk())))
 
-def save(list):
-    d = dict( ((x, function.fetch(x)) for x in list) )
-    def execute(function):
-        max = len(d)
-        for i,k in enumerate(d):
-            print '%x: updating %d of %d'% (k,i+1,max)
-            function.store(k, d[k])
-        return set(d.keys())
-    return execute
+if False:
+    def save(list):
+        d = dict( ((x, function.fetch(x)) for x in list) )
+        def execute(function):
+            max = len(d)
+            for i,k in enumerate(d):
+                print '%x: updating %d of %d'% (k,i+1,max)
+                function.store(k, d[k])
+            return set(d.keys())
+        return execute
 
 import collections
 def frequency(list):
@@ -939,6 +940,7 @@ def getsymbol_recurse(type):
             fields.append( (getsymbol_recurse(t), n) )
     return dyn.clone(pstruct.type, _fields_=fields, blocksize=lambda x: size)
 
+###
 def searchdelta(ea, delta, direction=-1):
     '''return the block containing all instructions within the specified stack delta'''
     assert direction != 0, 'you make no sense with your lack of direction'
@@ -1044,178 +1046,274 @@ def sib(state, pc, insn, **options):
 def collect(address, depth, collect=set(), **options):
     return emul.i386.collect(Ida.producer, address, depth, set(collect).union((sib,)), **options)
 
-def collectbranches(address, depth=0):
-    def isconditional(state, pc, insn):
-        if ia32.isConditionalBranch(insn) or ia32.isUnconditionalBranch(insn):
-            state.store('branch', pc)
-        return 
-    
-    result = collect(address, depth, [isconditional])
-    return result['branch']
-
-def collectchildren(address, depth=0):
-    def ischild(state, pc, insn):
-        if ia32.isRelativeCall(insn):
-            address = ia32.getRelativeAddress(pc, insn)
-            state.store('result', address)
-        return 
-    return collect(address, depth, [ischild])['result']
-
-def collectexternals(address, depth=0):
-    def isexternal(state, pc, insn):
-        if ia32.isMemoryCall(insn) or ia32.isMemoryBranch(insn):
-            res = ia32.decodeInteger( ia32.getDisplacement(insn) )
-            state.store('result', res)
-        return 
-    return collect(address, depth, [isexternal])['result']
-
-def collectinstruction(address, comparison, depth=0):
-    def ismatch(state, pc, insn):
-        if comparison(insn):
-            state.store('result', pc)
-        return 
-    return collect(address, depth, [ismatch])['result']
-
-def collectdynamic(address, depth=0):
-    def isdynamic(state, pc, insn):
-        if isdynamiccall(insn):
-            state.store('result', pc)
-        return 
-    return collect(address, depth, [isdynamic])['result']
-
-def collectfs(address, depth=0):
-    return collectinstruction(address, lambda x: ia32.getPrefix(x) == 'd', depth=depth)
-
-def collectfourcc(address, depth=0):
-    def isfourcc(insn):
-        if not iscmpconstant(insn):
-            return False
-        constant = ia32.getImmediate(insn)
-        a = len(''.join((x for x in constant if x in string.printable)))
-        b = len(constant)
+if False:
+    def collectbranches(address, depth=0):
+        def isconditional(state, pc, insn):
+            if ia32.isConditionalBranch(insn) or ia32.isUnconditionalBranch(insn):
+                state.store('branch', pc)
+            return 
         
-        return (a == b) or (a-1 == b)
+        result = collect(address, depth, [isconditional])
+        return result['branch']
 
-    result = collectinstruction(address, isfourcc, depth=depth)
-    result = [ ''.join(reversed(ia32.getImmediate(database.decode(x)))) for x in result]
-    return set(result)
+    def collectchildren(address, depth=0):
+        def ischild(state, pc, insn):
+            if ia32.isRelativeCall(insn):
+                address = ia32.getRelativeAddress(pc, insn)
+                state.store('result', address)
+            return 
+        return collect(address, depth, [ischild])['result']
+
+    def collectexternals(address, depth=0):
+        def isexternal(state, pc, insn):
+            if ia32.isMemoryCall(insn) or ia32.isMemoryBranch(insn):
+                res = ia32.decodeInteger( ia32.getDisplacement(insn) )
+                state.store('result', res)
+            return 
+        return collect(address, depth, [isexternal])['result']
+
+    def collectinstruction(address, comparison, depth=0):
+        def ismatch(state, pc, insn):
+            if comparison(insn):
+                state.store('result', pc)
+            return 
+        return collect(address, depth, [ismatch])['result']
+
+    def collectdynamic(address, depth=0):
+        def isdynamic(state, pc, insn):
+            if isdynamiccall(insn):
+                state.store('result', pc)
+            return 
+        return collect(address, depth, [isdynamic])['result']
+
+    def collectfs(address, depth=0):
+        return collectinstruction(address, lambda x: ia32.getPrefix(x) == 'd', depth=depth)
+
+    def collectfourcc(address, depth=0):
+        def isfourcc(insn):
+            if not iscmpconstant(insn):
+                return False
+            constant = ia32.getImmediate(insn)
+            a = len(''.join((x for x in constant if x in string.printable)))
+            b = len(constant)
+            
+            return (a == b) or (a-1 == b)
+
+        result = collectinstruction(address, isfourcc, depth=depth)
+        result = [ ''.join(reversed(ia32.getImmediate(database.decode(x)))) for x in result]
+        return set(result)
 
 def coloring(state, pc, insn, **options):
     database.color(pc, options.get('color'))
 
-### analyzers
+### analyze for pre-processing ida shit, lol at me writing this last.
 import string
 class analyze(object):
     key = None
     definitions = []
+
     @classmethod
     def define(cls, definition):
         cls.definitions.append(definition)
 
-    @classmethod
-    def enter(cls, pc):
+    def enter(self, pc, **options):
+        self.start = pc
+
+    def iterate(self, state, pc, insn, **options):
         pass
 
-    @classmethod
-    def iterate(cls, state, pc, insn):
-        raise NotImplementedError
+    def exit(self, state, pc, **options):
+        if self.key in state:
+#            function.tag(pc, self.key, list(state[self.key]))
+            options['database'].context.set(pc, **{self.key:list(state[self.key])})
 
-    @classmethod
-    def exit(cls, state, pc):
-        if cls.key in state:
-            function.tag(pc, cls.key, list(state[cls.key]))
-
+## analyzers
 @analyze.define
 class analyze_call(analyze):
-    key = 'regularcalls'
-    @classmethod
-    def iterate(cls, state, pc, insn):
+    key = 'regular-call'
+
+    def iterate(self, state, pc, insn, **options):
         if ia32.isRelativeCall(insn):
             address = ia32.getRelativeAddress(pc, insn)
-            state.store(cls.key, address)
+            state.store(self.key, address)
         return 
+
+    def exit(self, state, pc, **options):
+        if self.key in state:
+#            function.tag(pc, 'down', state[self.key])
+            options['database'].context.set(pc, down=set(state[self.key]))
+        return
 
 @analyze.define
 class analyze_leaf(analyze):
     key = 'node-type'
-    @classmethod
-    def iterate(cls, state, pc, insn):
+
+    def iterate(self, state, pc, insn, **options):
         if isacall(insn):
-            state.store(cls.key, pc)
+            state.store(self.key, pc)
         return
-    @classmethod
-    def exit(cls, state, pc):
-        if cls.key in state and len(state[cls.key]) > 0:
+
+    def exit(self, state, pc, **options):
+        if self.key in state and len(state[self.key]) > 0:
             return
-        function.tag(pc, cls.key, 'leaf')
+#        function.tag(pc, self.key, 'leaf')
+        options['database'].context.set(pc, **{self.key:'leaf'})
 
 @analyze.define
 class analyze_external(analyze):
-    key = 'externalcalls'
-    @classmethod
-    def iterate(cls, state, pc, insn):
+    key = 'external-call'
+
+    def iterate(self, state, pc, insn, **options):
         if ia32.isMemoryCall(insn) or ia32.isMemoryBranch(insn):
             res = ia32.decodeInteger( ia32.getDisplacement(insn) )
-            state.store(cls.key, res)
+            state.store(self.key, res)
+#            database.tag(pc, self.key, True)
+            options['database'].content.set(self.start, pc, **{self.key:True})
         return 
 
 @analyze.define
 class analyze_dynamic(analyze):
-    key = 'dynamiccalls'
-    @classmethod
-    def iterate(cls, state, pc, insn):
-        if isdynamiccall(insn):
-            state.store(cls.key, pc)
+    key = 'dynamic-call'
+
+    def iterate(self, state, pc, insn, **options):
+#        if isdynamiccall(insn):
+
+        p,i,m,s,d,imm = insn   #heh
+        if i == '\xff':
+            mod,r,rm = ia32.decoder.extractmodrm(ord(m))
+            if (mod == 0) and (rm == 5):
+                return False
+            if (r == 2) or (r == 3):
+#                database.tag(pc, self.key, True)
+                options['database'].content.set(self.start, pc, **{self.key:True})
+            pass
+        return 
+
+@analyze.define
+class analyze_branch(analyze):
+    key = 'is-branch'
+
+    def iterate(self, state, pc, insn, **options):
+        if ia32.isBranch(insn):
+#            database.tag(pc, self.key, True)
+            options['database'].content.set(self.start, pc, **{self.key:True})
         return 
 
 @analyze.define
 class analyze_fourcc(analyze):
-    key = 'fourcc'
-    @classmethod
-    def iterate(cls, state, pc, insn):
+    key = 'use-fourcc'
+
+    def stash_fourcc(self, pc, insn, **options):
+        constant = ia32.getImmediate(insn)
+        a,b = len(''.join((x for x in constant if x in string.printable))),len(constant)
+        if (a == b) or (a-1 == b):
+            fourcc = ''.join(reversed(constant))
+#            database.tag(pc, self.key, True)
+            options['database'].content.set(self.start, pc, **{self.key:True})
+            state.store(self.key, fourcc)
+        return
+
+    def iterate(self, state, pc, insn, **options):
         m = ia32.modrm.extract(insn)
         if m:
             mod,reg,rm = m
             if reg == 7 and ia32.getOpcode(insn) == '\x81':
-                constant = ia32.getImmediate(insn)
-                a,b = len(''.join((x for x in constant if x in string.printable))),len(constant)
-                if (a == b) or (a-1 == b):
-                    fourcc = ''.join(reversed(constant))
-                    state.store(cls.key, fourcc)
+                self.stash_fourcc(pc,insn)
+        elif ia32.getOpcode(insn) == '\x68':
+            self.stash_fourcc(pc,insn)
         return
 
 @analyze.define
 class analyze_libcalls(analyze):
-    key = 'librarycalls'
-    @classmethod
-    def iterate(cls, state, pc, insn):
+    key = 'known-call'
+
+    def iterate(self, state, pc, insn, **options):
         if ia32.isRelativeCall(insn):
             address = ia32.getRelativeAddress(pc, insn)
             if idc.GetFunctionFlags(address) & idc.FUNC_LIB:
-                state.store(cls.key, address)
+                #state.store(self.key, address)
+                state.store(self.key, database.name(address))
+        return
+
+# FIXME: implement this to log global addresses that are used
+class analyze_globals(analyze):
+    key = 'use-global'
+
+    def iterate(self, state, pc, insn, **options):
+        if ia32.isRelativeCall(insn):
+            address = ia32.getRelativeAddress(pc, insn)
+            if idc.GetFunctionFlags(address) & idc.FUNC_LIB:
+                state.store(self.key, address)
         return
 
 @analyze.define
 class analyze_fs(analyze):
-    key = 'hasfs'
-    @classmethod
-    def iterate(cls, state, pc, insn):
+    key = 'use-fs'
+
+    def iterate(self, state, pc, insn, **options):
         if ia32.getPrefix(insn) == 'd':
-            state.store(cls.key, pc)
+            state.store(self.key, pc)
         return
 
-    @classmethod
-    def exit(cls, state, pc):
-        if cls.key in state and len(state[cls.key]) > 0:
-            function.tag(pc, cls.key, True)
+    def exit(self, state, pc, **options):
+        if self.key in state and len(state[self.key]) > 0:
+#            function.tag(pc, self.key, True)
+            options['database'].context.set(pc, **{self.key:True})
         return
 
-def process(ea, **attrs):
-    for x in analyze.definitions:
-        x.enter(ea)
+@analyze.define
+class analyze_argsize(analyze):
+    key = 'argument-size'
 
-    collectors = [getattr(x, 'iterate') for x in analyze.definitions]
-    result = collect(ea, 0, collectors)
+    def exit(self, state, pc, **options):
+        total = function.getAvarSize(pc)
+#        function.tag(pc, self.key, total)
+        options['database'].context.set(pc, **{self.key:total})
 
-    for x in analyze.definitions:
-        x.exit(result, ea)
+@analyze.define
+class analyze_framesize(analyze):
+    key = 'frame-size'
+
+    def exit(self, state, pc, **options):
+        total = function.getRvarSize(pc)+function.getLvarSize(pc)
+#        function.tag(pc, self.key, total)
+        options['database'].context.set(pc, **{self.key:total})
+
+@analyze.define
+class analyze_regsize(analyze):
+    key = 'reg-size'
+
+    def exit(self, state, pc, **options):
+        total = function.getRvarSize(pc)
+#        function.tag(pc, self.key, total)
+        options['database'].context.set(pc, **{self.key:total})
+
+@analyze.define
+class analyze_names(analyze):
+    def iterate(self, state, pc, insn, **options):
+        name = database.name(pc)
+        if name:
+            options['database'].content.set(self.start, pc, __name__=name)
+        pass
+
+    def exit(self, state, pc, **options):
+        name = function.name(pc)
+        options['database'].context.set(pc, __name__=name)
+
+def process(ea, **options):
+    if 'database' not in options:
+        import store
+        options['database'] = store.interface.ida
+
+    analyzers = set(x() for x in analyze.definitions)
+
+    for x in analyzers:
+        x.enter(ea, **options)
+
+    collectors = [getattr(x, 'iterate') for x in analyzers]
+    result = collect(ea, 0, collectors, **options)
+
+    for x in analyzers:
+        x.exit(result, ea, **options)
+
+    options['database'].commit()
