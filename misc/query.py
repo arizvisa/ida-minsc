@@ -40,7 +40,7 @@ class empty(matcher):
     def has(self, object):
         return bool(object) is False
     def sqlq(self):
-        return 'not exists(select 1 where context.id=?)'
+        return '1=0'
     def sqld(self):
         return ()
 
@@ -69,19 +69,19 @@ class hasvalue(operator):
     def has(self, object):
         return self.attribute in object and object[self.attribute] == self.operand
     def sqlq(self):
-        return 'tag.name=? and value=?'
+        return 'tag.name=? and dataset.value=?'
     def sqld(self):
         return self.attribute,self.operand
 
 class address(clause):
-    def __init__(self, address):
-        self.address = address
+    def __init__(self, *address):
+        self.address = set(address)
     def has(self, object):
-        return object['__address__'] == self.address    # XXX: magic
+        return object['__address__'] in self.address    # XXX: magic
     def sqlq(self):
-        return 'dataset.address=?'
+        return 'dataset.address in (%s)'% ','.join('?' for x in range(len(self.address)))
     def sqld(self):
-        return self.address,
+        return tuple(self.address)
 
 class between(clause):
     def __init__(self, left, right):
@@ -130,9 +130,9 @@ class _or(conjunction):
 
 ## wraps a conjunction
 class _not(matcher):
-    '''inverts a conjunction'''
-    def __init__(self, conjunction):
-        self.conjunction = conjunction
+    '''inverts a query'''
+    def __init__(self, query):
+        self.conjunction = query
 
     def has(self, object):
         return not self.conjunction.has(object)
@@ -163,7 +163,7 @@ class orv(_or):
 #        self.clause = [ _and(hasattr(k),hasvalue(k,v)) for k,v in attributes.iteritems() ]
         self.clause = [ hasvalue(k,v) for k,v in attributes.iteritems() ]
 
-class attribute(_or):
+class attribute(clause):
     '''accept _only_ the specified list of attributes'''
     def __init__(self, *keys):
         self.keys = set(keys)
@@ -181,7 +181,7 @@ class attribute(_or):
         return True
     def sqlq(self):
         if self.keys:
-            return '(%s)'% ' or '.join('(tag.name=?)' for x in self.keys)
+            return 'tag.name in (%s)'% ('?,'*len(self.keys))[:-1]
         return '(1=0)'  # kill the query
     def sqld(self):
         return tuple(self.keys)
@@ -230,19 +230,64 @@ class similar(eq):
 
 ### complex clauses
 class depth(clause):
-    def __init__(self, address, depth, conjunction):
-        self.depth = depth
-        self.conjunction = conjunction
-        raise NotImplementedError
+    '''
+    This will search below address for anything matching the specified query
+    '''
+    # ...with apologies to the sqlite engine
+    def __init__(self, address, depth=1, query=all()):
+        self.address,self.depth = address,depth
+        self.conjunction = query
 
     def has(self, object):
         # descend some amount of depth into object, and then
         #   apply the conjunction
+        raise NotImplementedError
         assert type(object) is function
+
+        # recurse depth times, and check to see if the conjunction matches
+        down = set()
+        for x in function.iterate():
+            down.update( database.down() )
         return False
 
-    def sqlq(self, object):
+    def sqlq(self):
+        if self.depth > 0:
+            def recurse(depth, query=''):
+                if depth > 0:
+                    return recurse(depth-1, '%s (select `end` from `edge` where `start` in'% query)
+                return '%s (select `end` from `edge` where `start`=? and %s'% (query, self.conjunction.sqlq())
+
+        elif self.depth < 0:
+            self.depth = -self.depth
+            def recurse(depth, query=''):
+                if depth > 0:
+                    return recurse(depth-1, '%s (select `start` from `edge` where `end` in'% query)
+                return '%s (select `start` from `edge` where `end`=? and %s'% (query, self.conjunction.sqlq())
+        else:
+            logging.warning('Using an empty query depth of 0')
+            return ''
+
+        def generate(depth):
+            return 'dataset.address in%s%s)'% (recurse(depth), ')'*depth)
+
+        # heh. :)
+        return ' or '.join('(%s)'%generate(x) for x in xrange(self.depth)) 
+
+    def sqld(self):
+        return ((self.address,)+self.conjunction.sqld())*self.depth
+
+class newer(clause):
+    def __init__(self, datetime):
+        self.datetime = datetime
+    def has(self, object):
         raise NotImplementedError
+
+    def sqlq(self):
+        return "(datetime(dataset.timestamp,'localtime')>?)"
+    def sqld(self):
+        dt = self.datetime
+        y,m,d,h,m,s = dt.year,dt.month,dt.day,dt.hour,dt.minute,dt.second
+        return self.datetime,
 
 if __name__ == '__main__' and False:
     import query

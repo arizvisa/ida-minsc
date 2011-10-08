@@ -22,9 +22,6 @@ def isTail(ea):
 def functions():
     '''Returns a list of all the functions in the current database (using idautils)'''
     min,max = idc.MinEA(), idc.MaxEA()
-    min = idc.NextFunction(min)
-    if min == -1:
-        raise StopIteration("No functions found")
     return list(idautils.Functions(min, max))
 
 def segments():
@@ -35,67 +32,6 @@ def getblock(start, end):
     '''Return a string of bytes'''
     result = [ idc.Byte(ea) for ea in xrange(start, end) ]
     return ''.join(__builtins__['map'](chr, result))
-
-if False:
-    import comment
-    def tag_read(address, key=None, repeatable=0):
-        res = idc.GetCommentEx(address, repeatable)
-        dict = comment.toDict(res)
-
-        name = idc.NameEx(address, address)
-        if name:
-            dict['name'] = name
-
-        c = color(address)
-        if c is not None:
-            dict['__color__'] = c
-
-        if '__address__' not in dict:
-            dict['__address__'] = address
-
-        if key is not None:
-            return dict[key]
-        return dict
-
-    def tag_write(address, key, value, repeatable=0):
-        dict = tag_read(address, repeatable=repeatable)
-        dict[key] = value
-
-        if '__color__' in dict:
-            value = dict['__color__']
-            color(address, value)
-            del(dict['__color__'])
-
-        res = comment.toString(dict)
-        if repeatable:
-            return idc.MakeRptCmt(address, res)
-
-        return idc.MakeComm(address, res)
-
-    def tag(address, *args, **kwds):
-        '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
-        try:
-            # in a function
-            function.top(address)
-            if 'repeatable' not in kwds:
-                kwds['repeatable'] = False
-
-        except ValueError:
-            # not in a function, could be a global, so it's now repeatable
-            if 'repeatable' not in kwds:
-                kwds['repeatable'] = True
-            pass
-
-        if len(args) < 2:
-            try:
-                result = tag_read(int(address), *args, **kwds)
-            except Exception, e:
-                log('database.tag(%x): %s raised'% (address, repr(e)))
-                result = None
-            return result
-
-        key,value = args
-        return tag_write(int(address), key, value, **kwds)
 
 def prev(ea):
     '''return the previous address (instruction or data)'''
@@ -233,38 +169,6 @@ def mark(ea, message):
     nextmark = len(list(marks())) + 1
     idc.MarkPosition(ea, 0, 0, 0, nextmark, message)
 
-if False:
-    def color_write(ea, rgb, what=1):
-        if rgb is None:
-            return idc.SetColor(ea, what, 0xffffffff)
-
-        a = rgb & 0xff000000
-        rgb &= 0x00ffffff
-
-        bgr = 0
-        for i in xrange(3):
-            bgr,rgb = ((bgr*0x100) + (rgb&0xff), rgb/0x100)
-        return idc.SetColor(ea, what, bgr)
-
-    def color_read(ea, what=1):
-        bgr = idc.GetColor(ea, what)
-        if bgr == 0xffffffff:
-            return None
-
-        a = bgr&0xff000000
-        bgr &= 0x00ffffff
-
-        rgb = 0
-        for i in xrange(3):
-            rgb,bgr = ((rgb*0x100) + (bgr&0xff), bgr/0x100)
-        return rgb
-
-    def color(ea, *args, **kwds):
-        '''color(address, rgb?) -> fetches or stores a color to the specified address'''
-        if len(args) == 0:
-            return color_read(ea, *args, **kwds)
-        return color_write(ea, *args, **kwds)
-
 def iterate(start, end):
     '''Iterate through instruction/data boundaries within the specified range'''
     while start < end:
@@ -299,27 +203,6 @@ base=baseaddress
 
 def getoffset(ea):
     return ea - baseaddress()
-
-if False:
-    def query(**where):
-        '''query all functions in database'''
-        for x in functions():
-            x = function.top(x)
-            if comment.has_and(function.tag(x), **where):
-                yield x
-            continue
-        return
-
-    def select(**where):
-        return set(query(**where))
-
-    def dump(*names,**where):
-        '''return a formatted table containing the specified query'''
-        def row(ea):
-            fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
-            d = function.tag(ea)
-            return fmt% tuple(( d.get(x, None) for x in names ))
-        return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(**where)) )
 
 def __select(q):
     for x in functions():
@@ -427,11 +310,45 @@ def erase(ea):
         tag(ea, x, None)
     color(ea, None)
 
-import store as __datastore
+import store
+datastore = store.ida
 def tag(address, *args, **kwds):
-    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
-    return __datastore.database.ida.db_tag(address, *args, **kwds)
+    '''tag(address, key?, value?) -> fetches/stores a tag from specified address'''
+    try:
+        context = function.top(address)
 
-def color(ea, *args, **kwds):
+    except ValueError:
+        context = None
+
+    if len(args) == 0 and len(kwds) == 0:
+#        result = __datastore.content.select(context, query.address(address))
+        result = datastore.address(context).select(query.address(address))
+        try:
+            result = result[address]
+        except:
+            result = {}
+        return result
+
+    elif len(args) == 1:
+        key, = args
+#        result = __datastore.content.select(context, query.address(address), query.attribute(key))
+        result = datastore.address(context).select(query.address(address), query.attribute(key))
+        try:
+            result = result[address][key]
+        except:
+            raise KeyError( (hex(address),key) )
+            result = None
+        return result
+
+    if len(args) > 0:
+        key,value = args
+        kwds.update({key:value})
+    return datastore.address(context).address(address).set(**kwds)
+#    return __datastore.content.set(context, address, **kwds)
+
+def color(ea, *args):
     '''color(address, rgb?) -> fetches or stores a color to the specified address'''
-    return __datastore.database.ida.color(ea, *args, **kwds)
+    if len(args) > 0:
+        c, = args
+        return tag(ea, '__color__', c)
+    return tag(ea, '__color__')

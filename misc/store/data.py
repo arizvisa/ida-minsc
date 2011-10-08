@@ -1,45 +1,6 @@
-import logging
-import query,trigger
-
-## unorganized database stuff
-class __base__(object):
-    def __init__(self, conn):
-        self.connection = conn
-        self.trigger = trigger.__base__()
-
-    def __getattr__(self, key):
-        return getattr(self.connection, key)
-
-
-## sqlite database
 try:
-    import cPickle,sqlite3
-    sqlite3.register_converter('BLOB', lambda x: cPickle.loads(x.encode('ascii')))   # XXX: this doesn't work
-    for pickleable in (list, dict, set):
-        sqlite3.register_adapter(pickleable, cPickle.dumps)
-
-    class sqlite(__base__):
-        def __init__(self, database=':memory:', *args, **kwds):
-            connection = sqlite3.connect(database, *args, **kwds)
-            super(sqlite,self).__init__(connection)
-            connection.set_authorizer( self.__authorizer )
-
-        def dump(self):
-            return '\n'.join(x for x in self.connection.iterdump())
-
-        def __authorizer(self, operation, arg1, arg2, databasename, trigger):
-            if trigger is None:
-                return sqlite3.SQLITE_OK
-            return (sqlite3.SQLITE_DENY,SQLITE_OK)[self.trigger.execute((operation,trigger), arg1, arg2, databasename)]
-
-except ImportError:
-    pass
-
-
-## default ida database
-try:
-    import idc,comment,function as fn,database as db
-    class ida(__base__):
+    import idc,comment
+    class ida(object):
         def __init__(self):
             assert False, 'This object is not intended to be instantiated'
 
@@ -119,13 +80,11 @@ try:
         @classmethod
         def db_tag(cls, address, *args, **kwds):
             '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
-            try:
-                # in a function
-                fn.top(address)
+
+            if idc.GetFunctionAttr(address, idc.FUNCATTR_FLAGS) != idc.BADADDR:
                 if 'repeatable' not in kwds:
                     kwds['repeatable'] = False
-
-            except ValueError:
+            else:
                 # not in a function, could be a global, so it's now repeatable
                 if 'repeatable' not in kwds:
                     kwds['repeatable'] = True
@@ -139,7 +98,11 @@ try:
 
         @classmethod
         def fn_read(cls, address, key=None, repeatable=1):
-            res = fn.getComment(address, repeatable)
+            address = idc.GetFunctionAttr(address, idc.FUNCATTR_START)
+            if address == idc.BADADDR:
+                raise ValueError("Address %x not in function"% address)
+
+            res = idc.GetFunctionCmt(int(address), repeatable)
             dict = comment.toDict(res)
             if '__name__' not in dict:
                 dict['__name__'] = idc.GetFunctionName(address)
@@ -158,7 +121,7 @@ try:
             if '__address__' in dict:
                 del(dict['__address__'])
             res = comment.toString(dict)
-            return fn.setComment(address, res, repeatable)
+            return idc.SetFunctionCmt(int(address), res, repeatable)
 
         @classmethod
         def fn_tag(cls, address, *args, **kwds):

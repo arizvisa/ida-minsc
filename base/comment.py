@@ -69,6 +69,8 @@ def serializeKeyValue(k, v):
     #if k == 'address':
     #    return '%08x'% int(v)
     if type(v) is int:
+        if v < 0:
+            return '-0x%x'% -int(v)
         return '0x%x'% int(v)
     elif type(v) is dict:
         # due to how bad this code is, i'm not allowing myself to add support for various types

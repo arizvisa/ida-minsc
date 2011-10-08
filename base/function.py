@@ -52,39 +52,6 @@ def make(start, end=idc.BADADDR):
         return idc.MakeFunction(start, end)
     raise ValueError, 'address %x does not contain code'% start
 
-if False:
-    def tag_read(address, key=None, repeatable=1):
-        res = getComment(address, repeatable)
-        dict = comment.toDict(res)
-        if 'name' not in dict:
-            dict['name'] = getName(address)
-
-        if '__address__' not in dict:
-            dict['__address__'] = address
-
-        if key is not None:
-            return dict[key]
-        return dict
-
-    def tag_write(address, key, value, repeatable=1):
-        dict = tag_read(address, repeatable=repeatable)
-        dict[key] = value
-        res = comment.toString(dict)
-        return setComment(address, res, repeatable)
-
-    def tag(address, *args, **kwds):
-        '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
-        if len(args) < 2:
-            try:
-                result = tag_read(address, *args, **kwds)
-            except Exception, e:
-                database.log('function.tag(%x): %s raised'% (address, repr(e)))
-                result = None
-            return result
-
-        key,value = args
-        return tag_write(address, key, value, **kwds)
-
 def contains(function, address):
     '''Checks if address is contained in function and any of it's chunks'''
     (start,end) = getRange(function)
@@ -115,29 +82,6 @@ def marks(function):
         continue
     return result
 
-if False:
-    def dump(function, *names, **where):
-        '''return a formatted table containing the specified query'''
-        def row(ea):
-            fmt = '%x: '%ea + ' | '.join( ('%s',)*len(names) )
-            d = database.tag(ea)
-            return fmt% tuple(( d.get(x, None) for x in names ))
-        return '--------> ' + ' | '.join(names) + '\n' + '\n'.join( (row(x) for x in query(function, **where)) )
-
-    def query(function, **where):
-        '''query all tags associated with a function'''
-        for start,end in chunks(function):
-            for ea in database.iterate(start, end):
-                d = database.tag(ea)        # FIXME: bmn noticed .select yielding empty records
-                if d and comment.has_and(d, **where):
-                    yield ea
-                continue
-            continue
-        return
-
-    def select(function, **where):
-        return set(query(function, **where))
-
 def __select(function, q):
     for start,end in chunks(function):
         for ea in database.iterate(start, end):
@@ -159,49 +103,6 @@ def select(function, *q, **where):
             continue
         result.append( query.hasvalue(k,v) )
     return __select(top(function), query._and(*result) )
-
-if False:
-    def __getchunk_tags(start, end):
-        result = {}
-        for ea in database.iterate(start, end):
-            try:
-                res = database.tag(ea)
-                if res:
-                    result[ea-start] = res
-            except KeyError:
-                pass
-            continue
-        return result
-
-    def __fetch_chunks(function):
-        result = []
-        for start,end in chunks(function):
-            result.append(__getchunk_tags(start, end))
-        return result
-
-    def fetch(function):
-        '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
-        return { 'head':tag_read(function), 'chunk':__fetch_chunks(function) }
-
-    def __store_chunks(function, list, prefix=''):
-        '''Store all tags in list to specified function. /list/ is the same format as returned by .fetch()'''
-        count  = 0
-        for (start,end),records in zip(chunks(function), list):
-            for offset in records.keys():
-                data = records[offset]
-                ea = start+offset
-                for k,v in data.items():
-                    database.tag(ea, prefix+k, v)
-                count += 1
-            continue
-        return count
-
-    def store(function, dict, prefix=''):
-        '''Fetch all tags associated with a function. Will return a list of each chunk. Each element will be keyed by offset.'''
-        head = dict['head']
-        for k,v in head.items():
-            tag_write(function, prefix+k, v)
-        return __store_chunks(function, dict['chunk'], prefix)
 
 # function frame attributes
 def getFrameId(function):
@@ -249,8 +150,26 @@ def blocks(function):
         continue
     return
 
-import store as __datastore
+import store
+datastore = store.ida
 def tag(address, *args, **kwds):
-    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
-    return __datastore.database.ida.fn_tag(address, *args, **kwds)
+    '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
+#    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
+    if len(args) == 0:
+        return datastore.address(address)
+#        return __datastore.context.get(address)
 
+    elif len(args) == 1:
+        key, = args
+#        result = __datastore.context.select(query.address(address), query.attribute(key)).values()
+        result = datastore.select(query.address(address), query.attribute(key)).values()
+        try:
+            result = result[0][key]
+        except:
+            raise KeyError(hex(address),key)
+        return result
+
+    key,value = args
+    kwds.update({key:value})
+    return datastore.address(address).set(**kwds)
+#    return datastore.context.set(address, **kwds)

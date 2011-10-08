@@ -1,15 +1,31 @@
-import database,deploy,interface
+import driver
+from driver import sql
 
-from database import sqlite
-from interface import user
-from deploy import admin
+ida = driver.ida.Store()
 
-if __name__ == '__main__':
-    import sys
-    sys.path.append('./store/')
-    import database,interface,deploy
-    db = database.sqlite('./test.db')
-#    a = deploy.admin(db)
-    u = interface.user(db, 'this')
+def open(id=None, path=None):
+    import os,sqlite3,logging
 
-    print u.context.get(0x00447FE0)
+    if path is None:
+        import idc
+        path = idc.GetIdbPath().replace('\\','/')
+        path = path[: path.rfind('/')] 
+        path = '%s/%s.db'%(path,idc.GetInputFile())
+
+    if os.path.exists(path):
+        db = sqlite3.connect(path)
+        session = sql.Session(db, id)
+        logging.info('succcessfully opened up database %s as %s'% (path, id))
+        return driver.sql.Store(session)
+
+    db = sqlite3.connect(path)
+    driver.sql.Deploy(db).create()
+    db.commit()
+    logging.info('succcessfully created database %s'% path)
+
+    driver.sql.Deploy(db).session(id)
+    session = sql.Session(db, id)
+    logging.info('succcessfully created new session for %s'% id)
+
+    return driver.sql.Store(session)
+

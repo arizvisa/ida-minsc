@@ -1,7 +1,8 @@
 import idc
-import database,function,segment,structure
+import database,function,segment,structure,store
 import ia32,pecoff,ndk
 import ptypes,ctypes
+import logging
 from ptypes import *
 pint.setbyteorder(pint.littleendian)
 
@@ -482,6 +483,9 @@ def fnmap(l, functions, *args, **kwds):
     result = []
     for i,x in enumerate(all):
         print '%x: processing # %d of %d'%( x, i+1, len(all) )
+        result.append( l(x, *args, **kwds) )
+        continue
+
         try:
             result.append( l(x, *args, **kwds) )
         except Exception,e:
@@ -953,6 +957,8 @@ def searchdelta(ea, delta, direction=-1):
         ea = next(ea)
     return ((start[0], ea), (ea+len(''.join(database.decode(ea))), start[0]+len(''.join(database.decode(start[0])))))[ea < start[0]]
 
+selectdelta = searchdelta
+
 class collection(list):
     '''A collection of addresses that can be navigated'''
     position = 0
@@ -1124,8 +1130,7 @@ class analyze(object):
 
     def exit(self, state, pc, **options):
         if self.key in state:
-#            function.tag(pc, self.key, list(state[self.key]))
-            options['database'].context.set(pc, **{self.key:list(state[self.key])})
+            options['database'].address(pc)[self.key] = list(state[self.key])
 
 ## analyzers
 @analyze.define
@@ -1140,8 +1145,7 @@ class analyze_call(analyze):
 
     def exit(self, state, pc, **options):
         if self.key in state:
-#            function.tag(pc, 'down', state[self.key])
-            options['database'].context.set(pc, down=set(state[self.key]))
+            options['database'].address(pc)['__down__']=set(state[self.key])
         return
 
 @analyze.define
@@ -1156,8 +1160,7 @@ class analyze_leaf(analyze):
     def exit(self, state, pc, **options):
         if self.key in state and len(state[self.key]) > 0:
             return
-#        function.tag(pc, self.key, 'leaf')
-        options['database'].context.set(pc, **{self.key:'leaf'})
+        options['database'].address(pc)[self.key] = 'leaf'
 
 @analyze.define
 class analyze_external(analyze):
@@ -1167,8 +1170,7 @@ class analyze_external(analyze):
         if ia32.isMemoryCall(insn) or ia32.isMemoryBranch(insn):
             res = ia32.decodeInteger( ia32.getDisplacement(insn) )
             state.store(self.key, res)
-#            database.tag(pc, self.key, True)
-            options['database'].content.set(self.start, pc, **{self.key:True})
+            options['database'].address(self.start).address(pc)[self.key] = True
         return 
 
 @analyze.define
@@ -1177,15 +1179,13 @@ class analyze_dynamic(analyze):
 
     def iterate(self, state, pc, insn, **options):
 #        if isdynamiccall(insn):
-
         p,i,m,s,d,imm = insn   #heh
         if i == '\xff':
             mod,r,rm = ia32.decoder.extractmodrm(ord(m))
             if (mod == 0) and (rm == 5):
                 return False
             if (r == 2) or (r == 3):
-#                database.tag(pc, self.key, True)
-                options['database'].content.set(self.start, pc, **{self.key:True})
+                options['database'].address(self.start).address(pc)[self.key] = True
             pass
         return 
 
@@ -1194,22 +1194,23 @@ class analyze_branch(analyze):
     key = 'is-branch'
 
     def iterate(self, state, pc, insn, **options):
+        if options['database'] is store.ida:
+            return
+
         if ia32.isBranch(insn):
-#            database.tag(pc, self.key, True)
-            options['database'].content.set(self.start, pc, **{self.key:True})
+            options['database'].address(self.start).address(pc)[self.key] = True
         return 
 
 @analyze.define
 class analyze_fourcc(analyze):
     key = 'use-fourcc'
 
-    def stash_fourcc(self, pc, insn, **options):
+    def stash_fourcc(self, state, pc, insn, **options):
         constant = ia32.getImmediate(insn)
         a,b = len(''.join((x for x in constant if x in string.printable))),len(constant)
         if (a == b) or (a-1 == b):
             fourcc = ''.join(reversed(constant))
-#            database.tag(pc, self.key, True)
-            options['database'].content.set(self.start, pc, **{self.key:True})
+            options['database'].address(self.start).address(pc)[self.key] = True
             state.store(self.key, fourcc)
         return
 
@@ -1218,9 +1219,9 @@ class analyze_fourcc(analyze):
         if m:
             mod,reg,rm = m
             if reg == 7 and ia32.getOpcode(insn) == '\x81':
-                self.stash_fourcc(pc,insn)
-        elif ia32.getOpcode(insn) == '\x68':
-            self.stash_fourcc(pc,insn)
+                self.stash_fourcc(state, pc,insn, **options)
+        elif ia32.getOpcode(insn) in ('\x68','\xbf', '\xb8'):
+            self.stash_fourcc(state, pc, insn, **options)
         return
 
 @analyze.define
@@ -1257,8 +1258,7 @@ class analyze_fs(analyze):
 
     def exit(self, state, pc, **options):
         if self.key in state and len(state[self.key]) > 0:
-#            function.tag(pc, self.key, True)
-            options['database'].context.set(pc, **{self.key:True})
+            options['database'].address(pc)[self.key] = True
         return
 
 @analyze.define
@@ -1267,8 +1267,7 @@ class analyze_argsize(analyze):
 
     def exit(self, state, pc, **options):
         total = function.getAvarSize(pc)
-#        function.tag(pc, self.key, total)
-        options['database'].context.set(pc, **{self.key:total})
+        options['database'].address(pc)[self.key] = total
 
 @analyze.define
 class analyze_framesize(analyze):
@@ -1276,8 +1275,7 @@ class analyze_framesize(analyze):
 
     def exit(self, state, pc, **options):
         total = function.getRvarSize(pc)+function.getLvarSize(pc)
-#        function.tag(pc, self.key, total)
-        options['database'].context.set(pc, **{self.key:total})
+        options['database'].address(pc)[self.key] = total
 
 @analyze.define
 class analyze_regsize(analyze):
@@ -1285,27 +1283,69 @@ class analyze_regsize(analyze):
 
     def exit(self, state, pc, **options):
         total = function.getRvarSize(pc)
-#        function.tag(pc, self.key, total)
-        options['database'].context.set(pc, **{self.key:total})
+        options['database'].address(pc)[self.key] = total
 
 @analyze.define
 class analyze_names(analyze):
     def iterate(self, state, pc, insn, **options):
         name = database.name(pc)
         if name:
-            options['database'].content.set(self.start, pc, __name__=name)
+            options['database'].address(self.start).address(pc)['__name__'] = name
         pass
 
     def exit(self, state, pc, **options):
         name = function.name(pc)
-        options['database'].context.set(pc, __name__=name)
+        options['database'].address(pc)['__name__'] = name
 
-def process(ea, **options):
+@analyze.define
+class analyze_edges(analyze):
+    def iterate(self, state, pc, insn, **options):
+        if not (ia32.isRelativeCall(insn)):
+            return
+
+        for x in database.down(pc):
+            try:
+                t,x = function.top(x),x
+            except ValueError:
+                t = None
+                
+            options['database'].address(self.start).address(pc).edge((t,x))
+
+        for x in database.up(pc):
+            try:
+                t,x = function.top(x),x
+            except ValueError:
+                t = None
+            options['database'].address(self.start).address(pc).edge((t,x))
+
+@analyze.define
+class analyze_blocks(analyze):
+    key = 'blockcount'
+    def exit(self, state, pc, **options):
+        count = list(function.blocks(pc))
+        options['database'].address(pc)[self.key] = count
+
+@analyze.define
+class analyze_delta(analyze):
+    key = 'sp'
+    def iterate(self, state, pc, insn, **options):
+        if options['database'] is store.ida:
+            return
+        options['database'].address(self.start).address(pc)[self.key] = function.getSpDelta(pc)
+
+@analyze.define
+class analyze_ida(analyze):
+    def iterate(self, state, pc, insn, **options):
+        if idc.isUnknown(pc):
+            logging.warning('0x%x: tried to emulate an unknown type at 0x%x', self.start, pc)
+            return True
+        return False
+
+def process(ea, analyzers=analyze.definitions, **options):
     if 'database' not in options:
-        import store
-        options['database'] = store.interface.ida
+        options['database'] = store.ida
 
-    analyzers = set(x() for x in analyze.definitions)
+    analyzers = set(x() for x in analyzers)
 
     for x in analyzers:
         x.enter(ea, **options)
@@ -1316,4 +1356,66 @@ def process(ea, **options):
     for x in analyzers:
         x.exit(result, ea, **options)
 
-    options['database'].commit()
+    options['database'].session.commit()
+
+def nextreference(self,value):
+    ea = value.getoffset()
+    if len(self) <= 1:
+        return False
+    
+    for x in xrange(value.getoffset(), value.getoffset()+value.blocksize()):
+        if database.up(x):
+            return True
+    return False
+
+class instruction_t(ptype.type):
+    def blocksize(self):
+        o = self.getoffset()
+        s = idc.ItemSize(o)
+        if s != len(''.join(database.decode(o))):
+            a = repr(database.decode(o))
+            b = repr(''.join(chr(idc.Byte(b)) for b in xrange(o, o+s)))
+            logging.warning('%08x: inconsistency between ia32 and idc. (%s != %s)'% (o, a, b))
+        return s
+
+    pc = property(fget=lambda x: x.getoffset())
+
+    # XXX: this'd only be useful if we could pivot the stack of the entire code_t
+    sp = property(fget=lambda x: function.getSpDelta(x.getoffset()))
+
+    def __repr__(self):
+        o = self.getoffset()
+        return '%s %x: %s'%(self.name(), o, idc.GetDisasm(o))
+
+    # XXX: if i keep going, i can probably add a pointer to a code chunk soon...
+
+class code_t(parray.terminated):
+    _object_ = instruction_t
+    def __repr__(self):
+        o,s = self.getoffset(),self.blocksize()
+
+        result = []
+        for insn in self:
+            o,s = insn.getoffset(),insn.blocksize()
+            result.append('    %x: %s'%(o, idc.GetDisasm(o)) )
+
+        intro = '[%08x] %s - %d instructions'% (self.getoffset(), self.name(), len(self))
+        result = [''.join([' '*11,x]) for x in result]
+        return '%s\n%s\n'%(intro, '\n'.join(result))
+
+def coderange(start,end):
+    return code_t(offset=start, isTerminator=lambda v: (True, False)[v.getoffset() < end]).l
+
+def codelines(address, count):
+    return code_t(offset=address, isTerminator=lambda v: len(v.parent.value) >= count).l
+
+def codechunk(address):
+    for start,end in function.chunks(address):
+        if address >= start and address < end:
+            return coderange(start,end)
+        continue
+    raise ValueError('%x not found in a chunk'%address)
+        
+def codestack(address, delta):
+    start,end=selectdelta(address, delta)
+    return coderange(start, end-idc.ItemSize(end))

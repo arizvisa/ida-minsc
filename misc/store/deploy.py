@@ -9,45 +9,47 @@ class __base__(object):
 # XXX: instead of doing this in sql, should i be doing this in
 #       libmemcached, or better yet..redis-py?
 
-class admin(__base__):
+class sql(__base__):
     # this schema is tied directly into the query module's .sqlq commands
     schema = '''
     -- session info
-    create table session (`id` integer primary key, `name` text unique);
-    insert into session (id, name) values (0, NULL);
+    create table if not exists session (`id` integer primary key, `name` text unique);
+    replace into session (id, name) values (0, NULL);
 
     -- tag info
-    create table tag (        
+    create table if not exists tag (
         `id` integer primary key, `session` integer not null, `name` text not null unique,  
         foreign key(session) references session(id)     
     );
 
-    insert into tag (id,session,name) values (0, 0, 'up');
-    insert into tag (id,session,name) values (1, 0, 'down');
-
     -- context of a function  (address, session-id, tag, value)
-    create table context (        
+    create table if not exists context (
         `address` integer not null, `session` integer not null, `tag` integer not null, `value` blob not null,
+        `timestamp` timestamp default current_timestamp,
         foreign key(tag) references tag(id), foreign key(session) references session(id)    
     );
-    create unique index `context-address` on context (address,session,tag);    -- XXX: double-check and make sure i'm remembering how multi-column indexes optimize the queries
+    create unique index if not exists `context-address` on context (address,session,tag);
+    create index if not exists `context-timestamp` on context (timestamp);
 
     -- contents of a function  (context-address, real-address, session-id, tag, value)
-    create table content (
+    create table if not exists content (
         `id` integer primary key, `context` integer, `address` integer not null, `session` integer not null, `tag` integer not null, `value` blob not null,
+        `timestamp` timestamp default current_timestamp,
         foreign key(tag) references tag(id), foreign key(session) references session(id)
     );
-    create unique index `content-address` on content (context,address,session,tag);
+    create unique index if not exists `content-address` on content (context,address,session,tag);
+    create index if not exists `content-timestamp` on content (timestamp);
 
-    -- views for debugging
-    create view `view-context` as select context.address as address,tag.name as key,context.value as value from context left join tag on tag.id = context.tag;
-    create view `view-content` as select context.address as context,content.address as address,tag.name as key,content.value as value from content left join tag on tag.id = content.tag left join context on content.context=context.address;
-
-    -- table for describing context hierarchy
-    create table `context-edge` (
-        `id` integer, `direction` integer not null, `node` integer not null,
-        foreign key(node) references context(address)
+    -- table for describing hierarchy
+    create table if not exists edge (
+        `id` integer primary key, `session` integer not null,
+        `source` integer not null, `target` integer not null,
+        `start` integer, `end` integer,
+        foreign key(start) references context(address), foreign key(end) references context(address),
+        foreign key(source) references content(address), foreign key(target) references content(address)
     );
+    create index if not exists `edge-context` on edge (start, end);
+    create unique index if not exists `edge-content` on edge (source, target);
     '''
     def __init__(self, database):
         self.database = database
