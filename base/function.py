@@ -1,4 +1,4 @@
-import idc, comment, database, structure, idautils, query
+import idc, comment, database, structure, idautils, store.query as query
 '''
 function-context
 

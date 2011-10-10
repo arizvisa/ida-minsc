@@ -1,5 +1,5 @@
 import idc,idautils,idaapi as ida
-import instruction,function,segment,query
+import instruction,function,segment,store.query as query
 
 def isCode(ea):
     '''True if ea marked as code'''

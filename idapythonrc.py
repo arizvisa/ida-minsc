@@ -10,15 +10,6 @@ root = __root__.__file__[ : __root__.__file__.rfind(os.sep) ]
 for h in ('base','app','misc','user'):
     sys.path.append('%s%c%s'% (root, os.sep, h))
 
-# import the default modules
-import comment,database,segment,function
-import instruction
-
-# shortcuts
-(db,fn) = (database,function)
-h,go,top = (db.h, db.go, lambda:fn.top(db.h()))
-hex = lambda i: '%x'% i
-
 # try and execute our user's idapythonrc.py
 try:
     if os.getenv('HOME'):
@@ -38,16 +29,17 @@ except Exception, e:
 #    print ''.join(tb)
     traceback.print_exc()
 
-import logging
-def notified(code, old=0):
-    global s
-    if code == idaapi.NW_OPENIDB:
-        s = store.open()
-    elif code == idaapi.NW_CLOSEIDB:
-        if s:
-            logging.info('committed changes back to database %s'% path)
-            s.commit()
-        s = None
-    return True
+if False:
+    import logging
+    def notified(code, old=0):
+        global s
+        if code == idaapi.NW_OPENIDB:
+            s = store.open()
+        elif code == idaapi.NW_CLOSEIDB:
+            if s:
+                logging.info('committed changes back to database %s'% path)
+                s.commit()
+            s = None
+        return True
 
-idaapi.notify_when(idaapi.NW_OPENIDB|idaapi.NW_CLOSEIDB, notified)
+    idaapi.notify_when(idaapi.NW_OPENIDB|idaapi.NW_CLOSEIDB, notified)

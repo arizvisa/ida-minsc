@@ -1298,32 +1298,11 @@ class analyze_names(analyze):
         options['database'].address(pc)['__name__'] = name
 
 @analyze.define
-class analyze_edges(analyze):
-    def iterate(self, state, pc, insn, **options):
-        if not (ia32.isRelativeCall(insn)):
-            return
-
-        for x in database.down(pc):
-            try:
-                t,x = function.top(x),x
-            except ValueError:
-                t = None
-                
-            options['database'].address(self.start).address(pc).edge((t,x))
-
-        for x in database.up(pc):
-            try:
-                t,x = function.top(x),x
-            except ValueError:
-                t = None
-            options['database'].address(self.start).address(pc).edge((t,x))
-
-@analyze.define
 class analyze_blocks(analyze):
     key = 'blockcount'
     def exit(self, state, pc, **options):
         count = list(function.blocks(pc))
-        options['database'].address(pc)[self.key] = count
+        options['database'].address(pc)[self.key] = len(count)
 
 @analyze.define
 class analyze_delta(analyze):
@@ -1336,10 +1315,37 @@ class analyze_delta(analyze):
 @analyze.define
 class analyze_ida(analyze):
     def iterate(self, state, pc, insn, **options):
-        if idc.isUnknown(pc):
+        # WTF ida...
+        if False and idc.isUnknown(pc) and not idc.isHead(pc):
             logging.warning('0x%x: tried to emulate an unknown type at 0x%x', self.start, pc)
             return True
+
+        # steal xrefs from calls
+        if ia32.isRelativeCall(insn):
+            for x in database.down(pc):
+                try:
+                    t,x = function.top(x),x
+                except ValueError:
+                    t = None
+                    
+                options['database'].address(self.start).address(pc).edge((t,x))
+
+            for x in database.up(pc):
+                try:
+                    t,x = function.top(x),x
+                except ValueError:
+                    t = None
+                options['database'].address(self.start).address(pc).edge((t,x))
+            pass
+
         return False
+
+#@analyze.define
+class analyze_dickhead(analyze):
+    def iterate(self, state, pc, insn, **options):
+        p = instruction_t(offset=pc,source=Ida).l
+        print p
+        options['database'].address(self.start).address(pc)['test'] = p
 
 def process(ea, analyzers=analyze.definitions, **options):
     if 'database' not in options:

@@ -2,11 +2,11 @@ import logging
 try:
     import fu as pickle
 except ImportError:
-    logging.info("unable to load fu serialization module")
+    logging.warning("unable to load fu serialization module")
     try:
         import cPickle as pickle
     except ImportError:
-        logging.info("unable to load cPickle serialization module")
+        logging.warning("unable to load cPickle serialization module")
         import pickle
 
 import string
@@ -25,6 +25,7 @@ def loads(string):
         return string.encode('ascii')
     return pickle.loads(str(string))
 
+### definitions
 class Deploy(object):
     def create(self):
         raise NotImplementedError
@@ -39,28 +40,40 @@ class Session(object):
     def rollback(self):
         raise NotImplementedError
 
-class Store(set):
-    id = property(fget=lambda x:x.__session.id)
-    session = property(fget=lambda x:x.__session)
-
-class Context(dict):
-    id = property(fget=lambda x:x.__id)
-    store = property(fget=lambda x:x.__store)
-
-    def reset(self):
+class Driver(object):
+    @staticmethod
+    def tag_fetch(session):
         raise NotImplementedError
-    def keys(self):
+    @staticmethod
+    def tag_add(session, *names):
+        raise NotImplementedError
+    @staticmethod
+    def tag_discard(session, *names):
         raise NotImplementedError
 
-class Content(dict):
-    id = property(fget=lambda x:x.__id)
-    context = property(fget=lambda x:x.__context)
-    store = property(fget=lambda x:x.__context.store)
-
-    def reset(self):
+    @staticmethod
+    def ctx_select(session, query):
         raise NotImplementedError
-    def keys(self):
+    @staticmethod
+    def ctx_update(session, ea, dictionary):
+        raise NotImplementedError
+    @staticmethod
+    def ctx_remove(session, query, names):
         raise NotImplementedError
 
-    def edge(self, (destination,address)):
+    @staticmethod
+    def con_edge(session, (ctx_source,con_source),(ctx_target,con_target)):
+        raise NotImplementedError
+    @staticmethod
+    def con_unedge(session, (ctx_source,con_source),(ctx_target,con_target)):
+        raise NotImplementedError
+
+    @staticmethod
+    def con_select(session, query):
+        raise NotImplementedError
+    @staticmethod
+    def con_update(session, ctx, ea, dictionary):
+        raise NotImplementedError
+    @staticmethod
+    def con_remove(session, query, names):
         raise NotImplementedError

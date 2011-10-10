@@ -83,6 +83,16 @@ class address(clause):
     def sqld(self):
         return tuple(self.address)
 
+class context(clause):
+    def __init__(self, *address):
+        self.address = set(address)
+    def has(self, object):
+        return object['__context__'] in self.address    # XXX: magic
+    def sqlq(self):
+        return 'dataset.context in (%s)'% ','.join('?' for x in range(len(self.address)))
+    def sqld(self):
+        return tuple(self.address)
+
 class between(clause):
     def __init__(self, left, right):
         self.left,self.right = left,right
@@ -289,7 +299,7 @@ class newer(clause):
         y,m,d,h,m,s = dt.year,dt.month,dt.day,dt.hour,dt.minute,dt.second
         return self.datetime,
 
-if __name__ == '__main__' and False:
+if __name__ == '__main__':
     import query
     reload(query)
 
