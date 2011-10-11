@@ -18,6 +18,7 @@ class Store(set):
         super(Store,self).clear()
         [ super(Store,self).add(x) for x in self.driver.tag_fetch(self.session) ]
 
+    c = property(fget=lambda x:x.address)
     def address(self, ea):
         return Context(self, ea)    # XXX: hopefully the cost of constructing these isn't too expensive
 
@@ -66,6 +67,7 @@ class Context(dict):
             super(Context,self).update(result[self.id])
         return self
 
+    a = property(fget=lambda x:x.address)
     def address(self, ea):
         return Content(self, ea)
 
@@ -152,20 +154,10 @@ class Content(dict):
     def unset(self, *names):
         return self.store.driver.con_remove(self.store.session, query._and(query.context(self.context.id),query.address(self.id), query.attribute(*names)))
 
-###
-if 'ida' in driver.list:
-    ida = Store(driver.ida.Session())
-
-# XXX: maybe we should try/except ida's imports to determine if we're using ida
-def open(path=None, id=None):
-    import os,sqlite3,logging
-
-    if path is None:
-        import idc
-        path = idc.GetIdbPath().replace('\\','/')
-        path = path[: path.rfind('/')] 
-        path = '%s/%s.db'%(path,idc.GetInputFile())
-
+### friendly interfaces
+import os,logging
+import sqlite3
+def open(path, id=None):
     if os.path.exists(path):
         db = sqlite3.connect(path)
         session = driver.sqlite.Session(db, id)
@@ -182,3 +174,15 @@ def open(path=None, id=None):
     logging.info('succcessfully created new session for %s'% id)
 
     return Store(session)
+
+if 'ida' in driver.list:
+    ida = Store(driver.ida.Session())
+
+    import idc
+    __open = open
+    def open(path=None, id=None):
+        if path is None:
+            path = idc.GetIdbPath().replace('\\','/')
+            path = path[: path.rfind('/')] 
+            path = '%s/%s.db'%(path,idc.GetInputFile())
+        return __open(path, id)

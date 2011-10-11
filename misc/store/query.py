@@ -85,19 +85,19 @@ class address(clause):
 
 class context(clause):
     def __init__(self, *address):
-        self.address = set(address)
+        self.context = set(address)
     def has(self, object):
-        return object['__context__'] in self.address    # XXX: magic
+        return object['__context__'] in self.context    # XXX: magic
     def sqlq(self):
-        return 'dataset.context in (%s)'% ','.join('?' for x in range(len(self.address)))
+        return 'dataset.context in (%s)'% ','.join('?' for x in range(len(self.context)))
     def sqld(self):
-        return tuple(self.address)
+        return tuple(self.context)
 
 class between(clause):
     def __init__(self, left, right):
         self.left,self.right = left,right
     def has(self, object):
-        return object['__address__'] >= left and object['__address__'] < right
+        return object['__address__'] >= self.left and object['__address__'] < self.right
     def sqlq(self):
         return 'dataset.address>=? and dataset.address<?'
     def sqld(self):
@@ -175,26 +175,26 @@ class orv(_or):
 
 class attribute(clause):
     '''accept _only_ the specified list of attributes'''
-    def __init__(self, *keys):
-        self.keys = set(keys)
-        if not self.keys:
+    def __init__(self, *names):
+        self.names = set(names)
+        if not self.names:
             logging.warning("user requested a query of no attributes due to an empty 'attribute' conjunction")
 
     def has(self, object):
-        if not self.keys:
+        if not self.names:
             return False
 
-        for x in self.keys:
+        for x in self.names:
             if x not in object:
                 return False
             continue
         return True
     def sqlq(self):
-        if self.keys:
-            return 'tag.name in (%s)'% ('?,'*len(self.keys))[:-1]
+        if self.names:
+            return 'tag.name in (%s)'% ('?,'*len(self.names))[:-1]
         return '(1=0)'  # kill the query
     def sqld(self):
-        return tuple(self.keys)
+        return tuple(self.names)
 
 ### clauses
 ## for integers

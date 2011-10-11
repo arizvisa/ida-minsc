@@ -20,6 +20,11 @@ class watch(set):
         self.view.dirty()
         return [ super(watch,self).add(x) for x in tag ]
 
+    def discard(self, *tag):
+        # XXX: remove the specified tags from the view.render store
+        #      on the next update
+        raise NotImplementedError
+
 class view(object):
     '''
     this groups multiple record sources together and provides an interface for
@@ -137,7 +142,7 @@ class view(object):
         result = type(self)(self.store, self.watch)
         if self.node:
             nodes = tuple(k for k in self.node.iterkeys())
-            result.add(*self.store.select(query.address(*nodes), *q).keys())
+            result.extend(query.address(*nodes))
         return result
 
     def grow(self, depth):
@@ -173,108 +178,3 @@ class node(dict):
         ''' perform a query on this node's contents '''
         return self.data.select(*q)
    
-if False and __name__ == '__main__':
-    import sqlite3
-    import viewcache,store,query
-    reload(viewcache)
-    import query as q
-
-#    s = sqlite3.connect('./test.db')
-    s = sqlite3.connect('c:/users/arizvisa/blah.db')
-    u = store.interface.sql(s)
-    if False:
-        print 'creating schema'
-        a = store.deploy.sql(s)
-        a.create_schema()
-        import sys
-        sys.exit(0)
-
-    if True:
-        v = viewcache.view(u, u.tag.list())
-#        v.watch.add('__name__')
-#        v.watch.add('down')
-
-    if False:
-        u.tag.add('synopsis')
-        u.tag.add('fuck')
-        v.extend(query.all())
-        v.watch.add('synopsis')
-        v.watch.add('fuck')
-
-    if False:
-        def update_context(*args):
-            print 'context -> %s'% repr(args)
-
-        def update_content(*args):
-            print 'content -> %s'% repr(args)
-
-        u.trigger.add('context', update_context)
-        u.trigger.add('content', update_content)
-
-    if False:
-        import time,random
-        for x in range(25):
-            address = int(random.random()*0x100000 + 0x80000000)
-            string = ''.join(chr(random.randint(ord('0'),ord('9'))) for x in range(random.randint(10,15)))
-            u.context.set(address, synopsis=string, fuck=x)
-
-    if True:
-#        print v
-#        v.extend(q.all())
-#        v = v.select(q.andv(select=1))
-        v.extend(q.andv(select=1))
-
-#    u.commit()
-#    u.content.set(0, 5, synopsis='test', fuck='notag')
-
-    ctx = 0x4023d0
-    ea = 4204247
-
-    print 'context'
-    v[ctx]['note'] = 'fuckyou'
-    v.commit()
-    v.update()
-
-    print 'content'
-    v[ctx].content[ea]['note'] = 'fuckyou'
-    v.commit()
-    v.update()
-
-
-if False:
-    s = store.open()
-    r = store.ida
-
-    import store
-    reload(store)
-    reload(store.cache)
-    reload(store.driver)
-    reload(store.driver.sql)
-
-    key,ea = 'test',0x615D1090
-
-    v = store.cache.view( s, r )
-    v.watch.add(key)
-    v.add(ea)
-
-    a = v.node[ea]
-#    print a.data
-#    s.commit()
-
-    a.data[key] = 'blahblahblah'
-    s.commit()
-    print a.update()
-
-#    print hex(a.data.id)
-#    print a.data['__name__']
-
-if False and __name__ == '__main__':
-    import store
-    reload(store)
-    import store.cache
-    reload(store.cache)
-    s = store.open()
-    v=store.cache.view(s,store.ida)
-    v.watch.add('node-type','frame-size','blockcount')
-    v.extend(store.query.address(1633488896,1633489024))
-    print v.update()

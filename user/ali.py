@@ -1338,6 +1338,11 @@ class analyze_ida(analyze):
                 options['database'].address(self.start).address(pc).edge((t,x))
             pass
 
+        try:
+            options['database'].address(self.start).address(pc)['comment'] = database.tag(pc,'')
+        except KeyError:
+            pass
+
         return False
 
 #@analyze.define
