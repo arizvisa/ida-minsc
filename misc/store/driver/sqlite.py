@@ -115,8 +115,8 @@ class Driver(base.Driver):
         else:
             q = 'select dataset.address,tag.name,dataset.value from context dataset inner join tag on tag.id=dataset.tag where dataset.address in (select dataset.address from context dataset inner join tag on tag.id=dataset.tag where (%s))'%(query.sqlq())
 
-        print q
-        print query.sqld()+query.sqlad()
+#        print q
+#        print query.sqld()+query.sqlad()
 
         for address,k,v in session.database.execute(q, query.sqld()+query.sqlad()):
             if address not in result:
