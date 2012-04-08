@@ -18,12 +18,83 @@ class watch(set):
 
     def add(self, *tag):
         self.view.dirty()
-        return [ super(watch,self).add(x) for x in tag ]
+
+        result = set(tag).difference(self)
+        super(watch,self).update(tag)
+        return len(result)
 
     def discard(self, *tag):
-        # XXX: remove the specified tags from the view.render store
-        #      on the next update
-        raise NotImplementedError
+        tag,view = set(tag),self.view
+        for i,ea in enumerate(view.node):
+            n = view.node[ea]
+            update.discard_context(view, n,*tag)
+            update.discard_content(view, n,*tag)
+        [view.watch.remove(n) for n in tag.intersection(self)]
+        return
+
+class update:
+    # callbacks for some content
+    @staticmethod
+    def context(self, node, updates, content):
+        # clearing old stuff...probably too slow(?)
+        p = self.render.address(node.id)
+        if False:
+            for key,value in self.render.select(query.address(p.id), query._not(query.attribute(*self.watch))).iteritems():
+                value = set(value.keys())
+                p.unset( *value.difference(p.keys()) )
+
+        logging.debug('removing %x'%(node.id))
+        for address,value in self.render.select(query.address(p.id)).iteritems():
+            value = set(value.keys())
+            p.unset( *value.difference(p.keys()))
+
+        logging.debug('updating %x with %s'%(node.id,repr(updates)))
+        p.set(**updates)
+        update.content(self, node, content)
+
+    @staticmethod
+    def content(self, node, updates):
+        p = self.render.address(node.id)
+
+        # delete old content (slow?)
+        if False:
+            for address,value in self.render.c(node.id).select(query._not(query.attribute(*self.watch))).iteritems():
+                v = set(value.keys())
+                p.address(address).unset( *v.difference(p.keys()) )
+
+        logging.debug('removing content of %x'%(node.id,))
+        for address,value in p.select(query.address(p.id)).iteritems():
+            value = set(value.keys())
+            p.unset( *value.difference(p.keys()))
+
+        logging.debug('updating content of %x with %s'%(node.id,repr(updates)))
+        for address,value in updates.iteritems():
+            p.address(address).set( **value )
+        return
+
+    @staticmethod
+    def discard_context(self, node, *tags):
+        raise NotImplementedError("Need to empty the specified tags properly for both context and content")
+        tags = set(tags)
+        r = self.render.address(node.id)
+
+        # context
+        value = set(r.keys())
+        r.unset( *value.intersection(tags) )
+
+        # content
+        [update.discard_content(self, node, *tags)]
+        [self.trigger.remove((node.id,n)) for n in tags]
+        return
+
+    @staticmethod
+    def discard_content(self, node, *tags):
+        tags = set(tags)
+        r = self.render.address(node.id)
+        for ea in r.select(query.attribute(*tags)):
+            v = set(r.keys())
+            r.address(ea).unset( *v.intersection(tags) )
+        return
 
 class view(object):
     '''
@@ -31,6 +102,12 @@ class view(object):
     selecting/modifying nodes in a query. this can be used to update recordsets to update a graph.
     '''
     node = dict     # list of nodes to watch
+
+    # fronts to the watch list
+    def add(self, *name):
+        return self.watch.add(*name)
+    def discard(self, *name):
+        return self.watch.discard(*name)
 
     def __init__(self, store, render, tags=set()):
         self.node = {}
@@ -61,6 +138,15 @@ class view(object):
         self.dirty()
         return self.update()
 
+    def callback(self, address, n=None, fn=None):
+        ''' add callback to the specific node address '''
+        id = ((self.node[address].id,n), self.node[address].id)[n is None]
+        if id in self.trigger:
+            self.trigger.remove(id)
+        if fn is None:
+            fn = lambda *args,**kwds: update.context(self, *args, **kwds)
+        return self.trigger.add(id,fn)
+
     def update(self):
         ''' call this every once in a while '''
         # context
@@ -68,73 +154,65 @@ class view(object):
             logging.info('refusing to update due to an empty tag list')
             return {}
 
-        # query all contexts and update nodes
-        result = {}
-        for k,v in self.store.select(query.newer(self.__age),query.attribute(*self.watch),query.address(*self.node.keys())).iteritems():
+        # query all contexts
+        if False:
+            context = {}
+            for k,v in self.store.select(query.newer(self.__age),query.attribute(*self.watch),query.address(*self.node.keys())).iteritems():
+                if not v:
+                    continue
+                context[k] = v
+
+        context = {}
+#        for k,v in self.store.select(query.newer(self.__age),query.attribute(*self.watch),query.address(*self.node.keys())).iteritems():
+        for k in self.node.keys():
+            v = self.store.select(query.newer(self.__age),query.attribute(*self.watch), query.address(k))
             if not v:
                 continue
-            self.node[k].update(v)
-            result[k] = v
+            context[k] = v[k]
+            self.node[k].update(v[k])
+            logging.info('updated %x %s',k,repr(v[k]))
 
-        # execute callback for all nodes
-        for address,updates in result.iteritems():
-            node = self.node[address]
-            if self.trigger.execute(node.id, node, updates):
-                logging.warning('callback for %x returned non-zero value')
-            continue
-
-        completed = set(result.keys())
+        completed = set(context.keys())
 
         # now for content
+        content = {}
         for address in self.node:
             result = self.store.select_content(query.newer(self.__age),query.attribute(*self.watch),query.context(address))
+            content[address] = result
 
+        # execute callback for all nodes
+        for address,updates in content.iteritems():
             node = self.node[address]
+
+            if self.trigger.execute(node.id, node, context.get(address,{}), updates):
+                logging.warning('callback for %x returned non-zero value')
+
+            # call subscribed triggers
             names = set()
-
-            # collect names for updates
-            for ea,d in result.iteritems():
+            for ea,d in updates.iteritems():
                 names.update(d.keys())
+            [ self.trigger.execute((node.id,n), (node,n), context.get(address,{}), updates) for n in names ]
 
-            # callbacks for content
-            for n in names:
-                r = ((ea,d[n]) for ea,d in result.iteritems() if n in d)
-                self.trigger.execute((node.id,n), (node,n), dict(r))
-
-            node.content.update(result)
+            node.update(context.get(address,{}))
+            node.content.update(updates)
 
         self.__age = datetime.now()
         return completed
 
     ## adding nodes to view
-    def add(self, *address):
+    def __add(self, *address):
         '''add a list of addresses to the current view'''
-
-        # callbacks for some nodes
-        def __update_context(node, update):
-            logging.debug('updating %x with %s'%(node.id,repr(update)))
-            for key,value in update.iteritems():
-                self.render.address(node.id)[key] = value
-            return
-
-        # callbacks for some content
-        def __update_content((node,name), update):
-            logging.debug('updating %x:%s with %s'%(node.id,name,repr(update)))
-            for ea,value in update.iteritems():
-                self.render.address(node.id).address(ea)[name] = value
-            return
-
-        if len(address) > 0:
-            for i,ea in enumerate(address):
+        result = set(address).difference(set(self.node.keys()))
+        if len(result) > 0:
+            for i,ea in enumerate(result):
                 self.node[ea] = node(self, self.store.address(ea))
-                self.trigger.add(self.node[ea].id, __update_context)
-                [self.trigger.add((self.node[ea].id,n), __update_content) for n in self.watch]
+                self.callback(ea)
             return i+1
         return 0
 
     def extend(self, *q):
         '''extend the current view with other nodes using the given query'''
-        return self.add( *self.store.select(*q).keys() )
+        return self.__add( *self.store.select(*q).keys() )
 
     ## modifying current view
     def select(self, *q):
@@ -147,7 +225,7 @@ class view(object):
 
     def grow(self, depth):
         result = type(self)(self.store, self.watch)
-        result.add(*self.node.keys())
+        result.__add(*self.node.keys())
         for k,v in self.iteritems():
             result.extend(query.depth(k, depth))
         return result
@@ -157,6 +235,10 @@ class node(dict):
     view = None     # the view we belong to
     store = property(fget=lambda s:s.view.store)
     data = property(fget=lambda s:s.__data)
+
+    l = property(fget=lambda s: s.sync())
+    def sync(self):
+        return self.update(self.data.l)
 
     # node navigation
     def __init__(self, view, ctx):
@@ -178,3 +260,15 @@ class node(dict):
         ''' perform a query on this node's contents '''
         return self.data.select(*q)
    
+if __name__ == '__main__':
+    import store
+    s=store.open()
+    import store.cache
+    reload(store.cache)
+    v=store.cache.view(s, store.ida)
+    v.watch.add('frame-size','completed','name')
+    v.extend(q.address(top()))
+    print v.update()
+    v.watch.discard('frame-size','completed')
+    print v.update()
+

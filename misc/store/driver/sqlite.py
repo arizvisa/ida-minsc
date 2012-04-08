@@ -108,8 +108,17 @@ class Driver(base.Driver):
     ### context stuff
     @classmethod
     def ctx_select(cls, session, query):
-        result={}
-        for address,k,v in session.database.execute('select dataset.address,tag.name,dataset.value from context dataset inner join tag on tag.id=dataset.tag where %s'% query.sqlq(), query.sqld()):
+        result = {}
+        a = query.sqlaq()
+        if a:
+            q = 'select dataset.address,tag.name,dataset.value from context dataset inner join tag on tag.id=dataset.tag where dataset.address in (select dataset.address from context dataset inner join tag on tag.id=dataset.tag where (%s)) and (%s)'%(query.sqlq(), a)
+        else:
+            q = 'select dataset.address,tag.name,dataset.value from context dataset inner join tag on tag.id=dataset.tag where dataset.address in (select dataset.address from context dataset inner join tag on tag.id=dataset.tag where (%s))'%(query.sqlq())
+
+        print q
+        print query.sqld()+query.sqlad()
+
+        for address,k,v in session.database.execute(q, query.sqld()+query.sqlad()):
             if address not in result:
                 result[address] = {}
             result[address][k] = base.loads(v)   # XXX
@@ -120,11 +129,14 @@ class Driver(base.Driver):
     def ctx_update(cls, session, ea, dictionary):
         result = ((session.id,ea,base.dumps(v),k) for k,v in dictionary.iteritems())  # XXX
         q = 'replace into context (session,address,tag,value) select ?,?,id,? from tag where tag.name=?'
-        return session.database.executemany(q, result).rowcount == len(dictionary)
+        return session.database.executemany(q, result).rowcount
 
     @classmethod
     def ctx_remove(cls, session, query):
         # don't forget query.address
+        a = query.sqlaq()
+        if a:
+            return session.database.execute('delete from context where exists (select 0 from context dataset inner join tag on tag.id=dataset.tag where context.id=dataset.id and dataset.session=? and %s and %s)'%(query.sqlq(),query.sqlaq()), (session.id,)+query.sqld()+query.sqlad()).rowcount
         return session.database.execute('delete from context where exists (select 0 from context dataset inner join tag on tag.id=dataset.tag where context.id=dataset.id and dataset.session=? and %s)'%query.sqlq(), (session.id,)+query.sqld()).rowcount
 
     ### content stuff
@@ -141,8 +153,13 @@ class Driver(base.Driver):
     @classmethod
     def con_select(cls, session, query):
         result = {}
-        for address,k,v in session.database.execute('select dataset.address,tag.name,dataset.value from content dataset inner join tag on tag.id = dataset.tag inner join context on context.address=dataset.context where %s'% query.sqlq(), query.sqld()):
-#        for address,k,v in session.database.execute('select dataset.address,tag.name,dataset.value from content dataset left join tag on tag.id = dataset.tag inner join context on context.address=dataset.context where %s'% query.sqlq(), query.sqld()):
+        a = query.sqlaq()
+        if a:
+            q = 'select dataset.address,tag.name,dataset.value from content dataset inner join tag on tag.id=dataset.tag where dataset.address in (select dataset.address from content dataset inner join tag on tag.id=dataset.tag inner join context on context.address=dataset.context where %s) and (%s)'%(query.sqlq(), a)
+        else:
+            q = 'select dataset.address,tag.name,dataset.value from content dataset inner join tag on tag.id=dataset.tag where dataset.address in (select dataset.address from content dataset inner join tag on tag.id=dataset.tag inner join context on context.address=dataset.context where %s)'%(query.sqlq())
+
+        for address,k,v in session.database.execute(q, query.sqld()+query.sqlad()):
             if address not in result:
                 result[address] = {}
             result[address][k] = base.loads(v)
@@ -153,10 +170,13 @@ class Driver(base.Driver):
     def con_update(cls, session, ctx, ea, dictionary):
         result = ((session.id,ctx,ea,base.dumps(v),k) for k,v in dictionary.iteritems())  # XXX
         q = 'replace into content (session,context,address,tag,value) select ?,?,?,tag.id,? from tag where tag.name=?'
-        return session.database.executemany(q, result).rowcount == len(dictionary)
+        return session.database.executemany(q, result).rowcount
     @classmethod
     def con_remove(cls, session, query):
         # don't forget query.context
+        a = query.sqlaq()
+        if a:
+            return session.database.execute('delete from content where exists (select 0 from content dataset inner join tag on tag.id=dataset.tag where content.id=dataset.id and dataset.session=? and %s and %s)'%(query.sqlq(), query.sqlaq()), (session.id,)+query.sqld()+query.sqlad()).rowcount
         return session.database.execute('delete from content where exists (select 0 from content dataset inner join tag on tag.id=dataset.tag where content.id=dataset.id and dataset.session=? and %s)'%query.sqlq(), (session.id,)+query.sqld()).rowcount
 
 class Session(base.Session):

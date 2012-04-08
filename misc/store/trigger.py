@@ -10,6 +10,9 @@ class __base__(object):
     def __getitem__(self, id):
         return self.state[id]
 
+    def __contains__(self, id):
+        return id in self.state
+
     # hook primitives
     def add(self, id, function):
         '''add a callback function to id'''
@@ -20,7 +23,8 @@ class __base__(object):
 
     def remove(self, id, function=None):
         '''remove the specified function(s) keyed by id'''
-        self.state[id]
+        if id not in self.state:
+            return lambda *args,**kwds: False
 
         if function is None:
             result = self.state[id]
@@ -34,6 +38,9 @@ class __base__(object):
 
     def execute(self, id, *args, **kwds):
         '''execute all functions stored in id'''
+        if id not in self.state:
+            return False
+
         result = False
         for fn in self.state[id]:
             if fn(*args, **kwds):

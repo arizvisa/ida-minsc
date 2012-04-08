@@ -7,6 +7,14 @@ class Deploy(base.Deploy):
         raise NotImplementedError("Please use IDA for this. Thanks")
         # XXX: i guess i could start ida up and build a database...
 
+def isNotEmpty(dict):
+
+    # discard keys that are implied
+    k = set(dict.keys())
+    [k.discard(x) for x in ('__address__','__context__')]
+
+    return len(k) > 0
+
 class Driver(base.Driver):
     class search:
         # hacks to make ida work with the query module
@@ -18,7 +26,9 @@ class Driver(base.Driver):
                 return True
             except AttributeError:
                 pass
+
             try:
+                query.clause.__iter__
                 for x in query.clause:
                     if cls._not(x):
                         return True
@@ -134,14 +144,16 @@ class Driver(base.Driver):
     #######
     @classmethod
     def ctx_update(cls, session, ea, dictionary):
-        for k,v in dictionary.iteritems():
+        i = 0
+        for i,(k,v) in enumerate(dictionary.iteritems()):
             session.ida.fn_write(ea,k,v)
-        return
+        return i
     @classmethod
     def con_update(cls, session, ctx, ea, dictionary):
-        for k,v in dictionary.iteritems():
+        i = 0
+        for i,(k,v) in enumerate(dictionary.iteritems()):
             session.ida.db_write(ea,k,v)
-        return
+        return i
 
     #######
     @classmethod
@@ -152,9 +164,10 @@ class Driver(base.Driver):
                 [session.ida.fn_write(ea, k, None) for k in names]
             return
 
-        for ea in cls.ctx_select(session, query):
+        i = 0
+        for i,ea in enumerate(cls.ctx_select(session, query)):
             session.ida.fn_empty(ea)
-        return
+        return i
 
     @classmethod
     def con_remove(cls, session, query):
@@ -164,9 +177,10 @@ class Driver(base.Driver):
                 [session.ida.db_write(ea, k, None) for k in names]
             return
 
-        for ea in cls.con_select(session, query):
+        i = 0
+        for i,ea in enumerate(cls.con_select(session, query)):
             session.ida.db_empty(ea)
-        return
+        return i
 
     #######
     @classmethod
@@ -203,13 +217,12 @@ class Driver(base.Driver):
         names = cls.search.attribute(query)
         gather = (lambda x: x, lambda x: dict((k,v) for k,v in x.iteritems() if k in names))[len(names) > 0]
 
+        result = {}
         for x in cls.__list_functions():
             x = idc.GetFunctionAttr(x, idc.FUNCATTR_START)
             v = session.ida.fn_read(x)
-            if query.has(v):
-                if len([k for k in v.keys() if not k.startswith('__')]) > 0:
-                    result[ea] = gather(v)
-                pass
+            if query.has(v) and isNotEmpty(v):
+                result[x] = gather(v)
             continue
         return result
 
@@ -225,7 +238,7 @@ class Driver(base.Driver):
                 for left,right in interval:
                     for ea in cls.__iterate(left,right):
                         v = session.ida.db_read(ea)
-                        if query.has(v) and len([k for k in v.keys() if not k.startswith('__')]) > 0:
+                        if query.has(v) and isNotEmpty(v):
                             result[ea] = gather(v)
                         pass
                     continue
@@ -236,7 +249,7 @@ class Driver(base.Driver):
             for start,end in cls.__chunks(ctx):
                 for ea in cls.__iterate(start, end):
                     v = session.ida.db_read(ea)
-                    if query.has(v) and len([k for k in v.keys() if not k.startswith('__')]) > 0:
+                    if query.has(v) and isNotEmpty(v):
                         result[ea] = gather(v)
                     pass
                 continue
@@ -253,12 +266,12 @@ class Driver(base.Driver):
             interval = list(cls.__chunks(ctx))
 
             for ea in address:
-                if cls.search.checkinterval(address, set(interval)):
+                if cls.search.checkinterval(ea, set(interval)):
                     v = session.ida.db_read(ea)
-                    if query.has(v) and len([k for k in v.keys() if not k.startswith('__')]) > 0:
+                    if query.has(v) and isNotEmpty(v):
                         result[ea] = gather(v)
                     pass
-                continude
+                continue
             continue
         return result
 
@@ -267,23 +280,26 @@ class Driver(base.Driver):
         context = cls.search.context(query)
         address = cls.search.address(query)
 
-        if None in context:
+        if None in context and len(address) == 0:
             raise StandardError('driver.ida: refusing to search globally due to specified query.context(None)')
 
-        if cls.search._not(query):
+        noncontext = [x for x in context if x is not None]
+        if cls.search._not(query) and len(noncontext) == 0:
             raise StandardError('driver.ida: refusing to search all functions and their entire content space for your inverted query. please use query.context or query.address and no query.not')
-
-        if context and address:
+        elif context and address and len(noncontext) > 0:
+            logging.debug('fastest %s %s',repr(address), repr(noncontext))
             return cls.con_select_fastest(session,context,address,query)
-        elif context:
+        elif context and len(noncontext) > 0:
+            logging.debug('fast %s',repr(noncontext))
             return cls.con_select_fast(session,context,query)
         elif address:
+            logging.debug('address %s', address)
             names = cls.search.attribute(query)
             gather = (lambda x: x, lambda x: dict((k,v) for k,v in x.iteritems() if k in names))[len(names) > 0]
             result = {}
             for ea in address:
                 v = session.ida.db_read(ea)
-                if query.has(v) and len([k for k in v.keys() if not k.startswith('__')]) > 0:
+                if query.has(v) and isNotEmpty(v):
                     result[ea] = gather(v)
                 continue
             return result
@@ -291,13 +307,14 @@ class Driver(base.Driver):
         # check for intervals
         interval = cls.search.between(query)
         if interval:
+            logging.debug('interval %s', repr(interval))
             names = cls.search.attribute(query)
             gather = (lambda x: x, lambda x: dict((k,v) for k,v in x.iteritems() if k in names))[len(names) > 0]
             result = {}
             for left,right in interval:
                 for ea in cls.__iterate(left,right):
                     v = session.ida.db_read(ea)
-                    if query.has(v) and len([k for k in v.keys() if not k.startswith('__')]) > 0:
+                    if query.has(v) and isNotEmpty(v):
                         result[ea] = gather(v)
                     continue
                 continue
@@ -381,14 +398,18 @@ class Session(base.Session):
             if name:
                 result['__name__'] = name
 
-            c = cls.color(address)
-            if c is not None:
-                result['__color__'] = c
-
+            # defaults
+            if '__color__' not in result:
+                c = cls.color(address)
+                if c is not None:
+                    result['__color__'] = c
             if '__address__' not in result:
                 result['__address__'] = address
+
             if '__context__' not in result:
                 result['__context__'] = idc.GetFunctionAttr(address, idc.FUNCATTR_START)
+            if '__sp__' not in result:
+                result['__sp__'] = idc.GetSpd(address)
 
             if key is not None:
                 return result[key]
@@ -457,6 +478,7 @@ class Session(base.Session):
             result[key] = value
             if '__address__' in result:
                 del(result['__address__'])
+            result = dict((k,v) for k,v in result.iteritems() if not k.startswith('__'))
             return idc.SetFunctionCmt(int(address), comment.toString(result).encode('ascii'), repeatable)
 
         @classmethod

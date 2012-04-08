@@ -2,9 +2,11 @@ import idc
 import database,function,segment,structure,store
 import ia32,pecoff,ndk
 import ptypes,ctypes
-import logging
+import logging,time
 from ptypes import *
 pint.setbyteorder(pint.littleendian)
+
+logging.root=logging.RootLogger(logging.INFO)
 
 class Ida(object):
     offset = 0xffffffff
@@ -388,10 +390,14 @@ def getframe(pc, spdelta=None):
     id = function.getFrameId(top)
     a,r,l = function.getAvarSize(top), function.getRvarSize(top), function.getLvarSize(top)
     spdelta = (spdelta, function.getSpDelta(pc))[spdelta is None]
+#    spdelta = (spdelta, store.ida.c(top).a(pc)['__sp__'])[spdelta is None]
     bs = (spdelta+l) + (r-4)
 
     class frame(pstruct.type):
         _fields_ = []
+        def name(self):
+            assert ' r' in self.keys()
+            return '%s size:0x%x return:0x%x'% (super(frame,self).name(), self.blocksize(), self[' r'].int())
 
     # FIXME: sometimes this code doesn't decode the stack correctly. i suspect it's
     #        something in ida that i'm missing.
@@ -494,6 +500,9 @@ def fnmap(l, functions, *args, **kwds):
     return result
 
 def processall(**attrs):
+    def incomplete(ea, **options):
+        options['database'].address(ea)['completed'] = 0
+    fnmap(incomplete, database.functions(), **attrs)
     return fnmap(process, database.functions(), **attrs)
 
 """
@@ -825,8 +834,15 @@ except ImportError:
     print 'unable to load _PyDbgEng'
 
 class stackcontext(pstruct.type):
+    store = store.ida
     def stackblock(self):
         delta = function.getSpDelta(self.pc)
+#        try:
+#            top = self.store.c(self.pc)['__address__']
+#            delta = self.store.c(top).a(self.pc)['__sp__']
+#        except KeyError:
+#            delta = None
+
         if delta is None:
             return ptype.empty
         return dyn.block( -delta )
@@ -837,7 +853,14 @@ class stackcontext(pstruct.type):
     ]
 
     def fetch(self):
-        return self.newelement(getframe(self.pc, function.getSpDelta(self.pc)), 'struct', self.getoffset()).l
+#        delta = function.getSpDelta(self.pc)
+        top = function.top(self.pc)
+        delta = self.store.c(top).a(self.pc)['__sp__']
+        return self.newelement(getframe(self.pc, delta), 'struct', self.getoffset()).l
+
+    def name(self):
+        assert ' r' in self.keys()
+        return '%s size:0x%x return:0x%x'% (super(stackcontext,self).name(), self.blocksize(), self[' r'].int())
 
 class stackarray(parray.terminated):
     _object_ = stackcontext
@@ -1052,63 +1075,6 @@ def sib(state, pc, insn, **options):
 def collect(address, depth, collect=set(), **options):
     return emul.i386.collect(Ida.producer, address, depth, set(collect).union((sib,)), **options)
 
-if False:
-    def collectbranches(address, depth=0):
-        def isconditional(state, pc, insn):
-            if ia32.isConditionalBranch(insn) or ia32.isUnconditionalBranch(insn):
-                state.store('branch', pc)
-            return 
-        
-        result = collect(address, depth, [isconditional])
-        return result['branch']
-
-    def collectchildren(address, depth=0):
-        def ischild(state, pc, insn):
-            if ia32.isRelativeCall(insn):
-                address = ia32.getRelativeAddress(pc, insn)
-                state.store('result', address)
-            return 
-        return collect(address, depth, [ischild])['result']
-
-    def collectexternals(address, depth=0):
-        def isexternal(state, pc, insn):
-            if ia32.isMemoryCall(insn) or ia32.isMemoryBranch(insn):
-                res = ia32.decodeInteger( ia32.getDisplacement(insn) )
-                state.store('result', res)
-            return 
-        return collect(address, depth, [isexternal])['result']
-
-    def collectinstruction(address, comparison, depth=0):
-        def ismatch(state, pc, insn):
-            if comparison(insn):
-                state.store('result', pc)
-            return 
-        return collect(address, depth, [ismatch])['result']
-
-    def collectdynamic(address, depth=0):
-        def isdynamic(state, pc, insn):
-            if isdynamiccall(insn):
-                state.store('result', pc)
-            return 
-        return collect(address, depth, [isdynamic])['result']
-
-    def collectfs(address, depth=0):
-        return collectinstruction(address, lambda x: ia32.getPrefix(x) == 'd', depth=depth)
-
-    def collectfourcc(address, depth=0):
-        def isfourcc(insn):
-            if not iscmpconstant(insn):
-                return False
-            constant = ia32.getImmediate(insn)
-            a = len(''.join((x for x in constant if x in string.printable)))
-            b = len(constant)
-            
-            return (a == b) or (a-1 == b)
-
-        result = collectinstruction(address, isfourcc, depth=depth)
-        result = [ ''.join(reversed(ia32.getImmediate(database.decode(x)))) for x in result]
-        return set(result)
-
 def coloring(state, pc, insn, **options):
     database.color(pc, options.get('color'))
 
@@ -1121,6 +1087,7 @@ class analyze(object):
     @classmethod
     def define(cls, definition):
         cls.definitions.append(definition)
+        return definition
 
     def enter(self, pc, **options):
         self.start = pc
@@ -1170,7 +1137,7 @@ class analyze_external(analyze):
         if ia32.isMemoryCall(insn) or ia32.isMemoryBranch(insn):
             res = ia32.decodeInteger( ia32.getDisplacement(insn) )
             state.store(self.key, res)
-            options['database'].address(self.start).address(pc)[self.key] = True
+            options['database'].address(self.start).address(pc)[self.key] = 1
         return 
 
 @analyze.define
@@ -1185,7 +1152,7 @@ class analyze_dynamic(analyze):
             if (mod == 0) and (rm == 5):
                 return False
             if (r == 2) or (r == 3):
-                options['database'].address(self.start).address(pc)[self.key] = True
+                options['database'].address(self.start).address(pc)[self.key] = 1
             pass
         return 
 
@@ -1198,7 +1165,7 @@ class analyze_branch(analyze):
             return
 
         if ia32.isBranch(insn):
-            options['database'].address(self.start).address(pc)[self.key] = True
+            options['database'].address(self.start).address(pc)[self.key] = 1
         return 
 
 @analyze.define
@@ -1210,7 +1177,7 @@ class analyze_fourcc(analyze):
         a,b = len(''.join((x for x in constant if x in string.printable))),len(constant)
         if (a == b) or (a-1 == b):
             fourcc = ''.join(reversed(constant))
-            options['database'].address(self.start).address(pc)[self.key] = True
+            options['database'].address(self.start).address(pc)[self.key] = 1
             state.store(self.key, fourcc)
         return
 
@@ -1258,7 +1225,7 @@ class analyze_fs(analyze):
 
     def exit(self, state, pc, **options):
         if self.key in state and len(state[self.key]) > 0:
-            options['database'].address(pc)[self.key] = True
+            options['database'].address(pc)[self.key] = 1
         return
 
 @analyze.define
@@ -1306,7 +1273,7 @@ class analyze_blocks(analyze):
 
 @analyze.define
 class analyze_delta(analyze):
-    key = 'sp'
+    key = '__sp__'
     def iterate(self, state, pc, insn, **options):
         if options['database'] is store.ida:
             return
@@ -1314,6 +1281,13 @@ class analyze_delta(analyze):
 
 @analyze.define
 class analyze_ida(analyze):
+    def enter(self, pc, **options):
+        f = options['database'].address(pc)
+        f['completed'] = 0
+        for k,v in function.tag(pc).iteritems():
+            f[k] = v
+        pass
+
     def iterate(self, state, pc, insn, **options):
         # WTF ida...
         if False and idc.isUnknown(pc) and not idc.isHead(pc):
@@ -1338,12 +1312,28 @@ class analyze_ida(analyze):
                 options['database'].address(self.start).address(pc).edge((t,x))
             pass
 
-        try:
-            options['database'].address(self.start).address(pc)['comment'] = database.tag(pc,'')
-        except KeyError:
-            pass
+        # instruction size validation because my disassembler (that i should've
+        #   stopped using a long time ago but haven't for some reason) sucks.
 
+        s = idc.ItemSize(pc)
+        if len(''.join(insn)) != s:
+            options['database'].address(self.start).address(pc)['error'] = 1
+            options['database'].address(self.start)['error'] = 1
+
+        # breakpoints stop code
+        if ia32.getOpcode(insn) == '\xcc':
+            return True
+
+        # copy out all comments
+        record = database.tag(pc)
+        for k,v in record.iteritems():
+            options['database'].address(self.start).address(pc)[k] = v
+
+        # ...
         return False
+
+    def exit(self, state, pc, **options):
+        options['database'].address(pc)['completed'] = 1
 
 #@analyze.define
 class analyze_dickhead(analyze):
@@ -1359,6 +1349,7 @@ def process(ea, analyzers=analyze.definitions, **options):
     analyzers = set(x() for x in analyzers)
 
     for x in analyzers:
+        x.start = ea
         x.enter(ea, **options)
 
     collectors = [getattr(x, 'iterate') for x in analyzers]
@@ -1383,10 +1374,10 @@ class instruction_t(ptype.type):
     def blocksize(self):
         o = self.getoffset()
         s = idc.ItemSize(o)
-        if s != len(''.join(database.decode(o))):
-            a = repr(database.decode(o))
-            b = repr(''.join(chr(idc.Byte(b)) for b in xrange(o, o+s)))
-            logging.warning('%08x: inconsistency between ia32 and idc. (%s != %s)'% (o, a, b))
+#        if s != len(''.join(database.decode(o))):
+#            a = repr(database.decode(o))
+#            b = repr(''.join(chr(idc.Byte(b)) for b in xrange(o, o+s)))
+#            logging.warning('%08x: inconsistency between ia32 and idc. (%s != %s)'% (o, a, b))
         return s
 
     pc = property(fget=lambda x: x.getoffset())
@@ -1430,3 +1421,524 @@ def codechunk(address):
 def codestack(address, delta):
     start,end=selectdelta(address, delta)
     return coderange(start, end-idc.ItemSize(end))
+
+if False:
+    ### stack stuff
+    class __stack_t(pstruct.type):
+        store = None
+        context = 0
+
+        _fields_ = [
+            (lambda s: dyn.block(s.blocksize()), 'unknown')
+        ]
+
+        def get(self):
+            # cast the current component to an ida structure
+            raise NotImplementedError
+
+    ### components of the context
+    class frame_t(__stack_t):
+        '''contains the stack frame with all the variables'''
+        def blocksize(self):
+            return self.store.c(self.context)['frame-size']
+
+    class state_t(__stack_t):
+        '''all the register state for a frame'''
+        _fields_ = [
+            (lambda s: dyn.block(s.blocksize()), 'unknown'),
+        ]
+        def blocksize(self):
+            return self.store.c(self.context)['reg-size']
+
+    class arg_t(__stack_t):
+        '''all arguments for a frame'''
+        def blocksize(self):
+            return 0
+            return self.store.c(self.context)['argument-size']
+
+
+    if False:
+        if True:
+            pass
+        else:
+            fragment = getfragment(id, offset=bs, size=l-bs, baseoffset=-l)
+
+        if fragment().a.size() > 0:
+            frame._fields_.extend( fragment._fields_ )
+
+        frame._fields_.extend( getfragment(id, offset=l, size=r)._fields_ )
+        frame._fields_.extend( getfragment(id, offset=l+r, size=a)._fields_ )
+
+    ### the entire context
+    class context_t(__stack_t):
+        def __extra(self):
+            return dyn.block((self.store.c(self.context)['frame-size'] - 4) + self.delta)
+
+        _fields_ = [
+            (__extra, 'extra'),
+            (frame_t, 'frame'),
+            (state_t, 'state'),
+            (dyn.pointer(code_t), ' r'),
+            (arg_t, 'arguments'),
+        ]
+        def name(self):
+            return '%s size:0x%x return:0x%x'% (super(context_t,self).name(), self.blocksize(), self[' r'].int())
+
+    class unknowncontext_t(__stack_t):
+        def blocksize(self):
+            return self.delta + 4
+        
+        _fields_ = [
+            (lambda s: dyn.block(s.delta), 'extra'),
+            (__stack_t, 'frame'),
+            (__stack_t, 'state'),
+            (dyn.pointer(code_t), ' r'),
+            (arg_t, 'arguments'),
+        ]
+
+    class stackarray_t(parray.terminated):
+        def ___object_(self):
+            yield dyn.clone(unknowncontext_t, delta=self.delta)
+            while True:
+                pc = self.value[-1][' r'].l.int()
+                ctx = self.store.c(function.top(pc))
+                delta = ctx['frame-size'] + -ctx.a(pc)['__sp__']
+                yield dyn.clone(context_t, delta=delta, context=ctx.id)
+            return
+
+        def load(self):
+            self._object_ = self.___object_()
+            return super(stackarray,self).load()
+        def __init__(self,*args,**kwds):
+            self._object_ = self.___object_()
+            return super(stackarray,self).__init__(*args, **kwds)
+
+        def transform(self, address):
+            return address
+
+        def isTerminator(self, value):
+            pc = value.l[' r'].int()
+            ea = self.transform(pc)
+            if database.contains(ea):
+                return False
+
+            sp = self.v[-1][' r'].getoffset()
+            data = dyn.array(pint.uint32_t,8)(source=value.source,offset=sp)
+            nextdwords = '|'+' '.join(map(lambda x:'%08x'%x.int(), data.l)).replace(' ', '|', 1)
+            logging.warning('terminated at frame %d (sp,delta)=(0x%x,) %s'%( len(self), sp, nextdwords))
+
+            # XXX: we could scan ahead for the next dword that points to code in our stack...
+            return True
+
+    def getframes(sp, delta, **attrs):
+        resume = pint.uint32_t(offset=sp+delta, source=attrs['source']).l.int()
+        top = function.top(resume)
+        attrs['context'] = top
+        return stackarray(offset=sp, recurse=attrs, delta=delta).a
+
+if False:
+    print '-'*60
+    a=z.kv()
+    print ''
+    for x in (8,4,4,8,8,8,8,8,8,8,8,0xc,8,8,8):
+        sp = a[-1].getoffset()+a[-1].size()-4
+        a.extend( z.kv((0,sp),x) )
+
+    print ''
+    b=z.kv()
+    for x in (4,4,4,0xc,0x8,0xc,4,8,0xc):
+        sp = b[-1].getoffset()+a[-1].size()-4
+        b.extend( z.kv((0,sp),x) )
+
+if False:
+    for x in a:
+        y=x[' r'].int()
+        if database.contains(y):
+            ctx = s.c(fn.top(y))
+            ali.process(ctx.id, database=s)
+            print hex(y), repr(dict((k,v) for k,v in ctx.iteritems() if k in set(('note','synopsis','__name__','mark','fourcc'))))
+
+### envi stuff
+import envi
+class IdaMemObj(envi.memory.MemoryObject):
+    # XXX: i can probably create a proper memory state so that stuff written to memory can be kept track of
+    addressspace = []
+
+    def readMemory(self, va, size):
+        if database.contains(va):
+            return database.getblock(va, va+size)
+        logging.info('%s.readMemory(va=%x,size=%x) will read outsize of addressspace. returning uninitialized memory instead', type(self).__name__, va, size)
+        return ('\x0b\xad\xf0\x0d'*((size+4)/4))[:size]
+    def writeMemory(self, va, bytes):
+        logging.info('%s.writeMemory(va=%x,bytes=%s)', type(self).__name__, va, repr(bytes))
+    def protectMemory(self, va, size, perms):
+        logging.info('%s.protectMemory(va=%x,size=%x,perms=%x)', type(self).__name__, va, repr(bytes), perms)
+    def probeMemory(self, va, size, perm):
+        logging.info('%s.probeMemory(va=%x,size=%x,perm=%x)', type(self).__name__, va, repr(bytes), perm)
+        return False
+
+    def allocateMemory(self, size, perms, suggestaddr=0):
+        logging.info('%s.probeMemory(size=%x,perm=%x,suggestaddr=%x)', type(self).__name__, va, repr(bytes), perm)
+
+    def addMemoryMap(self, mapva, perms, fname, bytes):
+        logging.info('%s.addMemoryMap(mapva=%x,perms=%x,fname=%s,bytes=%x)', type(self).__name__, mapva, perms, fname, repr(bytes))
+    def getMemoryMaps(self):
+        logging.info('%s.getMemoryMaps()') 
+
+class DummyMemObj(envi.memory.MemoryObject):
+    def readMemory(self, va, size):
+        return '\xcc'*size
+
+def getOperandImmediates(emu, oper):
+    t = oper.__class__.__name__
+    if t in ('i386ImmOper', 'i386ImmMemOper'):
+        return oper.imm,
+    if t == 'i386SibOper':
+        return (oper.imm, ())[oper.imm is None],
+    return ()
+
+def getOperandRegisters(emu, oper):
+    t = oper.__class__.__name__
+    if t == 'i386RegOper':
+        return emu.getRegisterName(oper.reg),
+    if t == 'i386ImmOper':
+        return ()
+    if t == 'i386RegMemOper':
+        return emu.getRegisterName(oper.reg),
+    if t == 'i386ImmMemOper':
+        return ()
+    if t == 'i386SibOper':
+        result = (emu.getRegisterName(i) for i in (oper.reg,oper.scale,oper.index,oper.disp,oper.imm) if i is not None)
+        return tuple(result)
+    logging.warn('NotImplementedError(%s,%s)',repr(t),repr(oper))
+    return ()
+
+def checkinterval(address, interval):
+    def __checkinterval(address, interval):
+        if len(interval) > 0:
+            left,right = interval.pop()
+            if address >= left and address < right:
+                return True
+            return __checkinterval(address, interval)
+        return False
+    return __checkinterval(address, list(interval))
+
+class ecollect(object):
+    envimemory = IdaMemObj
+    interactive = True
+    def __init__(self, emulator, **registers):
+        self.emu = emulator
+        self.emu.setMemoryObject( self.envimemory() )
+
+        self.states = []        # a stack of register states
+        self.set(**registers)
+
+        pc = registers.get('eip', 0)
+        self.emu.setProgramCounter(pc)
+
+        sp = registers.get('esp', 0)
+        self.emu.setStackCounter(sp)
+
+    def log(self, string):
+        logging.debug('[*] %s',string)
+
+    def __set_pc(self, value):
+        self['eip'] = value
+        return self.emu.setProgramCounter(value)
+    def __set_sp(self, value):
+        self['esp'] = value
+        return self.emu.setStackCounter(value)
+
+    pc = property(fget=lambda s: s.emu.getProgramCounter(), fset=__set_pc)
+    sp = property(fget=lambda s: s.emu.getStackCounter(), fset=__set_sp)
+    instruction = property(fget=lambda s: s.readInstruction(s.emu.getProgramCounter()))
+
+    ## register state abstractions
+    def push(self, state=None):
+        if state is None:
+            state = self.emu.getRegisterSnap()
+        self.states.append(state)
+        return state
+    def pop(self):
+        state = self.states.pop(-1)
+        self.emu.setRegisterSnap(state)
+        self.here()
+        return state
+
+    l = property(fget=lambda s: s.last())
+    def last(self):
+        state = self.states[-1]
+        self.emu.setRegisterSnap(state)
+        self.here()
+        return state
+
+    def set(self, **registers):
+        return self.emu.setRegisters(registers)
+    def get(self, *registers):
+        return dict((n,self.emu.getRegisterByName(n)) for n in registers )
+
+    ## instruction stuff
+    def readInstruction(self, pc):
+        # wtf, invisigoth...you should make this available to your user... it's an emulator dude..
+        #bytes = self.readMemory(pc, 32)     #  heh, read 32-bytes to ensure we get a full instruction. 15-bytes for 80x86
+        try:
+            bytes = self.emu.readMemory(pc, idc.ItemSize(pc))
+        except ValueError:
+            logging.fatal("Attempted to decode invalid address %x due to instruction %x:%s", pc, self.pc, self.instruction)
+            raise
+        try:
+            result = self.emu.makeOpcode(bytes, va=pc)
+        except IndexError:
+            logging.fatal("Unable to disassemble instruction at address %x", pc)
+            raise
+        return result
+
+    def executeInstruction(self, op):
+        try:
+            return self.emu.executeOpcode(op)
+        except Exception,e:
+            logging.fatal('%08x: Unable to emulate instruction %s', self.pc, repr(op))
+            self.log('Error! %s'% repr(self))
+            raise
+        return
+
+    s = property(fget=lambda s: s.step())
+    def step(self, count=1):
+        result = []
+        while count > 0:
+            op = self.readInstruction(self.pc)
+            self.executeInstruction(op)
+            self.log(repr(self))
+            result.append(op)
+            count -= 1
+        self.here()
+        return result
+
+    def skip(self, count=1):
+        result = []
+        while count > 0:
+            op = self.readInstruction(self.pc)
+            self.pc += op.size
+            count -= 1
+            result.append(op)
+        self.here()
+        return result
+
+    n = property(fget=lambda s: s.next())
+    def next(self, count=1):
+        result = []
+        for x in range(count):
+            returned = self.pc + slf.readInstruction(self.pc).size
+            result.extend(self.go(returned))
+        self.here()
+        return result
+
+    def go(self, address, **kwds):
+        return self.wait(lambda self,op: self.pc == address, **kwds)
+
+    def wait(self, till, *args, **kwds):
+        result = list(self.till(till,*args, **kwds))
+        self.log('broke at %x'%self.pc)
+        self.log(repr(self))
+        return result
+
+    h = property(fget=lambda s: s.here())
+    def here(self):
+        if self.interactive:
+            return database.go(self.pc)
+        return
+
+    # dict-like syntax
+    def keys(self):
+        return [n for n,_ in self.emu.getRegisterNameIndexes()]
+    def __setitem__(self, key, value):
+        return self.set(**{key:value})
+    def __getitem__(self, key):
+        return self.get(key)[key]
+    def __repr__(self):
+        emu = self.emu
+        name = super(ecollect,self).__repr__()
+
+        regstate = []
+        result = ((n, emu.getRegister(i)) for n,i in emu.getRegisterNameIndexes() if len(n) == 3 and not (n.startswith('mm') or n.startswith('st')))
+        result = ['='.join((k, (lambda:'%08x'%v,lambda:'????????')[v is None]())) for k,v in result]
+        result.sort()
+        
+        for i in range(0, len(result), 5):
+            regstate.append( ' '.join(result[i:i+5]) )
+
+        try:
+            data = []
+            sp = self.sp
+            for i in range(2):
+                result = self.emu.readMemory(sp, 0x10).encode('hex')
+                result = [result[i:i+2] for i in range(0,len(result), 2)]
+                result = ' '.join(result)
+                data.append("%08X\t%s"%(sp,result))
+                sp += 0x10
+        except Exception, e:
+            data = ["%08X\t???"%self.sp]
+
+        insn = "%08x\t%s"%(self.pc, self.readInstruction(self.pc))
+
+        result = []
+        result.extend(regstate)
+        result.extend(data)
+        result.append('')
+        result.append(insn)
+        return name + '\n' + '\n'.join('%s'%x for x in result)
+
+    ## execution abstractions
+    def till(self, test, count=None, **kwds):
+        if count is None:
+            while True:
+                op = self.readInstruction(self.pc)
+                if 'debug' in kwds:
+                    print 'till',repr(op)
+
+                yield self.pc,op
+                if test(self, op, **kwds):
+                    break
+                self.executeInstruction(op)
+            return
+
+        while count > 0:
+            op = self.readInstruction(self.pc)
+            if 'debug' in kwds:
+                print 'till',repr(op)
+            yield self.pc,op
+            if test(self, op, **kwds):
+                break
+            self.executeInstruction(op)
+            count -= 1
+        return
+
+    def tillreturn(self, **kwds):
+        def isreturn(self,op, **kwds):
+            return bool(op.iflags & envi.IF_RET)
+        return list(self.till(isreturn, **kwds))
+
+    def tillbranch(self, **kwds):
+        def isbranch(self,op, **kwds):
+            return bool(op.iflags & (envi.IF_RET|envi.IF_CALL|envi.IF_BRANCH|envi.IF_RET))
+        return list(self.till(isbranch, **kwds))
+
+    def tilldynamicbranch(self, **kwds):
+        def isdynbranch(self, op, **kwds):
+            return bool(op.iflags&(envi.IF_BRANCH|envi.IF_NOFALL) and op.opers[0].isDeref())
+        return list(self.till(isdynbranch, **kwds))
+
+    def tilldereference(self, **kwds):
+        def isderef(self,op, **kwds):
+            for x in op.opers:
+                if x.isDeref():
+                    return True
+                continue
+            return False
+        # envi's code doesn't seem to differentiate at all between read/write operands
+        return list(self.till(isderef,**kwds))
+
+    def tillregister(self, registers, **kwds):
+        registers = ( tuple((registers,)), registers )[type(registers) is tuple]
+        registers = set(x.lower() for x in registers)
+        def isregister(self,op, **kwds):
+            result = set()
+            for x in op.opers:
+                result.update( getOperandRegisters(self.emu,x) )
+            if 'debug' in kwds:
+                print 'tillregister',result,registers
+            return len(result.intersection(registers)) > 0
+        return list(self.till(isregister,**kwds))
+
+    def tillglobalrange(self, intervals, **kwds):
+        def isinterval(self,op, **kwds):
+            immediates = ( getOperandImmediates(self.emu, x) for x in op.opers )
+            for ea in reduce(lambda x,y:x+y,immediates):
+                if checkinterval(ea, intervals):
+                    return True
+                continue
+            return False
+        return list(self.till(isinterval,**kwds))
+
+    def tillnotexecuting(self, intervals, **kwds):
+        def isinterval(self, op, **kwds):
+            if checkinterval(op.va, intervals):
+                return False
+            return True
+        return list(self.till(isinterval,**kwds))
+
+    def tillcall(self, **kwds):
+        def iscall(self, op, **kwds):
+            return bool(op.iflags & envi.IF_CALL)
+        return list(self.till(iscall, **kwds))
+
+    def tilldepth(self, depth, **kwds):
+        # FIXME: finish this
+        for x in self.till(lambda s,op: bool(o.iflags&(envi.IF_CALL|envi.IF_RETURN))):
+            pass
+        raise
+
+if False:
+    memobj = DummyMemObj()
+
+if False:
+    memobj = ali.IdaMemObj()
+    archstring = envi.getCurrentArch()
+    arch = envi.getArchModule(archstring)
+    emu = arch.getEmulator()
+    emu.setMemoryObject(memobj)
+
+if False:
+    arch = envi.getArchModule(envi.getCurrentArch())
+    emu = arch.getEmulator()
+    emu.setMemoryObject(ali.IdaMemObj())
+
+if False:
+    emu.run(stepcount=1)
+    print emu.readMemory(0, 4)
+        
+if False:
+    print emu.getRegisterNames()
+    print emu.getRegisterByName('eip')
+    print emu.setRegisterByName('eip', 0xdead)
+
+    print [ (n, emu.getRegisterIndex(i)) for n,i in emu.getRegisterNameIndexes() if len(n) == 3 and not (n.startswith('mm') or n.startswith('st'))]
+
+    z = ecollect(emu, eip=0, eax=0x100)
+    x = z.readInstruction(h())
+
+class Envi:
+    import envi
+    memoryobject = IdaMemObj()
+    architecture = envi.getArchModule(envi.getCurrentArch())
+    emulator = architecture.getEmulator()
+    emulator.setMemoryObject(memoryobject)
+
+    @staticmethod
+    def collect(**kwds):
+        return ecollect(Envi.emulator, **kwds)
+
+def qtresolve(entry):
+    '''returns minor dispatchpointer, the functionpointer, and then framesize for a given dispatch code'''
+    e = Envi.collect(eip=entry)
+    e.interactive = False
+    e.push()
+
+    # executes through the dispatcher that selects the minor code handler
+    e.tilldynamicbranch()
+    e.step()
+    e.tillbranch()
+    flag = pint.uint32_t(source=Ida,offset=e['ecx']).l.int()
+    e.tilldynamicbranch()
+    e.step()
+
+    if flag != 0:
+        functionpointer,stacksize = e['eax'],e['edx']
+    elif len(list(function.blocks(e.pc))) > 1:
+        e.tillnotexecuting( [function.getRange(e.pc)] )
+        functionpointer,stacksize = e['eax'],e['edx']
+    else:
+        functionpointer,stacksize = e.pc,0
+
+    e.pop()
+    return functionpointer,stacksize

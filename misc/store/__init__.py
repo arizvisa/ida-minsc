@@ -51,49 +51,104 @@ class Store(set):
         self.reset()
         return '%s %s'%(type(self), super(Store,self).__repr__())
 
-class Context(dict):
+class CachedDict(dict):
+    '''Contains a caching dictionary that syncs with some data source'''
+    # stuff to use
+    def keys(self): 
+        return list(self.iterkeys())
+    def values(self):
+        return list(self.itervalues())
+    def items(self):
+        return list(self.iteritems())
+    def __iter__(self):
+        return self.iterkeys()
+    def __repr__(self):
+        return '%s address:0x%x %s'%(type(self), self.id, super(CachedDict,self).__repr__())
+
+    l = property(fget=lambda x: x.sync())
+    def sync(self):
+        return dict(self.items())
+
+    # like a dictionary
+    def __getitem__(self, key):
+        if super(CachedDict,self).__contains__(key):
+            return super(CachedDict,self).__getitem__(key)
+
+        result = self.get(key)[key]
+        super(CachedDict,self).__setitem__(key, result)
+        return result
+
+    def __setitem__(self, key, value):
+        super(CachedDict,self).__setitem__(key, value)
+        return self.set( **{key:value} )
+    def __delitem__(self, key):
+        if key in self:
+            super(CachedDict,self).__delitem__(key)
+        return self.unset(key)
+
+    def iteritems(self):
+        for k,v in self.get().iteritems():
+            super(CachedDict,self).__setitem__(k,v)
+            yield k,v
+        return
+
+    # stuff to implement
+    def iterkeys(self):
+        raise NotImplementedError
+    def set(self, **attrs):
+        raise NotImplementedError
+    def unset(self, *names):
+        raise NotImplementedError
+    def get(self, *names):
+        raise NotImplementedError
+
+    # for caching an already created object
+    a = property(fget=lambda x:x.address)
+    __address = dict
+    def address(self, ea):
+        raise NotImplementedError
+
+    def __init__(self):
+        self.__address = {}
+        return super(CachedDict,self).__init__()
+
+class Context(CachedDict):
     id = property(fget=lambda x:x.__id)
     store = property(fget=lambda x:x.__store)
 
     def __init__(self, store, address):
-        super(Context,self).__init__()
         self.__id = address
         self.__store = store
-
-    def reset(self):
-        super(Context,self).clear()
-        result = self.store.select(query.address(self.id))
-        if len(result) > 0:
-            super(Context,self).update(result[self.id])
-        return self
+        return super(Context,self).__init__()
 
     a = property(fget=lambda x:x.address)
     def address(self, ea):
         return Content(self, ea)
 
-    # friendly stuff
-    def __repr__(self):
-        self.reset()
-        return super(Context,self).__repr__()
-    def __getitem__(self, key):
-        result = self.store.select(query.address(self.id),query.attribute(key))
+    def iterkeys(self):
+        result = self.store.driver.ctx_select(self.store.session, query.address(self.id))
         try:
-            return result[self.id][key]
+            return result[self.id].iterkeys()
         except KeyError:
             pass
-        raise KeyError((hex(self.id),key))
-    def __setitem__(self, key, value):
-        return self.set(**{key:value})
-    def __delitem__(self, key):
-        return self.unset(key)
-    def keys(self):
-        return self.store.select(query.address(self.id))[self.id].keys()
+        return iter(())
 
     def set(self, **attrs):
+        # XXX
         [self.store.add(k) for k in set(attrs.iterkeys()).difference(self.store)]            # XXX: this is racy if we use a real database
         return self.store.driver.ctx_update(self.store.session, self.id, attrs)
+    def get(self, *names):
+        if names:
+            result = self.store.driver.ctx_select(self.store.session, query._and(query.address(self.id),query.attribute(*names)))
+        else: 
+            result = self.store.driver.ctx_select(self.store.session, query.address(self.id))
+        return result[self.id]
     def unset(self, *names):
-        return self.store.driver.ctx_remove(self.store.session, query._and(query.address(self.id), query.attribute(*names)))
+        if names:
+            result = self.store.driver.ctx_remove(self.store.session, query._and(query.address(self.id),query.attribute(*names)))
+        else:
+            result = self.store.driver.ctx_remove(self.store.session, query._and(query.address(self.id)))
+        return result
 
     def select(self, *q):
         if q:
@@ -102,25 +157,15 @@ class Context(dict):
             q = query.all()
         return self.store.driver.con_select(self.store.session, query._and(query.context(self.id), q))
 
-class Content(dict):
+class Content(CachedDict):
     id = property(fget=lambda x:x.__id)
     context = property(fget=lambda x:x.__context)
     store = property(fget=lambda x:x.__context.store)
 
     def __init__(self, context, address):
-        super(Content,self).__init__()
         self.__context = context
         self.__id = address
-
-    def reset(self):
-        super(Content,self).clear()
-        result = self.context.select(query.address(self.id))[self.id]
-        super(Content,self).update(result)
-        return self
-
-    def __repr__(self):
-        self.reset()
-        return super(Content,self).__repr__()
+        return super(Content,self).__init__()
 
     def edge(self, (destination,address)):
         return self.store.driver.con_edge(self.store.session, (self.context.id,self.id), (destination,address))
@@ -134,25 +179,24 @@ class Content(dict):
         raise NotImplementedError
         return self.store.driver.con_unedge(self.store.session, (self.context.id,self.id), (destination,address))
 
-    def __getitem__(self, key):
-        result = self.context.select(query.attribute(key), query.address(self.id))
-        try:
-            return result[self.id][key]
-        except KeyError:
-            pass
-        raise KeyError((hex(self.context.id),hex(self.id),key))
-    def __setitem__(self, key, value):
-        return self.set(**{key:value})
-    def keys(self):
-        return self.context.select(query.address(self.id))[self.id].keys()
-    def __delitem__(self, key):
-        return self.unset(key)
-
+    def iterkeys(self):
+        return self.store.driver.con_select(self.store.session, query._and(query.context(self.context.id),query.address(self.id)))[self.id].iterkeys()
     def set(self, **attrs):
-        [self.store.add(k) for k in set(attrs.iterkeys()).difference(self.store)]            # XXX: this is racy if we use a real database
+        # XXX: this is racy if we use a real database
+        [self.store.add(k) for k in set(attrs.iterkeys()).difference(self.store)]
         return self.store.driver.con_update(self.store.session, self.context.id, self.id, attrs)
+    def get(self, *names):
+        if names:
+            result = self.store.driver.con_select(self.store.session, query._and(query.context(self.context.id),query.address(self.id),query.attribute(*names)))
+        else:
+            result = self.store.driver.con_select(self.store.session, query._and(query.context(self.context.id),query.address(self.id)))
+        return result[self.id]
     def unset(self, *names):
-        return self.store.driver.con_remove(self.store.session, query._and(query.context(self.context.id),query.address(self.id), query.attribute(*names)))
+        if names:
+            result = self.store.driver.con_remove(self.store.session, query._and(query.context(self.context.id),query.address(self.id), query.attribute(*names)))
+        else: 
+            result = self.store.driver.con_remove(self.store.session, query._and(query.context(self.context.id),query.address(self.id)))
+        return result
 
 ### friendly interfaces
 import os,logging

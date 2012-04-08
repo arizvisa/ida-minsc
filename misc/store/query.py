@@ -9,11 +9,22 @@ import re,logging
 class matcher(object):
     '''base shell module for providing some type of meaning with a language-like syntax'''
     def has(self, object):
+        '''testing for attributes in a dictionary'''
         raise NotImplementedError
+
     def sqlq(self):
+        '''generate a sql query'''
         raise NotImplementedError
     def sqld(self):
+        '''generates the data required for the query'''
         raise NotImplementedError
+
+    def sqlaq(self):
+        '''generates a query for attributes'''
+        return ''
+    def sqlad(self):
+        '''generates sql data data for the attributes'''
+        return ()
 
 class conjunction(matcher):
     '''a conjunction joins a list of clauses together via some operation'''
@@ -21,11 +32,74 @@ class conjunction(matcher):
     def __init__(self, *clauses):
         self.clause = list(clauses)
 
+    def sqlaq(self):
+        result = [x.sqlaq() for x in self.clause]
+        if result:
+            return ' or '.join(x for x in result if x)
+        return ''
+
+    def sqlad(self):
+        return reduce(lambda x,y:x+y.sqlad(), self.clause, ())
+
 class clause(matcher):
     '''a clause is used to describe a proposition that could be queried with'''
     def has(self, object):
         raise NotImplementedError
 
+class attribute(clause):
+    '''accept _only_ the specified list of attributes'''
+    def __init__(self, *names):
+        self.names = set(names)
+        if not self.names:
+            logging.warning("user requested a query of no attributes due to an empty 'attribute' conjunction")
+
+    def has(self, object):
+        if not self.names:
+            return False
+
+        for x in self.names:
+            if x not in object:
+                return False
+            continue
+        return True
+
+    def sqlq(self):
+        return '2=2'
+    def sqld(self):
+        return ()
+
+    def sqlaq(self):
+        if self.names:
+            return 'tag.name in (%s)'% ('?,'*len(self.names))[:-1]
+        return ''
+    def sqlad(self):
+        return tuple(self.names)
+
+class empty(matcher):
+    '''true if the given id contains no attributes'''
+    def has(self, object):
+        return bool(object) is False
+    def sqlq(self):
+        raise NotImplementedError
+        return '1=0'
+    def sqld(self):
+        raise NotImplementedError
+        return ()
+
+class all(matcher):
+    def has(self, object):
+        return bool(object) is True
+    def sqlq(self):
+        return '3=3'
+    def sqld(self):
+        return ()
+    def sqlaq(self):
+#        return '0=0'
+        return '"all"="all"'
+    def sqlad(self):
+        return ()
+
+###
 class operator(clause):
     '''used for describing a token that would define an operator'''
     def __init__(self, attribute, operand):
@@ -35,22 +109,10 @@ class operator(clause):
     def sqld(self):
         return self.attribute,self.operand,
 
-class empty(matcher):
-    '''true if the given id contains no attributes'''
-    def has(self, object):
-        return bool(object) is False
-    def sqlq(self):
-        return '1=0'
-    def sqld(self):
-        return ()
-
-class all(matcher):
-    def has(self, object):
-        return bool(object) is True
-    def sqlq(self):
-        return '1=1'
-    def sqld(self):
-        return ()
+    def sqlaq(self):
+        return 'tag.name=?'
+    def sqlad(self):
+        return self.attribute,
 
 ## misc
 class hasattr(clause):
@@ -63,6 +125,10 @@ class hasattr(clause):
         return 'exists(select 1 where tag.name=?)'
     def sqld(self):
         return self.operand,
+    def sqlaq(self):
+        return 'tag.name=?'
+    def sqlad(self):
+        return self.operand,
 
 class hasvalue(operator):
     '''true if the object has the specified key=value pair defined'''
@@ -72,6 +138,10 @@ class hasvalue(operator):
         return 'tag.name=? and dataset.value=?'
     def sqld(self):
         return self.attribute,self.operand
+    def sqlaq(self):
+        return 'tag.name=?'
+    def sqlad(self):
+        return self.attribute,
 
 class address(clause):
     def __init__(self, *address):
@@ -152,6 +222,11 @@ class _not(matcher):
     def sqld(self):
         return self.conjunction.sqld()
 
+    def sqlaq(self):
+        return self.conjunction.sqlaq()
+    def sqlad(self):
+        return self.conjunction.sqlad()
+    
 ## friendly conjunctions
 class anda(_and):
     '''and attribute'''
@@ -172,29 +247,6 @@ class orv(_or):
     def __init__(self, **attributes):
 #        self.clause = [ _and(hasattr(k),hasvalue(k,v)) for k,v in attributes.iteritems() ]
         self.clause = [ hasvalue(k,v) for k,v in attributes.iteritems() ]
-
-class attribute(clause):
-    '''accept _only_ the specified list of attributes'''
-    def __init__(self, *names):
-        self.names = set(names)
-        if not self.names:
-            logging.warning("user requested a query of no attributes due to an empty 'attribute' conjunction")
-
-    def has(self, object):
-        if not self.names:
-            return False
-
-        for x in self.names:
-            if x not in object:
-                return False
-            continue
-        return True
-    def sqlq(self):
-        if self.names:
-            return 'tag.name in (%s)'% ('?,'*len(self.names))[:-1]
-        return '(1=0)'  # kill the query
-    def sqld(self):
-        return tuple(self.names)
 
 ### clauses
 ## for integers
@@ -230,15 +282,15 @@ class eq(operator):
         return 'tag.name=? and dataset.value=?'
 
 ## string
-class similar(eq):
+class glob(eq):
     def has(self, object):
         return re.match(self.operand, object[self.attribute]) is not None
     def sqlq(self):
-        return 'tag.name=? and dataset.value glob ?'% self.attribute
+        return 'tag.name=? and dataset.value glob ?'
     def sqld(self):
         return self.attribute,self.operand
 
-### complex clauses
+### misc clauses
 class depth(clause):
     '''
     This will search below address for anything matching the specified query
@@ -246,7 +298,7 @@ class depth(clause):
     # ...with apologies to the sqlite engine
     def __init__(self, address, depth=1, query=all()):
         self.address,self.depth = address,depth
-        self.conjunction = query
+        self.clause = query
 
     def has(self, object):
         # descend some amount of depth into object, and then
@@ -265,14 +317,14 @@ class depth(clause):
             def recurse(depth, query=''):
                 if depth > 0:
                     return recurse(depth-1, '%s (select `end` from `edge` where `start` in'% query)
-                return '%s (select `end` from `edge` where `start`=? and %s'% (query, self.conjunction.sqlq())
+                return '%s (select `end` from `edge` where `start`=? and %s'% (query, self.clause.sqlq())
 
         elif self.depth < 0:
             self.depth = -self.depth
             def recurse(depth, query=''):
                 if depth > 0:
                     return recurse(depth-1, '%s (select `start` from `edge` where `end` in'% query)
-                return '%s (select `start` from `edge` where `end`=? and %s'% (query, self.conjunction.sqlq())
+                return '%s (select `start` from `edge` where `end`=? and %s'% (query, self.clause.sqlq())
         else:
             logging.warning('Using an empty query depth of 0')
             return ''
@@ -284,7 +336,7 @@ class depth(clause):
         return ' or '.join('(%s)'%generate(x) for x in xrange(self.depth)) 
 
     def sqld(self):
-        return ((self.address,)+self.conjunction.sqld())*self.depth
+        return ((self.address,)+self.clause.sqld())*self.depth
 
 class newer(clause):
     def __init__(self, datetime):

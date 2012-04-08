@@ -1,5 +1,6 @@
 import idc,idautils,idaapi as ida
 import instruction,function,segment,store.query as query
+import array
 
 def isCode(ea):
     '''True if ea marked as code'''
@@ -28,10 +29,32 @@ def segments():
     '''Returns a list of all segments in the current database'''
     return list(idautils.Segments())
 
+if False:
+    def getblock(start, end):
+        '''Return a string of bytes'''
+        result = [ idc.Byte(ea) for ea in xrange(start, end) ]
+        return ''.join(__builtins__['map'](chr, result))
+
 def getblock(start, end):
-    '''Return a string of bytes'''
-    result = [ idc.Byte(ea) for ea in xrange(start, end) ]
-    return ''.join(__builtins__['map'](chr, result))
+    if start > end:
+        start,end=end,start
+    length = end-start
+
+    if not globals()['contains'](start):
+        raise ValueError('Address %x is not in database'%start)
+
+    tostr = lambda integer,string,length: (lambda:string, lambda:tostr(integer/0x100, string + chr(integer&0xff), length-1))[length > 0]()
+
+    result = array.array('c')
+    ea = start
+    if length > 7:
+        for i in xrange(length/8):
+            result.fromstring(tostr(idc.Qword(ea), '', 8))
+            ea += 8
+
+    for x in xrange(ea,end):
+        result.fromstring( chr(idc.Byte(x)) )
+    return result.tostring()
 
 def prev(ea):
     '''return the previous address (instruction or data)'''
