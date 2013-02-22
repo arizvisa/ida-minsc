@@ -1,4 +1,4 @@
-import sys,os
+import sys,os,logging
 import idc,idautils
 
 # store the root path
@@ -6,7 +6,6 @@ import __root__
 root = __root__.__file__[ : __root__.__file__.rfind(os.sep) ]
 
 # add subdirs to the search path
-# XXX: we might be able to do this via the ihooka module
 for h in ('base','app','misc','user'):
     sys.path.append('%s%c%s'% (root, os.sep, h))
 
@@ -20,7 +19,7 @@ try:
         raise OSError('Unable to figure out home directory')
     pass
 except IOError:
-    print 'warning: No idapythonrc.py file found in home directory'
+    logging.warn('No idapythonrc.py file found in home directory')
 
 except Exception, e:
     print 'warning: Exception %s raised'% repr(e)
@@ -43,3 +42,5 @@ if False:
         return True
 
     idaapi.notify_when(idaapi.NW_OPENIDB|idaapi.NW_CLOSEIDB, notified)
+
+from __namespace__ import *

@@ -1,5 +1,6 @@
+import logging
 import idc,idautils,idaapi as ida
-import instruction,function,segment,store.query as query
+import instruction,function,segment
 import array
 
 def isCode(ea):
@@ -171,10 +172,6 @@ def down(ea):
 def demangle(string):
     return idc.Demangle(string, idc.GetLongPrm(idc.INF_LONG_DN))
 
-def log(string, *argv):
-    '''idc.Message(formatstring, ...)'''
-    return idc.Message('>' + string% argv + '\n')
-
 def marks():
     '''returns all the known marked positions in an .idb'''
     index = 1
@@ -226,25 +223,6 @@ base=baseaddress
 
 def getoffset(ea):
     return ea - baseaddress()
-
-def __select(q):
-    for x in functions():
-        x = function.top(x)
-        if q.has(function.tag(x)):
-            yield x
-        continue
-    return
-
-def select(*q, **where):
-    if where:
-        print "database.select's kwd arguments have been deprecated in favor of query"
-    result = list(q)
-    for k,v in where.iteritems():
-        if v is None:
-            result.append( query.hasattr(k) )
-            continue
-        result.append( query.hasvalue(k,v) )
-    return __select( query._and(*result) )
 
 def search(name):
     return idc.LocByName(name)
@@ -333,45 +311,134 @@ def erase(ea):
         tag(ea, x, None)
     color(ea, None)
 
-import store
-datastore = store.ida
-def tag(address, *args, **kwds):
-    '''tag(address, key?, value?) -> fetches/stores a tag from specified address'''
-    try:
-        context = function.top(address)
+def color_write(ea, bgr, what=1):
+    if bgr is None:
+        bgr = 0xffffffff
+    return idc.SetColor(ea, what, bgr)
 
-    except ValueError:
-        context = None
+def color_read(ea, what=1):
+    return idc.GetColor(ea, what)
 
-    if len(args) == 0 and len(kwds) == 0:
-#        result = __datastore.content.select(context, query.address(address))
-        result = datastore.address(context).select(query.address(address))
-        try:
-            result = result[address]
-        except:
-            result = {}
-        return result
-
-    elif len(args) == 1:
-        key, = args
-#        result = __datastore.content.select(context, query.address(address), query.attribute(key))
-        result = datastore.address(context).select(query.address(address), query.attribute(key))
-        try:
-            result = result[address][key]
-        except:
-            raise KeyError( (hex(address),key) )
-            result = None
-        return result
-
-    if len(args) > 0:
-        key,value = args
-        kwds.update({key:value})
-    return datastore.address(context).address(address).set(**kwds)
-#    return __datastore.content.set(context, address, **kwds)
-
-def color(ea, *args):
+def color(ea, *args, **kwds):
     '''color(address, rgb?) -> fetches or stores a color to the specified address'''
-    if len(args) > 0:
-        c, = args
-        return tag(ea, '__color__', c)
-    return tag(ea, '__color__')
+    if len(args) == 0:
+        return color_read(ea, *args, **kwds)
+    return color_write(ea, *args, **kwds)
+
+try:
+    import store.query as query
+    import store
+
+    datastore = store.ida
+    def tag(address, *args, **kwds):
+        '''tag(address, key?, value?) -> fetches/stores a tag from specified address'''
+        try:
+            context = function.top(address)
+
+        except ValueError:
+            context = None
+
+        if len(args) == 0 and len(kwds) == 0:
+    #        result = __datastore.content.select(context, query.address(address))
+            result = datastore.address(context).select(query.address(address))
+            try:
+                result = result[address]
+            except:
+                result = {}
+            return result
+
+        elif len(args) == 1:
+            key, = args
+    #        result = __datastore.content.select(context, query.address(address), query.attribute(key))
+            result = datastore.address(context).select(query.address(address), query.attribute(key))
+            try:
+                result = result[address][key]
+            except:
+                raise KeyError( (hex(address),key) )
+                result = None
+            return result
+
+        if len(args) > 0:
+            key,value = args
+            kwds.update({key:value})
+        return datastore.address(context).address(address).set(**kwds)
+    #    return __datastore.content.set(context, address, **kwds)
+
+    def __select(q):
+        for x in functions():
+            x = function.top(x)
+            if q.has(function.tag(x)):
+                yield x
+            continue
+        return
+
+    def select(*q, **where):
+        if where:
+            print "database.select's kwd arguments have been deprecated in favor of query"
+        result = list(q)
+        for k,v in where.iteritems():
+            if v is None:
+                result.append( query.hasattr(k) )
+                continue
+            result.append( query.hasvalue(k,v) )
+        return __select( query._and(*result) )
+
+except ImportError:
+    import comment
+
+    def tag_read(address, key=None, repeatable=0):
+        res = idc.GetCommentEx(address, repeatable)
+        dict = comment.toDict(res)
+        name = idc.Name(address)
+        if name:
+            dict['name'] = name
+        if key:
+            return dict[key]
+        return dict
+
+    def tag_write(address, key, value, repeatable=0):
+        dict = tag_read(address, repeatable=repeatable)
+        dict[key] = value
+        res = comment.toString(dict)
+        if repeatable:
+            return idc.MakeRptCmt(address, res)
+        return idc.MakeComm(address, res)
+
+    def tag(address, *args, **kwds):
+        '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
+        try:
+            # in a function
+            function.top(address)
+            if 'repeatable' not in kwds:
+                kwds['repeatable'] = False
+
+        except ValueError:
+            # not in a function, could be a global, so it's now repeatable
+            if 'repeatable' not in kwds:
+                kwds['repeatable'] = True
+            pass
+
+        if len(args) < 2:
+            return tag_read(int(address), *args, **kwds)
+        key,value = args
+        return tag_write(int(address), key, value, **kwds)
+
+    def select(tags=None):
+        if tags is None:
+            result = {}
+            for ea in functions():
+                res = function.tag(ea)
+                if res:
+                    result[ea] = res
+                continue
+            return result
+
+        tags = set((tags,)) if type(tags) is str else set(tags)
+
+        result = {}
+        for ea in functions():
+            res = dict((k,v) for k,v in function.tag(ea).iteritems() if k in tags)
+            if res:
+                result[ea] = res
+            continue
+        return result
