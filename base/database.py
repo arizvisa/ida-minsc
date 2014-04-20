@@ -1,6 +1,6 @@
 import logging
 import idc,idautils,idaapi as ida
-import instruction,function,segment
+import instruction,function,segment,declaration
 import array
 
 def isCode(ea):
@@ -28,7 +28,7 @@ def functions():
 
 def segments():
     '''Returns a list of all segments in the current database'''
-    return list(idautils.Segments())
+    return [s.startEA for s in segment.list()]
 
 if False:
     def getblock(start, end):
@@ -41,21 +41,9 @@ def getblock(start, end):
         start,end=end,start
     length = end-start
 
-    if not globals()['contains'](start):
+    if not contains(start):
         raise ValueError('Address %x is not in database'%start)
-
-    tostr = lambda integer,string,length: (lambda:string, lambda:tostr(integer/0x100, string + chr(integer&0xff), length-1))[length > 0]()
-
-    result = array.array('c')
-    ea = start
-    if length > 7:
-        for i in xrange(length/8):
-            result.fromstring(tostr(idc.Qword(ea), '', 8))
-            ea += 8
-
-    for x in xrange(ea,end):
-        result.fromstring( chr(idc.Byte(x)) )
-    return result.tostring()
+    return ida.get_many_bytes(start, length)
 
 def prev(ea):
     '''return the previous address (instruction or data)'''
@@ -169,8 +157,7 @@ def down(ea):
     '''All locations that are referenced by the specified address'''
     return cxdown(ea) + dxdown(ea)
 
-def demangle(string):
-    return idc.Demangle(string, idc.GetLongPrm(idc.INF_LONG_DN))
+demangle = declaration.demangle
 
 def marks():
     '''returns all the known marked positions in an .idb'''
@@ -211,24 +198,28 @@ def h():
 here = h    # alias
 
 def filename():
+    '''return the filename that the database was built from'''
     return idc.GetInputFile()
 
 def path():
+    '''return the full path to the database'''
     filepath = idc.GetIdbPath().replace('\\','/')
     return filepath[: filepath.rfind('/')] 
 
 def baseaddress():
+    '''returns the baseaddress of the module'''
     return ida.get_imagebase()
 base=baseaddress
 
 def getoffset(ea):
+    '''returns the offset of ea from the baseaddress'''
     return ea - baseaddress()
 
 def search(name):
     return idc.LocByName(name)
 
 def searchname(name):
-    print 'database.searchname has been deprecated in favor of database.search'
+    raise DeprecationWarning('database.searchname has been deprecated in favor of database.search')
     return search(name)
 
 def name(ea, string=None):
@@ -294,7 +285,7 @@ def range():
     '''Return the total address range of the database'''
     left,right = 0xffffffff,0x00000000
     for x in segments():
-        l,r = segment.getRange(x)
+        l,r = segment.range(x)
         if l < left:
             left = l
         if r > right:
@@ -324,6 +315,73 @@ def color(ea, *args, **kwds):
     if len(args) == 0:
         return color_read(ea, *args, **kwds)
     return color_write(ea, *args, **kwds)
+
+def add_entry(name, ea, ordinal=None):
+    '''addentry(name, ea, index?) -> adds an entry point to the database'''
+    if ordinal == None:
+        ordinal = ida.get_entry_qty()
+    return ida.add_entry(ordinal, ea, name, 0)
+
+class config(object):
+    info = ida.get_inf_structure()
+    @classmethod
+    def version(cls):
+        return cls.info.version
+
+    @classmethod
+    def bits(cls):
+        '''return number of bits'''
+        if cls.info.is_64bit():
+            return 64
+        elif cls.info.is_32bit():
+            return 32
+        raise ValueError('Unknown bit size')
+
+    @classmethod
+    def processor(cls):
+        '''return processor name'''
+        return cls.info.procName
+
+    @classmethod
+    def graphview(cls):
+        '''currently using graph view'''
+        return cls.info.graph_view != 0
+
+    @classmethod
+    def main(cls):
+        return cls.info.main
+
+    @classmethod
+    def entry(cls):
+        return cls.info.beginEA
+        #return cls.info.startIP
+
+    @classmethod
+    def margin(cls):
+        return cls.info.margin
+
+    @classmethod
+    def bounds(cls):
+        return cls.info.minEA,cls.info.maxEA
+
+# FIXME: this only works on x86 where args are pushed via stack
+def makecall(ea):
+    result = cxdown(ea)
+    if len(result) != 1:
+        raise ValueError('Invalid code reference: %s'% repr(result))
+    fn, = result
+
+    if not function.contains(ea, ea):
+        return None
+
+    result = []
+    for offset,name,size in function.getArguments(fn):
+        left,_ = function.stackwindow(ea, offset+config.bits()/8)
+        # FIXME: if left is not an assignment or a push, find last assignment
+        result.append((name,left))
+
+    result = ['%s=%s'%(name,instruction.op_repr(ea,0)) for name,ea in result]
+    return '%s(%s)'%(declaration.demangle(function.getName(fn)), ','.join(result))
 
 try:
     import store.query as query
@@ -442,3 +500,46 @@ except ImportError:
                 result[ea] = res
             continue
         return result
+
+def getImportModules():
+    return [ida.get_import_module_name(i) for i in xrange(ida.get_import_module_qty())]
+def getImports(modulename):
+    idx = [x.lower() for x in getImportModules()].index(modulename.lower())
+    result = []
+    def fn(ea,name,ordinal):
+        result.append((ea,(name,ordinal)))
+        return True
+    ida.enum_import_names(idx,fn)
+    return result
+def imports():
+    """Iterator containing (address,(module,name,ordinal)) of imports in database"""
+    for idx,module in ((i,ida.get_import_module_name(i)) for i in xrange(ida.get_import_module_qty())):
+        result = []
+        def fn(ea,name,ordinal):
+            result.append( (ea,(name,ordinal)) )
+            return True
+        ida.enum_import_names(idx,fn)
+        for ea,(name,ordinal) in result:
+            yield ea,(module,name,ordinal)
+        continue
+    return
+
+### register information.
+class register(object):
+    @classmethod
+    def names(cls):
+        return ida.ph_get_regnames()
+    @classmethod
+    def segments(cls):
+        names = cls.names()
+        return [names[i] for i in xrange(ida.ph_get_regFirstSreg(),ida.ph_get_regLastSreg()+1)]
+    @classmethod
+    def codesegment(cls):
+        return cls.names()[ida.ph_get_regCodeSreg()]
+    @classmethod
+    def datasegment(cls):
+        return cls.names()[ida.ph_get_regDataSreg()]
+    @classmethod
+    def segmentsize(cls):
+        return ida.ph_get_segreg_size()
+

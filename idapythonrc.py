@@ -1,13 +1,16 @@
 import sys,os,logging
-import idc,idautils
+import idaapi,idc,idautils
 
-# store the root path
-import __root__
-root = __root__.__file__[ : __root__.__file__.rfind(os.sep) ]
+# grab ida's user directory
+root = idaapi.get_user_idadir()
+sys.path.append(root)
 
 # add subdirs to the search path
 for h in ('base','app','misc','user'):
     sys.path.append('%s%c%s'% (root, os.sep, h))
+
+# populate default namespace
+from __root__ import *
 
 # try and execute our user's idapythonrc.py
 try:
@@ -42,5 +45,3 @@ if False:
         return True
 
     idaapi.notify_when(idaapi.NW_OPENIDB|idaapi.NW_CLOSEIDB, notified)
-
-from __namespace__ import *

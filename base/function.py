@@ -1,11 +1,10 @@
 import logging
-import idc, comment, database, structure, idautils
+import idc, comment, database, structure, idautils, idaapi
 '''
 function-context
 
 generic tools for working in the context of a function.
 '''
-#EXPORT = ['getComment', 'setComment', 'chunks', 'getName', 'setName', 'getRange', 'make', 'tag', 'contains', 'getBranches']
 
 def getComment(ea, repeatable=1):
     return idc.GetFunctionCmt(int(ea), repeatable)
@@ -13,11 +12,17 @@ def setComment(ea, string, repeatable=1):
     return idc.SetFunctionCmt(int(ea), string, repeatable)
 
 def getName(ea):
-    '''fetches the function name, returns None on no function'''
-    res = idc.GetFunctionName(ea)
-    if res:
-        return res
-    return None
+    '''fetches the function name, or the global name'''
+    res = idaapi.get_func_name(ea)
+    if res is None:
+        res = idaapi.get_name(-1, ea)
+    if res is None:
+        res = idaapi.get_true_name(ea, ea)
+
+    # if name is mangled...  and version <= 6.4
+    if res and res.startswith('@'):
+        return '$'+res
+    return res
 
 def setName(ea, name):
     '''sets the function name, returns True or False based on success'''
@@ -26,6 +31,7 @@ def setName(ea, name):
 
 def name(ea, *args):
     '''sets/gets the function name'''
+    raise DeprecationWarning
     if args:
         name, = args
         return setName(ea, name)
@@ -49,12 +55,19 @@ def getRange(ea):
 
 def make(start, end=idc.BADADDR):
     '''pseudo-safely makes the address at start a function'''
+    # FIXME: scroll upward looking for the previous function
     if database.isCode(start):
         return idc.MakeFunction(start, end)
     raise ValueError, 'address %x does not contain code'% start
 
 def contains(fn, address):
     '''Checks if address is contained in function and any of it's chunks'''
+    try:
+        fn = top(fn)
+    except ValueError:
+        # not a valid function
+        return False
+
     (start,end) = getRange(fn)
     if address >= start and address < end:
         return True
@@ -128,6 +141,56 @@ def blocks(fn):
             yield r
         continue
     return
+
+import declaration
+getDeclaration = declaration.function
+def getArguments(ea):
+    '''Returns the arguments as (offset,name,size)'''
+    try:
+        # grab from declaration first
+        o = 0
+        for arg in declaration.arguments(ea):
+            sz = declaration.size(arg)
+            yield o,arg,sz
+            o += sz
+        return
+
+    except ValueError:
+        pass
+
+    # grab from structure
+    ea = top(ea)
+    fr = idaapi.get_frame(ea)
+    if fr is None:  # unable to figure out arguments
+        return
+
+    base = getLvarSize(ea)+getRvarSize(ea)
+    for (off,size),(name,cmt) in structure.fragment(fr.id, base, getAvarSize(ea)):
+        yield off-base,name,size
+
+def stackwindow(ea, delta, direction=-1):
+    '''return the block containing all instructions within the specified stack delta'''
+    assert direction != 0, 'you make no sense with your lack of direction'
+    next = database.next if direction > 0 else database.prev
+
+    sp = getSpDelta(ea)
+    start = (ea,sp)
+    while abs(sp - start[1]) < delta:
+        sp = getSpDelta(ea)
+        ea = next(ea)
+
+    if ea < start[0]:
+        return ea+idaapi.decode_insn(ea),start[0]+idaapi.decode_insn(start[0])
+    return (start[0],ea)
+
+def stackdelta(left, right):
+    '''return the minimum,maximum delta of the range of instructions'''
+    min,max = 0,0
+    for ea in database.iterate(left,right):
+        sp = getSpDelta(ea)
+        min = sp if sp < min else min
+        max = max if sp < max else sp
+    return min,max
 
 try:
     import store.query as query
@@ -231,3 +294,93 @@ except ImportError:
             continue
         return result
 
+def byAddress(ea):
+    return idaapi.get_func(ea)
+
+class instance(object):
+    # FIXME: finish this
+    class chunk_t(object):
+        pass
+
+    @classmethod
+    def byAddress(cls, ea):
+        n = idaapi.get_fchunk_num(ea)
+        f = idaapi.getn_func(n)
+        return cls.getIndex(n)
+
+def down(ea):
+    """Returns all functions that are called by specified function"""
+    def codeRefs(ea):
+        fn = top(ea)
+        resultData,resultCode = [],[]
+        for l,r in chunks(fn):
+            for ea in database.iterate(l,r):
+                if len(database.down(ea)) == 0:
+                    insn = idaapi.ua_mnem(ea)
+                    if insn and insn.startswith('call'):
+                        resultCode.append((ea, 0))
+                    continue
+                resultData.extend( (ea,x) for x in database.dxdown(ea) )
+                resultCode.extend( (ea,x) for x in database.cxdown(ea) if not contains(fn,x) )
+            continue
+        return resultData,resultCode
+    return list(set(d for x,d in codeRefs(ea)[1]))
+
+### switch stuff
+class switch_t(object):
+    #x.defjump -- default case
+    #x.jcases,x.jumps -- number of branches,address of branch data
+    #x.ncases,x.lowcase -- number of cases,address of switch data
+    #x.startea -- beginning of basicblock that is switch
+    # get_jtable_element_size -- table entry size
+    # need some way to get pointer size
+    def __init__(self, switch_info_ex):
+        self.object = switch_info_ex
+    @property
+    def default(self):
+        # address of default case
+        return self.object.defjump
+    @property
+    def ea(self):
+        # address of beginning of switch code
+        return self.object.startea
+    @property
+    def branch_ea(self):
+        # address of branch table
+        return self.object.jumps
+    @property
+    def table_ea(self):
+        # address of case table
+        return selfobject.lowcase
+    @property
+    def branch(self):
+        # return the branch table as an array
+        pass
+    @property
+    def table(self):
+        # return the index table as an array
+        pass
+    def getCase(self, case):
+        # return the ea of the specified case number
+        raise NotImplementedError
+
+def switches(fn):
+    fn = top(fn)
+    for ea in iterate(fn):
+        x = idaapi.get_switch_info_ex(ea)
+        if x:
+            yield switch_t(x)
+        continue
+    return
+
+### vtable stuff       
+
+### flags
+def hasNoFrame(fn):
+    return not isThunk(fn) and (idaapi.get_func(fn).flags & idaapi.FUNC_FRAME == 0)
+def hasNoReturn(fn):
+    return not isThunk(fn) and (idaapi.get_func(fn).flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
+def isLibrary(fn):
+    return idaapi.get_func(fn).flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
+def isThunk(fn):
+    return idaapi.get_func(fn).flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
