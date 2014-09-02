@@ -1,5 +1,5 @@
 import logging
-import idc, comment, database, structure, idautils, idaapi
+import idc, comment, database, structure, idaapi
 '''
 function-context
 
@@ -229,14 +229,11 @@ try:
     datastore = store.ida
     def tag(address, *args, **kwds):
         '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
-    #    '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
         if len(args) == 0:
             return datastore.address(address)
-    #        return __datastore.context.get(address)
 
         elif len(args) == 1:
             key, = args
-    #        result = __datastore.context.select(query.address(address), query.attribute(key)).values()
             result = datastore.select(query.address(address), query.attribute(key)).values()
             try:
                 result = result[0][key]
@@ -247,7 +244,6 @@ try:
         key,value = args
         kwds.update({key:value})
         return datastore.address(address).set(**kwds)
-    #    return datastore.context.set(address, **kwds)
 
 except ImportError:
     import comment
@@ -269,35 +265,15 @@ except ImportError:
         return setComment(address, res, repeatable)
 
     def tag(address, *args, **kwds):
-        '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
+        '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
         if len(args) < 2:
             return tag_read(address, *args, **kwds)
 
         key,value = args
         return tag_write(address, key, value, **kwds)
 
-    """
     def select(fn, *tags, **boolean):
-        '''Fetch all instances of the specified tag located within function'''
-        if tags is None:
-            for ea in iterate(fn):
-                res = database.tag(ea)
-                if res: yield ea, res
-            return
-
-        tags = set(tags)
-        #if function.tags(fn).intersection(tags) != tags:
-        #    return {}
-
-        for ea in iterate(fn):
-            res = dict((k,v) for k,v in database.tag(ea).iteritems() if k in tags)
-            if res: yield ea,res
-        return
-    """
-
-    # FIXME: this function can be made generic
-    def select(fn, *tags, **boolean):
-        '''Fetch all instances of the specified tag located within function'''
+        '''Fetch a list of addresses within the function that contain the specified tags'''
         boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
         if tags:
             boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))

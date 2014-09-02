@@ -30,12 +30,6 @@ def segments():
     '''Returns a list of all segments in the current database'''
     return [s.startEA for s in segment.list()]
 
-if False:
-    def getblock(start, end):
-        '''Return a string of bytes'''
-        result = [ idc.Byte(ea) for ea in xrange(start, end) ]
-        return ''.join(__builtins__['map'](chr, result))
-
 def getblock(start, end):
     if start > end:
         start,end=end,start
@@ -429,7 +423,6 @@ try:
             context = None
 
         if len(args) == 0 and len(kwds) == 0:
-    #        result = __datastore.content.select(context, query.address(address))
             result = datastore.address(context).select(query.address(address))
             try:
                 result = result[address]
@@ -439,7 +432,6 @@ try:
 
         elif len(args) == 1:
             key, = args
-    #        result = __datastore.content.select(context, query.address(address), query.attribute(key))
             result = datastore.address(context).select(query.address(address), query.attribute(key))
             try:
                 result = result[address][key]
@@ -452,7 +444,6 @@ try:
             key,value = args
             kwds.update({key:value})
         return datastore.address(context).address(address).set(**kwds)
-    #    return __datastore.content.set(context, address, **kwds)
 
     def __select(q):
         for x in functions():
@@ -514,27 +505,8 @@ except ImportError:
 
         return result
 
-    """
-    def select(*tags):
-        '''yield function_ea,tagdict for each function that contains the specified tags'''
-
-        everything = functions()
-        if tags == ():
-            for i,ea in enumerate(everything):
-                res = function.tag(ea)
-                if res: yield ea,res
-            return
-
-        tags = set(tags)
-        for i,ea in enumerate(everything):
-            res = dict((k,v) for k,v in function.tag(ea).iteritems() if k in tags)
-            if res: yield ea,res
-        return
-    """
-
-    # FIXME: this function can be made generic
     def select(*tags, **boolean):
-        '''Fetch all instances of the specified tag located within function'''
+        '''Fetch all the functions containing the specified tags within it's declaration'''
         boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
         if tags:
             boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
@@ -559,22 +531,8 @@ except ImportError:
             if res: yield ea,res
         return
 
-    """
-    def selectcontents(*tags):
-        '''yield each function that contains the requested tags in it's contents'''
-        everything,tags = functions(),set(tags)
-        for i,ea in enumerate(everything):
-            t = function.tags(ea)
-            #if tags.intersection(t) == tags:
-            if tags.intersection(t):
-                yield ea
-            continue
-        return
-    """
-
-    # FIXME: this function can be made generic
     def selectcontents(*tags, **boolean):
-        '''Fetch all instances of the specified tag located within function'''
+        '''Fetch all the functions containing the specified tags within it's contents'''
         boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
         if tags:
             boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
@@ -653,7 +611,7 @@ def getArrayLength(ea):
     sz,ele = idaapi.get_item_size(ea),getSize(ea)
     return sz // ele
 
-def getStructId(ea):
+def getStructureId(ea):
     assert getType(ea) == idaapi.FF_STRU
     ti = idaapi.opinfo_t()
     res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)

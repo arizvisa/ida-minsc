@@ -3,33 +3,23 @@ segment-context
 
 generic tools for working with segments
 '''
-import idc,idautils,database
+import idc,database
 import idaapi,logging
 
-if False:
-    def getName(ea):
-        return idc.SegName(ea)
-
-    def getRange(ea):
-        return idc.GetSegmentAttr(ea, idc.SEGATTR_START), idc.GetSegmentAttr(ea, idc.SEGATTR_END)
-
-    def get(name):
-        for x in idautils.Segments():
-            if getName(x) == name:
-                return x
-            continue
-        raise KeyError(name)
-
-    def top(ea):
-        return idc.GetSegmentAttr(ea, idc.SEGATTR_START)
-
-    def bottom(ea):
-        return idc.GetSegmentAttr(ea, idc.SEGATTR_END)
+def top(ea):
+    return byAddress(ea).startEA
+def bottom(ea):
+    return byAddress(ea).endEA
 
 # enumerating
-def list():
+def iterate():
     for n in xrange(idaapi.get_segm_qty()):
         yield idaapi.getnseg(n)
+    return
+
+def list():
+    for n in iterate():
+        yield idaapi.get_true_segm_name(n) or ""
     return
 
 # searching

@@ -1,4 +1,5 @@
 import database,function
+import sys,logging
 
 class remote(object):
     '''For poor folk without a dbgeng'''
@@ -39,6 +40,7 @@ class InputBox(idaapi.PluginForm):
 
 import PySide.QtGui,idaapi
 class UI(object):
+    '''static class for interacting with IDA's Qt user-interface'''
     @classmethod
     def application(cls):
         return PySide.QtGui.QApplication.instance()
@@ -134,40 +136,43 @@ class UI(object):
                 cls.rm(path,name)
             return
 
-    class current(object):
-        """Current ida state"""
-        @classmethod
-        def address(cls):
-            """Current address"""
-            return idaapi.get_screen_ea()
-        @classmethod
-        def widget(cls):
-            """Current widget"""
-            x,y = Input.mouse.position()
-            return Input.at((x,y))
-        @classmethod
-        def color(cls):
-            """Current color"""
-            ea = cls.address()
-            return idaapi.get_item_color(ea)
-        @classmethod
-        def function(cls):
-            """Current function"""
-            ea = cls.address()
-            return idaapi.get_func(ea)
-        @classmethod
-        def segment(cls):
-            """Current segment"""
-            ea = cls.address()
-            return idaapi.getseg(ea)
-        @classmethod
-        def status(cls):
-            """IDA Status"""
-            raise NotImplementedError
-        @classmethod
-        def symbol(cls):
-            """Return the symbol name directly under the cursor"""
-            return idaapi.get_highlighted_identifier()
+class current(object):
+    """Fetching things from current visual state.
+
+    Pretty much used for doing friendly user-interface type stuff.
+    """
+    @classmethod
+    def address(cls):
+        """Current address"""
+        return idaapi.get_screen_ea()
+    @classmethod
+    def widget(cls):
+        """Current widget"""
+        x,y = Input.mouse.position()
+        return Input.at((x,y))
+    @classmethod
+    def color(cls):
+        """Current color"""
+        ea = cls.address()
+        return idaapi.get_item_color(ea)
+    @classmethod
+    def function(cls):
+        """Current function"""
+        ea = cls.address()
+        return idaapi.get_func(ea)
+    @classmethod
+    def segment(cls):
+        """Current segment"""
+        ea = cls.address()
+        return idaapi.getseg(ea)
+    @classmethod
+    def status(cls):
+        """IDA Status"""
+        raise NotImplementedError
+    @classmethod
+    def symbol(cls):
+        """Return the symbol name directly under the cursor"""
+        return idaapi.get_highlighted_identifier()
 
 #class MenuItem(QtGui.
 
@@ -177,12 +182,16 @@ class UI(object):
 #class navigation(object):
 #    pass
 
-def colormarks():
+## XXX: would be useful to have a quick wrapper class for interacting with Ida's mark list
+##          in the future, this would be abstracted into a arbitrarily sized tree.
+
+def colormarks(color=0x7f007f):
+    '''Iterate through all database marks and tag+color their address'''
     # tag and color
     f = set()
     for ea,m in database.marks():
         database.tag(ea, 'mark', m)
-        database.color(ea, 0x7f007f)
+        database.color(ea, color)
         try:
             f.add(function.top(ea))
         except ValueError:
@@ -192,5 +201,68 @@ def colormarks():
     # tag the functions too
     for ea in list(f):
         m = function.marks(ea)
-        database.tag(ea, 'marks', ','.join([hex(a) for a,b in m]))
+        function.tag(ea, 'marks', [ea for ea,_ in m])
+    return
+
+def recovermarks():
+    '''Utilizing any tag information found in the database, recreate all the database marks.'''
+    # collect
+    result = []
+    for fn,l in database.select('marks'):
+        m = set( (l['marks']) if hasattr(l['marks'],'__iter__') else [int(x,16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
+        res = [(ea,d['mark']) for ea,d in function.select(fn,'mark')]
+        if m != set(a for a,_ in res):
+            logging.warning("%x: ignoring cached version of marks due to being out-of-sync with real values : %r : %r", fn, map(hex,m), map(hex,set(a for a,_ in res)))
+        result.extend(res)
+    result.sort(cmp=lambda x,y: cmp(x[1],y[1]))
+
+    # discovered marks versus database marks
+    result = dict(result)
+    current = {ea:descr for ea,descr in database.marks()}
+
+    # create tags
+    for x,y in result.items():
+        if (x not in current) or (current[x] != result[x]):
+            if current[x] != result[x]:
+                logging.info('%x: database tag is newer than mark description : %r', x, result[x])
+            database.mark(x, y)
+            continue
+        logging.warning('%x: skipping already existing mark : %r', x, current[x])
+
+    # marks that aren't reachable in the database
+    for ea in set(current.viewkeys()).difference(result.viewkeys()):
+        logging.warning('%x: unreachable mark (global) : %r', ea, current[ea])
+
+    # color them
+    colormarks()
+
+def checkmarks():
+    '''Output all functions (sys.stdout) containing more than 1 mark.'''
+    res = []
+    for a,m in database.marks():
+        try:
+            res.append((function.top(a), a, m))
+        except ValueError:
+            pass
+        continue
+
+    d = list(res)
+    d.sort( lambda a,b: cmp(a[0], b[0]) )
+
+    flookup = {}
+    for fn,a,m in d:
+        try:
+            flookup[fn].append((a,m))
+        except:
+            flookup[fn] = [(a,m)]
+        continue
+
+    functions = [ (k,v) for k,v in flookup.items() if len(v) > 1 ]
+    if not functions:
+        logging.warning('There are no functions available containing multiple marks.')
+        return
+
+    for k,v in functions:
+        print >>sys.stdout, '%x : in function %s'% (k,function.getName(k))
+        print >>sys.stdout, '\n'.join( ('- %x : %s'%(a,m) for a,m in sorted(v)) )
     return

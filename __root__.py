@@ -2,7 +2,7 @@
 
 # import the default modules
 import database,segment,function
-import instruction
+import instruction,helper
 
 import database as db,function as fn
 
@@ -17,4 +17,4 @@ def hex(i):
 h,go = database.h,database.go
 
 import helper
-from helper import remote
+from helper import remote,colormarks,checkmarks,recovermarks
