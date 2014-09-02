@@ -1,7 +1,7 @@
-import logging
-import idc,idautils,idaapi as ida
-import instruction,function,segment,declaration
-import array
+import logging,os
+import idc,idautils,idaapi
+import instruction as _instruction,function,segment,declaration
+import array,itertools
 
 def isCode(ea):
     '''True if ea marked as code'''
@@ -43,7 +43,7 @@ def getblock(start, end):
 
     if not contains(start):
         raise ValueError('Address %x is not in database'%start)
-    return ida.get_many_bytes(start, length)
+    return idaapi.get_many_bytes(start, length)
 
 def prev(ea):
     '''return the previous address (instruction or data)'''
@@ -96,7 +96,24 @@ def guessrange(ea):
     return start,end
 
 def decode(ea):
-    return instruction.decode(ea)
+    return _instruction.decode(ea)
+
+def instruction(ea):
+    insn = idaapi.generate_disasm_line(ea)
+    unformatted = idaapi.tag_remove(insn)
+    nocomment = unformatted[:unformatted.rfind(';')]
+    return reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
+
+def disasm(ea, count=1):
+    res = []
+    while count > 0:
+        insn = idaapi.generate_disasm_line(ea)
+        unformatted = idaapi.tag_remove(insn)
+        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted else unformatted
+        res.append( '{:x}: {:s}'.format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
+        ea = next(ea)
+        count -= 1
+    return '\n'.join(res)
 
 # FIXME: there's issues when trying to get xrefs from a structure or array,
 #        if it's not the first address of the item, then it will return no
@@ -108,16 +125,16 @@ def decode(ea):
 def iterate_refs(address, start, next):
     ea = address
     address = start(ea)
-    while address != ida.BADADDR:
+    while address != idaapi.BADADDR:
         yield address
         address = next(ea, address)
     return
 
 def drefs(ea, descend=False):
     if descend:
-        start,next = ida.get_first_dref_from, ida.get_next_dref_from
+        start,next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
     else:
-        start,next = ida.get_first_dref_to, ida.get_next_dref_to
+        start,next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
 
     for addr in iterate_refs(ea, start, next):
         yield addr
@@ -125,9 +142,9 @@ def drefs(ea, descend=False):
 
 def crefs(ea, descend=False):
     if descend:
-        start,next = ida.get_first_cref_from, ida.get_next_cref_from
+        start,next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
     else:
-        start,next = ida.get_first_cref_to, ida.get_next_cref_to
+        start,next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
 
     for addr in iterate_refs(ea, start, next):
         yield addr
@@ -197,18 +214,24 @@ def h():
 
 here = h    # alias
 
+def module():
+    return filename().split('\\')[-1].rsplit('.',2)[0]
+
 def filename():
     '''return the filename that the database was built from'''
-    return idc.GetInputFile()
+    return idaapi.get_root_filename()
+
+def idb():
+    return idaapi.cvar.database_idb
 
 def path():
     '''return the full path to the database'''
-    filepath = idc.GetIdbPath().replace('\\','/')
+    filepath = idb().replace(os.sep,'/')
     return filepath[: filepath.rfind('/')] 
 
 def baseaddress():
     '''returns the baseaddress of the module'''
-    return ida.get_imagebase()
+    return idaapi.get_imagebase()
 base=baseaddress
 
 def getoffset(ea):
@@ -240,11 +263,11 @@ def name(ea, string=None):
             flags |= 0
 
         idc.MakeNameEx(ea, string, flags)
-        tag(ea, '__name__', string)
+        tag(ea, 'name', string)
         return n
 
     try:
-        return tag(ea, '__name__')
+        return tag(ea, 'name')
     except KeyError:
         pass
     return None
@@ -319,11 +342,11 @@ def color(ea, *args, **kwds):
 def add_entry(name, ea, ordinal=None):
     '''addentry(name, ea, index?) -> adds an entry point to the database'''
     if ordinal == None:
-        ordinal = ida.get_entry_qty()
-    return ida.add_entry(ordinal, ea, name, 0)
+        ordinal = idaapi.get_entry_qty()
+    return idaapi.add_entry(ordinal, ea, name, 0)
 
 class config(object):
-    info = ida.get_inf_structure()
+    info = idaapi.get_inf_structure()
     @classmethod
     def version(cls):
         return cls.info.version
@@ -366,13 +389,22 @@ class config(object):
 
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea):
-    result = cxdown(ea)
-    if len(result) != 1:
-        raise ValueError('Invalid code reference: %s'% repr(result))
-    fn, = result
-
     if not function.contains(ea, ea):
         return None
+
+    # scan down until we find a call that references something
+    chunk, = ((l,r) for l,r in function.chunks(ea) if l <= ea <= r)
+    result = []
+    while (len(result) < 1) and ea < chunk[1]:
+        # FIXME: it's probably not good to just scan for a call
+        if not instruction(ea).startswith('call '):
+            ea = next(ea)
+            continue
+        result = cxdown(ea)
+
+    if len(result) != 1:
+        raise ValueError('Invalid code reference: %x %s'% (ea,repr(result)))
+    fn, = result
 
     result = []
     for offset,name,size in function.getArguments(fn):
@@ -380,7 +412,7 @@ def makecall(ea):
         # FIXME: if left is not an assignment or a push, find last assignment
         result.append((name,left))
 
-    result = ['%s=%s'%(name,instruction.op_repr(ea,0)) for name,ea in result]
+    result = ['%s=%s'%(name,_instruction.op_repr(ea,0)) for name,ea in result]
     return '%s(%s)'%(declaration.demangle(function.getName(fn)), ','.join(result))
 
 try:
@@ -445,80 +477,146 @@ except ImportError:
     import comment
 
     def tag_read(address, key=None, repeatable=0):
-        res = idc.GetCommentEx(address, repeatable)
+        res = idaapi.get_cmt(address, int(bool(repeatable)))
         dict = comment.toDict(res)
-        name = idc.Name(address)
-        if name:
-            dict['name'] = name
-        if key:
-            return dict[key]
-        return dict
+        name = idaapi.get_name(-1,address)
+        dict.setdefault('name', name)
+        if key is None:
+            return dict
+        return dict[key]
 
     def tag_write(address, key, value, repeatable=0):
         dict = tag_read(address, repeatable=repeatable)
         dict[key] = value
         res = comment.toString(dict)
-        if repeatable:
-            return idc.MakeRptCmt(address, res)
-        return idc.MakeComm(address, res)
+        return idaapi.set_cmt(address, res, int(bool(repeatable)))
 
-    def tag(address, *args, **kwds):
-        '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
-        try:
-            # in a function
-            function.top(address)
-            if 'repeatable' not in kwds:
-                kwds['repeatable'] = False
-
-        except ValueError:
-            # not in a function, could be a global, so it's now repeatable
-            if 'repeatable' not in kwds:
-                kwds['repeatable'] = True
-            pass
+    def tag(ea, *args, **kwds):
+        '''tag(ea, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
+        # if not in a function, it could be a global, so make the tag repeatable
+        #   otherwise, use a non-repeatable comment
+        ea = int(ea)
+        func = function.byAddress(ea)
+        kwds.setdefault('repeatable', True if func is None else False)
 
         if len(args) < 2:
-            return tag_read(int(address), *args, **kwds)
+            return tag_read(ea, *args, **kwds)
+
         key,value = args
-        return tag_write(int(address), key, value, **kwds)
+        result = tag_write(ea, key, value, **kwds)
 
-    def select(tags=None):
-        if tags is None:
-            result = {}
-            for ea in functions():
-                res = function.tag(ea)
-                if res:
-                    result[ea] = res
-                continue
-            return result
+        # add tag-name to function's cache
+        if func is not None and value is not None and key is not '__tags__':
+            top = func.startEA
+            tags = function.tags(ea)
+            tags.add(key)
+            tag_write(top, '__tags__', tags)
 
-        tags = set((tags,)) if type(tags) is str else set(tags)
-
-        result = {}
-        for ea in functions():
-            res = dict((k,v) for k,v in function.tag(ea).iteritems() if k in tags)
-            if res:
-                result[ea] = res
-            continue
         return result
 
+    """
+    def select(*tags):
+        '''yield function_ea,tagdict for each function that contains the specified tags'''
+
+        everything = functions()
+        if tags == ():
+            for i,ea in enumerate(everything):
+                res = function.tag(ea)
+                if res: yield ea,res
+            return
+
+        tags = set(tags)
+        for i,ea in enumerate(everything):
+            res = dict((k,v) for k,v in function.tag(ea).iteritems() if k in tags)
+            if res: yield ea,res
+        return
+    """
+
+    # FIXME: this function can be made generic
+    def select(*tags, **boolean):
+        '''Fetch all instances of the specified tag located within function'''
+        boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
+        if tags:
+            boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
+
+        if not boolean:
+            for ea in functions():
+                res = database.tag(ea)
+                if res: yield ea, res
+            return
+
+        for ea in functions():
+            res,d = {},function.tag(ea)
+
+            Or = boolean.get('Or', set())
+            res.update((k,v) for k,v in d.iteritems() if k in Or)
+
+            And = boolean.get('And', set())
+            if And:
+                if And.intersection(d.viewkeys()) == And:
+                    res.update((k,v) for k,v in d.iteritems() if k in And)
+                else: continue
+            if res: yield ea,res
+        return
+
+    """
+    def selectcontents(*tags):
+        '''yield each function that contains the requested tags in it's contents'''
+        everything,tags = functions(),set(tags)
+        for i,ea in enumerate(everything):
+            t = function.tags(ea)
+            #if tags.intersection(t) == tags:
+            if tags.intersection(t):
+                yield ea
+            continue
+        return
+    """
+
+    # FIXME: this function can be made generic
+    def selectcontents(*tags, **boolean):
+        '''Fetch all instances of the specified tag located within function'''
+        boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
+        if tags:
+            boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
+
+        if not boolean:
+            for ea in functions():
+                res = function.tags(ea)
+                if res: yield ea, res
+            return
+
+        for ea in functions():
+            res,d = set(),function.tags(ea)
+
+            Or = boolean.get('Or', set())
+            res.update(Or.intersection(d))
+
+            And = boolean.get('And', set())
+            if And:
+                if And.intersection(d) == And:
+                    res.update(And)
+                else: continue
+            if res: yield ea,res
+        return
+
 def getImportModules():
-    return [ida.get_import_module_name(i) for i in xrange(ida.get_import_module_qty())]
+    return [idaapi.get_import_module_name(i) for i in xrange(idaapi.get_import_module_qty())]
 def getImports(modulename):
     idx = [x.lower() for x in getImportModules()].index(modulename.lower())
     result = []
     def fn(ea,name,ordinal):
         result.append((ea,(name,ordinal)))
         return True
-    ida.enum_import_names(idx,fn)
+    idaapi.enum_import_names(idx,fn)
     return result
 def imports():
     """Iterator containing (address,(module,name,ordinal)) of imports in database"""
-    for idx,module in ((i,ida.get_import_module_name(i)) for i in xrange(ida.get_import_module_qty())):
+    for idx,module in ((i,idaapi.get_import_module_name(i)) for i in xrange(idaapi.get_import_module_qty())):
         result = []
         def fn(ea,name,ordinal):
             result.append( (ea,(name,ordinal)) )
             return True
-        ida.enum_import_names(idx,fn)
+        idaapi.enum_import_names(idx,fn)
         for ea,(name,ordinal) in result:
             yield ea,(module,name,ordinal)
         continue
@@ -528,18 +626,37 @@ def imports():
 class register(object):
     @classmethod
     def names(cls):
-        return ida.ph_get_regnames()
+        return idaapi.ph_get_regnames()
     @classmethod
     def segments(cls):
         names = cls.names()
-        return [names[i] for i in xrange(ida.ph_get_regFirstSreg(),ida.ph_get_regLastSreg()+1)]
+        return [names[i] for i in xrange(idaapi.ph_get_regFirstSreg(),idaapi.ph_get_regLastSreg()+1)]
     @classmethod
     def codesegment(cls):
-        return cls.names()[ida.ph_get_regCodeSreg()]
+        return cls.names()[idaapi.ph_get_regCodeSreg()]
     @classmethod
     def datasegment(cls):
-        return cls.names()[ida.ph_get_regDataSreg()]
+        return cls.names()[idaapi.ph_get_regDataSreg()]
     @classmethod
     def segmentsize(cls):
-        return ida.ph_get_segreg_size()
+        return idaapi.ph_get_segreg_size()
+
+def getType(ea):
+    module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
+    res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
+    return res
+
+def getSize(ea):
+    return idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
+
+def getArrayLength(ea):
+    sz,ele = idaapi.get_item_size(ea),getSize(ea)
+    return sz // ele
+
+def getStructId(ea):
+    assert getType(ea) == idaapi.FF_STRU
+    ti = idaapi.opinfo_t()
+    res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
+    assert res, 'idaapi.get_opinfo returned %x at %x'% (res,ea)
+    return ti.tid
 

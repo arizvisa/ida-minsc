@@ -7,9 +7,11 @@ generic tools for working in the context of a function.
 '''
 
 def getComment(ea, repeatable=1):
-    return idc.GetFunctionCmt(int(ea), repeatable)
+    fn = byAddress(ea)
+    return idaapi.get_func_cmt(fn, repeatable)
 def setComment(ea, string, repeatable=1):
-    return idc.SetFunctionCmt(int(ea), string, repeatable)
+    fn = byAddress(ea)
+    return idaapi.set_func_cmt(fn, string, repeatable)
 
 def getName(ea):
     '''fetches the function name, or the global name'''
@@ -48,10 +50,10 @@ def chunks(ea):
 
 def getRange(ea):
     '''tuple containing function start and end'''
-    start, end = (idc.GetFunctionAttr(ea, idc.FUNCATTR_START), idc.GetFunctionAttr(ea, idc.FUNCATTR_END))
-    if (start == 0xffffffff) and (end == 0xffffffff):
+    func = byAddress(ea)
+    if func is None:
         raise ValueError, 'address %x is not contained in a function'% ea
-    return start, end
+    return func.startEA,func.endEA
 
 def make(start, end=idc.BADADDR):
     '''pseudo-safely makes the address at start a function'''
@@ -60,28 +62,23 @@ def make(start, end=idc.BADADDR):
         return idc.MakeFunction(start, end)
     raise ValueError, 'address %x does not contain code'% start
 
-def contains(fn, address):
-    '''Checks if address is contained in function and any of it's chunks'''
-    try:
-        fn = top(fn)
-    except ValueError:
-        # not a valid function
+def contains(func, ea):
+    '''Checks if ea is contained in function or in any of it's chunks'''
+    f = byAddress(func)
+    if f is None:   # or not f.contains(ea):
         return False
-
-    (start,end) = getRange(fn)
-    if address >= start and address < end:
-        return True
-
-    for start,end in chunks(fn):
-        if address >= start and address < end:
+    for start,end in chunks(func):
+        if start <= ea < end:
             return True
         continue
-
     return False
 
 def top(ea):
     '''Jump to the top of the specified function'''
-    min,max = getRange(ea)
+    func = byAddress(ea)
+    if func is None:
+        raise ValueError, "Address %x not in a function"% ea
+    min,_ = func.startEA,func.endEA
     return min
 
 def marks(fn):
@@ -130,6 +127,17 @@ def iterate(fn):
 def searchinstruction(fn, match=lambda insn: True):
     for ea in iterate(fn):
         if match( database.decode(ea) ):
+            yield ea
+        continue
+    return
+
+import re
+def search(fn, regex):
+    '''Return each instruction that matches the case-insensitive regex'''
+    pattern = re.compile(regex, re.I)
+    for ea in iterate(fn):
+        insn = re.sub(' +', ' ', database.instruction(ea))
+        if pattern.search(insn) is not None:
             yield ea
         continue
     return
@@ -263,39 +271,69 @@ except ImportError:
     def tag(address, *args, **kwds):
         '''tag(address, key?, value?, repeatable=True/False) -> fetches/stores a tag from a function's comment'''
         if len(args) < 2:
-            try:
-                result = tag_read(address, *args, **kwds)
-            except Exception, e:
-                logging.warn('function.tag(%x): %s raised'% (address, repr(e)))
-                result = None
-            return result
+            return tag_read(address, *args, **kwds)
 
         key,value = args
         return tag_write(address, key, value, **kwds)
 
-    def select(fn, tags=None):
+    """
+    def select(fn, *tags, **boolean):
         '''Fetch all instances of the specified tag located within function'''
         if tags is None:
-            result = {}
             for ea in iterate(fn):
                 res = database.tag(ea)
-                if res:
-                    result[ea] = res
-                continue
-            return result
+                if res: yield ea, res
+            return
 
-        tags = set((tags,)) if type(tags) is str else set(tags)
+        tags = set(tags)
+        #if function.tags(fn).intersection(tags) != tags:
+        #    return {}
 
-        result = {}
         for ea in iterate(fn):
             res = dict((k,v) for k,v in database.tag(ea).iteritems() if k in tags)
-            if res:
-                result[ea] = res
-            continue
-        return result
+            if res: yield ea,res
+        return
+    """
+
+    # FIXME: this function can be made generic
+    def select(fn, *tags, **boolean):
+        '''Fetch all instances of the specified tag located within function'''
+        boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
+        if tags:
+            boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
+
+        if not boolean:
+            for ea in iterate(fn):
+                res = database.tag(ea)
+                if res: yield ea, res
+            return
+
+        for ea in iterate(fn):
+            res,d = {},database.tag(ea)
+
+            Or = boolean.get('Or', set())
+            res.update((k,v) for k,v in d.iteritems() if k in Or)
+
+            And = boolean.get('And', set())
+            if And:
+                if And.intersection(d.viewkeys()) == And:
+                    res.update((k,v) for k,v in d.iteritems() if k in And)
+                else: continue
+            if res: yield ea,res
+        return
 
 def byAddress(ea):
     return idaapi.get_func(ea)
+
+def tags(ea):
+    func_ea = top(ea)    
+    try:
+        if func_ea is None:
+            raise KeyError
+        result = eval(database.tag_read(func_ea, '__tags__'))
+    except KeyError:
+        result = set()
+    return result
 
 class instance(object):
     # FIXME: finish this
