@@ -1,4 +1,4 @@
-import sys, idc, comment, database
+import sys, idc, database
 '''
 structure-context
 
@@ -160,8 +160,10 @@ class instance(object):
     class member_t(object):
         integer = {
             1:(idaapi.FF_BYTE,-1), 2:(idaapi.FF_WORD,-1), 3:(idaapi.FF_3BYTE,-1), 4:(idaapi.FF_DWRD,-1),
-            8:(idaapi.FF_QWRD,-1), 10:(idaapi.FF_TBYT,-1), 16:(idaapi.FF_OWRD,-1), 32:(idaapi.FF_YWRD,-1),
+            8:(idaapi.FF_QWRD,-1), 10:(idaapi.FF_TBYT,-1), 16:(idaapi.FF_OWRD,-1)
         }
+        if hasattr(idaapi, 'FF_YWRD'): integer[32] = (getattr(idaapi, 'FF_YWRD'),-1)
+
         decimal = {
             4:(idaapi.FF_FLOAT,-1), 8:(idaapi.FF_DOUBLE,-1), 10:(idaapi.FF_PACKREAL,-1), 12:(idaapi.FF_PACKREAL,-1),
         }

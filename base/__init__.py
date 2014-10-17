@@ -1,4 +1,4 @@
-import segment,function,database
+import database,function,segment,structure,enum
 import _idaapi as idaapi,ctypes
 
 library = ctypes.WinDLL if __import__('os').name == 'nt' else ctypes.CDLL

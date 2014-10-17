@@ -1,12 +1,8 @@
-import idc
-
 '''
 tagged-comments plugin.
 provides serialization/deserialization from arbitrary types to fit within ida's comments
 [arizvisa@tippingpoint.com]
 '''
-
-EXPORT = ['toString', 'toDict']
 
 def tokens(input):
     input = iter(input)

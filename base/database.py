@@ -1,8 +1,97 @@
+'''
+database-context
+
+generic tools for working in the context of the database
+'''
+
 import logging,os
 import idc,idautils,idaapi
-import instruction as _instruction,function,segment,declaration
+import instruction as _instruction,function,segment,base._declaration as _declaration
 import array,itertools
 
+## properties
+def h():
+    '''slightly less typing for idc.ScreenEA()'''
+    return idc.ScreenEA()
+
+here = h    # alias
+
+def module():
+    return filename().split('\\')[-1].rsplit('.',2)[0]
+
+def filename():
+    '''return the filename that the database was built from'''
+    return idaapi.get_root_filename()
+
+def idb():
+    return idaapi.cvar.database_idb
+
+def path():
+    '''return the full path to the database'''
+    filepath = idb().replace(os.sep,'/')
+    return filepath[: filepath.rfind('/')] 
+
+def baseaddress():
+    '''returns the baseaddress of the module'''
+    return idaapi.get_imagebase()
+base=baseaddress
+
+def range():
+    '''Return the total address range of the database'''
+    return config.bounds()
+
+class config(object):
+    info = idaapi.get_inf_structure()
+    @classmethod
+    def version(cls):
+        return cls.info.version
+
+    @classmethod
+    def bits(cls):
+        '''return number of bits'''
+        if cls.info.is_64bit():
+            return 64
+        elif cls.info.is_32bit():
+            return 32
+        raise ValueError('Unknown bit size')
+
+    @classmethod
+    def processor(cls):
+        '''return processor name'''
+        return cls.info.procName
+
+    @classmethod
+    def graphview(cls):
+        '''currently using graph view'''
+        return cls.info.graph_view != 0
+
+    @classmethod
+    def main(cls):
+        return cls.info.main
+
+    @classmethod
+    def entry(cls):
+        return cls.info.beginEA
+        #return cls.info.startIP
+
+    @classmethod
+    def margin(cls):
+        return cls.info.margin
+
+    @classmethod
+    def bounds(cls):
+        return cls.info.minEA,cls.info.maxEA
+
+def functions():
+    '''Returns a list of all the functions in the current database (using idautils)'''
+    min,max = range()
+    return list(idautils.Functions(min, max))
+
+def segments():
+    '''Returns a list of all segments in the current database'''
+    return [segment.byName(s).startEA for s in segment.list()]
+
+## information about a given address
 def isCode(ea):
     '''True if ea marked as code'''
     return idc.isCode( idc.GetFlags(ea) )
@@ -21,31 +110,32 @@ def isHead(ea):
 def isTail(ea):
     return idc.isTail( idc.GetFlags(ea) )
 
-def functions():
-    '''Returns a list of all the functions in the current database (using idautils)'''
-    min,max = idc.MinEA(), idc.MaxEA()
-    return list(idautils.Functions(min, max))
+def getType(ea):
+    module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
+    res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
+    return res
 
-def segments():
-    '''Returns a list of all segments in the current database'''
-    return [s.startEA for s in segment.list()]
+def getSize(ea):
+    return idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
 
-def getblock(start, end):
-    if start > end:
-        start,end=end,start
-    length = end-start
+def getArrayLength(ea):
+    sz,ele = idaapi.get_item_size(ea),getSize(ea)
+    return sz // ele
 
-    if not contains(start):
-        raise ValueError('Address %x is not in database'%start)
-    return idaapi.get_many_bytes(start, length)
+def getStructureId(ea):
+    assert getType(ea) == idaapi.FF_STRU
+    ti = idaapi.opinfo_t()
+    res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
+    assert res, 'idaapi.get_opinfo returned %x at %x'% (res,ea)
+    return ti.tid
 
 def prev(ea):
     '''return the previous address (instruction or data)'''
-    return idc.PrevHead(ea, idc.MinEA())
+    return idaapi.prev_head(ea, 0)
 
 def next(ea):
     '''return the next address (instruction or data)'''
-    return idc.NextHead(ea, idc.MaxEA())
+    return idaapi.next_head(ea, -1)
 
 def walk(ea, next, match):
     if match(ea):
@@ -109,15 +199,8 @@ def disasm(ea, count=1):
         count -= 1
     return '\n'.join(res)
 
-# FIXME: there's issues when trying to get xrefs from a structure or array,
-#        if it's not the first address of the item, then it will return no
-#        xrefs for that particular address. it might be possible to fix this
-#        in this module.
-
-#   -- it seems like ida makes structures and stuff into an instruction_t or
-#       something
-def iterate_refs(address, start, next):
-    ea = address
+def _iterate_refs(address, start, next):
+    ea = address if isHead(address) else prev(address)
     address = start(ea)
     while address != idaapi.BADADDR:
         yield address
@@ -130,7 +213,7 @@ def drefs(ea, descend=False):
     else:
         start,next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
 
-    for addr in iterate_refs(ea, start, next):
+    for addr in _iterate_refs(ea, start, next):
         yield addr
     return
 
@@ -140,7 +223,7 @@ def crefs(ea, descend=False):
     else:
         start,next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
 
-    for addr in iterate_refs(ea, start, next):
+    for addr in _iterate_refs(ea, start, next):
         yield addr
     return
 
@@ -168,25 +251,38 @@ def down(ea):
     '''All locations that are referenced by the specified address'''
     return cxdown(ea) + dxdown(ea)
 
-demangle = declaration.demangle
+## functions
+demangle = _declaration.demangle
 
+def getblock(start, end):
+    if start > end:
+        start,end=end,start
+    length = end-start
+
+    if not contains(start):
+        raise ValueError('Address %x is not in database'%start)
+    return idaapi.get_many_bytes(start, length)
+getBlock = getblock
+
+def read(ea, size):
+    return idaapi.get_many_bytes(ea, size)
+def write(ea, data, original=False):
+    return idaapi.patch_many_bytes(ea, data) if original else idaapi.put_many_bytes(ea, data)
 def marks():
     '''returns all the known marked positions in an .idb'''
     index = 1
     while True:
         ea = idc.GetMarkedPos(index)
-        if ea == 0xffffffff:
+        if ea == idaapi.BADADDR:
             break
         comment = idc.GetMarkComment(index)
         yield ea, comment
         index += 1
     return
-
 def mark(ea, message):
-    # TODO: give a warning if we're replacing a mark at the given ea
+    # FIXME: give a warning if we're replacing a mark at the given ea
     nextmark = len(list(marks())) + 1
     idc.MarkPosition(ea, 0, 0, 0, nextmark, message)
-
 def iterate(start, end):
     '''Iterate through instruction/data boundaries within the specified range'''
     while start < end:
@@ -202,42 +298,13 @@ def go(ea):
     idc.Jump(ea)
     return ea
 
-def h():
-    '''slightly less typing for idc.ScreenEA()'''
-    return idc.ScreenEA()
-
-here = h    # alias
-
-def module():
-    return filename().split('\\')[-1].rsplit('.',2)[0]
-
-def filename():
-    '''return the filename that the database was built from'''
-    return idaapi.get_root_filename()
-
-def idb():
-    return idaapi.cvar.database_idb
-
-def path():
-    '''return the full path to the database'''
-    filepath = idb().replace(os.sep,'/')
-    return filepath[: filepath.rfind('/')] 
-
-def baseaddress():
-    '''returns the baseaddress of the module'''
-    return idaapi.get_imagebase()
-base=baseaddress
-
 def getoffset(ea):
     '''returns the offset of ea from the baseaddress'''
     return ea - baseaddress()
+getOffset = getoffset
 
 def search(name):
-    return idc.LocByName(name)
-
-def searchname(name):
-    raise DeprecationWarning('database.searchname has been deprecated in favor of database.search')
-    return search(name)
+    return idaapi.get_name_ea(-1, name)
 
 def name(ea, string=None):
     '''Returns the name at the specified address. (local than global)'''
@@ -256,7 +323,7 @@ def name(ea, string=None):
         except ValueError:
             flags |= 0
 
-        idc.MakeNameEx(ea, string, flags)
+        res = idaapi.set_name(ea, string, flags)
         tag(ea, 'name', string)
         return n
 
@@ -298,20 +365,8 @@ def map(l, *args, **kwds):
         result.append( l(x, *args, **kwds) )
     return result
 
-def range():
-    '''Return the total address range of the database'''
-    left,right = 0xffffffff,0x00000000
-    for x in segments():
-        l,r = segment.range(x)
-        if l < left:
-            left = l
-        if r > right:
-            right = r
-        continue
-    return baseaddress(), right
-
 def contains(ea):
-    l,r = range()
+    l,r = config.bounds()
     return (ea >= l) and (ea < r)
 
 def erase(ea):
@@ -333,53 +388,9 @@ def color(ea, *args, **kwds):
         return color_read(ea, *args, **kwds)
     return color_write(ea, *args, **kwds)
 
-def add_entry(name, ea, ordinal=None):
-    '''addentry(name, ea, index?) -> adds an entry point to the database'''
-    if ordinal == None:
-        ordinal = idaapi.get_entry_qty()
-    return idaapi.add_entry(ordinal, ea, name, 0)
-
-class config(object):
-    info = idaapi.get_inf_structure()
-    @classmethod
-    def version(cls):
-        return cls.info.version
-
-    @classmethod
-    def bits(cls):
-        '''return number of bits'''
-        if cls.info.is_64bit():
-            return 64
-        elif cls.info.is_32bit():
-            return 32
-        raise ValueError('Unknown bit size')
-
-    @classmethod
-    def processor(cls):
-        '''return processor name'''
-        return cls.info.procName
-
-    @classmethod
-    def graphview(cls):
-        '''currently using graph view'''
-        return cls.info.graph_view != 0
-
-    @classmethod
-    def main(cls):
-        return cls.info.main
-
-    @classmethod
-    def entry(cls):
-        return cls.info.beginEA
-        #return cls.info.startIP
-
-    @classmethod
-    def margin(cls):
-        return cls.info.margin
-
-    @classmethod
-    def bounds(cls):
-        return cls.info.minEA,cls.info.maxEA
+def addEntry(name, ea, ordinal=None):
+    '''addEntry(name, ea, index?) -> adds an entry point to the database'''
+    return idaapi.add_entry(idaapi.get_entry_qty() if ordinal is None else ordinal, ea, name, 0)
 
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea):
@@ -407,7 +418,7 @@ def makecall(ea):
         result.append((name,left))
 
     result = ['%s=%s'%(name,_instruction.op_repr(ea,0)) for name,ea in result]
-    return '%s(%s)'%(declaration.demangle(function.getName(fn)), ','.join(result))
+    return '%s(%s)'%(_declaration.demangle(function.name(function.byAddress(fn))), ','.join(result))
 
 try:
     import store.query as query
@@ -465,11 +476,11 @@ try:
         return __select( query._and(*result) )
 
 except ImportError:
-    import comment
+    import base._comment as _comment
 
     def tag_read(address, key=None, repeatable=0):
         res = idaapi.get_cmt(address, int(bool(repeatable)))
-        dict = comment.toDict(res)
+        dict = _comment.toDict(res)
         name = idaapi.get_name(-1,address)
         dict.setdefault('name', name)
         if key is None:
@@ -479,7 +490,7 @@ except ImportError:
     def tag_write(address, key, value, repeatable=0):
         dict = tag_read(address, repeatable=repeatable)
         dict[key] = value
-        res = comment.toString(dict)
+        res = _comment.toString(dict)
         return idaapi.set_cmt(address, res, int(bool(repeatable)))
 
     def tag(ea, *args, **kwds):
@@ -487,7 +498,10 @@ except ImportError:
         # if not in a function, it could be a global, so make the tag repeatable
         #   otherwise, use a non-repeatable comment
         ea = int(ea)
-        func = function.byAddress(ea)
+        try:
+            func = function.byAddress(ea)
+        except Exception:
+            func = None
         kwds.setdefault('repeatable', True if func is None else False)
 
         if len(args) < 2:
@@ -557,6 +571,22 @@ except ImportError:
             if res: yield ea,res
         return
 
+if False:
+    def select_equal(ea, **matches):
+        for ea,res in select(ea, And=matches.keys()):
+            if all(k in res and matches[k] == res[k] for k in matches.items()):
+                yield ea,res
+            continue
+        return
+            
+    def selectcontents_equal(ea, **matches):
+        for ea,res in selectcontents(ea, And=matches.keys()):
+            if all(k in res and matches[k] == res[k] for k in matches.items()):
+                yield ea,res
+            continue
+        return
+
+## imports
 def getImportModules():
     return [idaapi.get_import_module_name(i) for i in xrange(idaapi.get_import_module_qty())]
 def getImports(modulename):
@@ -580,7 +610,7 @@ def imports():
         continue
     return
 
-### register information.
+### register information
 class register(object):
     @classmethod
     def names(cls):
@@ -598,23 +628,4 @@ class register(object):
     @classmethod
     def segmentsize(cls):
         return idaapi.ph_get_segreg_size()
-
-def getType(ea):
-    module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
-    res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
-    return res
-
-def getSize(ea):
-    return idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
-
-def getArrayLength(ea):
-    sz,ele = idaapi.get_item_size(ea),getSize(ea)
-    return sz // ele
-
-def getStructureId(ea):
-    assert getType(ea) == idaapi.FF_STRU
-    ti = idaapi.opinfo_t()
-    res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
-    assert res, 'idaapi.get_opinfo returned %x at %x'% (res,ea)
-    return ti.tid
 

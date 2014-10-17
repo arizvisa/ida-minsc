@@ -1,46 +1,104 @@
-import logging
-import idc, comment, database, structure, idaapi
 '''
 function-context
 
 generic tools for working in the context of a function.
 '''
 
-def getComment(ea, repeatable=1):
-    fn = byAddress(ea)
-    return idaapi.get_func_cmt(fn, repeatable)
-def setComment(ea, string, repeatable=1):
-    fn = byAddress(ea)
-    return idaapi.set_func_cmt(fn, string, repeatable)
+import logging
+import idc, base._comment as _comment, database, structure, idaapi
 
-def getName(ea):
-    '''fetches the function name, or the global name'''
-    res = idaapi.get_func_name(ea)
+## searching
+def byAddress(ea):
+    res = idaapi.get_func(ea)
     if res is None:
-        res = idaapi.get_name(-1, ea)
-    if res is None:
-        res = idaapi.get_true_name(ea, ea)
-
-    # if name is mangled...  and version <= 6.4
-    if res and res.startswith('@'):
-        return '$'+res
+        raise Exception, "function.byAddress(%x):unable to locate function"% ea
     return res
+def byName(name):
+    ea = idaapi.get_name_ea(-1, name)
+    if ea == idaapi.BADADDR:
+        raise Exception, "function.byName(%r):unable to locate function"% name
+    return idaapi.get_func(ea)
+def by(n):
+    if type(n) is idaapi.func_t:
+        return n
+    if type(n) is str:
+        return byName(n)
+    return byAddress(n)
 
-def setName(ea, name):
-    '''sets the function name, returns True or False based on success'''
-    res = idc.MakeNameEx(ea, name, 2)
-    return [False, True][int(res)]
+## functions
+def add(start, end=idaapi.BADADDR):
+    '''Creates a function at the specified /start/'''
+    return idaapi.add_func(start, end)
+make = add
+def remove(fn):
+    if type(fn) is idaapi.func_t:
+        return idaapi.del_func(fn.startEA)
+    return remove(by(fn))
 
-def name(ea, *args):
-    '''sets/gets the function name'''
-    raise DeprecationWarning
-    if args:
-        name, = args
-        return setName(ea, name)
-    return getName(ea)
+def addChunk(fn, start, end):
+    if type(fn) is idaapi.func_t:
+        return idaapi.append_func_tail(fn, start, end)
+    return addChunk(by(fn), start, end)
+def removeChunk(fn, ea):
+    if type(fn) is idaapi.func_t:
+        return idaapi.remove_func_tail(fn, ea)
+    return removeChunk(by(fn), ea)
+def assignChunk(fn, chunkea):
+    if type(fn) is idaapi.func_t:
+        idaapi.set_tail_owner(fn, chunkea)
+    return assignChunk(by(fn), chunkea)
 
-def chunks(ea):
+def _findTail(ea):
+    while database.isCode(ea):
+        n = idaapi.decode_insn(ea)
+        ea += n
+    return ea
+
+## properties
+def comment(fn, comment=None, repeatable=1):
+    fn = by(fn)
+    if comment is None:
+        return idaapi.get_func_cmt(fn, repeatable)
+    return idaapi.set_func_cmt(fn, comment, repeatable)
+def name(fn, name=None):
+    fn = by(fn)
+    if name is None:
+        res = idaapi.get_func_name(fn.startEA)
+        if not res: res = idaapi.get_name(-1, fn.startEA)
+        if not res: res = idaapi.get_true_name(fn.startEA, fn.startEA)
+        return res
+    return idaapi.set_name(fn.startEA, name, idaapi.SN_PUBLIC)
+def frame(fn):
+    return idaapi.get_frame(by(fn).startEA)
+
+if True:
+    def getComment(ea, repeatable=1):
+        fn = byAddress(ea)
+        return idaapi.get_func_cmt(fn, repeatable)
+    def setComment(ea, string, repeatable=1):
+        fn = byAddress(ea)
+        return idaapi.set_func_cmt(fn, string, repeatable)
+
+    def getName(ea):
+        '''fetches the function name, or the global name'''
+        res = idaapi.get_func_name(ea)
+        if res is None:
+            res = idaapi.get_name(-1, ea)
+        if res is None:
+            res = idaapi.get_true_name(ea, ea)
+
+        # if name is mangled...  and version <= 6.4
+        if res and res.startswith('@'):
+            return '$'+res
+        return res
+    def setName(ea, name):
+        '''sets the function name, returns True or False based on success'''
+        res = idc.MakeNameEx(ea, name, 2)
+        return True if int(res) else False
+
+def chunks(fn):
     '''enumerates all chunks in a function '''
+    ea = by(fn).startEA
     res = idc.FirstFuncFchunk(ea)
     while res != idc.BADADDR:
         (start, end) = idc.GetFchunkAttr(res, idc.FUNCATTR_START), idc.GetFchunkAttr(res, idc.FUNCATTR_END)
@@ -48,37 +106,33 @@ def chunks(ea):
         res = idc.NextFuncFchunk(ea, res)
     return
 
-def getRange(ea):
+def blocks(fn):
+    '''Returns each block in the specified function'''
+    for start,end in chunks(fn):
+        for r in database.blocks(start, end):
+            yield r
+        continue
+    return
+
+def getRange(fn):
     '''tuple containing function start and end'''
-    func = byAddress(ea)
+    func = by(fn)
     if func is None:
         raise ValueError, 'address %x is not contained in a function'% ea
     return func.startEA,func.endEA
 
-def make(start, end=idc.BADADDR):
-    '''pseudo-safely makes the address at start a function'''
-    # FIXME: scroll upward looking for the previous function
-    if database.isCode(start):
-        return idc.MakeFunction(start, end)
-    raise ValueError, 'address %x does not contain code'% start
-
-def contains(func, ea):
+def contains(fn, ea):
     '''Checks if ea is contained in function or in any of it's chunks'''
-    f = byAddress(func)
-    if f is None:   # or not f.contains(ea):
-        return False
-    for start,end in chunks(func):
+    fn = by(fn)
+    for start,end in chunks(fn):
         if start <= ea < end:
             return True
         continue
     return False
 
-def top(ea):
-    '''Jump to the top of the specified function'''
-    func = byAddress(ea)
-    if func is None:
-        raise ValueError, "Address %x not in a function"% ea
-    min,_ = func.startEA,func.endEA
+def top(fn):
+    '''Return the top of the specified function'''
+    min,_ = getRange(fn)
     return min
 
 def marks(fn):
@@ -142,23 +196,15 @@ def search(fn, regex):
         continue
     return
 
-def blocks(fn):
-    '''Returns each block in the specified function'''
-    for start,end in chunks(fn):
-        for r in database.blocks(start, end):
-            yield r
-        continue
-    return
-
-import declaration
-getDeclaration = declaration.function
+import base._declaration as _declaration
+getDeclaration = _declaration.function
 def getArguments(ea):
     '''Returns the arguments as (offset,name,size)'''
     try:
         # grab from declaration first
         o = 0
-        for arg in declaration.arguments(ea):
-            sz = declaration.size(arg)
+        for arg in _declaration.arguments(ea):
+            sz = _declaration.size(arg)
             yield o,arg,sz
             o += sz
         return
@@ -176,6 +222,7 @@ def getArguments(ea):
     for (off,size),(name,cmt) in structure.fragment(fr.id, base, getAvarSize(ea)):
         yield off-base,name,size
 
+# FIXME: come up with a better name
 def stackwindow(ea, delta, direction=-1):
     '''return the block containing all instructions within the specified stack delta'''
     assert direction != 0, 'you make no sense with your lack of direction'
@@ -191,14 +238,16 @@ def stackwindow(ea, delta, direction=-1):
         return ea+idaapi.decode_insn(ea),start[0]+idaapi.decode_insn(start[0])
     return (start[0],ea)
 
-def stackdelta(left, right):
-    '''return the minimum,maximum delta of the range of instructions'''
-    min,max = 0,0
-    for ea in database.iterate(left,right):
-        sp = getSpDelta(ea)
-        min = sp if sp < min else min
-        max = max if sp < max else sp
-    return min,max
+# FIXME: what the fuck is this for?
+if False:
+    def stackdelta(left, right):
+        '''return the minimum,maximum delta of the range of instructions'''
+        min,max = 0,0
+        for ea in database.iterate(left,right):
+            sp = getSpDelta(ea)
+            min = sp if sp < min else min
+            max = max if sp < max else sp
+        return min,max
 
 try:
     import store.query as query
@@ -246,23 +295,18 @@ try:
         return datastore.address(address).set(**kwds)
 
 except ImportError:
-    import comment
-
     def tag_read(address, key=None, repeatable=1):
-        res = getComment(address, repeatable)
-        dict = comment.toDict(res)
+        res = comment(byAddress(address), repeatable=repeatable)
+        dict = _comment.toDict(res)
         if 'name' not in dict:
-            dict['name'] = getName(address)
-
-        if key is not None:
-            return dict[key]
-        return dict
+            dict['name'] = name(byAddress(address))
+        return dict if key is None else dict[key]
 
     def tag_write(address, key, value, repeatable=1):
         dict = tag_read(address, repeatable=repeatable)
         dict[key] = value
-        res = comment.toString(dict)
-        return setComment(address, res, repeatable)
+        res = _comment.toString(dict)
+        return comment(byAddress(address), res, repeatable=repeatable)
 
     def tag(address, *args, **kwds):
         '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
@@ -298,9 +342,6 @@ except ImportError:
             if res: yield ea,res
         return
 
-def byAddress(ea):
-    return idaapi.get_func(ea)
-
 def tags(ea):
     func_ea = top(ea)    
     try:
@@ -311,16 +352,17 @@ def tags(ea):
         result = set()
     return result
 
-class instance(object):
-    # FIXME: finish this
-    class chunk_t(object):
-        pass
+if False:
+    class instance(object):
+        # FIXME: finish this
+        class chunk_t(object):
+            pass
 
-    @classmethod
-    def byAddress(cls, ea):
-        n = idaapi.get_fchunk_num(ea)
-        f = idaapi.getn_func(n)
-        return cls.getIndex(n)
+        @classmethod
+        def byAddress(cls, ea):
+            n = idaapi.get_fchunk_num(ea)
+            f = idaapi.getn_func(n)
+            return cls.getIndex(n)
 
 def down(ea):
     """Returns all functions that are called by specified function"""
@@ -339,6 +381,9 @@ def down(ea):
             continue
         return resultData,resultCode
     return list(set(d for x,d in codeRefs(ea)[1]))
+
+def up(fn):
+    return database.up( by(fn).startEA )
 
 ### switch stuff
 class switch_t(object):

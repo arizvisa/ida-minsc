@@ -6,7 +6,7 @@ def op_count(ea):
         if v.type == idaapi.o_void:
             return c
         continue
-    # maximum operand ocunt. ida might be wrong here...
+    # maximum operand count. ida might be wrong here...
     return c
 
 def op(ea, n):
@@ -21,14 +21,20 @@ def mnemonic(ea):
     '''Returns the mnemonic of an instruction'''
     return idc.GetMnem(ea)
 
-def decode(ea):
-    import ia32
-    '''Disassemble instruction at specified address using external disassembler'''
-    def bytegenerator(ea):
-        while True:
-            yield chr(idc.Byte(ea))
-            ea += 1
-    return ia32.consume(bytegenerator(ea))
+def op_type(ea, n, type=None):
+    pass
+
+def op_value(ea, n, value=None):
+    pass
+
+#def decode(ea):
+#    import ia32
+#    '''Disassemble instruction at specified address using external disassembler'''
+#    def bytegenerator(ea):
+#        while True:
+#            yield chr(idc.Byte(ea))
+#            ea += 1
+#    return ia32.consume(bytegenerator(ea))
 
 #import idaapi
 #def GetOpType(ea, n):
@@ -147,3 +153,26 @@ def isGlobalRef(ea):
 def isImportRef(ea):
     return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
 
+
+# op_t.type
+# op_t.dtyp
+# op_t.flags
+#def set_op_type(*args):
+#def op_enum(*args):
+#def get_enum_id(*args):
+#def op_seg(*args):
+#def op_stkvar(*args):
+#def op_*(
+#def? op_offset(ea, n, type, target = BADADDR, base = 0, tdelta = 0) -> int
+
+#UA_MAXOP   = 6
+#"""
+#The maximum number of operands in the insn_t structure
+#"""
+#
+## Create 'cmd' into the global scope
+#cmd = insn_t(_idaapi.py_get_global_cmd_link())
+#"""
+#cmd is a global variable of type insn_t. It is contains information about the last decoded instruction.
+#This variable is also filled by processor modules when they decode instructions.
+#"""

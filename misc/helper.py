@@ -263,6 +263,6 @@ def checkmarks():
         return
 
     for k,v in functions:
-        print >>sys.stdout, '%x : in function %s'% (k,function.getName(k))
+        print >>sys.stdout, '%x : in function %s'% (k,function.name(function.byAddress(k)))
         print >>sys.stdout, '\n'.join( ('- %x : %s'%(a,m) for a,m in sorted(v)) )
     return
