@@ -136,20 +136,34 @@ def create(offset, size, name, **kwds):
     /bits/ can be used to specify the bit size of the segment
     /comb/ can be used to specify any flags (idaapi.sc*)
     /align/ can be used to specify paragraph alignment (idaapi.sa*)
+    /org/ specifies the origin of the segment (must be paragraph aligned due to ida)
     '''
-    # FIXME: throw an error if segment already exists
+    s = idaapi.get_segm_by_name(name)
+    if s is not None:
+        logging.fatal("segment.create(%x, %x, %r, %r) : a segment with the specified name already exists : %s", offset, size, name, kwds, name)
+        return None
 
-    bits = kwds.get('bits', 32)
+    bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits()) # FIXME: use disassembler default bit length instead of 32
 
-    ## auto-create a selector for it
-    #sel = idaapi.setup_selector(kwds['selector']>>4) if 'selector' in kwds else idaapi.find_free_selector()
-    #sel = kwds.get('selector', idaapi.find_free_selector())
+    if bits == 16:
+        ## create a selector with the requested origin
+        org = kwds.get('org',0)
+        if org&0xf > 0:
+            logging.fatal("segment.create(%x, %x, %r, %r) : origin (.org) is not aligned to the size of a paragraph (0x10):%x", offset, size, name, kwds, org)
+            return None
+
+        para = offset/16
+        sel = idaapi.allocate_selector(para)
+        idaapi.set_selector(sel, (para-kwds.get('org',0)/16)&0xffffffff)
+    else:
+        ## auto-create a selector for everything else
+        sel = idaapi.setup_selector(kwds['selector']) if 'selector' in kwds else idaapi.find_free_selector()
 
     # create segment. ripped from idc
     s = idaapi.segment_t()
     s.startEA = offset
     s.endEA = offset+size
-    s.sel = 0
+    s.sel = sel
     s.bitness = {16:0,32:1,64:2}[bits]
     s.comb = kwds.get('comb', idaapi.scPub)       # public
     s.align = kwds.get('align', idaapi.saRelByte)  # paragraphs
@@ -157,19 +171,19 @@ def create(offset, size, name, **kwds):
     res = idaapi.add_segm_ex(s, name, "", idaapi.ADDSEG_NOSREG|idaapi.ADDSEG_SPARSE)
     if res == 0:
         logging.warn("segment.create(%x, %x, %r, %r) : unable to add a new segment", offset, size, name, kwds)
-        #res = idaapi.del_selector(sel)
+        res = idaapi.del_selector(sel)
         #assert res != 0
         return None
     return s
 
-def delete(segment):
+def delete(segment, remove=False):
     '''Given a segment_t, delete it along with any selectors that might point to it.'''
     assert type(segment) is idaapi.segment_t
     assert segment is not None
     res = idaapi.del_selector(segment.sel)
     if res == 0:
         logging.warn("segment.delete(%s):Unable to delete selector %x", repr(segment), segment.sel)
-    res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL)
+    res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL if remove else idaapi.SEGMOD_KEEP)
     if res == 0:
         logging.warn("segment %s:Unable to delete segment %s", segment.name, segment.sel)
     return res

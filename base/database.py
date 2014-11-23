@@ -12,27 +12,25 @@ import array,itertools
 ## properties
 def h():
     '''slightly less typing for idc.ScreenEA()'''
-    return idc.ScreenEA()
+    return idaapi.get_screen_ea()
 
 here = h    # alias
-
-def module():
-    return filename().split('\\')[-1].rsplit('.',2)[0]
 
 def filename():
     '''return the filename that the database was built from'''
     return idaapi.get_root_filename()
-
 def idb():
-    return idaapi.cvar.database_idb
-
+    '''Return the full path to the ida database'''
+    return idaapi.cvar.database_idb.replace(os.sep, '/')
+def module():
+    '''return the module name as per the windows loader'''
+    return os.path.splitext(os.path.split(filename())[1])[0]
 def path():
-    '''return the full path to the database'''
-    filepath = idb().replace(os.sep,'/')
-    return filepath[: filepath.rfind('/')] 
+    '''return the full path to the directory containing the database'''
+    return os.path.split(idb())[0]
 
 def baseaddress():
-    '''returns the baseaddress of the module'''
+    '''returns the baseaddress of the database'''
     return idaapi.get_imagebase()
 base=baseaddress
 
@@ -94,34 +92,27 @@ def segments():
 ## information about a given address
 def isCode(ea):
     '''True if ea marked as code'''
-    return idc.isCode( idc.GetFlags(ea) )
-
+    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_CODE
 def isData(ea):
     '''True if ea marked as data'''
-    return idc.isData( idc.GetFlags(ea) )
-
+    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_DATA
 def isUnknown(ea):
     '''True if ea marked unknown'''
-    return idc.isUnknown( idc.GetFlags(ea) )
-
+    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_UNK
 def isHead(ea):
-    return idc.isHead( idc.GetFlags(ea) )
-
+    return idaapi.getFlags(address)&idaapi.FF_DATA != 0
 def isTail(ea):
-    return idc.isTail( idc.GetFlags(ea) )
+    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_TAIL
 
 def getType(ea):
     module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
     res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
     return res
-
 def getSize(ea):
     return idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
-
 def getArrayLength(ea):
     sz,ele = idaapi.get_item_size(ea),getSize(ea)
     return sz // ele
-
 def getStructureId(ea):
     assert getType(ea) == idaapi.FF_STRU
     ti = idaapi.opinfo_t()
@@ -131,46 +122,29 @@ def getStructureId(ea):
 
 def prev(ea):
     '''return the previous address (instruction or data)'''
-    return idaapi.prev_head(ea, 0)
-
+    return address.prev(ea)
 def next(ea):
     '''return the next address (instruction or data)'''
-    return idaapi.next_head(ea, -1)
-
-def walk(ea, next, match):
-    if match(ea):
-        return ea
-
-    while True:
-        ea = next(ea)
-        if match(ea):
-            return ea
-        continue
-    assert False is True
+    return address.next(ea)
 
 def prevdata(ea):
     '''return previous address containing data referencing it'''
-    return walk(ea, prev, dxup)
-
+    return address.prevdata(ea)
 def nextdata(ea):
     '''return next address containing data referencing it'''
-    return walk(ea, next, dxup)
-
+    return address.nextdata(ea)
 def prevcode(ea):
     '''return previous address containing code referencing it'''
-    return walk(ea, prev, cxup)
-
+    return address.prevcode(ea)
 def nextcode(ea):
     '''return next address containing code referencing it'''
-    return walk(ea, next, cxup)
-
+    return address.nextcode(ea)
 def prevref(ea):
     '''return previous address containing any kind of reference to it'''
-    return walk(ea, prev, up)
-
+    return address.prevref(ea)
 def nextref(ea):
     '''return next address containing any kind of reference to it'''
-    return walk(ea, next, up)
+    return address.nextref(ea)
 
 def guessrange(ea):
     '''Try really hard to get boundaries of the block at specified address'''
@@ -199,57 +173,27 @@ def disasm(ea, count=1):
         count -= 1
     return '\n'.join(res)
 
-def _iterate_refs(address, start, next):
-    ea = address if isHead(address) else prev(address)
-    address = start(ea)
-    while address != idaapi.BADADDR:
-        yield address
-        address = next(ea, address)
-    return
-
 def drefs(ea, descend=False):
-    if descend:
-        start,next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
-    else:
-        start,next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
-
-    for addr in _iterate_refs(ea, start, next):
-        yield addr
-    return
-
+    return xref.data(ea, descend)
 def crefs(ea, descend=False):
-    if descend:
-        start,next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
-    else:
-        start,next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
-
-    for addr in _iterate_refs(ea, start, next):
-        yield addr
-    return
+    return xref.code(ea, descend)
 
 def dxdown(ea):
-    return list(drefs(ea, True))
-
+    return xref.data_down(ea)
 def dxup(ea):
-    return list(drefs(ea, False))
+    return xref.data_up(ea)
 
 def cxdown(ea):
-    result = set(crefs(ea, True))
-    result.discard(next(ea))
-    return list(result)
-
+    return xref.code_down(ea)
 def cxup(ea):
-    result = set(crefs(ea, False))
-    result.discard(prev(ea))
-    return list(result)
+    return xref.code_up(ea)
 
 def up(ea):
     '''All locations that reference specified address'''
-    return cxup(ea) + dxup(ea)
-
+    return xref.up(ea)
 def down(ea):
     '''All locations that are referenced by the specified address'''
-    return cxdown(ea) + dxdown(ea)
+    return xref.down(ea)
 
 ## functions
 demangle = _declaration.demangle
@@ -279,10 +223,15 @@ def marks():
         yield ea, comment
         index += 1
     return
+
 def mark(ea, message):
     # FIXME: give a warning if we're replacing a mark at the given ea
-    nextmark = len(list(marks())) + 1
-    idc.MarkPosition(ea, 0, 0, 0, nextmark, message)
+    res = set((n for n,_ in marks()))
+    if ea in res:
+        idx,comm = (comm for i,(n,comm) in enumerate(marks()) if n == ea)
+        logging.warn("Replacing mark %d at %x : %r", idx, ea, comm)
+    idc.MarkPosition(ea, 0, 0, 0, len(res)+1, message)
+
 def iterate(start, end):
     '''Iterate through instruction/data boundaries within the specified range'''
     while start < end:
@@ -290,12 +239,29 @@ def iterate(start, end):
         start = next(start)
     return
 
+## searching by stuff
+def byBytes(ea, string, reverse=False):
+    flags = idaapi.SEARCH_UP if reverse else idaapi.SEARCH_DOWN
+    return idaapi.find_binary(ea, -1, ' '.join(str(ord(c)) for c in string), 10, idaapi.SEARCH_CASE | flags)
+
+def byRegex(ea, string, radix=16, reverse=False, sensitive=False):
+    flags = idaapi.SEARCH_UP if reverse else idaapi.SEARCH_DOWN
+    flags |= idaapi.SEARCH_CASE if sensitive else 0
+    return idaapi.find_binary(ea, -1, string, radix, flags)
+
+def iterate_search(start, string, type=byBytes):
+    ea = type(start, string)
+    while ea != idaapi.BADADDR:
+        yield ea
+        ea = type(ea+1, string)
+    return
+
 def go(ea):
     '''slightly less typing for idc.Jump'''
     if not contains(ea):
         left,right=range()
-        raise ValueError("Unable to goto address %x. (valid range is %x - %x)"% (ea,left,right))
-    idc.Jump(ea)
+        logging.warn("Jumping to an invalid location %x. (valid range is %x - %x)",ea,left,right)
+    idaapi.jumpto(ea)
     return ea
 
 def getoffset(ea):
@@ -303,8 +269,9 @@ def getoffset(ea):
     return ea - baseaddress()
 getOffset = getoffset
 
-def search(name):
+def byName(name):
     return idaapi.get_name_ea(-1, name)
+search = byName
 
 def name(ea, string=None):
     '''Returns the name at the specified address. (local than global)'''
@@ -339,10 +306,10 @@ def blocks(start, end):
     for ea in iterate(start, end):
         nextea = next(ea)
 
-        if idc.GetMnem(ea).startswith('call'):      # FIXME: heh. ;)
+        if idaapi.ua_mnem(ea).startswith('call'):      # FIXME: heh. ;)
             continue
 
-        if idc.GetMnem(ea).startswith('ret'):       #   whee
+        if idaapi.ua_mnem(ea).startswith('ret'):       #   whee
             yield block,nextea
             block = ea
 
@@ -628,4 +595,129 @@ class register(object):
     @classmethod
     def segmentsize(cls):
         return idaapi.ph_get_segreg_size()
+
+class address(object):
+    @staticmethod
+    def walk(ea, next, match):
+        while match(ea):
+            ea = next(ea)
+        return ea
+
+    @staticmethod
+    def prev(ea):
+        return idaapi.prev_head(ea, 0)
+    @staticmethod
+    def next(ea):
+        return idaapi.next_head(ea, idaapi.BADADDR)
+
+    @staticmethod
+    def prevdata(ea):
+        return address.walk(ea, address.prev, xref.du)
+    @staticmethod
+    def nextdata(ea):
+        return address.walk(ea, address.next, xref.du)
+
+    @staticmethod
+    def prevcode(ea):
+        return address.walk(ea, address.prev, xref.cu)
+    @staticmethod
+    def nextcode(ea):
+        return address.walk(ea, address.next, xref.cu)
+
+    @staticmethod
+    def prevref(ea):
+        return address.walk(ea, address.prev, xref.u)
+    @staticmethod
+    def nextref(ea):
+        return address.walk(ea, address.next, xref.u)
+
+class xref(object):
+    @staticmethod
+    def iterate(address, start, next):
+        ea = address if (idaapi.getFlags(address)&idaapi.FF_DATA) else idaapi.prev_head(address,0)
+        address = start(ea)
+        while address != idaapi.BADADDR:
+            yield address
+            address = next(ea, address)
+        return
+
+    @staticmethod
+    def code(ea, descend=False):
+        if descend:
+            start,next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
+        else:
+            start,next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
+        for addr in xref.iterate(ea, start, next):
+            yield addr
+        return
+    c=code
+
+    @staticmethod
+    def data(ea, descend=False):
+        if descend:
+            start,next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
+        else:
+            start,next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
+        for addr in xref.iterate(ea, start, next):
+            yield addr
+        return
+    d=data
+
+    @staticmethod
+    def data_down(ea):
+        return list(xref.data(ea, True))
+    @staticmethod
+    def data_up(ea):
+        return list(xref.data(ea, False))
+    dd,du=data_down,data_up
+    @staticmethod
+    def code_down(ea):
+        result = set(xref.code(ea, True))
+        result.discard(address.next(ea))
+        return list(result)
+    @staticmethod
+    def code_up(ea):
+        result = set(xref.code(ea, False))
+        result.discard(address.prev(ea))
+        return list(result)
+    cd,cu=code_down,code_up
+
+    @staticmethod
+    def up(ea):
+        return list(set(xref.data_up(ea) + xref.code_up(ea)))
+    @staticmethod
+    def down(ea):
+        return list(set(xref.data_down(ea) + xref.code_down(ea)))
+    u,d=up,down
+
+    @staticmethod
+    def add_code(ea, target, isCall=False):
+        if abs(target-ea) > 2**(config.bits()/2):
+            flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
+        else:
+            flowtype = idaapi.fl_CN if isCall else idaapi.fl_JN
+        idaapi.add_cref(ea, target, flowtype | idaapi.XREF_USER)
+        return target in xref.code_down(ea)
+    @staticmethod
+    def add_data(ea, target, write=False):
+        flowtype = idaapi.dr_W if write else idaapi.dr_R
+        idaapi.add_dref(ea, target, flowtype | idaapi.XREF_USER)
+        return target in xref.data_down(ea)
+    @staticmethod
+    def del_code(ea, target=None):
+        if target is None:
+            [ idaapi.del_cref(ea, target, 0) for target in xref.code_down(ea) ]
+            return False if len(xref.code_down(ea)) > 0 else True
+        idaapi.del_cref(ea, target, 0)
+        return target not in xref.code_down(ea)
+    @staticmethod
+    def del_data(ea, target=None):
+        if target is None:
+            [ idaapi.del_dref(ea, target) for target in xref.data_down(ea) ]
+            return False if len(xref.data_down(ea)) > 0 else True
+        idaapi.del_dref(ea, target)
+        return target not in xref.data_down(ea)
+    @staticmethod
+    def clear(ea):
+        return all((res is True) for res in (xref.del_code(ea),xref.del_data(ea)))
 

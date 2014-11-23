@@ -20,7 +20,7 @@ class remote(object):
     def go(self, ea):
         database.go( self.get(ea) )
 
-import idaapi,sip
+import idaapi
 class InputBox(idaapi.PluginForm):
     def OnCreate(self, form):
         self.parent = self.FormToPyQtWidget(form)
@@ -38,7 +38,11 @@ class InputBox(idaapi.PluginForm):
 ### another item menu to toolbar
 ### find the QAction associated with a command (or keypress)
 
-import PySide.QtGui,idaapi
+try:
+    import PySide.QtGui
+except ImportError:
+    logging.warn("__module__:%s:Unable to load PySide.QtGui module. Certain UI.* methods might not work.", __name__)
+
 class UI(object):
     '''static class for interacting with IDA's Qt user-interface'''
     @classmethod
@@ -266,3 +270,13 @@ def checkmarks():
         print >>sys.stdout, '%x : in function %s'% (k,function.name(function.byAddress(k)))
         print >>sys.stdout, '\n'.join( ('- %x : %s'%(a,m) for a,m in sorted(v)) )
     return
+
+def above(ea):
+    '''Display all the callers of the function at /ea/'''
+    tryhard = lambda x: '%s+%x'%(database.name(function.top(x)),x-function.top(x)) if function.within(x) else hex(x) if database.name(x) is None else database.name(x)
+    return '\n'.join(map(tryhard,function.up(ea)))
+
+def below(ea):
+    '''Display all the functions that the function at /ea/ can call'''
+    tryhard = lambda x: '%s+%x'%(database.name(function.top(x)),x-function.top(x)) if function.within(x) else hex(x) if database.name(x) is None else database.name(x)
+    return '\n'.join(map(tryhard,function.down(ea)))

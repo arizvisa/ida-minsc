@@ -130,6 +130,10 @@ def contains(fn, ea):
         continue
     return False
 
+def within(ea):
+    '''Returns True if address is associated with a function of some kind'''
+    return idaapi.get_func(ea) is not None
+
 def top(fn):
     '''Return the top of the specified function'''
     min,_ = getRange(fn)
