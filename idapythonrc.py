@@ -109,7 +109,7 @@ try:
         raise OSError('Unable to figure out home directory')
     pass
 except IOError:
-    logging.warn('No idapythonrc.py file found in home directory')
+    __import__('logging').warn('No idapythonrc.py file found in home directory')
 
 except Exception, e:
     print 'warning: Unexpected exception %s raised'% repr(e)

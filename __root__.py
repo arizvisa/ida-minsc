@@ -13,8 +13,8 @@ import database as db,function as fn
 
 # shortcuts
 def top():
-    import function     # ida's usage of python sucks.
-    return function.top(db.h())
+    import function,database     # ida's usage of python sucks.
+    return function.top(database.h())
 
 def hex(i):
     return '%x'% i
