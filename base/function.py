@@ -4,8 +4,9 @@ function-context
 generic tools for working in the context of a function.
 '''
 
-import logging
-import idc, base._comment as _comment, database, structure, idaapi
+import logging,re
+import internal,database,structure
+import idc,idaapi
 
 ## searching
 def byAddress(ea):
@@ -24,6 +25,14 @@ def by(n):
     if type(n) is str:
         return byName(n)
     return byAddress(n)
+
+def address(ea):
+    min,_ = getRange(ea)
+    return min
+
+def offset(ea):
+    min,_ = getRange(ea)
+    return database.getoffset(min)
 
 ## functions
 def add(start, end=idaapi.BADADDR):
@@ -189,7 +198,6 @@ def searchinstruction(fn, match=lambda insn: True):
         continue
     return
 
-import re
 def search(fn, regex):
     '''Return each instruction that matches the case-insensitive regex'''
     pattern = re.compile(regex, re.I)
@@ -200,15 +208,14 @@ def search(fn, regex):
         continue
     return
 
-import base._declaration as _declaration
-getDeclaration = _declaration.function
+getDeclaration = internal.declaration.function
 def getArguments(ea):
     '''Returns the arguments as (offset,name,size)'''
     try:
         # grab from declaration first
         o = 0
-        for arg in _declaration.arguments(ea):
-            sz = _declaration.size(arg)
+        for arg in internal.declaration.arguments(ea):
+            sz = internal.declaration.size(arg)
             yield o,arg,sz
             o += sz
         return
@@ -301,7 +308,7 @@ try:
 except ImportError:
     def tag_read(address, key=None, repeatable=1):
         res = comment(byAddress(address), repeatable=repeatable)
-        dict = _comment.toDict(res)
+        dict = internal.comment.toDict(res)
         if 'name' not in dict:
             dict['name'] = name(byAddress(address))
         return dict if key is None else dict[key]
@@ -309,7 +316,7 @@ except ImportError:
     def tag_write(address, key, value, repeatable=1):
         dict = tag_read(address, repeatable=repeatable)
         dict[key] = value
-        res = _comment.toString(dict)
+        res = internal.comment.toString(dict)
         return comment(byAddress(address), res, repeatable=repeatable)
 
     def tag(address, *args, **kwds):

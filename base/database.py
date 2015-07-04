@@ -6,14 +6,13 @@ generic tools for working in the context of the database
 
 import logging,os
 import idc,idautils,idaapi
-import instruction as _instruction,function,segment,base._declaration as _declaration
+import instruction as _instruction,function,segment,internal
 import array,itertools
 
 ## properties
 def h():
     '''slightly less typing for idc.ScreenEA()'''
     return idaapi.get_screen_ea()
-
 here = h    # alias
 
 def filename():
@@ -92,17 +91,19 @@ def segments():
 ## information about a given address
 def isCode(ea):
     '''True if ea marked as code'''
-    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_CODE
+    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_CODE
 def isData(ea):
     '''True if ea marked as data'''
-    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_DATA
+    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_DATA
 def isUnknown(ea):
     '''True if ea marked unknown'''
-    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_UNK
+    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_UNK
 def isHead(ea):
-    return idaapi.getFlags(address)&idaapi.FF_DATA != 0
+    return idaapi.getFlags(ea)&idaapi.FF_DATA != 0
 def isTail(ea):
-    return idaapi.getFlags(address)&idaapi.MS_CLS == idaapi.FF_TAIL
+    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_TAIL
+def isAlign(ea):
+    return idaapi.isAlign(idaapi.getFlags(ea))
 
 def getType(ea):
     module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
@@ -196,7 +197,7 @@ def down(ea):
     return xref.down(ea)
 
 ## functions
-demangle = _declaration.demangle
+#demangle = internal.declaration.demangle
 
 def getblock(start, end):
     if start > end:
@@ -264,10 +265,17 @@ def go(ea):
     idaapi.jumpto(ea)
     return ea
 
-def getoffset(ea):
+def offset(ea):
     '''returns the offset of ea from the baseaddress'''
     return ea - baseaddress()
+getoffset = offset
 getOffset = getoffset
+
+def goof(ea):
+    '''goes to the specified offset'''
+    idaapi.jumpto(baseaddress()+ea)
+    return ea
+gotooffset = goof
 
 def byName(name):
     return idaapi.get_name_ea(-1, name)
@@ -385,23 +393,23 @@ def makecall(ea):
         result.append((name,left))
 
     result = ['%s=%s'%(name,_instruction.op_repr(ea,0)) for name,ea in result]
-    return '%s(%s)'%(_declaration.demangle(function.name(function.byAddress(fn))), ','.join(result))
+    return '%s(%s)'%(internal.declaration.demangle(function.name(function.byAddress(fn))), ','.join(result))
 
 try:
     import store.query as query
     import store
 
     datastore = store.ida
-    def tag(address, *args, **kwds):
-        '''tag(address, key?, value?) -> fetches/stores a tag from specified address'''
+    def tag(ea, *args, **kwds):
+        '''tag(ea, key?, value?) -> fetches/stores a tag from specified address'''
         try:
-            context = function.top(address)
+            context = function.top(ea)
 
         except ValueError:
             context = None
 
         if len(args) == 0 and len(kwds) == 0:
-            result = datastore.address(context).select(query.address(address))
+            result = datastore.address(context).select(query.address(ea))
             try:
                 result = result[address]
             except:
@@ -410,18 +418,18 @@ try:
 
         elif len(args) == 1:
             key, = args
-            result = datastore.address(context).select(query.address(address), query.attribute(key))
+            result = datastore.address(context).select(query.address(ea), query.attribute(key))
             try:
                 result = result[address][key]
             except:
-                raise KeyError( (hex(address),key) )
+                raise KeyError( (hex(ea),key) )
                 result = None
             return result
 
         if len(args) > 0:
             key,value = args
             kwds.update({key:value})
-        return datastore.address(context).address(address).set(**kwds)
+        return datastore.address(context).address(ea).set(**kwds)
 
     def __select(q):
         for x in functions():
@@ -443,22 +451,20 @@ try:
         return __select( query._and(*result) )
 
 except ImportError:
-    import base._comment as _comment
-
-    def tag_read(address, key=None, repeatable=0):
-        res = idaapi.get_cmt(address, int(bool(repeatable)))
-        dict = _comment.toDict(res)
-        name = idaapi.get_name(-1,address)
-        dict.setdefault('name', name)
+    def tag_read(ea, key=None, repeatable=0):
+        res = idaapi.get_cmt(ea, int(bool(repeatable)))
+        dict = internal.comment.toDict(res)
+        name = idaapi.get_name(-1,ea)
+        if name is not None: dict.setdefault('name', name)
         if key is None:
             return dict
         return dict[key]
 
-    def tag_write(address, key, value, repeatable=0):
-        dict = tag_read(address, repeatable=repeatable)
+    def tag_write(ea, key, value, repeatable=0):
+        dict = tag_read(ea, repeatable=repeatable)
         dict[key] = value
-        res = _comment.toString(dict)
-        return idaapi.set_cmt(address, res, int(bool(repeatable)))
+        res = internal.comment.toString(dict)
+        return idaapi.set_cmt(ea, res, int(bool(repeatable)))
 
     def tag(ea, *args, **kwds):
         '''tag(ea, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
@@ -494,7 +500,7 @@ except ImportError:
 
         if not boolean:
             for ea in functions():
-                res = database.tag(ea)
+                res = tag(ea)
                 if res: yield ea, res
             return
 
@@ -565,7 +571,7 @@ def getImports(modulename):
     idaapi.enum_import_names(idx,fn)
     return result
 def imports():
-    """Iterator containing (address,(module,name,ordinal)) of imports in database"""
+    """Iterator containing (ea,(module,name,ordinal)) of imports in database"""
     for idx,module in ((i,idaapi.get_import_module_name(i)) for i in xrange(idaapi.get_import_module_qty())):
         result = []
         def fn(ea,name,ordinal):
@@ -633,12 +639,13 @@ class address(object):
 
 class xref(object):
     @staticmethod
-    def iterate(address, start, next):
-        ea = address if (idaapi.getFlags(address)&idaapi.FF_DATA) else idaapi.prev_head(address,0)
-        address = start(ea)
-        while address != idaapi.BADADDR:
-            yield address
-            address = next(ea, address)
+    def iterate(ea, start, next):
+        ea = ea if (idaapi.getFlags(ea)&idaapi.FF_DATA) else idaapi.prev_head(ea,0)
+
+        addr = start(ea)
+        while addr != idaapi.BADADDR:
+            yield addr
+            addr = next(ea, addr)
         return
 
     @staticmethod
