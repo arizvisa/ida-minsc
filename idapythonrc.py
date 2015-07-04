@@ -84,13 +84,13 @@ globals().pop('__root__')
 
 # try and execute our user's idapythonrc.py
 try:
-    # execute user's .pythonrc and .idapythonrc in one go
-    if __import__('user').home:
-        execfile(__import__('os').path.join(__import__('user').home, 'idapythonrc.py'))
-
-except ImportError:
-    # otherwise try to figure it out without tainting the namespace
     try:
+        # execute user's .pythonrc and .idapythonrc in one go
+        if __import__('user').home:
+            execfile(__import__('os').path.join(__import__('user').home, 'idapythonrc.py'))
+
+    except ImportError:
+        # otherwise try to figure it out without tainting the namespace
         if __import__('os').getenv('HOME'):
             execfile(__import__('os').path.join(__import__('os').getenv('HOME'), 'idapythonrc.py'))
         elif __import__('os').getenv('USERPROFILE'):
@@ -98,8 +98,9 @@ except ImportError:
         else:
             raise OSError('Unable to figure out home directory')
         pass
-    except IOError:
-        __import__('logging').warn('No idapythonrc.py file found in home directory')
+
+except IOError:
+    __import__('logging').warn('No idapythonrc.py file found in home directory')
 
 except Exception, e:
     print 'warning: Unexpected exception %s raised'% repr(e)
