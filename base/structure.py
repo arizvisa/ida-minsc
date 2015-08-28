@@ -65,13 +65,13 @@ def fragment(id, offset, size):
 def get(name):
     id = idaapi.get_struc_id(name)
     if id == idaapi.BADADDR:
-        id = idaapi.add_struc(name)
+        id = idaapi.add_struc(idaapi.BADADDR, name)
     return instance(id)
 
 class instance(object):
-    def __init__(self, id):
+    def __init__(self, id, baseoffset=0):
         self.__id = id
-        self.__members = self.members_t(self)
+        self.__members = self.members_t(self, baseoffset)
 
     __id = 0
     @property
@@ -102,6 +102,13 @@ class instance(object):
     @property
     def size(self):
         return idaapi.get_struc_size(self.ptr)
+    @property
+    def baseoffset(self):
+        return self.members.baseoffset
+    @baseoffset.setter
+    def baseoffset(self, value):
+        res,self.members.baseoffset = self.members.baseoffset,value
+        return res
 
     def destroy(self):
         return idaapi.del_struc(self.ptr)
@@ -113,9 +120,10 @@ class instance(object):
         @property
         def owner(self):
             return self.__owner
-        def __init__(self, owner):
+        def __init__(self, owner, baseoffset=0):
             self.__owner = owner
             self.__cache = self.__updatecache()
+            self.baseoffset = baseoffset
         def __updatecache(self):
             result = {}
             for i in xrange(len(self)):
@@ -126,28 +134,62 @@ class instance(object):
             for i in xrange(len(self)):
                 yield self[i]
         def __getitem__(self, index):
-            try:
-                return self.__cache[index]
-            except KeyError:
-                self.__cache[index] = self.owner.member_t.fetch(self, index)
-            return self[index]
+            if type(index) in (int,long):
+                try:
+                    self.__cache[index]
+                except:
+                    self.__cache[index] = self.owner.member_t.fetch(self, index)
+                res = self.__cache[index]
+            elif type(index) in (str,):
+                res = self.byname(index)
+            else:
+                raise TypeError, index
+            if res is None:
+                raise KeyError, index
+            return res
         def __len__(self):
             return self.owner.ptr.memqty
 
+        def index(self, mem):
+            for i in range(0, self.owner.ptr.memqty):
+                if mem.id == self[i].id:
+                    return i
+                continue
+            raise KeyError
+
         def byname(self, name):
-            index = idaapi.get_member_by_name(self.owner.ptr, name)
+            mem = idaapi.get_member_by_name(self.owner.ptr, str(name))
+            if mem is None: raise KeyError, name
+            index = self.index(mem)
             return self[index]
         def byfullname(self, fullname):
-            index = idaapi.get_member_by_fullname(self.owner.ptr, fullname)
+            mem = idaapi.get_member_by_fullname(self.owner.ptr, str(fullname))
+            if mem is None: raise KeyError, fullname
+            index = self.index(mem)
+            return self[index]
+        def byoffset(self, offset):
+            mem = idaapi.get_member(self.owner.ptr, offset - self.baseoffset)
+            if mem is None: raise IndexError, offset
+            index = self.index(mem)
             return self[index]
 
         def add(self, name, type, offset, size):
-            m = self.member_t.create(self, name, offset, type, size)
+            m = self.owner.member_t.create(self, name, offset - self.baseoffset, type, size)
             self.__cache[m.id] = m
             return m
         def __delitem__(self, index):
-            item = self.pop(index)
-            return idaapi.del_struc_member(self.ptr, item.offset)
+            item = self.__cache.pop(index)
+            return self.remove(item.offset - self.baseoffset)
+
+        def remove(self, *args):
+            """remove(offset) or remove(offset,size)"""
+            try:
+                offset,size = args
+            except:
+                offset, = args
+                return idaapi.del_struc_member(self.owner.ptr, offset - self.baseoffset)
+            ofs = offset - self.baseoffset
+            return idaapi.del_struc_members(self.owner.ptr, ofs, ofs+size)
 
         def __repr__(self):
             result = []
@@ -158,28 +200,28 @@ class instance(object):
             return '%s\n%s'%(type(self), '\n'.join(' [%d] %s %s {%x:+%x} %s'%(i,n,repr(t),o,s,'// %s'%c if c is not None else '') for i,n,t,o,s,c in result))
 
     class member_t(object):
-        integer = {
-            1:(idaapi.FF_BYTE,-1), 2:(idaapi.FF_WORD,-1), 3:(idaapi.FF_3BYTE,-1), 4:(idaapi.FF_DWRD,-1),
-            8:(idaapi.FF_QWRD,-1), 10:(idaapi.FF_TBYT,-1), 16:(idaapi.FF_OWRD,-1)
+        integermap = {
+            1:(idaapi.FF_BYTE, -1), 2:(idaapi.FF_WORD, -1), 3:(idaapi.FF_3BYTE, -1), 4:(idaapi.FF_DWRD, -1),
+            8:(idaapi.FF_QWRD, -1), 10:(idaapi.FF_TBYT, -1), 16:(idaapi.FF_OWRD, -1)
         }
-        if hasattr(idaapi, 'FF_YWRD'): integer[32] = (getattr(idaapi, 'FF_YWRD'),-1)
+        if hasattr(idaapi, 'FF_YWRD'): integermap[32] = getattr(idaapi, 'FF_YWRD'),-1
 
-        decimal = {
-            4:(idaapi.FF_FLOAT,-1), 8:(idaapi.FF_DOUBLE,-1), 10:(idaapi.FF_PACKREAL,-1), 12:(idaapi.FF_PACKREAL,-1),
+        decimalmap = {
+            4:(idaapi.FF_FLOAT, -1), 8:(idaapi.FF_DOUBLE, -1), 10:(idaapi.FF_PACKREAL, -1), 12:(idaapi.FF_PACKREAL, -1),
         }
-        string = {
-            str:(idaapi.FF_ASCI,idaapi.ASCSTR_TERMCHR), unicode:(idaapi.FF_ASCI,idaapi.ASCSTR_UNICODE),
+        stringmap = {
+            str:(idaapi.FF_ASCI, idaapi.ASCSTR_TERMCHR), unicode:(idaapi.FF_ASCI,idaapi.ASCSTR_UNICODE),
         }
-        type = {
-            int:integer,long:integer,float:decimal,str:string,unicode:string
+        typemap = {
+            int:integermap,long:integermap,float:decimalmap,str:stringmap,unicode:stringmap
             #FF_ALIGN, FF_CUSTOM, FF_STRU
         }
         inverted = {}
-        for _,(f,_) in integer.items():
+        for _,(f,_) in integermap.items():
             inverted[f] = int
-        for _,(f,_) in decimal.items():
+        for _,(f,_) in decimalmap.items():
             inverted[f] = float
-        for _,(f,_) in string.items():
+        for _,(f,_) in stringmap.items():
             inverted[f] = str
         del f
 
@@ -190,16 +232,19 @@ class instance(object):
             return result(owner)
         @classmethod
         def create(cls, owner, name, offset, type, nbytes):
-            flag,typeid = self.__determine_type(type, nbytes)
-            index = idaapi.add_struc_member(owner, name, offset, flag, typeid, nbytes)
+            flag,typeid = cls.__determine_type(type, nbytes)
+            opinfo = idaapi.opinfo_t()
+            opinfo.tid = typeid
+            index = idaapi.add_struc_member(owner.owner.ptr, name, offset - owner.owner.baseoffset, flag, opinfo, nbytes)
             return cls.fetch(owner, index)
         def __init__(self, members):
             self.index
             self.__owner = members.owner
 
-        def __determine_type(self, type, nbytes):
-            if type in cls.type:
-                table = cls.type[type]
+        @classmethod
+        def __determine_type(cls, type, nbytes):
+            if type in cls.typemap:
+                table = cls.typemap[type]
                 if type in (str,unicode):
                     flag,typeid = table[type]
                 else:
@@ -220,14 +265,14 @@ class instance(object):
             return idaapi.get_member_size(self.ptr)
         @property
         def offset(self):
-            return self.ptr.get_soff()
+            return self.ptr.get_soff() + self.__owner.members.baseoffset
 
         @property
         def name(self):
             return idaapi.get_member_name(self.id)
         @name.setter
         def name(self, value):
-            return idaapi.set_member_name(self.owner.ptr, self.offset, value)
+            return idaapi.set_member_name(self.owner.ptr, self.offset - self.__owner.members.baseoffset, value)
         @property
         def fullname(self):
             return idaapi.get_member_fullname(self.id)
@@ -238,8 +283,14 @@ class instance(object):
         def comment(self, value):
             return idaapi.set_member_cmt(self.ptr, value, True)
         @property
+        def flag(self):
+            m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
+            if m is None:
+                return 0
+            return m.flag
+        @property
         def dt_type(self):
-            m = idaapi.get_member(self.__owner.ptr, self.offset)
+            m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
             if m is None:
                 return 0
             flag = m.flag & idaapi.DT_TYPE

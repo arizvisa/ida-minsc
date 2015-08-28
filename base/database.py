@@ -6,7 +6,7 @@ generic tools for working in the context of the database
 
 import logging,os
 import idc,idautils,idaapi
-import instruction as _instruction,function,segment,internal
+import instruction as _instruction,function,segment,structure,internal
 import array,itertools
 
 ## properties
@@ -88,39 +88,6 @@ def segments():
     '''Returns a list of all segments in the current database'''
     return [segment.byName(s).startEA for s in segment.list()]
 
-## information about a given address
-def isCode(ea):
-    '''True if ea marked as code'''
-    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_CODE
-def isData(ea):
-    '''True if ea marked as data'''
-    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_DATA
-def isUnknown(ea):
-    '''True if ea marked unknown'''
-    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_UNK
-def isHead(ea):
-    return idaapi.getFlags(ea)&idaapi.FF_DATA != 0
-def isTail(ea):
-    return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_TAIL
-def isAlign(ea):
-    return idaapi.isAlign(idaapi.getFlags(ea))
-
-def getType(ea):
-    module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
-    res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
-    return res
-def getSize(ea):
-    return idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
-def getArrayLength(ea):
-    sz,ele = idaapi.get_item_size(ea),getSize(ea)
-    return sz // ele
-def getStructureId(ea):
-    assert getType(ea) == idaapi.FF_STRU
-    ti = idaapi.opinfo_t()
-    res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
-    assert res, 'idaapi.get_opinfo returned %x at %x'% (res,ea)
-    return ti.tid
-
 def prev(ea):
     '''return the previous address (instruction or data)'''
     return address.prev(ea)
@@ -147,13 +114,6 @@ def nextref(ea):
     '''return next address containing any kind of reference to it'''
     return address.nextref(ea)
 
-def guessrange(ea):
-    '''Try really hard to get boundaries of the block at specified address'''
-    start,end = function.getRange(ea)
-    if function.contains(start, ea) and not (ea >= start and ea < end):
-        return (idc.GetFchunkAttr(ea, idc.FUNCATTR_START), idc.GetFchunkAttr(ea, idc.FUNCATTR_END))
-    return start,end
-
 def decode(ea):
     return _instruction.decode(ea)
 
@@ -174,31 +134,6 @@ def disasm(ea, count=1):
         count -= 1
     return '\n'.join(res)
 
-def drefs(ea, descend=False):
-    return xref.data(ea, descend)
-def crefs(ea, descend=False):
-    return xref.code(ea, descend)
-
-def dxdown(ea):
-    return xref.data_down(ea)
-def dxup(ea):
-    return xref.data_up(ea)
-
-def cxdown(ea):
-    return xref.code_down(ea)
-def cxup(ea):
-    return xref.code_up(ea)
-
-def up(ea):
-    '''All locations that reference specified address'''
-    return xref.up(ea)
-def down(ea):
-    '''All locations that are referenced by the specified address'''
-    return xref.down(ea)
-
-## functions
-#demangle = internal.declaration.demangle
-
 def getblock(start, end):
     if start > end:
         start,end=end,start
@@ -213,6 +148,7 @@ def read(ea, size):
     return idaapi.get_many_bytes(ea, size)
 def write(ea, data, original=False):
     return idaapi.patch_many_bytes(ea, data) if original else idaapi.put_many_bytes(ea, data)
+
 def marks():
     '''returns all the known marked positions in an .idb'''
     index = 1
@@ -229,8 +165,10 @@ def mark(ea, message):
     # FIXME: give a warning if we're replacing a mark at the given ea
     res = set((n for n,_ in marks()))
     if ea in res:
-        idx,comm = (comm for i,(n,comm) in enumerate(marks()) if n == ea)
-        logging.warn("Replacing mark %d at %x : %r", idx, ea, comm)
+        for idx,(n,comm) in enumerate(marks()):
+            if n == ea:
+                logging.warn("Replacing mark %d at %x : %r", idx, ea, comm)
+            continue
     idc.MarkPosition(ea, 0, 0, 0, len(res)+1, message)
 
 def iterate(start, end):
@@ -241,21 +179,32 @@ def iterate(start, end):
     return
 
 ## searching by stuff
-def byBytes(ea, string, reverse=False):
-    flags = idaapi.SEARCH_UP if reverse else idaapi.SEARCH_DOWN
-    return idaapi.find_binary(ea, -1, ' '.join(str(ord(c)) for c in string), 10, idaapi.SEARCH_CASE | flags)
+class search(object):
+    @staticmethod
+    def byBytes(ea, string, reverse=False):
+        flags = idaapi.SEARCH_UP if reverse else idaapi.SEARCH_DOWN
+        return idaapi.find_binary(ea, -1, ' '.join(str(ord(c)) for c in string), 10, idaapi.SEARCH_CASE | flags)
 
-def byRegex(ea, string, radix=16, reverse=False, sensitive=False):
-    flags = idaapi.SEARCH_UP if reverse else idaapi.SEARCH_DOWN
-    flags |= idaapi.SEARCH_CASE if sensitive else 0
-    return idaapi.find_binary(ea, -1, string, radix, flags)
+    @staticmethod
+    def byRegex(ea, string, radix=16, reverse=False, sensitive=False):
+        flags = idaapi.SEARCH_UP if reverse else idaapi.SEARCH_DOWN
+        flags |= idaapi.SEARCH_CASE if sensitive else 0
+        return idaapi.find_binary(ea, -1, string, radix, flags)
 
-def iterate_search(start, string, type=byBytes):
-    ea = type(start, string)
-    while ea != idaapi.BADADDR:
-        yield ea
-        ea = type(ea+1, string)
-    return
+    @staticmethod
+    def byName(ea, name):
+        return idaapi.get_name_ea(ea is None and -1 or ea, name)
+
+    @staticmethod
+    def iterate(start, string, type=byBytes):
+        ea = type(start, string)
+        while ea != idaapi.BADADDR:
+            yield ea
+            ea = type(ea+1, string)
+        return
+
+    def __new__(cls, string):
+        return cls.byName(here(), string)
 
 def go(ea):
     '''slightly less typing for idc.Jump'''
@@ -270,16 +219,13 @@ def offset(ea):
     return ea - baseaddress()
 getoffset = offset
 getOffset = getoffset
+o = offset
 
 def goof(ea):
     '''goes to the specified offset'''
     idaapi.jumpto(baseaddress()+ea)
     return ea
 gotooffset = goof
-
-def byName(name):
-    return idaapi.get_name_ea(-1, name)
-search = byName
 
 def name(ea, string=None):
     '''Returns the name at the specified address. (local than global)'''
@@ -295,7 +241,7 @@ def name(ea, string=None):
         try:
             function.top(ea)
             flags |= SN_LOCAL
-        except ValueError:
+        except (ValueError,Exception):
             flags |= 0
 
         res = idaapi.set_name(ea, string, flags)
@@ -392,10 +338,11 @@ def makecall(ea):
         # FIXME: if left is not an assignment or a push, find last assignment
         result.append((name,left))
 
-    result = ['%s=%s'%(name,_instruction.op_repr(ea,0)) for name,ea in result]
+    result = ['%s=%s'%(name,_instruction.ops_repr(ea)[0]) for name,ea in result]
     return '%s(%s)'%(internal.declaration.demangle(function.name(function.byAddress(fn))), ','.join(result))
 
 try:
+    ## tag data storage using a lisp-like syntax
     import store.query as query
     import store
 
@@ -451,6 +398,7 @@ try:
         return __select( query._and(*result) )
 
 except ImportError:
+    ## tag data storage hack using magically syntaxed comments
     def tag_read(ea, key=None, repeatable=0):
         res = idaapi.get_cmt(ea, int(bool(repeatable)))
         dict = internal.comment.toDict(res)
@@ -494,7 +442,7 @@ except ImportError:
 
     def select(*tags, **boolean):
         '''Fetch all the functions containing the specified tags within it's declaration'''
-        boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
+        boolean = dict((k,set(v) if v.__class__ is tuple else set((v,))) for k,v in boolean.viewitems())
         if tags:
             boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
 
@@ -520,7 +468,7 @@ except ImportError:
 
     def selectcontents(*tags, **boolean):
         '''Fetch all the functions containing the specified tags within it's contents'''
-        boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
+        boolean = dict((k,set(v) if v.__class__ is tuple else set((v,))) for k,v in boolean.viewitems())
         if tags:
             boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
 
@@ -560,28 +508,40 @@ if False:
         return
 
 ## imports
-def getImportModules():
-    return [idaapi.get_import_module_name(i) for i in xrange(idaapi.get_import_module_qty())]
-def getImports(modulename):
-    idx = [x.lower() for x in getImportModules()].index(modulename.lower())
-    result = []
-    def fn(ea,name,ordinal):
-        result.append((ea,(name,ordinal)))
-        return True
-    idaapi.enum_import_names(idx,fn)
-    return result
-def imports():
-    """Iterator containing (ea,(module,name,ordinal)) of imports in database"""
-    for idx,module in ((i,idaapi.get_import_module_name(i)) for i in xrange(idaapi.get_import_module_qty())):
+class imports(object):
+    def __new__(cls):
+        return cls.iterate()
+
+    @staticmethod
+    def modules():
+        return [idaapi.get_import_module_name(i) for i in xrange(idaapi.get_import_module_qty())]
+
+    @staticmethod
+    def list(modulename):
+        idx = [x.lower() for x in imports.modules()].index(modulename.lower())
         result = []
         def fn(ea,name,ordinal):
-            result.append( (ea,(name,ordinal)) )
+            result.append((ea,(name,ordinal)))
             return True
         idaapi.enum_import_names(idx,fn)
-        for ea,(name,ordinal) in result:
-            yield ea,(module,name,ordinal)
-        continue
-    return
+        return result
+
+    @staticmethod
+    def iterate():
+        """Iterator containing (ea,(module,name,ordinal)) of imports in database"""
+        for idx,module in ((i,idaapi.get_import_module_name(i)) for i in xrange(idaapi.get_import_module_qty())):
+            result = []
+            def fn(ea,name,ordinal):
+                result.append( (ea,(name,ordinal)) )
+                return True
+            idaapi.enum_import_names(idx,fn)
+            for ea,(name,ordinal) in result:
+                yield ea,(module,name,ordinal)
+            continue
+        return
+
+getImportModules = imports.modules
+getImports = imports.list
 
 ### register information
 class register(object):
@@ -636,6 +596,104 @@ class address(object):
     @staticmethod
     def nextref(ea):
         return address.walk(ea, address.next, xref.u)
+a = addr = address
+
+class type(object):
+    def __new__(cls, ea):
+        module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
+        res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
+        return res
+    @staticmethod
+    def isCode(ea):
+        '''True if ea marked as code'''
+        return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_CODE
+    @staticmethod
+    def isData(ea):
+        '''True if ea marked as data'''
+        return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_DATA
+    @staticmethod
+    def isUnknown(ea):
+        '''True if ea marked unknown'''
+        return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_UNK
+    @staticmethod
+    def isHead(ea):
+        return idaapi.getFlags(ea)&idaapi.FF_DATA != 0
+    @staticmethod
+    def isTail(ea):
+        return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_TAIL
+    @staticmethod
+    def isAlign(ea):
+        return idaapi.isAlign(idaapi.getFlags(ea))
+
+    class array(object):
+        def __new__(cls, ea):
+            numerics = {
+                idaapi.FF_BYTE : 'B',
+                idaapi.FF_WORD : 'H',
+                idaapi.FF_DWRD : 'L',
+                idaapi.FF_QWRD : 'Q',
+                idaapi.FF_FLOAT : 'f',
+                idaapi.FF_DOUBLE : 'd',
+            }
+            strings = {
+                1 : 'c',
+                2 : 'u',
+            }
+            fl = idaapi.getFlags(ea)
+            elesize = idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
+            if fl & idaapi.FF_ASCI:
+                t = strings[elesize]
+            else:
+                ch = numerics[fl & idaapi.DT_TYPE]
+                t = ch.lower() if idaapi.is_signed_data(fl) else ch
+            res = array.array(t, read(ea, cls.size(ea)))
+            if len(res) != cls.length(ea):
+                logging.warn('array : Unexpected length : (%d != %d)', len(res), cls.length(ea))
+            return res
+            
+        @staticmethod
+        def element(ea):
+            return idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
+        @staticmethod
+        def length(ea):
+            sz,ele = idaapi.get_item_size(ea),idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
+            return sz // ele
+        @staticmethod
+        def size(ea):
+            return idaapi.get_item_size(ea)
+
+    class structure(object):
+        def __new__(cls, ea):
+            return cls.get(ea)
+
+        @staticmethod
+        def id(ea):
+            assert type(ea) == idaapi.FF_STRU, 'Specified IDA Type is not an FF_STRU(%x) : %x'% (idaapi.FF_STRU, type(ea))
+            ti = idaapi.opinfo_t()
+            res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
+            assert res, 'idaapi.get_opinfo returned %x at %x'% (res,ea)
+            return ti.tid
+
+        @staticmethod
+        def get(ea):
+            return structure.instance( type.structure.id(ea) )
+t = type
+
+## information about a given address
+isCode = type.isCode
+isData = type.isData
+isUnknown = type.isUnknown
+isHead = type.isHead
+isTail = type.isTail
+isAlign = type.isAlign
+getType = type
+
+# arrays
+getSize = type.array.element
+getArrayLength = type.array.length
+
+# structures
+getStructureId = type.structure.id
 
 class xref(object):
     @staticmethod
@@ -691,9 +749,11 @@ class xref(object):
 
     @staticmethod
     def up(ea):
+        '''All locations that reference specified address'''
         return list(set(xref.data_up(ea) + xref.code_up(ea)))
     @staticmethod
     def down(ea):
+        '''All locations that are referenced by the specified address'''
         return list(set(xref.data_down(ea) + xref.code_down(ea)))
     u,d=up,down
 
@@ -727,4 +787,20 @@ class xref(object):
     @staticmethod
     def clear(ea):
         return all((res is True) for res in (xref.del_code(ea),xref.del_data(ea)))
+x = xref
+
+drefs = xref.data
+crefs = xref.code
+
+dxdown = xref.data_down
+dxup = xref.data_up
+
+cxdown = xref.code_down
+cxup = xref.code_up
+
+up = xref.up
+down = xref.down
+
+## functions
+#demangle = internal.declaration.demangle
 

@@ -1,5 +1,5 @@
 # some general python modules
-import __builtin__,sys,imp
+import __builtin__,sys,imp,fnmatch
 import os,logging,_idaapi as idaapi,ctypes
 
 library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
@@ -8,50 +8,94 @@ library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
 root = idaapi.get_user_idadir()
 sys.path.remove(root)
 
-class internal_path(object):
-    '''Add all files within a subdirectory as submodule to a module'''
+class internal_api(object):
+    """Meta-path base-class for an api that's based on files within a directory"""
     imp = imp
-
-    @staticmethod
-    def new_module(name, doc=None, submodules={}):
-        '''Create a base module containing the specified submodules'''
-        module = type(__import__('__builtin__'))
-        result = module(name, doc)
-        for name,value in submodules.iteritems():
-            setattr(result, name, value)
-        return result
-
-    def __init__(self, directory, fullname=None, filter=lambda name:name, doc=None):
+    def __init__(self, directory, **attributes):
         self.path = os.path.realpath(directory)
-        self.api = {}
+        [setattr(self, k, v) for k,v in attributes.iteritems()]
+
+    ### Api operations
+    def load_api(self, path):
+        path,filename = os.path.split(path)
+        name,_ = os.path.splitext(filename)
+        return self.imp.find_module(name,[ path ])
+
+    def iterate_api(self, include='*.py', exclude=None):
+        import fnmatch
         result = []
-        for p in os.listdir(self.path):
-            (name,ext) = os.path.splitext(p)
-            modulepath,modulename = os.path.join(self.path,p),filter(name)
-            if ext == '.py' and modulename:
-                self.api[modulename] = self.imp.find_module(name, [self.path])
-                result.append((modulename,modulepath))
-            continue
-        if doc is None:
-            doc = '\n'.join('%s -- %s'%(n,p) for n,p in result)
-        self.__name__,self.__doc__ = fullname,doc
+        for filename in fnmatch.filter(os.listdir(self.path), include):
+            if exclude and fnmatch.fnmatch(filename, exclude):
+                continue
+
+            path = os.path.join(self.path, filename)
+            _,ext = os.path.splitext(filename)
+
+            left,right = (None,None) if include == '*' else (include.index('*'),len(include)-include.rindex('*'))
+            modulename = filename[left:-right+1]
+            yield modulename,path
         return
 
+    def new_api(self, modulename, path):
+        file,path,description = self.load_api(path)
+        try:
+            return self.imp.load_module(modulename, file, path, description)
+        finally: file.close()
+
+    ### Module operations
+    def new_module(self, fullname, doc=None):
+        res = self.imp.new_module(fullname)
+        res.__doc__ = doc or ''
+        return res
+
     def find_module(self, fullname, path=None):
-        if self.__name__ and fullname == self.__name__:
-            return self
-        return self if fullname in self.api.viewkeys() else None
+        raise NotImplementedError
 
     def load_module(self, fullname):
-        if self.__name__:
-            submodules = {name : self.imp.load_module(name,*location) for name,location in self.api.iteritems()}
-            return self.new_module(self.__name__, self.__doc__, submodules)
-        return self.imp.load_module(fullname, *self.api[fullname])
+        raise NotImplementedError
+
+class internal_path(internal_api):
+    def __init__(self, path, **attrs):
+        super(internal_path,self).__init__(path)
+        attrs.setdefault('include','*.py')
+        self.cache = dict(self.iterate_api(**attrs))
+
+    def find_module(self, fullname, path=None):
+        return self if path is None and fullname in self.cache else None
+    
+    def load_module(self, fullname):
+        res = sys.modules[fullname] = self.new_api(fullname, self.cache[fullname])
+        return res
+
+class internal_submodule(internal_api):
+    def __init__(self, __name__, path, **attrs):
+        super(internal_submodule,self).__init__(path)
+        attrs.setdefault('include','*.py')
+        self.__name__ = __name__
+        self.attrs = attrs
+
+    def find_module(self, fullname, path=None):
+        return self if path is None and fullname == self.__name__ else None
+
+    def load_module(self, fullname):
+        module = sys.modules.setdefault(fullname, self.new_module(fullname))
+
+        cache = dict(self.iterate_api(**self.attrs))
+        module.__doc__ = '\n'.join('{:s} -- {:s}'.format(name, path) for name,path in sorted(cache.iteritems()))
+
+        for name,path in cache.iteritems():
+            try:
+                res = self.new_api(name, path)
+            except:
+                __import__('logging').warn('%s : Unable to import module %s from %r', self.__name__, name, path, exc_info=True)
+            else:
+                setattr(module, name, res)
+            continue
+        return module
 
 class internal_object(object):
     def __init__(self, name, object):
         self.name,self.object = name,object
-
     def find_module(self, fullname, path=None):
         return self if path is None and fullname == self.name else None
     def load_module(self, fullname):
@@ -62,15 +106,15 @@ class internal_object(object):
 sys.meta_path.append( internal_object('ida',library('ida.wll')) )
 
 # private api
-sys.meta_path.append( internal_path(os.path.join(root,'base'), 'internal', lambda s: s[1:] if s.startswith('_') else None) )
+sys.meta_path.append( internal_submodule('internal', os.path.join(root,'base'), include='_*.py') )
 
 # public api
-sys.meta_path.append( internal_path(os.path.join(root,'base'), filter=lambda s: None if s.startswith('_') else s) )
+sys.meta_path.append( internal_path(os.path.join(root,'base'), exclude='_*.py') )
 sys.meta_path.append( internal_path(os.path.join(root,'misc')) )
 
 # user and application api's
 for n in ('custom','app'):
-    sys.meta_path.append( internal_path(os.path.join(root,n), n) )
+    sys.meta_path.append( internal_submodule(n, os.path.join(root,n)) )
 
 # temporarily root namespace
 __root__ = imp.load_source('__root__', os.path.join(root,'__root__.py'))

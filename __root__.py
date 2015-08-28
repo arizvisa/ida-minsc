@@ -5,11 +5,11 @@ import _idaapi as idaapi, ida
 import segment,database,function,instruction
 import structure,enum
 
-import database as db,function as fn
+import database as db,function as fn,instruction as ins
 
 # shortcuts
-def top():
-    return function.top(database.h())
+def top(ea=None):
+    return function.top(ea is not None and ea or database.h())
 
 def hex(i):
     return '%x'% i

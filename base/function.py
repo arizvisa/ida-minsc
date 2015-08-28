@@ -34,6 +34,14 @@ def offset(ea):
     min,_ = getRange(ea)
     return database.getoffset(min)
 
+def guess(ea):
+    '''Try really hard to get boundaries of the function at specified address'''
+    # FIXME: remove this because it doesn't try hard enough
+    start,end = getRange(ea)
+    if function.contains(start, ea) and not (ea >= start and ea < end):
+        return (idc.GetFchunkAttr(ea, idc.FUNCATTR_START), idc.GetFchunkAttr(ea, idc.FUNCATTR_END))
+    return start,end
+
 ## functions
 def add(start, end=idaapi.BADADDR):
     '''Creates a function at the specified /start/'''
@@ -75,10 +83,12 @@ def name(fn, name=None):
         res = idaapi.get_func_name(fn.startEA)
         if not res: res = idaapi.get_name(-1, fn.startEA)
         if not res: res = idaapi.get_true_name(fn.startEA, fn.startEA)
-        return res
+        return internal.declaration.extract.name(internal.declaration.demangle(res)) if res.startswith('?') else res
     return idaapi.set_name(fn.startEA, name, idaapi.SN_PUBLIC)
 def frame(fn):
-    return idaapi.get_frame(by(fn).startEA)
+    func = by(fn)
+    res = idaapi.get_frame(func.startEA)
+    return structure.instance(res.id, -func.frsize)
 
 if True:
     def getComment(ea, repeatable=1):
@@ -148,6 +158,9 @@ def top(fn):
     min,_ = getRange(fn)
     return min
 
+def bottom(fn):
+    return tuple(database.address.prev(addr) for _,addr in chunks(fn))
+
 def marks(fn):
     result = []
     fn = top(fn)
@@ -163,24 +176,29 @@ def marks(fn):
 # function frame attributes
 def getFrameId(fn):
     '''Returns the structure id of the frame'''
+    #func = by(fn)  # FIXME
     return idc.GetFunctionAttr(fn, idc.FUNCATTR_FRAME)
 
 def getAvarSize(fn):
     '''Return the number of bytes occupying argument space'''
+    #func = by(fn)  # FIXME
     max = structure.size(getFrameId(fn))
     total = getLvarSize(fn) + getRvarSize(fn)
     return max - total
 
 def getLvarSize(fn):
     '''Return the number of bytes occupying local variable space'''
+    #func = by(fn)  # FIXME
     return idc.GetFunctionAttr(fn, idc.FUNCATTR_FRSIZE)
 
 def getRvarSize(fn):
     '''Return the number of bytes occupying any saved registers'''
+    #func = by(fn)  # FIXME
     return idc.GetFunctionAttr(fn, idc.FUNCATTR_FRREGS) + 4   # +4 for the pc because ida doesn't count it
 
 def getSpDelta(ea):
     '''Gets the stack delta at the specified address'''
+    #func = by(fn)  # FIXME
     return idc.GetSpd(ea)
 
 def iterate(fn):
