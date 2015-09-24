@@ -1,11 +1,11 @@
 ## ida-python specific modules
-import _idaapi as idaapi, ida
+import _idaapi as idaapi,ida
 
 ## contextual modules
 import segment,database,function,instruction
 import structure,enum
 
-import database as db,function as fn,instruction as ins
+import database as db,function as fn,instruction as ins,structure as struc
 
 # shortcuts
 def top(ea=None):
@@ -18,3 +18,5 @@ h,go = database.h,database.go
 
 import utils
 from utils import remote
+
+#import custom,app

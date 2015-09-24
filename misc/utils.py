@@ -1,4 +1,4 @@
-import database,function
+import database,function,instruction as ins,internal
 import sys,logging
 
 class remote(object):
@@ -280,3 +280,39 @@ def below(ea):
     '''Display all the functions that the function at /ea/ can call'''
     tryhard = lambda x: '%s+%x'%(database.name(function.top(x)),x-function.top(x)) if function.within(x) else hex(x) if database.name(x) is None else database.name(x)
     return '\n'.join(map(tryhard,function.down(ea)))
+
+# FIXME: this only works on x86 where args are pushed via stack
+def makecall(ea):
+    if not function.contains(ea, ea):
+        return None
+
+    # scan down until we find a call that references something
+    chunk, = ((l,r) for l,r in function.chunks(ea) if l <= ea <= r)
+    result = []
+    while (len(result) < 1) and ea < chunk[1]:
+        # FIXME: it's probably not good to just scan for a call
+        if not database.instruction(ea).startswith('call '):
+            ea = database.next(ea)
+            continue
+        result = database.cxdown(ea)
+        if len(result) == 0: raise TypeError, 'utils.makecall(%x) : Unable to determine number of arguments'% ea
+
+    if len(result) != 1:
+        raise ValueError('Invalid code reference: %x %s'% (ea,repr(result)))
+    fn, = result
+
+    result = []
+    for offset,name,size in function.getArguments(fn):
+        left,_ = function.stackwindow(ea, offset+database.config.bits()/8)
+        # FIXME: if left is not an assignment or a push, find last assignment
+        result.append((name,left))
+
+#    result = ['%s=%s'%(name,ins.op_repr(ea, 0)) for name,ea in result]
+    result = ['%s=%s'%(name, ':'.join(ins.op_repr(database.address.prevreg(ea, ins.op_value(ea,0), write=1), n) for n in ins.ops_read(database.address.prevreg(ea, ins.op_value(ea,0), write=1))) if ins.op_type(ea,0) == 'opt_reg' else ins.op_repr(ea, 0)) for name,ea in result]
+
+    try:
+        return '%s(%s)'%(internal.declaration.demangle(function.name(function.byAddress(fn))), ','.join(result))
+    except:
+        pass
+    return '%s(%s)'%(internal.declaration.demangle(database.name(fn)), ','.join(result))
+

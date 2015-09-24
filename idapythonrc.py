@@ -77,7 +77,16 @@ class internal_submodule(internal_api):
     def find_module(self, fullname, path=None):
         return self if path is None and fullname == self.__name__ else None
 
+    class module(object):
+        def __init__(self, meta):
+            self.__metapath = meta
+            # FIXME: create a get-descriptor for each sub-module that will try to
+            #        load the module continuously until it's finally successful
+        def __getattr__(self, name):
+            raise NotImplementedError, "Unable to fetch module %s on-demand"% name
+
     def load_module(self, fullname):
+        # FIXME: make module a lazy-loaded object for fetching module-code on-demand
         module = sys.modules.setdefault(fullname, self.new_module(fullname))
 
         cache = dict(self.iterate_api(**self.attrs))
@@ -149,3 +158,13 @@ except IOError:
 except Exception, e:
     print 'warning: Unexpected exception %s raised'% repr(e)
     __import__('traceback').print_exc()
+
+# find the frame that fucks with our sys.modules, and save it for later
+__builtin__._ = __import__('sys')._getframe()
+while __builtin__._.f_code.co_name != 'IDAPython_ExecScript':
+    __builtin__._ = __builtin__._.f_back
+
+# inject our current sys.modules state into IDAPython_ExecScript's state if it's the broken version
+if 'basemodules' in __builtin__._.f_locals:
+    __builtin__._.f_locals['basemodules'].update(__import__('sys').modules)
+del(__builtin__._)

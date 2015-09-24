@@ -16,13 +16,6 @@ def mnem(ea):
     return idaapi.ua_mnem(ea) or None
 mnemonic = mnem
 
-def op(ea, n=None):
-    '''Returns the `n`th operand of the instruction at `ea`'''
-    insn = at(ea)
-    if n is None:
-        return tuple(insn.Operands[n] for n in xrange(ops_count(insn.ea)))
-    return insn.Operands[n]
-
 ## functions vs all operands of an insn
 def ops_count(ea):
     '''Return the number of operands of given instruction'''
@@ -51,7 +44,20 @@ def ops_state(ea):
     res = ( ((f&read[i]),(f&write[i])) for i in range(ops_count(ea)) )
     return [ (r and 'r' or '') + (w and 'w' or '') for r,w in res ]
 
+def ops_read(ea):
+    '''Returns the indexes of the operands in an instruction that are read from'''
+    return [i for i,s in enumerate(ops_state(ea)) if 'r' in s]
+def ops_write(ea):
+    '''Returns the indexes of the operands in an instruction that are written to'''
+    return [i for i,s in enumerate(ops_state(ea)) if 'w' in s]
+
 ## functions vs a specific operand of an insn
+def operand(ea, n=None):
+    '''Returns the `n`th op_t of the instruction at `ea`'''
+    insn = at(ea)
+    if n is None:
+        return tuple(insn.Operands[n] for n in xrange(ops_count(insn.ea)))
+    return insn.Operands[n]
 def op_repr(ea, n):
     '''Returns the string representation of an operand'''
     return ops_repr(ea)[n]
@@ -66,10 +72,11 @@ def op_type(ea, n):
     '''Returns the type of an operand (opt_imm, opt_reg, opt_phrase, opt_addr)'''
     insn = at(ea)
     return opt.type(insn.Operands[n]).__name__
-def op_native(ea, n):
-    '''Returns the value for an operand as per ida's format'''
+
+def op_decode(ea, n):
+    '''Returns the value for an operand in a parseable form'''
     insn = at(ea)
-    return opt.native(insn.Operands[n])
+    return opt.decode(insn.Operands[n])
 def op_value(ea, n):
     '''Returns an operand's value converted to register names, immediate, or offset,(base reg,index reg,scale)'''
     insn = at(ea)
@@ -93,7 +100,7 @@ class opt(object):
     @classmethod
     def value(cls, op):
         res = cls.cache[op.type](op)
-        if op.type in (idaapi.o_reg,):
+        if op.type in (idaapi.o_reg,idaapi.o_idpspec3,idaapi.o_idpspec4,idaapi.o_idpspec5):
             return reg_t.byIndex(res,op.dtyp).name
         elif op.type in (idaapi.o_phrase,idaapi.o_displ):
             dt = ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
@@ -104,7 +111,7 @@ class opt(object):
         return res
 
     @classmethod
-    def native(cls, op):
+    def decode(cls, op):
         return cls.cache[op.type](op)
 
     @classmethod
@@ -197,6 +204,31 @@ def opt_addr(op):
         return op.addr
     raise TypeError, op.type
 
+@opt.define(idaapi.o_idpspec0)
+def opt_reg(op):
+    '''opt_trreg'''
+    raise NotImplementedError
+@opt.define(idaapi.o_idpspec1)
+def opt_reg(op):
+    '''opt_dbreg'''
+    raise NotImplementedError
+@opt.define(idaapi.o_idpspec2)
+def opt_reg(op):
+    '''opt_crreg'''
+    raise NotImplementedError
+@opt.define(idaapi.o_idpspec3)
+def opt_reg(op):
+    '''opt_fpreg'''
+    return getattr(register, 'st{:d}'.format(op.reg)).id
+@opt.define(idaapi.o_idpspec4)
+def opt_reg(op):
+    '''opt_mmxreg'''
+    return getattr(register, 'mmx{:d}'.format(op.reg)).id
+@opt.define(idaapi.o_idpspec5)
+def opt_reg(op):
+    '''opt_xmmreg'''
+    return getattr(register, 'xmm{:d}'.format(op.reg)).id
+
 ## instruction type references
 def isGlobalRef(ea):
     '''Return True if the specified instruction references data (like a global)'''
@@ -230,6 +262,7 @@ def isCall(ea):
 #def op_*(
 #def? op_offset(ea, n, type, target = BADADDR, base = 0, tdelta = 0) -> int
 
+## register lookups and types
 class reg_t:
     cache = {}
 
@@ -251,12 +284,38 @@ class reg_t:
         def offset(self):
             return self.offset
         def __repr__(self):
-            dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi,name) == self.dtyp]
+            try:
+                dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi,name) == self.dtyp]
+            except ValueError:
+                dt = 'unknown'
             return '{:s} {:s} {:d}:+{:d}'.format(self.__class__, dt, self.offset, self.size, dt)
 
+        def __contains__(self, other):
+            return other in self.children.values()
+
+        def subset(self, other):
+            '''Returns true if register other is a part of self'''
+            def collect(node):
+                res = set([node])
+                [res.update(collect(n)) for n in node.children.values()]
+                return res
+            return other in collect(self)
+
+        def superset(self, other):
+            '''Returns true if register `other` is a superset of `self`'''
+            res,pos = set(),self
+            while pos is not None:
+                res.add(pos)
+                pos = pos.parent
+            return other in res
+
+        def related(self, other):
+            '''Returns true if the register `other` affects the state'''
+            return self.superset(other) or self.subset(other)
+
     @classmethod
-    def new(cls, name, bits, idaname=None):
-        dtyp = idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8))
+    def new(cls, name, bits, idaname=None, **kwds):
+        dtyp = kwds.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
         namespace = dict(cls.type.__dict__)
         namespace.update({'__name__':name, 'parent':None, 'children':{}, 'dtyp':dtyp, 'offset':0, 'size':bits, 'realname':idaname or name})
         namespace['realname'] = idaname
@@ -264,8 +323,8 @@ class reg_t:
         cls.cache[name] = cls.cache[idaname or name,dtyp] = res
         return res
     @classmethod
-    def child(cls, parent, name, offset, bits, idaname=None):
-        dtyp = idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8))
+    def child(cls, parent, name, offset, bits, idaname=None, **kwds):
+        dtyp = kwds.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
         namespace = dict(cls.type.__dict__)
         namespace.update({'__name__':name, 'parent':parent, 'children':{}, 'dtyp':dtyp, 'offset':offset, 'size':bits})
         namespace['realname'] = idaname
@@ -292,23 +351,24 @@ class register: pass
 [ setattr(register, _+'l', reg_t.child(reg_t.byName(_+'x'), _+'l', 0, 8)) for _ in ('a','c','d','b') ]
 [ setattr(register, _+'l', reg_t.child(reg_t.byName(_), _+'l', 0, 8)) for _ in ('sp','bp','si','di') ]
 [ setattr(register,     _, reg_t.new('es',16)) for _ in ('es','cs','ss','ds','fs','gs') ]
+setattr(register, 'fpstack', reg_t.new('st', 80*8, dtyp=None))
+
+# single precision
+[ setattr(register, 'st{:d}f'.format(_), reg_t.child(register.fpstack, 'st{:d}f'.format(_), _*80, 80, 'st{:d}'.format(_), dtyp=idaapi.dt_float)) for _ in range(8) ]
+# double precision
+[ setattr(register, 'st{:d}d'.format(_), reg_t.child(register.fpstack, 'st{:d}d'.format(_), _*80, 80, 'st{:d}'.format(_), dtyp=idaapi.dt_double)) for _ in range(8) ]
+# umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
+[ setattr(register, 'st{:d}'.format(_), reg_t.child(register.fpstack, 'st{:d}'.format(_), _*80, 80, 'st{:d}'.format(_), dtyp=idaapi.dt_tbyte)) for _ in range(8) ]
+
+# not sure if the mmx registers trash the other 16 bits of an fp register
+[ setattr(register, 'mm{:d}'.format(_), reg_t.child(register.fpstack, 'mm{:d}'.format(_), _*80, 64, dtyp=idaapi.dt_qword)) for _ in range(8) ]
+
+# sse1/sse2 simd registers
+[ setattr(register, 'xmm{:d}'.format(_), reg_t.new('xmm{:d}'.format(_), 128, dtyp=idaapi.dt_byte16)) for _ in range(8) ]
+[ setattr(register, 'ymm{:d}'.format(_), reg_t.new('ymm{:d}'.format(_), 128, dtyp=idaapi.dt_ldbl)) for _ in range(8) ]
+
+#fpctrl, fpstat, fptags
+#mxcsr
 # 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
 
-## fpu state         #o_fpreg = idaapi.o_idpspec3      # floating point register
-#[reg_t.define('st%d'%_, idaapi.dt_float) for _ in range(8)]
-## mmx state         #o_mmxreg = idaapi.o_idpspec4      # mmx register
-#[reg_t.define('mm%d'%_, idaapi.dt_qword) for _ in range(8)]
-## sse1 state        #o_xmmreg = idaapi.o_idpspec5      # xmm register
-#[reg_t.define('xmm%d'%_, idaapi.dt_float) for _ in range(16)]
-## sse2 state
-#[reg_t.define('ymm%d'%_, idaapi.dt_double) for _ in range(16)]
-
-#['ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15',
-#'al', 'cl', 'dl', 'bl', 'ah', 'ch', 'dh', 'bh', 'spl', 'bpl', 'sil', 'dil', 'ip', 
-# 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
-#'st0', 'st1', 'st2', 'st3', 'st4', 'st5', 'st6', 'st7',
-#'fpctrl', 'fpstat', 'fptags',
-#'mm0', 'mm1', 'mm2', 'mm3', 'mm4', 'mm5', 'mm6', 'mm7',
-#'xmm0', 'xmm1', 'xmm2', 'xmm3', 'xmm4', 'xmm5', 'xmm6', 'xmm7', 'xmm8', 'xmm9', 'xmm10', 'xmm11', 'xmm12', 'xmm13', 'xmm14', 'xmm15',
-#'mxcsr',
-#'ymm0', 'ymm1', 'ymm2', 'ymm3', 'ymm4', 'ymm5', 'ymm6', 'ymm7', 'ymm8', 'ymm9', 'ymm10', 'ymm11', 'ymm12', 'ymm13', 'ymm14', 'ymm15']
+# FIXME: implement switch_t to determine information about switch statements

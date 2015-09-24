@@ -7,7 +7,7 @@ generic tools for working in the context of the database
 import logging,os
 import idc,idautils,idaapi
 import instruction as _instruction,function,segment,structure,internal
-import array,itertools
+import array,itertools,ctypes
 
 ## properties
 def h():
@@ -40,8 +40,22 @@ def range():
 class config(object):
     info = idaapi.get_inf_structure()
     @classmethod
+    def compiler(cls):
+        return cls.info.cc
+    @classmethod
     def version(cls):
         return cls.info.version
+
+    @classmethod
+    def type(cls, typestr):
+        lookup = {
+            'char':'size_b',
+            'short':'size_s',
+            'int':'size_i',
+            'long':'size_l',
+            'longlong':'size_ll',
+        }
+        return getattr(cls.compiler, lookup.get(typestr.lower(),typestr) )
 
     @classmethod
     def bits(cls):
@@ -88,31 +102,43 @@ def segments():
     '''Returns a list of all segments in the current database'''
     return [segment.byName(s).startEA for s in segment.list()]
 
-def prev(ea):
+def prev(ea, count=1):
     '''return the previous address (instruction or data)'''
-    return address.prev(ea)
-def next(ea):
+    return address.prev(ea, count=count)
+def next(ea, count=1):
     '''return the next address (instruction or data)'''
-    return address.next(ea)
+    return address.next(ea, count=count)
 
-def prevdata(ea):
+def prevdata(ea, count=1):
     '''return previous address containing data referencing it'''
-    return address.prevdata(ea)
-def nextdata(ea):
+    return address.prevdata(ea, count=count)
+def nextdata(ea, count=1):
     '''return next address containing data referencing it'''
-    return address.nextdata(ea)
-def prevcode(ea):
+    return address.nextdata(ea, count=count)
+def prevcode(ea, count=1):
     '''return previous address containing code referencing it'''
-    return address.prevcode(ea)
-def nextcode(ea):
+    return address.prevcode(ea, count=count)
+def nextcode(ea, count=1):
     '''return next address containing code referencing it'''
-    return address.nextcode(ea)
-def prevref(ea):
+    return address.nextcode(ea, count=count)
+def prevref(ea, count=1):
     '''return previous address containing any kind of reference to it'''
-    return address.prevref(ea)
-def nextref(ea):
+    return address.prevref(ea, count=count)
+def nextref(ea, count=1):
     '''return next address containing any kind of reference to it'''
-    return address.nextref(ea)
+    return address.nextref(ea, count=count)
+def prevreg(ea, *regs, **write):
+    """return previous address containing an instruction that uses one of the requested registers ``regs`
+
+    If the keyword ``write`` is True, then only return the address if it's writing to the register.
+    """
+    return address.prevreg(ea, *regs, **write)
+def nextreg(ea, *regs, **write):
+    """return next address containing an instruction that uses one of the requested registers ``regs`
+
+    If the keyword ``write`` is True, then only return the address if it's writing to the register.
+    """
+    return address.nextreg(ea, *regs, **write)
 
 def decode(ea):
     return _instruction.decode(ea)
@@ -309,37 +335,14 @@ def color(ea, *args, **kwds):
         return color_read(ea, *args, **kwds)
     return color_write(ea, *args, **kwds)
 
+def comment(ea, comment=None, repeatable=0):
+    if comment is None:
+        return idaapi.get_cmt(ea, int(bool(repeatable)))
+    return idaapi.set_cmt(ea, comment, int(bool(repeatable)))
+
 def addEntry(name, ea, ordinal=None):
     '''addEntry(name, ea, index?) -> adds an entry point to the database'''
     return idaapi.add_entry(idaapi.get_entry_qty() if ordinal is None else ordinal, ea, name, 0)
-
-# FIXME: this only works on x86 where args are pushed via stack
-def makecall(ea):
-    if not function.contains(ea, ea):
-        return None
-
-    # scan down until we find a call that references something
-    chunk, = ((l,r) for l,r in function.chunks(ea) if l <= ea <= r)
-    result = []
-    while (len(result) < 1) and ea < chunk[1]:
-        # FIXME: it's probably not good to just scan for a call
-        if not instruction(ea).startswith('call '):
-            ea = next(ea)
-            continue
-        result = cxdown(ea)
-
-    if len(result) != 1:
-        raise ValueError('Invalid code reference: %x %s'% (ea,repr(result)))
-    fn, = result
-
-    result = []
-    for offset,name,size in function.getArguments(fn):
-        left,_ = function.stackwindow(ea, offset+config.bits()/8)
-        # FIXME: if left is not an assignment or a push, find last assignment
-        result.append((name,left))
-
-    result = ['%s=%s'%(name,_instruction.ops_repr(ea)[0]) for name,ea in result]
-    return '%s(%s)'%(internal.declaration.demangle(function.name(function.byAddress(fn))), ','.join(result))
 
 try:
     ## tag data storage using a lisp-like syntax
@@ -512,6 +515,38 @@ class imports(object):
     def __new__(cls):
         return cls.iterate()
 
+    # searching
+    @classmethod
+    def get(cls,ea):
+        for addr,(module,name,ordinal) in cls.iterate():
+            if addr == ea:
+                return (module,name,ordinal)
+            continue
+        raise LookupError, 'Unable to determine import at address %x'% ea
+
+    @classmethod
+    def module(cls,ea):
+        for addr,(module,_,_) in cls.iterate():
+            if addr == ea:
+                return module
+            continue
+        raise LookupError, 'Unable to determine import module name at address %x'% ea
+
+    # specific parts of the import
+    @classmethod
+    def fullname(cls,ea):
+        module,name,ordinal = cls.get(ea)
+        return '{:s}!{:s}'.format(module, name or 'Ordinal%d'%ordinal)
+    @classmethod
+    def name(cls,ea):
+        _,name,ordinal = cls.get(ea)
+        return name or 'Ordinal%d'%ordinal
+    @classmethod
+    def ordinal(cls,ea):
+        _,_,ordinal = cls.get(ea)
+        return ordinal
+
+    # iteration
     @staticmethod
     def modules():
         return [idaapi.get_import_module_name(i) for i in xrange(idaapi.get_import_module_qty())]
@@ -562,6 +597,7 @@ class register(object):
     def segmentsize(cls):
         return idaapi.ph_get_segreg_size()
 
+### navigating the database according to the address reference type
 class address(object):
     @staticmethod
     def walk(ea, next, match):
@@ -570,32 +606,87 @@ class address(object):
         return ea
 
     @staticmethod
-    def prev(ea):
-        return idaapi.prev_head(ea, 0)
+    def prev(ea, count=1):
+        res = idaapi.prev_head(ea,0)
+        return address.prev(res, count-1) if count > 1 else res
     @staticmethod
-    def next(ea):
-        return idaapi.next_head(ea, idaapi.BADADDR)
+    def next(ea, count=1):
+        res = idaapi.next_head(ea, idaapi.BADADDR)
+        return address.next(res, count-1) if count > 1 else res
 
     @staticmethod
-    def prevdata(ea):
-        return address.walk(ea, address.prev, xref.du)
+    def prevdata(ea, count=1):
+        res = address.walk(ea, address.prev, lambda n: len(xref.du(n)) == 0)
+        return address.prevdata(res-1, count-1) if count > 1 else res
     @staticmethod
-    def nextdata(ea):
-        return address.walk(ea, address.next, xref.du)
+    def nextdata(ea, count=1):
+        res = address.walk(ea, address.next, lambda n: len(xref.du(n)) == 0)
+        return address.nextdata(res+1, count-1) if count > 1 else res
 
     @staticmethod
-    def prevcode(ea):
-        return address.walk(ea, address.prev, xref.cu)
+    def prevcode(ea, count=1):
+        res = address.walk(ea, address.prev, lambda n: len(xref.cu(n)) == 0)
+        return address.prevcode(res-1, count-1) if count > 1 else res
     @staticmethod
-    def nextcode(ea):
-        return address.walk(ea, address.next, xref.cu)
+    def nextcode(ea, count=1):
+        res = address.walk(ea, address.next, lambda n: len(xref.cu(n)) == 0)
+        return address.nextcode(res+1, count-1) if count > 1 else res
 
     @staticmethod
-    def prevref(ea):
-        return address.walk(ea, address.prev, xref.u)
+    def prevref(ea, count=1):
+        res = address.walk(ea, address.prev, lambda n: len(xref.u(n)) == 0)
+        return address.prevref(res-1, count-1) if count > 1 else res
     @staticmethod
-    def nextref(ea):
-        return address.walk(ea, address.next, xref.u)
+    def nextref(ea, count=1):
+        res = address.walk(ea, address.next, lambda n: len(xref.u(n)) == 0)
+        return address.nextref(res+1, count-1) if count > 1 else res
+
+    @staticmethod
+    def prevreg(ea, *regs, **kwds):
+        count = kwds.get('count',1)
+        write = kwds.get('write',False)
+        def uses_register(ea, regs):
+            res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
+            match = lambda r,regs: itertools.imap(_instruction.reg_t.byName(r).related,itertools.imap(_instruction.reg_t.byName,regs))
+            for t,p,st in res:
+                if t == 'opt_reg' and any(match(p,regs)) and ('w' in st if write else True):
+                    return True
+                if t == 'opt_phrase' and not write:
+                    _,(base,index,_) = p
+                    if (base and any(match(base,regs))) or (index and any(match(index,regs))):
+                        return True
+                continue
+            return False
+        res = address.walk(ea, address.prev, lambda ea: not uses_register(ea, regs))
+        return address.prevreg(res-1, *regs, count=count-1) if count > 1 else res
+    @staticmethod
+    def nextreg(ea, *regs, **kwds):
+        count = kwds.get('count',1)
+        write = kwds.get('write',False)
+        def uses_register(ea, regs):
+            res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
+            match = lambda r,regs: itertools.imap(_instruction.reg_t.byName(r).related,itertools.imap(_instruction.reg_t.byName,regs))
+            for t,p,st in res:
+                if t == 'opt_reg' and any(match(p,regs)) and ('w' in st if write else True):
+                    return True
+                if t == 'opt_phrase' and not write:
+                    _,(base,index,_) = p
+                    if (base and any(match(base,regs))) or (index and any(match(index,regs))):
+                        return True
+                continue
+            return False
+        res = address.walk(ea, address.next, lambda ea: not uses_register(ea, regs))
+        return address.nextreg(res+1, *regs, count=count-1) if count > 1 else res
+
+    @staticmethod
+    def prevstack(ea, delta):
+        fn,sp = function.top(ea),function.getSpDelta(ea)
+        return address.walk(ea, address.prev, lambda n: abs(function.getSpDelta(n) - sp) < delta)
+    @staticmethod
+    def nextstack(ea, delta):
+        fn,sp = function.top(ea),function.getSpDelta(ea)
+        return address.walk(ea, address.next, lambda n: abs(function.getSpDelta(n) - sp) < delta)
+
 a = addr = address
 
 class type(object):
@@ -627,6 +718,7 @@ class type(object):
 
     class array(object):
         def __new__(cls, ea):
+            """Return the values of the array at address ``ea``"""
             numerics = {
                 idaapi.FF_BYTE : 'B',
                 idaapi.FF_WORD : 'H',
@@ -641,8 +733,11 @@ class type(object):
             }
             fl = idaapi.getFlags(ea)
             elesize = idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
-            if fl & idaapi.FF_ASCI:
+            if fl & idaapi.FF_ASCI == idaapi.FF_ASCI:
                 t = strings[elesize]
+            elif fl & idaapi.FF_STRU == idaapi.FF_STRU:
+                t = type.structure.id(ea)
+                raise TypeError, 'array : Unable to handle an array of structure type %x'% t
             else:
                 ch = numerics[fl & idaapi.DT_TYPE]
                 t = ch.lower() if idaapi.is_signed_data(fl) else ch
@@ -653,21 +748,26 @@ class type(object):
             
         @staticmethod
         def element(ea):
+            """Return the size of an element in the array at address ``ea``"""
             return idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
         @staticmethod
         def length(ea):
+            """Return the number of elements in the array at address ``ea``"""
             sz,ele = idaapi.get_item_size(ea),idaapi.get_full_data_elsize(ea, idaapi.getFlags(ea))
             return sz // ele
         @staticmethod
         def size(ea):
+            """Return the size of the array at address ``ea``"""
             return idaapi.get_item_size(ea)
 
     class structure(object):
         def __new__(cls, ea):
+            """Return the structure at address ``ea``"""
             return cls.get(ea)
 
         @staticmethod
         def id(ea):
+            """Return the identifier of the structure at address ``ea``"""
             assert type(ea) == idaapi.FF_STRU, 'Specified IDA Type is not an FF_STRU(%x) : %x'% (idaapi.FF_STRU, type(ea))
             ti = idaapi.opinfo_t()
             res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
@@ -676,7 +776,41 @@ class type(object):
 
         @staticmethod
         def get(ea):
-            return structure.instance( type.structure.id(ea) )
+            st = structure.instance(type.structure.id(ea), offset=ea)
+            typelookup = {
+                (int,-1) : ctypes.c_int8, (int,1) : ctypes.c_uint8,
+                (int,-2) : ctypes.c_int16, (int,2) : ctypes.c_uint16,
+                (int,-4) : ctypes.c_int32, (int,4) : ctypes.c_uint32,
+                (int,-8) : ctypes.c_int64, (int,8) : ctypes.c_uint64,
+                (float,4) : ctypes.c_float, (float,8) : ctypes.c_double,
+            }
+
+            res = {}
+            for m in st.members:
+                val = read(m.offset, m.size)
+                try:
+                    ct = typelookup[m.type]
+                except KeyError:
+                    ty,sz = m.type
+                    if isinstance(ty, list):
+                        t = typelookup[tuple(ty)]
+                        ct = t*sz
+                    elif isinstance(ty, (chr,str)):
+                        ct = ctypes.c_char*sz
+                    else:
+                        ct = None
+                finally:
+                    res[m.name] = val if any(_ is None for _ in (ct,val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)),ctypes.POINTER(ct)).contents
+            return res
+
+        @staticmethod
+        def apply(ea, st):
+            """Apply the structure ``st`` to the address at ``ea``"""
+            ti = idaapi.opinfo_t()
+            res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
+            ti.tid = st.id
+            return idaapi.set_opinfo(ea, 0, idaapi.getFlags(ea) | idaapi.struflag(), ti)
+            
 t = type
 
 ## information about a given address

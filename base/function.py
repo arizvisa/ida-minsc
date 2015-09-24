@@ -4,7 +4,7 @@ function-context
 generic tools for working in the context of a function.
 '''
 
-import logging,re
+import logging,re,itertools,functools,operator
 import internal,database,structure
 import idc,idaapi
 
@@ -12,6 +12,12 @@ import idc,idaapi
 def byAddress(ea):
     res = idaapi.get_func(ea)
     if res is None:
+        try:
+            database.imports.get(ea)
+        except LookupError:
+            pass
+        else:
+            return ea
         raise Exception, "function.byAddress(%x):unable to locate function"% ea
     return res
 def byName(name):
@@ -88,7 +94,11 @@ def name(fn, name=None):
 def frame(fn):
     func = by(fn)
     res = idaapi.get_frame(func.startEA)
-    return structure.instance(res.id, -func.frsize)
+    if res is not None:
+        return structure.instance(res.id, offset=-func.frsize)
+    #logging.fatal('%s.frame : function does not have a frame : %x %s', __name__, func.startEA, name(func.startEA))
+    logging.info('%s.frame : function does not have a frame : %x %s', __name__, func.startEA, name(func.startEA))
+    return structure.instance(-1)
 
 if True:
     def getComment(ea, repeatable=1):
@@ -472,3 +482,14 @@ def isLibrary(fn):
     return idaapi.get_func(fn).flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
 def isThunk(fn):
     return idaapi.get_func(fn).flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
+
+def register(fn, *regs, **options):
+    write = options.get('write', 0)
+    for l,r in chunks(fn):
+        ea = database.address.nextreg(l, *regs, write=write)
+        while ea < r:
+            yield ea
+            ea = database.address.nextreg(database.address.next(ea), *regs, write=write)
+        continue
+    return
+
