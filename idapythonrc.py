@@ -58,12 +58,14 @@ class internal_path(internal_api):
     def __init__(self, path, **attrs):
         super(internal_path,self).__init__(path)
         attrs.setdefault('include','*.py')
+        self.attrs = attrs
         self.cache = dict(self.iterate_api(**attrs))
 
     def find_module(self, fullname, path=None):
         return self if path is None and fullname in self.cache else None
     
     def load_module(self, fullname):
+        self.cache = dict(self.iterate_api(**self.attrs))
         res = sys.modules[fullname] = self.new_api(fullname, self.cache[fullname])
         return res
 

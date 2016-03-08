@@ -3,6 +3,7 @@ tagged-comments plugin.
 provides serialization/deserialization from arbitrary types to fit within ida's comments
 [arizvisa@tippingpoint.com]
 '''
+import __builtin__
 
 def tokens(input):
     input = iter(input)
@@ -115,8 +116,7 @@ def toDict(string):
     items = toList(string)
 
     # pull out/rename duplicates
-    blah = set()
-    all = set()
+    all,blah = set(),set()
     for k,v in items:
         if k in all:
             blah.add(k)
@@ -128,7 +128,7 @@ def toDict(string):
     for i,(k,v) in enumerate(items):
         if k in blah:
             k = '%s_%x'%(k, i)
-        res.append((k,v))
+        res.append((k,getattr(__builtin__,v) if isinstance(v,basestring) and hasattr(__builtin__,v) else v))
 
     # done
     return dict(res)

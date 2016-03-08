@@ -4,26 +4,20 @@ function-context
 generic tools for working in the context of a function.
 '''
 
-import logging,re,itertools,functools,operator
-import internal,database,structure
-import idc,idaapi
+import logging,re
+import internal,database,structure,ui
+import idaapi
 
 ## searching
 def byAddress(ea):
     res = idaapi.get_func(ea)
     if res is None:
-        try:
-            database.imports.get(ea)
-        except LookupError:
-            pass
-        else:
-            return ea
-        raise Exception, "function.byAddress(%x):unable to locate function"% ea
+        raise LookupError, "function.byAddress(%x):unable to locate function"% ea
     return res
 def byName(name):
     ea = idaapi.get_name_ea(-1, name)
     if ea == idaapi.BADADDR:
-        raise Exception, "function.byName(%r):unable to locate function"% name
+        raise LookupError, "function.byName(%r):unable to locate function"% name
     return idaapi.get_func(ea)
 def by(n):
     if type(n) is idaapi.func_t:
@@ -32,21 +26,152 @@ def by(n):
         return byName(n)
     return byAddress(n)
 
-def address(ea):
-    min,_ = getRange(ea)
-    return min
+def __addressOfRtOrSt(fn):
+    '''Returns (F,address) if a statically linked address, or (T,address) if a runtime linked address'''
+    try: fn = by(fn)
 
-def offset(ea):
-    min,_ = getRange(ea)
-    return database.getoffset(min)
+    # otherwise, maybe it's an rtld symbol
+    except LookupError, e:
+        if not database.isData(fn): raise
+
+        # ensure that we're an import, otherwise throw original exception
+        try: database.imports.get(fn)
+        except LookupError: raise e
+
+        # yep, we're an import
+        return True,fn
+    return False,fn.startEA
+
+def address(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.address(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return fn.startEA
+
+def offset(key=None):
+    ea = address(key)
+    return database.getoffset(ea)
 
 def guess(ea):
-    '''Try really hard to get boundaries of the function at specified address'''
-    # FIXME: remove this because it doesn't try hard enough
-    start,end = getRange(ea)
-    if function.contains(start, ea) and not (ea >= start and ea < end):
-        return (idc.GetFchunkAttr(ea, idc.FUNCATTR_START), idc.GetFchunkAttr(ea, idc.FUNCATTR_END))
-    return start,end
+    '''Determine the contiguous boundaries of the code at the given address'''
+    for left,right in chunks(ea):
+        if left <= ea < right:
+            return left,right
+        continue
+    raise LookupError, "Unable to determine function chunk's bounds : %x"%ea
+
+## properties
+def comment(fn, comment=None, repeatable=1):
+    fn = by(fn)
+    if comment is None:
+        return idaapi.get_func_cmt(fn, repeatable)
+    return idaapi.set_func_cmt(fn, comment, repeatable)
+
+def name(key=None, name=None):
+    '''Returns the name of the function or import identified by key.'''
+    rt,ea = __addressOfRtOrSt(ui.current.address() if key is None else key)
+    if rt:   
+        if name is None:
+            res = idaapi.get_name(-1, ea)
+            return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if res.startswith('?') else res
+        # FIXME: shuffle the new name into the prototype and then re-mangle it
+        return database.name(ea, name)
+
+    if name is None:
+        res = idaapi.get_func_name(ea)
+        if not res: res = idaapi.get_name(-1, ea)
+        if not res: res = idaapi.get_true_name(ea, ea)
+        return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if res.startswith('?') else res
+        #return internal.declaration.extract.name(internal.declaration.demangle(res)) if res.startswith('?') else res
+    return idaapi.set_name(ea, name, idaapi.SN_PUBLIC)
+
+def prototype(key=None):
+    '''Returns the full prototype of the function identified by fn.'''
+    rt,ea = __addressOfRtOrSt(ui.current.address() if key is None else key)
+    funcname = database.name(ea)
+    try:
+        res = internal.declaration.function(ea)
+        idx = res.find('(')
+        result = res[:idx] + ' ' + funcname + res[idx:]
+
+    except ValueError:
+        if not funcname.startswith('?'): raise
+        result = internal.declaration.demangle(funcname)
+    return result
+
+def frame(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.frame(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+
+    res = idaapi.get_frame(fn.startEA)
+    if res is not None:
+        return structure.instance(res.id, offset=-fn.frsize)
+    #logging.fatal('%s.frame : function does not have a frame : %x %s', __name__, fn.startEA, name(fn.startEA))
+    logging.info('%s.frame : function does not have a frame : %x %s', __name__, fn.startEA, name(fn.startEA))
+    return structure.instance(-1)
+
+def getRange(key=None):
+    '''tuple containing function start and end'''
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.getRange(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    if fn is None:
+        raise ValueError, 'address %x is not contained in a function'% ea
+    return fn.startEA,fn.endEA
+
+def color_write(fn, bgr):
+    fn = by(fn)
+    fn.color = 0xffffffff if bgr is None else bgr
+    return bool(idaapi.update_func(fn))
+
+def color_read(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.color_read(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return fn.color
+
+def color(fn, *args, **kwds):
+    '''color(address, rgb?) -> fetches or stores a color to the specified function.'''
+    if len(args) == 0:
+        return color_read(fn, *args, **kwds)
+    return color_write(fn, *args, **kwds)
+
+def top(key=None):
+    '''Return the top of the specified function'''
+    return address(key)
+
+def bottom(key=None):
+    '''Return the addresses of instructions that are used to exit the specified function'''
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.bottom(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
+    fc = flow(key)
+    exit_types = (fc_block_type_t.fcb_ret,fc_block_type_t.fcb_cndret,fc_block_type_t.fcb_noret,fc_block_type_t.fcb_enoret,fc_block_type_t.fcb_error)
+    return tuple(database.address.prev(n.endEA) for n in fc if n.type in exit_types)
+
+def marks(key=None):
+    funcea = top(key)
+    result = []
+    for ea,comment in database.marks():
+        try:
+            if top(ea) == funcea:
+                result.append( (ea,comment) )
+        except Exception:
+            pass
+        continue
+    return result
 
 ## functions
 def add(start, end=idaapi.BADADDR):
@@ -71,85 +196,11 @@ def assignChunk(fn, chunkea):
         idaapi.set_tail_owner(fn, chunkea)
     return assignChunk(by(fn), chunkea)
 
-def _findTail(ea):
-    while database.isCode(ea):
-        n = idaapi.decode_insn(ea)
-        ea += n
-    return ea
+def within(ea):
+    '''Returns True if address is associated with a function of some kind'''
+    return idaapi.get_func(ea) is not None
 
-## properties
-def comment(fn, comment=None, repeatable=1):
-    fn = by(fn)
-    if comment is None:
-        return idaapi.get_func_cmt(fn, repeatable)
-    return idaapi.set_func_cmt(fn, comment, repeatable)
-def name(fn, name=None):
-    fn = by(fn)
-    if name is None:
-        res = idaapi.get_func_name(fn.startEA)
-        if not res: res = idaapi.get_name(-1, fn.startEA)
-        if not res: res = idaapi.get_true_name(fn.startEA, fn.startEA)
-        return internal.declaration.extract.name(internal.declaration.demangle(res)) if res.startswith('?') else res
-    return idaapi.set_name(fn.startEA, name, idaapi.SN_PUBLIC)
-def frame(fn):
-    func = by(fn)
-    res = idaapi.get_frame(func.startEA)
-    if res is not None:
-        return structure.instance(res.id, offset=-func.frsize)
-    #logging.fatal('%s.frame : function does not have a frame : %x %s', __name__, func.startEA, name(func.startEA))
-    logging.info('%s.frame : function does not have a frame : %x %s', __name__, func.startEA, name(func.startEA))
-    return structure.instance(-1)
-
-if True:
-    def getComment(ea, repeatable=1):
-        fn = byAddress(ea)
-        return idaapi.get_func_cmt(fn, repeatable)
-    def setComment(ea, string, repeatable=1):
-        fn = byAddress(ea)
-        return idaapi.set_func_cmt(fn, string, repeatable)
-
-    def getName(ea):
-        '''fetches the function name, or the global name'''
-        res = idaapi.get_func_name(ea)
-        if res is None:
-            res = idaapi.get_name(-1, ea)
-        if res is None:
-            res = idaapi.get_true_name(ea, ea)
-
-        # if name is mangled...  and version <= 6.4
-        if res and res.startswith('@'):
-            return '$'+res
-        return res
-    def setName(ea, name):
-        '''sets the function name, returns True or False based on success'''
-        res = idc.MakeNameEx(ea, name, 2)
-        return True if int(res) else False
-
-def chunks(fn):
-    '''enumerates all chunks in a function '''
-    ea = by(fn).startEA
-    res = idc.FirstFuncFchunk(ea)
-    while res != idc.BADADDR:
-        (start, end) = idc.GetFchunkAttr(res, idc.FUNCATTR_START), idc.GetFchunkAttr(res, idc.FUNCATTR_END)
-        yield start,end
-        res = idc.NextFuncFchunk(ea, res)
-    return
-
-def blocks(fn):
-    '''Returns each block in the specified function'''
-    for start,end in chunks(fn):
-        for r in database.blocks(start, end):
-            yield r
-        continue
-    return
-
-def getRange(fn):
-    '''tuple containing function start and end'''
-    func = by(fn)
-    if func is None:
-        raise ValueError, 'address %x is not contained in a function'% ea
-    return func.startEA,func.endEA
-
+## operations
 def contains(fn, ea):
     '''Checks if ea is contained in function or in any of it's chunks'''
     fn = by(fn)
@@ -159,107 +210,129 @@ def contains(fn, ea):
         continue
     return False
 
-def within(ea):
-    '''Returns True if address is associated with a function of some kind'''
-    return idaapi.get_func(ea) is not None
-
-def top(fn):
-    '''Return the top of the specified function'''
-    min,_ = getRange(fn)
-    return min
-
-def bottom(fn):
-    return tuple(database.address.prev(addr) for _,addr in chunks(fn))
-
-def marks(fn):
-    result = []
-    fn = top(fn)
-    for ea,comment in database.marks():
-        try:
-            if top(ea) == fn:
-                result.append( (ea,comment) )
-        except ValueError:
-            pass
-        continue
-    return result
-
-# function frame attributes
-def getFrameId(fn):
-    '''Returns the structure id of the frame'''
-    #func = by(fn)  # FIXME
-    return idc.GetFunctionAttr(fn, idc.FUNCATTR_FRAME)
-
-def getAvarSize(fn):
-    '''Return the number of bytes occupying argument space'''
-    #func = by(fn)  # FIXME
-    max = structure.size(getFrameId(fn))
-    total = getLvarSize(fn) + getRvarSize(fn)
-    return max - total
-
-def getLvarSize(fn):
-    '''Return the number of bytes occupying local variable space'''
-    #func = by(fn)  # FIXME
-    return idc.GetFunctionAttr(fn, idc.FUNCATTR_FRSIZE)
-
-def getRvarSize(fn):
-    '''Return the number of bytes occupying any saved registers'''
-    #func = by(fn)  # FIXME
-    return idc.GetFunctionAttr(fn, idc.FUNCATTR_FRREGS) + 4   # +4 for the pc because ida doesn't count it
-
-def getSpDelta(ea):
-    '''Gets the stack delta at the specified address'''
-    #func = by(fn)  # FIXME
-    return idc.GetSpd(ea)
-
-def iterate(fn):
-    '''Iterate through all the instructions in each chunk of the specified function'''
-    for start,end in chunks(fn):
-        for ea in database.iterate(start, end):
-            yield ea
-        continue
-    return
-
-def searchinstruction(fn, match=lambda insn: True):
-    for ea in iterate(fn):
-        if match( database.decode(ea) ):
-            yield ea
-        continue
-    return
-
-def search(fn, regex):
-    '''Return each instruction that matches the case-insensitive regex'''
-    pattern = re.compile(regex, re.I)
-    for ea in iterate(fn):
-        insn = re.sub(' +', ' ', database.instruction(ea))
-        if pattern.search(insn) is not None:
-            yield ea
-        continue
-    return
-
-getDeclaration = internal.declaration.function
-def getArguments(ea):
+def arguments(key=None):
     '''Returns the arguments as (offset,name,size)'''
     try:
-        # grab from declaration first
+        if key is None:
+            fn = ui.current.function()
+            if fn is None: raise LookupError, "function.arguments(%r):Not currently positioned within a function"% key
+        else:
+            fn = by(key)
+
+    except Exception:
+        target = ui.current.address() if key is None else key
+        database.imports.get(target)
+
+        # grab from declaration
         o = 0
-        for arg in internal.declaration.arguments(ea):
+        for arg in internal.declaration.arguments(target):
             sz = internal.declaration.size(arg)
             yield o,arg,sz
             o += sz
         return
 
-    except ValueError:
-        pass
-
     # grab from structure
-    ea = top(ea)
-    fr = idaapi.get_frame(ea)
+    fr = idaapi.get_frame(fn)
     if fr is None:  # unable to figure out arguments
-        return
+        raise LookupError, "function.arguments(%r):Unable to determine function frame"%key
+    if database.config.bits() != 32:
+        raise RuntimeError, "function.arguments(%r):Unable to determine arguments for %x due to %d-bit calling convention."%(key, fn.startEA, database.config.bits()) 
 
-    base = getLvarSize(ea)+getRvarSize(ea)
-    for (off,size),(name,cmt) in structure.fragment(fr.id, base, getAvarSize(ea)):
+    base = getLvarSize(fn)+getRvarSize(fn)
+    for (off,size),(name,cmt) in structure.fragment(fr.id, base, getAvarSize(fn)):
         yield off-base,name,size
+    return
+
+def chunks(key=None):
+    '''enumerates all chunks in a function '''
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.chunks(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
+    if not fci.main():
+        raise ValueError, "function.chunks(%r):Unable to create a func_tail_iterator_t"% key
+
+    while True:
+        ch = fci.chunk()
+        yield ch.startEA, ch.endEA
+        if not fci.next():
+            break
+    return
+
+def blocks(key=None):
+    '''Returns each block in the specified function'''
+    for start,end in chunks(key):
+        for r in database.blocks(start, end):
+            yield r
+        continue
+    return
+
+# function frame attributes
+def getFrameId(key=None):
+    '''Returns the structure id of the frame'''
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.getFrameId(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return fn.frame
+
+def getAvarSize(key=None):
+    '''Return the number of bytes occupying argument space'''
+    max = structure.size(getFrameId(key))
+    total = getLvarSize(key) + getRvarSize(key)
+    return max - total
+
+def getLvarSize(key=None):
+    '''Return the number of bytes occupying local variable space'''
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.getLvarSize(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return fn.frsize
+
+def getRvarSize(key=None):
+    '''Return the number of bytes occupying any saved registers'''
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.getRvarSize(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return fn.frregs + 4   # +4 for the pc because ida doesn't count it
+
+def getSpDelta(ea):
+    '''Gets the stack delta at the specified address'''
+    func = byAddress(ea)
+    return idaapi.get_spd(func, ea)
+
+## instruction iteration/searching
+def iterate(key=None):
+    '''Iterate through all the instructions in each chunk of the specified function'''
+    for start,end in chunks(key):
+        for ea in database.iterate(start, end):
+            yield ea
+        continue
+    return
+
+def searchinstruction(key=None, match=lambda insn: True):
+    for ea in iterate(key):
+        if match( database.decode(ea) ):
+            yield ea
+        continue
+    return
+
+def search(key, regex):
+    '''Return each instruction that matches the case-insensitive regex'''
+    pattern = re.compile(regex, re.I)
+    for ea in iterate(key):
+        insn = re.sub(' +', ' ', database.instruction(ea))
+        if pattern.search(insn) is not None:
+            yield ea
+        continue
+    return
 
 # FIXME: come up with a better name
 def stackwindow(ea, delta, direction=-1):
@@ -276,18 +349,9 @@ def stackwindow(ea, delta, direction=-1):
     if ea < start[0]:
         return ea+idaapi.decode_insn(ea),start[0]+idaapi.decode_insn(start[0])
     return (start[0],ea)
+stackWindow = stackwindow
 
-# FIXME: what the fuck is this for?
-if False:
-    def stackdelta(left, right):
-        '''return the minimum,maximum delta of the range of instructions'''
-        min,max = 0,0
-        for ea in database.iterate(left,right):
-            sp = getSpDelta(ea)
-            min = sp if sp < min else min
-            max = max if sp < max else sp
-        return min,max
-
+## tagging
 try:
     import store.query as query
     import store
@@ -381,12 +445,12 @@ except ImportError:
             if res: yield ea,res
         return
 
-def tags(ea):
-    func_ea = top(ea)    
+def tags(key=None):
+    funcea = top(key)    
     try:
-        if func_ea is None:
+        if funcea is None:
             raise KeyError
-        result = eval(database.tag_read(func_ea, '__tags__'))
+        result = eval(database.tag_read(funcea, '__tags__'))
     except KeyError:
         result = set()
     return result
@@ -403,28 +467,32 @@ if False:
             f = idaapi.getn_func(n)
             return cls.getIndex(n)
 
-def down(ea):
+## referencing
+def down(key=None):
     """Returns all functions that are called by specified function"""
-    def codeRefs(ea):
-        fn = top(ea)
+    def codeRefs(func):
         resultData,resultCode = [],[]
-        for l,r in chunks(fn):
-            for ea in database.iterate(l,r):
-                if len(database.down(ea)) == 0:
-                    insn = idaapi.ua_mnem(ea)
-                    if insn and insn.startswith('call'):
-                        resultCode.append((ea, 0))
-                    continue
-                resultData.extend( (ea,x) for x in database.dxdown(ea) )
-                resultCode.extend( (ea,x) for x in database.cxdown(ea) if not contains(fn,x) )
-            continue
+        for ea in iterate(func):
+            if len(database.down(ea)) == 0:
+                insn = idaapi.ua_mnem(ea)
+                if insn and insn.startswith('call'):
+                    resultCode.append((ea, 0))
+                continue
+            resultData.extend( (ea,x) for x in database.dxdown(ea) )
+            resultCode.extend( (ea,x) for x in database.cxdown(ea) if func.startEA == x or not contains(func,x) )
         return resultData,resultCode
-    return list(set(d for x,d in codeRefs(ea)[1]))
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.down(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return list(set(d for x,d in codeRefs(fn)[1]))
 
-def up(fn):
-    return database.up( by(fn).startEA )
+def up(key=None):
+    ea = address(key)
+    return database.up(ea)
 
-### switch stuff
+## switch stuff
 class switch_t(object):
     #x.defjump -- default case
     #x.jcases,x.jumps -- number of branches,address of branch data
@@ -462,26 +530,41 @@ class switch_t(object):
         # return the ea of the specified case number
         raise NotImplementedError
 
-def switches(fn):
-    fn = top(fn)
-    for ea in iterate(fn):
-        x = idaapi.get_switch_info_ex(ea)
-        if x:
-            yield switch_t(x)
-        continue
+def switches(key=None):
+    for ea in iterate(key):
+        res = idaapi.get_switch_info_ex(ea)
+        if res: yield switch_t(res)
     return
 
-### vtable stuff       
-
-### flags
-def hasNoFrame(fn):
-    return not isThunk(fn) and (idaapi.get_func(fn).flags & idaapi.FUNC_FRAME == 0)
-def hasNoReturn(fn):
-    return not isThunk(fn) and (idaapi.get_func(fn).flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
-def isLibrary(fn):
-    return idaapi.get_func(fn).flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
-def isThunk(fn):
-    return idaapi.get_func(fn).flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
+## flags
+def hasNoFrame(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.hasNoFrame(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return not isThunk(fn) and (fn.flags & idaapi.FUNC_FRAME == 0)
+def hasNoReturn(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.hasNoReturn(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return not isThunk(fn) and (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
+def isLibrary(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.isLibrary(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return fn.flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
+def isThunk(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.isThunk(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
 
 def register(fn, *regs, **options):
     write = options.get('write', 0)
@@ -493,3 +576,22 @@ def register(fn, *regs, **options):
         continue
     return
 
+## internal enumerations that idapython missed
+class fc_block_type_t:
+    fcb_normal = 0  # normal block
+    fcb_indjump = 1 # block ends with indirect jump
+    fcb_ret = 2     # return block
+    fcb_cndret = 3  # conditional return block
+    fcb_noret = 4   # noreturn block
+    fcb_enoret = 5  # external noreturn block (does not belong to the function)
+    fcb_extern = 6  # external normal block
+    fcb_error = 7   # block passes execution past the function end
+
+def flow(key=None):
+    if key is None:
+        fn = ui.current.function()
+        if fn is None: raise LookupError, "function.bottom(%r):Not currently positioned within a function"% key
+    else:
+        fn = by(key)
+    fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
+    return fc

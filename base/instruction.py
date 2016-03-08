@@ -1,4 +1,5 @@
-import idc,idaapi,database
+import database,function
+import idaapi
 
 ## functions vs the instruction at an ea
 def at(ea):
@@ -73,6 +74,43 @@ def op_type(ea, n):
     insn = at(ea)
     return opt.type(insn.Operands[n]).__name__
 
+def op_segment(ea, n):
+    insn = at(ea)
+    segment = insn.Operands[n].specval & 0x00ff0000
+    if segment == 0x001f0000:
+        return 'ss'
+    elif segment == 0x00200000:
+        return 'ds'
+    elif segment == 0x00210000:
+        return 'fs'
+    raise NotImplementedError, hex(segment)
+
+def op_stkvar(ea, n):
+    py_op = operand(ea,n)    
+    py_v = py_op.addr
+    member,_ = idaapi.get_stkvar(py_op, py_v)
+    return member
+    
+    #https://www.hex-rays.com/products/ida/support/idapython_docs/
+    # xreflist_t
+    #https://www.hex-rays.com/products/ida/support/sdkdoc/frame_8hpp.html#aaeba4d56367ba26fb9a04923cfc89bb6
+    # idaman void ida_export build_stkvar_xrefs(xreflist_t * out, func_t * pfn, const member_t * mptr)  
+    #https://www.hex-rays.com/products/ida/support/sdkdoc/frame_8hpp.html#a88d80d5d38b062a7743afc80d32e8a2c
+    # typedef qvector<xreflist_entry_t> xreflist_t // vector of xrefs to variables in a function's stack frame 
+    #https://www.hex-rays.com/products/ida/support/sdkdoc/structxreflist__entry__t.html
+    # xreflist_entry_t  
+
+
+    # shortcut to get from a stkvar operand to the frame structure offset
+    #   without needing to calculate with the sp-delta
+    #fn = function.byAddress(ea)
+    #ofs = idaapi.calc_stkvar_struc_offset(fn, ea, n)
+    #return member,ofs
+
+#def op_xref(ea, n):
+#    '''Returns whether the operand has a local or global xref'''
+#   return idaapi.op_adds_xrefs(idaapi.getFlags(ea),n) 
+
 def op_decode(ea, n):
     '''Returns the value for an operand in a parseable form'''
     insn = at(ea)
@@ -102,11 +140,13 @@ class opt(object):
         res = cls.cache[op.type](op)
         if op.type in (idaapi.o_reg,idaapi.o_idpspec3,idaapi.o_idpspec4,idaapi.o_idpspec5):
             return reg_t.byIndex(res,op.dtyp).name
-        elif op.type in (idaapi.o_phrase,idaapi.o_displ):
+
+        elif op.type in (idaapi.o_mem,idaapi.o_phrase,idaapi.o_displ):
             dt = ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
             ofs,(b,i,s) = res
             return ofs,(None if b is None else reg_t.byIndex(b,dt).name,None if i is None else reg_t.byIndex(i,dt).name,s)
-        elif op.type in (idaapi.o_mem,idaapi.o_far,idaapi.o_near):
+
+        elif op.type in (idaapi.o_far,idaapi.o_near):
             return res
         return res
 
@@ -130,34 +170,58 @@ class opt(object):
 def opt_void(op):
     return ()
 
+@opt.define(idaapi.o_mem)
 @opt.define(idaapi.o_displ)
 @opt.define(idaapi.o_phrase)
 def opt_phrase(op):
     """Returns (offset, (basereg, indexreg, scale))"""
     if op.type == idaapi.o_displ:
         if op.specflag1 == 0:
-            index = None
             base = op.reg
-            offset = op.addr
+            index = None
+
         elif op.specflag1 == 1:
-            index = (op.specflag2&0x07) >> 0
-            base = None
-            offset = op.addr
+            base = (op.specflag2&0x07) >> 0
+            index = (op.specflag2&0x38) >> 3
+
         else:
             raise TypeError, os.specflag1
+        offset = op.addr
+
+        # XXX: for some reason stack variables include both base and index
+        #      testing .specval seems to be a good way to determine whether
+        #      something is referencing the stack
+        if op.specval & 0x00ff0000 == 0x001f0000 and index == base:
+            index = None
 
         # OF_NO_BASE_DISP = 1 then .addr doesn't exist
         # OF_OUTER_DISP = 1 then .value exists
     elif op.type == idaapi.o_phrase:
         if op.specflag1 == 0:
-            index = None
             base  = op.reg
+            index = None
+
         elif op.specflag1 == 1:
-            index = (op.specflag2&0x38) >> 3
             base =  (op.specflag2&0x07) >> 0
+            index = (op.specflag2&0x38) >> 3
+
         else:
             raise TypeError, os.specflag1
         offset = op.value
+
+    elif op.type == idaapi.o_mem:
+        if op.specflag1 == 0:
+            base = None
+            index = None
+
+        elif op.specflag1 == 1:
+            base = None
+            index = (op.specflag2&0x38) >> 3
+
+        else:
+            raise TypeError, os.specflag1
+        offset = op.addr
+
     else:
         raise TypeError, op.type
 
@@ -180,14 +244,9 @@ def opt_phrase(op):
 
 @opt.define(idaapi.o_reg)
 def opt_reg(op):
+    '''opt_genreg'''
     if op.type in (idaapi.o_reg,):
         return op.reg
-    #o_trreg  =       idaapi.o_idpspec0      # trace register
-    #o_dbreg  =       idaapi.o_idpspec1      # debug register
-    #o_crreg  =       idaapi.o_idpspec2      # control register
-    #o_fpreg  =       idaapi.o_idpspec3      # floating point register
-    #o_mmxreg  =      idaapi.o_idpspec4      # mmx register
-    #o_xmmreg  =      idaapi.o_idpspec5      # xmm register
     raise TypeError, op.type
 
 @opt.define(idaapi.o_imm)
@@ -196,7 +255,6 @@ def opt_imm(op):
         return op.value
     raise TypeError, op.type
 
-@opt.define(idaapi.o_mem)
 @opt.define(idaapi.o_far)
 @opt.define(idaapi.o_near)
 def opt_addr(op):
@@ -372,3 +430,71 @@ setattr(register, 'fpstack', reg_t.new('st', 80*8, dtyp=None))
 # 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
 
 # FIXME: implement switch_t to determine information about switch statements
+
+class ir:
+    """Returns an operand as a parseable intermediary representation"""
+    class operation:
+        class __base__(object):
+            def __init__(self, size=0):
+                self.size = size
+            def __repr__(self):
+                return '{:s}({:d})'.format(self.__class__.__name__,self.size)
+        class store(__base__): pass
+        class load(__base__): pass
+        class assign(__base__): pass
+        class value(__base__): pass
+        class modify(__base__): pass
+        class unknown(__base__): pass
+
+    table = {
+        'opt_imm':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify},
+        'opt_addr':    {'r':operation.load,    'w':operation.store, 'rw':operation.unknown},
+        'opt_phrase':  {'r':operation.load,    'w':operation.store, 'rw':operation.unknown},
+        'opt_reg':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify},
+    }
+
+    @classmethod
+    def op(cls, ea, opnum):
+        """Returns an operand as a normalized type.
+
+        (store,(immediate,register,index,scale))
+        (load,(immediate,register,index,scale))
+        (value,(immediate,register,index,scale))
+        (assign,(immediate,register,index,scale))
+        """
+        op = operand(ea, opnum)
+        t = opt.type(op)
+        operation = cls.table[t.__name__][op_state(ea,opnum)]
+
+        # if mnemonic is lea, then demote it from a memory operation
+        # FIXME: i don't like this hack.
+        if mnem(ea).upper() == 'LEA':
+            if operation == cls.operation.load:
+                operation = cls.operation.value
+            elif operation == cls.operation.store:
+                operation = cls.operation.assign
+            else:
+                operation = operation
+
+        if t == opt_phrase:
+            imm,(reg, index, scale) = t(op)
+        elif t in (opt_imm, opt_addr):
+            imm,reg,index,scale = t(op),None,None,None
+        else:
+            imm,reg,index,scale = None,t(op), None, None
+
+        return operation(opt.size(op)),(imm,reg,index,scale)
+
+    @classmethod
+    def instruction(cls, ea):
+        operands = [cls.op(ea, i) for i in range(ops_count(ea))]
+        result = []
+        for opnum in range(ops_count(ea)):
+            operation,value = cls.op(ea, opnum)
+            if operation == cls.operation.modify:
+                result.append((cls.operation.assign,value))
+                result.append((cls.operation.value,value))
+            else:
+                result.append((operation,value))
+            continue
+        return mnem(ea),result

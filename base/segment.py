@@ -3,7 +3,8 @@ segment-context
 
 generic tools for working with segments
 '''
-import idc,database,idaapi
+import idaapi
+import database,ui
 import logging,os
 
 ## enumerating
@@ -45,41 +46,85 @@ def by(n):
     return byAddress(n)
 
 ## properties
-def range(segment):
+def range(key=None):
     '''Given a segment_t/address, return it's (begin,end)'''
-    if type(segment) is idaapi.segment_t:
-        return segment.startEA,segment.endEA
-    return range(by(segment))
-def size(segment):
+    if key is None:
+        segment = ui.current.segment()
+        if segment is None: raise LookupError, "segment.range(%r):Not currently positioned within a segment"% key
+    else:
+        segment = by(key)
+    return segment.startEA,segment.endEA
+
+def size(key=None):
     '''Given a segment_t/address, return it's size'''
-    if type(segment) is idaapi.segment_t:
-        return segment.endEA - segment.startEA
-    return size(by(segment))
-def string(segment):
+    if key is None:
+        segment = ui.current.segment()
+        if segment is None: raise LookupError, "segment.size(%r):Not currently positioned within a segment"% key
+    else:
+        segment = by(key)
+    return segment.endEA - segment.startEA
+
+def string(key=None):
     '''Given a segment_t/address, return it's contents as a string'''
-    if type(segment) is idaapi.segment_t:
-        return idaapi.get_many_bytes(segment.startEA, segment.endEA-segment.startEA)
-    return string(by(segment))
-def repr(segment):
+    if key is None:
+        segment = ui.current.segment()
+        if segment is None: raise LookupError, "segment.string(%r):Not currently positioned within a segment"% key
+    else:
+        segment = by(key)
+    return idaapi.get_many_bytes(segment.startEA, segment.endEA-segment.startEA)
+
+def repr(key=None):
     '''Given a segment_t/address, return a printable representation of it'''
-    if type(segment) is idaapi.segment_t:
-        return '{:s} {:s} {:x}-{:x} (+{:x})'.format(object.__repr__(segment),idaapi.get_true_segm_name(segment),segment.startEA,segment.endEA,segment.endEA-segment.startEA)
-    return repr(by(segment))
-def top(segment):
+    if key is None:
+        segment = ui.current.segment()
+        if segment is None: raise LookupError, "segment.repr(%r):Not currently positioned within a segment"% key
+    else:
+        segment = by(key)
+    return '{:s} {:s} {:x}-{:x} (+{:x})'.format(object.__repr__(segment),idaapi.get_true_segm_name(segment),segment.startEA,segment.endEA,segment.endEA-segment.startEA)
+
+def top(key=None):
     '''Given a segment_t/address, return it's top address'''
-    if type(segment) is idaapi.segment_t:
-        return segment.startEA
-    return top(by(segment))
-def bottom(segment):
+    if key is None:
+        segment = ui.current.segment()
+        if segment is None: raise LookupError, "segment.top(%r):Not currently positioned within a segment"% key
+    else:
+        segment = by(key)
+    return segment.startEA
+
+def bottom(key=None):
     '''Given a segment_t/address, return it's bottom address'''
-    if type(segment) is idaapi.segment_t:
-        return segment.endEA
-    return bottom(by(segment))
-def name(segment):
+    if key is None:
+        segment = ui.current.segment()
+        if segment is None: raise LookupError, "segment.bottom(%r):Not currently positioned within a segment"% key
+    else:
+        segment = by(key)
+    return segment.endEA
+
+def name(key=None):
     '''Given a segment_t/address, return it's name'''
-    if type(segment) is idaapi.segment_t:
-        return idaapi.get_true_segm_name(segment)
-    return name(by(segment))
+    if key is None:
+        segment = ui.current.segment()
+        if segment is None: raise LookupError, "segment.name(%r):Not currently positioned within a segment"% key
+    else:
+        segment = by(key)
+    return idaapi.get_true_segm_name(segment)
+
+def color_write(seg, bgr):
+    seg = by(seg)
+    seg.color = 0xffffffff if bgr is None else bgr
+    return bool(seg.update())
+def color_read(key=None):
+    if key is None:
+        seg = ui.current.segment()
+        if seg is None: raise LookupError, "segment.color_read(%r):Not currently positioned within a segment"% key
+    else:
+        seg = by(key)
+    return seg.color
+def color(seg, *args, **kwds):
+    '''color(address, rgb?) -> fetches or stores a color to the specified segment'''
+    if len(args) == 0:
+        return color_read(seg, *args, **kwds)
+    return color_write(seg, *args, **kwds)
 
 ## functions
 # shamefully ripped from idc.py
@@ -91,6 +136,7 @@ def _load_file(filename, ea, size, offset=0):
     res = idaapi.file2base(li, offset, ea, ea+size, True)
     idaapi.close_linput(li)
     return res
+
 def _save_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     of = idaapi.fopenWB(path)
@@ -99,6 +145,7 @@ def _save_file(filename, ea, size, offset=0):
     res = idaapi.base2file(of, offset, ea, ea+size)
     idaapi.eclose(of)
     return res
+
 def load(filename, ea, size=None, offset=0, **kwds):
     '''Load the specified /filename/ to the address /ea/
 

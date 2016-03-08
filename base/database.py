@@ -4,19 +4,19 @@ database-context
 generic tools for working in the context of the database
 '''
 
-import logging,os
+import __builtin__,logging,os
 import idc,idautils,idaapi
-import instruction as _instruction,function,segment,structure,internal
-import array,itertools,ctypes
+import instruction as _instruction,function,segment,structure,internal,ui
+import array,itertools,functools,ctypes
 
 ## properties
 def h():
     '''slightly less typing for idc.ScreenEA()'''
-    return idaapi.get_screen_ea()
+    return ui.current.address()
 here = h    # alias
 
 def filename():
-    '''return the filename that the database was built from'''
+    '''return the filename that the databasr was built from'''
     return idaapi.get_root_filename()
 def idb():
     '''Return the full path to the ida database'''
@@ -102,31 +102,31 @@ def segments():
     '''Returns a list of all segments in the current database'''
     return [segment.byName(s).startEA for s in segment.list()]
 
-def prev(ea, count=1):
+def prev(ea=None, count=1):
     '''return the previous address (instruction or data)'''
-    return address.prev(ea, count=count)
-def next(ea, count=1):
+    return address.prev(ui.current.address() if ea is None else ea, count=count)
+def next(ea=None, count=1):
     '''return the next address (instruction or data)'''
-    return address.next(ea, count=count)
+    return address.next(ui.current.address() if ea is None else ea, count=count)
 
-def prevdata(ea, count=1):
+def prevdata(ea=None, count=1):
     '''return previous address containing data referencing it'''
-    return address.prevdata(ea, count=count)
-def nextdata(ea, count=1):
+    return address.prevdata(ui.current.address() if ea is None else ea, count=count)
+def nextdata(ea=None, count=1):
     '''return next address containing data referencing it'''
-    return address.nextdata(ea, count=count)
-def prevcode(ea, count=1):
+    return address.nextdata(ui.current.address() if ea is None else ea, count=count)
+def prevcode(ea=None, count=1):
     '''return previous address containing code referencing it'''
-    return address.prevcode(ea, count=count)
-def nextcode(ea, count=1):
+    return address.prevcode(ui.current.address() if ea is None else ea, count=count)
+def nextcode(ea=None, count=1):
     '''return next address containing code referencing it'''
-    return address.nextcode(ea, count=count)
-def prevref(ea, count=1):
+    return address.nextcode(ui.current.address() if ea is None else ea, count=count)
+def prevref(ea=None, count=1):
     '''return previous address containing any kind of reference to it'''
-    return address.prevref(ea, count=count)
-def nextref(ea, count=1):
+    return address.prevref(ui.current.address() if ea is None else ea, count=count)
+def nextref(ea=None, count=1):
     '''return next address containing any kind of reference to it'''
-    return address.nextref(ea, count=count)
+    return address.nextref(ui.current.address() if ea is None else ea, count=count)
 def prevreg(ea, *regs, **write):
     """return previous address containing an instruction that uses one of the requested registers ``regs`
 
@@ -136,25 +136,30 @@ def prevreg(ea, *regs, **write):
 def nextreg(ea, *regs, **write):
     """return next address containing an instruction that uses one of the requested registers ``regs`
 
-    If the keyword ``write`` is True, then only return the address if it's writing to the register.
+    If the keyword ``write`` is True, then only retur  the address if it's writing to the register.
     """
     return address.nextreg(ea, *regs, **write)
 
-def decode(ea):
-    return _instruction.decode(ea)
+def decode(ea=None):
+    return _instruction.decode(ui.current.address() if ea is None else ea)
 
-def instruction(ea):
-    insn = idaapi.generate_disasm_line(ea)
+def instruction(ea=None):
+    insn = idaapi.generate_disasm_line(ui.current.address() if ea is None else ea)
     unformatted = idaapi.tag_remove(insn)
     nocomment = unformatted[:unformatted.rfind(';')]
     return reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
 
-def disasm(ea, count=1):
+def disasm(ea=None, count=1, **options):
+    """disassemble ``count`` instructions starting at ``ea``.
+
+    If the keyword ``comments`` is True, then also display the comments for each line of the disassembly.
+    """
     res = []
+    ea = ui.current.address() if ea is None else ea
     while count > 0:
         insn = idaapi.generate_disasm_line(ea)
         unformatted = idaapi.tag_remove(insn)
-        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted else unformatted
+        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted and options.get('comments',False) else unformatted
         res.append( '{:x}: {:s}'.format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
         ea = next(ea)
         count -= 1
@@ -174,28 +179,6 @@ def read(ea, size):
     return idaapi.get_many_bytes(ea, size)
 def write(ea, data, original=False):
     return idaapi.patch_many_bytes(ea, data) if original else idaapi.put_many_bytes(ea, data)
-
-def marks():
-    '''returns all the known marked positions in an .idb'''
-    index = 1
-    while True:
-        ea = idc.GetMarkedPos(index)
-        if ea == idaapi.BADADDR:
-            break
-        comment = idc.GetMarkComment(index)
-        yield ea, comment
-        index += 1
-    return
-
-def mark(ea, message):
-    # FIXME: give a warning if we're replacing a mark at the given ea
-    res = set((n for n,_ in marks()))
-    if ea in res:
-        for idx,(n,comm) in enumerate(marks()):
-            if n == ea:
-                logging.warn("Replacing mark %d at %x : %r", idx, ea, comm)
-            continue
-    idc.MarkPosition(ea, 0, 0, 0, len(res)+1, message)
 
 def iterate(start, end):
     '''Iterate through instruction/data boundaries within the specified range'''
@@ -234,45 +217,81 @@ class search(object):
 
 def go(ea):
     '''slightly less typing for idc.Jump'''
+    if isinstance(ea, basestring):
+        ea = search.byName(None, ea)
     if not contains(ea):
         left,right=range()
         logging.warn("Jumping to an invalid location %x. (valid range is %x - %x)",ea,left,right)
     idaapi.jumpto(ea)
     return ea
 
-def offset(ea):
+def offset(ea=None):
     '''returns the offset of ea from the baseaddress'''
+    ea = ui.current.address() if ea is None else ea
     return ea - baseaddress()
 getoffset = offset
 getOffset = getoffset
 o = offset
 
-def goof(ea):
+def coof(offset):
+    '''convert the specified offset to an address'''
+    return baseaddress()+offset
+
+def goof(offset):
     '''goes to the specified offset'''
-    idaapi.jumpto(baseaddress()+ea)
-    return ea
+    res = ui.current.address()-baseaddress()
+    idaapi.jumpto(coof(offset))
+    return res
 gotooffset = goof
 
-def name(ea, string=None):
-    '''Returns the name at the specified address. (local than global)'''
-    if string is not None:
-        SN_NOCHECK = 0x00
-        SN_NOLIST = 0x80
-        SN_LOCAL = 0x200
-        SN_PUBLIC = 0x02
+def name(ea=None, *args, **kwds):
+    """name(ea), name(ea, string)
+    First syntax returns the name at the given address.
+    Second syntax changes the name at the given address.
+    """
+    if len(args) > 1: raise TypeError, "{:s}() takes exactly {!r} arguments ({:d} given)".format('name', (1,2), len(args)+1 + len(kwds))
+    if kwds and tuple(kwds.keys()) != ('string',): raise TypeError, "{:s}() got an unexpected keyword argument '{:s}'".format('name', filter(lambda n: n != 'string',kwds.keys())[0])
 
-        n = name(ea)
-        
-        flags = SN_NOCHECK
+    ea = ui.current.address() if ea is None else ea
+    if len(args) == 1 or kwds.has_key('string'):
+        string = kwds.get('string', args[0])
+        assert idaapi.SN_NOCHECK == 0, '%s.name : idaapi.SN_NOCHECK != 0'% __name__
+        SN_NOLIST = idaapi.SN_NOLIST
+        SN_LOCAL = idaapi.SN_LOCAL
+        SN_NON_PUBLIC = idaapi.SN_NON_PUBLIC
+
+        if idaapi.has_any_name(idaapi.getFlags(ea)):
+            pass
+
+        flags = idaapi.SN_NON_AUTO
+        flags |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
+        flags |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
+        flags |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+
         try:
             function.top(ea)
-            flags |= SN_LOCAL
-        except (ValueError,Exception):
-            flags |= 0
+            flags |= idaapi.SN_LOCAL
+        except Exception:
+            flags &= ~idaapi.SN_LOCAL
 
-        res = idaapi.set_name(ea, string, flags)
+        try:
+            # check if we're a label of some kind
+            f = idaapi.getFlags(ea)
+            if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
+                # that is referenced by an array with a correctly sized pointer inside it
+                (r,sidata), = ((r,type.array(r)) for r in xref.data_up(ea))
+                if config.bits() == sidata.itemsize*8 and ea in sidata:
+                    # which we check to see if it's a switch_info_t
+                    si, = (idaapi.get_switch_info_ex(r) for r in xref.data_up(r))
+                    if si is not None:
+                        # because it's name has it's local flag cleared
+                        flags ^= idaapi.SN_LOCAL
+        except: pass
+
+        res,ok = name(ea),idaapi.set_name(ea, string or "", flags)
         tag(ea, 'name', string)
-        return n
+        assert ok, '%s.name : unable to call idaapi.set_name(%x, %r, %x)'%(__name__,ea,string,flags)
+        return res
 
     try:
         return tag(ea, 'name')
@@ -313,21 +332,21 @@ def map(l, *args, **kwds):
     return result
 
 def contains(ea):
+    ea = ui.current.address() if ea is None else ea
     l,r = config.bounds()
     return (ea >= l) and (ea < r)
 
-def erase(ea):
-    for x in tag(ea):
-        tag(ea, x, None)
+def erase(ea=None):
+    ea = ui.current.address() if ea is None else ea
+    for k in tag(ea):
+        tag(ea, k, None)
     color(ea, None)
 
-def color_write(ea, bgr, what=1):
-    if bgr is None:
-        bgr = 0xffffffff
-    return idc.SetColor(ea, what, bgr)
+def color_write(ea, bgr):
+    return idaapi.set_item_color(ea, 0xffffffff if bgr is None else bgr)
 
-def color_read(ea, what=1):
-    return idc.GetColor(ea, what)
+def color_read(ea=None):
+    return idaapi.get_item_color(ui.current.address() if ea is None else ea)
 
 def color(ea, *args, **kwds):
     '''color(address, rgb?) -> fetches or stores a color to the specified address'''
@@ -405,11 +424,9 @@ except ImportError:
     def tag_read(ea, key=None, repeatable=0):
         res = idaapi.get_cmt(ea, int(bool(repeatable)))
         dict = internal.comment.toDict(res)
-        name = idaapi.get_name(-1,ea)
+        name = idaapi.get_true_name(-1,ea)
         if name is not None: dict.setdefault('name', name)
-        if key is None:
-            return dict
-        return dict[key]
+        return dict if key is None else dict[key]
 
     def tag_write(ea, key, value, repeatable=0):
         dict = tag_read(ea, repeatable=repeatable)
@@ -525,7 +542,8 @@ class imports(object):
         raise LookupError, 'Unable to determine import at address %x'% ea
 
     @classmethod
-    def module(cls,ea):
+    def module(cls,ea=None):
+        ea = ui.current.address() if ea is None else ea
         for addr,(module,_,_) in cls.iterate():
             if addr == ea:
                 return module
@@ -534,15 +552,18 @@ class imports(object):
 
     # specific parts of the import
     @classmethod
-    def fullname(cls,ea):
+    def fullname(cls,ea=None):
+        ea = ui.current.address() if ea is None else ea
         module,name,ordinal = cls.get(ea)
         return '{:s}!{:s}'.format(module, name or 'Ordinal%d'%ordinal)
     @classmethod
-    def name(cls,ea):
+    def name(cls,ea=None):
+        ea = ui.current.address() if ea is None else ea
         _,name,ordinal = cls.get(ea)
         return name or 'Ordinal%d'%ordinal
     @classmethod
-    def ordinal(cls,ea):
+    def ordinal(cls,ea=None):
+        ea = ui.current.address() if ea is None else ea
         _,_,ordinal = cls.get(ea)
         return ordinal
 
@@ -606,40 +627,52 @@ class address(object):
         return ea
 
     @staticmethod
-    def prev(ea, count=1):
+    def head(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return idaapi.get_item_head(ea)
+    @staticmethod
+    def prev(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
         res = idaapi.prev_head(ea,0)
         return address.prev(res, count-1) if count > 1 else res
     @staticmethod
-    def next(ea, count=1):
+    def next(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
         res = idaapi.next_head(ea, idaapi.BADADDR)
         return address.next(res, count-1) if count > 1 else res
 
     @staticmethod
-    def prevdata(ea, count=1):
-        res = address.walk(ea, address.prev, lambda n: len(xref.du(n)) == 0)
-        return address.prevdata(res-1, count-1) if count > 1 else res
+    def prevdata(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(address.prev(ea), address.prev, lambda n: len(xref.du(n)) == 0)
+        return address.prevdata(res, count-1) if count > 1 else res
     @staticmethod
-    def nextdata(ea, count=1):
+    def nextdata(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
         res = address.walk(ea, address.next, lambda n: len(xref.du(n)) == 0)
-        return address.nextdata(res+1, count-1) if count > 1 else res
+        return address.nextdata(address.next(res), count-1) if count > 1 else res
 
     @staticmethod
-    def prevcode(ea, count=1):
-        res = address.walk(ea, address.prev, lambda n: len(xref.cu(n)) == 0)
-        return address.prevcode(res-1, count-1) if count > 1 else res
+    def prevcode(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(address.prev(ea), address.prev, lambda n: len(xref.cu(n)) == 0)
+        return address.prevcode(res, count-1) if count > 1 else res
     @staticmethod
-    def nextcode(ea, count=1):
+    def nextcode(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
         res = address.walk(ea, address.next, lambda n: len(xref.cu(n)) == 0)
-        return address.nextcode(res+1, count-1) if count > 1 else res
+        return address.nextcode(address.next(res), count-1) if count > 1 else res
 
     @staticmethod
-    def prevref(ea, count=1):
-        res = address.walk(ea, address.prev, lambda n: len(xref.u(n)) == 0)
-        return address.prevref(res-1, count-1) if count > 1 else res
+    def prevref(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(address.prev(ea), address.prev, lambda n: len(xref.u(n)) == 0)
+        return address.prevref(res, count-1) if count > 1 else res
     @staticmethod
-    def nextref(ea, count=1):
+    def nextref(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
         res = address.walk(ea, address.next, lambda n: len(xref.u(n)) == 0)
-        return address.nextref(res+1, count-1) if count > 1 else res
+        return address.nextref(address.next(res), count-1) if count > 1 else res
 
     @staticmethod
     def prevreg(ea, *regs, **kwds):
@@ -657,8 +690,8 @@ class address(object):
                         return True
                 continue
             return False
-        res = address.walk(ea, address.prev, lambda ea: not uses_register(ea, regs))
-        return address.prevreg(res-1, *regs, count=count-1) if count > 1 else res
+        res = address.walk(address.prev(ea), address.prev, lambda ea: not uses_register(ea, regs))
+        return address.prevreg(res, *regs, count=count-1) if count > 1 else res
     @staticmethod
     def nextreg(ea, *regs, **kwds):
         count = kwds.get('count',1)
@@ -676,7 +709,7 @@ class address(object):
                 continue
             return False
         res = address.walk(ea, address.next, lambda ea: not uses_register(ea, regs))
-        return address.nextreg(res+1, *regs, count=count-1) if count > 1 else res
+        return address.nextreg(address.next(res), *regs, count=count-1) if count > 1 else res
 
     @staticmethod
     def prevstack(ea, delta):
@@ -687,6 +720,40 @@ class address(object):
         fn,sp = function.top(ea),function.getSpDelta(ea)
         return address.walk(ea, address.next, lambda n: abs(function.getSpDelta(n) - sp) < delta)
 
+    @staticmethod
+    def prevcall(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(address.prev(ea), address.prev, lambda n: not idaapi.is_call_insn(n))
+        return address.prevcall(res, count-1) if count > 1 else res
+    @staticmethod
+    def nextcall(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(ea, address.next, lambda n: not idaapi.is_call_insn(n))
+        return address.nextcall(address.next(res), count-1) if count > 1 else res
+
+    @staticmethod
+    def prevbranch(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(address.prev(ea), address.prev, lambda n: idaapi.is_call_insn(n) or len(xref.d(n)) == 0 and not idaapi.is_indirect_jump_insn(n))
+        return address.prevbranch(res, count-1) if count > 1 else res
+    @staticmethod
+    def nextbranch(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(ea, address.next, lambda n: idaapi.is_call_insn(n) or len(xref.d(n)) == 0 and not idaapi.is_indirect_jump_insn(n))
+        return address.nextbranch(address.next(res), count-1) if count > 1 else res
+
+    # FIXME: allow one to specify a specific tag type to look for
+    @staticmethod
+    def prevtag(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(address.prev(ea), address.prev, lambda n: not type.hasComment(n))
+        return address.prevbranch(res, count-1) if count > 1 else res
+    @staticmethod
+    def nexttag(ea=None, count=1):
+        ea = ui.current.address() if ea is None else ea
+        res = address.walk(ea, address.next, lambda n: not type.hasComment(n))
+        return address.nextbranch(address.next(res), count-1) if count > 1 else res
+
 a = addr = address
 
 class type(object):
@@ -695,26 +762,73 @@ class type(object):
         res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
         return res
     @staticmethod
-    def isCode(ea):
+    def isCode(ea=None):
         '''True if ea marked as code'''
+        ea = ui.current.address() if ea is None else ea
         return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_CODE
     @staticmethod
-    def isData(ea):
+    def isData(ea=None):
         '''True if ea marked as data'''
+        ea = ui.current.address() if ea is None else ea
         return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_DATA
     @staticmethod
-    def isUnknown(ea):
+    def isUnknown(ea=None):
         '''True if ea marked unknown'''
+        ea = ui.current.address() if ea is None else ea
         return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_UNK
     @staticmethod
-    def isHead(ea):
+    def isHead(ea=None):
+        ea = ui.current.address() if ea is None else ea
         return idaapi.getFlags(ea)&idaapi.FF_DATA != 0
     @staticmethod
-    def isTail(ea):
+    def isTail(ea=None):
+        ea = ui.current.address() if ea is None else ea
         return idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_TAIL
     @staticmethod
-    def isAlign(ea):
+    def isAlign(ea=None):
+        ea = ui.current.address() if ea is None else ea
         return idaapi.isAlign(idaapi.getFlags(ea))
+
+    @staticmethod
+    def hasComment(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return bool(idaapi.getFlags(ea) & idaapi.FF_COMM == idaapi.FF_COMM)
+    @staticmethod
+    def hasReference(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return bool(idaapi.getFlags(ea) & idaapi.FF_REF == idaapi.FF_REF)
+    @staticmethod
+    def hasName(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return idaapi.has_any_name(idaapi.getFlags(ea))
+    @staticmethod
+    def hasCustomName(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return bool(idaapi.getFlags(ea) & idaapi.FF_NAME == idaapi.FF_NAME)
+    @staticmethod
+    def hasDummyName(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return bool(idaapi.getFlags(ea) & idaapi.FF_LABL == idaapi.FF_LABL)
+    @staticmethod
+    def hasAutoName(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return idaapi.has_auto_name(idaapi.getFlags(ea))
+    @staticmethod
+    def hasPublicName(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return idaapi.is_public_name(ea)
+    @staticmethod
+    def hasWeakName(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return idaapi.is_weak_name(ea)
+    @staticmethod
+    def hasListedName(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return idaapi.is_in_nlist(ea)
+    @staticmethod
+    def isLabel(ea=None):
+        ea = ui.current.address() if ea is None else ea
+        return type.hasDummyName(ea) or type.hasCustomName(ea)
 
     class array(object):
         def __new__(cls, ea):
@@ -810,7 +924,53 @@ class type(object):
             res = idaapi.get_opinfo(ea, 0, idaapi.getFlags(ea), ti)
             ti.tid = st.id
             return idaapi.set_opinfo(ea, 0, idaapi.getFlags(ea) | idaapi.struflag(), ti)
-            
+
+    class switch(object):
+        @classmethod
+        def __getlabel(cls, ea):
+            try:
+                f = idaapi.getFlags(ea)
+                if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
+                    r, = xref.data_up(ea)
+                    return cls.__getarray(r)
+            except TypeError: pass
+            raise TypeError, "Unable to instantiate a switch_info_ex_t at target label : %x"% ea
+
+        @classmethod
+        def __getarray(cls, ea):
+            try:
+                c, = xref.data_up(ea)
+                sidata,each = type.array(ea),set(xref.code_down(c))
+
+                # check to see if first element is the correct dataref
+                lastea, = xref.data_down(c)
+                if ea != lastea: raise TypeError
+                # then copy the first element since it's been decoded already
+                each.add(sidata[0])
+
+                # ensure that each element matches
+                if config.bits() == sidata.itemsize*8 and all(x in each for x in sidata):
+                    r, = xref.data_up(ea)
+                    return cls.__getinsn(r)
+
+            except (IndexError,TypeError,KeyError,ValueError): pass
+            raise TypeError, "Unable to instantiate a switch_info_ex_t at switch array : %x"% ea
+
+        @classmethod
+        def __getinsn(cls, ea):
+            res = idaapi.get_switch_info_ex(ea)
+            if res is None:
+                raise TypeError, "Unable to instantiate a switch_info_ex_t at branch instruction : %x"% ea
+            return res
+
+        def __new__(cls, ea):
+            try: return cls.__getinsn(ea)
+            except TypeError: pass
+            try: return cls.__getarray(ea)
+            except TypeError: pass
+            try: return cls.__getlabel(ea)
+            except TypeError: pass
+            raise TypeError, "Unable to instantiate a switch_info_ex_t : %x"% ea
 t = type
 
 ## information about a given address
@@ -841,7 +1001,8 @@ class xref(object):
         return
 
     @staticmethod
-    def code(ea, descend=False):
+    def code(ea=None, descend=False):
+        ea = ui.current.address() if ea is None else ea
         if descend:
             start,next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
         else:
@@ -852,7 +1013,8 @@ class xref(object):
     c=code
 
     @staticmethod
-    def data(ea, descend=False):
+    def data(ea=None, descend=False):
+        ea = ui.current.address() if ea is None else ea
         if descend:
             start,next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
         else:
@@ -863,31 +1025,37 @@ class xref(object):
     d=data
 
     @staticmethod
-    def data_down(ea):
+    def data_down(ea=None):
+        ea = ui.current.address() if ea is None else ea
         return list(xref.data(ea, True))
     @staticmethod
-    def data_up(ea):
+    def data_up(ea=None):
+        ea = ui.current.address() if ea is None else ea
         return list(xref.data(ea, False))
     dd,du=data_down,data_up
     @staticmethod
-    def code_down(ea):
+    def code_down(ea=None):
+        ea = ui.current.address() if ea is None else ea
         result = set(xref.code(ea, True))
         result.discard(address.next(ea))
         return list(result)
     @staticmethod
-    def code_up(ea):
+    def code_up(ea=None):
+        ea = ui.current.address() if ea is None else ea
         result = set(xref.code(ea, False))
         result.discard(address.prev(ea))
         return list(result)
     cd,cu=code_down,code_up
 
     @staticmethod
-    def up(ea):
+    def up(ea=None):
         '''All locations that reference specified address'''
+        ea = ui.current.address() if ea is None else ea
         return list(set(xref.data_up(ea) + xref.code_up(ea)))
     @staticmethod
-    def down(ea):
+    def down(ea=None):
         '''All locations that are referenced by the specified address'''
+        ea = ui.current.address() if ea is None else ea
         return list(set(xref.data_down(ea) + xref.code_down(ea)))
     u,d=up,down
 
@@ -935,6 +1103,111 @@ cxup = xref.code_up
 up = xref.up
 down = xref.down
 
-## functions
-#demangle = internal.declaration.demangle
+def mark(ea, message):
+    '''create/erase a mark at the specified address in the .idb'''
+    if message is None:
+        tag(ea, 'mark', None)
+        color(ea, None)
+        return marks.remove(ea)
+    return marks.new(ea, message)
 
+class marks(object):
+    MAX_SLOT_COUNT = 0x400
+    table = {}
+
+    def __new__(cls):
+        '''returns all the known marked positions in an .idb'''
+        for ea,comment in cls.iterate():
+            yield ea, comment
+        return
+
+    @classmethod
+    def new(cls, ea, descr):
+        ea = address.head(ea)
+        try:
+            idx = cls.getSlotIndex(ea)
+            ea,comm = cls.byIndex(idx)
+            logging.warn("Replacing mark %d at %x : %r -> %r", idx, ea, comm, descr)
+        except KeyError:
+            idx = cls.length()
+            logging.info("Creating mark %d at %x : %r", idx, ea, descr)
+
+        res = cls.location(ea=ea, x=0, y=0, lnnum=0)
+        title,descr = descr,descr
+        res.mark(idx+1, title, descr)
+        return idx
+
+    @classmethod
+    def remove(cls, ea):
+        ea = address.head(ea)
+        idx = cls.getSlotIndex(ea)
+        descr = cls.location().markdesc(idx+1)
+
+        res = cls.location(ea=idaapi.BADADDR)
+        res.mark(idx+1, "", "")
+
+        logging.warn("Removed mark %d at %x : %r", idx, ea, descr)
+        return idx
+
+    @classmethod
+    def iterate(cls):
+        count = 0
+        try:
+            for count,idx in enumerate(xrange(cls.MAX_SLOT_COUNT)):
+                yield cls.byIndex(idx)
+        except KeyError:
+            pass
+        return
+
+    @classmethod
+    def length(cls):
+        return len(list(cls.iterate()))
+
+    @classmethod
+    def location(cls, **attrs):
+        '''Return a location_t object with the specified attributes'''
+        res = idaapi.curloc()
+        list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
+        return res
+
+    @classmethod
+    def byIndex(cls, index):
+        if 0 <= index < cls.MAX_SLOT_COUNT:
+            return (cls.getSlotAddress(index), cls.location().markdesc(index+1))
+        raise KeyError, "Mark slot index is out of bounds : %s"% (('%d < 0'%index) if index < 0 else ('%d >= MAX_SLOT_COUNT'%index))
+
+    @classmethod
+    def byAddress(cls, ea):
+        res = address.head(ea)
+        return cls.byIndex(cls.getSlotIndex(res))
+
+    @classmethod
+    def findSlotAddress(cls, ea):
+        ea = address.head(ea)
+        res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
+        res, iterable = itertools.tee(itertools.imap(cls.getSlotAddress, res))
+        try:
+            count = len(list(itertools.takewhile(lambda n: n != ea, res)))
+        except IndexError:
+            raise KeyError, ea
+        list(itertools.islice(iterable, count))
+        if iterable.next() != ea:
+            raise KeyError, ea
+        return count
+
+    @classmethod
+    def getSlotIndex(cls, ea):
+        ea = address.head(ea)
+        return cls.table.get(ea, cls.findSlotAddress(ea))
+
+    @classmethod
+    def getSlotAddress(cls, slotidx):
+        loc = cls.location()
+        intp = idaapi.int_pointer()
+        intp.assign(slotidx+1)
+        res = loc.markedpos(intp)
+        if res == idaapi.BADADDR:
+            raise KeyError, slotidx
+        ea = address.head(res)
+        cls.table[ea] = slotidx
+        return ea

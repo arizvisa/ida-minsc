@@ -5,6 +5,9 @@ structure-context
 generic tools for working in the context of a structure.
 '''
 
+## FIXME: need to add support for a union_t. add_struc takes another parameter
+##        that defines whether a structure is a union or not.
+
 import idaapi
 def name(id, name=None):
     """set/get the name of a particular structure"""
@@ -178,14 +181,14 @@ def byName(name, **options):
     """Return a structure by it's name"""
     id = idaapi.get_struc_id(name)
     if id == idaapi.BADADDR:
-        raise LookupError, name
+        raise LookupError, 'Unable to locate structure {!r}'.format(name)
     return instance(id, **options)
 
 def byIndex(index, **options):
     """Return a structure by it's index"""
     id = idaapi.get_struc_by_idx(index)
     if id == idaapi.BADADDR:
-        raise IndexError, index
+        raise IndexError, 'Unable to locate structure #{:d}'.format(index)
     return instance(id, **options)
 
 def instance(identifier, **options):
@@ -316,7 +319,7 @@ class members_t(object):
         ownername,baseoffset,_ = state
         identifier = idaapi.get_struc_id(ownername)
         if identifier == idaapi.BADADDR:
-            raise LookupError, ownername
+            raise LookupError, 'Failure creating a members_t for structure_t {!r}'.format(ownername)
             logging.warn('members_t : Creating structure %s -- [%x] %d members'% (ownername, baseoffset, len(members)))
             identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
         self.baseoffset = baseoffset
@@ -474,7 +477,7 @@ class member_t(object):
         self.__owner = owner
 
     def __getstate__(self):
-        t = (self.flag,None if self.typeid is None else instance(self.typeid, 0),self.size)
+        t = (self.flag,None if self.typeid is None else instance(self.typeid),self.size)
         cmtt = idaapi.get_member_cmt(self.id, True)
         cmtf = idaapi.get_member_cmt(self.id, False)
         ofs = self.offset - self.__owner.members.baseoffset
@@ -486,7 +489,7 @@ class member_t(object):
         if identifier == idaapi.BADADDR:
             logging.warn('member_t : Creating structure %s -- [%x] %s%s'% (ownername, ofs, name, ' // %s'%(cmtt or cmtf) if cmtt or cmtf else ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
-        self.__owner = owner = instance(identifier, 0)
+        self.__owner = owner = instance(identifier, offset=0)
 
         flag,mytype,nbytes = t
 
@@ -548,7 +551,7 @@ class member_t(object):
     def typeid(self):
         opinfo = idaapi.opinfo_t()
         res = idaapi.retrieve_member_info(self.ptr, opinfo)
-        return None if res is None else res.tid
+        return None if res is None else res.tid if res.tid != idaapi.BADADDR else None
     @property
     def index(self):
         return self.__index
@@ -577,7 +580,7 @@ class member_t(object):
         m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
         if m is None:
             return 0
-        flag = m.flag & idaapi.DT_TYPE
+        flag = m.flag & self.FF_MASK
 
         # idaapi(swig) and python have different definitions of what constant values are
         max = (sys.maxint+1)*2
@@ -617,6 +620,12 @@ class member_t(object):
 # FIXME: move this typemap code under a shared utility module of some kind
 class typemap:
     """Convert bidirectionally from a pythonic type into an IDA type"""
+
+    FF_MASK = 0xfff00000    # Mask that specifies the structure's type
+    # FIXME: In some cases FF_nOFF (where n is 0 or 1) does not actually
+    #        get auto-treated as an pointer by ida. Instead, it appears to
+    #        only get marked as an "offset" and rendered as an integer.
+
     integermap = {
         1:(idaapi.byteflag(), -1),  2:(idaapi.wordflag(), -1),  3:(idaapi.tribyteflag(), -1),
         4:(idaapi.dwrdflag(), -1),  8:(idaapi.qwrdflag(), -1), 10:(idaapi.tbytflag(), -1),
@@ -635,7 +644,7 @@ class typemap:
     }
     
     charmap = { chr:(idaapi.charflag(),-1), }
-    ptrmap = { type:(idaapi.offflag(),-1), }
+    ptrmap = { sz : (idaapi.offflag()|flg, tid) for sz,(flg,tid) in integermap.iteritems() }
 
     typemap = {
         int:integermap,long:integermap,float:decimalmap,
@@ -646,28 +655,35 @@ class typemap:
     # inverted lookup table
     inverted = {}
     for s,(f,_) in integermap.items():
-        inverted[f & idaapi.DT_TYPE] = (int,s)
+        inverted[f & FF_MASK] = (int,s)
     for s,(f,_) in decimalmap.items():
-        inverted[f & idaapi.DT_TYPE] = (float,s)
+        inverted[f & FF_MASK] = (float,s)
     for s,(f,_) in stringmap.items():
-        inverted[f & idaapi.DT_TYPE] = (str,s)
+        inverted[f & FF_MASK] = (str,s)
+    for s,(f,_) in ptrmap.items():
+        inverted[f & FF_MASK] = (type,s)
     del f
+    inverted[idaapi.FF_STRU] = (int,1)  # FIXME: hack for dealing with
+                                        #   structures that have the flag set
+                                        #   but aren't actually structures..
 
     # defaults
     integermap[None] = integermap[(hasattr(database,'config') and database.config.bits() or 32)/8]
     decimalmap[None] = decimalmap[(hasattr(database,'config') and database.config.bits() or 32)/8]
+    ptrmap[None] = ptrmap[(hasattr(database,'config') and database.config.bits() or 32)/8]
     stringmap[None] = stringmap[str]
     charmap[None] = charmap[chr]
-    ptrmap[None] = ptrmap[type]
 
     @classmethod
     def dissolve(cls, flag, typeid, size):
-        dt = flag & idaapi.DT_TYPE
+        dt = flag & cls.FF_MASK
         sf = -1 if idaapi.is_signed_data(flag) else +1
-        if dt == idaapi.FF_STRU:
+        if dt == idaapi.FF_STRU and isinstance(typeid,(int,long)):
             t = instance(typeid) 
             sz = t.size
             return t if sz == size else ([t],size // sz)
+        if dt not in cls.inverted:
+            logging.warn('typemap.disolve(%r, %r, %r) : Unable to identify a pythonic type'% (dt, typeid, size))
         t,sz = cls.inverted[dt]
         res = t if sz == size else [t,sz * sf]
         return res if sz == size else (res,size)
@@ -681,6 +697,10 @@ class typemap:
         (int,2)     -- a word
         (chr,4)     -- an array of 4 characters
         """
+
+        # FIXME: Array definitions seem awkward, I think they should look
+        #        like [type, length] and so an array of 4 words should be
+        #        [(int,2), 4]
 
         # return idaapi.FF_xxx, typeid, and size given a tuple (type,size) or just a type/instance
         type,nbytes = type if isinstance(type, tuple) else (type,None)
@@ -702,7 +722,7 @@ class typemap:
         # defined in typemap -- (type,size)
         else:
             table = cls.typemap[type]
-            if type in (int,long,float):
+            if type in (int,long,float,type):
                 flag,typeid = table[None if nbytes is None else size]   # FIXME
             else:
                 flag,typeid = table[type]
@@ -711,7 +731,8 @@ class typemap:
         if nbytes is None:
             opinfo = idaapi.opinfo_t()
             opinfo.tid = typeid
-            size = idaapi.get_data_type_size(flag,opinfo)
+            size = idaapi.get_data_type_size(flag, opinfo)
+
         elif nbytes < 0:
             flag |= idaapi.signed_data_flag()
 
