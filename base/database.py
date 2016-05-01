@@ -299,16 +299,28 @@ def name(ea=None, *args, **kwds):
         pass
     return None
 
+if False:   # XXX: can't trust idaapi.is_basic_block_end(...)
+    def blocks(start, end):
+        '''Returns each block between the specified range of instructions'''
+        block = start
+        for ea in iterate(start, end):
+            nextea = next(ea)
+            if idaapi.is_basic_block_end(ea):
+                yield block,nextea
+                block = nextea
+            continue
+        return
+
 def blocks(start, end):
     '''Returns each block between the specified range of instructions'''
     block = start
     for ea in iterate(start, end):
         nextea = next(ea)
 
-        if idaapi.ua_mnem(ea).startswith('call'):      # FIXME: heh. ;)
+        if _instruction.isCall(ea):
             continue
 
-        if idaapi.ua_mnem(ea).startswith('ret'):       #   whee
+        if _instruction.isReturn(ea):
             yield block,nextea
             block = ea
 
@@ -324,11 +336,18 @@ def blocks(start, end):
 
 def map(l, *args, **kwds):
     '''Execute provided callback on all functions in database. Synonymous to map(l,db.functions())'''
+    i,x = 0,here()
+    current = x
     all = functions()
     result = []
-    for i,x in enumerate(all):
-        print '%x: processing # %d of %d'%( x, i+1, len(all) )
-        result.append( l(x, *args, **kwds) )
+    try:
+        for i,x in enumerate(all):
+            go(x)
+            print '%x: processing # %d of %d : %s'%( x, i+1, len(all), name(x) )
+            result.append( l(x, *args, **kwds) )
+    except KeyboardInterrupt:
+        print '%x: terminated at # %d of %d : %s'%( x, i+1, len(all), name(x) )
+    go(current)
     return result
 
 def contains(ea):
@@ -622,60 +641,68 @@ class register(object):
 class address(object):
     @staticmethod
     def walk(ea, next, match):
-        while match(ea):
+        while ea not in (None,idaapi.BADADDR) and match(ea):
             ea = next(ea)
         return ea
 
-    @staticmethod
-    def head(ea=None):
+    @classmethod
+    def iterate(cls, ea, next=None):
+        next = cls.next if next is None else next
+        while ea not in (None,idaapi.BADADDR):
+            yield ea
+            ea = next(ea)
+        return
+
+    @classmethod
+    def head(cls, ea=None):
         ea = ui.current.address() if ea is None else ea
         return idaapi.get_item_head(ea)
-    @staticmethod
-    def prev(ea=None, count=1):
+    @classmethod
+    def prev(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
         res = idaapi.prev_head(ea,0)
-        return address.prev(res, count-1) if count > 1 else res
-    @staticmethod
-    def next(ea=None, count=1):
+        return cls.prev(res, count-1) if count > 1 else res
+    @classmethod
+    def next(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
         res = idaapi.next_head(ea, idaapi.BADADDR)
-        return address.next(res, count-1) if count > 1 else res
+        return cls.next(res, count-1) if count > 1 else res
 
-    @staticmethod
-    def prevdata(ea=None, count=1):
+    @classmethod
+    def prevdata(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(address.prev(ea), address.prev, lambda n: len(xref.du(n)) == 0)
-        return address.prevdata(res, count-1) if count > 1 else res
-    @staticmethod
-    def nextdata(ea=None, count=1):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.du(n)) == 0)
+        return cls.prevdata(res, count-1) if count > 1 else res
+    @classmethod
+    def nextdata(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(ea, address.next, lambda n: len(xref.du(n)) == 0)
-        return address.nextdata(address.next(res), count-1) if count > 1 else res
+        res = cls.walk(ea, cls.next, lambda n: len(xref.du(n)) == 0)
+        return cls.nextdata(cls.next(res), count-1) if count > 1 else res
 
-    @staticmethod
-    def prevcode(ea=None, count=1):
+    @classmethod
+    def prevcode(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(address.prev(ea), address.prev, lambda n: len(xref.cu(n)) == 0)
-        return address.prevcode(res, count-1) if count > 1 else res
-    @staticmethod
-    def nextcode(ea=None, count=1):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.cu(n)) == 0)
+        return cls.prevcode(res, count-1) if count > 1 else res
+    @classmethod
+    def nextcode(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(ea, address.next, lambda n: len(xref.cu(n)) == 0)
-        return address.nextcode(address.next(res), count-1) if count > 1 else res
+        res = cls.walk(ea, cls.next, lambda n: len(xref.cu(n)) == 0)
+        return cls.nextcode(cls.next(res), count-1) if count > 1 else res
 
-    @staticmethod
-    def prevref(ea=None, count=1):
+    @classmethod
+    def prevref(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(address.prev(ea), address.prev, lambda n: len(xref.u(n)) == 0)
-        return address.prevref(res, count-1) if count > 1 else res
-    @staticmethod
-    def nextref(ea=None, count=1):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.u(n)) == 0)
+        return cls.prevref(res, count-1) if count > 1 else res
+    @classmethod
+    def nextref(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(ea, address.next, lambda n: len(xref.u(n)) == 0)
-        return address.nextref(address.next(res), count-1) if count > 1 else res
+        res = cls.walk(ea, cls.next, lambda n: len(xref.u(n)) == 0)
+        return cls.nextref(cls.next(res), count-1) if count > 1 else res
 
-    @staticmethod
-    def prevreg(ea, *regs, **kwds):
+    @classmethod
+    def prevreg(cls, ea, *regs, **kwds):
         count = kwds.get('count',1)
         write = kwds.get('write',False)
         def uses_register(ea, regs):
@@ -690,10 +717,10 @@ class address(object):
                         return True
                 continue
             return False
-        res = address.walk(address.prev(ea), address.prev, lambda ea: not uses_register(ea, regs))
-        return address.prevreg(res, *regs, count=count-1) if count > 1 else res
-    @staticmethod
-    def nextreg(ea, *regs, **kwds):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda ea: not uses_register(ea, regs))
+        return cls.prevreg(res, *regs, count=count-1) if count > 1 else res
+    @classmethod
+    def nextreg(cls, ea, *regs, **kwds):
         count = kwds.get('count',1)
         write = kwds.get('write',False)
         def uses_register(ea, regs):
@@ -708,53 +735,87 @@ class address(object):
                         return True
                 continue
             return False
-        res = address.walk(ea, address.next, lambda ea: not uses_register(ea, regs))
-        return address.nextreg(address.next(res), *regs, count=count-1) if count > 1 else res
+        res = cls.walk(ea, cls.next, lambda ea: not uses_register(ea, regs))
+        return cls.nextreg(cls.next(res), *regs, count=count-1) if count > 1 else res
 
-    @staticmethod
-    def prevstack(ea, delta):
+    @classmethod
+    def prevstack(cls, ea, delta):
         fn,sp = function.top(ea),function.getSpDelta(ea)
-        return address.walk(ea, address.prev, lambda n: abs(function.getSpDelta(n) - sp) < delta)
-    @staticmethod
-    def nextstack(ea, delta):
+        return cls.walk(ea, cls.prev, lambda n: abs(function.getSpDelta(n) - sp) < delta)
+    @classmethod
+    def nextstack(cls, ea, delta):
         fn,sp = function.top(ea),function.getSpDelta(ea)
-        return address.walk(ea, address.next, lambda n: abs(function.getSpDelta(n) - sp) < delta)
+        return cls.walk(ea, cls.next, lambda n: abs(function.getSpDelta(n) - sp) < delta)
 
-    @staticmethod
-    def prevcall(ea=None, count=1):
+    @classmethod
+    def prevcall(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(address.prev(ea), address.prev, lambda n: not idaapi.is_call_insn(n))
-        return address.prevcall(res, count-1) if count > 1 else res
-    @staticmethod
-    def nextcall(ea=None, count=1):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: not _instruction.isCall(n))
+        return cls.prevcall(res, count-1) if count > 1 else res
+    @classmethod
+    def nextcall(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(ea, address.next, lambda n: not idaapi.is_call_insn(n))
-        return address.nextcall(address.next(res), count-1) if count > 1 else res
+        res = cls.walk(ea, cls.next, lambda n: not _instruction.isCall(n))
+        return cls.nextcall(cls.next(res), count-1) if count > 1 else res
 
-    @staticmethod
-    def prevbranch(ea=None, count=1):
+    @classmethod
+    def prevbranch(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(address.prev(ea), address.prev, lambda n: idaapi.is_call_insn(n) or len(xref.d(n)) == 0 and not idaapi.is_indirect_jump_insn(n))
-        return address.prevbranch(res, count-1) if count > 1 else res
-    @staticmethod
-    def nextbranch(ea=None, count=1):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: _instruction.isCall(n) and not _instruction.isBranch(n))
+        return cls.prevbranch(res, count-1) if count > 1 else res
+    @classmethod
+    def nextbranch(cls, ea=None, count=1):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(ea, address.next, lambda n: idaapi.is_call_insn(n) or len(xref.d(n)) == 0 and not idaapi.is_indirect_jump_insn(n))
-        return address.nextbranch(address.next(res), count-1) if count > 1 else res
+        res = cls.walk(ea, cls.next, lambda n: _instruction.isCall(n) and not _instruction.isBranch(n))
+        return cls.nextbranch(cls.next(res), count-1) if count > 1 else res
 
-    # FIXME: allow one to specify a specific tag type to look for
-    @staticmethod
-    def prevtag(ea=None, count=1):
+    @classmethod
+    def prevtag(cls, ea=None, count=1, tagname=None):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(address.prev(ea), address.prev, lambda n: not type.hasComment(n))
-        return address.prevbranch(res, count-1) if count > 1 else res
-    @staticmethod
-    def nexttag(ea=None, count=1):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: not (type.hasComment(n) if tagname is None else tagname in tag(n)))
+        return cls.prevbranch(res, count-1) if count > 1 else res
+    @classmethod
+    def nexttag(cls, ea=None, count=1, tagname=None):
         ea = ui.current.address() if ea is None else ea
-        res = address.walk(ea, address.next, lambda n: not type.hasComment(n))
-        return address.nextbranch(address.next(res), count-1) if count > 1 else res
+        res = cls.walk(ea, cls.next, lambda n: not (type.hasComment(n) if tagname is None else tagname in tag(n)))
+        return cls.nextbranch(cls.next(res), count-1) if count > 1 else res
 
 a = addr = address
+
+class flow(address):
+    @staticmethod
+    def walk(ea, next, match):
+        res = set()
+        while ea not in (None,idaapi.BADADDR) and isCode(ea) and ea not in res and match(ea):
+            res.add(ea)
+            ea = next(ea)
+        return ea
+
+    @classmethod
+    def prev(cls, ea=None, count=1):
+        isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
+        ea = ui.current.address() if ea is None else ea
+        refs = xref.up(ea)
+        if len(refs) > 1 and isStop(address.prev(ea)):
+            logging.fatal("%x: Unable to determine previous address due to multiple xrefs being available : %s"% (ea, ', '.join(__builtin__.map(hex,refs))))
+            return None
+        res = refs[0] if isStop(address.prev(ea)) else address.prev(ea)
+        return cls.prev(res, count-1) if count > 1 else res
+    @classmethod
+    def next(cls, ea=None, count=1):
+        isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
+        ea = ui.current.address() if ea is None else ea
+        refs = xref.down(ea)
+        if len(refs) > 1:
+            logging.fatal("%x: Unable to determine next address due to multiple xrefs being available : %s"% (ea, ', '.join(__builtin__.map(hex,refs))))
+            return None
+        if isStop(ea) and not _instruction.isJmp(ea):
+#            logging.fatal("%x: Unable to move to next address. Flow has stopped."% (ea,))
+            return None
+        res = refs[0] if _instruction.isJmp(ea) else address.next(ea)
+        return cls.next(res, count-1) if count > 1 else res
+
+f = flow
 
 class type(object):
     def __new__(cls, ea):

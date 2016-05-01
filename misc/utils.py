@@ -30,11 +30,8 @@ def colormarks(color=0x7f007f):
     for ea,m in database.marks():
         database.tag(ea, 'mark', m)
         database.color(ea, color)
-        try:
-            f.add(function.top(ea))
-        except ValueError:
-            pass
-        continue
+        try: f.add(function.top(ea))
+        except (LookupError,ValueError): pass
 
     # tag the functions too
     for ea in list(f):

@@ -14,7 +14,7 @@ def feature(ea):
 
 def mnem(ea):
     '''Returns the mnemonic of an instruction'''
-    return idaapi.ua_mnem(ea) or None
+    return idaapi.ua_mnem(ea) or ''
 mnemonic = mnem
 
 ## functions vs all operands of an insn
@@ -66,7 +66,7 @@ def op_state(ea, n):
     '''Returns 'r','w','rw' of an operand'''
     return ops_state(ea)[n]
 def op_size(ea, n):
-    '''Returns the size of an operand'''
+    '''Returns the read size of an operand'''
     insn = at(ea)
     return opt.size(insn.Operands[n])
 def op_type(ea, n):
@@ -85,11 +85,45 @@ def op_segment(ea, n):
         return 'fs'
     raise NotImplementedError, hex(segment)
 
-def op_stkvar(ea, n):
-    py_op = operand(ea,n)    
-    py_v = py_op.addr
-    member,_ = idaapi.get_stkvar(py_op, py_v)
-    return member
+## flags
+# idaapi.stroffflag()
+# idaapi.stkvarflag()
+# idaapi.offflag()
+# idaapi.struflag()
+
+## lvars
+#def op_stkvar(ea, n):
+#    '''Return the member of a stack variable'''
+#    py_op = operand(ea,n)    
+#    py_v = py_op.addr
+#    member,_ = idaapi.get_stkvar(py_op, py_v)
+#    return member
+
+# def op_type(ea, n)
+#    '''Apply the specified type to a stack variable'''
+#    py_op = operand(ea,n)
+#    py_v = py_op.addr
+#    py_t = idc.ParseType("type string", flags)[1]
+#    py_name = "stack variable name"
+#    idaapi.apply_type_to_stkarg(py_op, py_v, py_t, py_name)
+
+## structure operands
+#def op_stroff(ea, n):
+#    '''Convert the specified operand repr to a structure field'''
+#    path = idaapi.tid_array(1)
+#    path[0] = structureId
+#    lengthOfPath = 1
+#    return idaapi.op_stroff(ea, n, path.cast(), lengthOfPath, delta)
+
+## set_stroff_path
+# length = 1
+# pathvar = idaapi.tid_array(length)
+# delta = 0
+# res = idaapi.set_stroff_path(ea, n, pathvar, length, delta)
+
+## get_Stroff_path
+# pathvar = idaapi.tid_array(length)
+# res = idapi.get_stroff_path(ea, n, pathvar, delta)
     
     #https://www.hex-rays.com/products/ida/support/idapython_docs/
     # xreflist_t
@@ -116,7 +150,7 @@ def op_decode(ea, n):
     insn = at(ea)
     return opt.decode(insn.Operands[n])
 def op_value(ea, n):
-    '''Returns an operand's value converted to register names, immediate, or offset,(base reg,index reg,scale)'''
+    '''Returns an operand's written value converted to register names, immediate, or offset,(base reg,index reg,scale)'''
     insn = at(ea)
     return opt.value(insn.Operands[n])
 
@@ -139,12 +173,12 @@ class opt(object):
     def value(cls, op):
         res = cls.cache[op.type](op)
         if op.type in (idaapi.o_reg,idaapi.o_idpspec3,idaapi.o_idpspec4,idaapi.o_idpspec5):
-            return reg_t.byIndex(res,op.dtyp).name
+            return reg_t.byIndexType(res,op.dtyp).name
 
         elif op.type in (idaapi.o_mem,idaapi.o_phrase,idaapi.o_displ):
             dt = ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
             ofs,(b,i,s) = res
-            return ofs,(None if b is None else reg_t.byIndex(b,dt).name,None if i is None else reg_t.byIndex(i,dt).name,s)
+            return ofs,(None if b is None else reg_t.byIndexType(b,dt).name,None if i is None else reg_t.byIndexType(i,dt).name,s)
 
         elif op.type in (idaapi.o_far,idaapi.o_near):
             return res
@@ -274,6 +308,7 @@ def opt_reg(op):
 def opt_reg(op):
     '''opt_crreg'''
     raise NotImplementedError
+    return getattr(register, 'cr{:d}'.format(op.reg)).id
 @opt.define(idaapi.o_idpspec3)
 def opt_reg(op):
     '''opt_fpreg'''
@@ -296,13 +331,28 @@ def isImportRef(ea):
 
 ## types of instructions
 def isReturn(ea):
-    #return idaapi.is_ret_insn(ea)
-    return feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
+    return idaapi.is_ret_insn(ea)
+#    return feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
 def isShift(ea):
     return feature(ea) & idaapi.CF_SHFT == idaapi.CF_SHFT
+def isBranch(ea):
+    return isJmp(ea) or isJxx(ea) or isJmpi(ea)
+def isJmp(ea):
+    MASK_BRANCH = 0b111
+    CF_JMPIMM = 0b001
+    CF_JMPCOND = 0b000
+    CF_CALL = 0b010
+    return not isJmpi(ea) and (feature(ea) & MASK_BRANCH == CF_JMPIMM) and bool(database.xref.down(ea))
+def isJxx(ea):
+    MASK_BRANCH = 0b111
+    CF_JMPIMM = 0b001
+    CF_JMPCOND = 0b000
+    CF_CALL = 0b010
+    return (feature(ea) & MASK_BRANCH == CF_JMPCOND) and bool(database.xref.down(ea))
 def isJmpi(ea):
     return feature(ea) & idaapi.CF_JUMP == idaapi.CF_JUMP
 def isCall(ea):
+    # return idaapi.is_call_insn(ea)
     return feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL
 
 ## op_t.flags
@@ -368,14 +418,14 @@ class reg_t:
             return other in res
 
         def related(self, other):
-            '''Returns true if the register `other` affects the state'''
+            '''Returns true if the register `other` affects this one if it's modified'''
             return self.superset(other) or self.subset(other)
 
     @classmethod
     def new(cls, name, bits, idaname=None, **kwds):
         dtyp = kwds.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
         namespace = dict(cls.type.__dict__)
-        namespace.update({'__name__':name, 'parent':None, 'children':{}, 'dtyp':dtyp, 'offset':0, 'size':bits, 'realname':idaname or name})
+        namespace.update({'__name__':name, 'parent':None, 'children':{}, 'dtyp':dtyp, 'offset':0, 'size':bits})
         namespace['realname'] = idaname
         res = type(name, (cls.type,), namespace)()
         cls.cache[name] = cls.cache[idaname or name,dtyp] = res
@@ -391,7 +441,11 @@ class reg_t:
         parent.children[offset] = res
         return res
     @classmethod
-    def byIndex(cls, index, dtyp):
+    def byIndex(cls, index):
+        name = idaapi.ph.regnames[index]
+        return cls.byName(name)
+    @classmethod
+    def byIndexType(cls, index, dtyp):
         name = idaapi.ph.regnames[index]
         return cls.cache[name,dtyp]
     @classmethod
@@ -403,13 +457,20 @@ class register: pass
 [ setattr(register, 'r'+_, reg_t.new('r'+_, 64, _)) for _ in ('ax','cx','dx','bx','sp','bp','si','di','ip') ]
 [ setattr(register, 'r'+_, reg_t.new('r'+_, 64)) for _ in map(str,range(8,16)) ]
 [ setattr(register, 'e'+_, reg_t.child(reg_t.byName('r'+_), 'e'+_, 0, 32, _)) for _ in ('ax','cx','dx','bx','sp','bp','si','di','ip') ]
-[ setattr(register, 'r'+_, reg_t.child(reg_t.byName('r'+_), 'r'+_+'d', 0, 32)) for _ in map(str,range(8,16)) ]
+[ setattr(register, 'r'+_+'d', reg_t.child(reg_t.byName('r'+_), 'r'+_+'d', 0, 32, idaname='r'+_)) for _ in map(str,range(8,16)) ]
+[ setattr(register, 'r'+_+'w', reg_t.child(reg_t.byName('r'+_+'d'), 'r'+_+'w', 0, 16, idaname='r'+_)) for _ in map(str,range(8,16)) ]
+[ setattr(register, 'r'+_+'b', reg_t.child(reg_t.byName('r'+_+'w'), 'r'+_+'b', 0, 8, idaname='r'+_)) for _ in map(str,range(8,16)) ]
 [ setattr(register,     _, reg_t.child(reg_t.byName('e'+_), _, 0, 16)) for _ in ('ax','cx','dx','bx','sp','bp','si','di','ip') ]
 [ setattr(register, _+'h', reg_t.child(reg_t.byName(_+'x'), _+'h', 8, 8)) for _ in ('a','c','d','b') ]
 [ setattr(register, _+'l', reg_t.child(reg_t.byName(_+'x'), _+'l', 0, 8)) for _ in ('a','c','d','b') ]
 [ setattr(register, _+'l', reg_t.child(reg_t.byName(_), _+'l', 0, 8)) for _ in ('sp','bp','si','di') ]
 [ setattr(register,     _, reg_t.new('es',16)) for _ in ('es','cs','ss','ds','fs','gs') ]
 setattr(register, 'fpstack', reg_t.new('st', 80*8, dtyp=None))
+
+# FIXME: rex-prefixed 32-bit registers are implicitly extended to the 64-bit regs which implies that 64-bit are children of 32-bit
+
+# explicitly set the lookups for (word-register,idaapi.dt_byte) which exist due to ida's love for the inconsistent
+[ reg_t.cache.setdefault((_+'x', reg_t.byName(_+'l').type), reg_t.byName(_+'l')) for _ in ('a','c','d','b') ]
 
 # single precision
 [ setattr(register, 'st{:d}f'.format(_), reg_t.child(register.fpstack, 'st{:d}f'.format(_), _*80, 80, 'st{:d}'.format(_), dtyp=idaapi.dt_float)) for _ in range(8) ]
@@ -422,8 +483,8 @@ setattr(register, 'fpstack', reg_t.new('st', 80*8, dtyp=None))
 [ setattr(register, 'mm{:d}'.format(_), reg_t.child(register.fpstack, 'mm{:d}'.format(_), _*80, 64, dtyp=idaapi.dt_qword)) for _ in range(8) ]
 
 # sse1/sse2 simd registers
-[ setattr(register, 'xmm{:d}'.format(_), reg_t.new('xmm{:d}'.format(_), 128, dtyp=idaapi.dt_byte16)) for _ in range(8) ]
-[ setattr(register, 'ymm{:d}'.format(_), reg_t.new('ymm{:d}'.format(_), 128, dtyp=idaapi.dt_ldbl)) for _ in range(8) ]
+[ setattr(register, 'xmm{:d}'.format(_), reg_t.new('xmm{:d}'.format(_), 128, dtyp=idaapi.dt_byte16)) for _ in range(16) ]
+[ setattr(register, 'ymm{:d}'.format(_), reg_t.new('ymm{:d}'.format(_), 128, dtyp=idaapi.dt_ldbl)) for _ in range(16) ]
 
 #fpctrl, fpstat, fptags
 #mxcsr
@@ -447,7 +508,7 @@ class ir:
         class unknown(__base__): pass
 
     table = {
-        'opt_imm':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify},
+        'opt_imm':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify, '':operation.value},
         'opt_addr':    {'r':operation.load,    'w':operation.store, 'rw':operation.unknown},
         'opt_phrase':  {'r':operation.load,    'w':operation.store, 'rw':operation.unknown},
         'opt_reg':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify},

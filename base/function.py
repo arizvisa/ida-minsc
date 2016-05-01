@@ -4,7 +4,7 @@ function-context
 generic tools for working in the context of a function.
 '''
 
-import logging,re
+import logging,re,itertools
 import internal,database,structure,ui
 import idaapi
 
@@ -203,7 +203,10 @@ def within(ea):
 ## operations
 def contains(fn, ea):
     '''Checks if ea is contained in function or in any of it's chunks'''
-    fn = by(fn)
+    try: fn = by(fn)
+    except LookupError:
+        return False
+
     for start,end in chunks(fn):
         if start <= ea < end:
             return True
@@ -257,8 +260,7 @@ def chunks(key=None):
     while True:
         ch = fci.chunk()
         yield ch.startEA, ch.endEA
-        if not fci.next():
-            break
+        if not fci.next(): break
     return
 
 def blocks(key=None):
@@ -312,7 +314,7 @@ def getSpDelta(ea):
 def iterate(key=None):
     '''Iterate through all the instructions in each chunk of the specified function'''
     for start,end in chunks(key):
-        for ea in database.iterate(start, end):
+        for ea in itertools.ifilter(database.type.isCode, database.iterate(start, end)):
             yield ea
         continue
     return
