@@ -85,7 +85,7 @@ class internal_submodule(internal_api):
             # FIXME: create a get-descriptor for each sub-module that will try to
             #        load the module continuously until it's finally successful
         def __getattr__(self, name):
-            raise NotImplementedError, "Unable to fetch module %s on-demand"% name
+            raise NotImplementedError("Unable to fetch module {:s} on-demand".format(name))
 
     def load_module(self, fullname):
         # FIXME: make module a lazy-loaded object for fetching module-code on-demand
@@ -98,7 +98,7 @@ class internal_submodule(internal_api):
             try:
                 res = self.new_api(name, path)
             except:
-                __import__('logging').warn('%s : Unable to import module %s from %r', self.__name__, name, path, exc_info=True)
+                __import__('logging').warn('{:s} : Unable to import module {:s} from {!r}'.format(self.__name__, name, path, exc_info=True))
             else:
                 setattr(module, name, res)
             continue
@@ -158,7 +158,7 @@ except IOError:
     __import__('logging').warn('No idapythonrc.py file found in home directory')
 
 except Exception, e:
-    print 'warning: Unexpected exception %s raised'% repr(e)
+    print('warning: Unexpected exception {!r} raised'.format(e))
     __import__('traceback').print_exc()
 
 # find the frame that fucks with our sys.modules, and save it for later

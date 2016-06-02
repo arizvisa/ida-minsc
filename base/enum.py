@@ -16,39 +16,53 @@ for e in enum.iterate():
 enum.delete("example_enum")
 '''
 
-import sys,idaapi,math
+import internal
+from internal import utils
+import sys,six,math
+
+import idaapi
+
+# FIXME: complete this with more types similar to the 'structure' module.
+# FIXME: normalize the documentation.
 
 def count():
     '''Return the total number of enumerations'''
     return idaapi.get_enum_qty()
+
 def iterate():
     '''Yield the identifier of each defined enumeration'''
     for n in xrange(idaapi.get_enum_qty()):
         yield idaapi.getn_enum(n)
     return
     
-def byName(name):
+def by_name(name):
     '''Return an enum id by it's /name/'''
     res = idaapi.get_enum(name)
     if res == idaapi.BADADDR:
-        raise Exception, "enum.byName(%r):unable to locate enumeration"% name
+        raise Exception("{:s}.by_name({!r}) : Unable to locate enumeration.".format(__name__, name))
     return res
-def byIndex(index):
+byName = by_name
+
+def by_index(index):
     '''Return an enum id by it's /index/'''
     res = idaapi.getn_enum(index)
     if res == idaapi.BADADDR:
-        raise Exception, "enum.byIndex(%x):unable to locate enumeration"% index
+        raise Exception("{:s}.by_index({:x}) : Unable to locate enumeration.".format(__name__, index))
     return res
-def by(n):
-    if type(n) is str:
-        return byName(n)
-#    if n & 0xff000000 == 0xff000000:
-#        return n
-    return byIndex(n)
+byIndex = by_index
+
+@utils.multicase(index=six.integer_types)
+def by(index):
+    if index & 0xff000000 == 0xff000000:
+        return index
+    return by_index(index)
+@utils.multicase(name=basestring)
+def by(name): return by_name(n)
 
 def keys(identifier):
     '''Given an enum id, return the names of all of it's elements.'''
     return [member.name(n) for n in member.each(identifier)]
+
 def values(identifier):
     '''Given an enum id, return all of it's defined values'''
     return [member.value(n) for n in member.each(identifier)]
@@ -59,45 +73,59 @@ def create(name, flags=0):
     idx = count()
     res = idaapi.add_enum(idx, name, flags)
     if res == 0xffffffff:
-        raise Exception, "Unable to create enum"
+        raise Exception("{:s}.create : Unable to create enumeration named {:s}".format(__name__, name))
     return res
 def _delete(identifier):
     return idaapi.del_enum(identifier)
 def delete(name):
     '''Delete an enumeration by it's /name/'''
-    identifier = byName(name)
+    identifier = by_name(name)
     return _delete(identifier)
 new,remove = create,delete
 
 ## setting enum options
-def name(identifier, name=None):
-    '''Given an enum id, get/set it's /name/'''
-    if name is None:
-        return idaapi.get_enum_name(identifier)
+@utils.multicase()
+def name(identifier):
+    '''Given an enum id, get it's /name/'''
+    return idaapi.get_enum_name(identifier)
+@utils.multicase(name=basestring)
+def name(identifier, name):
+    '''Given an enum id, set it's /name/'''
     return idaapi.set_enum_name(identifier, name)
-def comment(identifier, comment=None):
-    '''Given an enum id, get/set it's /comment/'''
-    if commment is None:
-        return idaapi.get_enum_cmt(identifier)
+
+@utils.multicase()
+def comment(identifier):
+    '''Given an enum id, get it's /comment/'''
+    return idaapi.get_enum_cmt(identifier)
+@utils.multicase(comment=basestring)
+def comment(identifier, comment):
+    '''Given an enum id, set it's /comment/'''
     return idaapi.set_enum_cmt(identifier, comment)
-def size(identifier, width=None):
-    '''Given an enum id, get/set it's size'''
-    if width is None:
-        res = idaapi.get_enum_width(identifier)
-        return 2**(res-1) if res > 0 else 0
+
+@utils.multicase()
+def size(identifier):
+    '''Given an enum id, get it's size'''
+    res = idaapi.get_enum_width(identifier)
+    return 2**(res-1) if res > 0 else 0
+@utils.multicase(width=six.integer_types)
+def size(identifier, width):
+    '''Given an enum id, set it's size'''
     res = int(math.log(width, 2))
     return idaapi.set_enum_width(identifier, int(res)+1)
+
 def mask(identifier):
     '''Given an enum id, return it's bitmask'''
     res = min((size(identifier), 4))    # FIXME: is uval_t/bmask_t a maximum of 32bits on ida64 too?
     if res > 0:
         return 2**(res*8)-1
     return sys.maxint*2+1
+
 def members(identifier):
     '''Given an enum id, yield each member's name'''
     for n in member.each(identifier):
         yield member.name(n)
     return
+
 def repr(identifier):
     '''Given an enum id, return a representation of it suitable for human consumption'''
     w = size(identifier)*2
@@ -143,7 +171,7 @@ class member(object):
         bmask = kwds.get('mask', -1&mask(enum))
         res = idaapi.add_enum_member(enum, name, value, bmask)
         if res in (idaapi.ENUM_MEMBER_ERROR_NAME, idaapi.ENUM_MEMBER_ERROR_VALUE, idaapi.ENUM_MEMBER_ERROR_ENUM, idaapi.ENUM_MEMBER_ERROR_MASK, idaapi.ENUM_MEMBER_ERROR_ILLV):
-            raise Exception, "enum.member.add(%x, %r, %r, %r):Unable to add enum member"%(enum, name, value, kwds)
+            raise Exception("{:s}.member.add({:x}, {!r}, {!r}, {!r}) : Unable to add member to enumeration.".format(__name__, enum, name, value, kwds))
         return cls.byValue(enum, value)
     new = create = add
 
@@ -154,13 +182,14 @@ class member(object):
         # XXX: is a serial of 0 valid?
         res = idaapi.del_enum_member(cls.parent(identifier), value, 0, -1&cls.bmask(identifier))
         if not res:
-            raise Exception, "enum.member._remove(%x):Unable to remove enum member"% identifier
+            raise Exception("{:s}.member._remove({:x}) : Unable to remove member from enumeration.".format(__name__, identifier))
         return res
     _delete = _destroy = _remove
+
     @classmethod
     def remove(cls, enum, name):
         '''Given an enum id, remove it's member called /name/'''
-        identifier = cls.byName(enum, name)
+        identifier = cls.by_namd(enum, name)
         return cls._remove(identifier)
     delete = destroy = remove
     
@@ -173,6 +202,7 @@ class member(object):
             res = idaapi.get_next_enum_member(enum, res, bmask)
             yield res
         return
+
     @classmethod
     def each(cls, enum):
         '''Given an enum id, yield each id of it's members'''
@@ -185,46 +215,62 @@ class member(object):
 
     ## searching
     @staticmethod
-    def byValue(enum, value):
+    def by_value(enum, value):
         '''Given an enum id, return the member id with the specified /value/'''
         bmask = -1&mask(enum)
         res,_ = idaapi.get_first_serial_enum_member(enum, value, bmask)
         return res
+    byValue = by_value
+
     @classmethod
-    def byName(cls, enum, name):
+    def by_name(cls, enum, name):
         '''Given an enum id, return the member id of /name/'''
         for identifier in cls.each(enum):
             if name == cls.name(identifier):
                 return identifier
             continue
         return
+    byName = by_name
 
     ## properties
+    @utils.multicase()
     @staticmethod
-    def name(identifier, name=None):
-        '''Given a member id, fetch/set it's /name/'''
-        if name is None:
-            return idaapi.get_enum_member_name(identifier)
+    def name(identifier):
+        '''Given a member id, fetch it's /name/'''
+        return idaapi.get_enum_member_name(identifier)
+    @utils.multicase(name=basestring)
+    @staticmethod
+    def name(identifier, name):
+        '''Given a member id, set it's /name/'''
         return idaapi.set_enum_member_name(identifier, name)
+
     @classmethod
     def rename(cls, enum, name, newname):
         '''Given an enumeration id, rename one of it's members from /name/ to /newname/'''
-        identifier = member.byName(enum, name)
+        identifier = member.by_name(enum, name)
         return cls.name(identifier, newname)
 
+    @utils.multicase()
     @staticmethod
-    def comment(identifier, comment=None, repeatable=True):
-        '''Given a member id, fetch/set it's /comment/'''
-        if comment is None:
-            return idaapi.get_enum_member_cmt(identifier, repeatable)
-        return idaapi.set_enum_member_cmt(identifier, comment, repeatable)
+    def comment(identifier, **kwds):
+        '''Given a member id, fetch it's /comment/'''
+        return idaapi.get_enum_member_cmt(identifier, kwds.get('repeatable', 1))
+    @utils.multicase(comment=basestring)
+    @staticmethod
+    def comment(identifier, comment, **kwds):
+        '''Given a member id, set it's /comment/'''
+        return idaapi.set_enum_member_cmt(identifier, comment, kwds.get('repeatable', 1))
 
+    @utils.multicase()
     @staticmethod
-    def value(identifier, value=None, **kwds):
+    def value(identifier):
+        return idaapi.get_enum_member_value(identifier)
+    @utils.multicase()
+    @staticmethod
+    def value(identifier, value, **kwds):
         '''Given a member id, fetch/set it's /value/'''
-        if value is None:
-            return idaapi.get_enum_member_value(identifier)
-        bmask = kwds.get('mask', -1&mask(enum))
+        #bmask = kwds.get('mask', -1 & mask(enum))
+        bmask = kwds.get('mask', -1 & mask(identifier))
         return idaapi.set_enum_member_value(identifier, value, bmask)
 
     @staticmethod

@@ -3,14 +3,14 @@ tagged-comments plugin.
 provides serialization/deserialization from arbitrary types to fit within ida's comments
 [arizvisa@tippingpoint.com]
 '''
-import __builtin__
+import __builtin__,six
 
 def tokens(input):
     input = iter(input)
 
     ### '['
     char = input.next()
-    assert char == '[', 'unexpected token %s'% char
+    assert char == '[', 'unexpected token {:s}'.format(char)
     yield char
 
     ### key
@@ -45,11 +45,11 @@ def getKVFromString(string):
     return (res[1], res[-1])
 
 def getStringFromKV(key, value):
-    return '[%s] %s'% (key, value)
+    return '[{:s}] {:s}'.format(key, value)
 
 def getIntFromKV(tuple):
     key, value = tuple
-    return '[%s] %x'% (key, value)
+    return '[{:s}] {:x}'.format(key, value)
 
 def IntifyString(value):
     if value[:2] == '0x':
@@ -65,17 +65,17 @@ def IntifyString(value):
 ### our stars
 def serializeKeyValue(k, v):
     #if k == 'address':
-    #    return '%08x'% int(v)
-    if type(v) is int:
+    #    return '{:08x}'.format(int(v))
+    if isinstance(v, six.integer_types):
         if v < 0:
-            return '-0x%x'% -int(v)
-        return '0x%x'% int(v)
-    elif type(v) is dict:
+            return '-0x{:x}'.format(-int(v))
+        return '0x{:x}'.format(int(v))
+    elif isinstance(v, dict):
         # due to how bad this code is, i'm not allowing myself to add support for various types
         raise NotImplementedError("Please don't store dicts using this code. Thanks.")
-    elif type(v) in (list,set):
+    elif isinstance(v, (list,set)):
         try:
-            return '[ %s ]'% ','.join(map(hex,v))
+            return '[ {:s} ]'.format(','.join(map(hex,v)))
         except:
             pass
         return repr(v)
@@ -127,7 +127,7 @@ def toDict(string):
     res = []
     for i,(k,v) in enumerate(items):
         if k in blah:
-            k = '%s_%x'%(k, i)
+            k = '{:s}_{:x}'.format(k, i)
         res.append((k,getattr(__builtin__,v) if isinstance(v,basestring) and hasattr(__builtin__,v) else v))
 
     # done

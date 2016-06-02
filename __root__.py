@@ -19,7 +19,7 @@ def hex(i):
 
 h,go,goof = database.h,database.go,database.goof
 
-import utils,ui
-from utils import remote
+import tools,ui
+from tools import remote
 
 #import custom,app

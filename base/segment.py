@@ -3,128 +3,203 @@ segment-context
 
 generic tools for working with segments
 '''
-import idaapi
-import database,ui
 import logging,os
+import six,types
+
+import internal,ui,database
+from internal import utils
+
+import idaapi
 
 ## enumerating
 def iterate():
-    '''Iterate through each segment_t defined in the database'''
+    '''Iterate through each segment defined in the database.'''
     for n in xrange(idaapi.get_segm_qty()):
         yield idaapi.getnseg(n)
     return
 def list():
-    '''List all the segments defined in the database by name'''
+    '''List all the segments defined in the database by name.'''
     for n in iterate():
         yield idaapi.get_true_segm_name(n) or ""
     return
 
 ## searching
-def byName(name):
-    '''Return the segment_t with the given /name/'''
+def by_name(name):
+    '''Return the segment with the given ``name``.'''
     s = idaapi.get_segm_by_name(name)
     if s is None:
-        raise Exception, "segment.byName(%r):unable to locate segment"% name
+        raise Exception("{:s}.by_name({!r}) : Unable to locate segment".format(__name__, name))
     return s
-def bySelector(selector):
-    '''Return the segment_t associated with /selector/'''
+byName = by_name
+def by_selector(selector):
+    '''Return the segment associated with ``selector``.'''
     s = idaapi.get_segm_by_sel(selector)
     if s is None:
-        raise Exception, "segment.bySelector(%x):unable to locate segment"% selector
+        raise Exception("{:s}.by_selector(0x{:x}) : Unable to locate segment".format(__name__, selector))
     return s
-def byAddress(ea):
-    '''Return the segment_t that holds the specified /ea/'''
+bySelector = by_selector
+def by_address(ea):
+    '''Return the segment that contains the specified ``ea``.'''
     s = idaapi.getseg(ea)
     if s is None:
-        raise Exception, "segment.byAddress(%x):unable to locate segment"% ea
+        raise Exception("{:s}.by_address(0x{:x}) : Unable to locate segment".format(__name__, ea))
     return s
-def by(n):
-    if type(n) is idaapi.segment_t:
-        return n
-    if type(n) is str:
-        return byName(n)
-    return byAddress(n)
+byAddress = by_address
+@utils.multicase(seg=idaapi.segment_t)
+def by(segment):
+    '''Return a segment by it's segment_t.'''
+    return segment
+@utils.multicase(name=basestring)
+def by(name):
+    '''Return the segment by it's ``name``.'''
+    return by_name(name)
+@utils.multicase(ea=six.integer_types)
+def by(ea):
+    '''Return the segment containing the address ``ea``.'''
+    return by_address(ea)
 
 ## properties
-def range(key=None):
-    '''Given a segment_t/address, return it's (begin,end)'''
-    if key is None:
-        segment = ui.current.segment()
-        if segment is None: raise LookupError, "segment.range(%r):Not currently positioned within a segment"% key
-    else:
-        segment = by(key)
-    return segment.startEA,segment.endEA
+@utils.multicase()
+def range():
+    '''Return the range of the current segment.'''
+    seg = ui.current.segment()
+    if seg is None: raise LookupError("{:s}.range() : Not currently positioned within a segment".format(__name__))
+    return seg.startEA, seg.endEA
+@utils.multicase()
+def range(segment):
+    '''Return the range of the segment specified by ``seg``.'''
+    seg = by(segment)
+    return seg.startEA, seg.endEA
 
-def size(key=None):
-    '''Given a segment_t/address, return it's size'''
-    if key is None:
-        segment = ui.current.segment()
-        if segment is None: raise LookupError, "segment.size(%r):Not currently positioned within a segment"% key
-    else:
-        segment = by(key)
-    return segment.endEA - segment.startEA
+@utils.multicase()
+def size():
+    '''Return the size of the current segment.'''
+    seg = ui.current.segment()
+    if seg is None: raise LookupError("{:s}.size() : Not currently positioned within a segment".format(__name__))
+    return seg.endEA - seg.startEA
+@utils.multicase()
+def size(segment):
+    '''Return the size of the segment specified by ``segment``.'''
+    seg = by(segment)
+    return seg.endEA - seg.startEA
 
-def string(key=None):
-    '''Given a segment_t/address, return it's contents as a string'''
-    if key is None:
-        segment = ui.current.segment()
-        if segment is None: raise LookupError, "segment.string(%r):Not currently positioned within a segment"% key
-    else:
-        segment = by(key)
+@utils.multicase()
+def string():
+    '''Return the contents of the current segment as a string.'''
+    segment = ui.current.segment()
+    if segment is None: raise LookupError("{:s}.string() : Not currently positioned within a segment".format(__name__))
     return idaapi.get_many_bytes(segment.startEA, segment.endEA-segment.startEA)
+@utils.multicase()
+def string(segment):
+    '''Return the contents of the segment identified by ``segment`` as a string.'''
+    seg = by(segment)
+    return idaapi.get_many_bytes(seg.startEA, seg.endEA-seg.startEA)
 
-def repr(key=None):
-    '''Given a segment_t/address, return a printable representation of it'''
-    if key is None:
-        segment = ui.current.segment()
-        if segment is None: raise LookupError, "segment.repr(%r):Not currently positioned within a segment"% key
-    else:
-        segment = by(key)
+@utils.multicase()
+def repr():
+    '''Return a repr() of the current segment.'''
+    segment = ui.current.segment()
+    if segment is None: raise LookupError("{:s}.repr() : Not currently positioned within a segment".format(__name__))
     return '{:s} {:s} {:x}-{:x} (+{:x})'.format(object.__repr__(segment),idaapi.get_true_segm_name(segment),segment.startEA,segment.endEA,segment.endEA-segment.startEA)
+@utils.multicase()
+def repr(segment):
+    '''Return a repr() of the segment identified by ``segment``.'''
+    '''Given a segment_t/address, return a printable representation of it'''
+    seg = by(segment)
+    return '{:s} {:s} {:x}-{:x} (+{:x})'.format(object.__repr__(seg),idaapi.get_true_segm_name(seg),seg.startEA,seg.endEA,seg.endEA-seg.startEA)
 
-def top(key=None):
-    '''Given a segment_t/address, return it's top address'''
-    if key is None:
-        segment = ui.current.segment()
-        if segment is None: raise LookupError, "segment.top(%r):Not currently positioned within a segment"% key
-    else:
-        segment = by(key)
+@utils.multicase()
+def top():
+    '''Return the top address of the current segment.'''
+    segment = ui.current.segment()
+    if segment is None: raise LookupError("{:s}.top() : Not currently positioned within a segment".format(__name__))
     return segment.startEA
+@utils.multicase()
+def top(segment):
+    '''Return the top address of the segment identified by ``segment``.'''
+    seg = by(segment)
+    return seg.startEA
 
-def bottom(key=None):
-    '''Given a segment_t/address, return it's bottom address'''
-    if key is None:
-        segment = ui.current.segment()
-        if segment is None: raise LookupError, "segment.bottom(%r):Not currently positioned within a segment"% key
-    else:
-        segment = by(key)
-    return segment.endEA
+@utils.multicase()
+def bottom():
+    '''Return the bottom address of the current segment.'''
+    seg = ui.current.segment()
+    if seg is None: raise LookupError("{:s}.bottom() : Not currently positioned within a segment".format(__name__))
+    return seg.endEA
+@utils.multicase()
+def bottom(segment):
+    '''Return the bottom address of the segment identified by ``segment``.'''
+    seg = by(segment)
+    return seg.endEA
 
-def name(key=None):
-    '''Given a segment_t/address, return it's name'''
-    if key is None:
-        segment = ui.current.segment()
-        if segment is None: raise LookupError, "segment.name(%r):Not currently positioned within a segment"% key
-    else:
-        segment = by(key)
-    return idaapi.get_true_segm_name(segment)
+@utils.multicase()
+def name():
+    '''Return the name of the current segment.'''
+    seg = ui.current.segment()
+    if seg is None: raise LookupError("{:s}.name() : Not currently positioned within a segment".format(__name__))
+    return idaapi.get_true_segm_name(seg)
+@utils.multicase()
+def name(segment):
+    '''Return the name of the segment identified by ``segment``.'''
+    seg = by(segment)
+    return idaapi.get_true_segm_name(seg)
 
-def color_write(seg, bgr):
-    seg = by(seg)
-    seg.color = 0xffffffff if bgr is None else bgr
+@utils.multicase(none=types.NoneType)
+def set_color(segment, none):
+    '''Clear the color of the segment identified by ``segment``.'''
+    seg = by(segment)
+    seg.color = 0xffffffff
     return bool(seg.update())
-def color_read(key=None):
-    if key is None:
-        seg = ui.current.segment()
-        if seg is None: raise LookupError, "segment.color_read(%r):Not currently positioned within a segment"% key
-    else:
-        seg = by(key)
-    return seg.color
-def color(seg, *args, **kwds):
-    '''color(address, rgb?) -> fetches or stores a color to the specified segment'''
-    if len(args) == 0:
-        return color_read(seg, *args, **kwds)
-    return color_write(seg, *args, **kwds)
+@utils.multicase(rgb=int)
+def set_color(segment, rgb):
+    '''Set the color of the segment identified by ``segment`` to ``rgb``.'''
+    r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
+    seg = by(segment)
+    seg.color = (b<<16)|(rgb&0x00ff00)|r
+    return bool(seg.update())
+@utils.multicase(rgb=int)
+def set_color(rgb):
+    '''Set the color of the current segment to ``rgb``.'''
+    return set_color(ui.current.segment(), rgb)
+@utils.multicase(none=types.NoneType)
+def set_color(none):
+    '''Clear the color of the current segment.'''
+    return set_color(ui.current.segment(), None)
+
+@utils.multicase()
+def get_color():
+    '''Return the color of the current segment.'''
+    seg = ui.current.segment()
+    if seg is None: raise LookupError("{:s}.get_color() : Not currently positioned within a segment".format(__name__))
+    b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
+    return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
+@utils.multicase()
+def get_color(segment):
+    '''Return the color of the segment identified by ``segment``.'''
+    seg = by(segment)
+    b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
+    return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
+
+@utils.multicase()
+def color():
+    '''Return the color of the current segment.'''
+    return get_color(ui.current.segment())
+@utils.multicase()
+def color(segment):
+    '''Return the color of the segment identified by ``segment``.'''
+    return get_color(segment)
+@utils.multicase(none=types.NoneType)
+def color(none):
+    '''Clear the color of the current segment.'''
+    return set_color(ui.current.segment(), None)
+@utils.multicase(none=types.NoneType)
+def color(segment, none):
+    '''Clear the color of the segment identified by ``segment``.'''
+    return set_color(segment, None)
+@utils.multicase(rgb=int)
+def color(segment, rgb):
+    '''Sets the color of the segment identified by ``segment`` to ``rgb``.'''
+    return set_color(segment, rgb)
 
 ## functions
 # shamefully ripped from idc.py
@@ -132,7 +207,7 @@ def _load_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     li = idaapi.open_linput(path, False)
     if not li:
-        raise Exception, 'Unable to create loader_input_t : %s'% path
+        raise Exception('{:s}.load_file : Unable to create loader_input_t : {:s}'.format(__name__, path))
     res = idaapi.file2base(li, offset, ea, ea+size, True)
     idaapi.close_linput(li)
     return res
@@ -141,53 +216,50 @@ def _save_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     of = idaapi.fopenWB(path)
     if not of:
-        raise Exception, 'Unable to open target file : %s'% path
+        raise Exception('{:s}.save_file : Unable to open target file : {:s}'.format(__name__, path))
     res = idaapi.base2file(of, offset, ea, ea+size)
     idaapi.eclose(of)
     return res
 
 def load(filename, ea, size=None, offset=0, **kwds):
-    '''Load the specified /filename/ to the address /ea/
-
-    If /size/ is not specified, use the length of the file.
-    /offset/ represents the offset into the file to use.
-    /name/ can be used to name the segment.
-    '''
+    """Load the specified ``filename`` to the address ``ea`` as a segment.
+    If ``size`` is not specified, use the length of the file.
+    ``offset`` represents the offset into the file to use.
+    ``name`` can be used to name the segment.
+    """
     filesize = os.stat(filename).st_size
 
     if size is None:
         size = filesize - offset
     res = _load_file(filename, size, ea, offset)
     if not res:
-        raise Exception, "Unable to load file into %x:+%x : %s"% (ea, size, os.path.relpath(filename))
+        raise Exception("{:s}.load : Unable to load file into 0x{:x}:+0x{:x} : {:s}".format(__name__, ea, size, os.path.relpath(filename)))
     return create(ea, size, kwds.get('name', os.path.split(filename)[1]))
 
 def map(ea, size, newea, **kwds):
-    '''Map /size/ bytes of data from /ea/ into a new segment at /newea/
-
-    /name/ can be used to name the segment.
-    '''
+    """Map ``size`` bytes of data from ``ea`` into a new segment at ``newea``.
+    ``name`` can be used to name the segment.
+    """
     fpos,data = idaapi.get_fileregion_offset(ea),database.read(ea, size)
     if len(data) != size:
-        raise Exception, "Unable to read %x bytes from %x"% (size, ea)
+        raise Exception("{:s}.map : Unable to read 0x{:x} bytes from 0x{:x}".format(__name__, size, ea))
     res = idaapi.mem2base(data, newea, fpos)
     if not res:
-        raise Exception, "Unable to remap %x:+%x to %x"% (ea, size, newea)
-    return create(newea, size, kwds.get('name', 'map_%x'% ea))
-    #return create(newea, size, kwds.get('name', 'map_%x'% newea>>4))
+        raise Exception("{:s}.map : Unable to remap 0x{:x}:+0x{:x} to 0x{:x}".format(__Name__, ea, size, newea))
+    return create(newea, size, kwds.get('name', 'map_{:x}'.format(ea)))
+    #return create(newea, size, kwds.get('name', 'map_{:s}'.format(newea>>4)))
 
 # creation/destruction
 def create(offset, size, name, **kwds):
-    '''Create a segment at /offset/ and /size/ and name it /name/
-
-    /bits/ can be used to specify the bit size of the segment
-    /comb/ can be used to specify any flags (idaapi.sc*)
-    /align/ can be used to specify paragraph alignment (idaapi.sa*)
-    /org/ specifies the origin of the segment (must be paragraph aligned due to ida)
-    '''
+    """Create a segment at ``offset`` with ``size`` and name it according to ``name``.
+    ``bits`` can be used to specify the bit size of the segment
+    ``comb`` can be used to specify any flags (idaapi.sc*)
+    ``align`` can be used to specify paragraph alignment (idaapi.sa*)
+    ``org`` specifies the origin of the segment (must be paragraph aligned due to ida)
+    """
     s = idaapi.get_segm_by_name(name)
     if s is not None:
-        logging.fatal("segment.create(%x, %x, %r, %r) : a segment with the specified name already exists : %s", offset, size, name, kwds, name)
+        logging.fatal("{:s}.create({:x}, {:x}, {!r}, {!r}) : a segment with the specified name already exists : {:s}".format(__name__, offset, size, name, kwds, name))
         return None
 
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits()) # FIXME: use disassembler default bit length instead of 32
@@ -196,7 +268,7 @@ def create(offset, size, name, **kwds):
         ## create a selector with the requested origin
         org = kwds.get('org',0)
         if org&0xf > 0:
-            logging.fatal("segment.create(%x, %x, %r, %r) : origin (.org) is not aligned to the size of a paragraph (0x10):%x", offset, size, name, kwds, org)
+            logging.fatal("{:s}.create({:x}, {:x}, {!r}, {!r}) : origin (.org) is not aligned to the size of a paragraph (0x10) : {:x}".format(__name__, offset, size, name, kwds, org))
             return None
 
         para = offset/16
@@ -217,30 +289,32 @@ def create(offset, size, name, **kwds):
 
     res = idaapi.add_segm_ex(s, name, "", idaapi.ADDSEG_NOSREG|idaapi.ADDSEG_SPARSE)
     if res == 0:
-        logging.warn("segment.create(%x, %x, %r, %r) : unable to add a new segment", offset, size, name, kwds)
+        logging.warn("{:s}.create({:x}, {:x}, {!r}, {!r}) : unable to add a new segment".format(__name__, offset, size, name, kwds))
         res = idaapi.del_selector(sel)
         #assert res != 0
         return None
     return s
 
 def delete(segment, remove=False):
-    '''Given a segment_t, delete it along with any selectors that might point to it.'''
-    assert type(segment) is idaapi.segment_t
-    assert segment is not None
+    """Remove the segment identified by ``segment``.
+    If the bool ``remove`` is specified, then remove the content of the segment from the database.
+    """
+    if not isinstance(segment, idaapi.segment_t):
+        raise AssertionError('{:s}.delete : segment is not of an idaapi.segment_t : {!r}'.format(__name__, type(segment)))
     res = idaapi.del_selector(segment.sel)
     if res == 0:
-        logging.warn("segment.delete(%s):Unable to delete selector %x", repr(segment), segment.sel)
+        logging.warn("{:s}.delete({!r}):Unable to delete selector {:x}".format(__name__, segment, segment.sel))
     res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL if remove else idaapi.SEGMOD_KEEP)
     if res == 0:
-        logging.warn("segment %s:Unable to delete segment %s", segment.name, segment.sel)
+        logging.warn("{:s}.delete({!r}):Unable to delete segment {:s} : {:s}".format(__name__, segment, segment.name, segment.sel))
     return res
 
 def save(filename, segment, offset=0):
-    '''Export /segment/ into the file specified by /filename/
+    """Export the segment identified by ``segment`` to the file named ``filename``.
 
-    /offset/ specified an offset into the file
-    '''
-    if type(segment) is idaapi.segment_t:
+    If the int ``offset`` is specified, then begin writing into the file at the specified offset.
+    """
+    if isinstance(segment, idaapi.segment_t):
         return _save_file(filename, segment.startEA, size(segment), offset)
     return save(filename, by(segment))
 

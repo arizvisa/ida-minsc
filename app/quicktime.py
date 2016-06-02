@@ -73,12 +73,12 @@ def FindLastAssignment(ea, register):
 def nameDispatch(address):
     '''Name the dispatch function at the specified address in quicktime.qts'''
     try:
-        start, end = function.getRange(address)
+        start, end = function.range(address)
 
     except ValueError:
         print '%x making a function'% address
         function.make(address)
-        start, end = function.getRange(address)
+        start, end = function.range(address)
 
     try:
         ea = FindLastAssignment(address, 'eax')

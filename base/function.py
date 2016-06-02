@@ -5,91 +5,233 @@ generic tools for working in the context of a function.
 '''
 
 import logging,re,itertools
+import six,types
+
 import internal,database,structure,ui
+from internal import utils
+
 import idaapi
 
+if False:
+    class instance(object):
+        # FIXME: finish this
+        class chunk_t(object):
+            pass
+
+        @classmethod
+        def by_address(cls, ea):
+            n = idaapi.get_fchunk_num(ea)
+            f = idaapi.getn_func(n)
+            return cls.getIndex(n)
+
 ## searching
-def byAddress(ea):
+@utils.multicase()
+def by_address():
+    '''Return the function at the current address.'''
+    return by_address(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def by_address(ea):
+    '''Return the function containing the address ``ea``.'''
     res = idaapi.get_func(ea)
     if res is None:
-        raise LookupError, "function.byAddress(%x):unable to locate function"% ea
+        raise LookupError("{:s}.by_address(0x{:x}) : unable to locate function".format(__name__,ea))
     return res
-def byName(name):
+byAddress = by_address
+
+def by_name(name):
+    '''Return the function with the name ``name``.'''
     ea = idaapi.get_name_ea(-1, name)
     if ea == idaapi.BADADDR:
-        raise LookupError, "function.byName(%r):unable to locate function"% name
+        raise LookupError("{:s}.by_name({!r}) : unable to locate function".format(__name__, name))
     return idaapi.get_func(ea)
-def by(n):
-    if type(n) is idaapi.func_t:
-        return n
-    if type(n) is str:
-        return byName(n)
-    return byAddress(n)
+byName = by_name
 
-def __addressOfRtOrSt(fn):
+@utils.multicase()
+def by(): return by_address(ui.current.address())
+@utils.multicase(func=idaapi.func_t)
+def by(func): return func
+@utils.multicase(ea=six.integer_types)
+def by(ea): return by_address(ea)
+@utils.multicase(name=basestring)
+def by(name): return by_name(name)
+
+# FIXME: document this despite it being internal
+def __addressOfRtOrSt(func):
     '''Returns (F,address) if a statically linked address, or (T,address) if a runtime linked address'''
-    try: fn = by(fn)
+    try:
+        fn = by(func)
 
     # otherwise, maybe it's an rtld symbol
     except LookupError, e:
-        if not database.isData(fn): raise
+        if not database.is_data(func): raise
 
         # ensure that we're an import, otherwise throw original exception
-        try: database.imports.get(fn)
+        try: database.imports.get(func)
         except LookupError: raise e
 
         # yep, we're an import
-        return True,fn
+        return True,func
     return False,fn.startEA
 
-def address(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.address(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def address():
+    '''Return the address of the current function.'''
+    fn = ui.current.function()
+    if fn is None: raise LookupError("{:s}.address(0x{:s}) : Not currently positioned within a function".format(__name__, ui.current.address()))
     return fn.startEA
+@utils.multicase()
+def address(func):
+    '''Return the address of the function ``func``.'''
+    res = by(func)
+    return res.startEA
 
-def offset(key=None):
-    ea = address(key)
+@utils.multicase()
+def offset():
+    '''Return the offset of the current function from the base of the database.'''
+    ea = address()
+    return database.getoffset(ea)
+@utils.multicase()
+def offset(func):
+    '''Return the offset of the function ``func`` from the base of the database.'''
+    ea = address(func)
     return database.getoffset(ea)
 
+@utils.multicase()
+def guess():
+    '''Return the boundaries of the function chunk for the current address.'''
+    return guess(ui.current.address())
+@utils.multicase(ea=six.integer_types)
 def guess(ea):
-    '''Determine the contiguous boundaries of the code at the given address'''
+    '''Return the boundaries of the function chunk for the address ``ea``.'''
     for left,right in chunks(ea):
         if left <= ea < right:
             return left,right
         continue
-    raise LookupError, "Unable to determine function chunk's bounds : %x"%ea
+    raise LookupError("{:s}.guess : Unable to determine function chunk's bounds : 0x{:x}".format(__name__, ea))
 
 ## properties
-def comment(fn, comment=None, repeatable=1):
-    fn = by(fn)
-    if comment is None:
-        return idaapi.get_func_cmt(fn, repeatable)
-    return idaapi.set_func_cmt(fn, comment, repeatable)
+@utils.multicase()
+def get_comment(**kwds):
+    '''Return the comment for the current function.'''
+    return get_comment(ui.current.function(), **kwds)
+@utils.multicase()
+def get_comment(func, **kwds):
+    """Return the comment for the function ``func``.
+    If the bool ``repeatable`` is specified, then return the repeatable comment.
+    """
+    fn = by(func)
+    return idaapi.get_func_cmt(fn, kwds.get('repeatable', 1))
+@utils.multicase(comment=basestring)
+def set_comment(comment, **kwds):
+    '''Set the comment for the current function to ``comment``.'''
+    return set_comment(ui.current.function(), comment, **kwds)
+@utils.multicase(comment=basestring)
+def set_comment(func, comment, **kwds):
+    """Set the comment for the function ``func`` to ``comment``.
+    If the bool ``repeatable`` is specified, then modify the repeatable comment.
+    """
+    fn = by(func)
+    return idaapi.set_func_cmt(fn, comment, kwds.get('repeatable', 1))
 
-def name(key=None, name=None):
-    '''Returns the name of the function or import identified by key.'''
-    rt,ea = __addressOfRtOrSt(ui.current.address() if key is None else key)
-    if rt:   
-        if name is None:
-            res = idaapi.get_name(-1, ea)
-            return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if res.startswith('?') else res
-        # FIXME: shuffle the new name into the prototype and then re-mangle it
-        return database.name(ea, name)
+@utils.multicase()
+def comment(**kwds):
+    '''Return the comment for the current function.'''
+    return get_comment(ui.current.function(), **kwds)
+@utils.multicase()
+def comment(func, **kwds):
+    '''Return the comment for the function ``func``.'''
+    return get_comment(func, **kwds)
+@utils.multicase(comment=basestring)
+def comment(comment, **kwds):
+    '''Set the comment for the current function to ``comment``.'''
+    return set_comment(ui.current.function(), comment, **kwds)
+@utils.multicase(comment=basestring)
+def comment(func, comment, **kwds):
+    """Set the comment for the function ``func`` to ``comment``.
+    If the bool ``repeatable`` is specified, then modify the repeatable comment.
+    """
+    return set_comment(func, comment, **kwds)
 
-    if name is None:
-        res = idaapi.get_func_name(ea)
-        if not res: res = idaapi.get_name(-1, ea)
-        if not res: res = idaapi.get_true_name(ea, ea)
+@utils.multicase()
+def get_name():
+    '''Return the name of the current function.'''
+    return get_name(ui.current.function())
+@utils.multicase()
+def get_name(func):
+    '''Return the name of the function ``func``.'''
+    rt,ea = __addressOfRtOrSt(func)
+    if rt:
+        res = idaapi.get_name(-1, ea)
         return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if res.startswith('?') else res
-        #return internal.declaration.extract.name(internal.declaration.demangle(res)) if res.startswith('?') else res
-    return idaapi.set_name(ea, name, idaapi.SN_PUBLIC)
+    res = idaapi.get_func_name(ea)
+    if not res: res = idaapi.get_name(-1, ea)
+    if not res: res = idaapi.get_true_name(ea, ea)
+    return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if res.startswith('?') else res
+    #return internal.declaration.extract.name(internal.declaration.demangle(res)) if res.startswith('?') else res
 
-def prototype(key=None):
-    '''Returns the full prototype of the function identified by fn.'''
-    rt,ea = __addressOfRtOrSt(ui.current.address() if key is None else key)
+@utils.multicase(none=types.NoneType)
+def set_name(none):
+    '''Remove the custom-name from the current function.'''
+    return set_name(ui.current.function(), none or '')
+@utils.multicase(name=basestring)
+def set_name(name):
+    '''Set the name of the current function to ``name``.'''
+    # we use ui.current.address() instead of ui.current.function()
+    # in case the user might be hovering over an import table
+    # function and wanting to rename that instead.
+    return set_name(ui.current.address(), name)
+@utils.multicase(none=types.NoneType)
+def set_name(func, none):
+    '''Remove the custom-name from the function ``func``.'''
+    return set_name(func, none or '')
+@utils.multicase(name=basestring)
+def set_name(func, name):
+    '''Set the name of the function ``func`` to ``name``.'''
+    rt,ea = __addressOfRtOrSt(func)
+    if rt:
+        # FIXME: shuffle the new name into the prototype and then re-mangle it
+        res, ok = get_name(ea), database.name(ea, name)
+    else:
+        res, ok = get_name(ea), idaapi.set_name(ea, name, idaapi.SN_PUBLIC)
+    if not ok:
+        raise AssertionError('{:s}.set_name : Unable to set function name : 0x{:x}'.format(__name__, ea))
+    return res
+
+@utils.multicase()
+def name():
+    '''Return the name of the current function.'''
+    return get_name(ui.current.function())
+@utils.multicase()
+def name(func):
+    '''Return the name of the function ``func``.'''
+    return get_name(func)
+@utils.multicase(none=types.NoneType)
+def name(none):
+    '''Remove the custom-name from the current function.'''
+    return set_name(ui.current.function(), none or '')
+@utils.multicase(string=basestring)
+def name(string, *suffix):
+    '''Set the name of the current function to ``string``.'''
+    return name(ui.current.function(), string, *suffix)
+@utils.multicase(none=types.NoneType)
+def name(func, none):
+    '''Remove the custom-name from the function ``func``.'''
+    return set_name(func, none or '')
+@utils.multicase(string=basestring)
+def name(func, string, *suffix):
+    '''Set the name of the function ``func`` to ``string``.'''
+    res = (string,) + suffix
+    res = ('{:x}'.format(_) if isinstance(_, six.integer_types) else _ for _ in res)
+    return set_name(func, '_'.join(res))
+
+@utils.multicase()
+def prototype():
+    '''Return the prototype of the current function if it has one.'''
+    return prototype(ui.current.function())
+@utils.multicase()
+def prototype(func):
+    '''Return the prototype of the function ``func`` if it has one.'''
+    rt,ea = __addressOfRtOrSt(func)
     funcname = database.name(ea)
     try:
         res = internal.declaration.function(ea)
@@ -101,68 +243,118 @@ def prototype(key=None):
         result = internal.declaration.demangle(funcname)
     return result
 
-def frame(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.frame(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
-
+@utils.multicase()
+def frame():
+    '''Return the frame of the current function.'''
+    return frame(ui.current.function())
+@utils.multicase()
+def frame(func):
+    '''Return the frame of the function ``func``.'''
+    fn = by(func)
     res = idaapi.get_frame(fn.startEA)
     if res is not None:
         return structure.instance(res.id, offset=-fn.frsize)
-    #logging.fatal('%s.frame : function does not have a frame : %x %s', __name__, fn.startEA, name(fn.startEA))
-    logging.info('%s.frame : function does not have a frame : %x %s', __name__, fn.startEA, name(fn.startEA))
+    #logging.fatal("{:s}.frame : function does not have a frame : 0x{:x} : {:s}".format(__name__, fn.startEA, name(fn.startEA)))
+    logging.info("{:s}.frame : function does not have a frame : 0x{:x} : {:s}".format(__name__, fn.startEA, name(fn.startEA)))
     return structure.instance(-1)
 
-def getRange(key=None):
-    '''tuple containing function start and end'''
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.getRange(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+# FIXME: fix the naming
+@utils.multicase()
+def range():
+    '''Return a tuple containing the bounds of the first chunk of the current function.'''
+    return range(ui.current.function())
+@utils.multicase()
+def range(func):
+    '''Return a tuple containing the bounds of the first chunk of the function ``func``.'''
+    fn = by(func)
     if fn is None:
-        raise ValueError, 'address %x is not contained in a function'% ea
+        raise ValueError("{:s}.range : address 0x{:x} is not contained in a function".format(__name__, ea))
     return fn.startEA,fn.endEA
 
-def color_write(fn, bgr):
-    fn = by(fn)
-    fn.color = 0xffffffff if bgr is None else bgr
+@utils.multicase(none=types.NoneType)
+def set_color(none):
+    '''Remove the color from the current function.'''
+    return set_color(ui.current.function(), None)
+@utils.multicase(rgb=int)
+def set_color(rgb):
+    '''Set the color of the current function to ``rgb``.'''
+    return set_color(ui.current.function(), rgb)
+@utils.multicase(none=types.NoneType)
+def set_color(func, none):
+    '''Remove the color from the function ``func``.'''
+    fn = by(func)
+    fn.color = 0xffffffff
+    return bool(idaapi.update_func(fn))
+@utils.multicase(rgb=six.integer_types)
+def set_color(func, rgb):
+    '''Set the color of the function ``func`` to ``rgb``.'''
+    r,b = (rgb&0xff0000)>>16, rgb&0x0000ff
+    fn = by(func)
+    fn.color = (b<<16)|(rgb&0x00ff00)|r
     return bool(idaapi.update_func(fn))
 
-def color_read(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.color_read(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
-    return fn.color
+@utils.multicase()
+def get_color():
+    '''Return the color of the current function.'''
+    return get_color(ui.current.function())
+@utils.multicase()
+def get_color(func):
+    '''Return the color of the function ``func``.'''
+    fn = by(func)
+    b,r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
+    return None if fn.color == 0xffffffff else (r<<16)|(fn.color&0x00ff00)|b
 
-def color(fn, *args, **kwds):
-    '''color(address, rgb?) -> fetches or stores a color to the specified function.'''
-    if len(args) == 0:
-        return color_read(fn, *args, **kwds)
-    return color_write(fn, *args, **kwds)
+@utils.multicase()
+def color():
+    '''Return the color of the current function.'''
+    return get_color(ui.current.function())
+@utils.multicase()
+def color(func):
+    '''Return the color of the function ``func``.'''
+    return get_color(func)
+@utils.multicase(none=types.NoneType)
+def color(func, none):
+    '''Remove the color for the function ``func``.'''
+    return set_color(func, None)
+@utils.multicase(rgb=six.integer_types)
+def color(func, rgb):
+    '''Set the color of the function ``func`` to ``rgb``.'''
+    return set_color(func, rgb)
+@utils.multicase(none=types.NoneType)
+def color(none):
+    '''Remove the color for the current function.'''
+    return set_color(ui.current.function(), None)
 
-def top(key=None):
-    '''Return the top of the specified function'''
-    return address(key)
+@utils.multicase()
+def top():
+    '''Return the top of the current function.'''
+    return top(ui.current.function())
+@utils.multicase()
+def top(func):
+    '''Return the top of the function ``func``.'''
+    return address(func)
 
-def bottom(key=None):
-    '''Return the addresses of instructions that are used to exit the specified function'''
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.bottom(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def bottom():
+    '''Return the exit-points of the current function.'''
+    return bottom(ui.current.function())
+@utils.multicase()
+def bottom(func):
+    '''Return the exit-points of the function ``func``.'''
+    fn = by(func)
     fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
-    fc = flow(key)
+    fc = flow(fn)
     exit_types = (fc_block_type_t.fcb_ret,fc_block_type_t.fcb_cndret,fc_block_type_t.fcb_noret,fc_block_type_t.fcb_enoret,fc_block_type_t.fcb_error)
     return tuple(database.address.prev(n.endEA) for n in fc if n.type in exit_types)
 
-def marks(key=None):
-    funcea = top(key)
+@utils.multicase()
+def marks():
+    '''Return all the marks in the current function.'''
+    return marks(ui.current.function())
+@utils.multicase()
+def marks(func):
+    '''Return all the marks in the function ``func``.'''
+    funcea = top(func)
     result = []
     for ea,comment in database.marks():
         try:
@@ -174,56 +366,100 @@ def marks(key=None):
     return result
 
 ## functions
-def add(start, end=idaapi.BADADDR):
-    '''Creates a function at the specified /start/'''
+@utils.multicase()
+def add():
+    '''Make a function at the current address.'''
+    return add(ui.current.address())
+@utils.multicase(start=six.integer_types)
+def add(start, **kwds):
+    """Make a function at the address ``start``.
+    If the address ``end`` is specified, then stop processing the function at it's address.
+    """
+    end = kwds.getattr('end', idaapi.BADADDR)
     return idaapi.add_func(start, end)
 make = add
-def remove(fn):
-    if type(fn) is idaapi.func_t:
-        return idaapi.del_func(fn.startEA)
-    return remove(by(fn))
 
-def addChunk(fn, start, end):
-    if type(fn) is idaapi.func_t:
-        return idaapi.append_func_tail(fn, start, end)
-    return addChunk(by(fn), start, end)
-def removeChunk(fn, ea):
-    if type(fn) is idaapi.func_t:
-        return idaapi.remove_func_tail(fn, ea)
-    return removeChunk(by(fn), ea)
-def assignChunk(fn, chunkea):
-    if type(fn) is idaapi.func_t:
-        idaapi.set_tail_owner(fn, chunkea)
-    return assignChunk(by(fn), chunkea)
+@utils.multicase()
+def remove():
+    '''Remove the definition of the current function from the database.'''
+    return remove(ui.current.function())
+@utils.multicase()
+def remove(func):
+    '''Remove the definition of the function ``func`` from the database.'''
+    fn = by(func)
+    return idaapi.del_func(fn.startEA)
 
+@utils.multicase(start=six.integer_types, end=six.integer_types)
+def add_chunk(start, end):
+    '''Add the chunk ``start`` to ``end`` to the current function.'''
+    return add_chunk(ui.current.function(), start, end)
+@utils.multicase(start=six.integer_types, end=six.integer_types)
+def add_chunk(func, start, end):
+    '''Add the chunk ``start`` to ``end`` to the function ``func``.'''
+    fn = by(func)
+    return idaapi.append_func_tail(fn, start, end)
+
+@utils.multicase(ea=six.integer_types)
+def remove_chunk(ea):
+    '''Remove the chunk at ``ea`` it's function.'''
+    return remove_chunk(ea, ea)
+@utils.multicase(ea=six.integer_types)
+def remove_chunk(func, ea):
+    '''Remove the chunk at ``ea`` from the function ``func``.'''
+    fn = by(func)
+    return idaapi.remove_func_tail(fn, ea)
+
+@utils.multicase(ea=six.integer_types)
+def assign_chunk(ea):
+    '''Assign the chunk at ``ea`` to the current function.'''
+    return assign_chunk(ui.current.function(), ea)
+@utils.multicase(ea=six.integer_types)
+def assign_chunk(func, ea):
+    '''Assign the chunk at ``ea`` to the function ``func``.'''
+    fn = by(func)
+    return idaapi.set_tail_owner(fn, ea)
+
+@utils.multicase()
+def within():
+    '''Return True if the current address is within a function.'''
+    return within(ui.current.address())
+@utils.multicase(ea=six.integer_types)
 def within(ea):
-    '''Returns True if address is associated with a function of some kind'''
+    '''Return True if the address ``ea`` is within a function.'''
     return idaapi.get_func(ea) is not None
 
 ## operations
-def contains(fn, ea):
-    '''Checks if ea is contained in function or in any of it's chunks'''
-    try: fn = by(fn)
+# Checks if ea is contained in function or in any of it's chunks
+@utils.multicase()
+def contains():
+    '''Returns True if the current address is within a function.'''
+    return contains(ui.current.function(), ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def contains(ea):
+    '''Returns True if the address ``ea`` is contained by the current function.'''
+    return contains(ui.current.function(), ea)
+@utils.multicase(ea=six.integer_types)
+def contains(func, ea):
+    '''Returns True if the address ``ea`` is contained by the function ``func``.'''
+    try: fn = by(func)
     except LookupError:
         return False
+    return any(start <= ea < end for start,end in chunks(fn))
 
-    for start,end in chunks(fn):
-        if start <= ea < end:
-            return True
-        continue
-    return False
-
-def arguments(key=None):
-    '''Returns the arguments as (offset,name,size)'''
+@utils.multicase()
+def arguments():
+    '''Returns the arguments for the current function.'''
+    return arguments(ui.current.function())
+@utils.multicase()
+def arguments(func):
+    """Yields the arguments for the function ``func`` in order.
+    Each result is of the format (offset into stack, name, size).
+    """
     try:
-        if key is None:
-            fn = ui.current.function()
-            if fn is None: raise LookupError, "function.arguments(%r):Not currently positioned within a function"% key
-        else:
-            fn = by(key)
+        fn = by(func)
 
     except Exception:
-        target = ui.current.address() if key is None else key
+        target = func
         database.imports.get(target)
 
         # grab from declaration
@@ -237,25 +473,26 @@ def arguments(key=None):
     # grab from structure
     fr = idaapi.get_frame(fn)
     if fr is None:  # unable to figure out arguments
-        raise LookupError, "function.arguments(%r):Unable to determine function frame"%key
+        raise LookupError("{:s}.arguments({!r}) : Unable to determine function frame.".format(__name__, func))
     if database.config.bits() != 32:
-        raise RuntimeError, "function.arguments(%r):Unable to determine arguments for %x due to %d-bit calling convention."%(key, fn.startEA, database.config.bits()) 
+        raise RuntimeError("{:s}.arguments({!r}) : Unable to determine arguments for 0x{:x} due to {:d}-bit calling convention.".format(__name__, func, fn.startEA, database.config.bits()))
 
-    base = getLvarSize(fn)+getRvarSize(fn)
-    for (off,size),(name,cmt) in structure.fragment(fr.id, base, getAvarSize(fn)):
+    base = get_vars_size(fn)+get_regs_size(fn)
+    for (off,size),(name,cmt) in structure.fragment(fr.id, base, get_args_size(fn)):
         yield off-base,name,size
     return
 
-def chunks(key=None):
-    '''enumerates all chunks in a function '''
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.chunks(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def chunks():
+    '''Return all the chunks for the current function.'''
+    return chunks(ui.current.function())
+@utils.multicase()
+def chunks(func):
+    '''Return all the chunks for the function ``func``.'''
+    fn = by(func)
     fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
     if not fci.main():
-        raise ValueError, "function.chunks(%r):Unable to create a func_tail_iterator_t"% key
+        raise ValueError("{:s}.chunks({!r}) : Unable to create a func_tail_iterator_t".format(__name__, func))
 
     while True:
         ch = fci.chunk()
@@ -263,192 +500,310 @@ def chunks(key=None):
         if not fci.next(): break
     return
 
-def blocks(key=None):
-    '''Returns each block in the specified function'''
-    for start,end in chunks(key):
+@utils.multicase()
+def blocks():
+    '''Return each basic-block for the current function.'''
+    return blocks(ui.current.function())
+@utils.multicase()
+def blocks(func):
+    '''Returns each basic-block for the function ``func``.'''
+    for start,end in chunks(func):
         for r in database.blocks(start, end):
             yield r
         continue
     return
 
 # function frame attributes
-def getFrameId(key=None):
-    '''Returns the structure id of the frame'''
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.getFrameId(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def get_frameid():
+    '''Returns the structure id for the current function's frame.'''
+    return get_frameid(ui.current.function())
+@utils.multicase()
+def get_frameid(func):
+    '''Returns the structure id for the function ``func``.'''
+    fn = by(func)
     return fn.frame
 
-def getAvarSize(key=None):
-    '''Return the number of bytes occupying argument space'''
-    max = structure.size(getFrameId(key))
-    total = getLvarSize(key) + getRvarSize(key)
+@utils.multicase()
+def get_args_size():
+    '''Returns the size of the arguments for the current function.'''
+    return get_args_size(ui.current.function())
+@utils.multicase()
+def get_args_size(func):
+    '''Returns the size of the arguments for the function ``func``.'''
+    fn = by(func)
+    max = structure.size(get_frameid(fn))
+    total = get_vars_size(fn) + get_regs_size(fn)
     return max - total
 
-def getLvarSize(key=None):
-    '''Return the number of bytes occupying local variable space'''
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.getLvarSize(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def get_vars_size():
+    '''Returns the size of the local variables for the current function.'''
+    return get_vars_size(ui.current.function())
+@utils.multicase()
+def get_vars_size(func):
+    '''Returns the size of the local variables for the function ``func``.'''
+    fn = by(func)
     return fn.frsize
 
-def getRvarSize(key=None):
-    '''Return the number of bytes occupying any saved registers'''
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.getRvarSize(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def get_regs_size():
+    '''Returns the number of bytes occupied by the saved registers in the current function.'''
+    return get_regs_size(ui.current.function())
+@utils.multicase()
+def get_regs_size(func):
+    '''Returns the number of bytes occupied by the saved registers for the function ``func``.'''
+    fn = by(func)
     return fn.frregs + 4   # +4 for the pc because ida doesn't count it
 
-def getSpDelta(ea):
-    '''Gets the stack delta at the specified address'''
-    func = byAddress(ea)
-    return idaapi.get_spd(func, ea)
+@utils.multicase()
+def get_spdelta():
+    '''Returns the stack delta for the current address within it's function.'''
+    return get_spdelta(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def get_spdelta(ea):
+    '''Returns the stack delta for the address ``ea`` within it's given function.'''
+    fn = by_address(ea)
+    return idaapi.get_spd(fn, ea)
 
 ## instruction iteration/searching
-def iterate(key=None):
-    '''Iterate through all the instructions in each chunk of the specified function'''
-    for start,end in chunks(key):
-        for ea in itertools.ifilter(database.type.isCode, database.iterate(start, end)):
+@utils.multicase()
+def iterate():
+    '''Iterate through all the instructions for each chunk in the current function.'''
+    return iterate(ui.current.function())
+@utils.multicase()
+def iterate(func):
+    '''Iterate through all the instructions for each chunk in the function ``func``.'''
+    for start,end in chunks(func):
+        for ea in itertools.ifilter(database.type.is_code, database.iterate(start, end)):
             yield ea
         continue
     return
 
-def searchinstruction(key=None, match=lambda insn: True):
-    for ea in iterate(key):
+# FIXME
+@utils.multicase(match=(types.FunctionType,types.MethodType))
+def search_instruction(match):
+    '''Search through the current function for any instruction that matches with the callable ``match``.'''
+    return search_instruction(ui.current.address(), match)
+@utils.multicase(match=(types.FunctionType,types.MethodType))
+def search_instruction(func, match):
+    """Search through the function ``func`` for any instruction that matches with the callable ``match``.
+    ``match`` is a callable that takes one argument which is the result of database.decode(ea).
+    """
+    for ea in iterate(func):
         if match( database.decode(ea) ):
             yield ea
         continue
     return
 
-def search(key, regex):
-    '''Return each instruction that matches the case-insensitive regex'''
+@utils.multicase(regex=basestring)
+def search(regex):
+    '''Return each instruction in the current function that matches the string ``regex``.'''
+    return search(ui.current.function(), regex)
+@utils.multicase(regex=basestring)
+def search(func, regex):
+    '''Return each instruction in the function ``func`` that matches the string ``regex``.'''
     pattern = re.compile(regex, re.I)
-    for ea in iterate(key):
+    for ea in iterate(func):
         insn = re.sub(' +', ' ', database.instruction(ea))
         if pattern.search(insn) is not None:
             yield ea
         continue
     return
 
-# FIXME: come up with a better name
-def stackwindow(ea, delta, direction=-1):
-    '''return the block containing all instructions within the specified stack delta'''
-    assert direction != 0, 'you make no sense with your lack of direction'
+# FIXME: rename this to something better like {next,prev}delta.
+@utils.multicase(delta=six.integer_types)
+def stack_window(delta, **kwds):
+    '''Return the boundaries of current address that fit within the specified stack ``delta``.'''
+    return stack_window(ui.current.address(), delta, **kwds)
+@utils.multicase(delta=six.integer_types)
+def stack_window(ea, delta, **kwds):
+    """Return the boundaries of the address ``ea`` that fit within the specified stack ``delta``.
+    If int ``direction`` is provided, search backwards if it's less than 0 or forwards if it's greater.
+    """
+    direction = kwds.get('direction', -1)
+    if direction == 0:
+        raise AssertionError('you make no sense with your lack of direction')
     next = database.next if direction > 0 else database.prev
 
-    sp = getSpDelta(ea)
+    sp = get_spdelta(ea)
     start = (ea,sp)
     while abs(sp - start[1]) < delta:
-        sp = getSpDelta(ea)
+        sp = get_spdelta(ea)
         ea = next(ea)
 
     if ea < start[0]:
         return ea+idaapi.decode_insn(ea),start[0]+idaapi.decode_insn(start[0])
     return (start[0],ea)
-stackWindow = stackwindow
+stackwindow = stack_window
 
 ## tagging
-try:
-    import store.query as query
-    import store
+#try:
+#    import store.query as query
+#    import store
+#
+#    def __select(func, q):
+#        for start,end in chunks(func):
+#            for ea in database.iterate(start, end):
+#                d = database.tag(ea)        # FIXME: bmn noticed .select yielding empty records
+#                if d and q.has(d):
+#                    yield ea
+#                continue
+#            continue
+#        return
+#
+#    def select(func, *q, **where):
+#        if where:
+#            print "function.select's kwd arguments have been deprecated in favor of query"
+#
+#        result = list(q)
+#        for k,v in where.iteritems():
+#            if v is None:
+#                result.append( query.hasattr(k) )
+#                continue
+#            result.append( query.hasvalue(k,v) )
+#        return __select(top(func), query._and(*result) )
+#
+#    datastore = store.ida
+#    def tag(address, *args, **kwds):
+#        '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
+#        if len(args) == 0:
+#            return datastore.address(address)
+#
+#        elif len(args) == 1:
+#            key, = args
+#            result = datastore.select(query.address(address), query.attribute(key)).values()
+#            try:
+#                result = result[0][key]
+#            except:
+#                raise KeyError(hex(address),key)
+#            return result
+#
+#        key,value = args
+#        kwds.update({key:value})
+#        return datastore.address(address).set(**kwds)
+#
+#except ImportError:
+#    def tag_read(address, key=None, repeatable=1):
+#        res = comment(by_address(address), repeatable=repeatable)
+#        dict = internal.comment.toDict(res)
+#        fname = name(by_address(address))
+#        if fname: dict['name'] = fname
+#        return dict if key is None else dict[key]
+#
+#    def tag_write(address, key, value, repeatable=1):
+#        dict = tag_read(address, repeatable=repeatable)
+#        dict[key] = value
+#        res = internal.comment.toString(dict)
+#        return comment(by_address(address), res, repeatable=repeatable)
 
-    def __select(fn, q):
-        for start,end in chunks(fn):
-            for ea in database.iterate(start, end):
-                d = database.tag(ea)        # FIXME: bmn noticed .select yielding empty records
-                if d and q.has(d):
-                    yield ea
-                continue
-            continue
-        return
+#    def tag(address, *args, **kwds):
+#        '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
+#        if len(args) < 2:
+#            return tag_read(address, *args, **kwds)
+#
+#        key,value = args
+#        return tag_write(address, key, value, **kwds)
 
-    def select(fn, *q, **where):
-        if where:
-            print "function.select's kwd arguments have been deprecated in favor of query"
 
-        result = list(q)
-        for k,v in where.iteritems():
-            if v is None:
-                result.append( query.hasattr(k) )
-                continue
-            result.append( query.hasvalue(k,v) )
-        return __select(top(fn), query._and(*result) )
+@utils.multicase()
+def tag_read():
+    '''Returns all the tags for the current function.'''
+    return tag_read(ui.current.function())
+@utils.multicase()
+def tag_read(func):
+    '''Returns all the tags defined for the function ``func``.'''
+    fn = by(func)
+    res = comment(fn, repeatable=1)
+    dict = internal.comment.toDict(res)
+    fname = name(fn)
+    if fname: dict['name'] = fname
+    return dict
+@utils.multicase(key=basestring)
+def tag_read(key):
+    '''Returns the value for the tag ``key`` for the current function.'''
+    return tag_read(ui.current.function(), key)
+@utils.multicase(key=basestring)
+def tag_read(func, key):
+    '''Returns the value for the tag ``key`` for the function ``func``.'''
+    fn = by(func)
+    res = comment(fn, repeatable=1)
+    dict = internal.comment.toDict(res)
+    fname = name(fn)
+    if fname: dict['name'] = fname
+    return dict[key]
 
-    datastore = store.ida
-    def tag(address, *args, **kwds):
-        '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
-        if len(args) == 0:
-            return datastore.address(address)
+@utils.multicase(key=basestring)
+def tag_write(key, value):
+    '''Set the tag ``key`` to ``value`` for the current function.'''
+    return tag_write(ui.current.function(), key, value)
+@utils.multicase(key=basestring, none=types.NoneType)
+def tag_write(key, none):
+    '''Removes the tag ``key`` from the current function.'''
+    return tag_write(ui.current.function(), key, None)
+@utils.multicase(key=basestring)
+def tag_write(func, key, value):
+    '''Set the tag ``key`` to ``value`` for the function ``func``.'''
+    if value is None:
+        raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
+    fn = by(func)
+    state = internal.comment.toDict(comment(fn, repeatable=1))
+    res,state[key] = state.get(key,None),value
+    comment(fn, internal.comment.toString(state), repeatable=1)
+    return res
+@utils.multicase(key=basestring, none=types.NoneType)
+def tag_write(func, key, none):
+    '''Removes the tag identified by ``key`` from the function ``func``.'''
+    fn = by(func)
+    state = internal.comment.toDict(comment(fn, repeatable=1))
+    res = state.pop(key)
+    comment(fn, internal.comment.toString(state), repeatable=1)
+    return res
 
-        elif len(args) == 1:
-            key, = args
-            result = datastore.select(query.address(address), query.attribute(key)).values()
-            try:
-                result = result[0][key]
-            except:
-                raise KeyError(hex(address),key)
-            return result
+#FIXME: define tag_erase
 
-        key,value = args
-        kwds.update({key:value})
-        return datastore.address(address).set(**kwds)
+@utils.multicase()
+def tag():
+    '''Returns all the tags defined for the current function.'''
+    return tag_read(ui.current.function())
+@utils.multicase(key=basestring)
+def tag(key):
+    '''Returns the value of the tag identified by ``key`` for the current function.'''
+    return tag_read(ui.current.function(), key)
+@utils.multicase(key=basestring)
+def tag(func, key):
+    '''Returns the value of the tag identified by ``key`` for the function ``func``.'''
+    return tag_read(func, key)
+@utils.multicase()
+def tag(func):
+    '''Returns all the tags for the function ``func``.'''
+    return tag_read(func)
+@utils.multicase(key=basestring)
+def tag(key, value):
+    '''Sets the value for the tag ``key`` to ``value`` for the current function.'''
+    return tag_write(ui.current.function(), key, value)
+@utils.multicase(key=basestring)
+def tag(func, key, value):
+    '''Sets the value for the tag ``key`` to ``value`` for the function ``func``.'''
+    return tag_write(func, key, value)
+@utils.multicase(key=basestring, none=types.NoneType)
+def tag(key, none):
+    '''Removes the tag identified by ``key`` for the current function.'''
+    return tag_write(ui.current.function(), key, None)
+@utils.multicase(key=basestring, none=types.NoneType)
+def tag(func, key, none):
+    '''Removes the tag identified by ``key`` for the function ``func``.'''
+    return tag_write(func, key, None)
 
-except ImportError:
-    def tag_read(address, key=None, repeatable=1):
-        res = comment(byAddress(address), repeatable=repeatable)
-        dict = internal.comment.toDict(res)
-        if 'name' not in dict:
-            dict['name'] = name(byAddress(address))
-        return dict if key is None else dict[key]
-
-    def tag_write(address, key, value, repeatable=1):
-        dict = tag_read(address, repeatable=repeatable)
-        dict[key] = value
-        res = internal.comment.toString(dict)
-        return comment(byAddress(address), res, repeatable=repeatable)
-
-    def tag(address, *args, **kwds):
-        '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
-        if len(args) < 2:
-            return tag_read(address, *args, **kwds)
-
-        key,value = args
-        return tag_write(address, key, value, **kwds)
-
-    def select(fn, *tags, **boolean):
-        '''Fetch a list of addresses within the function that contain the specified tags'''
-        boolean = dict((k,set(v) if type(v) is tuple else set((v,))) for k,v in boolean.viewitems())
-        if tags:
-            boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
-
-        if not boolean:
-            for ea in iterate(fn):
-                res = database.tag(ea)
-                if res: yield ea, res
-            return
-
-        for ea in iterate(fn):
-            res,d = {},database.tag(ea)
-
-            Or = boolean.get('Or', set())
-            res.update((k,v) for k,v in d.iteritems() if k in Or)
-
-            And = boolean.get('And', set())
-            if And:
-                if And.intersection(d.viewkeys()) == And:
-                    res.update((k,v) for k,v in d.iteritems() if k in And)
-                else: continue
-            if res: yield ea,res
-        return
-
-def tags(key=None):
-    funcea = top(key)    
+# FIXME: this should be handled by a reference count
+@utils.multicase()
+def tags():
+    '''Returns all the content tags for the current function.'''
+    return tags(ui.current.function())
+@utils.multicase()
+def tags(func):
+    '''Returns all the content tags for the function ``func``.'''
+    funcea = top(func)
     try:
         if funcea is None:
             raise KeyError
@@ -457,21 +812,56 @@ def tags(key=None):
         result = set()
     return result
 
-if False:
-    class instance(object):
-        # FIXME: finish this
-        class chunk_t(object):
-            pass
+# FIXME: this should be handled by a reference count
+@utils.multicase()
+def tags_clean():
+    '''Fix up all the content tags for the current function.'''
+    return tags_clean(ui.current.function())
+@utils.multicase()
+def tags_clean(func):
+    '''Fix up all the content tags for the function ``func``.'''
+    res = set()
+    for ea in func.iterate(func):
+        res.update(database.tag(ea).iterkeys())
+    database.tag_write(top(func), '__tags__', res)
 
-        @classmethod
-        def byAddress(cls, ea):
-            n = idaapi.get_fchunk_num(ea)
-            f = idaapi.getn_func(n)
-            return cls.getIndex(n)
+# FIXME: consolidate this logic into the utils module
+# FIXME: multicase this
+# FIXME: document this properly
+def select(func, *tags, **boolean):
+    '''Fetch a list of addresses within the function that contain the specified tags.'''
+    boolean = dict((k,set(v) if isinstance(v, tuple) else set((v,))) for k,v in boolean.viewitems())
+    if tags:
+        boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
+
+    if not boolean:
+        for ea in iterate(func):
+            res = database.tag(ea)
+            if res: yield ea, res
+        return
+
+    for ea in iterate(func):
+        res,d = {},database.tag(ea)
+
+        Or = boolean.get('Or', set())
+        res.update((k,v) for k,v in d.iteritems() if k in Or)
+
+        And = boolean.get('And', set())
+        if And:
+            if And.intersection(d.viewkeys()) == And:
+                res.update((k,v) for k,v in d.iteritems() if k in And)
+            else: continue
+        if res: yield ea,res
+    return
 
 ## referencing
-def down(key=None):
-    """Returns all functions that are called by specified function"""
+@utils.multicase()
+def down():
+    '''Return all the functions that are called by the current function.'''
+    return down(ui.current.function())
+@utils.multicase()
+def down(func):
+    '''Return all the functions that are called by the function ``func``.'''
     def codeRefs(func):
         resultData,resultCode = [],[]
         for ea in iterate(func):
@@ -483,18 +873,21 @@ def down(key=None):
             resultData.extend( (ea,x) for x in database.dxdown(ea) )
             resultCode.extend( (ea,x) for x in database.cxdown(ea) if func.startEA == x or not contains(func,x) )
         return resultData,resultCode
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.down(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+    fn = by(func)
     return list(set(d for x,d in codeRefs(fn)[1]))
 
-def up(key=None):
-    ea = address(key)
+@utils.multicase()
+def up():
+    '''Return all the functions that call the current function.'''
+    return up(ui.current.function())
+@utils.multicase()
+def up(func):
+    '''Return all the functions that call the function ``func``.'''
+    ea = address(func)
     return database.up(ea)
 
 ## switch stuff
+# FIXME: document this
 class switch_t(object):
     #x.defjump -- default case
     #x.jcases,x.jumps -- number of branches,address of branch data
@@ -519,7 +912,7 @@ class switch_t(object):
     @property
     def table_ea(self):
         # address of case table
-        return selfobject.lowcase
+        return self.object.lowcase
     @property
     def branch(self):
         # return the branch table as an array
@@ -528,49 +921,66 @@ class switch_t(object):
     def table(self):
         # return the index table as an array
         pass
-    def getCase(self, case):
+    def get_case(self, case):
         # return the ea of the specified case number
         raise NotImplementedError
 
-def switches(key=None):
-    for ea in iterate(key):
+@utils.multicase()
+def switches(): return switches(ui.current.function())
+@utils.multicase()
+def switches(func):
+    for ea in iterate(func):
         res = idaapi.get_switch_info_ex(ea)
         if res: yield switch_t(res)
     return
 
 ## flags
-def hasNoFrame(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.hasNoFrame(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
-    return not isThunk(fn) and (fn.flags & idaapi.FUNC_FRAME == 0)
-def hasNoReturn(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.hasNoReturn(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
-    return not isThunk(fn) and (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
-def isLibrary(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.isLibrary(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def has_noframe():
+    '''Return True if the current function has no frame.'''
+    return has_noframe(ui.current.function())
+@utils.multicase()
+def has_noframe(func):
+    '''Return True if the function ``func`` has no frame.'''
+    fn = by(func)
+    return not is_thunk(fn) and (fn.flags & idaapi.FUNC_FRAME == 0)
+
+@utils.multicase()
+def has_noreturn():
+    '''Return True if the current function does not return.'''
+    return has_noreturn(ui.current.function())
+@utils.multicase()
+def has_noreturn(func):
+    '''Return True if the function ``func`` does not return.'''
+    fn = by(func)
+    return not is_thunk(fn) and (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
+
+@utils.multicase()
+def is_library():
+    '''Return True if the current function is considered a library function.'''
+    return is_library(ui.current.function())
+@utils.multicase()
+def is_library(func):
+    '''Return True if the function ``func`` is considered a library function.'''
+    fn = by(func)
     return fn.flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
-def isThunk(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.isThunk(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+
+@utils.multicase()
+def is_thunk():
+    '''Return True if the current function is considered a code thunk.'''
+    return is_thunk(ui.current.function())
+@utils.multicase()
+def is_thunk(func):
+    '''Return True if the function ``func`` is considered a code thunk.'''
+    fn = by(func)
     return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
 
-def register(fn, *regs, **options):
+def register(func, *regs, **options):
+    """Yield all the address within the function ``func`` that touches one of the registers identified by ``regs``.
+    If the keyword ``write`` is True, then only return the address if it's writing to the register.
+    """
     write = options.get('write', 0)
-    for l,r in chunks(fn):
+    for l,r in chunks(func):
         ea = database.address.nextreg(l, *regs, write=write)
         while ea < r:
             yield ea
@@ -589,11 +999,13 @@ class fc_block_type_t:
     fcb_extern = 6  # external normal block
     fcb_error = 7   # block passes execution past the function end
 
-def flow(key=None):
-    if key is None:
-        fn = ui.current.function()
-        if fn is None: raise LookupError, "function.bottom(%r):Not currently positioned within a function"% key
-    else:
-        fn = by(key)
+@utils.multicase()
+def flow():
+    '''Return a flow chart object for the current function.'''
+    return flow(ui.current.function())
+@utils.multicase()
+def flow(func):
+    '''Return a flow chart object for the function ``func``.'''
+    fn = by(func)
     fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
     return fc

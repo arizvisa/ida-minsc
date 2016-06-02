@@ -1,12 +1,12 @@
-import idaapi
 import function as fn,database as db
+import idaapi
 
 ### c declaration stuff
 def function(ea):
     '''returns the C function declaration at given address'''
     result = idaapi.idc_get_type(ea)
     if result is None:
-        raise ValueError, 'function %x does not have a declaration'% ea
+        raise ValueError('function {:x} does not have a declaration'.format(ea))
     return result
 
 def arguments(ea):
@@ -27,7 +27,7 @@ def size(string):
         result = idaapi.idc_parse_decl(idaapi.cvar.idati, string if string.endswith(';') else string+';', 0)
 
     if result is None:
-        raise TypeError, 'Unable to parse C declaration : %r'% str
+        raise TypeError('Unable to parse C declaration : {!r}'.format(string))
     _,type,_ = result
     return idaapi.get_type_size0(idaapi.cvar.idati, type)
 
