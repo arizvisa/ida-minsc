@@ -1,5 +1,5 @@
-import database,function,instruction as ins
 import sys,logging
+import database,function,instruction as ins
 
 class remote(object):
     '''For poor folk without a dbgeng'''

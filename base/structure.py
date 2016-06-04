@@ -1,8 +1,8 @@
 import sys,logging,itertools
 import six,types,re,fnmatch
 
-import database,internal
-from internal import utils
+import database,ui
+from internal import utils,interface
 
 import idaapi
 '''
@@ -260,7 +260,7 @@ def by_name(name, **options):
     if id == idaapi.BADADDR:
         raise LookupError('{:s}.by_name : Unable to locate structure {!r}'.format(__name__, name))
     return instance(id, **options)
-byName = by_name
+byName = utils.alias(by_name)
 
 def by_index(index, **options):
     '''Return a structure by it's index.'''
@@ -268,7 +268,7 @@ def by_index(index, **options):
     if id == idaapi.BADADDR:
         raise IndexError('{:s}.by_index : Unable to locate structure #{:d}'.format(__name__, index))
     return instance(id, **options)
-byIndex = by_index
+byIndex = utils.alias(by_index)
 
 def instance(identifier, **options):
     '''Returns the structure identified by ``identifier``.'''
@@ -502,14 +502,14 @@ class members_t(object):
         if mem is None: raise KeyError('{:s}.instance({:s}).members.by_name : Unable to find member with requested name : {!r}'.format(__name__, self.owner.name, name))
         index = self.index(mem)
         return self[index]
-    byname=byName=by_name
+    byname = byName = utils.alias(by_name, 'members_t')
     def by_fullname(self, fullname):
         '''Return the member with the specified ``fullname``.'''
         mem = idaapi.get_member_by_fullname(self.owner.ptr, str(fullname))
         if mem is None: raise KeyError('{:s}.instance({:s}).members.by_fullname : Unable to find member with full name : {!r}'.format(__name__, self.owner.name, fullname))
         index = self.index(mem)
         return self[index]
-    byfullname=byFullname=by_fullname
+    byfullname = byFullname = utils.alias(by_fullname, 'members_t')
     def by_offset(self, offset):
         '''Return the member at the specified ``offset``.'''
         min,max = map(lambda sz: sz - self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr),idaapi.get_struc_last_offset(self.owner.ptr)))
@@ -522,7 +522,7 @@ class members_t(object):
 
         index = self.index(mem)
         return self[index]
-    byoffset=byOffset=by_offset
+    byoffset = byOffset = utils.alias(by_offset, 'members_t')
 
     def near_offset(self, offset):
         '''Return the member near to the specified ``offset``.'''
@@ -540,7 +540,7 @@ class members_t(object):
 
         index = self.index(mem)
         return self[index]
-    nearoffset=nearOffset=near_offset
+    nearoffset = nearOffset = utils.alias(near_offset, 'members_t')
 
     # adding/removing members
     @utils.multicase(name=basestring)
@@ -553,7 +553,7 @@ class members_t(object):
         """Add a member at ``offset`` with the given ``name`` and ``type``.
         To specify a particular size, ``type`` can be a tuple with the second element referring to the size.
         """
-        flag,typeid,nbytes = utils.typemap.resolve(type)
+        flag,typeid,nbytes = interface.typemap.resolve(type)
 
         # FIXME: handle .strtype (strings), .ec (enums), .cd (custom)
         opinfo = idaapi.opinfo_t()
@@ -601,8 +601,8 @@ class members_t(object):
         ofs = offset - self.baseoffset
         return idaapi.del_struc_members(self.owner.ptr, ofs, ofs+size)
 
-    # displaying members
     def __repr__(self):
+        '''Display all the fields within the specified structure.'''
         result = []
         for i in xrange(len(self)):
             m = self[i]
@@ -614,8 +614,8 @@ class member_t(object):
     '''Contains information about a particular member within a given structure'''
     __slots__ = ('__owner', '__index')
 
-    ## constructors
     def __init__(self, owner, index):
+        '''Create a member_t for the field in the structure ``owner`` at ``index``.'''
         self.__index = index
         self.__owner = owner
 
@@ -746,7 +746,7 @@ class member_t(object):
     @property
     def type(self):
         '''Return the member's type in it's pythonic form.'''
-        res = utils.typemap.dissolve(self.flag,self.typeid,self.size)
+        res = interface.typemap.dissolve(self.flag,self.typeid,self.size)
         if isinstance(res, structure_t):
             res = instance(res.id, offset=self.offset)
         elif isinstance(res, tuple):
@@ -760,7 +760,7 @@ class member_t(object):
     @type.setter
     def type(self, type):
         '''Set the member's type.'''
-        flag,typeid,size = utils.typemap.resolve(type)
+        flag,typeid,size = interface.typemap.resolve(type)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         return idaapi.set_member_type(self.__owner.ptr, self.offset, flag, opinfo, size)
@@ -772,8 +772,8 @@ class member_t(object):
     #        logging.fatal('structure_t({!r}).member_t[{:d}].resize : Issue resizing field {:s} : 0x{:x}'.format(self.owner.name, self.index, self.fullname, size))
     #    return res
 
-    # friendly description of a particular member
     def __repr__(self):
+        '''Display the specified member in a readable format.'''
         id,name,typ,comment = self.id,self.name,self.type,self.comment
         return '{:s} [{:d}] {:s} {:s} {{0x{:x}:+0x{:x}}}{:s}'.format(self.__class__, self.index, name, repr(typ), self.offset, self.size, ' // {:d}'.format(comment) if comment else '')
 

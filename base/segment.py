@@ -6,7 +6,7 @@ generic tools for working with segments
 import logging,os
 import six,types
 
-import internal,ui,database
+import database,ui
 from internal import utils
 
 import idaapi
@@ -30,21 +30,21 @@ def by_name(name):
     if s is None:
         raise Exception("{:s}.by_name({!r}) : Unable to locate segment".format(__name__, name))
     return s
-byName = by_name
+byName = utils.alias(by_name)
 def by_selector(selector):
     '''Return the segment associated with ``selector``.'''
     s = idaapi.get_segm_by_sel(selector)
     if s is None:
         raise Exception("{:s}.by_selector(0x{:x}) : Unable to locate segment".format(__name__, selector))
     return s
-bySelector = by_selector
+bySelector = utils.alias(by_selector)
 def by_address(ea):
     '''Return the segment that contains the specified ``ea``.'''
     s = idaapi.getseg(ea)
     if s is None:
         raise Exception("{:s}.by_address(0x{:x}) : Unable to locate segment".format(__name__, ea))
     return s
-byAddress = by_address
+byAddress = utils.alias(by_address)
 @utils.multicase(seg=idaapi.segment_t)
 def by(segment):
     '''Return a segment by it's segment_t.'''

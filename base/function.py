@@ -7,7 +7,7 @@ generic tools for working in the context of a function.
 import logging,re,itertools
 import six,types
 
-import internal,database,structure,ui
+import database,structure,ui,internal
 from internal import utils
 
 import idaapi
@@ -377,7 +377,7 @@ def add(start, **kwds):
     """
     end = kwds.getattr('end', idaapi.BADADDR)
     return idaapi.add_func(start, end)
-make = add
+make = utils.alias(add)
 
 @utils.multicase()
 def remove():
@@ -611,13 +611,13 @@ def search(func, regex):
         continue
     return
 
-# FIXME: rename this to something better like {next,prev}delta.
+# FIXME: rename this to something better or deprecate it
 @utils.multicase(delta=six.integer_types)
-def stack_window(delta, **kwds):
+def stackdelta(delta, **kwds):
     '''Return the boundaries of current address that fit within the specified stack ``delta``.'''
-    return stack_window(ui.current.address(), delta, **kwds)
+    return stackdelta(ui.current.address(), delta, **kwds)
 @utils.multicase(delta=six.integer_types)
-def stack_window(ea, delta, **kwds):
+def stackdelta(ea, delta, **kwds):
     """Return the boundaries of the address ``ea`` that fit within the specified stack ``delta``.
     If int ``direction`` is provided, search backwards if it's less than 0 or forwards if it's greater.
     """
@@ -635,7 +635,7 @@ def stack_window(ea, delta, **kwds):
     if ea < start[0]:
         return ea+idaapi.decode_insn(ea),start[0]+idaapi.decode_insn(start[0])
     return (start[0],ea)
-stackwindow = stack_window
+stackwindow = stack_window = utils.alias(stackdelta)
 
 ## tagging
 #try:
@@ -812,7 +812,7 @@ def tags(func):
         result = set()
     return result
 
-# FIXME: this should be handled by a reference count
+# FIXME: this should be automatically handled by a reference count
 @utils.multicase()
 def tags_clean():
     '''Fix up all the content tags for the current function.'''

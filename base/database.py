@@ -8,7 +8,7 @@ import __builtin__,logging,os
 import array,itertools,functools,ctypes
 import six,types
 
-import internal,function,segment,structure,ui
+import function,segment,structure,ui,internal
 import instruction as _instruction
 from internal import utils
 
@@ -18,7 +18,7 @@ import idaapi
 def h():
     '''Return the current address.'''
     return ui.current.address()
-here = h    # alias
+here = utils.alias(h)
 
 def filename():
     '''Returns the filename that the database was built from.'''
@@ -36,7 +36,7 @@ def path():
 def baseaddress():
     '''Returns the baseaddress of the database.'''
     return idaapi.get_imagebase()
-base=baseaddress
+base = utils.alias(baseaddress)
 
 def range():
     '''Return the total address range of the database.'''
@@ -119,109 +119,6 @@ def segments():
     return [segment.byName(s).startEA for s in segment.list()]
 
 @utils.multicase()
-def prev():
-    '''Returns the previously defined address from the current one.'''
-    return prev(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def prev(ea):
-    '''Returns the previous address from ``ea``.'''
-    return prev(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def prev(ea, count):
-    return address.prev(ea, count)
-
-# return the next address (instruction or data)
-@utils.multicase()
-def next():
-    '''Returns the next defined address from the current one.'''
-    return next(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def next(ea):
-    '''Returns the next address from ``ea``.'''
-    return next(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def next(ea, count):
-    return address.next(ea, count)
-
-@utils.multicase()
-def prevdata():
-    '''Returns the previous address that has data referencing it.'''
-    return prevdata(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def prevdata(ea):
-    '''Returns the previous address from ``ea`` that has data referencing it.'''
-    return prevdata(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def prevdata(ea, count): return address.prevdata(ea, count)
-
-@utils.multicase()
-def nextdata():
-    '''Returns the next address that has data referencing it.'''
-    return nextdata(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def nextdata(ea):
-    '''Returns the next address from ``ea`` that has data referencing it.'''
-    return nextdata(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def nextdata(ea, count): return address.nextdata(ea, count)
-
-@utils.multicase()
-def prevcode():
-    '''Returns the previous address that has code referencing it.'''
-    return prevcode(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def prevcode(ea):
-    '''Returns the previous address from ``ea`` that has code referencing it.'''
-    return prevcode(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def prevcode(ea, count): return address.prevcode(ea, count)
-
-@utils.multicase()
-def nextcode():
-    '''Returns the next address that has code referencing it.'''
-    return nextcode(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def nextcode(ea):
-    '''Returns the next address from ``ea`` that has code referencing it.'''
-    return nextcode(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def nextcode(ea, count): return address.nextcode(ea, count)
-
-@utils.multicase()
-def prevref():
-    '''Returns the previous address that has anything referencing it.'''
-    return prevref(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def prevref(ea):
-    '''Returns the previous address from ``ea`` that has anything referencing it.'''
-    return prevref(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def prevref(ea, count): return address.prevref(ea, count)
-
-@utils.multicase()
-def nextref():
-    '''Returns the next address that has anything referencing it.'''
-    return nextref(ui.current.address(), 1)
-@utils.multicase(ea=six.integer_types)
-def nextref(ea):
-    '''Returns the next address from ``ea`` that has anything referencing it.'''
-    return nextref(ea, 1)
-@utils.multicase(ea=six.integer_types, count=six.integer_types)
-def nextref(ea, count): return address.nextref(ea, count)
-
-# FIXME: multicase this
-def prevreg(ea, *regs, **write):
-    """Return the previous address containing an instruction that uses one of the specified registers ``regs``.
-    If the keyword ``write`` is True, then only return the address if it's writing to the register.
-    """
-    return address.prevreg(ea, *regs, **write)
-def nextreg(ea, *regs, **write):
-    """Return next address containing an instruction that uses one of the specified registers ``regs``.
-    If the keyword ``write`` is True, then only retur  the address if it's writing to the register.
-    """
-    return address.nextreg(ea, *regs, **write)
-
-@utils.multicase()
 def decode():
     '''Decode the instruction at the current address.'''
     return decode(ui.current.address())
@@ -271,7 +168,7 @@ def read_block(start, end):
     if not contains(start):
         raise ValueError("{:s}.read_block : Address 0x{:x} is not in database".format(__name__, start))
     return idaapi.get_many_bytes(start, length)
-getBlock = getblock = get_block = read_block
+getBlock = getblock = get_block = utils.alias(read_block)
 
 @utils.multicase(size=six.integer_types)
 def read(size):
@@ -345,7 +242,7 @@ class search(object):
     def by_name(ea, name):
         '''Search through the database at address ``ea`` for the symbol ``name``.'''
         return idaapi.get_name_ea(ea, name)
-    byName = by_name
+    byName = utils.alias(by_name, 'search')
 
     @utils.multicase(string=basestring)
     @staticmethod
@@ -390,9 +287,7 @@ def offset(ea):
     '''Return the address ``ea`` converted to an offset from the base-address of the database.'''
     return ea - baseaddress()
 
-getoffset = offset
-getOffset = getoffset
-o = offset
+getoffset = getOffset = o = utils.alias(offset)
 
 def coof(offset):
     '''Convert the specified ``offset`` to an address in the database.'''
@@ -403,7 +298,7 @@ def goof(offset):
     res = ui.current.address()-baseaddress()
     idaapi.jumpto(coof(offset))
     return res
-gotooffset = goof
+gotooffset = utils.alias(goof)
 
 @utils.multicase()
 def get_name():
@@ -1019,7 +914,7 @@ def selectcontents(*tags, **boolean):
             else: continue
         if res: yield ea,res
     return
-selectcontent = selectcontents
+selectcontent = utils.alias(selectcontents)
 
 ## imports
 class imports(object):
@@ -1127,8 +1022,8 @@ class imports(object):
             continue
         return
 
-getImportModules = imports.modules
-getImports = imports.list
+getImportModules = utils.alias(imports.modules, 'imports')
+getImports = utils.alias(imports.list, 'imports')
 
 ### register information
 class register(object):
@@ -1193,7 +1088,7 @@ class address(object):
     @utils.multicase()
     @classmethod
     def prev(cls):
-        '''Return the previously defined address from the current one in the database.'''
+        '''Return the previously defined address from the current one.'''
         return cls.prev(ui.current.address(), 1)
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -1209,7 +1104,7 @@ class address(object):
     @utils.multicase()
     @classmethod
     def next(cls):
-        '''Return the next defined address from the current one in the database.'''
+        '''Return the next defined address from the current one.'''
         return cls.next(ui.current.address(), 1)
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -1343,14 +1238,14 @@ class address(object):
     @utils.multicase()
     @classmethod
     def prevreg(cls, *regs, **kwds):
-        """Return the previous address containing an instruction that used one of the specified registers ``regs``."""
+        '''Return the previous address containing an instruction that uses one of the specified registers ``regs``.'''
         return cls.prevreg(ui.current.address(), *regs, **kwds)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextreg(cls, ea, *regs, **kwds):
-        """Return the next address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.
-        If the keyword ``write`` is True, then only return the address if it's writing to the register.
+        """Return next address containing an instruction that uses one of the specified registers ``regs``.
+        If the keyword ``write`` is True, then only retur  the address if it's writing to the register.
         """
         count = kwds.get('count',1)
         write = kwds.get('write',False)
@@ -1371,7 +1266,7 @@ class address(object):
     @utils.multicase()
     @classmethod
     def nextreg(cls, *regs, **kwds):
-        '''Return the next address containing an instruction that used one of the specified registers ``regs``.'''
+        '''Return the next address containing an instruction that uses one of the specified registers ``regs``.'''
         return cls.nextreg(ui.current.address(), *regs, **kwds)
 
     @utils.multicase()
@@ -1500,6 +1395,12 @@ class address(object):
 
 a = addr = address
 
+prev,next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'address')
+prevdata,nextdata = utils.alias(address.prevdata, 'address'), utils.alias(address.nextdata, 'address')
+prevcode,nextcode = utils.alias(address.prevcode, 'address'), utils.alias(address.nextcode, 'address')
+prevref,nextref = utils.alias(address.prevref, 'address'), utils.alias(address.nextref, 'address')
+prevreg,nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.nextreg, 'address')
+
 class flow(address):
     @staticmethod
     def walk(ea, next, match):
@@ -1554,11 +1455,17 @@ class flow(address):
             return None
         res = refs[0] if _instruction.is_jmp(ea) else address.next(ea)
         return cls.next(res, count-1) if count > 1 else res
-
 f = flow
 
 class type(object):
-    # FIXME: multicase this
+    @utils.multicase()
+    def __new__(cls):
+        '''Return the type at the address specified at the current address.'''
+        ea = ui.current.address()
+        module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
+        res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
+        return res
+    @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
         '''Return the type at the address specified by ``ea``.'''
         module,F = idaapi,(idaapi.getFlags(ea)&idaapi.DT_TYPE)
@@ -1936,20 +1843,20 @@ class type(object):
 t = type
 
 ## information about a given address
-is_code = type.is_code
-is_data = type.is_data
-is_unknown = type.is_unknown
-is_head = type.is_head
-is_tail = type.is_tail
-is_align = type.is_align
-getType = get_type = type
+is_code = utils.alias(type.is_code, 'type')
+is_data = utils.alias(type.is_data, 'type')
+is_unknown = utils.alias(type.is_unknown, 'type')
+is_head = utils.alias(type.is_head, 'type')
+is_tail = utils.alias(type.is_tail, 'type')
+is_align = utils.alias(type.is_align, 'type')
+getType = get_type = utils.alias(type.__new__, 'type')
 
 # arrays
-getSize = get_size = type.array.element
-getArrayLength = get_arraylength = type.array.length
+getSize = get_size = utils.alias(type.array.element, 'type.array')
+getArrayLength = get_arraylength = utils.alias(type.array.length, 'type.array')
 
 # structures
-getStructureId = get_strucid = get_structureid = type.structure.id
+getStructureId = get_strucid = get_structureid = utils.alias(type.structure.id, 'type.structure')
 
 class xref(object):
     @staticmethod
@@ -1987,7 +1894,7 @@ class xref(object):
         for addr in xref.iterate(ea, start, next):
             yield addr
         return
-    c=code
+    c = utils.alias(code, 'xref')
 
     @utils.multicase()
     @staticmethod
@@ -2016,7 +1923,7 @@ class xref(object):
         for addr in xref.iterate(ea, start, next):
             yield addr
         return
-    d=data
+    d = utils.alias(data, 'xref')
 
     @utils.multicase()
     @staticmethod
@@ -2028,7 +1935,7 @@ class xref(object):
     def data_down(ea):
         '''Return all the data xrefs that are referenced by the address ``ea``.'''
         return list(xref.data(ea, True))
-    dd = data_down
+    dd = utils.alias(data_down, 'xref')
 
     @utils.multicase()
     @staticmethod
@@ -2040,7 +1947,7 @@ class xref(object):
     def data_up(ea):
         '''Return all the data xrefs that refer to the address ``ea``.'''
         return list(xref.data(ea, False))
-    du=data_up
+    du = utils.alias(data_up, 'xref')
 
     @utils.multicase()
     @staticmethod
@@ -2054,7 +1961,7 @@ class xref(object):
         result = set(xref.code(ea, True))
         result.discard(address.next(ea))
         return list(result)
-    cd = code_down
+    cd = utils.alias(code_down, 'xref')
 
     @utils.multicase()
     @staticmethod
@@ -2068,7 +1975,7 @@ class xref(object):
         result = set(xref.code(ea, False))
         result.discard(address.prev(ea))
         return list(result)
-    cu=code_up
+    cu = utils.alias(code_up, 'xref')
 
     @utils.multicase()
     @staticmethod
@@ -2080,7 +1987,7 @@ class xref(object):
     def up(ea):
         '''Return all the references that refer to the address ``ea``.'''
         return list(set(xref.data_up(ea) + xref.code_up(ea)))
-    u = up
+    u = utils.alias(up, 'xref')
 
     # All locations that are referenced by the specified address
     @utils.multicase()
@@ -2093,7 +2000,7 @@ class xref(object):
     def down(ea):
         '''Return all the references that are referred by the address ``ea``.'''
         return list(set(xref.data_down(ea) + xref.code_down(ea)))
-    d=down
+    d = utils.alias(down, 'xref')
 
     @utils.multicase(target=six.integer_types)
     @staticmethod
@@ -2160,46 +2067,12 @@ class xref(object):
         return all((res is True) for res in (xref.del_code(ea),xref.del_data(ea)))
 x = xref
 
-drefs = xref.data
-crefs = xref.code
-
-dxdown = xref.data_down
-dxup = xref.data_up
-
-cxdown = xref.code_down
-cxup = xref.code_up
-
-up = xref.up
-down = xref.down
+drefs,crefs = utils.alias(xref.data, 'xref'), utils.alias(xref.code, 'xref')
+dxdown,dxup = utils.alias(xref.data_down, 'xref'), utils.alias(xref.data_up, 'xref')
+cxdown,cxup = utils.alias(xref.code_down, 'xref'), utils.alias(xref.code_up, 'xref')
+up,down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
 
 # create/erase a mark at the specified address in the .idb
-@utils.multicase()
-def mark():
-    '''Return the mark at the current address.'''
-    return marks.by_address(ui.current.address())
-@utils.multicase(none=types.NoneType)
-def mark(none):
-    '''Remove the mark at the current address.'''
-    return mark(ui.current.address(), None)
-@utils.multicase(ea=six.integer_types)
-def mark(ea):
-    '''Return the mark at the specified address ``ea``.'''
-    return marks.by_address(ea)
-@utils.multicase(description=basestring)
-def mark(description):
-    '''Create a mark at the current address with the specified ``description``.'''
-    return mark(ui.current.address(), description)
-@utils.multicase(ea=six.integer_types, none=types.NoneType)
-def mark(ea, none):
-    '''Erase the mark at address ``ea``.'''
-    tag(ea, 'mark', None)
-    color(ea, None)
-    return marks.remove(ea)
-@utils.multicase(ea=six.integer_types, description=basestring)
-def mark(ea, description):
-    '''Create a mark at address ``ea`` with the given ``description``.'''
-    return marks.new(ea, description)
-
 class marks(object):
     MAX_SLOT_COUNT = 0x400
     table = {}
@@ -2281,7 +2154,7 @@ class marks(object):
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.get_slotaddress(index), cls.location().markdesc(index))
         raise KeyError("{:s}.marks.by_index : Mark slot index is out of bounds : {:x}".format(__name__, ('{:d} < 0'.format(index)) if index < 0 else ('{:d} >= MAX_SLOT_COUNT'.format(index))))
-    byIndex = by_index
+    byIndex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
     @classmethod
@@ -2294,7 +2167,7 @@ class marks(object):
         '''Return the mark at the given address ``ea``.'''
         res = address.head(ea)
         return cls.by_index(cls.get_slotindex(res))
-    byAddress = by_address
+    byAddress = utils.alias(by_address, 'marks')
 
     @utils.multicase()
     @classmethod
@@ -2313,7 +2186,7 @@ class marks(object):
         if iterable.next() != ea:
             raise KeyError(ea)
         return count
-    findSlotAddress = find_slotaddress
+    findSlotAddress = utils.alias(find_slotaddress, 'marks')
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -2326,7 +2199,7 @@ class marks(object):
         '''Get the index of the mark at address ``ea``.'''
         ea = address.head(ea)
         return cls.table.get(ea, cls.find_slotaddress(ea))
-    getSlotIndex = get_slotindex
+    getSlotIndex = utils.alias(get_slotindex, 'marks')
 
     @classmethod
     def get_slotaddress(cls, slotidx):
@@ -2340,3 +2213,31 @@ class marks(object):
         ea = address.head(res)
         cls.table[ea] = slotidx
         return ea
+
+@utils.multicase()
+def mark():
+    '''Return the mark at the current address.'''
+    return marks.by_address(ui.current.address())
+@utils.multicase(none=types.NoneType)
+def mark(none):
+    '''Remove the mark at the current address.'''
+    return mark(ui.current.address(), None)
+@utils.multicase(ea=six.integer_types)
+def mark(ea):
+    '''Return the mark at the specified address ``ea``.'''
+    return marks.by_address(ea)
+@utils.multicase(description=basestring)
+def mark(description):
+    '''Create a mark at the current address with the specified ``description``.'''
+    return mark(ui.current.address(), description)
+@utils.multicase(ea=six.integer_types, none=types.NoneType)
+def mark(ea, none):
+    '''Erase the mark at address ``ea``.'''
+    tag(ea, 'mark', None)
+    color(ea, None)
+    return marks.remove(ea)
+@utils.multicase(ea=six.integer_types, description=basestring)
+def mark(ea, description):
+    '''Create a mark at address ``ea`` with the given ``description``.'''
+    return marks.new(ea, description)
+

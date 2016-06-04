@@ -16,10 +16,8 @@ for e in enum.iterate():
 enum.delete("example_enum")
 '''
 
-import internal
-from internal import utils
 import sys,six,math
-
+from internal import utils,interface as ui
 import idaapi
 
 # FIXME: complete this with more types similar to the 'structure' module.

@@ -1,7 +1,7 @@
 import logging,__builtin__
 import six,types
 
-import internal,database,function,ui
+import database,function,ui
 from internal import utils
 
 import idaapi
@@ -34,7 +34,7 @@ def mnem(): return mnem(ui.current.address())
 def mnem(ea):
     '''Returns the mnemonic of an instruction'''
     return idaapi.ua_mnem(ea) or ''
-mnemonic = mnem
+mnemonic = utils.alias(mnem)
 
 ## functions vs all operands of an insn
 @utils.multicase()
@@ -409,7 +409,7 @@ def is_importref(): return is_importref(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_importref(ea):
     return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
-isImportRef = is_importref
+isImportRef = utils.alias(is_importref)
 
 ## types of instructions
 @utils.multicase()
@@ -418,21 +418,21 @@ def is_return(): return is_return(ui.current.address())
 def is_return(ea):
     return database.is_code(ea) and idaapi.is_ret_insn(ea)
 #    return feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-isReturn = is_return
+isReturn = utils.alias(is_return)
 
 @utils.multicase()
 def is_shift(): return is_shift(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_shift(ea):
     return database.is_code(ea) and feature(ea) & idaapi.CF_SHFT == idaapi.CF_SHFT
-isShift = is_shift
+isShift = utils.alias(is_shift)
 
 @utils.multicase()
 def is_branch(): return is_branch(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_branch(ea):
     return database.is_code(ea) and isJmp(ea) or isJxx(ea) or isJmpi(ea)
-isBranch = is_branch
+isBranch = utils.alias(is_branch)
 
 @utils.multicase()
 def is_jmp(): return is_jmp(ui.current.address())
@@ -443,7 +443,7 @@ def is_jmp(ea):
     CF_JMPCOND = 0b000
     CF_CALL = 0b010
     return database.is_code(ea) and not isJmpi(ea) and (feature(ea) & MASK_BRANCH == CF_JMPIMM) and bool(database.xref.down(ea))
-isJmp = is_jmp
+isJmp = utils.alias(is_jmp)
 
 @utils.multicase()
 def is_jxx(): return is_jxx(ui.current.address())
@@ -454,14 +454,14 @@ def is_jxx(ea):
     CF_JMPCOND = 0b000
     CF_CALL = 0b010
     return database.is_code(ea) and (feature(ea) & MASK_BRANCH == CF_JMPCOND) and bool(database.xref.down(ea))
-isJxx = is_jxx
+isJxx = utils.alias(is_jxx)
 
 @utils.multicase()
 def is_jmpi(): return is_jmpi(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_jmpi(ea):
     return database.is_code(ea) and feature(ea) & idaapi.CF_JUMP == idaapi.CF_JUMP
-isJmpi = is_jmpi
+isJmpi = utils.alias(is_jmpi)
 
 @utils.multicase()
 def is_call(): return is_call(ui.current.address())
@@ -469,7 +469,7 @@ def is_call(): return is_call(ui.current.address())
 def is_call(ea):
     # return idaapi.is_call_insn(ea)
     return database.is_code(ea) and feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL
-isCall = is_call
+isCall = utils.alias(is_call)
 
 ## op_t.flags
 #OF_NO_BASE_DISP = 0x80 #  o_displ: base displacement doesn't exist meaningful only for o_displ type if set, base displacement (x.addr) doesn't exist.
@@ -560,16 +560,16 @@ class reg:
     def by_index(cls, index):
         name = idaapi.ph.regnames[index]
         return cls.by_name(name)
-    byIndex = by_index
+    byIndex = utils.alias(by_index, 'reg')
     @classmethod
     def by_indextype(cls, index, dtyp):
         name = idaapi.ph.regnames[index]
         return cls.cache[name,dtyp]
-    byIndexType= by_indextype
+    byIndexType = utils.alias(by_indextype, 'reg')
     @classmethod
     def by_name(cls, name):
         return cls.cache[name]
-    byName = by_name
+    byName = utils.alias(by_name, 'reg')
 
 class register: pass
 [ setattr(register, 'r'+_, reg.new('r'+_, 64, _)) for _ in ('ax','cx','dx','bx','sp','bp','si','di','ip') ]
@@ -697,4 +697,4 @@ class ir:
                 result.append((operation,value))
             continue
         return mnem(ea),result
-    at=instruction
+    at = utils.alias(instruction, 'ir')

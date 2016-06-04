@@ -1,4 +1,4 @@
-import internal,database,segment,function,instruction as ins
+import internal,database,segment,function,instruction as ins,structure
 import idaapi,logging
 
 ## TODO:
@@ -330,3 +330,8 @@ def sourcechain(fn, *args, **kwds):
             continue
         continue
     return [(ea,result[ea]) for ea in sorted(result.keys())]
+
+class hook(object):
+    idp = internal.interface.priorityhook(idaapi.IDP_Hooks)
+    idb = internal.interface.priorityhook(idaapi.IDB_Hooks)
+    ui =  internal.interface.priorityhook(idaapi.UI_Hooks)

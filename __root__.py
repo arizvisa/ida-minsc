@@ -6,6 +6,7 @@ import segment,database,function,instruction
 import structure,enum
 
 import database as db,function as func,instruction as ins,structure as struc
+import function as fn
 
 # default logging that displays any info
 __import__('logging').root.level = __import__('logging').INFO
@@ -22,4 +23,6 @@ h,go,goof = database.h,database.go,database.goof
 import tools,ui
 from tools import remote
 
-#import custom,app
+import custom,app
+
+ui.hook.ui.add('database_inited', __import__('internal').interface.typemap.__database_inited__, 0)

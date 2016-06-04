@@ -1,6 +1,7 @@
 # some general python modules
-import __builtin__,sys,imp,fnmatch
-import os,logging,_idaapi as idaapi,ctypes
+import sys,os,__builtin__
+import imp,fnmatch,ctypes
+import _idaapi as idaapi
 
 library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
 
@@ -10,26 +11,25 @@ sys.path.remove(root)
 
 class internal_api(object):
     """Meta-path base-class for an api that's based on files within a directory"""
-    imp = imp
+    os,imp,fnmatch = os,imp,fnmatch
     def __init__(self, directory, **attributes):
-        self.path = os.path.realpath(directory)
+        self.path = self.os.path.realpath(directory)
         [setattr(self, k, v) for k,v in attributes.iteritems()]
 
     ### Api operations
     def load_api(self, path):
-        path,filename = os.path.split(path)
-        name,_ = os.path.splitext(filename)
+        path,filename = self.os.path.split(path)
+        name,_ = self.os.path.splitext(filename)
         return self.imp.find_module(name,[ path ])
 
     def iterate_api(self, include='*.py', exclude=None):
-        import fnmatch
         result = []
-        for filename in fnmatch.filter(os.listdir(self.path), include):
-            if exclude and fnmatch.fnmatch(filename, exclude):
+        for filename in self.fnmatch.filter(self.os.listdir(self.path), include):
+            if exclude and self.fnmatch.fnmatch(filename, exclude):
                 continue
 
-            path = os.path.join(self.path, filename)
-            _,ext = os.path.splitext(filename)
+            path = self.os.path.join(self.path, filename)
+            _,ext = self.os.path.splitext(filename)
 
             left,right = (None,None) if include == '*' else (include.index('*'),len(include)-include.rindex('*'))
             modulename = filename[left:-right+1]
@@ -55,6 +55,7 @@ class internal_api(object):
         raise NotImplementedError
 
 class internal_path(internal_api):
+    sys = sys
     def __init__(self, path, **attrs):
         super(internal_path,self).__init__(path)
         attrs.setdefault('include','*.py')
@@ -66,10 +67,11 @@ class internal_path(internal_api):
     
     def load_module(self, fullname):
         self.cache = dict(self.iterate_api(**self.attrs))
-        res = sys.modules[fullname] = self.new_api(fullname, self.cache[fullname])
+        res = self.sys.modules[fullname] = self.new_api(fullname, self.cache[fullname])
         return res
 
 class internal_submodule(internal_api):
+    sys = sys
     def __init__(self, __name__, path, **attrs):
         super(internal_submodule,self).__init__(path)
         attrs.setdefault('include','*.py')
@@ -89,7 +91,7 @@ class internal_submodule(internal_api):
 
     def load_module(self, fullname):
         # FIXME: make module a lazy-loaded object for fetching module-code on-demand
-        module = sys.modules.setdefault(fullname, self.new_module(fullname))
+        module = self.sys.modules.setdefault(fullname, self.new_module(fullname))
 
         cache = dict(self.iterate_api(**self.attrs))
         module.__doc__ = '\n'.join('{:s} -- {:s}'.format(name, path) for name,path in sorted(cache.iteritems()))
