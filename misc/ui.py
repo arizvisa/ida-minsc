@@ -31,7 +31,10 @@ class current(object):
     def function(cls):
         """Current function"""
         ea = cls.address()
-        return idaapi.get_func(ea)
+        res = idaapi.get_func(ea)
+        if res is None:
+            raise StandardError("{:s}.{:s}.function : Not currently inside a function.".format(__name__, cls.__name__))
+        return res
     @classmethod
     def segment(cls):
         """Current segment"""

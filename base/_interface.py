@@ -1,6 +1,7 @@
 import operator,collections,heapq,types
 import database,structure
 import idaapi
+import logging
 
 class typemap:
     """Convert bidirectionally from a pythonic type into an IDA type"""
@@ -195,3 +196,88 @@ class priorityhook(object):
         new_method = types.MethodType(method, self.object, self.object.__class__)
         setattr(self.object, name, new_method)
         return True
+
+import sys
+class address(object):
+    @classmethod
+    def pframe(cls):
+        '''Return the python frame that was called from the main thread.'''
+        res = fr = sys._getframe()
+        while fr.f_back and fr.f_code.co_name != '<module>':
+            res = fr
+            fr = fr.f_back
+        return res
+
+    @classmethod
+    def __bounds__(cls):
+        info = idaapi.get_inf_structure()
+        return info.minEA, info.maxEA
+
+    @classmethod
+    def __within__(cls, ea):
+        l, r = cls.__bounds__()
+        return l <= ea < r
+
+    @classmethod
+    def __head1__(cls, ea):
+        # Ensures that ``ea`` is pointing to a valid address
+        entryframe = cls.pframe()
+        res = idaapi.get_item_head(ea)
+        if res != ea:
+            logging.warn("{:s} : Address {:x} not aligned to the beginning of an item. Fixing it to {:x}.".format(entryframe.f_code.co_name, ea, res))
+            ea = res
+        return ea
+    @classmethod
+    def __head2__(cls, start, end):
+        entryframe = cls.pframe()
+        res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
+        # FIXME: off-by-one here, as end can be the size of the db.
+        if res_start != start:
+            logging.warn("{:s} : Starting address of {:x} not aligned to the beginning of an item. Fixing it to {:x}.".format(entryframe.f_code.co_name, start, res_start))
+            start = res_start
+        if res_end != end:
+            logging.warn("{:s} : Ending address of {:x} not aligned to the beginning of an item. Fixing it to {:x}.".format(entryframe.f_code.co_name, end, res_end))
+            end = res_end
+        return start, end
+    @classmethod
+    def head(cls, *args):
+        if len(args) > 1:
+            return cls.__head2__(*args)
+        return cls.__head1__(*args)
+
+    @classmethod
+    def __inside1__(cls, ea):
+        # Ensures that ``ea`` is within the database and pointing at a valid address
+        res = cls.within(ea)
+        return cls.head(res)
+    @classmethod
+    def __inside2__(cls, start, end):
+        start, end = cls.within(start, end)
+        return cls.head(start, end)
+    @classmethod
+    def inside(cls, *args):
+        if len(args) > 1:
+            return cls.__inside2__(*args)
+        return cls.__inside1__(*args)
+
+    @classmethod
+    def __within1__(cls, ea):
+        # Ensures that ``ea`` is within the database
+        entryframe = cls.pframe()
+        if not cls.__within__(ea):
+            l, r = cls.__bounds__()
+            raise StandardError("{:s} : Address {:x} not within bounds of database ({:x} - {:x}.)".format(entryframe.f_code.co_name, ea, l, r))
+        return ea
+    @classmethod
+    def __within2__(cls, start, end):
+        entryframe = cls.pframe()
+        # FIXME: off-by-one here, as end can be the size of the db.
+        if any(not cls.__within__(ea) for ea in (start,end-1)):
+            l, r = cls.__bounds__()
+            raise StandardError("{:s} : Address range ({:x} - {:x}) not within bounds of database ({:x} - {:x}.)".format(entryframe.f_code.co_name, start, end, l, r))
+        return start, end
+    @classmethod
+    def within(cls, *args):
+        if len(args) > 1:
+            return cls.__within2__(*args)
+        return cls.__within1__(*args)

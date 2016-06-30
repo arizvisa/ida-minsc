@@ -35,6 +35,9 @@ def demangle(string):
     '''demangle's a symbol to a human-decipherable string'''
     return extract.declaration(string)
 
+def mangled(string):
+    return any(string.startswith(n) for n in ('?', '__'))
+
 # examples to test below code with
 "??_U@YAPAXI@Z"
 "?_BADOFF_func@std@@YAABJXZ"
@@ -63,21 +66,22 @@ class extract:
     def convention(string):
         types = set(('__cdecl', '__stdcall', '__thiscall', '__fastcall'))
         result = string.split(' ')
+        return result[0]
 
     @staticmethod
     def fullname(string):
         result = extract.declaration(string)
-        return result[:result.find('(')].split(' ',3)[-1]
+        return result[:result.find('(')].split(' ',3)[-1] if any(n in result for n in ('(',' ')) else result
 
     @staticmethod
     def name(string):
         result = extract.fullname(string)
-        return result.rsplit(':',2)[-1]
+        return result.rsplit(':',2)[-1] if ':' in result else result
 
     @staticmethod
     def arguments(string):
         result = extract.declaration(string)
-        return map(str.strip,result[result.index('(')+1:result.find(')')].split(','))
+        return map(str.strip,result[result.index('(')+1:result.find(')')].split(',')) if '(' in result else []
 
     @staticmethod
     def result(string):

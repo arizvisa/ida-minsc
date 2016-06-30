@@ -6,19 +6,13 @@ import segment,database,function,instruction
 import structure,enum
 
 import database as db,function as func,instruction as ins,structure as struc
-import function as fn
 
 # default logging that displays any info
 __import__('logging').root.level = __import__('logging').INFO
 
 # shortcuts
-def top(ea=None):
-    return function.top(ea is not None and ea or database.h())
-
-def hex(i):
-    return '%x'% i
-
-h,go,goof = database.h,database.go,database.goof
+h,top,go,goof = database.h,func.top,database.go,database.goof
+hex = lambda n: '{:x}'.format(n)
 
 import tools,ui
 from tools import remote

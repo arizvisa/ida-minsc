@@ -144,14 +144,14 @@ try:
     try:
         # execute user's .pythonrc and .idapythonrc in one go
         if __import__('user').home:
-            execfile(__import__('os').path.join(__import__('user').home, 'idapythonrc.py'))
+            execfile(__import__('os').path.join(__import__('user').home, '.idapythonrc.py'))
 
     except ImportError:
         # otherwise try to figure it out without tainting the namespace
         if __import__('os').getenv('HOME'):
-            execfile(__import__('os').path.join(__import__('os').getenv('HOME'), 'idapythonrc.py'))
+            execfile(__import__('os').path.join(__import__('os').getenv('HOME'), '.idapythonrc.py'))
         elif __import__('os').getenv('USERPROFILE'):
-            execfile(__import__('os').path.join(__import__('os').getenv('USERPROFILE'), 'idapythonrc.py'))
+            execfile(__import__('os').path.join(__import__('os').getenv('USERPROFILE'), '.idapythonrc.py'))
         else:
             raise OSError('Unable to figure out home directory')
         pass

@@ -7,7 +7,7 @@ import logging,os
 import six,types
 
 import database,ui
-from internal import utils
+from internal import utils,interface
 
 import idaapi
 
@@ -40,7 +40,7 @@ def by_selector(selector):
 bySelector = utils.alias(by_selector)
 def by_address(ea):
     '''Return the segment that contains the specified ``ea``.'''
-    s = idaapi.getseg(ea)
+    s = idaapi.getseg(interface.address.within(ea))
     if s is None:
         raise Exception("{:s}.by_address(0x{:x}) : Unable to locate segment".format(__name__, ea))
     return s

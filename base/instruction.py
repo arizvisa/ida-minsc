@@ -2,7 +2,7 @@ import logging,__builtin__
 import six,types
 
 import database,function,ui
-from internal import utils
+from internal import utils,interface
 
 import idaapi
 
@@ -11,6 +11,7 @@ import idaapi
 def at(): return at(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def at(ea):
+    ea = interface.address.inside(ea)
     if not database.is_code(ea):
         raise TypeError('{:s}.at : Unable to decode a non-instruction at address : 0x{:x}'.format(__name__, ea))
     length = idaapi.decode_insn(ea)
@@ -33,6 +34,7 @@ def mnem(): return mnem(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def mnem(ea):
     '''Returns the mnemonic of an instruction'''
+    ea = interface.address.inside(ea)
     return idaapi.ua_mnem(ea) or ''
 mnemonic = utils.alias(mnem)
 

@@ -8,7 +8,7 @@ import logging,re,itertools
 import six,types
 
 import database,structure,ui,internal
-from internal import utils
+from internal import utils,interface
 
 import idaapi
 
@@ -32,6 +32,7 @@ def by_address():
 @utils.multicase(ea=six.integer_types)
 def by_address(ea):
     '''Return the function containing the address ``ea``.'''
+    ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
         raise LookupError("{:s}.by_address(0x{:x}) : unable to locate function".format(__name__,ea))
@@ -103,6 +104,7 @@ def guess():
 @utils.multicase(ea=six.integer_types)
 def guess(ea):
     '''Return the boundaries of the function chunk for the address ``ea``.'''
+    ea = interface.address.within(ea)
     for left,right in chunks(ea):
         if left <= ea < right:
             return left,right
@@ -162,12 +164,13 @@ def get_name(func):
     rt,ea = __addressOfRtOrSt(func)
     if rt:
         res = idaapi.get_name(-1, ea)
-        return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if res.startswith('?') else res
+        return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     res = idaapi.get_func_name(ea)
     if not res: res = idaapi.get_name(-1, ea)
     if not res: res = idaapi.get_true_name(ea, ea)
-    return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if res.startswith('?') else res
-    #return internal.declaration.extract.name(internal.declaration.demangle(res)) if res.startswith('?') else res
+    return res
+    #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
+    #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
 
 @utils.multicase(none=types.NoneType)
 def set_name(none):
@@ -239,7 +242,7 @@ def prototype(func):
         result = res[:idx] + ' ' + funcname + res[idx:]
 
     except ValueError:
-        if not funcname.startswith('?'): raise
+        if not internal.declaration.mangled(funcname): raise
         result = internal.declaration.demangle(funcname)
     return result
 
@@ -375,6 +378,7 @@ def add(start, **kwds):
     """Make a function at the address ``start``.
     If the address ``end`` is specified, then stop processing the function at it's address.
     """
+    start = interface.address.inside(start)
     end = kwds.getattr('end', idaapi.BADADDR)
     return idaapi.add_func(start, end)
 make = utils.alias(add)
@@ -397,6 +401,7 @@ def add_chunk(start, end):
 def add_chunk(func, start, end):
     '''Add the chunk ``start`` to ``end`` to the function ``func``.'''
     fn = by(func)
+    start, end = interface.address.inside(start, end)
     return idaapi.append_func_tail(fn, start, end)
 
 @utils.multicase(ea=six.integer_types)
@@ -406,7 +411,7 @@ def remove_chunk(ea):
 @utils.multicase(ea=six.integer_types)
 def remove_chunk(func, ea):
     '''Remove the chunk at ``ea`` from the function ``func``.'''
-    fn = by(func)
+    fn, ea = by(func), interface.address.within(ea)
     return idaapi.remove_func_tail(fn, ea)
 
 @utils.multicase(ea=six.integer_types)
@@ -416,7 +421,7 @@ def assign_chunk(ea):
 @utils.multicase(ea=six.integer_types)
 def assign_chunk(func, ea):
     '''Assign the chunk at ``ea`` to the function ``func``.'''
-    fn = by(func)
+    fn, ea = by(func), interface.address.within(ea)
     return idaapi.set_tail_owner(fn, ea)
 
 @utils.multicase()
@@ -426,6 +431,7 @@ def within():
 @utils.multicase(ea=six.integer_types)
 def within(ea):
     '''Return True if the address ``ea`` is within a function.'''
+    ea = interface.address.within(ea)
     return idaapi.get_func(ea) is not None
 
 ## operations
@@ -444,6 +450,7 @@ def contains(func, ea):
     try: fn = by(func)
     except LookupError:
         return False
+    ea = interface.address.within(ea)
     return any(start <= ea < end for start,end in chunks(fn))
 
 @utils.multicase()
@@ -563,7 +570,7 @@ def get_spdelta():
 @utils.multicase(ea=six.integer_types)
 def get_spdelta(ea):
     '''Returns the stack delta for the address ``ea`` within it's given function.'''
-    fn = by_address(ea)
+    fn, ea = by_address(ea), interface.address.inside(ea)
     return idaapi.get_spd(fn, ea)
 
 ## instruction iteration/searching
@@ -626,7 +633,7 @@ def stackdelta(ea, delta, **kwds):
         raise AssertionError('you make no sense with your lack of direction')
     next = database.next if direction > 0 else database.prev
 
-    sp = get_spdelta(ea)
+    sp, ea = get_spdelta(ea), interface.address.inside(ea)
     start = (ea,sp)
     while abs(sp - start[1]) < delta:
         sp = get_spdelta(ea)
@@ -771,6 +778,10 @@ def tag(key):
     '''Returns the value of the tag identified by ``key`` for the current function.'''
     return tag_read(ui.current.function(), key)
 @utils.multicase(key=basestring)
+def tag(key, value):
+    '''Sets the value for the tag ``key`` to ``value`` for the current function.'''
+    return tag_write(ui.current.function(), key, value)
+@utils.multicase(key=basestring)
 def tag(func, key):
     '''Returns the value of the tag identified by ``key`` for the function ``func``.'''
     return tag_read(func, key)
@@ -778,10 +789,6 @@ def tag(func, key):
 def tag(func):
     '''Returns all the tags for the function ``func``.'''
     return tag_read(func)
-@utils.multicase(key=basestring)
-def tag(key, value):
-    '''Sets the value for the tag ``key`` to ``value`` for the current function.'''
-    return tag_write(ui.current.function(), key, value)
 @utils.multicase(key=basestring)
 def tag(func, key, value):
     '''Sets the value for the tag ``key`` to ``value`` for the function ``func``.'''
@@ -879,11 +886,15 @@ def down(func):
 @utils.multicase()
 def up():
     '''Return all the functions that call the current function.'''
-    return up(ui.current.function())
+    return up(ui.current.address())
 @utils.multicase()
 def up(func):
     '''Return all the functions that call the function ``func``.'''
-    ea = address(func)
+    rt, ea = __addressOfRtOrSt(func)
+    # runtime
+    if rt:
+        return database.up(ea)
+    # regular
     return database.up(ea)
 
 ## switch stuff
