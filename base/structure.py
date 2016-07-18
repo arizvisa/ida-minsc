@@ -132,14 +132,17 @@ def search(**type):
             else:
                 raise LookupError
     except:
-        raise LookupError('{:s}.search : Unable to determine search type : {!r}'.format(__name__, args or type))
+        raise LookupError('{:s}.search : Unable to determine search type : ({:s})'.format(__name__, ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())))
 
     res = filter(match,iterate())
     if len(res) > 1:
-        logging.warn('{:s}.search({:s}) : Found {:d} results, returning the first one.'.format(__name__, args and 'match' or type.iterkeys().next(), len(res)))
+        logging.warn('{:s}.search({:s}) : Found {:d} results, returning the first one.'.format(__name__, ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems()), len(res)))
         fn = lambda x: sys.stdout.write(x + "\n")
         map(logging.info, (('[{:d}] {:s}'.format(idaapi.get_struc_idx(x.id), x.name)) for i,x in enumerate(res)))
-    return itertools.ifilter(match, iterate()).next()
+    res = next(itertools.ifilter(match, iterate()), None)
+    if res is None:
+        raise LookupError('{:s}.search({:s}) : Found 0 results.'.format(__name__, ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())))
+    return res
 
 def iterate():
     '''Iterate through all structures defined in the database.'''

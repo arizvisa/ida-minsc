@@ -209,13 +209,14 @@ def write(ea, data, **kwds):
     original = kwds.get('original', False)
     return idaapi.patch_many_bytes(ea, data) if original else idaapi.put_many_bytes(ea, data)
 
-def iterate(start, end):
+def iterate(start, end, step=None):
     '''Iterate through all the instruction and data boundaries from address ``start`` to ``end``.'''
-    start, end = interface.address.head(start), address.tail(end)+1
-    while start < end:
+    step = step or (address.prev if start > end else address.next)
+    start, end = __builtin__.map(interface.address.head, (start, end))
+    while start != end:
         yield start
-        start = next(start)
-    return
+        start = step(start)
+    yield end
 
 ## searching by stuff
 # FIXME: bounds-check all these addresses
@@ -351,8 +352,9 @@ def set_name(string):
     '''Rename the current address to ``string``.'''
     return set_name(ui.current.address(), string)
 @utils.multicase(ea=six.integer_types, string=basestring)
-def set_name(ea, string):
+def set_name(ea, string, **options):
     '''Rename the address specified by ``ea`` to ``string``.'''
+
     ea = interface.address.inside(ea)
     if idaapi.SN_NOCHECK != 0:
         raise AssertionError( '{:s}.name : idaapi.SN_NOCHECK != 0'.format(__name__))
@@ -368,6 +370,10 @@ def set_name(ea, string):
     flags |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
     flags |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
     flags |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+
+##    If the bool ``add_to_list`` is False, then ensure that this name is not added to the name list.
+#    if 'add_to_list' in options:
+#        flags = (flags & ~idaapi.SN_NOLIST) if options['add_to_list'] else (flags | idaapi.SN_NOLIST)
 
     try:
         function.top(ea)
@@ -671,7 +677,7 @@ def make_entry(ea, name, ordinal):
 #    ## tag data storage hack using magically syntaxed comments
 #    def tag_read(ea, key=None, repeatable=0):
 #        res = idaapi.get_cmt(ea, int(bool(repeatable)))
-#        dict = internal.comment.toDict(res)
+#        dict = internal.comment.decode(res)
 #        name = idaapi.get_true_name(ea)
 #        if name: dict.setdefault('name', name)
 #        return dict if key is None else dict[key]
@@ -679,7 +685,7 @@ def make_entry(ea, name, ordinal):
 #    def tag_write(ea, key, value, repeatable=0):
 #        dict = tag_read(ea, repeatable=repeatable)
 #        dict[key] = value
-#        res = internal.comment.toString(dict)
+#        res = internal.comment.encode(dict)
 #        return idaapi.set_cmt(ea, res, int(bool(repeatable)))
 #
 #    def tag(ea, *args, **kwds):
@@ -777,30 +783,51 @@ def make_entry(ea, name, ordinal):
 
 def tags():
     '''Returns all the tags used outside a function.'''
-    ea = top()
-    try:
-        result = eval(tag_read(ea, '__tags__'))
-    except KeyError:
-        result = set()
-    return result
+    return internal.comment.tag.get(idaapi.BADADDR)
 
 @utils.multicase(ea=six.integer_types, key=basestring)
 def tag_read(ea, key):
     '''Returns the tag identified by ``key`` from address ``ea``.'''
     ea = interface.address.inside(ea)
-    res = comment(ea, repeatable=0)
-    dict = internal.comment.toDict(res)
+
+    # if not within a function, then use a repeatable comment
+    # otherwise, use a non-repeatable one
+    try: func = function.by_address(ea)
+    except: func = None
+    repeatable = False if func else True
+
+    # fetch the tags at the given address
+    res = comment(ea, repeatable=repeatable)
+    dict = internal.comment.decode(res)
+
+    # modify the decoded dictionary to include the current name if it's there
     aname = idaapi.get_true_name(ea)
-    if aname: dict['name'] = aname
+    if (func and func.startEA != ea and aname) or (not func and aname):
+        dict['name'] = aname
+
+    # now return the key that the user wants
     return dict[key]
 @utils.multicase(ea=six.integer_types)
 def tag_read(ea):
     '''Returns all the tags defined at address ``ea``.'''
     ea = interface.address.inside(ea)
-    res = comment(ea, repeatable=0)
-    dict = internal.comment.toDict(res)
+
+    # if not within a function, then use a repeatable comment
+    # otherwise, use a non-repeatable one
+    try: func = function.by_address(ea)
+    except: func = None
+    repeatable = False if func else True
+
+    # fetch the tags at the given address
+    res = comment(ea, repeatable=repeatable)
+    dict = internal.comment.decode(res)
+
+    # modify the decoded dictionary to include the current name if it's there
     aname = idaapi.get_true_name(ea)
-    if aname: dict['name'] = aname
+
+    # now return what the user cares about
+    if (func and func.startEA != ea and aname) or (not func and aname):
+        dict['name'] = aname
     return dict
 @utils.multicase()
 def tag_read():
@@ -825,33 +852,43 @@ def tag_write(ea, key, value):
     if value is None:
         raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
 
-    ea = interface.address.inside(ea)
-    state = internal.comment.toDict(comment(ea, repeatable=0))
-    res,state[key] = state.get(key,None),value
-
+    # if not within a function, then use a repeatable comment
+    # otherwise, use a non-repeatable one
     try: func = function.by_address(ea)
-    except: comment(top(), internal.comment.toString({'__tags__':tags().union((key,))}), repeatable=0)
-    else: comment(func.startEA, internal.comment.toString({'__tags__':function.tags(func.startEA).union((key,))}), repeatable=0)
+    except: func = None
+    repeatable = False if func else True
 
-    # FIXME: keep a reference count of the tags used inside the function
-    #if func is not None:
-    #    funcstate = internal.comment.toDict(comment(func.startEA, repeatable=0))
-    #    count = funcstate.setdefault(key, 0)
-    #    if value is None:
-    #        count = 0 if count > 0 else (count-1)
-    #        if count == 0: del(funcstate[key])
-    #    else:
-    #        count += 1; funcstate[key] = count
-    #    comment(func.startEA, internal.comment.toString({'__tags__':funcstate}), repeatable=0)
-    comment(ea, internal.comment.toString(state), repeatable=0)
+    # grab the current value
+    ea = interface.address.inside(ea)
+    state = internal.comment.decode(comment(ea, repeatable=repeatable))
+
+    # update the tag's reference
+    if key not in state:
+        internal.comment.tag.inc(ea, key)
+
+    # now we can actually update the tag
+    res,state[key] = state.get(key,None),value
+    comment(ea, internal.comment.encode(state), repeatable=repeatable)
     return res
 @utils.multicase(ea=six.integer_types, key=basestring, none=types.NoneType)
 def tag_write(ea, key, none):
     '''Removes the tag specified by ``key`` from the address ``ea``.'''
     ea = interface.address.inside(ea)
-    state = internal.comment.toDict(comment(ea, repeatable=0))
+
+    # if not within a function, then fetch the repeatable comment
+    # otherwise update the non-repeatable one
+    try: func = function.by_address(ea)
+    except: func = None
+    repeatable = False if func else True
+
+    # fetch the dict, remove the key, then write it back.
+    state = internal.comment.decode(comment(ea, repeatable=repeatable))
     res = state.pop(key)
-    comment(ea, internal.comment.toString(state), repeatable=0)
+    comment(ea, internal.comment.encode(state), repeatable=repeatable)
+
+    # delete it's reference
+    internal.comment.tag.dec(ea, key)
+
     return res
 
 #FIXME: define tag_erase
@@ -890,17 +927,20 @@ def tag(ea, key, none):
     return tag_write(ea, key, None)
 
 # FIXME: consolidate the boolean querying logic into the utils module
-# FIXME: multicase this
 # FIXME: document this properly
-def select(*tags, **boolean):
+@utils.multicase(tag=basestring)
+def select(tag, *tags, **boolean):
+    tags = (tag,) + tags
+    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    return select(**boolean)
+@utils.multicase()
+def select(**boolean):
     '''Fetch all the functions containing the specified tags within it's declaration'''
-    boolean = dict((k,set(v) if v.__class__ is tuple else set((v,))) for k,v in boolean.viewitems())
-    if tags:
-        boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
+    boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
         for ea in functions():
-            res = tag(ea)
+            res = set(function.tag(ea).viewkeys())
             if res: yield ea, res
         return
 
@@ -919,13 +959,16 @@ def select(*tags, **boolean):
     return
 
 # FIXME: consolidate the boolean querying logic into the utils module
-# FIXME: multicase this
 # FIXME: document this properly
-def selectcontents(*tags, **boolean):
+@utils.multicase(tag=basestring)
+def selectcontents(tag, *tags, **boolean):
+    tags = (tag,) + tags
+    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    return selectcontents(**boolean)
+@utils.multicase()
+def selectcontents(**boolean):
     '''Fetch all the functions containing the specified tags within it's contents'''
-    boolean = dict((k,set(v) if v.__class__ is tuple else set((v,))) for k,v in boolean.viewitems())
-    if tags:
-        boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
+    boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
         for ea in functions():
@@ -1282,14 +1325,14 @@ class address(object):
         """
         regs = (reg,) + regs
         count = kwds.get('count',1)
-        write = kwds.get('write',False)
+        write = (not kwds.get('read',None)) if 'read' in kwds else kwds.get('write',None)
         def uses_register(ea, regs):
             res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
             match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).related,itertools.imap(_instruction.reg.by_name,regs))
             for t,p,st in res:
-                if t == 'opt_reg' and any(match(p,regs)) and ('w' in st if write else True):
+                if t == 'opt_reg' and any(match(p,regs)) and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
                     return True
-                if t == 'opt_phrase' and not write:
+                if t == 'opt_phrase' and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
                     _,(base,index,_) = p
                     if (base and any(match(base,regs))) or (index and any(match(index,regs))):
                         return True
@@ -1311,14 +1354,14 @@ class address(object):
         """
         regs = (reg,) + regs
         count = kwds.get('count',1)
-        write = kwds.get('write',False)
+        write = (not kwds.get('read',None)) if 'read' in kwds else kwds.get('write',None)
         def uses_register(ea, regs):
             res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
             match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).related,itertools.imap(_instruction.reg.by_name,regs))
             for t,p,st in res:
-                if t == 'opt_reg' and any(match(p,regs)) and ('w' in st if write else True):
+                if t == 'opt_reg' and any(match(p,regs)) and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
                     return True
-                if t == 'opt_phrase' and not write:
+                if t == 'opt_phrase' and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
                     _,(base,index,_) = p
                     if (base and any(match(base,regs))) or (index and any(match(index,regs))):
                         return True
@@ -1434,7 +1477,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevtag(cls, ea, count, **tagname):
-        tagname = tagname.get('tag', None)
+        tagname = tagname.get('tagname', None)
         res = cls.walk(cls.prev(ea), cls.prev, lambda n: not (type.has_comment(n) if tagname is None else tagname in tag(n)))
         return cls.prevbranch(res, count-1) if count > 1 else res
 
@@ -2325,4 +2368,3 @@ def mark(ea, none):
 def mark(ea, description):
     '''Create a mark at address ``ea`` with the given ``description``.'''
     return marks.new(ea, description)
-

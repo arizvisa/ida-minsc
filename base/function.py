@@ -35,7 +35,7 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
-        raise LookupError("{:s}.by_address(0x{:x}) : unable to locate function".format(__name__,ea))
+        raise LookupError("{:s}.by_address(0x{:x}) : Unable to locate function".format(__name__,ea))
     return res
 byAddress = by_address
 
@@ -43,7 +43,7 @@ def by_name(name):
     '''Return the function with the name ``name``.'''
     ea = idaapi.get_name_ea(-1, name)
     if ea == idaapi.BADADDR:
-        raise LookupError("{:s}.by_name({!r}) : unable to locate function".format(__name__, name))
+        raise LookupError("{:s}.by_name({!r}) : Unable to locate function".format(__name__, name))
     return idaapi.get_func(ea)
 byName = by_name
 
@@ -490,6 +490,18 @@ def arguments(func):
     return
 
 @utils.multicase()
+def chunk():
+    return chunk(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def chunk(ea):
+    fn = by_address(ea)
+    for l, r in chunks(fn):
+        if l <= ea < r:
+            return l, r
+        continue
+    raise LookupError("{:s}.chunk(0x{:x}) : Unable to locate function chunk for function. : 0x{:x}".format(__name__, ea, address(func)))
+
+@utils.multicase()
 def chunks():
     '''Return all the chunks for the current function.'''
     return chunks(ui.current.function())
@@ -572,6 +584,7 @@ def get_spdelta(ea):
     '''Returns the stack delta for the address ``ea`` within it's given function.'''
     fn, ea = by_address(ea), interface.address.inside(ea)
     return idaapi.get_spd(fn, ea)
+delta = get_sp = spdelta = utils.alias(get_spdelta)
 
 ## instruction iteration/searching
 @utils.multicase()
@@ -693,7 +706,7 @@ stackwindow = stack_window = utils.alias(stackdelta)
 #except ImportError:
 #    def tag_read(address, key=None, repeatable=1):
 #        res = comment(by_address(address), repeatable=repeatable)
-#        dict = internal.comment.toDict(res)
+#        dict = internal.comment.decode(res)
 #        fname = name(by_address(address))
 #        if fname: dict['name'] = fname
 #        return dict if key is None else dict[key]
@@ -701,7 +714,7 @@ stackwindow = stack_window = utils.alias(stackdelta)
 #    def tag_write(address, key, value, repeatable=1):
 #        dict = tag_read(address, repeatable=repeatable)
 #        dict[key] = value
-#        res = internal.comment.toString(dict)
+#        res = internal.comment.encode(dict)
 #        return comment(by_address(address), res, repeatable=repeatable)
 
 #    def tag(address, *args, **kwds):
@@ -722,7 +735,7 @@ def tag_read(func):
     '''Returns all the tags defined for the function ``func``.'''
     fn = by(func)
     res = comment(fn, repeatable=1)
-    dict = internal.comment.toDict(res)
+    dict = internal.comment.decode(res)
     fname = name(fn)
     if fname: dict['name'] = fname
     return dict
@@ -735,7 +748,7 @@ def tag_read(func, key):
     '''Returns the value for the tag ``key`` for the function ``func``.'''
     fn = by(func)
     res = comment(fn, repeatable=1)
-    dict = internal.comment.toDict(res)
+    dict = internal.comment.decode(res)
     fname = name(fn)
     if fname: dict['name'] = fname
     return dict[key]
@@ -754,17 +767,17 @@ def tag_write(func, key, value):
     if value is None:
         raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
     fn = by(func)
-    state = internal.comment.toDict(comment(fn, repeatable=1))
+    state = internal.comment.decode(comment(fn, repeatable=1))
     res,state[key] = state.get(key,None),value
-    comment(fn, internal.comment.toString(state), repeatable=1)
+    comment(fn, internal.comment.encode(state), repeatable=1)
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag_write(func, key, none):
     '''Removes the tag identified by ``key`` from the function ``func``.'''
     fn = by(func)
-    state = internal.comment.toDict(comment(fn, repeatable=1))
+    state = internal.comment.decode(comment(fn, repeatable=1))
     res = state.pop(key)
-    comment(fn, internal.comment.toString(state), repeatable=1)
+    comment(fn, internal.comment.encode(state), repeatable=1)
     return res
 
 #FIXME: define tag_erase
@@ -810,39 +823,39 @@ def tags():
 @utils.multicase()
 def tags(func):
     '''Returns all the content tags for the function ``func``.'''
-    funcea = top(func)
-    try:
-        if funcea is None:
-            raise KeyError
-        result = eval(database.tag_read(funcea, '__tags__'))
-    except KeyError:
-        result = set()
-    return result
-
-# FIXME: this should be automatically handled by a reference count
-@utils.multicase()
-def tags_clean():
-    '''Fix up all the content tags for the current function.'''
-    return tags_clean(ui.current.function())
-@utils.multicase()
-def tags_clean(func):
-    '''Fix up all the content tags for the function ``func``.'''
-    res = set()
-    for ea in func.iterate(func):
-        res.update(database.tag(ea).iterkeys())
-    database.tag_write(top(func), '__tags__', res)
+    ea = by(func).startEA
+    return internal.comment.tag.get(ea)
 
 # FIXME: consolidate this logic into the utils module
-# FIXME: multicase this
 # FIXME: document this properly
-def select(func, *tags, **boolean):
+@utils.multicase(tag=basestring)
+def select(**boolean):
+    return select(ui.current.function(), **boolean)
+@utils.multicase(tag=basestring)
+def select(tag, *tags, **boolean):
+    tags = (tag,) + tags
+    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    return select(ui.current.function(), **boolean)
+@utils.multicase(tag=basestring)
+def select(func, tag, *tags, **boolean):
+    tags = (tag,) + tags
+    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    return select(func, **boolean)
+@utils.multicase()
+def select(func, **boolean):
     '''Fetch a list of addresses within the function that contain the specified tags.'''
-    boolean = dict((k,set(v) if isinstance(v, tuple) else set((v,))) for k,v in boolean.viewitems())
-    if tags:
-        boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
+    boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
-        for ea in iterate(func):
+        iterable = iterate(func)
+
+        ea = next(iterable)
+        res = database.tag(ea)
+        [ res.pop(getattr(internal.comment.tag, n), None) for n in ('__tags__','__address__') ]
+        res.pop('name', None)
+        if res: yield ea, res
+
+        for ea in iterable:
             res = database.tag(ea)
             if res: yield ea, res
         return
@@ -986,17 +999,28 @@ def is_thunk(func):
     fn = by(func)
     return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
 
-def register(func, *regs, **options):
-    """Yield all the address within the function ``func`` that touches one of the registers identified by ``regs``.
+@utils.multicase(reg=basestring)
+def register(reg, *regs, **options):
+    """Yield all the addresses within the current function that touches one of the registers identified by ``regs``.
+    """
+    return register(ui.current.function(), reg, *regs, **options)
+@utils.multicase(reg=basestring)
+def register(func, reg, *regs, **options):
+    """Yield all the addresses within the function ``func`` that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the address if it's writing to the register.
     """
-    write = options.get('write', 0)
+    regs = (reg,) + regs
     for l,r in chunks(func):
-        ea = database.address.nextreg(l, *regs, write=write)
-        while ea < r:
-            yield ea
-            ea = database.address.nextreg(database.address.next(ea), *regs, write=write)
-        continue
+        # FIXME: implement this without using database.address.nextreg so we
+        #        don't have to play around with catching exceptions
+        try:
+            ea = database.address.nextreg(l, *regs, **options)
+        except TypeError: continue
+        try:
+            while ea < r:
+                yield ea
+                ea = database.address.nextreg(database.address.next(ea), *regs, **options)
+        except TypeError: pass
     return
 
 ## internal enumerations that idapython missed
