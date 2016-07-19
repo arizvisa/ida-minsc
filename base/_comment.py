@@ -333,6 +333,14 @@ class tag(object):
         res = cls._read(ea)
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
+        # backwards compatibility
+        if isinstance(state, set):
+            logging.warn("internal.{:s}.inc : Using deprecated tag cache syntax : {!r}".format( '.'.join((__name__,cls.__name__)), state))
+            state.add(name)
+            res[cls.__tags__] = state
+            cls._write(ea, res)
+            return 1
+
         # increase key reference count
         refs = state.get(name, 0) + 1
         state[name] = refs
@@ -353,8 +361,17 @@ class tag(object):
     def dec(cls, address, name):
         ea = cls._top(address)
 
+        # grab result
         res = cls._read(ea)
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
+
+        # backwards compatibility
+        if isinstance(state, set):
+            logging.warn("internal.{:s}.dec : Using deprecated tag cache syntax : {!r}".format( '.'.join((__name__,cls.__name__)), state))
+            state.add(name)
+            res[cls.__tags__] = state
+            cls._write(ea, res)
+            return 1
 
         # decrease key reference count
         refs = state.pop(name) - 1
@@ -380,7 +397,7 @@ class tag(object):
         ea = cls._top(ea)
         res = cls._read(ea)
         res = res.get(cls.__tags__, {})
-        return set(res.viewkeys())
+        return set(res.viewkeys()) if isinstance(res, dict) else set(res)
 
     @classmethod
     def address(cls, ea):
