@@ -1,7 +1,7 @@
 import operator,collections,heapq,types
 import database,structure
 import idaapi
-import logging
+import six, logging
 
 class typemap:
     """Convert bidirectionally from a pythonic type into an IDA type"""
@@ -57,8 +57,6 @@ class typemap:
     # defaults
     @classmethod
     def __database_inited__(cls, is_new_database, idc_script):
-        # FIXME: call this function on load
-
         # FIXME: figure out how to fix this recursive module dependency
         typemap.integermap[None] = typemap.integermap[(hasattr(database,'config') and database.config.bits() or 32)/8]
         typemap.decimalmap[None] = typemap.decimalmap[(hasattr(database,'config') and database.config.bits() or 32)/8]
@@ -128,16 +126,17 @@ class typemap:
 
 class priorityhook(object):
     '''Helper class for hooking different parts of IDA.'''
-    result = type('result', (type,), {})
-    result.CONTINUE = type('continue', (result,), {})
-    result.STOP = type('stop', (result,), {})
+    result = type('result', (object,), {})
+    CONTINUE = type('continue', (result,), {})()
+    STOP = type('stop', (result,), {})()
 
-    def __init__(self, hooktype):
+    def __init__(self, hooktype, **exclude):
+        exclusions = set(exclude.get('exclude', ()))
         self.object = type(hooktype.__name__, (hooktype,), {})()
         self.cache = collections.defaultdict(list)
         # FIXME: create a mutex too
         for name in dir(self.object):
-            if any(f(name) for f in (operator.methodcaller('startswith','_'), lambda n: not callable(getattr(self.object,n)), lambda n: n in ('hook','unhook'))):
+            if any(f(name) for f in (operator.methodcaller('startswith','_'), lambda n: not callable(getattr(self.object,n)), lambda n: n in ('hook','unhook'), lambda n: n in exclusions)):
                 continue
             self.new(name)
         self.object.hook()
@@ -159,20 +158,29 @@ class priorityhook(object):
         heapq.heappush(self.cache[name], (priority, function))
         return True
 
+    def get(self, name):
+        res = self.cache[name]
+        return tuple(f for _,f in res)
+
     def discard(self, name, function):
         if not hasattr(self.object, name):
             raise AttributeError('{:s}.priorityhook.add : Unable to add a method to hooker for unknown method. : {!r}'.format(__name__, name))
         if name not in self.cache: return False
 
-        res = []
+        res, found = [], 0
         for i,(p,f) in enumerate(self.cache[name][:]):
             if f != function:
                 res.append((p,f))
-            continue
+                continue
+            found += 1
 
         # FIXME: wrap this in a mutex
-        self.cache[name][:] = res
-        return False
+        if res:
+            self.cache[name][:] = res
+        else:
+            self.cache.pop(name, [])
+
+        return True if found else False
 
     def new(self, name):
         if not hasattr(self.object, name):
@@ -184,9 +192,9 @@ class priorityhook(object):
 
                 for _,func in heapq.nsmallest(len(hookq), hookq):
                     res = func(*args)
-                    if not isinstance(res, self.result) or res == self.result.CONTINUE:
+                    if not isinstance(res, self.result) or res == self.CONTINUE:
                         continue
-                    elif res == self.result.STOP:
+                    elif res == self.STOP:
                         break
                     raise TypeError('{:s}.priorityhook.callback : Unable to determine result type : {!r}'.format(__name__, res))
 

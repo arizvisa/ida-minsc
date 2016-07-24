@@ -156,22 +156,22 @@ def instruction(ea):
     return reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
 
 @utils.multicase()
-def disasm(**kwds):
+def disasm(**options):
     '''Disassemble the instructions at the current address.'''
-    return disasm(ui.current.address(), **kwds)
+    return disasm(ui.current.address(), **options)
 @utils.multicase(ea=six.integer_types)
-def disasm(ea, **kwds):
+def disasm(ea, **options):
     """Disassemble the instructions at the address ``ea``.
     If the integer ``count`` is specified, then return ``count`` number of instructions.
     If the bool ``comments`` is True, then return the comments for each instruction as well.
     """
     ea = interface.address.inside(ea)
 
-    res,count = [], kwds.get('count',1)
+    res,count = [], options.get('count',1)
     while count > 0:
         insn = idaapi.generate_disasm_line(ea)
         unformatted = idaapi.tag_remove(insn)
-        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted and kwds.get('comments',False) else unformatted
+        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted and options.get('comments',False) else unformatted
         res.append('{:x}: {:s}'.format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
         ea = next(ea)
         count -= 1
@@ -197,23 +197,23 @@ def read(ea, size):
     return idaapi.get_many_bytes(ea, end-start)
 
 @utils.multicase(data=bytes)
-def write(data, **kwds):
+def write(data, **original):
     '''Modify the database at the current address with the bytes ``data``.'''
-    return write(ui.current.address, data, **kwds)
+    return write(ui.current.address(), data, **original)
 @utils.multicase(ea=six.integer_types, data=bytes)
-def write(ea, data, **kwds):
+def write(ea, data, **original):
     """Modify the database at address ``ea`` with the bytes ``data``
     If the bool ``original`` is specified, then modify what IDA considers the original bytes.
     """
-    ea, _ = interface.address.within(ea, len(data))
-    original = kwds.get('original', False)
-    return idaapi.patch_many_bytes(ea, data) if original else idaapi.put_many_bytes(ea, data)
+    ea, _ = interface.address.within(ea, ea + len(data))
+    return idaapi.patch_many_bytes(ea, data) if original.get('original', False) else idaapi.put_many_bytes(ea, data)
 
 def iterate(start, end, step=None):
     '''Iterate through all the instruction and data boundaries from address ``start`` to ``end``.'''
+    # FIXME: implement this so it can act on the bounds of the address instead of all of them
     step = step or (address.prev if start > end else address.next)
     start, end = __builtin__.map(interface.address.head, (start, end))
-    while start != end:
+    while start != idaapi.BADADDR and start != end:
         yield start
         start = step(start)
     yield end
@@ -223,34 +223,34 @@ def iterate(start, end, step=None):
 class search(object):
     @utils.multicase(string=bytes)
     @staticmethod
-    def by_bytes(string, **kwds):
+    def by_bytes(string, **direction):
         '''Search through the database at the current address for the bytes specified by ``string``.'''
-        return search.by_bytes(ui.current.address(), string, **kwds)
+        return search.by_bytes(ui.current.address(), string, **direction)
     @utils.multicase(ea=six.integer_types, string=bytes, reverse=bool)
     @staticmethod
-    def by_bytes(ea, string, **kwds):
+    def by_bytes(ea, string, **direction):
         """Search through the database at address ``ea`` for the bytes specified by ``string``.
         If ``reverse`` is specified as a bool, then search backwards from the given address.
         """
-        flags = idaapi.SEARCH_UP if kwds.get('reverse', False) else idaapi.SEARCH_DOWN
+        flags = idaapi.SEARCH_UP if direction.get('reverse', False) else idaapi.SEARCH_DOWN
         return idaapi.find_binary(ea, -1, ' '.join(str(ord(c)) for c in string), 10, idaapi.SEARCH_CASE | flags)
     byBytes = by_bytes
 
     @utils.multicase(string=basestring)
     @staticmethod
-    def by_regex(string, **kwds):
+    def by_regex(string, **options):
         '''Search through the database at the current address for the regex matched by ``string``.'''
-        return search.by_regex(ui.current.address(), string, **kwds)
+        return search.by_regex(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @staticmethod
-    def by_regex(ea, string, **kwds):
+    def by_regex(ea, string, **options):
         """Search the database at address ``ea`` for the regex matched by ``string``.
         If ``reverse`` is specified as a bool, then search backwards from the given address.
         If ``sensitive`` is specified as bool, then perform a case-sensitive search.
         """
-        flags = idaapi.SEARCH_UP if kwds.get('reverse',False) else idaapi.SEARCH_DOWN
-        flags |= idaapi.SEARCH_CASE if kwds.get('sensitive',False) else 0
-        return idaapi.find_binary(ea, -1, string, kwds.get('radix',16), flags)
+        flags = idaapi.SEARCH_UP if options.get('reverse',False) else idaapi.SEARCH_DOWN
+        flags |= idaapi.SEARCH_CASE if options.get('sensitive',False) else 0
+        return idaapi.find_binary(ea, -1, string, options.get('radix',16), flags)
     byRegex = by_regex
 
     @utils.multicase(name=basestring)
@@ -330,30 +330,36 @@ def get_name():
 def get_name(ea):
     '''Return the name defined at the address ``ea``.'''
     ea = interface.address.inside(ea)
-    try:
-        res = tag(ea, 'name')
-    except KeyError:
-        logging.warn("{:s}.get_name : No name available at the requested address. : 0x{:x}".format(__name__, ea))
-    else:
-        return res
-        #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
-    return None
+
+    # if get_true_name is going to return the function's name instead of a real one
+    # then consider the address itself as being unnamed.
+    fn = idaapi.get_func(ea)
+    if fn and fn.startEA == ea:
+        return None
+
+    # now return the name at the specified address
+    aname = idaapi.get_true_name(ea)
+
+    # ..or not
+    return aname or None
 
 @utils.multicase(none=types.NoneType)
-def set_name(none):
+def set_name(none, **listed):
     '''Remove the name at the current address.'''
-    return set_name(ui.current.address(), '')
+    return set_name(ui.current.address(), '', **listed)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
-def set_name(ea, none):
+def set_name(ea, none, **listed):
     '''Remove the name defined at the address ``ea``.'''
-    return set_name(ea, '')
+    return set_name(ea, '', **listed)
 @utils.multicase(string=basestring)
-def set_name(string):
+def set_name(string, **listed):
     '''Rename the current address to ``string``.'''
-    return set_name(ui.current.address(), string)
+    return set_name(ui.current.address(), string, **listed)
 @utils.multicase(ea=six.integer_types, string=basestring)
-def set_name(ea, string, **options):
-    '''Rename the address specified by ``ea`` to ``string``.'''
+def set_name(ea, string, **listed):
+    """Rename the address specified by ``ea`` to ``string``.
+    If ``listed`` is True, then specify that the name is added to the Names list.
+    """
 
     ea = interface.address.inside(ea)
     if idaapi.SN_NOCHECK != 0:
@@ -371,9 +377,8 @@ def set_name(ea, string, **options):
     flags |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
     flags |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
 
-##    If the bool ``add_to_list`` is False, then ensure that this name is not added to the name list.
-#    if 'add_to_list' in options:
-#        flags = (flags & ~idaapi.SN_NOLIST) if options['add_to_list'] else (flags | idaapi.SN_NOLIST)
+    # If the bool ``listed`` is True, then ensure that this name is added to the name list.
+    flags = (flags & ~idaapi.SN_NOLIST) if listed.get('listed', False) else (flags | idaapi.SN_NOLIST)
 
     try:
         function.top(ea)
@@ -396,9 +401,6 @@ def set_name(ea, string, **options):
     except: pass
 
     res,ok = get_name(ea),idaapi.set_name(ea, string or "", flags)
-
-    try: tag(ea, 'name', string or None)
-    except KeyError: pass
 
     if not ok:
         raise AssertionError('{:s}.set_name : Unable to call idaapi.set_name(0x{:x}, {!r}, 0x{:x})'.format(__name__, ea, string, flags))
@@ -454,19 +456,23 @@ def blocks(start, end):
         continue
     return
 
-# FIXME: The idaapi.is_basic_block_end api has got to be faster than doing it with pythonic xrefs.
-if False:   # XXX: can't trust idaapi.is_basic_block_end(...)
+# FIXME: The idaapi.is_basic_block_end api has got to be faster than doing it
+#        with ida's xrefs in python..
+if False:
     def blocks(start, end):
         '''Returns each block between the specified range of instructions.'''
         start, end = interface.address.head(start), address.tail(end)+1
+        block = start
         for ea in iterate(start, end):
             nextea = next(ea)
+            idaapi.decode_insn(ea)
+            # XXX: for some reason idaapi.is_basic_block_end(...)
+            #      occasionally includes some stray 'call' instructions.
             if idaapi.is_basic_block_end(ea):
                 yield block,nextea
                 block = nextea
             continue
         return
-
 
 def map(l, *args, **kwds):
     """Execute provided callback on all functions in database. Synonymous to map(l,db.functions()).
@@ -544,46 +550,46 @@ def color(ea, rgb):
     return set_color(ea, rgb)
 
 @utils.multicase()
-def get_comment(**kwds):
+def get_comment(**repeatable):
     '''Return the comment at the current address.'''
-    return get_comment(ui.current.address(), **kwds)
+    return get_comment(ui.current.address(), **repeatable)
 @utils.multicase(ea=six.integer_types)
-def get_comment(ea, **kwds):
+def get_comment(ea, **repeatable):
     """Return the comment at the address ``ea``.
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
-    return idaapi.get_cmt(interface.address.inside(ea), kwds.get('repeatable', False))
+    return idaapi.get_cmt(interface.address.inside(ea), repeatable.get('repeatable', False))
 @utils.multicase(comment=basestring)
-def set_comment(comment, **kwds):
+def set_comment(comment, **repeatable):
     '''Set the comment at the current address to the string ``comment``.'''
-    return set_comment(ui.current.address(), comment, **kwds)
+    return set_comment(ui.current.address(), comment, **repeatable)
 @utils.multicase(ea=six.integer_types, comment=basestring)
-def set_comment(ea, comment, **kwds):
+def set_comment(ea, comment, **repeatable):
     """Set the comment at address ``ea`` to ``comment``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
-    return idaapi.set_cmt(interface.address.inside(ea), comment, kwds.get('repeatable', False))
+    return idaapi.set_cmt(interface.address.inside(ea), comment, repeatable.get('repeatable', False))
 
 @utils.multicase()
-def comment(**kwds):
+def comment(**repeatable):
     '''Return the comment at the current address.'''
-    return get_comment(ui.current.address(), **kwds)
+    return get_comment(ui.current.address(), **repeatable)
 @utils.multicase(ea=six.integer_types)
-def comment(ea, **kwds):
+def comment(ea, **repeatable):
     """Return the comment at the address ``ea``.
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
-    return get_comment(ea, **kwds)
+    return get_comment(ea, **repeatable)
 @utils.multicase(comment=basestring)
-def comment(comment, **kwds):
+def comment(comment, **repeatable):
     '''Set the comment at the current address to ``comment``.'''
-    return set_comment(ui.current.address(), comment, **kwds)
+    return set_comment(ui.current.address(), comment, **repeatable)
 @utils.multicase(ea=six.integer_types, comment=basestring)
-def comment(ea, comment, **kwds):
+def comment(ea, comment, **repeatable):
     """Set the comment at address ``ea`` to ``comment``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
-    return set_comment(ea, comment, **kwds)
+    return set_comment(ea, comment, **repeatable)
 
 @utils.multicase()
 def make_entry():
@@ -617,196 +623,18 @@ def make_entry(ea, name, ordinal):
     '''Adds an entry point at ``ea`` with the specified ``name`` and ``ordinal``.'''
     return idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
 
-#try:
-#    ## tag data storage using a lisp-like syntax
-#    import store.query as query
-#    import store
-#
-#    datastore = store.ida
-#    def tag(ea, *args, **kwds):
-#        '''tag(ea, key?, value?) -> fetches/stores a tag from specified address'''
-#        try:
-#            context = function.top(ea)
-#
-#        except ValueError:
-#            context = None
-#
-#        if len(args) == 0 and len(kwds) == 0:
-#            result = datastore.address(context).select(query.address(ea))
-#            try:
-#                result = result[address]
-#            except:
-#                result = {}
-#            return result
-#
-#        elif len(args) == 1:
-#            key, = args
-#            result = datastore.address(context).select(query.address(ea), query.attribute(key))
-#            try:
-#                result = result[address][key]
-#            except:
-#                raise KeyError( (hex(ea),key) )
-#                result = None
-#            return result
-#
-#        if len(args) > 0:
-#            key,value = args
-#            kwds.update({key:value})
-#        return datastore.address(context).address(ea).set(**kwds)
-#
-#    def __select(q):
-#        for x in functions():
-#            x = function.top(x)
-#            if q.has(function.tag(x)):
-#                yield x
-#            continue
-#        return
-#
-#    def select(*q, **where):
-#        if where:
-#            print "database.select's kwd arguments have been deprecated in favor of query"
-#        result = list(q)
-#        for k,v in where.iteritems():
-#            if v is None:
-#                result.append( query.hasattr(k) )
-#                continue
-#            result.append( query.hasvalue(k,v) )
-#        return __select( query._and(*result) )
-#
-#except ImportError:
-#    ## tag data storage hack using magically syntaxed comments
-#    def tag_read(ea, key=None, repeatable=0):
-#        res = idaapi.get_cmt(ea, int(bool(repeatable)))
-#        dict = internal.comment.decode(res)
-#        name = idaapi.get_true_name(ea)
-#        if name: dict.setdefault('name', name)
-#        return dict if key is None else dict[key]
-#
-#    def tag_write(ea, key, value, repeatable=0):
-#        dict = tag_read(ea, repeatable=repeatable)
-#        dict[key] = value
-#        res = internal.comment.encode(dict)
-#        return idaapi.set_cmt(ea, res, int(bool(repeatable)))
-#
-#    def tag(ea, *args, **kwds):
-#        '''tag(ea, key?, value?, repeatable=True/False) -> fetches/stores a tag from specified address'''
-#        # if not in a function, it could be a global, so make the tag repeatable
-#        #   otherwise, use a non-repeatable comment
-#        ea = int(ea)
-#        try:
-#            func = function.by_address(ea)
-#        except Exception:
-#            func = None
-#        kwds.setdefault('repeatable', True if func is None else False)
-#
-#        if len(args) < 2:
-#            return tag_read(ea, *args, **kwds)
-#
-#        key,value = args
-#        result = tag_write(ea, key, value, **kwds)
-#
-#        # add tag-name to function's cache
-#        if func is not None and value is not None and key is not '__tags__':
-#            top = func.startEA
-#            tags = function.tags(ea)
-#            tags.add(key)
-#            tag_write(top, '__tags__', tags)
-#
-#        return result
-#
-#    def select(*tags, **boolean):
-#        '''Fetch all the functions containing the specified tags within it's declaration'''
-#        boolean = dict((k,set(v) if v.__class__ is tuple else set((v,))) for k,v in boolean.viewitems())
-#        if tags:
-#            boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
-#
-#        if not boolean:
-#            for ea in functions():
-#                res = tag(ea)
-#                if res: yield ea, res
-#            return
-#
-#        for ea in functions():
-#            res,d = {},function.tag(ea)
-#
-#            Or = boolean.get('Or', set())
-#            res.update((k,v) for k,v in d.iteritems() if k in Or)
-#
-#            And = boolean.get('And', set())
-#            if And:
-#                if And.intersection(d.viewkeys()) == And:
-#                    res.update((k,v) for k,v in d.iteritems() if k in And)
-#                else: continue
-#            if res: yield ea,res
-#        return
-#
-#    def selectcontents(*tags, **boolean):
-#        '''Fetch all the functions containing the specified tags within it's contents'''
-#        boolean = dict((k,set(v) if v.__class__ is tuple else set((v,))) for k,v in boolean.viewitems())
-#        if tags:
-#            boolean.setdefault('And', set(boolean.get('And',set())).union(set(tags) if len(tags) > 1 else set(tags,)))
-#
-#        if not boolean:
-#            for ea in functions():
-#                res = function.tags(ea)
-#                if res: yield ea, res
-#            return
-#
-#        for ea in functions():
-#            res,d = set(),function.tags(ea)
-#
-#            Or = boolean.get('Or', set())
-#            res.update(Or.intersection(d))
-#
-#            And = boolean.get('And', set())
-#            if And:
-#                if And.intersection(d) == And:
-#                    res.update(And)
-#                else: continue
-#            if res: yield ea,res
-#        return
-#
-#if False:
-#    def select_equal(ea, **matches):
-#        for ea,res in select(ea, And=matches.keys()):
-#            if all(k in res and matches[k] == res[k] for k in matches.items()):
-#                yield ea,res
-#            continue
-#        return
-#
-#    def selectcontents_equal(ea, **matches):
-#        for ea,res in selectcontents(ea, And=matches.keys()):
-#            if all(k in res and matches[k] == res[k] for k in matches.items()):
-#                yield ea,res
-#            continue
-#        return
-
 def tags():
     '''Returns all the tags used outside a function.'''
-    return internal.comment.tag.get(idaapi.BADADDR)
+    return internal.comment.globals.name()
 
-@utils.multicase(ea=six.integer_types, key=basestring)
-def tag_read(ea, key):
-    '''Returns the tag identified by ``key`` from address ``ea``.'''
-    ea = interface.address.inside(ea)
-
-    # if not within a function, then use a repeatable comment
-    # otherwise, use a non-repeatable one
-    try: func = function.by_address(ea)
-    except: func = None
-    repeatable = False if func else True
-
-    # fetch the tags at the given address
-    res = comment(ea, repeatable=repeatable)
-    dict = internal.comment.decode(res)
-
-    # modify the decoded dictionary to include the current name if it's there
-    aname = idaapi.get_true_name(ea)
-    if (func and func.startEA != ea and aname) or (not func and aname):
-        dict['name'] = aname
-
-    # now return the key that the user wants
-    return dict[key]
+@utils.multicase()
+def tag_read():
+    '''Returns all the tags at the current address.'''
+    return tag_read(ui.current.address())
+@utils.multicase(key=basestring)
+def tag_read(key):
+    '''Returns the tag identified by ``key`` at the current addres.'''
+    return tag_read(ui.current.address(), key)
 @utils.multicase(ea=six.integer_types)
 def tag_read(ea):
     '''Returns all the tags defined at address ``ea``.'''
@@ -820,37 +648,43 @@ def tag_read(ea):
 
     # fetch the tags at the given address
     res = comment(ea, repeatable=repeatable)
-    dict = internal.comment.decode(res)
+    d1 = internal.comment.decode(res)
+    res = comment(ea, repeatable=not repeatable)
+    d2 = internal.comment.decode(res)
+    if d1.viewkeys() & d2.viewkeys():
+        logging.warn('{:s}.tag_read : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+    d2.update(d1)
 
     # modify the decoded dictionary to include the current name if it's there
-    aname = idaapi.get_true_name(ea)
+    aname = get_name(ea)
+    if aname: d2.setdefault('name', aname)
 
     # now return what the user cares about
-    if (func and func.startEA != ea and aname) or (not func and aname):
-        dict['name'] = aname
-    return dict
-@utils.multicase()
-def tag_read():
-    '''Returns all the tags at the current address.'''
-    return tag_read(ui.current.address())
-@utils.multicase(key=basestring)
-def tag_read(key):
-    '''Returns the tag identified by ``key`` at the current addres.'''
-    return tag_read(ui.current.address(), key)
+    return d2
+@utils.multicase(ea=six.integer_types, key=basestring)
+def tag_read(ea, key):
+    '''Returns the tag identified by ``key`` from address ``ea``.'''
+    res = tag_read(ea)
+    return res[key]
 
 @utils.multicase(key=basestring)
 def tag_write(key, value):
     '''Set the tag ``key`` to ``value`` at the current address.'''
-    return tag_write(ui.current.address(), key, value, **kwds)
+    return tag_write(ui.current.address(), key, value)
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag_write(key, none):
     '''Removes the tag specified by ``key`` from the current address ``ea``.'''
-    return tag_write(ui.current.address(), key, value, **kwds)
+    return tag_write(ui.current.address(), key, value)
 @utils.multicase(ea=six.integer_types, key=basestring)
 def tag_write(ea, key, value):
     '''Set the tag ``key`` to ``value`` at the address ``ea``.'''
     if value is None:
         raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
+
+    # if the user wants to change the 'name' tag, then
+    # change the name fo' real.
+    if key == 'name':
+        return set_name(ea, value, listed=True)
 
     # if not within a function, then use a repeatable comment
     # otherwise, use a non-repeatable one
@@ -864,7 +698,10 @@ def tag_write(ea, key, value):
 
     # update the tag's reference
     if key not in state:
-        internal.comment.tag.inc(ea, key)
+        if func:
+            internal.comment.contents.inc(ea, key)
+        else:
+            internal.comment.globals.inc(ea, key)
 
     # now we can actually update the tag
     res,state[key] = state.get(key,None),value
@@ -874,6 +711,10 @@ def tag_write(ea, key, value):
 def tag_write(ea, key, none):
     '''Removes the tag specified by ``key`` from the address ``ea``.'''
     ea = interface.address.inside(ea)
+
+    # if the 'name' is being cleared, then really remove it.
+    if key == 'name':
+        return set_name(ea, None, listed=True)
 
     # if not within a function, then fetch the repeatable comment
     # otherwise update the non-repeatable one
@@ -887,7 +728,10 @@ def tag_write(ea, key, none):
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
 
     # delete it's reference
-    internal.comment.tag.dec(ea, key)
+    if func:
+        internal.comment.contents.dec(ea, key)
+    else:
+        internal.comment.globals.dec(ea, key)
 
     return res
 
@@ -928,6 +772,7 @@ def tag(ea, key, none):
 
 # FIXME: consolidate the boolean querying logic into the utils module
 # FIXME: document this properly
+# FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=basestring)
 def select(tag, *tags, **boolean):
     tags = (tag,) + tags
@@ -939,13 +784,13 @@ def select(**boolean):
     boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
-        for ea in functions():
+        for ea in internal.comment.globals.address():
             res = set(function.tag(ea).viewkeys())
             if res: yield ea, res
         return
 
-    for ea in functions():
-        res,d = {},function.tag(ea)
+    for ea in internal.comment.globals.address():
+        res,d = {},function.tag(ea) if function.within(ea) else tag(ea)
 
         Or = boolean.get('Or', set())
         res.update((k,v) for k,v in d.iteritems() if k in Or)
@@ -976,8 +821,8 @@ def selectcontents(**boolean):
             if res: yield ea, res
         return
 
-    for ea in functions():
-        res,d = set(),function.tags(ea)
+    for ea in internal.comment.contents.iterate():
+        res,d = set(),internal.comment.contents.name(ea)
 
         Or = boolean.get('Or', set())
         res.update(Or.intersection(d))
@@ -1319,13 +1164,13 @@ class address(object):
 
     @utils.multicase(ea=six.integer_types, reg=basestring)
     @classmethod
-    def prevreg(cls, ea, reg, *regs, **kwds):
+    def prevreg(cls, ea, reg, *regs, **modifiers):
         """Return the previous address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.
-        If the keyword ``write`` is True, then only return the address if it's writing to the register.
+        If the modifier ``write`` is True, then only return the address if it's writing to the register.
         """
         regs = (reg,) + regs
-        count = kwds.get('count',1)
-        write = (not kwds.get('read',None)) if 'read' in kwds else kwds.get('write',None)
+        count = modifiers.get('count',1)
+        write = (not modifiers.get('read',None)) if 'read' in modifiers else modifiers.get('write',None)
         def uses_register(ea, regs):
             res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
             match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).related,itertools.imap(_instruction.reg.by_name,regs))
@@ -1338,23 +1183,27 @@ class address(object):
                         return True
                 continue
             return False
-        res = cls.walk(cls.prev(ea), cls.prev, lambda ea: not uses_register(ea, regs))
+        prevea = cls.prev(ea)
+        if prevea is None:
+            logging.fatal("{:s}.{:s}.prevreg : Unable to start walking from previous address. : {:x}".format(__name__, cls.__name__, ea))
+            return ea
+        res = cls.walk(ea, cls.prev, lambda ea: not uses_register(ea, regs))
         return cls.prevreg(res, *regs, count=count-1) if count > 1 else res
     @utils.multicase(reg=basestring)
     @classmethod
-    def prevreg(cls, reg, *regs, **kwds):
+    def prevreg(cls, reg, *regs, **modifiers):
         '''Return the previous address containing an instruction that uses one of the specified registers ``regs``.'''
-        return cls.prevreg(ui.current.address(), reg, *regs, **kwds)
+        return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
 
     @utils.multicase(ea=six.integer_types, reg=basestring)
     @classmethod
-    def nextreg(cls, ea, reg, *regs, **kwds):
+    def nextreg(cls, ea, reg, *regs, **modifiers):
         """Return next address containing an instruction that uses one of the specified registers ``regs``.
-        If the keyword ``write`` is True, then only retur  the address if it's writing to the register.
+        If the modifier ``write`` is True, then only return the address if it's writing to the register.
         """
         regs = (reg,) + regs
-        count = kwds.get('count',1)
-        write = (not kwds.get('read',None)) if 'read' in kwds else kwds.get('write',None)
+        count = modifiers.get('count',1)
+        write = (not modifiers.get('read',None)) if 'read' in modifiers else modifiers.get('write',None)
         def uses_register(ea, regs):
             res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
             match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).related,itertools.imap(_instruction.reg.by_name,regs))
@@ -1368,12 +1217,16 @@ class address(object):
                 continue
             return False
         res = cls.walk(ea, cls.next, lambda ea: not uses_register(ea, regs))
-        return cls.nextreg(cls.next(res), *regs, count=count-1) if count > 1 else res
+        nextea = cls.next(res)
+        if nextea is None:
+            logging.fatal("{:s}.{:s}.next : Unable to start walking from next address. : {:x}".format(__name__, cls.__name__, res))
+            return res
+        return cls.nextreg(nextea, *regs, count=count-1) if count > 1 else nextea
     @utils.multicase(reg=basestring)
     @classmethod
-    def nextreg(cls, reg, *regs, **kwds):
+    def nextreg(cls, reg, *regs, **modifiers):
         '''Return the next address containing an instruction that uses one of the specified registers ``regs``.'''
-        return cls.nextreg(ui.current.address(), reg, *regs, **kwds)
+        return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
 
     @utils.multicase()
     @classmethod
@@ -1537,7 +1390,7 @@ class flow(address):
         isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
         refs = xref.up(ea)
         if len(refs) > 1 and isStop(address.prev(ea)):
-            logging.fatal("{:s}.flow.prev : 0x{:x} : Unable to determine previous address due to multiple xrefs being available : {:s}".format(__name__, ea, ', '.join(__builtin__.map(hex,refs))))
+            logging.fatal("{:s}.flow.prev : 0x{:x} : Unable to determine previous address due to multiple previous references being available : {:s}".format(__name__, ea, ', '.join(__builtin__.map(hex,refs))))
             return None
         res = refs[0] if isStop(address.prev(ea)) else address.prev(ea)
         return cls.prev(res, count-1) if count > 1 else res
@@ -2124,17 +1977,17 @@ class xref(object):
 
     @utils.multicase(target=six.integer_types)
     @staticmethod
-    def add_code(target, **kwds):
+    def add_code(target, **reftype):
         '''Add a code reference from the current address to ``target``.'''
-        return xref.add_code(ui.current.address(), target, **kwds)
+        return xref.add_code(ui.current.address(), target, **reftype)
     @utils.multicase(six=six.integer_types, target=six.integer_types)
     @staticmethod
-    def add_code(ea, target, **kwds):
+    def add_code(ea, target, **reftype):
         """Add a code reference from address ``ea`` to ``target``.
-        If the bool ``isCall`` is specified, then specify this ref as a function call.
+        If the reftype ``call`` is True, then specify this ref as a function call.
         """
         ea, target = interface.address.inside(ea, target)
-        isCall = kwds.get('isCall', False)
+        isCall = reftype.get('call', reftype.get('is_call', reftype.get('isCall', False)))
         if abs(target-ea) > 2**(config.bits()/2):
             flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
         else:
@@ -2144,18 +1997,18 @@ class xref(object):
 
     @utils.multicase(target=six.integer_types)
     @staticmethod
-    def add_data(target, **kwds):
+    def add_data(target, **reftype):
         '''Add a data reference from the current address to ``target``.'''
-        return xref.add_data(ui.current.address(), target, **kwds)
+        return xref.add_data(ui.current.address(), target, **reftype)
     @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
-    def add_data(ea, target, **kwds):
+    def add_data(ea, target, **reftype):
         """Add a data reference from the address ``ea`` to ``target``.
-        If the bool ``write`` is specified, then specify this ref is writing to the target.
+        If the reftype ``write`` is True, then specify that this ref is writing to the target.
         """
         ea, target = interface.address.inside(ea, target)
-        write = kwds.get('write', False)
-        flowtype = idaapi.dr_W if write else idaapi.dr_R
+        isWrite = reftype.get('write', False)
+        flowtype = idaapi.dr_W if isWrite else idaapi.dr_R
         idaapi.add_dref(ea, target, flowtype | idaapi.XREF_USER)
         return target in xref.data_down(ea)
 
@@ -2368,3 +2221,199 @@ def mark(ea, none):
 def mark(ea, description):
     '''Create a mark at address ``ea`` with the given ``description``.'''
     return marks.new(ea, description)
+
+class extra(object):
+    MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
+    MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
+
+    @classmethod
+    def __hide(cls, ea):
+        if idaapi.hasExtra(ea):
+            return idaapi.noExtra(ea)
+        return False
+
+    @classmethod
+    def __show(cls, ea):
+        if idaapi.hasExtra(ea):
+            return idaapi.doExtra(ea)
+        return False
+    @classmethod
+    def __get(cls, ea, base):
+        res = []
+        for i in xrange(0, cls.MAX_ITEM_LINES):
+            row = idaapi.get_extra_cmt(ea, base+i)
+            if row is None: break
+            res.append(row)
+        return '\n'.join(res)
+    @classmethod
+    def __set(cls, ea, string, base):
+        for i,row in enumerate(string.split('\n')):
+            idaapi.update_extra_cmt(ea, base+i, row)
+        return
+
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def get_prefix(cls, ea):
+        '''Return the prefixed comment at address ``ea``.'''
+        return cls.__get(ea, idaapi.E_PREV)
+
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def get_suffix(cls, ea):
+        '''Return the suffixed comment at address ``ea``.'''
+        return cls.__get(ea, idaapi.E_NEXT)
+
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def del_prefix(cls, ea):
+        '''Delete the prefixed comment at address ``ea``.'''
+        res = cls.__get(ea, idaapi.E_PREV)
+        cls.__hide(ea)
+        # idaapi.del_extra_cmt(ea, idaapi.E_PREV+n)
+        idaapi.delete_extra_cmts(ea, idaapi.E_PREV)
+        cls.__show(ea)
+        return res
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def del_suffix(cls, ea):
+        '''Delete the suffixed comment at address ``ea``.'''
+        res = cls.__get(ea, idaapi.E_NEXT)
+        cls.__hide(ea)
+        # idaapi.del_extra_cmt(ea, idaapi.E_NEXt+n)
+        idaapi.delete_extra_cmts(ea, idaapi.E_NEXT)
+        cls.__show(ea)
+        return res
+
+    @utils.multicase(ea=six.integer_types, string=basestring)
+    @classmethod
+    def set_prefix(cls, ea, string):
+        '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
+        cls.__hide(ea)
+        res, ok = cls.del_prefix(ea), cls.__set(ea, string, idaapi.E_PREV)
+        cls.__show(ea)
+        return res
+    @utils.multicase(ea=six.integer_types, string=basestring)
+    @classmethod
+    def set_suffix(cls, ea, string):
+        '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
+        cls.__hide(ea)
+        res, ok = cls.del_suffix(ea), cls.__set(ea, string, idaapi.E_NEXT)
+        cls.__show(ea)
+        return res
+
+    @utils.multicase()
+    @classmethod
+    def get_prefix(cls):
+        '''Return the prefixed comment at the current address.'''
+        return cls.get_prefix(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def get_suffix(cls):
+        '''Return the suffixed comment at the current address.'''
+        return cls.get_suffix(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def del_prefix(cls):
+        '''Delete the prefixed comment at the current address.'''
+        return cls.del_prefix(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def del_suffix(cls):
+        '''Delete the suffixed comment at the current address.'''
+        return cls.del_suffix(ui.current.address())
+    @utils.multicase(string=basestring)
+    @classmethod
+    def set_prefix(cls, string):
+        '''Set the prefixed comment at the current address to the specified ``string``.'''
+        return cls.set_prefix(ui.current.address(), string)
+    @utils.multicase(string=basestring)
+    @classmethod
+    def set_suffix(cls, string):
+        '''Set the suffixed comment at the current address to the specified ``string``.'''
+        return cls.set_suffix(ui.current.address(), string)
+
+    @utils.multicase()
+    @classmethod
+    def prefix(cls):
+        '''Return the prefixed comment at the current address.'''
+        return cls.get_prefix(ui.current.address())
+    @utils.multicase(string=basestring)
+    @classmethod
+    def prefix(cls, string):
+        '''Set the prefixed comment at the current address to the specified ``string``.'''
+        return cls.set_prefix(ui.current.address(), string)
+    @utils.multicase(none=types.NoneType)
+    @classmethod
+    def prefix(cls, none):
+        '''Delete the prefixed comment at the current address.'''
+        return cls.del_prefix(ui.current.address())
+
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def prefix(cls, ea):
+        '''Return the prefixed comment at address ``ea``.'''
+        return cls.get_prefix(ea)
+    @utils.multicase(ea=six.integer_types, string=basestring)
+    @classmethod
+    def prefix(cls, ea, string):
+        '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
+        return cls.set_prefix(ea, string)
+    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @classmethod
+    def prefix(cls, ea, none):
+        '''Delete the prefixed comment at address ``ea``.'''
+        return cls.del_prefix(ea)
+
+    @utils.multicase()
+    @classmethod
+    def suffix(cls):
+        '''Return the suffixed comment at the current address.'''
+        return cls.get_suffix(ui.current.address())
+    @utils.multicase(string=basestring)
+    @classmethod
+    def suffix(cls, string):
+        '''Set the suffixed comment at the current address to the specified ``string``.'''
+        return cls.set_suffix(ui.current.address(), string)
+    @utils.multicase(none=types.NoneType)
+    @classmethod
+    def suffix(cls, none):
+        '''Delete the suffixed comment at the current address.'''
+        return cls.del_suffix(ui.current.address())
+
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def suffix(cls, ea):
+        '''Return the suffixed comment at address ``ea``.'''
+        return cls.get_suffix(ea)
+    @utils.multicase(ea=six.integer_types, string=basestring)
+    @classmethod
+    def suffix(cls, ea, string):
+        '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
+        return cls.set_suffix(ea, string)
+    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @classmethod
+    def suffix(cls, ea, none):
+        '''Delete the suffixed comment at address ``ea``.'''
+        return cls.del_suffix(ea)
+
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def insert(cls, ea, count):
+        '''Insert ``count`` lines in front of the item at address ``ea``.'''
+        return cls.set_prefix(ea, '\n'*(count-1)) if count > 0 else cls.del_prefix(ea)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def append(cls, ea, count):
+        '''Append ``count`` lines after the item at address ``ea``.'''
+        return cls.set_suffix(ea, '\n'*(count-1)) if count > 0 else cls.del_suffix(ea)
+
+    @utils.multicase(count=six.integer_types)
+    @classmethod
+    def insert(cls, count):
+        '''Insert ``count`` lines in front of the item at the current address.'''
+        return cls.insert(ui.current.address(), count)
+    @utils.multicase(count=six.integer_types)
+    @classmethod
+    def append(cls, count):
+        '''Append ``count`` lines after the item at the current address.'''
+        return cls.append(ui.current.address(), count)

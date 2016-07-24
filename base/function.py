@@ -8,6 +8,7 @@ import logging,re,itertools
 import six,types
 
 import database,structure,ui,internal
+import instruction as _instruction
 from internal import utils,interface
 
 import idaapi
@@ -113,46 +114,46 @@ def guess(ea):
 
 ## properties
 @utils.multicase()
-def get_comment(**kwds):
+def get_comment(**repeatable):
     '''Return the comment for the current function.'''
-    return get_comment(ui.current.function(), **kwds)
+    return get_comment(ui.current.function(), **repeatable)
 @utils.multicase()
-def get_comment(func, **kwds):
+def get_comment(func, **repeatable):
     """Return the comment for the function ``func``.
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
     fn = by(func)
-    return idaapi.get_func_cmt(fn, kwds.get('repeatable', 1))
+    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', 1))
 @utils.multicase(comment=basestring)
-def set_comment(comment, **kwds):
+def set_comment(comment, **repeatable):
     '''Set the comment for the current function to ``comment``.'''
-    return set_comment(ui.current.function(), comment, **kwds)
+    return set_comment(ui.current.function(), comment, **repeatable)
 @utils.multicase(comment=basestring)
-def set_comment(func, comment, **kwds):
+def set_comment(func, comment, **repeatable):
     """Set the comment for the function ``func`` to ``comment``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
     fn = by(func)
-    return idaapi.set_func_cmt(fn, comment, kwds.get('repeatable', 1))
+    return idaapi.set_func_cmt(fn, comment, repeatable.get('repeatable', 1))
 
 @utils.multicase()
-def comment(**kwds):
+def comment(**repeatable):
     '''Return the comment for the current function.'''
-    return get_comment(ui.current.function(), **kwds)
+    return get_comment(ui.current.function(), **repeatable)
 @utils.multicase()
-def comment(func, **kwds):
+def comment(func, **repeatable):
     '''Return the comment for the function ``func``.'''
-    return get_comment(func, **kwds)
+    return get_comment(func, **repeatable)
 @utils.multicase(comment=basestring)
-def comment(comment, **kwds):
+def comment(comment, **repeatable):
     '''Set the comment for the current function to ``comment``.'''
-    return set_comment(ui.current.function(), comment, **kwds)
+    return set_comment(ui.current.function(), comment, **repeatable)
 @utils.multicase(comment=basestring)
-def comment(func, comment, **kwds):
+def comment(func, comment, **repeatable):
     """Set the comment for the function ``func`` to ``comment``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
-    return set_comment(func, comment, **kwds)
+    return set_comment(func, comment, **repeatable)
 
 @utils.multicase()
 def get_name():
@@ -164,7 +165,8 @@ def get_name(func):
     rt,ea = __addressOfRtOrSt(func)
     if rt:
         res = idaapi.get_name(-1, ea)
-        return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
+        return internal.declaration.demangle(res) if internal.declaration.mangled(res) else res
+        #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     res = idaapi.get_func_name(ea)
     if not res: res = idaapi.get_name(-1, ea)
     if not res: res = idaapi.get_true_name(ea, ea)
@@ -193,7 +195,7 @@ def set_name(func, name):
     rt,ea = __addressOfRtOrSt(func)
     if rt:
         # FIXME: shuffle the new name into the prototype and then re-mangle it
-        res, ok = get_name(ea), database.name(ea, name)
+        res, ok = get_name(ea), database.set_name(ea, name)
     else:
         res, ok = get_name(ea), idaapi.set_name(ea, name, idaapi.SN_PUBLIC)
     if not ok:
@@ -374,12 +376,12 @@ def add():
     '''Make a function at the current address.'''
     return add(ui.current.address())
 @utils.multicase(start=six.integer_types)
-def add(start, **kwds):
+def add(start, **end):
     """Make a function at the address ``start``.
     If the address ``end`` is specified, then stop processing the function at it's address.
     """
     start = interface.address.inside(start)
-    end = kwds.getattr('end', idaapi.BADADDR)
+    end = end.getattr('end', idaapi.BADADDR)
     return idaapi.add_func(start, end)
 make = utils.alias(add)
 
@@ -491,9 +493,11 @@ def arguments(func):
 
 @utils.multicase()
 def chunk():
+    '''Return a tuple containing the bounds of the function chunk at the current address.'''
     return chunk(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def chunk(ea):
+    '''Return a tuple containing the bounds of the function chunk at the address ``ea``.'''
     fn = by_address(ea)
     for l, r in chunks(fn):
         if l <= ea < r:
@@ -518,6 +522,9 @@ def chunks(func):
         yield ch.startEA, ch.endEA
         if not fci.next(): break
     return
+
+# FIXME: would probably be better if we just trusted IDA's definition of a 
+#        basic-block and used idaapi.FlowChart to return these bounds.
 
 @utils.multicase()
 def blocks():
@@ -633,15 +640,15 @@ def search(func, regex):
 
 # FIXME: rename this to something better or deprecate it
 @utils.multicase(delta=six.integer_types)
-def stackdelta(delta, **kwds):
+def stackdelta(delta, **direction):
     '''Return the boundaries of current address that fit within the specified stack ``delta``.'''
-    return stackdelta(ui.current.address(), delta, **kwds)
+    return stackdelta(ui.current.address(), delta, **direction)
 @utils.multicase(delta=six.integer_types)
-def stackdelta(ea, delta, **kwds):
+def stackdelta(ea, delta, **direction):
     """Return the boundaries of the address ``ea`` that fit within the specified stack ``delta``.
     If int ``direction`` is provided, search backwards if it's less than 0 or forwards if it's greater.
     """
-    direction = kwds.get('direction', -1)
+    direction = direction.get('direction', -1)
     if direction == 0:
         raise AssertionError('you make no sense with your lack of direction')
     next = database.next if direction > 0 else database.prev
@@ -658,100 +665,37 @@ def stackdelta(ea, delta, **kwds):
 stackwindow = stack_window = utils.alias(stackdelta)
 
 ## tagging
-#try:
-#    import store.query as query
-#    import store
-#
-#    def __select(func, q):
-#        for start,end in chunks(func):
-#            for ea in database.iterate(start, end):
-#                d = database.tag(ea)        # FIXME: bmn noticed .select yielding empty records
-#                if d and q.has(d):
-#                    yield ea
-#                continue
-#            continue
-#        return
-#
-#    def select(func, *q, **where):
-#        if where:
-#            print "function.select's kwd arguments have been deprecated in favor of query"
-#
-#        result = list(q)
-#        for k,v in where.iteritems():
-#            if v is None:
-#                result.append( query.hasattr(k) )
-#                continue
-#            result.append( query.hasvalue(k,v) )
-#        return __select(top(func), query._and(*result) )
-#
-#    datastore = store.ida
-#    def tag(address, *args, **kwds):
-#        '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
-#        if len(args) == 0:
-#            return datastore.address(address)
-#
-#        elif len(args) == 1:
-#            key, = args
-#            result = datastore.select(query.address(address), query.attribute(key)).values()
-#            try:
-#                result = result[0][key]
-#            except:
-#                raise KeyError(hex(address),key)
-#            return result
-#
-#        key,value = args
-#        kwds.update({key:value})
-#        return datastore.address(address).set(**kwds)
-#
-#except ImportError:
-#    def tag_read(address, key=None, repeatable=1):
-#        res = comment(by_address(address), repeatable=repeatable)
-#        dict = internal.comment.decode(res)
-#        fname = name(by_address(address))
-#        if fname: dict['name'] = fname
-#        return dict if key is None else dict[key]
-#
-#    def tag_write(address, key, value, repeatable=1):
-#        dict = tag_read(address, repeatable=repeatable)
-#        dict[key] = value
-#        res = internal.comment.encode(dict)
-#        return comment(by_address(address), res, repeatable=repeatable)
-
-#    def tag(address, *args, **kwds):
-#        '''tag(address, key?, value?) -> fetches/stores a tag from a function's comment'''
-#        if len(args) < 2:
-#            return tag_read(address, *args, **kwds)
-#
-#        key,value = args
-#        return tag_write(address, key, value, **kwds)
-
-
 @utils.multicase()
 def tag_read():
     '''Returns all the tags for the current function.'''
     return tag_read(ui.current.function())
-@utils.multicase()
-def tag_read(func):
-    '''Returns all the tags defined for the function ``func``.'''
-    fn = by(func)
-    res = comment(fn, repeatable=1)
-    dict = internal.comment.decode(res)
-    fname = name(fn)
-    if fname: dict['name'] = fname
-    return dict
 @utils.multicase(key=basestring)
 def tag_read(key):
     '''Returns the value for the tag ``key`` for the current function.'''
     return tag_read(ui.current.function(), key)
+@utils.multicase()
+def tag_read(func):
+    '''Returns all the tags defined for the function ``func``.'''
+    fn,repeatable = by(func), True
+    res = comment(fn, repeatable=repeatable)
+    d1 = internal.comment.decode(res)
+    res = comment(fn, repeatable=not repeatable)
+    d2 = internal.comment.decode(res)
+    if d1.viewkeys() & d2.viewkeys():
+        logging.warn('{:s}.tag_read : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+    d2.update(d1)
+
+    # add the function's name to the result
+    fname = get_name(fn)
+    if fname: d2.setdefault('name', fname)
+
+    # ..and now hand it off.
+    return d2
 @utils.multicase(key=basestring)
 def tag_read(func, key):
     '''Returns the value for the tag ``key`` for the function ``func``.'''
-    fn = by(func)
-    res = comment(fn, repeatable=1)
-    dict = internal.comment.decode(res)
-    fname = name(fn)
-    if fname: dict['name'] = fname
-    return dict[key]
+    res = tag_read(func)
+    return res[key]
 
 @utils.multicase(key=basestring)
 def tag_write(key, value):
@@ -767,17 +711,33 @@ def tag_write(func, key, value):
     if value is None:
         raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
     fn = by(func)
+
+    # if the user wants to change the 'name' tag then update the function's name.
+    if key == 'name':
+        return set_name(fn, value)
+
     state = internal.comment.decode(comment(fn, repeatable=1))
     res,state[key] = state.get(key,None),value
     comment(fn, internal.comment.encode(state), repeatable=1)
+
+    if res is None:
+        internal.comment.globals.inc(fn.startEA, key)
+
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag_write(func, key, none):
     '''Removes the tag identified by ``key`` from the function ``func``.'''
     fn = by(func)
+
+    # if the user wants to remove the 'name' tag then remove the name from the function.
+    if key == 'name':
+        return set_name(fn, None)
+    
     state = internal.comment.decode(comment(fn, repeatable=1))
     res = state.pop(key)
     comment(fn, internal.comment.encode(state), repeatable=1)
+
+    internal.comment.globals.dec(fn.startEA, key)
     return res
 
 #FIXME: define tag_erase
@@ -815,7 +775,7 @@ def tag(func, key, none):
     '''Removes the tag identified by ``key`` for the function ``func``.'''
     return tag_write(func, key, None)
 
-# FIXME: this should be handled by a reference count
+# FIXME: this could be using the new reference counted tags
 @utils.multicase()
 def tags():
     '''Returns all the content tags for the current function.'''
@@ -824,7 +784,7 @@ def tags():
 def tags(func):
     '''Returns all the content tags for the function ``func``.'''
     ea = by(func).startEA
-    return internal.comment.tag.get(ea)
+    return internal.comment.contents.name(ea)
 
 # FIXME: consolidate this logic into the utils module
 # FIXME: document this properly
@@ -841,26 +801,24 @@ def select(func, tag, *tags, **boolean):
     tags = (tag,) + tags
     boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
     return select(func, **boolean)
+@utils.multicase(tag=(set,list))
+def select(func, tag, *tags, **boolean):
+    tags = set(list(tag) + list(tags))
+    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    return select(func, **boolean)
 @utils.multicase()
 def select(func, **boolean):
     '''Fetch a list of addresses within the function that contain the specified tags.'''
+    fn = by(func)
     boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
-        iterable = iterate(func)
-
-        ea = next(iterable)
-        res = database.tag(ea)
-        [ res.pop(getattr(internal.comment.tag, n), None) for n in ('__tags__','__address__') ]
-        res.pop('name', None)
-        if res: yield ea, res
-
-        for ea in iterable:
+        for ea in internal.comment.contents.address(fn.startEA):
             res = database.tag(ea)
             if res: yield ea, res
         return
 
-    for ea in iterate(func):
+    for ea in internal.comment.contents.address(fn.startEA):
         res,d = {},database.tag(ea)
 
         Or = boolean.get('Or', set())
@@ -1000,27 +958,35 @@ def is_thunk(func):
     return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
 
 @utils.multicase(reg=basestring)
-def register(reg, *regs, **options):
+def register(reg, *regs, **modifiers):
     """Yield all the addresses within the current function that touches one of the registers identified by ``regs``.
     """
-    return register(ui.current.function(), reg, *regs, **options)
+    return register(ui.current.function(), reg, *regs, **modifiers)
+
 @utils.multicase(reg=basestring)
-def register(func, reg, *regs, **options):
+def register(func, reg, *regs, **modifiers):
     """Yield all the addresses within the function ``func`` that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the address if it's writing to the register.
     """
     regs = (reg,) + regs
-    for l,r in chunks(func):
-        # FIXME: implement this without using database.address.nextreg so we
-        #        don't have to play around with catching exceptions
-        try:
-            ea = database.address.nextreg(l, *regs, **options)
-        except TypeError: continue
-        try:
-            while ea < r:
-                yield ea
-                ea = database.address.nextreg(database.address.next(ea), *regs, **options)
-        except TypeError: pass
+    write = (not modifiers.get('read',None)) if 'read' in modifiers else modifiers.get('write',None)
+    def uses_register(ea, regs):
+        res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
+        match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).related,itertools.imap(_instruction.reg.by_name,regs))
+        for t,p,st in res:
+            if t == 'opt_reg' and any(match(p,regs)) and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
+                return True
+            if t == 'opt_phrase' and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
+                _,(base,index,_) = p
+                if (base and any(match(base,regs))) or (index and any(match(index,regs))):
+                    return True
+            continue
+        return False
+
+    for ea in iterate(func):
+        if uses_register(ea, regs):
+            yield ea
+        continue
     return
 
 ## internal enumerations that idapython missed

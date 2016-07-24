@@ -1,4 +1,5 @@
 import logging,__builtin__
+import itertools,functools,operator
 import six,types
 
 import database,function,ui
@@ -44,13 +45,7 @@ def ops_count(): return ops_count(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_count(ea):
     '''Return the number of operands of given instruction'''
-    insn = at(ea)
-    for c,v in enumerate(insn.Operands):
-        if v.type == idaapi.o_void:
-            return c
-        continue
-    # maximum operand count. ida might be wrong here...
-    return c
+    return len(operand(ea, None))
 
 @utils.multicase()
 def ops_repr(): return ops_repr(ui.current.address())
@@ -72,11 +67,11 @@ def ops_state(): return ops_state(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_state(ea):
     '''Returns 'r','w','rw' for each operand of an instruction'''
-    read = [ getattr(idaapi, 'CF_USE{:d}'.format(n)) for n in range(1,7) ]
-    write = [ getattr(idaapi, 'CF_CHG{:d}'.format(n)) for n in range(1,7) ]
     f = feature(ea)
-    res = ( ((f&read[i]),(f&write[i])) for i in range(ops_count(ea)) )
+    res = ( ((f&ops_state.read[i]),(f&ops_state.write[i])) for i in range(ops_count(ea)) )
     return [ (r and 'r' or '') + (w and 'w' or '') for r,w in res ]
+# pre-cache the CF_ flags inside idaapi for ops_state
+ops_state.read, ops_state.write = zip(*((getattr(idaapi,'CF_USE{:d}'.format(_)), getattr(idaapi,'CF_CHG{:d}'.format(_))) for _ in range(1,7)))
 
 @utils.multicase()
 def ops_read(): return ops_read(ui.current.address())
@@ -99,15 +94,16 @@ def operand(): return operand(ui.current.address(), None)
 def operand(none): return operand(ui.current.address(), None)
 @utils.multicase(n=six.integer_types)
 def operand(n): return operand(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=types.NoneType)
-def operand(ea, n):
+@utils.multicase(ea=six.integer_types, none=types.NoneType)
+def operand(ea, none):
     insn = at(ea)
-    return tuple(insn.Operands[n] for n in xrange(ops_count(insn.ea)))
+    res = itertools.takewhile(lambda n: n.type != idaapi.o_void, (n.copy() for n in insn.Operands))
+    return tuple(res)
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def operand(ea, n):
     '''Returns the `n`th op_t of the instruction at `ea`'''
     insn = at(ea)
-    return insn.Operands[n]
+    return insn.Operands[n].copy()
 
 @utils.multicase(n=six.integer_types)
 def op_repr(n): return op_repr(ui.current.address(), n)
@@ -128,23 +124,23 @@ def op_size(n): return op_size(ui.current.address(), n)
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def op_size(ea, n):
     '''Returns the read size of an operand'''
-    insn = at(ea)
-    return opt.size(insn.Operands[n])
+    res = operand(ea, n)
+    return opt.size(res)
 
 @utils.multicase(n=six.integer_types)
 def op_type(n): return op_type(ui.current.address(), n)
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def op_type(ea, n):
     '''Returns the type of an operand (opt_imm, opt_reg, opt_phrase, opt_addr)'''
-    insn = at(ea)
-    return opt.type(insn.Operands[n]).__name__
+    res = operand(ea,n)
+    return opt.type(res).__name__
 
 @utils.multicase(n=six.integer_types)
 def op_segment(n): return op_segment(ui.current.address(), n)
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def op_segment(ea, n):
-    insn = at(ea)
-    segment = insn.Operands[n].specval & 0x00ff0000
+    op = operand(ea, n)
+    segment = op.specval & 0x00ff0000
     if segment == 0x001f0000:
         return 'ss'
     elif segment == 0x00200000:
@@ -162,7 +158,7 @@ def op_segment(ea, n):
 ## lvars
 #def op_stkvar(ea, n):
 #    '''Return the member of a stack variable'''
-#    py_op = operand(ea,n)    
+#    py_op = operand(ea,n)
 #    py_v = py_op.addr
 #    member,_ = idaapi.get_stkvar(py_op, py_v)
 #    return member
@@ -192,15 +188,15 @@ def op_segment(ea, n):
 ## get_Stroff_path
 # pathvar = idaapi.tid_array(length)
 # res = idapi.get_stroff_path(ea, n, pathvar, delta)
-    
+
     #https://www.hex-rays.com/products/ida/support/idapython_docs/
     # xreflist_t
     #https://www.hex-rays.com/products/ida/support/sdkdoc/frame_8hpp.html#aaeba4d56367ba26fb9a04923cfc89bb6
-    # idaman void ida_export build_stkvar_xrefs(xreflist_t * out, func_t * pfn, const member_t * mptr)  
+    # idaman void ida_export build_stkvar_xrefs(xreflist_t * out, func_t * pfn, const member_t * mptr)
     #https://www.hex-rays.com/products/ida/support/sdkdoc/frame_8hpp.html#a88d80d5d38b062a7743afc80d32e8a2c
-    # typedef qvector<xreflist_entry_t> xreflist_t // vector of xrefs to variables in a function's stack frame 
+    # typedef qvector<xreflist_entry_t> xreflist_t // vector of xrefs to variables in a function's stack frame
     #https://www.hex-rays.com/products/ida/support/sdkdoc/structxreflist__entry__t.html
-    # xreflist_entry_t  
+    # xreflist_entry_t
 
 
     # shortcut to get from a stkvar operand to the frame structure offset
@@ -211,23 +207,23 @@ def op_segment(ea, n):
 
 #def op_xref(ea, n):
 #    '''Returns whether the operand has a local or global xref'''
-#   return idaapi.op_adds_xrefs(idaapi.getFlags(ea),n) 
+#   return idaapi.op_adds_xrefs(idaapi.getFlags(ea),n)
 
 @utils.multicase(n=six.integer_types)
 def op_decode(n): return op_decode(ui.current.address(), n)
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def op_decode(ea, n):
     '''Returns the value for an operand in a parseable form'''
-    insn = at(ea)
-    return opt.decode(insn.Operands[n])
+    res = operand(ea, n)
+    return opt.decode(res)
 
 @utils.multicase(n=six.integer_types)
 def op_value(n): return op_value(ui.current.address(), n)
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def op_value(ea, n):
     '''Returns an operand's written value converted to register names, immediate, or offset,(base reg,index reg,scale)'''
-    insn = at(ea)
-    return opt.value(insn.Operands[n])
+    res = operand(ea, n)
+    return opt.value(res)
 
 ## operand types
 class opt(object):
@@ -257,6 +253,7 @@ class opt(object):
 
         elif op.type in (idaapi.o_far,idaapi.o_near):
             return res
+
         return res
 
     @classmethod
@@ -361,7 +358,8 @@ def opt_reg(op):
 @opt.define(idaapi.o_imm)
 def opt_imm(op):
     if op.type in (idaapi.o_imm,idaapi.o_phrase):
-        return op.value
+        bits = idaapi.get_dtyp_size(op.dtyp) * 8
+        return op.value & (2**bits-1)
     raise TypeError('{:s}.opt_imm : Invalid operand type. : {:d}'.format(__name__, op.type))
 
 @opt.define(idaapi.o_far)
@@ -402,7 +400,7 @@ def opt_reg(op):
 def is_globalref(): return is_globalref(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_globalref(ea):
-    '''Return True if the specified instruction references data (like a global)'''
+    '''Return True if the instruction at ``ea`` references global data.'''
     return len(database.dxdown(ea)) > len(database.cxdown(ea))
 isGlobalRef = is_globalref
 
@@ -410,6 +408,7 @@ isGlobalRef = is_globalref
 def is_importref(): return is_importref(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_importref(ea):
+    '''Returns True if the instruction at ``ea`` references an import.'''
     return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
 isImportRef = utils.alias(is_importref)
 
@@ -418,6 +417,8 @@ isImportRef = utils.alias(is_importref)
 def is_return(): return is_return(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_return(ea):
+    '''Returns True if the instruction at ``ea`` is a ret-type instruction.'''
+    idaapi.decode_insn(ea)
     return database.is_code(ea) and idaapi.is_ret_insn(ea)
 #    return feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
 isReturn = utils.alias(is_return)
@@ -426,6 +427,7 @@ isReturn = utils.alias(is_return)
 def is_shift(): return is_shift(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_shift(ea):
+    '''Returns True if the instruction at ``ea`` is a bit-shifting instruction.'''
     return database.is_code(ea) and feature(ea) & idaapi.CF_SHFT == idaapi.CF_SHFT
 isShift = utils.alias(is_shift)
 
@@ -433,6 +435,7 @@ isShift = utils.alias(is_shift)
 def is_branch(): return is_branch(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_branch(ea):
+    '''Returns True if the instruction at ``ea`` is a branch instruction.'''
     return database.is_code(ea) and isJmp(ea) or isJxx(ea) or isJmpi(ea)
 isBranch = utils.alias(is_branch)
 
@@ -440,6 +443,7 @@ isBranch = utils.alias(is_branch)
 def is_jmp(): return is_jmp(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_jmp(ea):
+    '''Returns True if the instruction at ``ea`` is a jmp (both immediate and indirect) instruction.'''
     MASK_BRANCH = 0b111
     CF_JMPIMM = 0b001
     CF_JMPCOND = 0b000
@@ -451,6 +455,7 @@ isJmp = utils.alias(is_jmp)
 def is_jxx(): return is_jxx(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_jxx(ea):
+    '''Returns True if the instruction at ``ea`` is a conditional branch.'''
     MASK_BRANCH = 0b111
     CF_JMPIMM = 0b001
     CF_JMPCOND = 0b000
@@ -462,6 +467,7 @@ isJxx = utils.alias(is_jxx)
 def is_jmpi(): return is_jmpi(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_jmpi(ea):
+    '''Returns True if the instruction at ``ea`` is an indirect branch.'''
     return database.is_code(ea) and feature(ea) & idaapi.CF_JUMP == idaapi.CF_JUMP
 isJmpi = utils.alias(is_jmpi)
 
@@ -469,8 +475,10 @@ isJmpi = utils.alias(is_jmpi)
 def is_call(): return is_call(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_call(ea):
-    # return idaapi.is_call_insn(ea)
-    return database.is_code(ea) and feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL
+    '''Returns True if the instruction at ``ea`` is a call instruction.'''
+    idaapi.decode_insn(ea)
+    return idaapi.is_call_insn(ea)
+#    return database.is_code(ea) and feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL
 isCall = utils.alias(is_call)
 
 ## op_t.flags
@@ -634,6 +642,7 @@ class ir:
                 return isinstance(self, other) if isinstance(other, __builtin__.type) else cmp(self,other) == 0
         class store(__base__): pass
         class load(__base__): pass
+        class loadstore(__base__): pass
         class assign(__base__): pass
         class value(__base__): pass
         class modify(__base__): pass
@@ -641,8 +650,8 @@ class ir:
 
     table = {
         'opt_imm':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify, '':operation.value},
-        'opt_addr':    {'r':operation.load,    'w':operation.store, 'rw':operation.unknown, '':operation.unknown},
-        'opt_phrase':  {'r':operation.load,    'w':operation.store, 'rw':operation.unknown, '':operation.unknown},
+        'opt_addr':    {'r':operation.load,    'w':operation.store, 'rw':operation.loadstore, '':operation.unknown},
+        'opt_phrase':  {'r':operation.load,    'w':operation.store, 'rw':operation.loadstore, '':operation.unknown},
         'opt_reg':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify, '':operation.unknown},
     }
 
@@ -692,11 +701,70 @@ class ir:
         result = []
         for opnum in range(ops_count(ea)):
             operation,value = cls.op(ea, opnum)
+            sz = operation.size
             if operation == cls.operation.modify:
-                result.append((cls.operation.assign,value))
-                result.append((cls.operation.value,value))
+                result.append((cls.operation.assign(sz),value))
+                result.append((cls.operation.value(sz),value))
+            elif operation == cls.operation.loadstore:
+                result.append((cls.operation.load(sz),value))
+                result.append((cls.operation.store(sz),value))
             else:
                 result.append((operation,value))
             continue
+
+        # if mnemonic is stack-related, then add the other implicit operation
+        # FIXME: ...and another pretty bad hack to figure out how to remove
+        sp,sz = register.sp,database.config.bits()/8
+        if mnem(ea).upper() == 'PUSH':
+            result.append((cls.operation.store(sz), (0, sp.id, 0, 1)))
+        elif mnem(ea).upper() == 'POP':
+            result.append((cls.operation.load(sz), (0, sp.id, 0, 1)))
+        elif mnem(ea).upper().startswith('RET'):
+            if len(result) > 0:
+                result.append((cls.operation.modify(sz), (0, sp.id, 0, 1)))
+            result.append((cls.operation.load(sz), (0, sp.id, 0, 1)))
+        elif mnem(ea).upper() == 'CALL':
+            result.append((cls.operation.store(sz), (0, sp.id, 0, 1)))
+
         return mnem(ea),result
     at = utils.alias(instruction, 'ir')
+
+    @utils.multicase()
+    @classmethod
+    def get_value(cls): return cls.get_value(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def get_value(cls, ea):
+        _,res = cls.at(ea)
+        value = [v for t,v in res if t == 'value']
+        return value or None
+
+    @utils.multicase()
+    @classmethod
+    def get_store(cls): return cls.get_store(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def get_store(cls, ea):
+        _,res = cls.at(ea)
+        store = [v for t,v in res if t == 'store']
+        return store or None
+
+    @utils.multicase()
+    @classmethod
+    def get_load(cls): return cls.get_load(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def get_load(cls, ea):
+        _,res = cls.at(ea)
+        load = [v for t,v in res if t == 'load']
+        return load or None
+
+    @utils.multicase()
+    @classmethod
+    def get_assign(cls): return cls.get_assign(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def get_assign(cls, ea):
+        _,res = cls.at(ea)
+        assign = [v for t,v in res if t == 'assign']
+        return assign or None
