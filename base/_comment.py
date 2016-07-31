@@ -23,7 +23,6 @@ Lists and Dictionary types are stored as-is. Integral types are always portrayed
 String types have the ability to escape certain characters.  The characters that have special meaning are '\n', '\r', and '\t'. Similarly if a backslash is escaped, it will result in a single '\'. If any other character is prefixed with a backslash, it will decode into a character prefixed with a backslash. This is different from what one would expect in that all characters might be escaped but is done so that one would not need to recursively escape and unescape strings that are stored.
 '''
 
-import sys
 import itertools,functools,operator
 import collections,heapq,string
 import six,logging
@@ -346,7 +345,21 @@ class contents(tagging):
         if key is None:
             raise LookupError(ea)
 
-        encdata = internal.netnode.sup.get(node, key)
+        # check to see if using old sup version
+        res = internal.netnode.sup.get(node, key)
+        if res is not None:
+            try:
+                # check if it's not corrupted
+                marshal.loads(cls.codec.decode(res))
+            except:
+                pass
+            else:
+                # if so, then re-assign it to function's blob
+                internal.netnode.blob.set(key, idaapi.stag, res)
+            internal.netnode.sup.remove(node, key)
+
+        encdata = internal.netnode.blob.get(key, idaapi.stag)
+        #encdata = internal.netnode.sup.get(node, key)
         if encdata is None:
             return None
 
@@ -363,15 +376,15 @@ class contents(tagging):
             raise LookupError(ea)
 
         if not value:
-            return internal.netnode.sup.remove(node, key)
+            return internal.netnode.blob.remove(key, idaapi.stag)
+            #return internal.netnode.sup.remove(node, key)
 
         data = cls.marshaller.dumps(value)
         encdata,sz = cls.codec.encode(data)
         if sz != len(data):
             raise ValueError((sz,len(data)))
-        if len(encdata) >= 1024:
-            raise ValueError((sz,1024))
-        return internal.netnode.sup.set(node, key, encdata)
+        return internal.netnode.blob.set(key, idaapi.stag, encdata)
+        #return internal.netnode.sup.set(node, key, encdata)
 
     @classmethod
     def iterate(cls):
@@ -401,7 +414,7 @@ class contents(tagging):
         res = cls._read(address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
-        refs, count = state.pop(name) - 1, cache.pop(address) - 1
+        refs, count = state.pop(name, 0) - 1, cache.pop(address, 0) - 1
         if refs > 0:
             state[name] = refs
 
@@ -409,10 +422,10 @@ class contents(tagging):
             cache[address] = count
 
         if state: res[cls.__tags__] = state
-        else: del res[cls.__tags__]
+        else: res.pop(cls.__tags__, None)
 
         if cache: res[cls.__address__] = cache
-        else: del res[cls.__address__]
+        else: res.pop(cls.__address__, None)
 
         cls._write(address, res)
         return refs
@@ -530,18 +543,7 @@ class globals(tagging):
         internal.netnode.alt.set(tagging.node(), address, count)
         return res
 
-class mixin_utils(object):
-    @staticmethod
-    def noapi(*args):
-        fr = sys._getframe().f_back
-        if fr is None:
-            logging.fatal("internal.{:s}.noapi : Unexpected empty frame from caller. Continuing.. : {!r} : {!r}".format('.'.join((__name__,'hook')), sys._getframe(), sys._getframe().f_code))
-            return hook.CONTINUE
-
-        hook = internal.interface.priorityhook
-        return hook.CONTINUE if fr.f_back is None else hook.STOP
-
-class address_hook(mixin_utils):
+class address_hook(object):
     @classmethod
     def _is_repeatable(cls, ea):
         f = idaapi.get_func(ea)
@@ -640,7 +642,7 @@ class address_hook(mixin_utils):
         newcmt = idaapi.get_cmt(ea, repeatable_cmt)
         cls.event.send((ea, bool(repeatable_cmt), None))
 
-class global_hook(mixin_utils):
+class global_hook(object):
     @classmethod
     def _update_refs(cls, fn, old, new):
         for key in old.viewkeys() ^ new.viewkeys():

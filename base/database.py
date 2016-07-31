@@ -5,7 +5,8 @@ generic tools for working in the context of the database
 '''
 
 import __builtin__,logging,os
-import array,itertools,functools,ctypes
+import array,ctypes,fnmatch,re
+import functools,itertools,operator
 import six,types
 
 import function,segment,structure,ui,internal
@@ -218,6 +219,60 @@ def iterate(start, end, step=None):
         start = step(start)
     yield end
 
+class names(object):
+    __matcher__ = internal.interface.matcher()
+    __matcher__.mapping('address', idaapi.get_nlist_ea)
+    __matcher__.mapping('ea', idaapi.get_nlist_ea)
+    __matcher__.boolean('name', operator.eq, idaapi.get_nlist_name)
+    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), idaapi.get_nlist_name)
+    __matcher__.boolean('regex', re.search, idaapi.get_nlist_name)
+    __matcher__.predicate('predicate', idaapi.get_nlist_ea)
+    __matcher__.predicate('pred', idaapi.get_nlist_ea)
+    __matcher__.attribute('index')
+
+    def __new__(cls):
+        for index in xrange(idaapi.get_nlist_size()):
+            res = zip((idaapi.get_nlist_ea,idaapi.get_nlist_name), (index,)*2)
+            yield tuple(f(n) for f,n in res)
+        return
+
+    @utils.multicase(string=basestring)
+    @classmethod
+    def list(cls, string):
+        return cls.list(like=string)
+
+    @utils.multicase()
+    @classmethod
+    def list(cls, **type):
+        iterable = xrange(idaapi.get_nlist_size())
+        for k,v in type.iteritems():
+            for index in cls.__matcher__.match(k, v, iterable):
+                print '[{:d}] {:x} {:s}'.format(index, idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index))
+            continue
+        return
+
+    @utils.multicase(string=basestring)
+    @classmethod
+    def search(cls, string):
+        return cls.list(like=string)
+    @utils.multicase()
+    @classmethod
+    def search(cls, **type):
+        iterable = xrange(idaapi.get_nlist_size())
+
+        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        if len(type) != 1:
+            raise LookupError('{:s}.{:s}.search({:s}) : More than one search type specified.', __name__, cls.__name__, searchstring)
+        k, v = __builtin__.next(type.iteritems())
+        res = __builtin__.map(None, cls.__matcher__.match(k, v, iterable))
+        if len(res) > 1:
+            __builtin__.map(logging.info, (('[{:d}] {:s}'.format(idaapi.get_struc_idx(x.id), st.name)) for i,st in enumerate(res)))
+            logging.warn('{:s}.{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format(__name__, cls.__name__, len(res)))
+        res = __builtin__.next(iter(res), None)
+        if res is None:
+            raise LookupError('{:s}.{:s}.search({:s}) : Found 0 matching results.', __name__, cls.__name__, searchstring)
+        return idaapi.get_nlist_ea(res), idaapi.get_nlist_name(res)
+
 ## searching by stuff
 # FIXME: bounds-check all these addresses
 class search(object):
@@ -338,7 +393,7 @@ def get_name(ea):
         return None
 
     # now return the name at the specified address
-    aname = idaapi.get_true_name(ea)
+    aname = idaapi.get_true_name(ea) or idaapi.get_true_name(ea, ea)
 
     # ..or not
     return aname or None
@@ -624,7 +679,7 @@ def make_entry(ea, name, ordinal):
     return idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
 
 def tags():
-    '''Returns all the tags used outside a function.'''
+    '''Returns all the tag names used globally.'''
     return internal.comment.globals.name()
 
 @utils.multicase()
@@ -653,14 +708,19 @@ def tag_read(ea):
     d2 = internal.comment.decode(res)
     if d1.viewkeys() & d2.viewkeys():
         logging.warn('{:s}.tag_read : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
-    d2.update(d1)
+    res = {}
+    __builtin__.map(res.update, (d1,d2))
 
-    # modify the decoded dictionary to include the current name if it's there
+    # modify the decoded dictionary with implicit tags
     aname = get_name(ea)
-    if aname: d2.setdefault('name', aname)
+    if aname and (idaapi.getFlags(ea) & idaapi.FF_NAME): res.setdefault('__name__', aname)
+    eprefix = extra.get_prefix(ea)
+    if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
+    esuffix = extra.get_suffix(ea)
+    if esuffix is not None: res.setdefault('__extra_suffix__', esuffix)
 
     # now return what the user cares about
-    return d2
+    return res
 @utils.multicase(ea=six.integer_types, key=basestring)
 def tag_read(ea, key):
     '''Returns the tag identified by ``key`` from address ``ea``.'''
@@ -681,10 +741,14 @@ def tag_write(ea, key, value):
     if value is None:
         raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
 
-    # if the user wants to change the 'name' tag, then
+    # if the user wants to change the '__name__' tag, then
     # change the name fo' real.
-    if key == 'name':
+    if key == '__name__':
         return set_name(ea, value, listed=True)
+    if key == '__extra_prefix__':
+        return extra.set_prefix(ea, value)
+    if key == '__extra_suffix__':
+        return extra.set_suffix(ea, value)
 
     # if not within a function, then use a repeatable comment
     # otherwise, use a non-repeatable one
@@ -712,9 +776,13 @@ def tag_write(ea, key, none):
     '''Removes the tag specified by ``key`` from the address ``ea``.'''
     ea = interface.address.inside(ea)
 
-    # if the 'name' is being cleared, then really remove it.
-    if key == 'name':
+    # if the '__name__' is being cleared, then really remove it.
+    if key == '__name__':
         return set_name(ea, None, listed=True)
+    if key == '__extra_prefix__':
+        return extra.del_prefix(ea)
+    if key == '__extra_suffix__':
+        return extra.del_suffix(ea)
 
     # if not within a function, then fetch the repeatable comment
     # otherwise update the non-repeatable one
@@ -781,11 +849,11 @@ def select(tag, *tags, **boolean):
 @utils.multicase()
 def select(**boolean):
     '''Fetch all the functions containing the specified tags within it's declaration'''
-    boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
+    boolean = dict((k,set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
         for ea in internal.comment.globals.address():
-            res = set(function.tag(ea).viewkeys())
+            res = function.tag(ea) if function.within(ea) else tag(ea)
             if res: yield ea, res
         return
 
@@ -813,7 +881,7 @@ def selectcontents(tag, *tags, **boolean):
 @utils.multicase()
 def selectcontents(**boolean):
     '''Fetch all the functions containing the specified tags within it's contents'''
-    boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
+    boolean = dict((k,set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
         for ea in functions():
@@ -943,6 +1011,9 @@ class imports(object):
                 yield ea,(module,name,ordinal)
             continue
         return
+
+    # FIXME: include a import matching class so that somebody can search imports
+    #        by module or wildcard or name or address..etc.
 
 getImportModules = utils.alias(imports.modules, 'imports')
 getImports = utils.alias(imports.list, 'imports')
@@ -1729,7 +1800,7 @@ class type(object):
                     ct = typelookup[m.type]
                 except KeyError:
                     ty,sz = m.type
-                    if isinstance(ty, list):
+                    if isinstance(ty, __builtin__.list):
                         t = typelookup[tuple(ty)]
                         ct = t*sz
                     elif isinstance(ty, (chr,str)):
@@ -1907,7 +1978,7 @@ class xref(object):
     @staticmethod
     def data_down(ea):
         '''Return all the data xrefs that are referenced by the address ``ea``.'''
-        return list(xref.data(ea, True))
+        return sorted(xref.data(ea, True))
     dd = utils.alias(data_down, 'xref')
 
     @utils.multicase()
@@ -1919,7 +1990,7 @@ class xref(object):
     @staticmethod
     def data_up(ea):
         '''Return all the data xrefs that refer to the address ``ea``.'''
-        return list(xref.data(ea, False))
+        return sorted(xref.data(ea, False))
     du = utils.alias(data_up, 'xref')
 
     @utils.multicase()
@@ -1933,7 +2004,7 @@ class xref(object):
         '''Return all the code xrefs that are referenced by the address ``ea``.'''
         result = set(xref.code(ea, True))
         result.discard(address.next(ea))
-        return list(result)
+        return sorted(result)
     cd = utils.alias(code_down, 'xref')
 
     @utils.multicase()
@@ -1947,7 +2018,7 @@ class xref(object):
         '''Return all the code xrefs that refer to the address ``ea``.'''
         result = set(xref.code(ea, False))
         result.discard(address.prev(ea))
-        return list(result)
+        return sorted(result)
     cu = utils.alias(code_up, 'xref')
 
     @utils.multicase()
@@ -1959,7 +2030,7 @@ class xref(object):
     @staticmethod
     def up(ea):
         '''Return all the references that refer to the address ``ea``.'''
-        return list(set(xref.data_up(ea) + xref.code_up(ea)))
+        return sorted(set(xref.data_up(ea) + xref.code_up(ea)))
     u = utils.alias(up, 'xref')
 
     # All locations that are referenced by the specified address
@@ -1972,7 +2043,7 @@ class xref(object):
     @staticmethod
     def down(ea):
         '''Return all the references that are referred by the address ``ea``.'''
-        return list(set(xref.data_down(ea) + xref.code_down(ea)))
+        return sorted(set(xref.data_down(ea) + xref.code_down(ea)))
     d = utils.alias(down, 'xref')
 
     @utils.multicase(target=six.integer_types)
@@ -2059,7 +2130,7 @@ class marks(object):
 
     def __new__(cls):
         '''Yields each of the marked positions within the database.'''
-        res = list(cls.iterate()) # make a copy in-case someone is actively it
+        res = __builtin__.list(cls.iterate()) # make a copy in-case someone is actively it
         for ea,comment in cls.iterate():
             yield ea, comment
         return
@@ -2120,13 +2191,13 @@ class marks(object):
     @classmethod
     def length(cls):
         '''Return the number of marks in the database.'''
-        return len(list(cls.iterate()))
+        return len(__builtin__.list(cls.iterate()))
 
     @classmethod
     def location(cls, **attrs):
         '''Return a location_t object with the specified attributes.'''
         res = idaapi.curloc()
-        list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
+        __builtin__.list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
         return res
 
     @classmethod
@@ -2159,10 +2230,10 @@ class marks(object):
         res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
         res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
         try:
-            count = len(list(itertools.takewhile(lambda n: n != ea, res)))
+            count = len(__builtin__.list(itertools.takewhile(lambda n: n != ea, res)))
         except IndexError:
             raise KeyError(ea)
-        list(itertools.islice(iterable, count))
+        __builtin__.list(itertools.islice(iterable, count))
         if iterable.next() != ea:
             raise KeyError(ea)
         return count
@@ -2223,33 +2294,55 @@ def mark(ea, description):
     return marks.new(ea, description)
 
 class extra(object):
+    '''Allow one to manipulate the extra comments that suffix or prefix a given address'''
+
     MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
     MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
 
     @classmethod
     def __hide(cls, ea):
-        if idaapi.hasExtra(ea):
+        if idaapi.hasExtra(ea) or True: # FIXME: idaapi.hasExtra doesn't seem to work
             return idaapi.noExtra(ea)
         return False
 
     @classmethod
     def __show(cls, ea):
-        if idaapi.hasExtra(ea):
+        if idaapi.hasExtra(ea) or True: # FIXME: idaapi.hasExtra doesn't seem to work
             return idaapi.doExtra(ea)
         return False
+
+    @classmethod
+    def has_extra(cls, ea, base):
+        sup = internal.netnode.sup
+        return sup.get(ea, base) is not None
+
+    @classmethod
+    def count(cls, ea, base):
+        sup = internal.netnode.sup
+        for i in xrange(0, cls.MAX_ITEM_LINES):
+            row = sup.get(ea, base+i)
+            if row is None: break
+        return i or None
+
     @classmethod
     def __get(cls, ea, base):
-        res = []
-        for i in xrange(0, cls.MAX_ITEM_LINES):
-            row = idaapi.get_extra_cmt(ea, base+i)
-            if row is None: break
-            res.append(row)
-        return '\n'.join(res)
+        sup = internal.netnode.sup
+        count = cls.count(ea, base)
+        if count is None: return None
+        res = (sup.get(ea, base+i) for i in xrange(count))
+        return '\n'.join(row[:-1] if row.endswith('\x00') else row for row in res)
     @classmethod
     def __set(cls, ea, string, base):
-        for i,row in enumerate(string.split('\n')):
-            idaapi.update_extra_cmt(ea, base+i, row)
-        return
+        sup = internal.netnode.sup
+        [ sup.set(ea, base+i, row+'\x00') for i,row in enumerate(string.split('\n')) ]
+        return True
+    @classmethod
+    def __del(cls, ea, base):
+        sup = internal.netnode.sup
+        count = cls.count(ea, base)
+        if count is None: return False
+        [ sup.remove(ea, base+i) for i in xrange(count) ]
+        return True
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -2269,8 +2362,7 @@ class extra(object):
         '''Delete the prefixed comment at address ``ea``.'''
         res = cls.__get(ea, idaapi.E_PREV)
         cls.__hide(ea)
-        # idaapi.del_extra_cmt(ea, idaapi.E_PREV+n)
-        idaapi.delete_extra_cmts(ea, idaapi.E_PREV)
+        cls.__del(ea, idaapi.E_PREV)
         cls.__show(ea)
         return res
     @utils.multicase(ea=six.integer_types)
@@ -2279,8 +2371,7 @@ class extra(object):
         '''Delete the suffixed comment at address ``ea``.'''
         res = cls.__get(ea, idaapi.E_NEXT)
         cls.__hide(ea)
-        # idaapi.del_extra_cmt(ea, idaapi.E_NEXt+n)
-        idaapi.delete_extra_cmts(ea, idaapi.E_NEXT)
+        cls.__del(ea, idaapi.E_NEXT)
         cls.__show(ea)
         return res
 
@@ -2290,6 +2381,7 @@ class extra(object):
         '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
         cls.__hide(ea)
         res, ok = cls.del_prefix(ea), cls.__set(ea, string, idaapi.E_PREV)
+        ok = cls.__set(ea, string, idaapi.E_PREV)
         cls.__show(ea)
         return res
     @utils.multicase(ea=six.integer_types, string=basestring)

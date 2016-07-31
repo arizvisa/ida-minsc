@@ -205,12 +205,12 @@ class blob(object):
         return None if res is None else res[:sz]
 
     @classmethod
-    def set(cls, nodeidx, val, tag, start=0):
+    def set(cls, nodeidx, tag, val, start=0):
         node = _idaapi.new_netnode(nodeidx)
         return _idaapi.netnode_setblob(node, val, start, tag)
 
     @classmethod
-    def remove(cls, tag, start=0):
+    def remove(cls, nodeidx, tag, start=0):
         node = _idaapi.new_netnode(nodeidx)
         return _idaapi.netnode_delblob(node, start, tag)
 

@@ -1,7 +1,8 @@
-import sys,logging,itertools
+import sys,logging
+import functools,itertools,operator
 import six,types,re,fnmatch
 
-import database,ui
+import database,ui,internal
 from internal import utils,interface
 
 import idaapi
@@ -32,25 +33,25 @@ def name(id, name):
 def name(struc, name): return name(struc.id, name)
 
 @utils.multicase(id=six.integer_types)
-def comment(id, **kwds):
+def comment(id, **repeatable):
     """Return the comment for the structure identified by ``id``.
     If the bool ``repeatable`` is specified, return the repeatable comment.
     """
-    return idaapi.get_struc_cmt(id, kwds.get('repeatable',1))
+    return idaapi.get_struc_cmt(id, repeatable.get('repeatable',True))
 @utils.multicase(struc=__structure_t)
-def comment(struc, **kwds):
+def comment(struc, **repeatable):
     '''Return the comment for the structure ``struc``.'''
-    return comment(struc.id, **kwds)
+    return comment(struc.id, **repeatable)
 @utils.multicase(cmt=basestring)
-def comment(id=six.integer_types, cmt=basestring, **kwds):
+def comment(id=six.integer_types, cmt=basestring, **repeatable):
     """Set the comment for the structure identified by ``id`` to ``cmt``.
     If the bool ``repeatable`` is specified, set the repeatable comment.
     """
-    return idaapi.set_struc_cmt(id, cmt, kwds.get('repeatable',1))
+    return idaapi.set_struc_cmt(id, cmt, repeatable.get('repeatable',True))
 @utils.multicase(struc=__structure_t, cmt=basestring)
-def comment(struc, cmt, **kwds):
+def comment(struc, cmt, **repeatable):
     '''Set the comment for the structure ``struc``.'''
-    return comment(struc.id, cmt, **kwds)
+    return comment(struc.id, cmt, **repeatable)
 
 @utils.multicase(id=six.integer_types)
 def index(id):
@@ -69,6 +70,16 @@ def index(struc, index):
     '''Move the structure ``struc`` to the index ``index``.'''
     return index(struc.id, index)
 
+__matcher__ = internal.interface.matcher()
+__matcher__.boolean('regex', re.search, 'name')
+__matcher__.mapping('index', idaapi.get_struc_idx, 'id')
+__matcher__.attribute('identifier', 'id')
+__matcher__.attribute('id', 'id')
+__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), 'name')
+__matcher__.boolean('name', operator.eq, 'name')
+__matcher__.predicate('predicate')
+__matcher__.predicate('pred')
+
 @utils.multicase(string=basestring)
 def list(string):
     '''List any structures that match the glob in `string`.'''
@@ -85,23 +96,14 @@ def list(**type):
     pred = function predicate
     """
 
-    # FIXME: refactor this implementation into a utility module
-    #        so that this can be reused elsewhere
-    if 'regex' in type:
-        match = lambda x: re.search(type['regex'], x.name)
-    elif 'index' in type:
-        match = lambda x: idaapi.get_struc_idx(x.id) == type['index']
-    elif 'identifer' in type:
-        match = lambda x: x.id == type['identifier']
-    elif 'like' in type:
-        match = lambda x: fnmatch.fnmatch(x.name, type['like'])
-    elif 'pred' in type:
-        match = type['pred']
+    if type:
+        for k,v in type.iteritems():
+            for st in map(None, __matcher__.match(k, v, iterate())):
+                print('[{:d}] {:s} +0x{:x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), st.name, st.size, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
+            continue
     else:
-        match = bool
-
-    for st in itertools.ifilter(match,iterate()):
-        print('[{:d}] {:s} +0x{:x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), st.name, st.size, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
+        for st in iterate():
+            print('[{:d}] {:s} +0x{:x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), st.name, st.size, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
     return
 
 @utils.multicase(string=basestring)
@@ -117,31 +119,20 @@ def search(**type):
     index = particular index
     identifier or id = internal id number
     """
-    try:
-        if type:
-            if 'regex' in type:
-                match = lambda x: re.search(type['regex'], x.name)
-            elif 'index' in type:
-                match = lambda x: idaapi.get_struc_idx(x.id) == type['index']
-            elif 'identifer' in type or 'id' in type:
-                match = lambda x: x.id == type['identifier']
-            elif 'like' in type:
-                match = lambda x: fnmatch.fnmatch(x.name, type['like'])
-            elif 'pred' in type:
-                match = type['pred']
-            else:
-                raise LookupError
-    except:
-        raise LookupError('{:s}.search : Unable to determine search type : ({:s})'.format(__name__, ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())))
 
-    res = filter(match,iterate())
+    searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+    if len(type) != 1:
+        raise LookupError('{:s}.search({:s}) : More than one search type specified.', __name__, searchstring)
+
+    k,v = next(type.iteritems())
+    res = map(None,__matcher__.match(k, v, iterate()))
     if len(res) > 1:
-        logging.warn('{:s}.search({:s}) : Found {:d} results, returning the first one.'.format(__name__, ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems()), len(res)))
-        fn = lambda x: sys.stdout.write(x + "\n")
-        map(logging.info, (('[{:d}] {:s}'.format(idaapi.get_struc_idx(x.id), x.name)) for i,x in enumerate(res)))
-    res = next(itertools.ifilter(match, iterate()), None)
+        map(logging.info, (('[{:d}] {:s}'.format(idaapi.get_struc_idx(st.id), st.name)) for i,st in enumerate(res)))
+        logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format(__name__, searchstring, len(res)))
+
+    res = next(iter(res), None)
     if res is None:
-        raise LookupError('{:s}.search({:s}) : Found 0 results.'.format(__name__, ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())))
+        raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format(__name__, searchstring))
     return res
 
 def iterate():
@@ -318,7 +309,6 @@ class structure_t(__structure_t):
         if identifier == idaapi.BADADDR:
             logging.warn('{:s}.structure_t.__setstate__ : Creating structure {:s} [{:d} fields]{:s}'.format(__name__, name, len(members), ' // {:s}'.format(cmtf or cmtt) if cmtf or cmtt else ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, name)
-        # FIXME: although set_struc_idx and stuff doesn't seem too important.
         idaapi.set_struc_cmt(identifier, cmtt, True)
         idaapi.set_struc_cmt(identifier, cmtf, False)
         self.__id = identifier
@@ -334,13 +324,13 @@ class structure_t(__structure_t):
         '''Set the name for the structure to ``name``.'''
         return idaapi.set_struc_name(self.id, name)
     @property
-    def comment(self):
+    def comment(self, repeatable=True):
         '''Return the repeatable comment for the structure.'''
-        return idaapi.get_struc_cmt(self.id, True)
+        return idaapi.get_struc_cmt(self.id, repeatable)
     @comment.setter
-    def comment(self, comment):
+    def comment(self, comment, repeatable=True):
         '''Set the repeatable comment for the structure to ``comment``.'''
-        return idaapi.set_struc_cmt(self.id, comment, True)
+        return idaapi.set_struc_cmt(self.id, comment, repeatable)
     @property
     def size(self):
         '''Return the size of the structure.'''
@@ -515,13 +505,13 @@ class members_t(object):
     byfullname = byFullname = utils.alias(by_fullname, 'members_t')
     def by_offset(self, offset):
         '''Return the member at the specified ``offset``.'''
-        min,max = map(lambda sz: sz - self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr),idaapi.get_struc_last_offset(self.owner.ptr)))
+        min,max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr),idaapi.get_struc_last_offset(self.owner.ptr)))
         if (offset < min) or (offset >= max):
-            raise LookupError('{:s}.instance({:s}).members.by_offset : Requested offset 0x{:x} not within bounds (0x{:x},0x{:x})'.format(__name__, self.owner.name, offset, min, max))
+            raise LookupError('{:s}.instance({:s}).members.by_offset : Requested offset {:s} not within bounds (0x{:x},0x{:x})'.format(__name__, self.owner.name, '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset), min, max))
 
         mem = idaapi.get_member(self.owner.ptr, offset - self.baseoffset)
         if mem is None:
-            raise LookupError('{:s}.instance({:s}).members.by_offset : Unable to find member at offset : 0x{:x}'.format(__name__, self.owner.name, offset))
+            raise LookupError('{:s}.instance({:s}).members.by_offset : Unable to find member at offset : {:s}'.format(__name__, self.owner.name, '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset)))
 
         index = self.index(mem)
         return self[index]
@@ -529,14 +519,17 @@ class members_t(object):
 
     def near_offset(self, offset):
         '''Return the member near to the specified ``offset``.'''
-        min,max = map(lambda sz: sz - self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr),idaapi.get_struc_last_offset(self.owner.ptr)))
+        offset_repr = '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset)
+        min,max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr),idaapi.get_struc_last_offset(self.owner.ptr)))
         if (offset < min) or (offset >= max):
-            logging.warn('{:s}.instance({:s}).members.near_offset : Requested offset 0x{:x} not within bounds (0x{:x},0x{:x}). Trying anyways..'.format(__name__, self.owner.name, offset, min, max))
+            logging.warn('{:s}.instance({:s}).members.near_offset : Requested offset {:s} not within bounds (0x{:x},0x{:x}). Trying anyways..'.format(__name__, self.owner.name, '-0x{:x}'.format(offset_repr), min, max))
 
-        mem = idaapi.get_member(self.owner.ptr, offset - self.baseoffset)
+        res = offset - self.baseoffset
+        mem = idaapi.get_member(self.owner.ptr, res)
         if mem is None:
-            logging.info('{:s}.instance({:s}).members.near_offset : Unable to locate member at offset 0x{:x}. Trying get_best_fit_member instead.'.format(__name__, self.owner.name, offset - self.baseoffset))
-            mem = idaapi.get_best_fit_member(self.owner.ptr, offset - self.baseoffset)
+            res_repr = '-0x{:x}'.format(abs(res)) if res < 0 else '0x{:x}'.format(res)
+            logging.info('{:s}.instance({:s}).members.near_offset : Unable to locate member at offset {:s}. Trying get_best_fit_member instead.'.format(__name__, self.owner.name, res))
+            mem = idaapi.get_best_fit_member(self.owner.ptr, res)
 
         if mem is None:
             raise LookupError('{:s}.instance({:s}).members.near_offset : Unable to find member near offset : 0x{:x}'.format(__name__, self.owner.name, offset))
@@ -562,26 +555,27 @@ class members_t(object):
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         realoffset = offset - self.baseoffset
+        realoffset_repr = '-0x{:x}'.format(abs(realoffset)) if realoffset < 0 else '0x{:x}'.format(realoffset)
         if name is None:
-            logging.warn('{:s}.instance({:s}).members.add : name is undefined, defaulting to offset 0x{:x}'.format(__name__, self.owner.name, realoffset))
+            logging.warn('{:s}.instance({:s}).members.add : name is undefined, defaulting to offset {:s}'.format(__name__, self.owner.name, realoffset_repr))
             name = 'v_{:s}'.format(realoffset)
 
         res = idaapi.add_struc_member(self.owner.ptr, name, realoffset, flag, opinfo, nbytes)
         if res == idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.info('{:s}.instance({:s}).members.add : idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset=0x{:x}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x}) : Success'.format(__name__, self.owner.name, self.owner.name, name, realoffset, flag, typeid, nbytes))
+            logging.info('{:s}.instance({:s}).members.add : idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:s}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x}) : Success'.format(__name__, self.owner.name, self.owner.name, name, realoffset_repr, flag, typeid, nbytes))
         else:
             error = {
                 idaapi.STRUC_ERROR_MEMBER_NAME : 'Duplicate field name',
                 idaapi.STRUC_ERROR_MEMBER_OFFSET : 'Invalid offset',
                 idaapi.STRUC_ERROR_MEMBER_SIZE : 'Invalid size',
             }
-            callee = 'idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset=0x{:x}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x})'.format(self.owner.name, name, realoffset, flag, typeid, nbytes)
+            callee = 'idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:s}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x})'.format(self.owner.name, name, realoffset_repr, flag, typeid, nbytes)
             logging.fatal(' : '.join(('members_t.add', callee, error.get(res, 'Error code 0x{:x}'.format(res)))))
             return None
 
         res = idaapi.get_member(self.owner.ptr, realoffset)
         if res is None:
-            logging.fatal("{:s}.instance({:s}.members.add : Failed creating member {!r} 0x{:x}:+0x{:x}".format(__name__, self.owner.name, name, realoffset, nbytes))
+            logging.fatal("{:s}.instance({:s}.members.add : Failed creating member {!r} {:s}:+0x{:x}".format(__name__, self.owner.name, name, realoffset_repr, nbytes))
 
         # sloppily figure out what the correct index is
         idx = self.index( idaapi.get_member(self.owner.ptr, realoffset) )
@@ -610,7 +604,7 @@ class members_t(object):
         for i in xrange(len(self)):
             m = self[i]
             name,t,ofs,size,comment = m.name,m.type,m.offset,m.size,m.comment
-            result.append((i, name,t,ofs,size,comment))
+            result.append((i,name,t,ofs,size,comment))
         return '{!r}\n{:s}'.format(self.owner, '\n'.join(' [{:d}] {:s} {!r} {{{:x}:+{:x}}}{:s}'.format(i,n,t,o,s,' // {:s}'.format(c) if c else '') for i,n,t,o,s,c in result))
 
 class member_t(object):
@@ -778,5 +772,6 @@ class member_t(object):
     def __repr__(self):
         '''Display the specified member in a readable format.'''
         id,name,typ,comment = self.id,self.name,self.type,self.comment
-        return '{:s} [{:d}] {:s} {:s} {{0x{:x}:+0x{:x}}}{:s}'.format(self.__class__, self.index, name, repr(typ), self.offset, self.size, ' // {:d}'.format(comment) if comment else '')
+        offset_repr = '-0x{:x}'.format(abs(self.offset)) if self.offset < 0 else '0x{:x}'.format(self.offset)
+        return '{:s} [{:d}] {:s} {:s} {{{!r}:+0x{:x}}}{:s}'.format(self.__class__, self.index, name, typ, offset_repr, self.size, ' // {:d}'.format(comment) if comment else '')
 

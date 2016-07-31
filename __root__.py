@@ -1,5 +1,5 @@
 ## ida-python specific modules
-import _idaapi as idaapi,ida
+import idaapi,ida
 
 ## contextual modules
 import segment,database,function,instruction
@@ -25,11 +25,16 @@ ui.hook.ui.add('database_inited', __import__('internal').interface.typemap.__dat
 # create the tagcache netnode in the database
 ui.hook.ui.add('database_inited', __import__('internal').comment.tagging.__database_inited__, 0)
 
-[ ui.hook.idb.add(n, __import__('internal').comment.mixin_utils.noapi, -1) for n in ('changing_cmt','cmt_changed','changing_area_cmt', 'area_cmt_changed') ]
+# hook comments so that they update the tagcache
+[ ui.hook.idb.add(n, __import__('internal').interface.hook.noapi, -1) for n in ('changing_cmt','cmt_changed','changing_area_cmt', 'area_cmt_changed') ]
 
 ui.hook.idb.add('changing_cmt', __import__('internal').comment.address_hook.changing, 0)
 ui.hook.idb.add('cmt_changed', __import__('internal').comment.address_hook.changed, 0)
 ui.hook.idb.add('changing_area_cmt', __import__('internal').comment.global_hook.changing, 0)
 ui.hook.idb.add('area_cmt_changed', __import__('internal').comment.global_hook.changed, 0)
+
+# hook naming and extra comments to update the cache with their implicit tags
+ui.hook.idp.add('rename', __import__('internal').interface.hook.rename)
+#ui.hook.idb.add('extra_cmt_changed', __import__('internal').interface.hook.extra_cmt_changed)
 
 print_banner = lambda: None

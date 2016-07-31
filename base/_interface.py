@@ -1,7 +1,12 @@
-import operator,collections,heapq,types
-import database,structure
-import idaapi
+import sys
 import six, logging
+import operator,functools,itertools
+import collections,heapq,types
+
+import database,structure
+import internal
+
+import idaapi
 
 class typemap:
     """Convert bidirectionally from a pythonic type into an IDA type"""
@@ -132,28 +137,32 @@ class priorityhook(object):
 
     def __init__(self, hooktype, **exclude):
         exclusions = set(exclude.get('exclude', ()))
-        self.object = type(hooktype.__name__, (hooktype,), {})()
+        self.__type__ = hooktype
         self.cache = collections.defaultdict(list)
-        # FIXME: create a mutex too
-        for name in dir(self.object):
-            if any(f(name) for f in (operator.methodcaller('startswith','_'), lambda n: not callable(getattr(self.object,n)), lambda n: n in ('hook','unhook'), lambda n: n in exclusions)):
-                continue
-            self.new(name)
-        self.object.hook()
+        self.object = self.cycle(self.__type__())
     
-    def cycle(self):
-        # FIXME: wrap this in a mutex
-        ok = self.object.unhook()
+    def cycle(self, object=None):
+        # uhook previous object
+        ok = object.unhook()
         if not ok:
-            logging.warn('{:s}.priorityhook.cycle : Error trying to unhook object.'.format(__name__))
-        return self.object.hook()
+            logging.debug('{:s}.priorityhook.cycle : Error trying to unhook object. : {!r}'.format(__name__, object))
+
+        namespace = { name : self.new(name) for name in self.cache.viewkeys() }
+        res = type(object.__class__.__name__, (self.__type__,), namespace)
+        object = res()
+        
+        ok = object.hook()
+        if not ok:
+            logging.debug('{:s}.priorityhook.cycle : Unable to hook with object.: {!r}'.format(__name__, object))
+        return object
 
     def add(self, name, function, priority=10):
-        if not hasattr(self.object, name):
-            raise AttributeError('{:s}.priorityhook.add : Unable to add a method to hooker for unknown method. : {!r}'.format(__name__, name))
+        if name not in self.cache:
+            res = self.new(name)
+            setattr(self.object, name, res)
+
         self.discard(name, function)
 
-        # FIXME: wrap this in a mutex
         res = self.cache[name]
         heapq.heappush(self.cache[name], (priority, function))
         return True
@@ -174,20 +183,17 @@ class priorityhook(object):
                 continue
             found += 1
 
-        # FIXME: wrap this in a mutex
-        if res:
-            self.cache[name][:] = res
-        else:
-            self.cache.pop(name, [])
+        if res: self.cache[name][:] = res
+        else: self.cache.pop(name, [])
 
         return True if found else False
 
     def new(self, name):
         if not hasattr(self.object, name):
             raise AttributeError('{:s}.priorityhook.new : Unable to create a hook for unknown method. : {!r}'.format(__name__, name))
-        def method(hook, *args):
+
+        def method(hookinstance, *args):
             if name in self.cache:
-                # FIXME: wrap this in a mutex
                 hookq = self.cache[name][:]
 
                 for _,func in heapq.nsmallest(len(hookq), hookq):
@@ -198,12 +204,9 @@ class priorityhook(object):
                         break
                     raise TypeError('{:s}.priorityhook.callback : Unable to determine result type : {!r}'.format(__name__, res))
 
-            supermethod = getattr(super(hook.__class__, hook), name)
+            supermethod = getattr(super(hookinstance.__class__, hookinstance), name)
             return supermethod(*args)
-
-        new_method = types.MethodType(method, self.object, self.object.__class__)
-        setattr(self.object, name, new_method)
-        return True
+        return types.MethodType(method, self.object, self.object.__class__)
 
 import sys
 class address(object):
@@ -289,3 +292,81 @@ class address(object):
         if len(args) > 1:
             return cls.__within2__(*args)
         return cls.__within1__(*args)
+
+class matcher(object):
+    def __init__(self):
+        self.__predicate__ = {}
+    def __attrib__(self, *attribute):
+        identity = lambda n: n
+        if not attribute:
+            return identity
+        res = [(operator.attrgetter(a) if isinstance(a,basestring) else a) for a in attribute]
+        return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
+    def attribute(self, type, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        self.__predicate__[type] = lambda v: compose(attr, functools.partial(functools.partial(operator.eq, v)))
+    def mapping(self, type, function, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        mapper = compose(attr, function)
+        self.__predicate__[type] = lambda v: compose(mapper, functools.partial(operator.eq, v))
+    def boolean(self, type, function, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        self.__predicate__[type] = lambda v: compose(attr, functools.partial(function, v))
+    def predicate(self, type, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        self.__predicate__[type] = functools.partial(compose, attr)
+    def match(self, type, value, iterable):
+        matcher = self.__predicate__[type](value)
+        return itertools.ifilter(matcher, iterable)
+
+class hook(object):
+    @staticmethod
+    def noapi(*args):
+        fr = sys._getframe().f_back
+        if fr is None:
+            logging.fatal("internal.{:s}.noapi : Unexpected empty frame from caller. Continuing.. : {!r} : {!r}".format('.'.join((__name__,'hook')), sys._getframe(), sys._getframe().f_code))
+            return hook.CONTINUE
+
+        return priorityhook.CONTINUE if fr.f_back is None else priorityhook.STOP
+
+    @staticmethod
+    def rename(ea, newname):
+        fl = idaapi.getFlags(ea)        
+        labelQ, customQ = (fl & n == n for n in (idaapi.FF_LABL,idaapi.FF_NAME))
+        #r, fn = database.xref.up(ea), idaapi.get_func(ea)
+        fn = idaapi.get_func(ea)
+
+        # figure out whether a global or function name is being changed, otherwise it's the function's contents
+        ctx = internal.comment.globals if not fn or (fn.startEA == ea) else internal.comment.contents
+
+        # if a name is being removed
+        if not newname:
+            # if it's a custom name
+            if (not labelQ and customQ):
+                ctx.dec(ea, '__name__')
+            return
+
+        # if it's currently a label or is unnamed
+        if (labelQ and not customQ) or all(not n for n in (labelQ,customQ)):
+            ctx.inc(ea, '__name__')
+        return
+
+    @staticmethod
+    def extra_cmt_changed(ea, line_idx, cmt):
+        oldcmt = internal.netnode.sup.get(ea, line_idx)
+        ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
+
+        MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
+        prefix = (idaapi.E_PREV, idaapi.E_PREV+MAX_ITEM_LINES, '__extra_prefix__')
+        suffix = (idaapi.E_NEXT, idaapi.E_NEXT+MAX_ITEM_LINES, '__extra_suffix__')
+
+        for l,r,key in (prefix,suffix):
+            if l <= line_idx < r:
+                if oldcmt is None and cmt: ctx.inc(ea, key)
+                elif oldcmt and cmt is None: ctx.dec(ea, key)
+            continue
+        return

@@ -92,6 +92,7 @@ def do_globally():
     return addr,tags
 
 def function(ea):
+    '''Iterate through all addresses in the function ``ea`` and it's tagcache with any found tags.'''
     try:
         fn.top(ea)
     except LookupError:
@@ -120,7 +121,8 @@ def function(ea):
 
     return addr, tags
 
-def database():
+def globals():
+    '''Iterate through all globals in the database and update the tagcache with any found tags.'''
     addr, tags = do_globally()
     
     for ea in internal.comment.globals.address():
@@ -138,7 +140,8 @@ def database():
 
     return addr, tags
 
-def everything():
+def all():
+    '''Iterate through everything in the database and update the tagcache with any found tags.'''
     total = len(list(db.functions()))
     addr,tags = {}, {}
     for i,ea in enumerate(db.functions()):
@@ -151,4 +154,53 @@ def everything():
 
         _, _ = function(ea)
     print 'yay : doing entire database globals and function-level'
-    _, _ = database()
+    _, _ = globals()
+
+def customnames():
+    '''Add all custom names defined in the database to the tagcache as "__name__"'''
+    # FIXME: first delete all the custom names '__name__' tag
+    left, right = db.range()
+    for ea in db.iterate(left, right-1):
+        fn = idaapi.get_func(ea)
+        ctx = internal.comment.globals if not fn or fn.startEA == ea else internal.comment.contents
+        if db.type.has_customname(ea):
+            ctx.inc(ea, '__name__')
+        continue
+    return
+
+def extracomments():
+    '''Add all extra cmts in the database to the tagcache as "__name__"'''
+    # FIXME: first delete all the custom names '__name__' tag
+    left, right = db.range()
+    for ea in db.iterate(left, right-1):
+        fn = idaapi.get_func(ea)
+        ctx = internal.comment.contents if fn else internal.comment.globals
+
+        count = db.extra.count(ea, idaapi.E_PREV)
+        if count: [ ctx.inc(ea, '__extra_prefix__') for i in xrange(count) ]
+
+        count = db.extra.count(ea, idaapi.E_NEXT)
+        if count: [ ctx.inc(ea, '__extra_suffix__') for i in xrange(count) ]
+    return
+
+def everything():
+    '''Re-create the tag cache for all found tags and custom names within the database.'''
+    erase_globals()
+    for ea in db.functions():
+        erase_contents(ea)
+    all()
+
+def erase_contents(ea):
+    ea = fn.top(ea)
+    n = internal.comment.contents.node()
+    for addr in internal.netnode.sup.fiter(n):
+        internal.netnode.sup.remove(n, addr)
+    for key in internal.netnode.hash.fiter(n):
+        internal.netnode.hash.remove(n, key)
+    internal.netnode.blob.remove(ea, idaapi.stag)
+    return
+
+def erase_globals():
+    internal.netnode.remove( internal.comment.globals.node() )
+
+__all__ = ['everything','globals','function']

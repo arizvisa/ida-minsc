@@ -335,6 +335,6 @@ def sourcechain(fn, *args, **kwds):
     return [(ea,result[ea]) for ea in sorted(result.keys())]
 
 class hook(object):
-    idp = internal.interface.priorityhook(idaapi.IDP_Hooks, exclude=('calc_retloc3','get_default_enum_size','get_reg_name'))
+    idp = internal.interface.priorityhook(idaapi.IDP_Hooks, exclude=('calc_retloc3','get_default_enum_size','get_reg_name','is_sane_insn','is_ret_insn','get_bg_color'))
     idb = internal.interface.priorityhook(idaapi.IDB_Hooks)
     ui =  internal.interface.priorityhook(idaapi.UI_Hooks)

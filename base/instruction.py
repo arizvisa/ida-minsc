@@ -155,6 +155,25 @@ def op_segment(ea, n):
 # idaapi.offflag()
 # idaapi.struflag()
 
+# idaapi.set_opinfo(ea, opnum, flags, ti)
+# idaapi.get_opinfo(ea, opnum, &flags, &buf)
+
+# idaapi.set_typeinfo(ea, opnum, flags, ti)
+# idaapi.get_typeinfo(ea, opnum, &flags, &buf)
+
+# idaapi.set_op_type(ea, type, opnum)
+# idaapi.typeflag(ea, &oldflag, type, opnum)
+
+# idaapi.op_stkvar(ea, opnum)
+
+# tid = idaapi.tid_array(1)
+# tid[0] = structure_id
+# idaapi.op_stroff(ea, opnum, tid, len(tid), delta)
+# idaapi.get_stroff_path(ea, opnum, &tid, delta)
+
+# idaapi.op_enum(ea, opnum, enumid, enumserial)
+# idaapi.get_enum_id(ea, opnum)
+
 ## lvars
 #def op_stkvar(ea, n):
 #    '''Return the member of a stack variable'''

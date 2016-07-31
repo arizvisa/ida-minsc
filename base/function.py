@@ -4,6 +4,7 @@ function-context
 generic tools for working in the context of a function.
 '''
 
+import __builtin__
 import logging,re,itertools
 import six,types
 
@@ -683,14 +684,15 @@ def tag_read(func):
     d2 = internal.comment.decode(res)
     if d1.viewkeys() & d2.viewkeys():
         logging.warn('{:s}.tag_read : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
-    d2.update(d1)
+    res = {}
+    map(res.update, (d1,d2))
 
     # add the function's name to the result
     fname = get_name(fn)
-    if fname: d2.setdefault('name', fname)
+    if fname and (idaapi.getFlags(fn.startEA) & idaapi.FF_NAME): res.setdefault('__name__', fname)
 
     # ..and now hand it off.
-    return d2
+    return res
 @utils.multicase(key=basestring)
 def tag_read(func, key):
     '''Returns the value for the tag ``key`` for the function ``func``.'''
@@ -712,8 +714,8 @@ def tag_write(func, key, value):
         raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
     fn = by(func)
 
-    # if the user wants to change the 'name' tag then update the function's name.
-    if key == 'name':
+    # if the user wants to change the '__name__' tag then update the function's name.
+    if key == '__name__':
         return set_name(fn, value)
 
     state = internal.comment.decode(comment(fn, repeatable=1))
@@ -729,8 +731,8 @@ def tag_write(func, key, none):
     '''Removes the tag identified by ``key`` from the function ``func``.'''
     fn = by(func)
 
-    # if the user wants to remove the 'name' tag then remove the name from the function.
-    if key == 'name':
+    # if the user wants to remove the '__name__' tag then remove the name from the function.
+    if key == '__name__':
         return set_name(fn, None)
     
     state = internal.comment.decode(comment(fn, repeatable=1))
@@ -801,16 +803,16 @@ def select(func, tag, *tags, **boolean):
     tags = (tag,) + tags
     boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
     return select(func, **boolean)
-@utils.multicase(tag=(set,list))
+@utils.multicase(tag=(__builtin__.set,__builtin__.list))
 def select(func, tag, *tags, **boolean):
-    tags = set(list(tag) + list(tags))
+    tags = set(__builtin__.list(tag) + __builtin__.list(tags))
     boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
     return select(func, **boolean)
 @utils.multicase()
 def select(func, **boolean):
     '''Fetch a list of addresses within the function that contain the specified tags.'''
     fn = by(func)
-    boolean = dict((k,set(v if isinstance(v, (tuple,set,list)) else (v,))) for k,v in boolean.viewitems())
+    boolean = dict((k,set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
         for ea in internal.comment.contents.address(fn.startEA):
@@ -852,7 +854,7 @@ def down(func):
             resultCode.extend( (ea,x) for x in database.cxdown(ea) if func.startEA == x or not contains(func,x) )
         return resultData,resultCode
     fn = by(func)
-    return list(set(d for x,d in codeRefs(fn)[1]))
+    return sorted(set(d for x,d in codeRefs(fn)[1]))
 
 @utils.multicase()
 def up():
