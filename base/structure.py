@@ -25,10 +25,14 @@ def name(id):
     return idaapi.get_struc_name(id)
 @utils.multicase(struc=__structure_t)
 def name(struc): return name(struc.id)
-@utils.multicase(name=basestring)
-def name(id, name):
-    '''Set the name of the structure identified by ``id`` to ``name``.'''
-    return idaapi.set_struc_name(id, name)
+@utils.multicase(string=basestring)
+def name(id, string):
+    '''Set the name of the structure identified by ``id`` to ``string``.'''
+    res = idaapi.validate_name2(buffer(string)[:])
+    if string and string != res:
+        logging.warn('{:s}.name : Stripping invalid chars from structure name \"{:s}\". : {!r}'.format(__name__, string, res))
+        string = res
+    return idaapi.set_struc_name(id, string)
 @utils.multicase(struc=__structure_t, name=basestring)
 def name(struc, name): return name(struc.id, name)
 
@@ -161,7 +165,7 @@ def members(struc):
 @utils.multicase(id=six.integer_types)
 def members(id):
     """Yields the members of the structure identified by ``id``.
-    Each iteration yields the ((offset,size),(name,comment)) of each member.
+    Each iteration yields the ((offset,size),(name,comment,repeatable-comment)) of each member.
     """
 
     st = idaapi.get_struc(id)
@@ -182,7 +186,7 @@ def members(id):
             yield (offset,left-offset), (None,None)
             offset = left
 
-        yield (offset,ms),(idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 1))
+        yield (offset,ms),(idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1))
         offset += ms
     return
 
@@ -193,25 +197,25 @@ def fragment(struc, offset, size):
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
 def fragment(id, offset, size):
     """Yields the members of the structure identified by ``id`` from ``offset`` up to the ``size``.
-    Each iteration yields ((offset,size),(name,comment)) for each member within the specified bounds.
+    Each iteration yields ((offset,size),(name,comment,repeatable-comment)) for each member within the specified bounds.
     """
     member = members(id)
 
     # seek
     while True:
-        (m_offset,m_size),(m_name,m_cmt) = member.next()
+        (m_offset,m_size),(m_name,m_cmt,m_rcmt) = member.next()
 
         left,right = m_offset, m_offset+m_size
         if (offset >= left) and (offset < right):
-            yield (m_offset,m_size),(m_name,m_cmt)
+            yield (m_offset,m_size),(m_name,m_cmt,m_rcmt)
             size -= m_size
             break
         continue
 
     # return
     while size > 0:
-        (m_offset,m_size),(m_name,m_cmt) = member.next()
-        yield (m_offset,m_size),(m_name,m_cmt)
+        (m_offset,m_size),(m_name,m_cmt,m_rcmt) = member.next()
+        yield (m_offset,m_size),(m_name,m_cmt,m_rcmt)
         size -= m_size
 
     return
@@ -299,8 +303,7 @@ class structure_t(__structure_t):
         return self.__members
 
     def __getstate__(self):
-        cmtt = idaapi.get_struc_cmt(self.id, True)
-        cmtf = idaapi.get_struc_cmt(self.id, False)
+        cmtt,cmtf = map(functools.partial(idaapi.get_struc_cmt,self.id), (True,False))
         # FIXME: perhaps we should preserve the get_struc_idx result too
         return (self.name,(cmtt,cmtf),self.members)
     def __setstate__(self, state):
@@ -320,9 +323,13 @@ class structure_t(__structure_t):
         '''Return the name for the structure.'''
         return idaapi.get_struc_name(self.id)
     @name.setter
-    def name(self, name):
-        '''Set the name for the structure to ``name``.'''
-        return idaapi.set_struc_name(self.id, name)
+    def name(self, string):
+        '''Set the name for the structure to ``string``.'''
+        res = idaapi.validate_name2(buffer(string)[:])
+        if string and string != res:
+            logging.warn('{:s}.name : Stripping invalid chars from structure name {!r}. : {!r}'.format( '.'.join((__name__,self.__class__.__name__)), string, res))
+            string = res
+        return idaapi.set_struc_name(self.id, string)
     @property
     def comment(self, repeatable=True):
         '''Return the repeatable comment for the structure.'''
@@ -335,6 +342,14 @@ class structure_t(__structure_t):
     def size(self):
         '''Return the size of the structure.'''
         return idaapi.get_struc_size(self.ptr)
+    @size.setter
+    def size(self, new):
+        res = idaapi.get_struc_size(self.ptr)
+        ok = idaapi.expand_struc(self.ptr, 0, new - res, recalc=True)
+        if not ok:
+            logging.fatal('{:s}.instance({:s}).resize : Unable to resize structure {:s} to {:x}. : {:x}'.format(__name__, self.name, self.name, size, res))
+        return res
+
     @property
     def offset(self):
         '''Return the base-offset of the structure.'''
@@ -368,18 +383,8 @@ class structure_t(__structure_t):
         '''Copy members into the structure ``name``.'''
         raise NotImplementedError
 
-    def resize(self, size):
-        raise NotImplementedError
-        # FIXME: re-assign this method as a setter for .size
-        res = idaapi.expand_struc(self.ptr, 0, size, recalc=True)
-        if not res:
-            logging.fatal('{:s}.instance({:s}).resize : Issue resizing {:s} : 0x{:x}'.format(__name__, self.name, size))
-        return res
-
     def __getattr__(self, name):
         return getattr(self.members, name)
-
-    #def resize(self, size):
 
 class members_t(object):
     """An abstraction around the members of a particular IDA structure
@@ -718,9 +723,13 @@ class member_t(object):
         '''Return the member's name.'''
         return idaapi.get_member_name(self.id) or ''
     @name.setter
-    def name(self, value):
-        '''Set the member's name.'''
-        return idaapi.set_member_name(self.__owner.ptr, self.offset - self.__owner.members.baseoffset, value)
+    def name(self, string):
+        '''Set the member's name to ``string``.'''
+        res = idaapi.validate_name2(buffer(string)[:])
+        if string and string != res:
+            logging.warn('{:s}.name : Stripping invalid chars from structure \"{:s}\" member {:d} name {!r}. : {!r}'.format( '.'.join((__name__,self.__class__.__name__)), self.__owner.name, self.__index, string, res))
+            string = res
+        return idaapi.set_member_name(self.__owner.ptr, self.offset - self.__owner.members.baseoffset, string)
     @property
     def comment(self):
         '''Return the member's repeable comment.'''
@@ -750,7 +759,7 @@ class member_t(object):
             t,sz = res
             if isinstance(t, structure_t):
                 t = instance(t.id, offset=self.offset)
-            elif isinstance(t, [].__class__) and isinstance(t[0], structure_t):
+            elif isinstance(t, types.ListType) and isinstance(t[0], structure_t):
                 t[0] = instance(t[0].id, offset=self.offset)
             res = t,sz
         return res
@@ -761,13 +770,6 @@ class member_t(object):
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         return idaapi.set_member_type(self.__owner.ptr, self.offset, flag, opinfo, size)
-
-    #def resize(self, size):
-    #    # FIXME: re-assign this method as a setter for .size
-    #    res = idaapi.expand_struc(self.owner.ptr, self.offset, size, recalc=True)
-    #    if not res:
-    #        logging.fatal('structure_t({!r}).member_t[{:d}].resize : Issue resizing field {:s} : 0x{:x}'.format(self.owner.name, self.index, self.fullname, size))
-    #    return res
 
     def __repr__(self):
         '''Display the specified member in a readable format.'''

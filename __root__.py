@@ -37,4 +37,8 @@ ui.hook.idb.add('area_cmt_changed', __import__('internal').comment.global_hook.c
 ui.hook.idp.add('rename', __import__('internal').interface.hook.rename)
 #ui.hook.idb.add('extra_cmt_changed', __import__('internal').interface.hook.extra_cmt_changed)
 
+# hook functions so they migrate tags between tagcache types
+[ ui.hook.idb.add(n, getattr(__import__('internal').interface.hook,n)) for n in ('thunk_func_created','func_tail_appended','removing_func_tail') ]
+[ ui.hook.idp.add(n, getattr(__import__('internal').interface.hook,n)) for n in ('add_func','del_func','set_func_start','set_func_end') ]
+
 print_banner = lambda: None

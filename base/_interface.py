@@ -3,7 +3,7 @@ import six, logging
 import operator,functools,itertools
 import collections,heapq,types
 
-import database,structure
+import function,database,structure
 import internal
 
 import idaapi
@@ -369,4 +369,102 @@ class hook(object):
                 if oldcmt is None and cmt: ctx.inc(ea, key)
                 elif oldcmt and cmt is None: ctx.dec(ea, key)
             continue
+        return
+
+    @staticmethod
+    def thunk_func_created(pfn):
+        pass
+
+    @staticmethod
+    def func_tail_appended(pfn, tail):
+        # tail = func_t
+        for ea in database.iterate(tail.startEA, tail.endEA):
+            for k in database.tag(ea):
+                internal.comment.globals.dec(ea, k)
+                internal.comment.contents.inc(ea, k, target=pfn.startEA)
+            continue
+        return
+
+    @staticmethod
+    def removing_func_tail(pfn, tail):
+        # tail = area_t
+        for ea in database.iterate(tail.startEA, tail.endEA):
+            for k in database.tag(ea):
+                internal.comment.contents.dec(ea, k, target=pfn.startEA)
+                internal.comment.globals.inc(ea, k)
+            continue
+        return
+
+    @staticmethod
+    def add_func(pfn):
+        # convert all globals into contents
+        for (l,r) in function.chunks(pfn):
+            for ea in database.iterate(l, r):
+                for k in database.tag(ea):
+                    internal.comment.globals.dec(ea, k)
+                    internal.comment.contents.inc(ea, k, target=pfn.startEA)
+                continue
+            continue
+        return
+
+    @staticmethod
+    def del_func(pfn):
+        # convert all contents into globals
+        for (l,r) in function.chunks(pfn):
+            for ea in database.iterate(l, r):
+                for k in database.tag(ea):
+                    internal.comment.contents.dec(ea, k, target=pfn.startEA)
+                    internal.comment.globals.inc(ea, k)
+                continue
+            continue
+
+        # remove all function tags
+        for k in function.tag(pfn.startEA):
+            internal.comment.globals.dec(pfn.startEA, k)
+        return
+
+    @staticmethod
+    def set_func_start(pfn, new_start):
+        # new_start has removed addresses from function
+        # replace contents with globals
+        if pfn.startEA > new_start:
+            for ea in database.iterate(new_start, pfn.startEA):
+                for k in database.tag(ea):
+                    internal.comment.contents.dec(ea, k, target=pfn.startEA)
+                    internal.comment.globals.inc(ea, k)
+                continue
+            return
+
+        # new_start has added addresses to function
+        # replace globals with contents
+        elif pfn.startEA < new_start:
+            for ea in database.iterate(pfn.startEA, new_start):
+                for k in database.tag(ea):
+                    internal.comment.globals.dec(ea, k)
+                    internal.comment.contents.inc(ea, k, target=pfn.startEA)
+                continue
+            return
+        return
+
+    @staticmethod
+    def set_func_end(pfn, new_end):
+        # new_end has added addresses to function
+        # replace globals with contents
+        if new_end > pfn.endEA:
+            for ea in database.iterate(pfn.endEA, new_end):
+                for k in database.tag(ea):
+                    internal.comment.globals.dec(ea, k)
+                    internal.comment.contents.inc(ea, k, target=pfn.startEA)
+                continue
+            return
+
+        # new_end has removed addresses from function
+        # replace contents with globals
+        elif new_end < pfn.endEA:
+            for ea in database.iterate(new_end, pfn.endEA):
+                for k in database.tag(ea):
+                    internal.comment.contents.dec(ea, k, target=pfn.startEA)
+                    internal.comment.globals.inc(ea, k)
+                continue
+            return
         return

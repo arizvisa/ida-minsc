@@ -49,7 +49,9 @@ def check_global(ea):
 
 def do_functions():
     addr,tags = {},{}
-    for ea in db.functions():
+    t = len(list(db.functions()))
+    for i, ea in enumerate(db.functions()):
+        print '{:x} : fetching function {:d} of {:d}'.format(ea, i, t)
         res = fn.tag(ea)
         res.pop('name', None)
         for k,v in res.items():
@@ -61,6 +63,7 @@ def do_functions():
 def do_data():
     addr,tags = {},{}
     left, right = db.range()
+    print 'fetching global tags'
     for ea in db.iterate(left, right-1):
         f = idaapi.get_func(ea)
         if f is not None: continue
@@ -74,12 +77,10 @@ def do_data():
     return addr, tags
 
 def do_globally():
-    print 'doing functions'
     faddr,ftags = do_functions()
-    print 'doing database'
     daddr,dtags = do_data()
 
-    print 'aggregating them'
+    print 'aggregating results'
     addr,tags = dict(faddr), dict(ftags)
     for k,v in daddr.items():
         addr[k] = addr.get(k, 0) + v
@@ -125,16 +126,17 @@ def globals():
     '''Iterate through all globals in the database and update the tagcache with any found tags.'''
     addr, tags = do_globally()
     
+    print 'initializing global references as empty'
     for ea in internal.comment.globals.address():
         internal.comment.globals.set_address(ea, 0)
     for name in internal.comment.globals.name():
         internal.comment.globals.set_name(0)
 
-    print 'doing tags'
+    print 'updating global name refs'
     for k,v in tags.items():
         internal.comment.globals.set_name(k, v)
 
-    print 'doing addresses'
+    print 'updating global address refs'
     for k,v in addr.items():
         internal.comment.globals.set_address(k, v)
 
@@ -145,15 +147,15 @@ def all():
     total = len(list(db.functions()))
     addr,tags = {}, {}
     for i,ea in enumerate(db.functions()):
-        print '{:x} : function content : {:d} of {:d}'.format(ea, i, total)
 
         for addr in internal.comment.contents.address(ea):
             internal.comment.contents.set_address(addr, 0)
         for name in internal.comment.contents.name(ea):
             internal.comment.contents.set_name(ea, name, 0)
 
+        print '{:x} : updating references for contents : {:d} of {:d}'.format(ea, i, total)
         _, _ = function(ea)
-    print 'yay : doing entire database globals and function-level'
+    print 'updating references for globals'
     _, _ = globals()
 
 def customnames():
@@ -185,8 +187,11 @@ def extracomments():
 
 def everything():
     '''Re-create the tag cache for all found tags and custom names within the database.'''
+    print 'erasing database globals'
     erase_globals()
-    for ea in db.functions():
+    t = len(list(db.functions()))
+    for i, ea in enumerate(db.functions()):
+        print '{:x} : erasing contents for function {:d} of {:d}'.format(ea, i, t)
         erase_contents(ea)
     all()
 
@@ -197,10 +202,34 @@ def erase_contents(ea):
         internal.netnode.sup.remove(n, addr)
     for key in internal.netnode.hash.fiter(n):
         internal.netnode.hash.remove(n, key)
-    internal.netnode.blob.remove(ea, idaapi.stag)
+
+    # old blob-based
+    res = internal.netnode.blob.get(ea, idaapi.stag)
+    if res and res.startswith('BZh9'):
+        internal.netnode.blob.remove(ea, idaapi.stag)
+
+    # new blob-blased
+    res = internal.netnode.blob.get(ea, internal.comment.contents.btag)
+    if res and res.startswith('BZh9'):
+        internal.netnode.blob.remove(ea, internal.comment.contents.btag)
     return
 
 def erase_globals():
     internal.netnode.remove( internal.comment.globals.node() )
+    l, r = db.range()
+    for ea in db.iterate(l, r-1):
+        if idaapi.get_func(ea): continue
+
+        # old blob-based
+        res = internal.netnode.blob.get(ea, idaapi.stag)
+        if res and res.startswith('BZh9'):
+            internal.netnode.blob.remove(ea, idaapi.stag)
+
+        # new blob-based
+        res = internal.netnode.blob.get(ea, internal.comment.contents.btag)
+        if res and res.startswith('BZh9'):
+            internal.netnode.blob.remove(ea, internal.comment.contents.btag)
+        continue
+    return
 
 __all__ = ['everything','globals','function']

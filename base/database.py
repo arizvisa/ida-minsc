@@ -455,6 +455,11 @@ def set_name(ea, string, **listed):
                     flags ^= idaapi.SN_LOCAL
     except: pass
 
+    res = idaapi.validate_name2(buffer(string)[:])
+    if string and string != res:
+        logging.warn('{:s}.set_name : Stripping invalid chars from name {!r} at {:x}. : {!r}'.format(__name__, string, ea, res))
+        string = res
+
     res,ok = get_name(ea),idaapi.set_name(ea, string or "", flags)
 
     if not ok:
@@ -889,8 +894,10 @@ def selectcontents(**boolean):
             if res: yield ea, res
         return
 
-    for ea in internal.comment.contents.iterate():
+    for ea,t in internal.comment.contents.iterate():
         res,d = set(),internal.comment.contents.name(ea)
+        if d != t:
+            logging.info("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:x}".format(__name__, ea))
 
         Or = boolean.get('Or', set())
         res.update(Or.intersection(d))

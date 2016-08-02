@@ -330,7 +330,11 @@ class contents(tagging):
     '''Tagging for an address within a function (contents)'''
 
     ## for each function's content
-    # netnode.sup[fn.startEA] = pickle.dumps({'__address__','__tags__')
+    # netnode.blob[fn.startEA, btag] = marshal.dumps({'name','address'})
+    # netnode.sup[fn.startEA] = marshal.dumps({tagnames})
+
+    #btag = idaapi.stag         # XXX: apparently 'S' is used for comments
+    btag = idaapi.atag
 
     @classmethod
     def _key(cls, ea):
@@ -339,9 +343,9 @@ class contents(tagging):
         return res.startEA if res else None
 
     @classmethod
-    def _read(cls, ea):
+    def _read(cls, target, ea):
         '''Reads a dictionary from the specific object'''
-        node, key = tagging.node(), cls._key(ea)
+        node, key = tagging.node(), cls._key(ea if target is None else target)
         if key is None:
             raise LookupError(ea)
 
@@ -355,11 +359,14 @@ class contents(tagging):
                 pass
             else:
                 # if so, then re-assign it to function's blob
-                internal.netnode.blob.set(key, idaapi.stag, res)
+                internal.netnode.blob.set(key, cls.btag, res)
             internal.netnode.sup.remove(node, key)
 
-        encdata = internal.netnode.blob.get(key, idaapi.stag)
+        # FIXME: check address and keynames against sup-cache to determine if
+        #        blob-cache is out of sync, or corrupted.
         #encdata = internal.netnode.sup.get(node, key)
+
+        encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
             return None
 
@@ -369,32 +376,54 @@ class contents(tagging):
         return cls.marshaller.loads(data)
 
     @classmethod
-    def _write(cls, ea, value):
+    def _write(cls, target, ea, value):
         '''Writes a dictionary to the specified object'''
-        node, key = tagging.node(), cls._key(ea)
+        node, key = tagging.node(), cls._key(ea if target is None else target)
         if key is None:
             raise LookupError(ea)
 
         if not value:
-            return internal.netnode.blob.remove(key, idaapi.stag)
-            #return internal.netnode.sup.remove(node, key)
+            ok = internal.netnode.sup.remove(node, key)
+            if not ok:
+                logging.info("internal.{:s}._write : Unable to remove address from sup cache. : {:x}".format('.'.join((__name__,cls.__name__)), key))
+            return internal.netnode.blob.remove(key, cls.btag)
 
-        data = cls.marshaller.dumps(value)
+        # update sup cache with keys
+        res = set(value.viewkeys())
+        data = cls.marshaller.dumps(res)
         encdata,sz = cls.codec.encode(data)
         if sz != len(data):
-            raise ValueError((sz,len(data)))
-        return internal.netnode.blob.set(key, idaapi.stag, encdata)
-        #return internal.netnode.sup.set(node, key, encdata)
+            raise ValueError((res,sz,len(data)))
+        if len(encdata) > 1024:
+            logging.warn("internal.{:s}._write : Too many tags within function. Size must be < 0x400. Ignoring. : {:x}".format('.'.join((__name__,cls.__name__)), len(encdata)))
+        ok = internal.netnode.sup.set(node, key, encdata)
+        if not ok:
+            logging.fatal("internal.{:s}._write : Unable to update sup cache with tag names. Ignoring. : {:x}".format('.'.join((__name__,cls.__name__)), key))
+
+        # update blob for given address
+        res = value
+        data = cls.marshaller.dumps(res)
+        encdata,sz = cls.codec.encode(data)
+        if sz != len(data):
+            raise ValueError((res,sz,len(data)))
+
+        return internal.netnode.blob.set(key, cls.btag, encdata)
 
     @classmethod
     def iterate(cls):
-        for fn in internal.netnode.sup.fiter(tagging.node()):
-            yield fn
+        node = tagging.node()
+        for ea in internal.netnode.sup.fiter(tagging.node()):
+            encdata = internal.netnode.sup.get(node, ea)
+            data,sz = cls.codec.decode(encdata)
+            if sz != len(encdata):
+                logging.warn("Internal.{:s}.iterate : Unable to decode tag names out of sup cache for {:x} : {:x} != {:x}".format('.'.join((__name__,cls.__name__)), ea, len(encdata), sz))
+            res = cls.marshaller.loads(data)
+            yield ea, res
         return
 
     @classmethod
-    def inc(cls, address, name):
-        res = cls._read(address) or {}
+    def inc(cls, address, name, **target):
+        res = cls._read(target.get('target',None), address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         state[name] = refs = state.get(name, 0) + 1
@@ -406,12 +435,12 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: del res[cls.__address__]
 
-        cls._write(address, res)
+        cls._write(target.get('target',None), address, res)
         return refs
 
     @classmethod
-    def dec(cls, address, name):
-        res = cls._read(address) or {}
+    def dec(cls, address, name, **target):
+        res = cls._read(target.get('target',None), address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         refs, count = state.pop(name, 0) - 1, cache.pop(address, 0) - 1
@@ -427,26 +456,26 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: res.pop(cls.__address__, None)
 
-        cls._write(address, res)
+        cls._write(target.get('target',None), address, res)
         return refs
 
     @classmethod
-    def name(cls, address):
+    def name(cls, address, **target):
         '''Return all the tag names for the specified function'''
-        res = cls._read(address) or {}
+        res = cls._read(target.get('target',None), address) or {}
         res = res.get(cls.__tags__, {})
         return set(res.viewkeys())
 
     @classmethod
-    def address(cls, address):
+    def address(cls, address, **target):
         '''Return all the tag address for the specified function'''
-        res = cls._read(address) or {}
+        res = cls._read(target.get('target',None), address) or {}
         res = res.get(cls.__address__, {})
         return sorted(res.viewkeys())
 
     @classmethod
-    def set_name(cls, address, name, count):
-        state = cls._read(address) or {}
+    def set_name(cls, address, name, count, **target):
+        state = cls._read(target.get('target',None), address) or {}
 
         res = state.get(cls.__tags__, {})
         if count > 0:
@@ -459,13 +488,13 @@ class contents(tagging):
         else:
             state.pop(cls.__tags__, None)
 
-        ok = cls._write(address, state)
+        ok = cls._write(target.get('target',None), address, state)
         assert ok
         return state
 
     @classmethod
-    def set_address(cls, address, count):
-        state = cls._read(address) or {}
+    def set_address(cls, address, count, **target):
+        state = cls._read(target.get('target',None), address) or {}
 
         res = state.get(cls.__address__,{})
         if count > 0:
@@ -478,7 +507,7 @@ class contents(tagging):
         else:
             state.pop(cls.__address__, None)
 
-        ok = cls._write(address, state)
+        ok = cls._write(target.get('target',None), address, state)
         assert ok
         return state
         

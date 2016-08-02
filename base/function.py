@@ -60,7 +60,7 @@ def by(name): return by_name(name)
 
 # FIXME: document this despite it being internal
 def __addressOfRtOrSt(func):
-    '''Returns (F,address) if a statically linked address, or (T,address) if a runtime linked address'''
+    '''Returns (F,address) if a statically linked address, or (T,address) if a runtime-linked address'''
     try:
         fn = by(func)
 
@@ -190,17 +190,23 @@ def set_name(name):
 def set_name(func, none):
     '''Remove the custom-name from the function ``func``.'''
     return set_name(func, none or '')
-@utils.multicase(name=basestring)
-def set_name(func, name):
-    '''Set the name of the function ``func`` to ``name``.'''
+@utils.multicase(string=basestring)
+def set_name(func, string):
+    '''Set the name of the function ``func`` to ``string``.'''
     rt,ea = __addressOfRtOrSt(func)
+
+    res = idaapi.validate_name2(buffer(string)[:])
+    if string and string != res:
+        logging.warn('{:s}.set_name : Stripping invalid chars from function name {!r} at {:x}. : {!r}'.format(__name__, string, ea, res))
+        string = res
+
     if rt:
         # FIXME: shuffle the new name into the prototype and then re-mangle it
-        res, ok = get_name(ea), database.set_name(ea, name)
+        res, ok = get_name(ea), database.set_name(ea, string)
     else:
-        res, ok = get_name(ea), idaapi.set_name(ea, name, idaapi.SN_PUBLIC)
+        res, ok = get_name(ea), idaapi.set_name(ea, string, idaapi.SN_PUBLIC)
     if not ok:
-        raise AssertionError('{:s}.set_name : Unable to set function name : 0x{:x}'.format(__name__, ea))
+        raise AssertionError('{:s}.set_name : Unable to set function name for {:x} : {!r}'.format(__name__, ea, string))
     return res
 
 @utils.multicase()
@@ -677,7 +683,17 @@ def tag_read(key):
 @utils.multicase()
 def tag_read(func):
     '''Returns all the tags defined for the function ``func``.'''
-    fn,repeatable = by(func), True
+    try:
+        rt,ea = __addressOfRtOrSt(func)
+    except LookupError:
+        logging.warn('{:s}.tag_read : Attempted to read tag from a non-function. Falling back to a database tag. : {:x}'.format(__name__, func))
+        return database.tag_read(func)
+
+    if rt:
+        logging.warn('{:s}.tag_read : Attempted to read tag from a runtime-linked address. Falling back to a database tag. : {:x}'.format(__name__, ea))
+        return database.tag_read(ea)
+
+    fn,repeatable = by_address(ea), True
     res = comment(fn, repeatable=repeatable)
     d1 = internal.comment.decode(res)
     res = comment(fn, repeatable=not repeatable)
@@ -712,7 +728,22 @@ def tag_write(func, key, value):
     '''Set the tag ``key`` to ``value`` for the function ``func``.'''
     if value is None:
         raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
-    fn = by(func)
+
+    # Check to see if function tag is being applied to an import
+    try:
+        rt,ea = __addressOfRtOrSt(func)
+    except LookupError:
+        # If we're not even in a function, then use a database tag.
+        logging.warn('{:s}.tag_write : Attempted to set tag for a non-function. Falling back to a database tag. : {:x}'.format(__name__, func))
+        return database.tag_write(func, key, value)
+
+    # If so, then write the tag to the import
+    if rt:
+        logging.warn('{:s}.tag_write : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag. : {:x}'.format(__name__, ea))
+        return database.tag_write(ea, key, value)
+
+    # Otherwise, it's a function.
+    fn = by_address(ea)
 
     # if the user wants to change the '__name__' tag then update the function's name.
     if key == '__name__':
@@ -729,7 +760,22 @@ def tag_write(func, key, value):
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag_write(func, key, none):
     '''Removes the tag identified by ``key`` from the function ``func``.'''
-    fn = by(func)
+    #fn = by(func)
+    # Check to see if function tag is being applied to an import
+    try:
+        rt,ea = __addressOfRtOrSt(func)
+    except LookupError:
+        # If we're not even in a function, then use a database tag.
+        logging.warn('{:s}.tag_write : Attempted to clear tag for a non-function. Falling back to a database tag. : {:x}'.format(__name__, func))
+        return database.tag_write(func, key, none)
+
+    # If so, then write the tag to the import
+    if rt:
+        logging.warn('{:s}.tag_write : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag. : {:x}'.format(__name__, ea))
+        return database.tag_write(ea, key, none)
+
+    # Otherwise, it's a function.
+    fn = by_address(ea)
 
     # if the user wants to remove the '__name__' tag then remove the name from the function.
     if key == '__name__':
@@ -747,15 +793,15 @@ def tag_write(func, key, none):
 @utils.multicase()
 def tag():
     '''Returns all the tags defined for the current function.'''
-    return tag_read(ui.current.function())
+    return tag_read(ui.current.address())
 @utils.multicase(key=basestring)
 def tag(key):
     '''Returns the value of the tag identified by ``key`` for the current function.'''
-    return tag_read(ui.current.function(), key)
+    return tag_read(ui.current.address(), key)
 @utils.multicase(key=basestring)
 def tag(key, value):
     '''Sets the value for the tag ``key`` to ``value`` for the current function.'''
-    return tag_write(ui.current.function(), key, value)
+    return tag_write(ui.current.address(), key, value)
 @utils.multicase(key=basestring)
 def tag(func, key):
     '''Returns the value of the tag identified by ``key`` for the function ``func``.'''
@@ -771,7 +817,7 @@ def tag(func, key, value):
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag(key, none):
     '''Removes the tag identified by ``key`` for the current function.'''
-    return tag_write(ui.current.function(), key, None)
+    return tag_write(ui.current.address(), key, None)
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag(func, key, none):
     '''Removes the tag identified by ``key`` for the function ``func``.'''
