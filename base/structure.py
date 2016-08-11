@@ -74,7 +74,7 @@ def index(struc, index):
     '''Move the structure ``struc`` to the index ``index``.'''
     return index(struc.id, index)
 
-__matcher__ = internal.interface.matcher()
+__matcher__ = utils.matcher()
 __matcher__.boolean('regex', re.search, 'name')
 __matcher__.mapping('index', idaapi.get_struc_idx, 'id')
 __matcher__.attribute('identifier', 'id')

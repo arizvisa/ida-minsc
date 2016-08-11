@@ -2,6 +2,7 @@ import logging,sys
 import itertools,operator,functools
 import six,types,heapq,collections
 
+import multiprocessing,Queue
 import idaapi
 
 class multicase(object):
@@ -25,35 +26,40 @@ class multicase(object):
 
     cache_name = '__multicase_cache__'
 
-    def __new__(cls, other=None, **types):
+    def __new__(cls, *other, **types):
         def result(wrapped):
             # extract the FunctionType and it's arg types
             cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
             args, defaults, (star, starstar) = cls.ex_args(func)
 
-            # determine the previous instance of the func
-            fr_locals = sys._getframe().f_back.f_locals
-            prev = fr_locals.get(func.func_name, lambda:fake) if other is None else other
-            prevfunc = cls.ex_function(prev)
-
-            # if the previous func isn't a wrapper, then create one.
-            if not hasattr(prevfunc, cls.cache_name):
-                cache = []
-                res = cls.new_wrapper(func, cache=cache)
-                setattr(res, cls.cache_name, cache)
-                setattr(res, '__doc__', '')
+            # determine if the user included the previous function
+            if len(other):
+                ok, prev = True, other[0]
+            # ..otherwise we just figure it out by looking in the caller's locals
+            elif func.func_name in sys._getframe().f_back.f_locals:
+                ok, prev = True, sys._getframe().f_back.f_locals[func.func_name]
+            # ..otherwise, first blood and we're not ok.
             else:
-                res, cache = prevfunc, getattr(prevfunc, cls.cache_name)
+                ok = False
+            
+            # so, a wrapper was found and we need to steal it's cache
+            res = ok and cls.ex_function(prev)
+            if ok and hasattr(res, cls.cache_name):
+                cache = getattr(res, cls.cache_name)
+            # ..otherwise, we just create a new one.
+            else:
+                cache = []
+                res = cls.new_wrapper(func, cache)
 
             # calculate the priority by trying to match the most first
             argtuple = args, defaults, (star, starstar)
             priority = len(args) - len(types) + (len(args) and (next((float(i) for i,a in enumerate(args) if a in types), 0) / len(args))) + sum(0.3 for _ in filter(None, (star, starstar)))
 
-            # check to see if we're already in the cache
+            # check to see if our fnuc is already in the cache
             current = tuple(types.get(_,None) for _ in args),(star,starstar)
             for i, (p, (_, t, a)) in enumerate(cache):
                 if p != priority: continue
-                # check if it matches the entry
+                # verify that it actually matches the entry
                 if current == (tuple(t.get(_,None) for _ in a[0]), a[2]):
                     # yuuup, update it.
                     cache[i] = (priority, (func, types, argtuple))
@@ -61,14 +67,17 @@ class multicase(object):
                     return cons(res)
                 continue
 
-            # everything is ok...so add it
+            # everything is ok...so should be safe to add it
             heapq.heappush(cache, (priority, (func, types, argtuple)))
 
             # now we can update the docs
             res.__doc__ = cls.document(func.__name__, [n for _, n in cache])
 
-            # now to restore the wrapper to it's former glory
+            # ..and then restore the wrapper to it's former glory
             return cons(res)
+
+        if len(other) > 1:
+            raise SyntaxError("{:s}.{:s} : More than one callable was specified. Not sure which callable to clone state from. : {!r}".format(__name__, cls.__name__, other))
         return result
 
     @classmethod
@@ -122,14 +131,14 @@ class multicase(object):
 
     @classmethod
     def new_wrapper(cls, func, cache):
-        # build the wrapper...
+        # define the wrapper...
         def callable(*arguments, **keywords):
             heap = [res for _,res in heapq.nsmallest(len(cache), cache)]
             f, (a, w, k) = cls.match((arguments[:],keywords), heap)
             return f(*arguments, **keywords)
             #return f(*(arguments + tuple(w)), **keywords)
 
-        # ...and assign the cache to it.
+        # swap out the original code object with our wrapper's
         f,c = callable, callable.func_code
         cargs = c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags, \
                 c.co_code, c.co_consts, c.co_names, c.co_varnames, \
@@ -138,7 +147,11 @@ class multicase(object):
         newcode = types.CodeType(*cargs)
         res = types.FunctionType(newcode, f.func_globals, f.func_name, f.func_defaults, f.func_closure)
         res.func_name, res.func_doc = func.func_name, func.func_doc
+
+        # assign the specified cache to it
         setattr(res, cls.cache_name, cache)
+        # ...and finally add a default docstring
+        setattr(res, '__doc__', '')
         return res
 
     @classmethod
@@ -559,6 +572,235 @@ def spawn(stdout, command, **options):
 
     # spawn the sub-process
     return process(command, stdout=stdout, stderr=stderr, **options)
+
+class execution(object):
+    __slots__ = ('queue','state','result','ev_unpaused','ev_terminating')
+    __slots__+= ('thread','lock')
+
+    def __init__(self):
+        '''Execute a function asynchronously in another thread.'''
+
+        # management of execution queue
+        res = multiprocessing.Lock()
+        self.queue = multiprocessing.Condition(res)
+        self.state = []
+
+        # results
+        self.result = Queue.Queue()
+
+        # thread management
+        self.ev_unpaused = multiprocessing.Event()
+        self.ev_terminating = multiprocessing.Event()
+        self.thread = threading.Thread(target=self.__run__, name='Thread-{:s}-{:x}'.format(self.__class__.__name__, id(self)))
+
+        # FIXME: we can support multiple threads, but since this is
+        #        being bound by a single lock due to my distrust for IDA
+        #        and race-conditions...we only use one.
+        self.lock = multiprocessing.Lock()
+
+        return self.__start()
+
+    def release(self):
+        '''Release any resources required to execute a function asynchronously.'''
+        self.queue.acquire()
+        self.state = []
+        self.queue.release()
+        return self.__stop()
+
+    def __del__(self):
+        self.release()
+
+    def __repr__(self):
+        cls = self.__class__
+        state = 'paused'
+        if self.ev_unpaused.is_set():
+            state = 'running'
+        if self.ev_terminating.is_set():
+            state = 'terminated'
+        if not self.thread.is_alive():
+            state = 'dead'
+        res = tuple(self.state)
+        return "<class '{:s}.{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal',__name__)), cls.__name__, state, len(res), self.result.unfinished_tasks)
+
+    running = property(fget=lambda s: s.thread.is_alive() and s.ev_unpaused.is_set() and not s.ev_terminating.is_set())
+    dead = property(fget=lambda s: s.thread.is_alive())
+
+    def notify(self):
+        '''Notify the execution queue that it should process anything that is queued.'''
+        logging.debug("{:s}.{:s}.notify : Waking up execution queue. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+        self.queue.acquire()
+        self.queue.notify()
+        self.queue.release()
+
+    def next(self):
+        '''Notify the execution queue that a result is needed, then return the next one available.'''
+        self.queue.acquire()
+        while self.state:
+            self.queue.notify()
+        self.queue.release()
+                
+        if self.result.empty():
+            raise StopIteration
+        return self.pop()
+
+    def __start(self):
+        logging.debug("{:s}.{:s}.start : Starting execution queue thread. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        self.ev_terminating.clear(), self.ev_unpaused.clear()
+        self.thread.daemon = True
+        return self.thread.start()
+
+    def __stop(self):
+        logging.debug("{:s}.{:s}.stop : Terminating execution queue thread. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        if not self.thread.is_alive():
+            cls = self.__class__
+            logging.warn("{:s}.{:s}.stop : Execution queue has already been terminated. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self))
+            return
+        self.ev_unpaused.set(), self.ev_terminating.set()
+        self.queue.acquire()
+        self.queue.notify_all()
+        self.queue.release()
+        return self.thread.join()
+
+    def start(self):
+        '''Start to dispatch callables in the execution queue.'''
+        if not self.thread.is_alive():
+            cls = self.__class__
+            logging.fatal("{:s}.{:s}.start : Unable to resume an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+            return False
+        logging.info("{:s}.{:s}.start : Resuming execution queue. :{!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.set()
+        self.queue.acquire()
+        self.queue.notify_all()
+        self.queue.release()
+        return not res
+
+    def stop(self):
+        '''Pause the execution queue.'''
+        if not self.thread.is_alive():
+            cls = self.__class__
+            logging.fatal("{:s}.{:s}.stop : Unable to pause an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+            return False
+        logging.info("{:s}.{:s}.stop : Pausing execution queue. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.clear()
+        self.queue.acquire()
+        self.queue.notify_all()
+        self.queue.release()
+        return res
+
+    def push(self, callable, *args, **kwds):
+        '''Push ``callable`` with the provided ``args`` and ``kwds`` onto the execution queue.'''
+        # package it all into a single function
+        res = functools.partial(callable, *args, **kwds)
+
+        logging.debug("{:s}.{:s}.push : Adding callable {!r} to execution queue. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, callable, self))
+        # shove it down a multiprocessing.Queue
+        self.queue.acquire()
+        self.state.append(res)
+        self.queue.notify()
+        self.queue.release()
+        return True
+
+    def pop(self):
+        '''Pop a result off of the result queue.'''
+        if not self.thread.is_alive():
+            cls = self.__class__
+            logging.fatal("{:s}.{:s}.pop : Refusing to wait for a result when execution queue has already terminated. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+            raise Queue.Empty
+
+        logging.debug("{:s}.{:s}.pop : Popping result off of execution queue. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self))
+        try:
+            _, res, err = self.result.get(block=0)
+            if err != (None, None, None):
+                t, e, tb = err
+                raise t, e, tb
+        finally:
+            self.result.task_done()
+        return res
+
+    @classmethod
+    def __consume(cls, event, queue, state):
+        while True:
+            if event.is_set():
+                break
+            queue.wait()
+            if state: yield state.pop(0)
+        yield   # prevents us from having to catch a StopIteration
+
+    @classmethod
+    def __dispatch(cls, lock):
+        res, error = None, (None, None, None)
+        while True:
+            callable = (yield res, error)
+            lock.acquire()
+            try:
+                res = callable()
+            except:
+                res, error = None, sys.exc_info()
+            else:
+                error = None, None, None
+            finally: lock.release()
+        return
+
+    def __run__(self):
+        consumer = self.__consume(self.ev_terminating, self.queue, self.state)
+        executor = self.__dispatch(self.lock); next(executor)
+
+        logging.debug("{:s}.{:s}.running : Execution queue is now running. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        while not self.ev_terminating.is_set():
+            # check if we're allowed to execute
+            if not self.ev_unpaused.is_set():
+                self.ev_unpaused.wait()
+
+            # pull a callable out of the queue
+            logging.debug("{:s}.{:s}.running : Waiting for an item.. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+            self.queue.acquire()
+            item = next(consumer)
+            self.queue.release()
+
+            if not self.ev_unpaused.is_set():
+                self.ev_unpaused.wait()
+
+            # check if we're terminating
+            if self.ev_terminating.is_set(): break
+
+            # now we can execute it
+            logging.debug("{:s}.{:s}.running : Executing {!r} asynchronously. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, item, self.thread))
+            res, err = executor.send(item)
+
+            # and stash our result
+            logging.debug("{:s}.{:s}.running : Received result {!r} from {!r}. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, (res,err), item, self.thread))
+            self.result.put((item,res,err))
+        return
+
+class matcher(object):
+    def __init__(self):
+        self.__predicate__ = {}
+    def __attrib__(self, *attribute):
+        identity = lambda n: n
+        if not attribute:
+            return identity
+        res = [(operator.attrgetter(a) if isinstance(a,basestring) else a) for a in attribute]
+        return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
+    def attribute(self, type, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        self.__predicate__[type] = lambda v: compose(attr, functools.partial(functools.partial(operator.eq, v)))
+    def mapping(self, type, function, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        mapper = compose(attr, function)
+        self.__predicate__[type] = lambda v: compose(mapper, functools.partial(operator.eq, v))
+    def boolean(self, type, function, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        self.__predicate__[type] = lambda v: compose(attr, functools.partial(function, v))
+    def predicate(self, type, *attribute):
+        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+        attr = self.__attrib__(*attribute)
+        self.__predicate__[type] = functools.partial(compose, attr)
+    def match(self, type, value, iterable):
+        matcher = self.__predicate__[type](value)
+        return itertools.ifilter(matcher, iterable)
 
 if __name__ == '__main__':
     fn = lambda: 0

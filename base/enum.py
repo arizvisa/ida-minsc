@@ -153,7 +153,7 @@ def repr(enum):
     aligned = max((len(n) for n,_,_,_ in result))
     return "<type 'enum'> {:x}\n".format(id) + '\n'.join((' {:<{align}s} : {:0{width}x}'.format(name,value,width=w,align=aligned)+((' # '+comment) if comment else '') for name,value,bmask,comment in result))
 
-__matcher__ = internal.interface.matcher()
+__matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
 __matcher__.boolean('regex', re.search, idaapi.get_enum_name)
 __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), idaapi.get_enum_name)

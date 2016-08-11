@@ -1,11 +1,9 @@
-import sys
-import six, logging
+import sys, logging
 import operator,functools,itertools
 import collections,heapq,types
+import six,traceback
 
-import function,database,structure
-import internal
-
+import internal,ui
 import idaapi
 
 class typemap:
@@ -61,28 +59,31 @@ class typemap:
 
     # defaults
     @classmethod
-    def __database_inited__(cls, is_new_database, idc_script):
-        # FIXME: figure out how to fix this recursive module dependency
-        typemap.integermap[None] = typemap.integermap[(hasattr(database,'config') and database.config.bits() or 32)/8]
-        typemap.decimalmap[None] = typemap.decimalmap[(hasattr(database,'config') and database.config.bits() or 32)/8]
-        typemap.ptrmap[None] = typemap.ptrmap[(hasattr(database,'config') and database.config.bits() or 32)/8]
+    def __loader_finished__(cls, li, neflags, filetypename):
+        info = idaapi.get_inf_structure()
+        bits = 64 if info.is_64bit() else 32 if info.is_32bit() else None
+        if bits is None: return
+
+        typemap.integermap[None] = typemap.integermap[bits/8]
+        typemap.decimalmap[None] = typemap.decimalmap[bits/8]
+        typemap.ptrmap[None] = typemap.ptrmap[bits/8]
         typemap.stringmap[None] = typemap.stringmap[str]
 
     @classmethod
     def dissolve(cls, flag, typeid, size):
         dt = flag & cls.FF_MASKSIZE
         sf = -1 if idaapi.is_signed_data(flag) else +1
-        if dt == idaapi.FF_STRU and isinstance(typeid,(int,long)):
+        if dt == idaapi.FF_STRU and isinstance(typeid,six.integer_types):
             # FIXME: figure out how to fix this recursive module dependency
-            t = structure.instance(typeid) 
+            t = sys.modules.get('structure', __import__('structure')).instance(typeid) 
             sz = t.size
             return t if sz == size else [t,size // sz]
         if dt not in cls.inverted:
-            logging.warn('typemap.disolve({!r}, {!r}, {!r}) : Unable to identify a pythonic type'.format(dt, typeid, size))
+            logging.warn('{:s}.{:s}.dissolve({!r}, {!r}, {!r}) : Unable to identify a pythonic type.'.format('.'.join(('internal',__name__)), cls.__name__, dt, typeid, size))
 
         t,sz = cls.inverted[dt]
         # if the type and size are the same, then it's a string or pointer type
-        if not isinstance(sz,(int,long)):
+        if not isinstance(sz,six.integer_types):
             count = size // idaapi.get_data_type_size(dt, idaapi.opinfo_t())
             return [t,count] if count > 1 else t
         # if the size matches, then we assume it's a single element
@@ -114,7 +115,7 @@ class typemap:
             res,count = pythonType
             flag,typeid,sz = cls.resolve(res)
 
-        elif isinstance(pythonType, structure.structure_t):
+        elif isinstance(pythonType, sys.modules.get('structure', __import__('structure')).structure_t):
             # it's a structure, pass it through.
             flag,typeid,sz = idaapi.struflag(),pythonType.id,pythonType.size
 
@@ -138,77 +139,128 @@ class priorityhook(object):
     def __init__(self, hooktype, **exclude):
         exclusions = set(exclude.get('exclude', ()))
         self.__type__ = hooktype
-        self.cache = collections.defaultdict(list)
+        self.__cache = collections.defaultdict(list)
         self.object = self.cycle(self.__type__())
+        self.__disabled = set()
+        self.__traceback = {}
+
+    def enable(self, name):
+        '''Enable any hooks for the ``name`` event that have been previously disabled.'''
+        if name not in self.__disabled:
+            logging.fatal("{:s}.{:s}.enable : Hook {:s}.{:s} is not disabled. : {:s}".format('.'.join(('internal',__name__)), cls.__name__, self.__type__.__name__, name, '{'+', '.join(self.__disabled)+'}'))
+            return False
+        self.__disabled.discard(name)
+        return True
+    def disable(self, name):
+        '''Disable execution of all the hooks for the ``name`` event.'''
+        if name not in self.__cache:
+            logging.fatal("{:s}.{:s}.disable : Hook {:s}.{:s} does not exist. : {:s}".format('.'.join(('internal',__name__)), cls.__name__, self.__type__.__name__, name, '{'+', '.join(self.__cache.viewkeys())+'}'))
+            return False
+        if name in self.__disabled:
+            logging.warn("{:s}.{:s}.disable : Hook {:s}.{:s} has already been disabled. : {:s}".format('.'.join(('internal',__name__)), cls.__name__, self.__type__.__name__, name, '{'+', '.join(self.__disabled)+'}'))
+            return False
+        self.__disabled.add(name)
+        return True
+    def __iter__(self):
+        '''Return the name of each event that is hooked by this object.'''
+        for name in self.__cache:
+            yield name
+        return
     
     def cycle(self, object=None):
+        '''Cycle the hooks for this object with the idaapi.*_Hooks instance provided by ``object``.'''
+        cls = self.__class__
         # uhook previous object
         ok = object.unhook()
         if not ok:
-            logging.debug('{:s}.priorityhook.cycle : Error trying to unhook object. : {!r}'.format(__name__, object))
+            logging.debug('{:s}.{:s}.cycle : Error trying to unhook object. : {!r}'.format('.'.join(('internal',__name__)), cls.__name__, object))
 
-        namespace = { name : self.new(name) for name in self.cache.viewkeys() }
+        namespace = { name : self.__new(name) for name in self.__cache.viewkeys() }
         res = type(object.__class__.__name__, (self.__type__,), namespace)
         object = res()
         
         ok = object.hook()
         if not ok:
-            logging.debug('{:s}.priorityhook.cycle : Unable to hook with object.: {!r}'.format(__name__, object))
+            logging.debug('{:s}.{:s}.cycle : Unable to hook with object. : {!r}'.format('.'.join(('internal',__name__)), cls.__name__, object))
         return object
 
-    def add(self, name, function, priority=10):
-        if name not in self.cache:
-            res = self.new(name)
+    def add(self, name, function, priority=50):
+        '''Add a hook for the event ``name`` to call the requested ``function`` at the given ``priority (lower is prioritized).'''
+        if name not in self.__cache:
+            res = self.__new(name)
             setattr(self.object, name, res)
-
         self.discard(name, function)
 
-        res = self.cache[name]
-        heapq.heappush(self.cache[name], (priority, function))
+        # add function to cache
+        res = self.__cache[name]
+        heapq.heappush(self.__cache[name], (priority, function))
+
+        # save the backtrace in case function errors out
+        self.__traceback[(name,function)] = traceback.extract_stack()[:-1]
         return True
 
     def get(self, name):
-        res = self.cache[name]
+        '''Return all the functions that are hooking the event ``name``.'''
+        res = self.__cache[name]
         return tuple(f for _,f in res)
 
     def discard(self, name, function):
+        '''Discard the specified ``function`` from hooking the event ``name``.'''
         if not hasattr(self.object, name):
-            raise AttributeError('{:s}.priorityhook.add : Unable to add a method to hooker for unknown method. : {!r}'.format(__name__, name))
-        if name not in self.cache: return False
+            cls = self.__class__
+            raise AttributeError('{:s}.{:s}.add : Unable to add a method to hooker for unknown method. : {!r}'.format('.'.join(('internal',__name__)), cls.__name__, name))
+        if name not in self.__cache: return False
 
         res, found = [], 0
-        for i,(p,f) in enumerate(self.cache[name][:]):
+        for i,(p,f) in enumerate(self.__cache[name][:]):
             if f != function:
                 res.append((p,f))
                 continue
             found += 1
 
-        if res: self.cache[name][:] = res
-        else: self.cache.pop(name, [])
+        if res: self.__cache[name][:] = res
+        else: self.__cache.pop(name, [])
 
         return True if found else False
 
-    def new(self, name):
+    def __new(self, name):
+        '''Overwrite the hook ``name`` with a priorityhook.'''
         if not hasattr(self.object, name):
-            raise AttributeError('{:s}.priorityhook.new : Unable to create a hook for unknown method. : {!r}'.format(__name__, name))
+            cls = self.__class__
+            raise AttributeError('{:s}.{:s}.__new : Unable to create a hook for unknown method. : {!r}'.format('.'.join(('internal',__name__)), cls.__name__, name))
 
         def method(hookinstance, *args):
-            if name in self.cache:
-                hookq = self.cache[name][:]
+            if name in self.__cache and name not in self.__disabled:
+                hookq = self.__cache[name][:]
 
                 for _,func in heapq.nsmallest(len(hookq), hookq):
-                    res = func(*args)
+                    try:
+                        res = func(*args)
+                    except:
+                        cls = self.__class__
+                        message = functools.partial("{:s}.{:s}.callback : {:s}".format, '.'.join(('internal',__name__)), cls.__name__)
+
+                        logging.fatal("{:s}.{:s}.callback : Callback for {:s} raised an exception.".format('.'.join(('internal',__name__)), cls.__name__, '.'.join((self.__type__.__name__,name))))
+                        res = map(message, traceback.format_exception(*sys.exc_info()))
+                        map(logging.fatal, res)
+
+                        logging.warn("{:s}.{:s}.callback : Hook originated from -> ".format('.'.join(('internal',__name__)), cls.__name__))
+                        res = map(message, traceback.format_list(self.__traceback[name,func]))
+                        map(logging.warn, res)
+
+                        res = self.STOP
+                    
                     if not isinstance(res, self.result) or res == self.CONTINUE:
                         continue
                     elif res == self.STOP:
                         break
-                    raise TypeError('{:s}.priorityhook.callback : Unable to determine result type : {!r}'.format(__name__, res))
+                    cls = self.__class__
+                    raise TypeError('{:s}.{:s}.callback : Unable to determine result type. : {!r}'.format('.'.join(('internal',__name__)), cls.__name__, res))
 
             supermethod = getattr(super(hookinstance.__class__, hookinstance), name)
             return supermethod(*args)
         return types.MethodType(method, self.object, self.object.__class__)
 
-import sys
 class address(object):
     @classmethod
     def pframe(cls):
@@ -293,178 +345,3 @@ class address(object):
             return cls.__within2__(*args)
         return cls.__within1__(*args)
 
-class matcher(object):
-    def __init__(self):
-        self.__predicate__ = {}
-    def __attrib__(self, *attribute):
-        identity = lambda n: n
-        if not attribute:
-            return identity
-        res = [(operator.attrgetter(a) if isinstance(a,basestring) else a) for a in attribute]
-        return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
-    def attribute(self, type, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
-        attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda v: compose(attr, functools.partial(functools.partial(operator.eq, v)))
-    def mapping(self, type, function, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
-        attr = self.__attrib__(*attribute)
-        mapper = compose(attr, function)
-        self.__predicate__[type] = lambda v: compose(mapper, functools.partial(operator.eq, v))
-    def boolean(self, type, function, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
-        attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda v: compose(attr, functools.partial(function, v))
-    def predicate(self, type, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
-        attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = functools.partial(compose, attr)
-    def match(self, type, value, iterable):
-        matcher = self.__predicate__[type](value)
-        return itertools.ifilter(matcher, iterable)
-
-class hook(object):
-    @staticmethod
-    def noapi(*args):
-        fr = sys._getframe().f_back
-        if fr is None:
-            logging.fatal("internal.{:s}.noapi : Unexpected empty frame from caller. Continuing.. : {!r} : {!r}".format('.'.join((__name__,'hook')), sys._getframe(), sys._getframe().f_code))
-            return hook.CONTINUE
-
-        return priorityhook.CONTINUE if fr.f_back is None else priorityhook.STOP
-
-    @staticmethod
-    def rename(ea, newname):
-        fl = idaapi.getFlags(ea)        
-        labelQ, customQ = (fl & n == n for n in (idaapi.FF_LABL,idaapi.FF_NAME))
-        #r, fn = database.xref.up(ea), idaapi.get_func(ea)
-        fn = idaapi.get_func(ea)
-
-        # figure out whether a global or function name is being changed, otherwise it's the function's contents
-        ctx = internal.comment.globals if not fn or (fn.startEA == ea) else internal.comment.contents
-
-        # if a name is being removed
-        if not newname:
-            # if it's a custom name
-            if (not labelQ and customQ):
-                ctx.dec(ea, '__name__')
-            return
-
-        # if it's currently a label or is unnamed
-        if (labelQ and not customQ) or all(not n for n in (labelQ,customQ)):
-            ctx.inc(ea, '__name__')
-        return
-
-    @staticmethod
-    def extra_cmt_changed(ea, line_idx, cmt):
-        oldcmt = internal.netnode.sup.get(ea, line_idx)
-        ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
-
-        MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
-        prefix = (idaapi.E_PREV, idaapi.E_PREV+MAX_ITEM_LINES, '__extra_prefix__')
-        suffix = (idaapi.E_NEXT, idaapi.E_NEXT+MAX_ITEM_LINES, '__extra_suffix__')
-
-        for l,r,key in (prefix,suffix):
-            if l <= line_idx < r:
-                if oldcmt is None and cmt: ctx.inc(ea, key)
-                elif oldcmt and cmt is None: ctx.dec(ea, key)
-            continue
-        return
-
-    @staticmethod
-    def thunk_func_created(pfn):
-        pass
-
-    @staticmethod
-    def func_tail_appended(pfn, tail):
-        # tail = func_t
-        for ea in database.iterate(tail.startEA, tail.endEA):
-            for k in database.tag(ea):
-                internal.comment.globals.dec(ea, k)
-                internal.comment.contents.inc(ea, k, target=pfn.startEA)
-            continue
-        return
-
-    @staticmethod
-    def removing_func_tail(pfn, tail):
-        # tail = area_t
-        for ea in database.iterate(tail.startEA, tail.endEA):
-            for k in database.tag(ea):
-                internal.comment.contents.dec(ea, k, target=pfn.startEA)
-                internal.comment.globals.inc(ea, k)
-            continue
-        return
-
-    @staticmethod
-    def add_func(pfn):
-        # convert all globals into contents
-        for (l,r) in function.chunks(pfn):
-            for ea in database.iterate(l, r):
-                for k in database.tag(ea):
-                    internal.comment.globals.dec(ea, k)
-                    internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                continue
-            continue
-        return
-
-    @staticmethod
-    def del_func(pfn):
-        # convert all contents into globals
-        for (l,r) in function.chunks(pfn):
-            for ea in database.iterate(l, r):
-                for k in database.tag(ea):
-                    internal.comment.contents.dec(ea, k, target=pfn.startEA)
-                    internal.comment.globals.inc(ea, k)
-                continue
-            continue
-
-        # remove all function tags
-        for k in function.tag(pfn.startEA):
-            internal.comment.globals.dec(pfn.startEA, k)
-        return
-
-    @staticmethod
-    def set_func_start(pfn, new_start):
-        # new_start has removed addresses from function
-        # replace contents with globals
-        if pfn.startEA > new_start:
-            for ea in database.iterate(new_start, pfn.startEA):
-                for k in database.tag(ea):
-                    internal.comment.contents.dec(ea, k, target=pfn.startEA)
-                    internal.comment.globals.inc(ea, k)
-                continue
-            return
-
-        # new_start has added addresses to function
-        # replace globals with contents
-        elif pfn.startEA < new_start:
-            for ea in database.iterate(pfn.startEA, new_start):
-                for k in database.tag(ea):
-                    internal.comment.globals.dec(ea, k)
-                    internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                continue
-            return
-        return
-
-    @staticmethod
-    def set_func_end(pfn, new_end):
-        # new_end has added addresses to function
-        # replace globals with contents
-        if new_end > pfn.endEA:
-            for ea in database.iterate(pfn.endEA, new_end):
-                for k in database.tag(ea):
-                    internal.comment.globals.dec(ea, k)
-                    internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                continue
-            return
-
-        # new_end has removed addresses from function
-        # replace contents with globals
-        elif new_end < pfn.endEA:
-            for ea in database.iterate(new_end, pfn.endEA):
-                for k in database.tag(ea):
-                    internal.comment.contents.dec(ea, k, target=pfn.startEA)
-                    internal.comment.globals.inc(ea, k)
-                continue
-            return
-        return

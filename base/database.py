@@ -220,7 +220,7 @@ def iterate(start, end, step=None):
     yield end
 
 class names(object):
-    __matcher__ = internal.interface.matcher()
+    __matcher__ = utils.matcher()
     __matcher__.mapping('address', idaapi.get_nlist_ea)
     __matcher__.mapping('ea', idaapi.get_nlist_ea)
     __matcher__.boolean('name', operator.eq, idaapi.get_nlist_name)
@@ -881,7 +881,7 @@ def select(**boolean):
 @utils.multicase(tag=basestring)
 def selectcontents(tag, *tags, **boolean):
     tags = (tag,) + tags
-    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    boolean['Or'] = tuple(set(boolean.get('Or',set())).union(tags))
     return selectcontents(**boolean)
 @utils.multicase()
 def selectcontents(**boolean):
@@ -889,15 +889,19 @@ def selectcontents(**boolean):
     boolean = dict((k,set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
-        for ea in functions():
-            res = function.tags(ea)
+        for ea,_ in internal.comment.contents.iterate():
+            res = internal.comment.contents.name(ea)
             if res: yield ea, res
         return
 
-    for ea,t in internal.comment.contents.iterate():
-        res,d = set(),internal.comment.contents.name(ea)
-        if d != t:
-            logging.info("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:x}".format(__name__, ea))
+    for ea, res in internal.comment.contents.iterate():
+        # check to see that the dict's keys match
+        res,d = set(res),internal.comment.contents._read(None, ea)
+        if set(d.viewkeys()) != res:
+            logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:x}".format(__name__, ea))
+
+        # now start aggregating the keys that the user is looking for
+        res, d = set(), internal.comment.contents.name(ea)
 
         Or = boolean.get('Or', set())
         res.update(Or.intersection(d))

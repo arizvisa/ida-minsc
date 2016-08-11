@@ -1,5 +1,10 @@
+import logging
 import internal,database,segment,function,instruction as ins,structure
-import idaapi,logging
+import os
+
+import PyQt5.Qt
+from PyQt5.Qt import QObject
+import idaapi
 
 ## TODO:
 # locate window under current cursor position
@@ -48,6 +53,117 @@ class current(object):
     def symbol(cls):
         """Return the symbol name directly under the cursor"""
         return idaapi.get_highlighted_identifier()
+
+class root(object):
+    @classmethod
+    def application(cls):
+        return PyQt5.Qt.qApp
+    @classmethod
+    def window(cls):
+        return max(cls.windows(), key=lambda w: w.width() * w.height())
+    @classmethod
+    def windows(cls):
+        q = cls.application()
+        return q.topLevelWindows()
+    @classmethod
+    def refresh(cls):
+        idaapi.refresh_lists()
+        return idaapi.refresh_idaview_anyway()
+
+class progress(object):
+    def __init__(self, blocking=True):
+        self.object = res = PyQt5.Qt.QProgressDialog()
+        res.setVisible(False)
+        res.setWindowModality(blocking)
+        res.setAutoClose(True)
+        path = '{:s}/{:s}'.format(database.path(), database.filename())
+        self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
+
+    # properties
+    canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s,v: s.object.canceled.connect(v))
+    maximum = property(fget=lambda s: s.object.maximum())
+    minimum = property(fget=lambda s: s.object.minimum())
+    current = property(fget=lambda s: s.object.value())
+
+    # methods
+    def open(self, width=0.8, height=0.1):
+        global root
+        window = root.window()
+        w, h = window.width() * width, window.height() * height
+        self.object.setFixedWidth(w), self.object.setFixedHeight(h)
+
+        center = window.geometry().center()
+        x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
+        self.object.move(x, y)
+
+        self.object.show()
+
+    def close(self):
+        self.object.close()
+
+    def update(self, **options):
+        minimum, maximum = options.get('min', None), options.get('max', None)
+        text,title,tooltip = (options.get(n, None) for n in ('text','title','tooltip'))
+
+        if minimum is not None:
+            self.object.setMinimum(minimum)
+        if maximum is not None:
+            self.object.setMaximum(maximum)
+        if title is not None:
+            self.object.setWindowTitle(title)
+        if tooltip is not None:
+            self.object.setToolTip(tooltip)
+        if text is not None:
+            self.object.setLabelText(text)
+
+        res = self.object.value()
+        if 'current' in options:
+            self.object.setValue(options['current'])
+        elif 'value' in options:
+            self.object.setValue(options['value'])
+        return res
+
+class ProgressBar(object):
+    """
+    int progressDialog()
+    {
+     QProgressDialog dialog("Bytes received", "Stop reading", 0, 100); // expect 100 bytes
+     PipeReader reader(fileno(stdin));
+     QObject::connect(&reader, &PipeReader::channelClosed,
+     &dialog, &QProgressDialog::accept);
+     QObject::connect(&reader, &PipeReader::dataReceived, [&](const QByteArray &data) {
+         qDebug() << "Received" << data.length() << "bytes";
+         dialog.setValue(qMin(dialog.maximum(), dialog.value() + data.length()));
+     });
+     dialog.exec();
+     return dialog.result() == QDialog::Accepted ? 0 : 1;
+    }
+    """
+
+#.setModal
+#.setRange
+#.setLabelText
+#.setMaximum
+#.setMinimum
+#.setValue
+#.setWindowTitle
+#.setStatusTip
+#.setToolTip
+#.setSizeHint
+#.setWindowRole
+#?.setWindowState
+
+class ProgressBar(object):
+    def __init__(self, title):
+        pass
+    def show(self, state):
+        pass
+    def start(self):
+        pass
+    def stop(self):
+        pass
+    def update(self, minimum, maximum, current):
+        pass
 
 class InputBox(idaapi.PluginForm):
     """Creating an InputBox to interact with the user"""
@@ -137,17 +253,20 @@ class Strings(object):
         return
 
 try:
-    import PySide.QtGui
+    # FIXME: switch over to PyQt5
+    import PyQt5.Qt
 
     class UI(object):
         '''static class for interacting with IDA's Qt user-interface'''
         @classmethod
         def application(cls):
-            return PySide.QtGui.QApplication.instance()
+            return PyQt5.Qt.qApp
+            #return PyQt5.Qt.QApplication.instance()
 
         @classmethod
         def clipboard(cls):
-            return cls.application().clipboard()
+            clp = cls.application().clipboard()
+            clp = utils.multicase()
 
         @classmethod
         def main(cls):
@@ -334,7 +453,63 @@ def sourcechain(fn, *args, **kwds):
         continue
     return [(ea,result[ea]) for ea in sorted(result.keys())]
 
+# for exposing the ability queueing functions asynchronously..
+# which is probably pretty unsafe in IDA, but let's hope.
+class queue(object):
+    @classmethod
+    def __start_ida__(cls):
+        if hasattr(cls, 'execute') and not cls.execute.dead:
+            logging.warn("{:s}.{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format(__name__, cls.__name__, cls.execute))
+            return
+        cls.execute = internal.utils.execution()
+
+    @classmethod
+    def __stop_ida__(cls):
+        if not hasattr(cls, 'execute'):
+            logging.warn("{:s}.{:s}.stop : Refusing to release execution queue due to it not being initialized.".format(__name__, cls.__name__))
+            return
+        cls.execute.release()
+
+    @classmethod
+    def __open_database__(cls, idp_modname):
+        cls.execute.start()
+
+    @classmethod
+    def __close_database__(cls):
+        cls.execute.stop()
+
+    @classmethod
+    def add(cls, func, *args, **kwds):
+        if not cls.execute.running:
+            logging.warn("{:s}.{:s}.add : Unable to execute {!r} due to queue not running.".format(__name__, cls.__name__, func))
+        return cls.execute.push(func, *args, **kwds)
+
+    @classmethod
+    def pop(cls):
+        return next(cls.execute)
+
+# for exposing the ability to hook different parts of IDA
 class hook(object):
-    idp = internal.interface.priorityhook(idaapi.IDP_Hooks, exclude=('calc_retloc3','get_default_enum_size','get_reg_name','is_sane_insn','is_ret_insn','get_bg_color'))
-    idb = internal.interface.priorityhook(idaapi.IDB_Hooks)
-    ui =  internal.interface.priorityhook(idaapi.UI_Hooks)
+    @classmethod
+    def __start_ida__(cls):
+        api = [
+            ('idp', idaapi.IDP_Hooks),
+            ('idb', idaapi.IDB_Hooks),
+            ('ui', idaapi.UI_Hooks),
+        ]
+        priorityhook = internal.interface.priorityhook
+        for attr, hookcls in api:
+            if not hasattr(cls, attr):
+                setattr(cls, attr, priorityhook(hookcls))
+            continue
+        return
+
+    @classmethod
+    def __stop_ida__(cls):
+        for api in ('idp','idb','ui'):
+            res = getattr(cls, api)
+            for name in res:
+                res.disable(name)
+            continue
+        return
+                

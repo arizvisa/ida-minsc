@@ -262,7 +262,7 @@ def parse_line(iterable):
         res = t.decode(value)
     except:
         res = _str.decode(value)
-        logging.warn("internal.{:s}.parse_line : Assuming tag {!r} is of type _str. : {!r}".format(__name__, key, value))
+        logging.warn("{:s}.parse_line : Assuming tag {!r} is of type _str. : {!r}".format( '.'.join(("internal", __name__)), key, value))
         #raise ValueError("Unable to decode data with {!r} : {!r}".format(t, value))
     return key, res
 
@@ -313,8 +313,9 @@ class tagging(object):
     codec = __import__('codecs').lookup('bz2_codec')    
 
     @classmethod
-    def __database_inited__(cls, is_new_database, idc_script):
+    def __init_tagcache__(cls, idp_modname):
         cls.node()
+        logging.debug("{:s}.{:s}.init_tagcache : Initialized tagcache with netnode {!r} : {:x}".format('.'.join(("internal",__name__)), cls.__name__, cls.__node__, cls.__nodeid__))
 
     @classmethod
     def node(cls):
@@ -343,71 +344,125 @@ class contents(tagging):
         return res.startEA if res else None
 
     @classmethod
+    def _read_header(cls, target, ea):
+        node, key = tagging.node(), cls._key(ea) if target is None else target
+        if key is None:
+            raise LookupError("{:s}.{:s}._read_header : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
+
+        encdata = internal.netnode.sup.get(key, cls.btag)
+        if encdata is None:
+            return None
+
+        try:
+            data,sz = cls.codec.decode(encdata)
+            if len(encdata) != sz:
+                raise ValueError((sz,len(encdata)))
+        except:
+            raise IOError("{:s}.{:s}._read_header : Unable to decode contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, encdata))
+
+        try:
+            result = cls.marshaller.loads(data)
+        except:
+            raise IOError("{:s}.{:s}._read_header : Unable to unmarshal contents for {:x} at {:x}: {!r}".format( '.'.join(("internal", __name__)), cls__name__, key, ea, data))
+        return result
+
+    @classmethod
+    def _write_header(cls, target, ea, value):
+        node, key = tagging.node(), cls._key(ea) if target is None else target
+        if key is None:
+            raise LookupError("{:s}.{:s}._write_header : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
+
+        if not value:
+            ok = internal.netnode.sup.remove(node, key)
+            return bool(ok)
+
+        try:
+            data = cls.marshaller.dumps(value)
+        except:
+            raise IOError("{:s}.{:s}._write_header : Unable to marshal contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, value))
+
+        try:
+            encdata,sz = cls.codec.encode(data)
+            if sz != len(data):
+                raise ValueError((value,sz,len(data)))
+        except:
+            raise IOError("{:s}.{:s}._write_header : Unable to encode contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, data))
+
+        if len(encdata) > 1024:
+            logging.warn("{:s}.{:s}._write_header : Too many tags within function. Size must be < 0x400. Ignoring. : {:x}".format('.'.join(("internal", __name__)), cls.__name__, len(encdata)))
+
+        ok = internal.netnode.sup.set(node, key, encdata)
+        return bool(ok)
+
+    @classmethod
     def _read(cls, target, ea):
         '''Reads a dictionary from the specific object'''
-        node, key = tagging.node(), cls._key(ea if target is None else target)
+        node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError(ea)
-
-        # check to see if using old sup version
-        res = internal.netnode.sup.get(node, key)
-        if res is not None:
-            try:
-                # check if it's not corrupted
-                marshal.loads(cls.codec.decode(res))
-            except:
-                pass
-            else:
-                # if so, then re-assign it to function's blob
-                internal.netnode.blob.set(key, cls.btag, res)
-            internal.netnode.sup.remove(node, key)
-
-        # FIXME: check address and keynames against sup-cache to determine if
-        #        blob-cache is out of sync, or corrupted.
-        #encdata = internal.netnode.sup.get(node, key)
+            raise LookupError("{:s}.{:s}._read : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
 
         encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
             return None
 
-        data,sz = cls.codec.decode(encdata)
-        if len(encdata) != sz:
-            raise ValueError((sz,len(encdata)))
-        return cls.marshaller.loads(data)
+        try:
+            data,sz = cls.codec.decode(encdata)
+            if len(encdata) != sz:
+                raise ValueError((sz,len(encdata)))
+        except:
+            raise IOError("{:s}.{:s}._read : Unable to decode contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, encdata))
+        
+        try:
+            result = cls.marshaller.loads(data)
+        except:
+            raise IOError("{:s}.{:s}._read : Unable to unmarshal contents for {:x} at {:x}: {!r}".format( '.'.join(("internal", __name__)), cls__name__, key, ea, data))
+        return result
 
     @classmethod
     def _write(cls, target, ea, value):
         '''Writes a dictionary to the specified object'''
-        node, key = tagging.node(), cls._key(ea if target is None else target)
+        node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError(ea)
+            raise LookupError("{:s}.{:s}._write : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
 
+        # erase cache and blob if no data is specified
         if not value:
-            ok = internal.netnode.sup.remove(node, key)
-            if not ok:
-                logging.info("internal.{:s}._write : Unable to remove address from sup cache. : {:x}".format('.'.join((__name__,cls.__name__)), key))
-            return internal.netnode.blob.remove(key, cls.btag)
-
-        # update sup cache with keys
-        res = set(value.viewkeys())
-        data = cls.marshaller.dumps(res)
-        encdata,sz = cls.codec.encode(data)
-        if sz != len(data):
-            raise ValueError((res,sz,len(data)))
-        if len(encdata) > 1024:
-            logging.warn("internal.{:s}._write : Too many tags within function. Size must be < 0x400. Ignoring. : {:x}".format('.'.join((__name__,cls.__name__)), len(encdata)))
-        ok = internal.netnode.sup.set(node, key, encdata)
-        if not ok:
-            logging.fatal("internal.{:s}._write : Unable to update sup cache with tag names. Ignoring. : {:x}".format('.'.join((__name__,cls.__name__)), key))
+            try:
+                ok = cls._write_header(target, ea, None)
+                if not ok:
+                    logging.info("{:s}.{:s}._write : Unable to remove address from sup cache. : {:x}".format('.'.join(("internal", __name__)), cls.__name__, key))
+            finally:
+                return internal.netnode.blob.remove(key, cls.btag)
 
         # update blob for given address
         res = value
-        data = cls.marshaller.dumps(res)
-        encdata,sz = cls.codec.encode(data)
+        try:
+            data = cls.marshaller.dumps(res)
+        except:
+            raise IOError("{:s}.{:s}._write : Unable to marshal contents for {:x} at {:x} : {!r}".format(__name__, cls.__name__, key, ea, res))
+
+        try:
+            encdata,sz = cls.codec.encode(data)
+        except:
+            raise IOError("{:s}.{:s}._write : Unable to encode contents for {:x} at {:x} : {!r}".format(__name__, cls.__name__, key, ea, data))
         if sz != len(data):
             raise ValueError((res,sz,len(data)))
 
-        return internal.netnode.blob.set(key, cls.btag, encdata)
+        # write blob
+        try:
+            ok = internal.netnode.blob.set(key, cls.btag, encdata)
+            assert ok
+        except:
+            raise IOError("{:s}.{:s}._write : Unable to set contents for {:x} at {:x} : {!r}".format(__name__, cls.__name__, key, ea, encdata))
+
+        # update sup cache with keys
+        res = set(value.viewkeys())
+        try:
+            ok = cls._write_header(target, ea, res)
+            assert ok
+        except:
+            logging.fatal("{:s}.{:s}._write : Unable to set address to sup cache. : {:x}".format('.'.join(("internal", __name__)), cls.__name__, key))
+        return ok
 
     @classmethod
     def iterate(cls):
@@ -572,197 +627,3 @@ class globals(tagging):
         internal.netnode.alt.set(tagging.node(), address, count)
         return res
 
-class address_hook(object):
-    @classmethod
-    def _is_repeatable(cls, ea):
-        f = idaapi.get_func(ea)
-        return True if f is None else False
-
-    @classmethod
-    def _update_refs(cls, ea, old, new):
-        f = idaapi.get_func(ea)
-        for key in old.viewkeys() ^ new.viewkeys():
-            if key not in new:
-                if f: contents.dec(ea, key)
-                else: globals.dec(ea, key)
-            if key not in old:
-                if f: contents.inc(ea, key)
-                else: globals.inc(ea, key)
-            continue
-        return
-
-    @classmethod
-    def _create_refs(cls, ea, res):
-        f = idaapi.get_func(ea)
-        for key in res.viewkeys():
-            if f: contents.inc(ea, key)
-            else: globals.inc(ea, key)
-        return
-
-    @classmethod
-    def _delete_refs(cls, ea, res):
-        f = idaapi.get_func(ea)
-        for key in res.viewkeys():
-            if f: contents.dec(ea, key)
-            else: globals.dec(ea, key)
-        return
-
-    @classmethod
-    def _event(cls):
-        while True:
-            # cmt_changing event
-            ea,rpt,new = (yield)
-            old = idaapi.get_cmt(ea, rpt)
-            f,o,n = idaapi.get_func(ea),decode(old),decode(new)
-
-            # update references before we update the comment
-            cls._update_refs(ea, o, n)
-
-            # wait for cmt_changed event
-            newea,nrpt,none = (yield)
-
-            # now fix the comment the user typed
-            if (newea,nrpt,none) == (ea,rpt,None):
-                ncmt,repeatable = idaapi.get_cmt(ea, rpt), cls._is_repeatable(ea)
-
-                if (ncmt or '') != new:
-                    logging.warn('internal.{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}'.format('.'.join((__name__,cls.__name__)), ea, new, ncmt))
-
-                # delete it if it's the wrong type
-#                if nrpt != repeatable:
-#                    idaapi.set_cmt(ea, '', nrpt)
-
-#                # write the tag back to the address
-#                if check(new): idaapi.set_cmt(ea, encode(n), repeatable)
-#                # write the comment back if it's non-empty
-#                elif new: idaapi.set_cmt(ea, new, repeatable)
-#                # otherwise, remove it's reference since it's being deleted
-#                else: cls._delete_refs(ea, n)
-
-                if check(new): idaapi.set_cmt(ea, encode(n), rpt)
-                elif new: idaapi.set_cmt(ea, new, rpt)
-                else: cls._delete_refs(ea, n)
-
-                continue
-
-            # if the changed event doesn't happen in the right order
-            logging.fatal("internal.{:s}.event : Comment events are out of sync, updating tags from previous comment. : {!r} : {!r}".format('.'.join((__name__,cls.__name__)), o, n))
-
-            # delete the old comment
-            cls._delete_refs(ea, o)
-            idaapi.set_cmt(ea, '', rpt)
-            logging.warn("internal.{:s}.event : Previous comment at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), o))
-
-            # new comment
-            new = idaapi.get_cmt(newea, nrpt)
-            n = decode(new)
-            cls._create_refs(newea, n)
-
-            continue
-        return
-
-    @classmethod
-    def changing(cls, ea, repeatable_cmt, newcmt):
-        oldcmt = idaapi.get_cmt(ea, repeatable_cmt)
-        cls.event.send((ea, bool(repeatable_cmt), newcmt))
-
-    @classmethod
-    def changed(cls, ea, repeatable_cmt):
-        newcmt = idaapi.get_cmt(ea, repeatable_cmt)
-        cls.event.send((ea, bool(repeatable_cmt), None))
-
-class global_hook(object):
-    @classmethod
-    def _update_refs(cls, fn, old, new):
-        for key in old.viewkeys() ^ new.viewkeys():
-            if key not in new:
-                globals.dec(fn.startEA, key)
-            if key not in old:
-                globals.inc(fn.startEA, key)
-            continue
-        return
-
-    @classmethod
-    def _create_refs(cls, fn, res):
-        for key in res.viewkeys():
-            globals.inc(fn.startEA, key)
-        return
-
-    @classmethod
-    def _delete_refs(cls, fn, res):
-        for key in res.viewkeys():
-            globals.dec(fn.startEA, key)
-        return
-
-    @classmethod
-    def _event(cls):
-        while True:
-            # cmt_changing event
-            ea,rpt,new = (yield)
-            fn = idaapi.get_func(ea)
-            old = idaapi.get_func_cmt(fn, rpt)
-            o,n = decode(old),decode(new)
-
-            # update references before we update the comment
-            cls._update_refs(fn, o, n)
-
-            # wait for cmt_changed event
-            newea,nrpt,none = (yield)
-
-            # now we can fix the user's new coment
-            if (newea,nrpt,none) == (ea,rpt,None):
-                ncmt = idaapi.get_func_cmt(fn, rpt)
-
-                if (ncmt or '') != new:
-                    logging.warn('internal.{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}'.format('.'.join((__name__,cls.__name__)), ea, new, ncmt))
-
-                # if it's non-repeatable, then fix it.
-#                if not nrpt:
-#                    idaapi.set_func_cmt(fn, '', nrpt)
-
-#                # write the tag back to the function
-#                if check(new): idaapi.set_func_cmt(fn, encode(n), True)
-#                # otherwise, write the comment back as long as it's valid
-#                elif new: idaapi.set_func_cmt(fn, new, True)
-#                # otherwise, the user has deleted it..so update it's refs.
-#                else: cls._delete_refs(fn, n)
-
-                # write the tag back to the function
-                if check(new): idaapi.set_func_cmt(fn, encode(n), rpt)
-                elif new: idaapi.set_func_cmt(fn, new, rpt)
-                else: cls._delete_refs(fn, n)
-                continue
-
-            # if the changed event doesn't happen in the right order
-            logging.fatal("internal.{:s}.event : Comment events are out of sync, updating tags from previous comment. : {!r} : {!r}".format('.'.join((__name__,cls.__name__)), o, n))
-
-            # delete the old comment
-            cls._delete_refs(fn, o)
-            idaapi.set_func_cmt(fn, '', rpt)
-            logging.warn("internal.{:s}.event : Previous comment at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), o))
-
-            # new comment
-            newfn = idaapi.get_func(newea)
-            new = idaapi.get_func_cmt(newfn, nrpt)
-            n = decode(new)
-            cls._create_refs(newfn, n)
-
-            continue
-        return
-
-    @classmethod
-    def changing(cls, cb, a, cmt, repeatable):
-        fn = idaapi.get_func(a.startEA)
-        oldcmt = idaapi.get_func_cmt(fn, repeatable)
-        cls.event.send((fn.startEA, bool(repeatable), cmt))
-
-    @classmethod
-    def changed(cls, cb, a, cmt, repeatable):
-        fn = idaapi.get_func(a.startEA)
-        newcmt = idaapi.get_func_cmt(fn, repeatable)
-        cls.event.send((fn.startEA, bool(repeatable), None))
-
-if not hasattr(address_hook, 'event'):
-    address_hook.event = address_hook._event(); next(address_hook.event)
-if not hasattr(global_hook, 'event'):
-    global_hook.event = global_hook._event(); next(global_hook.event)
