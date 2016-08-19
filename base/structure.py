@@ -775,5 +775,5 @@ class member_t(object):
         '''Display the specified member in a readable format.'''
         id,name,typ,comment = self.id,self.name,self.type,self.comment
         offset_repr = '-0x{:x}'.format(abs(self.offset)) if self.offset < 0 else '0x{:x}'.format(self.offset)
-        return '{:s} [{:d}] {:s} {:s} {{{!r}:+0x{:x}}}{:s}'.format(self.__class__, self.index, name, typ, offset_repr, self.size, ' // {:d}'.format(comment) if comment else '')
+        return '{:s} [{:d}] {:s} {:s} {{{!r}:+0x{:x}}}{:s}'.format(self.__class__, self.index, name, typ, offset_repr, self.size, ' // {:s}'.format(comment) if comment else '')
 

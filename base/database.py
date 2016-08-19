@@ -211,10 +211,10 @@ def write(ea, data, **original):
 
 def iterate(start, end, step=None):
     '''Iterate through all the instruction and data boundaries from address ``start`` to ``end``.'''
-    # FIXME: implement this so it can act on the bounds of the address instead of all of them
     step = step or (address.prev if start > end else address.next)
     start, end = __builtin__.map(interface.address.head, (start, end))
-    while start != idaapi.BADADDR and start != end:
+    op = operator.gt if start > end else operator.lt
+    while start != idaapi.BADADDR and op(start,end):
         yield start
         start = step(start)
     yield end
@@ -723,6 +723,8 @@ def tag_read(ea):
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
     esuffix = extra.get_suffix(ea)
     if esuffix is not None: res.setdefault('__extra_suffix__', esuffix)
+    col = get_color(ea)
+    if col is not None: res.setdefault('__color__', col)
 
     # now return what the user cares about
     return res
@@ -754,6 +756,8 @@ def tag_write(ea, key, value):
         return extra.set_prefix(ea, value)
     if key == '__extra_suffix__':
         return extra.set_suffix(ea, value)
+    if key == '__color__':
+        return set_color(ea, value)
 
     # if not within a function, then use a repeatable comment
     # otherwise, use a non-repeatable one

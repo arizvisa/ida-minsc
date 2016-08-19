@@ -9,7 +9,7 @@ def fetch_function(f):
     for ea in fn.iterate(f):
         res = db.tag(ea)
         res.pop('name', None)
-        for k,v in res.items():
+        for k, v in res.iteritems():
             addr[ea] = addr.get(ea,0) + 1
             tags[k] = tags.get(k,0) + 1
         continue
@@ -54,7 +54,7 @@ def do_functions():
         print '{:x} : fetching function {:d} of {:d}'.format(ea, i, t)
         res = fn.tag(ea)
         res.pop('name', None)
-        for k,v in res.items():
+        for k, v in res.iteritems():
             addr[ea] = addr.get(ea, 0) + 1
             tags[k] = tags.get(k, 0) + 1
         continue
@@ -67,10 +67,9 @@ def do_data():
     for ea in db.iterate(left, right-1):
         f = idaapi.get_func(ea)
         if f is not None: continue
-
         res = db.tag(ea)
         res.pop('name', None)
-        for k,v in res.items():
+        for k, v in res.iteritems():
             addr[ea] = addr.get(ea, 0) + 1
             tags[k] = tags.get(k, 0) + 1
         continue
@@ -82,9 +81,9 @@ def do_globally():
 
     print 'aggregating results'
     addr,tags = dict(faddr), dict(ftags)
-    for k,v in daddr.items():
+    for k, v in daddr.iteritems():
         addr[k] = addr.get(k, 0) + v
-    for k,v in dtags.items():
+    for k, v in dtags.iteritems():
         tags[k] = tags.get(k, 0) + v
 
     print 'found {:d} addrs'.format(len(addr))
@@ -112,10 +111,10 @@ def function(ea):
                     tags.pop(k)
         continue
 
-    for k,v in tags.items():
+    for k, v in tags.iteritems():
         internal.comment.contents.set_name(f, k, v)
 
-    for k,v in addr.items():
+    for k, v in addr.iteritems():
         if not fn.within(k):
             continue
         internal.comment.contents.set_address(k, v)
@@ -126,18 +125,12 @@ def globals():
     '''Iterate through all globals in the database and update the tagcache with any found tags.'''
     addr, tags = do_globally()
     
-    print 'initializing global references as empty'
-    for ea in internal.comment.globals.address():
-        internal.comment.globals.set_address(ea, 0)
-    for name in internal.comment.globals.name():
-        internal.comment.globals.set_name(0)
-
     print 'updating global name refs'
-    for k,v in tags.items():
+    for k, v in tags.iteritems():
         internal.comment.globals.set_name(k, v)
 
     print 'updating global address refs'
-    for k,v in addr.items():
+    for k, v in addr.iteritems():
         internal.comment.globals.set_address(k, v)
 
     return addr, tags
@@ -146,13 +139,7 @@ def all():
     '''Iterate through everything in the database and update the tagcache with any found tags.'''
     total = len(list(db.functions()))
     addr,tags = {}, {}
-    for i,ea in enumerate(db.functions()):
-
-        for addr in internal.comment.contents.address(ea):
-            internal.comment.contents.set_address(addr, 0)
-        for name in internal.comment.contents.name(ea):
-            internal.comment.contents.set_name(ea, name, 0)
-
+    for i, ea in enumerate(db.functions()):
         print '{:x} : updating references for contents : {:d} of {:d}'.format(ea, i, total)
         _, _ = function(ea)
     print 'updating references for globals'
@@ -187,49 +174,55 @@ def extracomments():
 
 def everything():
     '''Re-create the tag cache for all found tags and custom names within the database.'''
-    print 'erasing database globals'
-    erase_globals()
-    t = len(list(db.functions()))
-    for i, ea in enumerate(db.functions()):
-        print '{:x} : erasing contents for function {:d} of {:d}'.format(ea, i, t)
-        erase_contents(ea)
+    erase()
     all()
 
-def erase_contents(ea):
-    ea = fn.top(ea)
-    n = internal.comment.contents.node()
-    for addr in internal.netnode.sup.fiter(n):
-        internal.netnode.sup.remove(n, addr)
-    for key in internal.netnode.hash.fiter(n):
-        internal.netnode.hash.remove(n, key)
+def erase_globals():
+    n = internal.comment.tagging.node()
+    res = internal.netnode.hash.fiter(n), internal.netnode.alt.fiter(n), internal.netnode.sup.fiter(n)
+    res = map(list,res)
+    total = sum(map(len, res))
+    hashes, alts, sups = res
 
-    # old blob-based
-    res = internal.netnode.blob.get(ea, idaapi.stag)
-    if res and res.startswith('BZh9'):
-        internal.netnode.blob.remove(ea, idaapi.stag)
+    yield total
 
-    # new blob-blased
-    res = internal.netnode.blob.get(ea, internal.comment.contents.btag)
-    if res and res.startswith('BZh9'):
-        internal.netnode.blob.remove(ea, internal.comment.contents.btag)
+    current = 0
+    for idx, k in enumerate(hashes):
+        internal.netnode.hash.remove(n, k)
+        yield current + idx, k
+
+    current += len(hashes)
+    for idx, ea in enumerate(sups):
+        internal.netnode.sup.remove(n, ea)
+        yield current + idx, ea
+
+    current += len(sups)
+    for idx, (ea,_) in enumerate(alts):
+        internal.netnode.alt.remove(n, ea)
+        yield current + idx, ea
     return
 
-def erase_globals():
-    internal.netnode.remove( internal.comment.globals.node() )
-    l, r = db.range()
-    for ea in db.iterate(l, r-1):
-        if idaapi.get_func(ea): continue
+def erase_contents():
+    res = db.functions()
+    total, tag = len(res), internal.comment.contents.btag
+    yield total
 
-        # old blob-based
-        res = internal.netnode.blob.get(ea, idaapi.stag)
-        if res and res.startswith('BZh9'):
-            internal.netnode.blob.remove(ea, idaapi.stag)
+    for idx, ea in enumerate(db.functions()):
+        internal.netnode.blob.remove(ea, tag)
+        yield idx, ea
+    return
 
-        # new blob-based
-        res = internal.netnode.blob.get(ea, internal.comment.contents.btag)
-        if res and res.startswith('BZh9'):
-            internal.netnode.blob.remove(ea, internal.comment.contents.btag)
-        continue
+def erase():
+    iter1, iter2 = erase_contents(), erase_globals()
+    t1, t2 = map(next, (iter1,iter2))
+    total = sum((t1,t2))
+
+    current = 0
+    for idx, ea in iter1:
+        print 'erasing contents for function {:x} : {:d} of {:d}'.format(ea, idx, total)
+
+    for idx, res in iter2:
+        print 'erasing global {!r} : {:d} of {:d}'.format(res, t1+idx, total)
     return
 
 __all__ = ['everything','globals','function']

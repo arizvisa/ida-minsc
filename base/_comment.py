@@ -262,7 +262,7 @@ def parse_line(iterable):
         res = t.decode(value)
     except:
         res = _str.decode(value)
-        logging.warn("{:s}.parse_line : Assuming tag {!r} is of type _str. : {!r}".format( '.'.join(("internal", __name__)), key, value))
+        logging.debug("{:s}.parse_line : Assuming tag {!r} is of type _str. : {!r}".format( '.'.join(("internal", __name__)), key, value))
         #raise ValueError("Unable to decode data with {!r} : {!r}".format(t, value))
     return key, res
 
@@ -349,7 +349,7 @@ class contents(tagging):
         if key is None:
             raise LookupError("{:s}.{:s}._read_header : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
 
-        encdata = internal.netnode.sup.get(key, cls.btag)
+        encdata = internal.netnode.sup.get(node, key)
         if encdata is None:
             return None
 
