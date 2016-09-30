@@ -4,23 +4,57 @@ segment-context
 generic tools for working with segments
 '''
 import logging,os
-import six,types
+import math,types
+import itertools,operator,functools
+import six,re,fnmatch
 
 import database,ui
 from internal import utils,interface
 
-import idaapi
+import __builtin__,idaapi
 
 ## enumerating
 def iterate():
     '''Iterate through each segment defined in the database.'''
-    for n in xrange(idaapi.get_segm_qty()):
-        yield idaapi.getnseg(n)
+    for idx in xrange(idaapi.get_segm_qty()):
+        seg = idaapi.getnseg(idx)
+        seg.index = idx
+        yield seg
     return
-def list():
+
+__matcher__ = utils.matcher()
+__matcher__.boolean('regex', re.search, idaapi.get_true_segm_name)
+__matcher__.attribute('index', 'index')
+__matcher__.attribute('identifier', 'name'), __matcher__.attribute('id', 'name')
+__matcher__.attribute('selector', 'sel')
+__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), idaapi.get_true_segm_name)
+__matcher__.boolean('name', operator.eq, idaapi.get_true_segm_name)
+__matcher__.boolean('greater', operator.le, 'endEA'), __matcher__.boolean('gt', operator.lt, 'endEA')
+__matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', operator.gt, 'startEA')
+__matcher__.predicate('predicate'), __matcher__.predicate('pred')
+
+@utils.multicase(string=basestring)
+def list(string):
+    return list(like=string)
+@utils.multicase()
+def list(**type):
     '''List all the segments defined in the database by name.'''
-    for n in iterate():
-        yield idaapi.get_true_segm_name(n) or ""
+    if not type: type = {'predicate':lambda n: True}
+    result = __builtin__.list(iterate())
+    for k,v in type.iteritems():
+        res = __builtin__.list(__matcher__.match(k, v, result))
+        maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
+        maxaddr = max(__builtin__.map(operator.attrgetter('endEA'), res) or [1])
+        maxsize = max(__builtin__.map(operator.methodcaller('size'), res) or [1])
+        maxname = max(__builtin__.map(utils.compose(idaapi.get_true_segm_name,len), res) or [1])
+        cindex = math.ceil(math.log(maxindex)/math.log(10))
+        caddr = math.ceil(math.log(maxaddr)/math.log(16))
+        csize = math.ceil(math.log(maxsize)/math.log(16))
+
+        for seg in res:
+            comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
+            print('[{:{:d}d}] {:0{:d}x}:{:0{:d}x} {:>{:d}s} +0x{:<{:d}x} sel:{:04x} flags:{:02x}{:s}'.format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), maxname, seg.size(), int(csize), seg.sel, seg.flags, '// {:s}'.format(comment) if comment else ''))
+        continue
     return
 
 ## searching
@@ -57,6 +91,10 @@ def by(name):
 def by(ea):
     '''Return the segment containing the address ``ea``.'''
     return by_address(ea)
+@utils.multicase()
+def by():
+    '''Return the segment containing the current address.'''
+    return by_address(ui.current.address())
 
 ## properties
 @utils.multicase()

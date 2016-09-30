@@ -5,6 +5,8 @@ import six,types,heapq,collections
 import multiprocessing,Queue
 import idaapi
 
+compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+
 class multicase(object):
     CO_OPTIMIZED                = 0x00001
     CO_NEWLOCALS                = 0x00002
@@ -772,6 +774,7 @@ class execution(object):
             self.result.put((item,res,err))
         return
 
+# FIXME: figure out how to match against a bounds
 class matcher(object):
     def __init__(self):
         self.__predicate__ = {}
@@ -782,20 +785,16 @@ class matcher(object):
         res = [(operator.attrgetter(a) if isinstance(a,basestring) else a) for a in attribute]
         return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
     def attribute(self, type, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
         attr = self.__attrib__(*attribute)
         self.__predicate__[type] = lambda v: compose(attr, functools.partial(functools.partial(operator.eq, v)))
     def mapping(self, type, function, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
         attr = self.__attrib__(*attribute)
         mapper = compose(attr, function)
         self.__predicate__[type] = lambda v: compose(mapper, functools.partial(operator.eq, v))
     def boolean(self, type, function, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
         attr = self.__attrib__(*attribute)
         self.__predicate__[type] = lambda v: compose(attr, functools.partial(function, v))
     def predicate(self, type, *attribute):
-        compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
         attr = self.__attrib__(*attribute)
         self.__predicate__[type] = functools.partial(compose, attr)
     def match(self, type, value, iterable):

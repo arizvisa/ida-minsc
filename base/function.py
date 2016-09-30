@@ -5,7 +5,8 @@ generic tools for working in the context of a function.
 '''
 
 import __builtin__
-import logging,re,itertools
+import logging,re
+import functools,operator,itertools
 import six,types
 
 import database,structure,ui,internal
@@ -13,18 +14,6 @@ import instruction as _instruction
 from internal import utils,interface
 
 import idaapi
-
-if False:
-    class instance(object):
-        # FIXME: finish this
-        class chunk_t(object):
-            pass
-
-        @classmethod
-        def by_address(cls, ea):
-            n = idaapi.get_fchunk_num(ea)
-            f = idaapi.getn_func(n)
-            return cls.getIndex(n)
 
 ## searching
 @utils.multicase()
@@ -233,8 +222,7 @@ def name(func, none):
 def name(func, string, *suffix):
     '''Set the name of the function ``func`` to ``string``.'''
     res = (string,) + suffix
-    res = ('{:x}'.format(_) if isinstance(_, six.integer_types) else _ for _ in res)
-    return set_name(func, '_'.join(res))
+    return set_name(func, interface.tuplename(*res))
 
 @utils.multicase()
 def prototype():
@@ -346,6 +334,17 @@ def top(func):
     '''Return the top of the function ``func``.'''
     return address(func)
 
+## internal enumerations that idapython missed
+class fc_block_type_t:
+    fcb_normal = 0  # normal block
+    fcb_indjump = 1 # block ends with indirect jump
+    fcb_ret = 2     # return block
+    fcb_cndret = 3  # conditional return block
+    fcb_noret = 4   # noreturn block
+    fcb_enoret = 5  # external noreturn block (does not belong to the function)
+    fcb_extern = 6  # external normal block
+    fcb_error = 7   # block passes execution past the function end
+
 @utils.multicase()
 def bottom():
     '''Return the exit-points of the current function.'''
@@ -355,7 +354,6 @@ def bottom(func):
     '''Return the exit-points of the function ``func``.'''
     fn = by(func)
     fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
-    fc = flow(fn)
     exit_types = (fc_block_type_t.fcb_ret,fc_block_type_t.fcb_cndret,fc_block_type_t.fcb_noret,fc_block_type_t.fcb_enoret,fc_block_type_t.fcb_error)
     return tuple(database.address.prev(n.endEA) for n in fc if n.type in exit_types)
 
@@ -530,21 +528,239 @@ def chunks(func):
         if not fci.next(): break
     return
 
-# FIXME: would probably be better if we just trusted IDA's definition of a 
-#        basic-block and used idaapi.FlowChart to return these bounds.
+class blocks(object):
+    @utils.multicase()
+    def __new__(cls):
+        '''Return the bounds of each basic-block for the current function.'''
+        return cls(ui.current.function())
+    @utils.multicase()
+    def __new__(cls, func):
+        '''Returns the bounds of each basic-block for the function ``func``.'''
+        for bb in cls.iterate(func):
+            yield bb.startEA, bb.endEA
+        return
 
-@utils.multicase()
-def blocks():
-    '''Return each basic-block for the current function.'''
-    return blocks(ui.current.function())
-@utils.multicase()
-def blocks(func):
-    '''Returns each basic-block for the function ``func``.'''
-    for start,end in chunks(func):
-        for r in database.blocks(start, end):
-            yield r
-        continue
-    return
+    @utils.multicase()
+    @classmethod
+    def iterate(cls):
+        '''Return each basic-block for the current function.'''
+        return cls.iterate(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def iterate(cls, func):
+        '''Returns each basic-block for the function ``func``.'''
+        fn = by(func)
+        fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
+        for bb in fc:
+            yield bb
+        return
+
+    # FIXME: Implement .register for filtering blocks
+    # FIXME: Implement .search for filtering blocks
+
+class block(object):
+    @utils.multicase()
+    @classmethod
+    def id(cls):
+        '''Return the block id of the current address in the current function.'''
+        return cls.id(ui.current.function(), ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def id(cls, ea):
+        '''Return the block id of address ``ea`` in the current function.'''
+        fn = by(ea)
+        return cls.id(fn, ea)
+    @utils.multicase()
+    @classmethod
+    def id(cls, func, ea):
+        '''Return the block id of address ``ea`` in the function ``func``.'''
+        fn = by(func)
+        res = (bb.id for bb in blocks.iterate(fn) if bb.startEA <= ea < bb.endEA)
+        return next(res)
+
+    @utils.multicase()
+    def __new__(cls):
+        '''Returns the boundaries of the current basic-block.'''
+        return cls(ui.current.function(), ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    def __new__(cls, ea):
+        '''Returns the boundaries of the basic-block at address ``ea``.'''
+        return cls(by_address(ea), ea)
+    @utils.multicase(ea=six.integer_types)
+    def __new__(cls, func, ea):
+        '''Returns the boundaries of the basic-block at address ``ea`` in function ``func``.'''
+        fn = by(func)
+        res = ((bb.startEA,bb.endEA) for bb in blocks.iterate(fn) if bb.startEA <= ea < bb.endEA)
+        return next(res)
+
+    @utils.multicase(none=types.NoneType)
+    @classmethod
+    def set_color(cls, none):
+        '''Removes the color of the current-basic block.'''
+        return cls.set_color(ui.current.address(), None)
+    @utils.multicase(rgb=six.integer_types)
+    @classmethod
+    def set_color(cls, rgb):
+        '''Sets the color of the current-basic block to ``rgb``.'''
+        return cls.set_color(ui.current.address(), rgb)
+    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @classmethod
+    def set_color(cls, ea, none):
+        '''Removes the color of the basic-block at address ``ea``.'''
+        fn, bb = by(ea), cls.id(ea)
+        res = cls.get_color(ea)
+        try: idaapi.clr_node_info2(fn.startEA, bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+        finally: idaapi.refresh_idaview_anyway()
+        # FIXME: update the colors of each item too
+        #        altval index is 0x14
+        return res
+    @utils.multicase(ea=six.integer_types, rgb=int)
+    @classmethod
+    def set_color(cls, ea, rgb):
+        '''Sets the color of the basic-block at address ``ea`` to ``rgb``.'''
+        fn, bb = by(ea), cls.id(ea)
+        res = cls.get_color(ea)
+
+        n = idaapi.node_info_t()
+        r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
+        n.bg_color = n.frame_color = (b<<16)|(rgb&0x00ff00)|r
+        try: idaapi.set_node_info2(fn.startEA, bb, n, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+        finally: idaapi.refresh_idaview_anyway()
+        # FIXME: update the colors of each item too
+        #        altval index is 0x14
+        return res
+    @utils.multicase()
+    @classmethod
+    def get_color(cls):
+        '''Returns the color of the current basic-block.'''
+        return cls.get_color(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def get_color(cls, ea):
+        '''Returns the color of the basic-block at address ``ea``.'''
+        fn, bb = by(ea), cls.id(ea)
+        n = idaapi.node_info_t()
+        ok = idaapi.get_node_info2(n, fn.startEA, bb)
+        if ok and n.valid_bg_color():
+            res = n.bg_color
+            b,r = (res&0xff0000)>>16, res&0x0000ff
+            return (r<<16)|(res&0x00ff00)|b
+        return None
+
+    @utils.multicase()
+    @classmethod
+    def color(cls):
+        '''Returns the color of the basic-block at the current address.'''
+        return cls.get_color(ui.current.address())
+    @utils.multicase(none=types.NoneType)
+    @classmethod
+    def color(cls, none):
+        '''Removes the color of the basic-block at the current address.'''
+        return cls.set_color(ui.current.address(), None)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def color(cls, ea):
+        '''Returns the color of the basic-block at the address ``ea``.'''
+        return cls.get_color(ea)
+    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @classmethod
+    def color(cls, ea, none):
+        '''Removes the color of the basic-block at the address ``ea``.'''
+        return cls.set_color(ea, None)
+    @utils.multicase(ea=six.integer_types, rgb=int)
+    @classmethod
+    def color(cls, ea, rgb):
+        '''Sets the color of the basic-block at the address ``ea`` to ``rgb``.'''
+        return cls.set_color(ea, rgb)
+
+    @utils.multicase()
+    @classmethod
+    def before(cls):
+        '''Return the addresses of all the instructions that branch to the current basic-block.'''
+        return cls.predecessors(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def before(cls, ea):
+        '''Return the addresses of all the instructions that branch to the basic-block at address ``ea``.'''
+        fn = by(ea)
+        res = (bb for bb in blocks.iterate(fn) if bb.startEA <= ea < bb.endEA)
+        res = next(res).preds()
+        return [database.address.prev(bb.endEA) for bb in res]
+    predecessors = preds = utils.alias(before, 'block')
+
+    @utils.multicase()
+    @classmethod
+    def after(cls):
+        '''Return the addresses of all the instructions that the current basic-block leaves to.'''
+        return cls.successors(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def after(cls, ea):
+        '''Return the addresses of all the instructions that the basic-block at address ``ea`` leaves to.'''
+        fn = by(ea)
+        res = (bb for bb in blocks.iterate(fn) if bb.startEA <= ea < bb.endEA)
+        res = next(res).succs()
+        return [bb.startEA for bb in res]
+    successors = succs = utils.alias(after, 'block')
+
+    @utils.multicase()
+    @classmethod
+    def iterate(cls):
+        '''Yield all the addresses in the current basic-block.'''
+        return cls.iterate(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def iterate(cls, ea):
+        '''Yield all the addresses in the basic-block at address ``ea``.'''
+        l, r = cls(ea)
+        return database.iterate(l, database.address.prev(r))
+
+    @utils.multicase()
+    @classmethod
+    def read(cls):
+        '''Return all the bytes contained in the current basic-block.'''
+        return cls.read(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def read(cls, ea):
+        '''Return all the bytes contained in the basic-block at address ``ea``.'''
+        l, r = cls(ea)
+        return database.read(l, r-l)
+
+    @utils.multicase()
+    @classmethod
+    def disasm(cls):
+        '''Returns the disassembly of the basic-block at the current address.'''
+        return cls.disasm(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def disasm(cls, ea):
+        '''Returns the disassembly of the basic-block at the address ``ea``.'''
+        return '\n'.join(map(database.disasm, cls.iterate(ea)))
+    disassemble = utils.alias(disasm, 'block')
+
+    @utils.multicase()
+    @classmethod
+    def decompile(cls):
+        '''(UNSTABLE) Returns the decompiled code of the basic-block at the current address.'''
+        return cls.decompile(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def decompile(cls, ea):
+        '''(UNSTABLE) Returns the decompiled code of the basic-block at the address ``ea``.'''
+        source = idaapi.decompile(ea)
+
+        res = map(functools.partial(operator.__getitem__, source.eamap), cls.iterate(ea))
+        res = itertools.chain(*res)
+        formatted = reduce(lambda t,c: t if t[-1].ea == c.ea else t+[c], res, [next(res)])
+
+        res = []
+        # FIXME: pretty damn unstable
+        try:
+            for fmt in formatted:
+                res.append( fmt.print1(source.__deref__()) )
+        except TypeError: pass
+        return '\n'.join(map(idaapi.tag_remove,res))
 
 # function frame attributes
 @utils.multicase()
@@ -615,7 +831,7 @@ def iterate(func):
         continue
     return
 
-# FIXME
+# FIXME: put this in a class ``search``.
 @utils.multicase(match=(types.FunctionType,types.MethodType))
 def search_instruction(match):
     '''Search through the current function for any instruction that matches with the callable ``match``.'''
@@ -824,7 +1040,6 @@ def tag(func, key, none):
     '''Removes the tag identified by ``key`` for the function ``func``.'''
     return tag_write(func, key, None)
 
-# FIXME: this could be using the new reference counted tags
 @utils.multicase()
 def tags():
     '''Returns all the content tags for the current function.'''
@@ -1018,37 +1233,35 @@ def register(func, reg, *regs, **modifiers):
     If the keyword ``write`` is True, then only return the address if it's writing to the register.
     """
     regs = (reg,) + regs
-    write = (not modifiers.get('read',None)) if 'read' in modifiers else modifiers.get('write',None)
-    def uses_register(ea, regs):
-        res = [(_instruction.op_type(ea,x),_instruction.op_value(ea,x),_instruction.op_state(ea,x)) for x in xrange(_instruction.ops_count(ea)) if _instruction.op_type(ea,x) in ('opt_reg','opt_phrase')]
-        match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).related,itertools.imap(_instruction.reg.by_name,regs))
-        for t,p,st in res:
-            if t == 'opt_reg' and any(match(p,regs)) and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
+
+    # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
+    match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).related,itertools.imap(_instruction.reg.by_name,regs))
+
+    def uses_register(ea, opnum, regs):
+        t, val = _instruction.op_type(ea, opnum), _instruction.op_value(ea, opnum)
+        if t == 'opt_reg':
+            return any(match(val, regs))
+        if t == 'opt_phrase':
+            _,(base,index,_) = val
+            if (base and any(match(base,regs))) or (index and any(match(index,regs))):
                 return True
-            if t == 'opt_phrase' and (('w' in st) if write else ('r' in st) if (write is not None and not write) else True):
-                _,(base,index,_) = p
-                if (base and any(match(base,regs))) or (index and any(match(index,regs))):
-                    return True
-            continue
         return False
 
+    iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
+    if modifiers.get('read', False):
+        iterops = _instruction.ops_read
+    if modifiers.get('write', False):
+        iterops = _instruction.ops_write
+
     for ea in iterate(func):
-        if uses_register(ea, regs):
-            yield ea
+        for opnum in iterops(ea):
+            if uses_register(ea, opnum, regs):
+                yield ea, opnum, _instruction.op_state(ea, opnum)
+            continue
         continue
     return
 
-## internal enumerations that idapython missed
-class fc_block_type_t:
-    fcb_normal = 0  # normal block
-    fcb_indjump = 1 # block ends with indirect jump
-    fcb_ret = 2     # return block
-    fcb_cndret = 3  # conditional return block
-    fcb_noret = 4   # noreturn block
-    fcb_enoret = 5  # external noreturn block (does not belong to the function)
-    fcb_extern = 6  # external normal block
-    fcb_error = 7   # block passes execution past the function end
-
+# FIXME: deprecate this?
 @utils.multicase()
 def flow():
     '''Return a flow chart object for the current function.'''
@@ -1059,3 +1272,24 @@ def flow(func):
     fn = by(func)
     fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
     return fc
+
+# FIXME: document this
+#def refs(func, member):
+#    xl, fn = idaapi.xreflist_t(), by(func)
+#    idaapi.build_stkvar_xrefs(xl, fn, member.ptr)
+#    x.ea, x.opnum, x.type
+#    ref_types = {
+#        0  : 'Data_Unknown',
+#        1  : 'Data_Offset',
+#        2  : 'Data_Write',
+#        3  : 'Data_Read',
+#        4  : 'Data_Text',
+#        5  : 'Data_Informational',
+#        16 : 'Code_Far_Call',
+#        17 : 'Code_Near_Call',
+#        18 : 'Code_Far_Jump',
+#        19 : 'Code_Near_Jump',
+#        20 : 'Code_User',
+#        21 : 'Ordinary_Flow'
+#    }
+#    return [(x.ea,x.opnum) for x in xl]

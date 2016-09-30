@@ -1,11 +1,12 @@
 import sys,logging
 import functools,itertools,operator
-import six,types,re,fnmatch
+import math,types
+import six,re,fnmatch
 
 import database,ui,internal
 from internal import utils,interface
 
-import idaapi
+import __builtin__,idaapi
 '''
 structure-context
 
@@ -15,7 +16,7 @@ generic tools for working in the context of a structure.
 ## FIXME: need to add support for a union_t. add_struc takes another parameter
 ##        that defines whether a structure is a union or not.
 
-# FIXME: Deprcate this __structure_t, and move all multicase functions that use it
+# FIXME: Deprecate this __structure_t, and move all multicase functions that use it
 #        so that they're defined after the definition of the structure_t.
 class __structure_t(object): pass
 
@@ -26,15 +27,18 @@ def name(id):
 @utils.multicase(struc=__structure_t)
 def name(struc): return name(struc.id)
 @utils.multicase(string=basestring)
-def name(id, string):
+def name(id, string, *suffix):
     '''Set the name of the structure identified by ``id`` to ``string``.'''
+    res = (string,) + suffix
+    string = interface.tuplename(*res)
+
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
         logging.warn('{:s}.name : Stripping invalid chars from structure name \"{:s}\". : {!r}'.format(__name__, string, res))
         string = res
     return idaapi.set_struc_name(id, string)
-@utils.multicase(struc=__structure_t, name=basestring)
-def name(struc, name): return name(struc.id, name)
+@utils.multicase(struc=__structure_t, string=basestring)
+def name(struc, string, *suffix): return name(struc.id, string, *suffix)
 
 @utils.multicase(id=six.integer_types)
 def comment(id, **repeatable):
@@ -77,8 +81,7 @@ def index(struc, index):
 __matcher__ = utils.matcher()
 __matcher__.boolean('regex', re.search, 'name')
 __matcher__.mapping('index', idaapi.get_struc_idx, 'id')
-__matcher__.attribute('identifier', 'id')
-__matcher__.attribute('id', 'id')
+__matcher__.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
 __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), 'name')
 __matcher__.boolean('name', operator.eq, 'name')
 __matcher__.predicate('predicate')
@@ -99,15 +102,19 @@ def list(**type):
     identifier = particular id number
     pred = function predicate
     """
+    if not type: type = {'predicate':lambda n: True}
+    result = __builtin__.list(iterate())
+    for k,v in type.iteritems():
+        res = map(None, __matcher__.match(k, v, result))
+        maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
+        maxname = max(__builtin__.map(utils.compose(operator.attrgetter('name'),len), res) or [1])
+        maxsize = max(__builtin__.map(operator.attrgetter('size'), res) or [1])
+        cindex = math.ceil(math.log(maxindex)/math.log(10))
+        csize = math.ceil(math.log(maxsize)/math.log(16))
 
-    if type:
-        for k,v in type.iteritems():
-            for st in map(None, __matcher__.match(k, v, iterate())):
-                print('[{:d}] {:s} +0x{:x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), st.name, st.size, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
-            continue
-    else:
-        for st in iterate():
-            print('[{:d}] {:s} +0x{:x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), st.name, st.size, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
+        for st in res:
+            print('[{:{:d}d}] {:>{:d}s} +0x{:<{:d}x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), int(cindex), st.name, maxname, st.size, int(csize), len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
+        continue
     return
 
 @utils.multicase(string=basestring)
@@ -126,7 +133,7 @@ def search(**type):
 
     searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
     if len(type) != 1:
-        raise LookupError('{:s}.search({:s}) : More than one search type specified.', __name__, searchstring)
+        raise LookupError('{:s}.search({:s}) : Invalid number of search types specified.', __name__, searchstring)
 
     k,v = next(type.iteritems())
     res = map(None,__matcher__.match(k, v, iterate()))
@@ -248,7 +255,9 @@ def by(name, **options):
 @utils.multicase(n=six.integer_types)
 def by(n, **options):
     '''Return a structure by it's index or id.'''
-    if n & 0xff000000 == 0xff000000:
+    bits = int(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
+    highbyte = 0xff << (bits-8)
+    if index & highbyte == highbyte:
         return instance(n, **options)
     return by_index(n, **options)
 
@@ -280,6 +289,8 @@ def instance(identifier, **options):
         res.offset = options['offset']
     return res
 
+by_identifier = byid = utils.alias(instance)
+
 ### structure_t abstraction
 class structure_t(__structure_t):
     """An abstraction around an IDA structure"""
@@ -288,6 +299,33 @@ class structure_t(__structure_t):
     def __init__(self, id, offset=0):
         self.__id = id
         self.__members = members_t(self, baseoffset=offset)
+
+    def refs(self):
+        '''Return the (address, opnum, type) of all the references to this structure within the database.'''
+        # FIXME: figure out the proper way to determine all references to a structure.
+        #        maybe using a set of all the members and aggregating all their refs?
+        #        once a structure-id is found, then xrefblk_t() can give all members...
+        #        but how to deal with sub-structures and their members?
+        raise NotImplementedError
+        sid = self.id
+        Ref_T = { 2 : 'w', 3 : 'r' }
+
+        x = idaapi.xrefblk_t()
+        x.first_to(sid, 0)
+        if x is None:
+            return ()
+        refs = [(x.to,x.iscode,x.type)]
+        while x.next_to():
+            refs.append((x.to,x.iscode,x.type))
+
+        print [(hex(ea),t) for ea,_,t in refs]
+        res = []
+        for ea,_,t in refs:
+            ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
+            ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx,val in ops)
+            ops = (idx for idx,ids in ops if sid in ids)
+            res.extend( (ea,op,Ref_T.get(t,'')) for op in ops)
+        return tuple(res)
 
     @property
     def id(self):
@@ -325,15 +363,19 @@ class structure_t(__structure_t):
     @name.setter
     def name(self, string):
         '''Set the name for the structure to ``string``.'''
+        if isinstance(string, tuple):
+            string = interface.tuplename(*string)
+
         res = idaapi.validate_name2(buffer(string)[:])
         if string and string != res:
             logging.warn('{:s}.name : Stripping invalid chars from structure name {!r}. : {!r}'.format( '.'.join((__name__,self.__class__.__name__)), string, res))
             string = res
         return idaapi.set_struc_name(self.id, string)
     @property
-    def comment(self, repeatable=True):
+    #def comment(self, repeatable=True):
+    def comment(self):
         '''Return the repeatable comment for the structure.'''
-        return idaapi.get_struc_cmt(self.id, repeatable)
+        return idaapi.get_struc_cmt(self.id, True) or idaapi.get_struc_cmt(self.id, False)
     @comment.setter
     def comment(self, comment, repeatable=True):
         '''Set the repeatable comment for the structure to ``comment``.'''
@@ -451,6 +493,17 @@ class members_t(object):
             continue
         raise ValueError('{:s}.instance({:s}).members.index : {!r} not in list'.format(__name__, self.owner.name, member_t))
 
+    __member_matcher = utils.matcher()
+    __member_matcher.boolean('regex', re.search, 'name')
+    __member_matcher.attribute('index', 'index')
+    __member_matcher.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
+    __member_matcher.boolean('name', lambda v, n: fnmatch.fnmatch(n, v), 'name')
+    __member_matcher.boolean('fullname', lambda v, n: fnmatch.fnmatch(n, v), 'fullname')
+    __member_matcher.boolean('comment', lambda v, n: fnmatch.fnmatch(n, v), 'comment')
+    __member_matcher.boolean('greater', operator.le, lambda m: m.offset+m.size), __member_matcher.boolean('gt', operator.lt, lambda m: m.offset+m.size)
+    __member_matcher.boolean('less', operator.ge, 'offset'), __member_matcher.boolean('lt', operator.gt, 'offset')
+    __member_matcher.predicate('predicate'), __member_matcher.predicate('pred')
+
     # searching members
     @utils.multicase(string=basestring)
     def list(self, string):
@@ -467,32 +520,48 @@ class members_t(object):
         identifier = particular id number
         pred = function predicate
         """
-        # FIXME: refactor this implementation into a utility module
-        #        so that this can be reused elsewhere
-        if 'regex' in type:
-            match = lambda x: re.search(type['regex'], x.name)
-        elif 'index' in type:
-            match = lambda x: idaapi.get_struc_idx(x.id) == type['index']
-        elif 'identifer' in type:
-            match = lambda x: x.id == type['identifier']
-        elif 'like' in type:
-            match = lambda x: fnmatch.fnmatch(x.name, type['like'])
-        elif 'pred' in type:
-            match = type['pred']
-        else:
-            match = bool
-        for x in itertools.ifilter(match,self):
-            print '[{:d}] {:s} {:x}:+{:x} {!r}({:x},{:x},{:s}){:s}'.format(x.index, x.name, x.offset, x.size, x.type, x.flag, x.dt_type, '' if x.typeid is None else ', {:s}'.format(x.typeid), ' // {:s}'.format(x.comment) if x.comment else '')
+        if not type: type = {'predicate':lambda n: True}
+        result = __builtin__.list(self)
+        for k,v in type.iteritems():
+            res = __builtin__.list(self.__member_matcher.match(k, v, result))
+            maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
+            maxoffset = max(__builtin__.map(utils.compose(operator.attrgetter('offset'),'{:x}'.format,len), res) or [1])
+            maxsize = max(__builtin__.map(operator.attrgetter('size'), res) or [1])
+            maxname = max(__builtin__.map(utils.compose(operator.attrgetter('name'), len), res) or [1])
+            maxtype = max(__builtin__.map(utils.compose(operator.attrgetter('type'), repr, len), res) or [1])
+            cindex = math.ceil(math.log(maxindex)/math.log(10))
+            csize = math.ceil(math.log(maxsize)/math.log(16))
+
+            for m in res:
+                print '[{:{:d}d}] {:>{:d}x}:+{:0{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}'.format(m.index, int(cindex), m.offset, int(maxoffset), m.size, int(csize), "'{:s}'".format(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ',typeid={:s}'.format(m.typeid), ' // {:s}'.format(m.comment) if m.comment else '')
+            continue
         return
 
+    @utils.multicase()
+    def by(self, **type):
+        '''Return the member with the specified ``name``.'''
+        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        if len(type) != 1:
+            raise LookupError('{:s}.instance({:s}).members.by({:s}) : Invalid number of search types specified.'.format(__name__, self.owner.name, searchstring))
+
+        k,v = next(type.iteritems())
+        res = __builtin__.list(self.__member_matcher.match(k, v, self))
+        if len(res) > 1:
+            map(logging.info, (('[{:d}] {:x}:+{:x} {:s} {!r}'.format(m.index,m.offset,m.size,m.name,m.type)) for m in res))
+            logging.warn('{:s}.instance({:s}).members.by({:s}) : Found {:d} matching results, returning the first one.'.format(__name__, self.owner.name, searchstring, len(res)))
+
+        res = next(iter(res), None)
+        if res is None:
+            raise LookupError('{:s}.instance({:s}).members.by({:s}) : Found 0 matching results.'.format(__name__, self.owner.name, searchstring))
+        return res
     @utils.multicase(name=basestring)
     def by(self, name):
         '''Return the member with the specified ``name``.'''
         return self.by_name(name)
-    @utils.multicase(offset=six.integer_types)
-    def by(self, offset):
-        '''Return the member at the specified ``offset``.'''
-        return self.by_offset(offset)
+    @utils.multicase(index=six.integer_types)
+    def by(self, index):
+        '''Return the member at the specified ``index``.'''
+        return self[index]
 
     def by_name(self, name):
         '''Return the member with the specified ``name``.'''
@@ -606,11 +675,15 @@ class members_t(object):
     def __repr__(self):
         '''Display all the fields within the specified structure.'''
         result = []
+        mn = 0
         for i in xrange(len(self)):
             m = self[i]
             name,t,ofs,size,comment = m.name,m.type,m.offset,m.size,m.comment
             result.append((i,name,t,ofs,size,comment))
-        return '{!r}\n{:s}'.format(self.owner, '\n'.join(' [{:d}] {:s} {!r} {{{:x}:+{:x}}}{:s}'.format(i,n,t,o,s,' // {:s}'.format(c) if c else '') for i,n,t,o,s,c in result))
+            mn = max((mn,len(name)))
+        mi = len(str(len(self)))
+        mo = max(map(len,map('{:x}'.format, (self.baseoffset,self.baseoffset+self.owner.size))))
+        return '{!r}\n{:s}'.format(self.owner, '\n'.join(' [{:{:d}d}] {:>{:d}x}:+{:x} {:<{:d}s} {!r} {:s}'.format(i,mi,o,mo,s,"'{:s}'".format(n),mn+2,t,' // {:s}'.format(c) if c else '') for i,n,t,o,s,c in result))
 
 class member_t(object):
     '''Contains information about a particular member within a given structure'''
@@ -725,6 +798,9 @@ class member_t(object):
     @name.setter
     def name(self, string):
         '''Set the member's name to ``string``.'''
+        if isinstance(string, tuple):
+            string = interface.tuplename(*string)
+
         res = idaapi.validate_name2(buffer(string)[:])
         if string and string != res:
             logging.warn('{:s}.name : Stripping invalid chars from structure \"{:s}\" member {:d} name {!r}. : {!r}'.format( '.'.join((__name__,self.__class__.__name__)), self.__owner.name, self.__index, string, res))
@@ -733,7 +809,7 @@ class member_t(object):
     @property
     def comment(self):
         '''Return the member's repeable comment.'''
-        return idaapi.get_member_cmt(self.id, True)
+        return idaapi.get_member_cmt(self.id, True) or idaapi.get_member_cmt(self.id, False)
     @comment.setter
     def comment(self, value):
         '''Set the member's repeatable comment.'''
@@ -744,11 +820,11 @@ class member_t(object):
         m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
         if m is None:
             return 0
-        flag = m.flag & idaapi.FF_MASK
+        flag = m.flag & idaapi.DT_TYPE
 
         # idaapi(swig) and python have different definitions of what constant values are
         max = (sys.maxint+1)*2
-        return flag if flag < sys.maxint else flag - max
+        return (max+flag) if flag < 0 else (flag-max) if flag > max else flag
     @property
     def type(self):
         '''Return the member's type in it's pythonic form.'''
@@ -775,5 +851,25 @@ class member_t(object):
         '''Display the specified member in a readable format.'''
         id,name,typ,comment = self.id,self.name,self.type,self.comment
         offset_repr = '-0x{:x}'.format(abs(self.offset)) if self.offset < 0 else '0x{:x}'.format(self.offset)
-        return '{:s} [{:d}] {:s} {:s} {{{!r}:+0x{:x}}}{:s}'.format(self.__class__, self.index, name, typ, offset_repr, self.size, ' // {:s}'.format(comment) if comment else '')
+        return '{:s} [{:d}] {:s}:+0x{:x} \'{:s}\' {:s}{:s}'.format(self.__class__, self.index, offset_repr, self.size, name, typ, ' // {:s}'.format(comment) if comment else '')
 
+    def refs(self):
+        '''Return the (address, opnum, type) of all the references to this member within the database.'''
+        mid = self.id
+        Ref_T = { 2 : 'w', 3 : 'r' }
+
+        x = idaapi.xrefblk_t()
+        x.first_to(mid, 0)
+        if x is None:
+            return ()
+        refs = [(x.frm,x.iscode,x.type)]
+        while x.next_to():
+            refs.append((x.frm,x.iscode,x.type))
+
+        res = []
+        for ea,_,t in refs:
+            ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
+            ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx,val in ops)
+            ops = (idx for idx,ids in ops if self.__owner.id in ids)
+            res.extend( (ea,op,Ref_T.get(t,'')) for op in ops)
+        return tuple(res)

@@ -3,6 +3,8 @@ import itertools,functools,operator
 import six,types
 
 import database,function,ui
+import structure,enum
+import internal
 from internal import utils,interface
 
 import idaapi
@@ -71,7 +73,7 @@ def ops_state(ea):
     res = ( ((f&ops_state.read[i]),(f&ops_state.write[i])) for i in range(ops_count(ea)) )
     return [ (r and 'r' or '') + (w and 'w' or '') for r,w in res ]
 # pre-cache the CF_ flags inside idaapi for ops_state
-ops_state.read, ops_state.write = zip(*((getattr(idaapi,'CF_USE{:d}'.format(_)), getattr(idaapi,'CF_CHG{:d}'.format(_))) for _ in range(1,7)))
+ops_state.read, ops_state.write = zip(*((getattr(idaapi,'CF_USE{:d}'.format(_+1)), getattr(idaapi,'CF_CHG{:d}'.format(_+1))) for _ in range(idaapi.UA_MAXOP)))
 
 @utils.multicase()
 def ops_read(): return ops_read(ui.current.address())
@@ -92,52 +94,52 @@ def ops_write(ea):
 def operand(): return operand(ui.current.address(), None)
 @utils.multicase(none=types.NoneType)
 def operand(none): return operand(ui.current.address(), None)
-@utils.multicase(n=six.integer_types)
+@utils.multicase(n=int)
 def operand(n): return operand(ui.current.address(), n)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def operand(ea, none):
     insn = at(ea)
     res = itertools.takewhile(lambda n: n.type != idaapi.o_void, (n.copy() for n in insn.Operands))
     return tuple(res)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def operand(ea, n):
     '''Returns the `n`th op_t of the instruction at `ea`'''
     insn = at(ea)
     return insn.Operands[n].copy()
 
-@utils.multicase(n=six.integer_types)
+@utils.multicase(n=int)
 def op_repr(n): return op_repr(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def op_repr(ea, n):
     '''Returns the string representation of an operand'''
     return ops_repr(ea)[n]
 
-@utils.multicase(n=six.integer_types)
+@utils.multicase(n=int)
 def op_state(n): return op_state(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def op_state(ea, n):
     '''Returns 'r','w','rw' of an operand'''
     return ops_state(ea)[n]
 
-@utils.multicase(n=six.integer_types)
+@utils.multicase(n=int)
 def op_size(n): return op_size(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def op_size(ea, n):
     '''Returns the read size of an operand'''
     res = operand(ea, n)
     return opt.size(res)
 
-@utils.multicase(n=six.integer_types)
+@utils.multicase(n=int)
 def op_type(n): return op_type(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def op_type(ea, n):
     '''Returns the type of an operand (opt_imm, opt_reg, opt_phrase, opt_addr)'''
     res = operand(ea,n)
     return opt.type(res).__name__
 
-@utils.multicase(n=six.integer_types)
+@utils.multicase(n=int)
 def op_segment(n): return op_segment(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def op_segment(ea, n):
     op = operand(ea, n)
     segment = op.specval & 0x00ff0000
@@ -175,13 +177,6 @@ def op_segment(ea, n):
 # idaapi.get_enum_id(ea, opnum)
 
 ## lvars
-#def op_stkvar(ea, n):
-#    '''Return the member of a stack variable'''
-#    py_op = operand(ea,n)
-#    py_v = py_op.addr
-#    member,_ = idaapi.get_stkvar(py_op, py_v)
-#    return member
-
 # def op_type(ea, n)
 #    '''Apply the specified type to a stack variable'''
 #    py_op = operand(ea,n)
@@ -204,41 +199,145 @@ def op_segment(ea, n):
 # delta = 0
 # res = idaapi.set_stroff_path(ea, n, pathvar, length, delta)
 
-## get_Stroff_path
+## get_stroff_path
 # pathvar = idaapi.tid_array(length)
-# res = idapi.get_stroff_path(ea, n, pathvar, delta)
+# res = idapi.get_stroff_path(ea, n, pathvar.cast(), delta)
 
-    #https://www.hex-rays.com/products/ida/support/idapython_docs/
-    # xreflist_t
-    #https://www.hex-rays.com/products/ida/support/sdkdoc/frame_8hpp.html#aaeba4d56367ba26fb9a04923cfc89bb6
-    # idaman void ida_export build_stkvar_xrefs(xreflist_t * out, func_t * pfn, const member_t * mptr)
-    #https://www.hex-rays.com/products/ida/support/sdkdoc/frame_8hpp.html#a88d80d5d38b062a7743afc80d32e8a2c
-    # typedef qvector<xreflist_entry_t> xreflist_t // vector of xrefs to variables in a function's stack frame
-    #https://www.hex-rays.com/products/ida/support/sdkdoc/structxreflist__entry__t.html
-    # xreflist_entry_t
+@utils.multicase(n=int)
+def op_refs(n):
+    '''Returns the (address, opnum, type) of all the instructions that reference the ``n``th operand of the current instruction.'''
+    return op_refs(ui.current.address(), n)
+@utils.multicase(ea=six.integer_types, n=int)
+def op_refs(ea, n):
+    '''Returns the (address, opnum, type) of all the instructions that reference the ``n``th operand of the instruction at ``ea``.'''
+    fn = idaapi.get_func(ea)
+    if fn is None:
+        raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to locate function for address. : {:x}".format(__name__, ea, n, ea))
+    F = idaapi.getFlags(ea)
 
+    # reference types
+    #Ref_Types = {
+    #    0 : 'Data_Unknown', 1 : 'Data_Offset',
+    #    2 : 'Data_Write', 3 : 'Data_Read', 4 : 'Data_Text',
+    #    5  : 'Data_Informational',
+    #    16 : 'Code_Far_Call', 17 : 'Code_Near_Call',
+    #    18 : 'Code_Far_Jump', 19 : 'Code_Near_Jump',
+    #    20 : 'Code_User', 21 : 'Ordinary_Flow'
+    #}
+    Ref_T = {
+        2 : 'w', 3 : 'r',
+#        16:'x', 17:'x', 18:'x', 19:'x', 20:'x', 21:'x'
+    }
 
-    # shortcut to get from a stkvar operand to the frame structure offset
-    #   without needing to calculate with the sp-delta
-    #fn = function.byAddress(ea)
-    #ofs = idaapi.calc_stkvar_struc_offset(fn, ea, n)
-    #return member,ofs
+    # sanity: returns whether the operand has a local or global xref
+    ok = idaapi.op_adds_xrefs(F, n)
+    if not ok:
+        logging.warn('{:s}.op_refs(0x{:x}, {:d}) : Instruction operand does not directly contain any data references.'.format(__name__, ea, n))
+        # FIXME: try and match operand offset to structure
+        return ()
 
-#def op_xref(ea, n):
-#    '''Returns whether the operand has a local or global xref'''
-#   return idaapi.op_adds_xrefs(idaapi.getFlags(ea),n)
+    # FIXME: gots to be a better way to determine operand representation
+    ti = idaapi.opinfo_t()
+    res = idaapi.get_opinfo(ea, n, F, ti)
 
-@utils.multicase(n=six.integer_types)
+    # stkvar
+    if res is None:
+        stkofs_ = idaapi.calc_stkvar_struc_offset(fn, ea, n)
+        # check that the stkofs_ from get_stkvar and calc_stkvar are the same
+        op = operand(ea, n)
+        member,stkofs = idaapi.get_stkvar(op, op.addr)
+        if stkofs != stkofs_:
+            logging.warn('{:s}.op_refs(0x{:x}, {:d}) : Stack offsets for instruction operand do not match. : {:x} != {:x}'.format(__name__, ea, n, stkofs, stkofs_))
+
+        # build the xrefs
+        xl = idaapi.xreflist_t()
+        idaapi.build_stkvar_xrefs(xl, fn, member)
+        res = ((x.ea,x.opnum,Ref_T.get(x.type,'')) for x in xl)
+
+    # struc member
+    elif res.tid != idaapi.BADADDR:    # FIXME: is this right?
+        # structures are defined in a supval at index 0xf+opnum
+        # the supval has the format 0001c0xxxxxx where 'x' is the low 3 bytes of the structure id
+
+        # structure member xrefs (outside function)
+        pathvar = idaapi.tid_array(1)
+        delta = idaapi.sval_pointer()
+        delta.assign(0)
+        ok = idaapi.get_stroff_path(ea, n, pathvar.cast(), delta.cast())
+        if not ok:
+            raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to get structure id for operand. : {:x}".format(__name__, ea, n, ea))
+
+        # get the structure offset and then figure it's member
+        memofs = operand(ea, n).addr    # FIXME: this will be incorrect for an offsetted struct
+        st = idaapi.get_struc(pathvar[0])
+        if st is None:
+            raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to get structure for id. : {:x}".format(__name__, ea, n, pathvar[0]))
+        mem = idaapi.get_member(st, memofs)
+        if mem is None:
+            raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to find member for offset in structure {:x}. : {:x}".format(__name__, ea, n, st.id, memofs))
+
+        # extract the references
+        x = idaapi.xrefblk_t()
+        x.first_to(mem.id, 0)
+        if x is None:
+            return ()
+        refs = [(x.frm,x.iscode,x.type)]
+        while x.next_to():
+            refs.append((x.frm,x.iscode,x.type))
+
+        # now figure out the operands if there are any
+        res = []
+        for ea,_,t in refs:
+            ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
+            ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx,val in ops)
+            ops = (idx for idx,ids in ops if st.id in ids)
+            res.extend( (ea,op,Ref_T.get(t,'')) for op in ops)
+        res = res
+
+    # enums
+    elif res.tid != idaapi.BADADDR:
+        e = enum.by_identifier(res.tid)
+        # enums are defined in a altval at index 0xb+opnum
+        # the int points straight at the enumeration id
+        # FIXME: references to enums don't seem to work
+        raise NotImplementedError
+
+    # global
+    else:
+        # anything that's just a reference is a single-byte supval at index 0x9+opnum
+        # 9 -- '\x02' -- offset to segment 2
+        gid = operand(ea, n).value if operand(ea, n).type in (idaapi.o_imm,) else operand(ea, n).addr
+        x = idaapi.xrefblk_t()
+        x.first_to(gid, 0)
+        if x is None:
+            return ()
+        refs = [(x.frm,x.iscode,x.type)]
+        while x.next_to():
+            refs.append((x.frm,x.iscode,x.type))
+
+        # now figure out the operands if there are any
+        res = []
+        for ea,_,t in refs:
+            if idaapi.getFlags(ea)&idaapi.MS_CLS == idaapi.FF_CODE:
+                ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in (idaapi.o_imm,) else operand(ea,idx).addr) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 9+idx) is not None)
+                ops = (idx for idx,val in ops if val == gid)
+                res.extend( (ea,op,Ref_T.get(t,'')) for op in ops)
+            else: res.append((ea, None, Ref_T.get(t,'')))
+        res = res
+    return tuple(res)
+op_ref = utils.alias(op_refs)
+
+@utils.multicase(n=int)
 def op_decode(n): return op_decode(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def op_decode(ea, n):
     '''Returns the value for an operand in a parseable form'''
     res = operand(ea, n)
     return opt.decode(res)
 
-@utils.multicase(n=six.integer_types)
+@utils.multicase(n=int)
 def op_value(n): return op_value(ui.current.address(), n)
-@utils.multicase(ea=six.integer_types, n=six.integer_types)
+@utils.multicase(ea=six.integer_types, n=int)
 def op_value(ea, n):
     '''Returns an operand's written value converted to register names, immediate, or offset,(base reg,index reg,scale)'''
     res = operand(ea, n)
@@ -300,7 +399,7 @@ def opt_void(op):
 @opt.define(idaapi.o_phrase)
 def opt_phrase(op):
     """Returns (offset, (basereg, indexreg, scale))"""
-    if op.type == idaapi.o_displ:
+    if op.type in (idaapi.o_displ, idaapi.o_phrase):
         if op.specflag1 == 0:
             base = op.reg
             index = None
@@ -311,7 +410,13 @@ def opt_phrase(op):
 
         else:
             raise TypeError('{:s}.opt_phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
-        offset = op.addr
+
+        if op.type == idaapi.o_displ:
+            offset = op.addr
+        elif op.type == idaapi.o_phrase:
+            offset = op.value
+        else:
+            raise NotImplementedError
 
         # XXX: for some reason stack variables include both base and index
         #      testing .specval seems to be a good way to determine whether
@@ -321,18 +426,6 @@ def opt_phrase(op):
 
         # OF_NO_BASE_DISP = 1 then .addr doesn't exist
         # OF_OUTER_DISP = 1 then .value exists
-    elif op.type == idaapi.o_phrase:
-        if op.specflag1 == 0:
-            base  = op.reg
-            index = None
-
-        elif op.specflag1 == 1:
-            base =  (op.specflag2&0x07) >> 0
-            index = (op.specflag2&0x38) >> 3
-
-        else:
-            raise TypeError('{:s}.opt_phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
-        offset = op.value
 
     elif op.type == idaapi.o_mem:
         if op.specflag1 == 0:

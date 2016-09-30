@@ -54,7 +54,9 @@ byIndex = utils.alias(by_index)
 
 @utils.multicase(index=six.integer_types)
 def by(index):
-    if index & 0xff000000 == 0xff000000:
+    bits = int(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
+    highbyte = 0xff << (bits-8)
+    if index & highbyte == highbyte:
         return index
     return by_index(index)
 @utils.multicase(name=basestring)
@@ -178,15 +180,20 @@ def list(**type):
     identifier = particular id number
     pred = function predicate
     """
+    if not type: type = {'predicate':lambda n: True}
+    result = __builtin__.list(iterate())
+    size = utils.compose(idaapi.get_enum_width, lambda n:2**(n-1))
+    for k,v in type.iteritems():
+        res = map(None, __matcher__.match(k, v, iterate()))
+        maxindex = max(__builtin__.map(idaapi.get_enum_idx, res))
+        maxname = max(__builtin__.map(utils.compose(idaapi.get_enum_name, len), res))
+        maxsize = max(__builtin__.map(size, res))
+        cindex = math.ceil(math.log(maxindex)/math.log(10))
+        csize = math.ceil(math.log(maxsize)/math.log(16))
 
-    if type:
-        for k,v in type.iteritems():
-            for n in map(None, __matcher__.match(k, v, iterate())):
-                print('[{:d}] {:s} +0x{:x} ({:d} members){:s}'.format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), size(n), len(__builtin__.list(members(n))), ' // {:s}'.format(comment(n)) if comment(n) else ''))
-            continue
-    else:
-        for n in iterate():
-            print('[{:d}] {:s} +0x{:x} ({:d} members){:s}'.format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), size(n), len(__builtin__.list(members(n))), ' // {:s}'.format(comment(n)) if comment(n) else ''))
+        for n in res:
+            print('[{:{:d}d}] {:>{:d}s} +0x{:<{:d}x} ({:d} members){:s}'.format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, size(n), int(csize), len(__builtin__.list(members(n))), ' // {:s}'.format(comment(n)) if comment(n) else ''))
+        continue
     return
 
 @utils.multicase(string=basestring)

@@ -3,7 +3,7 @@ import itertools,operator,functools
 
 import database,function,ui
 import internal
-from internal import comment
+from internal import comment,utils
 
 import idaapi
 
@@ -244,30 +244,54 @@ State = None
 
 def on_init(idp_modname):
     '''IDP_Hooks.init'''
+
+    # Database has just been opened, setup the initial state.
     global State
     if State == None:
         State = state.init
     else:
         logging.debug("{:s}.on_init : Received unexpected state transition. : {!r}".format(__name__, State))
 
-def on_loaded(li, neflags, filetypename):
-    '''IDP_Hooks.loader_finished'''
+def on_newfile(fname):
+    '''IDP_Hooks.newfile'''
+
+    # Database has been created, switch the state to loaded.
     global State
     if State == state.init:
         State = state.loaded
     else:
-        logging.debug("{:s}.on_loaded : Received unexpected state transition. : {!r}".format(__name__, State))
+        logging.debug("{:s}.on_newfile : Received unexpected state transition. : {!r}".format(__name__, State))
     # FIXME: save current state like base addresses and such
+
+def on_oldfile(fname):
+    '''IDP_Hooks.oldfile'''
+
+    # Database has been loaded, switch the state to ready.
+    global State
+    if State == state.init:
+        State = state.ready
+
+        __check_functions()
+    else:
+        logging.debug("{:s}.on_oldfile : Received unexpected state transition. : {!r}".format(__name__, State))
+    # FIXME: save current state like base addresses and such
+
+def __check_functions():
+    # FIXME: check if tagcache needs to be created
+    return
 
 def on_ready():
     '''IDP_Hooks.auto_empty'''
     global State
+
+    # Queues have just been emptied, so now we can transition
     if State == state.loaded:
         State = state.ready
+
+        # update tagcache using function state
+        __process_functions()
     else:
         logging.debug("{:s}.on_ready : Received unexpected state transition. : {!r}".format(__name__, State))
-    # FIXME: update tagcache using function state
-    __process_functions()
 
 def __process_functions():
     p = ui.progress()
@@ -297,8 +321,7 @@ def __process_functions():
     p.close()
 
 def rebase(info):
-    compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
-    functions, globals = map(compose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
+    functions, globals = map(utils.compose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
 
     p = ui.progress()
     p.update(current=0, title="Rebasing tagcache...", min=0, max=len(functions)+len(globals))

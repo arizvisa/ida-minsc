@@ -27,13 +27,14 @@ map(__import__('atexit').register, (ui.queue.__stop_ida__, ui.hook.__stop_ida__)
 ui.hook.idp.add('init', ui.queue.__open_database__, 0)
 ui.hook.idp.add('term', ui.queue.__close_database__, 0)
 
-# update database state when ida's queues enter various states
-ui.hook.idp.add('init', __import__('hooks').on_init, 0)
-ui.hook.idp.add('loader_finished', __import__('hooks').on_loaded, 0)
-ui.hook.idp.add('auto_empty', __import__('hooks').on_ready, 0)
-
 # setup default integer types for the typemapper once the loader figures everything out
-ui.hook.idp.add('loader_finished', __import__('internal').interface.typemap.__loader_finished__, 0)
+ui.hook.idp.add('kernel_config_loaded', __import__('internal').interface.typemap.__kernel_config_loaded__, 0)
+
+# update database state when ida's enter various states
+ui.hook.idp.add('init', __import__('hooks').on_init, 0)
+ui.hook.idp.add('newfile', __import__('hooks').on_newfile, 0)
+ui.hook.idp.add('oldfile', __import__('hooks').on_oldfile, 0)
+ui.hook.idp.add('auto_empty', __import__('hooks').on_ready, 0)
 
 # create the tagcache netnode in any new database
 ui.hook.idp.add('init', __import__('internal').comment.tagging.__init_tagcache__, 0)

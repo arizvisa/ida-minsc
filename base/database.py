@@ -5,9 +5,9 @@ generic tools for working in the context of the database
 '''
 
 import __builtin__,logging,os
-import array,ctypes,fnmatch,re
 import functools,itertools,operator
-import six,types
+import math,types,array
+import six,fnmatch,re,ctypes
 
 import function,segment,structure,ui,internal
 import instruction as _instruction
@@ -178,14 +178,14 @@ def disasm(ea, **options):
         count -= 1
     return '\n'.join(res)
 
-def read_block(start, end):
+def block(start, end):
     '''Return the block of bytes from address ``start`` to ``end``.'''
     if start > end:
         start,end=end,start
     start, end = interface.address.within(start, end)
     length = end-start
     return read(start, length)
-getBlock = getblock = get_block = utils.alias(read_block)
+getBlock = getblock = get_block = read_block = utils.alias(block)
 
 @utils.multicase(size=six.integer_types)
 def read(size):
@@ -244,10 +244,17 @@ class names(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        iterable = xrange(idaapi.get_nlist_size())
+        if not type: type = {'predicate':lambda n: True}
+        result = __builtin__.range(idaapi.get_nlist_size())
         for k,v in type.iteritems():
-            for index in cls.__matcher__.match(k, v, iterable):
-                print '[{:d}] {:x} {:s}'.format(index, idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index))
+            res = __builtin__.list(cls.__matcher__.match(k, v, result))
+            maxindex = max(res)
+            maxaddr = max(__builtin__.map(idaapi.get_nlist_ea, res) or [idaapi.BADADDR])
+            cindex = math.ceil(math.log(maxindex)/math.log(10))
+            caddr = math.floor(math.log(maxaddr)/math.log(16))
+
+            for index in res:
+                print '[{:>{:d}d}] {:0{:d}x} {:s}'.format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index))
             continue
         return
 
@@ -486,8 +493,7 @@ def name(none):
 def name(ea, string, *suffix):
     '''Renames the address ``ea`` to ``string``.'''
     res = (string,) + suffix
-    res = ('{:x}'.format(_) if isinstance(_, six.integer_types) else _ for _ in res)
-    return set_name(ea, '_'.join(res))
+    return set_name(ea, interface.tuplename(*res))
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none):
     '''Removes the name at address ``ea``.'''
@@ -651,37 +657,137 @@ def comment(ea, comment, **repeatable):
     """
     return set_comment(ea, comment, **repeatable)
 
-@utils.multicase()
-def make_entry():
-    '''Makes an entry-point at the current address.'''
-    ea,entryname,ordinal = ui.current.address(), name(ui.current.address()), idaapi.get_entry_qty()
-    if entryname is None:
-        raise ValueError('{:s}.make_entry : Unable to determine name at address 0x{:x}'.format(__name__, ea))
-    return make_entry(ea, entryname, ordinal)
-@utils.multicase(ea=six.integer_types)
-def make_entry(ea):
-    '''Makes an entry-point at the specified address ``ea``.'''
-    entryname,ordinal = name(ea), idaapi.get_entry_qty()
-    if entryname is None:
-        raise ValueError('{:s}.make_entry : Unable to determine name at address 0x{:x}'.format(__name__, ea))
-    return make_entry(ea, entryname, ordinal)
-@utils.multicase(name=basestring)
-def make_entry(name):
-    '''Adds an entry point to the database named ``name`` using the next available index as the ordinal.'''
-    return make_entry(ui.current.address(), name, idaapi.get_entry_qty())
-@utils.multicase(ea=six.integer_types, name=basestring)
-def make_entry(ea, name):
-    '''Makes the specified address ``ea`` an entry-point named according to ``name``.'''
-    ordinal = idaapi.get_entry_qty()
-    return make_entry(ea, name, ordinal)
-@utils.multicase(name=basestring, ordinal=six.integer_types)
-def make_entry(name, ordinal):
-    '''Adds an entry point to the database named ``name`` with ``ordinal`` as it's index.'''
-    return make_entry(ui.current.address(), name, ordinal)
-@utils.multicase(ea=six.integer_types, name=basestring, ordinal=six.integer_types)
-def make_entry(ea, name, ordinal):
-    '''Adds an entry point at ``ea`` with the specified ``name`` and ``ordinal``.'''
-    return idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
+class entry(object):
+    # FIXME: document this class
+
+    __matcher__ = utils.matcher()
+    __matcher__.mapping('address', utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.mapping('ea', utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('greater', operator.le, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('gt', operator.lt, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('less', operator.ge, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('lt', operator.gt, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('name', operator.eq, utils.compose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
+    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.compose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
+    __matcher__.boolean('regex', re.search, utils.compose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
+    __matcher__.predicate('predicate', idaapi.get_entry_ordinal)
+    __matcher__.predicate('pred', idaapi.get_entry_ordinal)
+    __matcher__.boolean('index', operator.eq)
+
+    @classmethod
+    def iterate(cls):
+        for idx in xrange(idaapi.get_entry_qty()):
+            yield idx
+        return
+
+    @utils.multicase(string=basestring)
+    @classmethod
+    def list(cls, string):
+        '''List all the entry points that match the glob ``string`` against the name.'''
+        return cls.list(like=string)
+    @utils.multicase()
+    @classmethod
+    def list(cls, **type):
+        """List all the entry points within the database.
+
+        Search type can be identified by providing a named argument.
+        like = glob match against name
+        ea, address = exact address match
+        name = exact name match
+        regex = regular-expression against name
+        index = particular index
+        greater, less = greater-or-equal against address, less-or-equal against address
+        pred = function predicate
+        """
+        to_address = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
+        to_numlen = utils.compose('{:x}'.format, len)
+
+        if not type: type = {'predicate':lambda n: True}
+        result = __builtin__.list(cls.iterate())
+        for k,v in type.iteritems():
+            res = __builtin__.list(cls.__matcher__.match(k, v, result))
+            maxindex = max(res+[1])
+            maxaddr = max(__builtin__.map(to_address, res) or [idaapi.BADADDR])
+            maxordinal = max(__builtin__.map(idaapi.get_entry_ordinal, res) or [1])
+            cindex = math.ceil(math.log(maxindex)/math.log(10))
+            caddr = math.floor(math.log(maxaddr)/math.log(16))
+            cordinal = math.floor(math.log(maxordinal)/math.log(16))
+
+            for index in res:
+                print '[{:{:d}d}] {:>{:d}x} : ({:{:d}x}) {:s}'.format(index, int(cindex), to_address(index), int(caddr), idaapi.get_entry_ordinal(index), int(cindex), idaapi.get_entry_name(idaapi.get_entry_ordinal(index)))
+            continue
+        return
+
+    @utils.multicase(string=basestring)
+    @classmethod
+    def search(cls, string):
+        '''Search through all the entry-points matching the glob ``string`` against the name.'''
+        return cls.search(like=string)
+    @utils.multicase()
+    @classmethod
+    def search(cls, **type):
+        """Search through all the entry-points within the database and return the first result.
+
+        Search type can be identified by providing a named argument.
+        like = glob match against name
+        ea, address = exact address match
+        name = exact name match
+        regex = regular-expression against name
+        index = particular index
+        greater, less = greater-or-equal against address, less-or-equal against address
+        pred = function predicate
+        """
+
+        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        if len(type) != 1:
+            raise LookupError('{:s}.search({:s}) : Invalid number of search types specified.', '.'.join((__name__,cls.__name__)), searchstring)
+
+        k,v = __builtin__.next(type.iteritems())
+        res = __builtin__.map(None,cls.__matcher__.match(k, v, cls.iterate()))
+        if len(res) > 1:
+            __builtin__.map(logging.info, (('[{:d}] {:x} : ({:x}) {:s}'.format(idx, idaapi.get_entry(idaapi.get_entry_ordinal(idx)), idaapi.get_entry_ordinal(idx), idaapi.get_entry_name(idaapi.get_entry_ordinal(idx)))) for idx in res))
+            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format('.'.join((__name__,cls.__name__)), searchstring, len(res)))
+
+        res = __builtin__.next(iter(res), None)
+        if res is None:
+            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), searchstring))
+        return res
+
+    @utils.multicase()
+    @classmethod
+    def new(cls):
+        '''Makes an entry-point at the current address.'''
+        ea,entryname,ordinal = ui.current.address(), name(ui.current.address()), idaapi.get_entry_qty()
+        if entryname is None:
+            raise ValueError('{:s}.new : Unable to determine name at address 0x{:x}'.format( '.'.join((__name__,cls.__name__)), ea))
+        return cls.new(ea, entryname, ordinal)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def new(cls, ea):
+        '''Makes an entry-point at the specified address ``ea``.'''
+        entryname,ordinal = name(ea), idaapi.get_entry_qty()
+        if entryname is None:
+            raise ValueError('{:s}.new : Unable to determine name at address 0x{:x}'.format( '.'.join((__name__,cls.__name__)), ea))
+        return cls.new(ea, entryname, ordinal)
+    @utils.multicase(name=basestring)
+    @classmethod
+    def new(cls, name):
+        '''Adds an entry point to the database named ``name`` using the next available index as the ordinal.'''
+        return cls.new(ui.current.address(), name, idaapi.get_entry_qty())
+    @utils.multicase(ea=six.integer_types, name=basestring)
+    @classmethod
+    def new(cls, ea, name):
+        '''Makes the specified address ``ea`` an entry-point named according to ``name``.'''
+        ordinal = idaapi.get_entry_qty()
+        return cls.new(ea, name, ordinal)
+    @utils.multicase(name=basestring, ordinal=six.integer_types)
+    @classmethod
+    def new(cls, name, ordinal):
+        '''Adds an entry point to the database named ``name`` with ``ordinal`` as it's index.'''
+        return cls.new(ui.current.address(), name, ordinal)
+    @utils.multicase(ea=six.integer_types, name=basestring, ordinal=six.integer_types)
+    @classmethod
+    def new(cls, ea, name, ordinal):
+        '''Adds an entry point at ``ea`` with the specified ``name`` and ``ordinal``.'''
+        return idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
 
 def tags():
     '''Returns all the tag names used globally.'''
@@ -1274,7 +1380,8 @@ class address(object):
             logging.fatal("{:s}.{:s}.prevreg : Unable to start walking from previous address. : {:x}".format(__name__, cls.__name__, ea))
             return ea
         res = cls.walk(ea, cls.prev, lambda ea: not uses_register(ea, regs))
-        return cls.prevreg(res, *regs, count=count-1) if count > 1 else res
+        modifiers['count'] = count - 1
+        return cls.prevreg( cls.prev(res), *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=basestring)
     @classmethod
     def prevreg(cls, reg, *regs, **modifiers):
@@ -1302,12 +1409,13 @@ class address(object):
                         return True
                 continue
             return False
-        res = cls.walk(ea, cls.next, lambda ea: not uses_register(ea, regs))
-        nextea = cls.next(res)
+        nextea = cls.next(ea)
         if nextea is None:
             logging.fatal("{:s}.{:s}.next : Unable to start walking from next address. : {:x}".format(__name__, cls.__name__, res))
-            return res
-        return cls.nextreg(nextea, *regs, count=count-1) if count > 1 else nextea
+            return ea
+        res = cls.walk(ea, cls.next, lambda ea: not uses_register(ea, regs))
+        modifiers['count'] = count - 1
+        return cls.nextreg(cls.next(res), *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=basestring)
     @classmethod
     def nextreg(cls, reg, *regs, **modifiers):
@@ -1698,7 +1806,11 @@ class type(object):
         return type.has_dummyname(ea) or type.has_customname(ea)
 
     class array(object):
-        # FIXME: finish multicasing this
+        @utils.multicase()
+        def __new__(cls):
+            '''Return the values of the array at the current address.'''
+            return cls(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the values of the array at address ``ea``.'''
             ea = interface.address.within(ea)
@@ -1767,6 +1879,11 @@ class type(object):
             return idaapi.get_item_size(ea)
 
     class structure(object):
+        @utils.multicase()
+        def __new__(cls):
+            '''Return the structure at the current address.'''
+            return cls(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the structure at address ``ea``.'''
             return cls.get(ea)
@@ -1889,7 +2006,13 @@ class type(object):
                 raise TypeError("{:s}.type.switch : Unable to instantiate a switch_info_ex_t at branch instruction : 0x{:x}".format(__name__, ea))
             return res
 
+        @utils.multicase()
+        def __new__(cls):
+            '''Return the switch at the current address.'''
+            return cls(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
+            '''Return the switch at the address ``ea``.'''
             ea = interface.address.within(ea)
             try: return cls.__getinsn(ea)
             except TypeError: pass
@@ -2163,10 +2286,10 @@ class marks(object):
         try:
             idx = cls.get_slotindex(ea)
             ea,comm = cls.by_index(idx)
-            logging.warn("{:s}.marks.new : Replacing mark {:d} at 0x{:x} : {!r} -> {!r}".format(__name__, idx, ea, comm, description))
+            logging.warn("{:s}.new : Replacing mark {:d} at 0x{:x} : {!r} -> {!r}".format('.'.join((__name__,cls.__name__)), idx, ea, comm, description))
         except KeyError:
             idx = cls.length()
-            logging.info("{:s}.marks.new : Creating mark {:d} at 0x{:x} : {!r}".format(__name__, idx, ea, description))
+            logging.info("{:s}.new : Creating mark {:d} at 0x{:x} : {!r}".format('.'.join((__name__,cls.__name__)), idx, ea, description))
 
         res = cls.location(ea=ea, x=0, y=0, lnnum=0)
         title,descr = description,description
@@ -2189,7 +2312,7 @@ class marks(object):
         res = cls.location(ea=idaapi.BADADDR)
         res.mark(idx, "", "")
 
-        logging.warn("{:s}.marks.remove : Removed mark {:d} at 0x{:x} : {!r}".format(__name__, idx, ea, descr))
+        logging.warn("{:s}.remove : Removed mark {:d} at 0x{:x} : {!r}".format('.'.join((__name__,cls.__name__)), idx, ea, descr))
         return idx
 
     @classmethod
@@ -2220,7 +2343,7 @@ class marks(object):
         '''Return the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.get_slotaddress(index), cls.location().markdesc(index))
-        raise KeyError("{:s}.marks.by_index : Mark slot index is out of bounds : 0x{:x}".format(__name__, ('{:d} < 0'.format(index)) if index < 0 else ('{:d} >= MAX_SLOT_COUNT'.format(index))))
+        raise KeyError("{:s}.by_index : Mark slot index is out of bounds : 0x{:x}".format('.'.join((__name__,cls.__name__)), ('{:d} < 0'.format(index)) if index < 0 else ('{:d} >= MAX_SLOT_COUNT'.format(index))))
     byIndex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
