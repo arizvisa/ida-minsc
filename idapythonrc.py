@@ -1,7 +1,7 @@
 # some general python modules
 import sys,os,__builtin__
 import imp,fnmatch,ctypes
-import _idaapi as idaapi
+import idaapi
 
 library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
 
@@ -116,7 +116,14 @@ class internal_object(object):
         return self.object
 
 # ida's native api
-sys.meta_path.append( internal_object('ida',library('ida.wll')) )
+if sys.platform == 'darwin':
+    sys.meta_path.append( internal_object('ida',library(idaapi.idadir('libida.dylib'))) )
+elif sys.platform == 'linux':
+    sys.meta_path.append( internal_object('ida',library('libida.so')) )
+elif sys.platform == 'win32':
+    sys.meta_path.append( internal_object('ida',library(idaapi.idadir('ida.wll'))) )
+else:
+    raise NotImplementedError
 
 # private api
 sys.meta_path.append( internal_submodule('internal', os.path.join(root,'base'), include='_*.py') )

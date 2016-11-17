@@ -5,8 +5,34 @@ import six,types,heapq,collections
 import multiprocessing,Queue
 import idaapi
 
-compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+__all__ = ['compose','box','unbox','identity','first','second','cond','discard','fagg']
 
+### functional programming primitives (FIXME: probably better to document these with examples)
+
+# box any specified arguments
+box = lambda *a: a
+# return a closure that executes ``f`` with the arguments unboxed.
+unbox = lambda f, *ap, **kp: lambda *a, **k: f(*(ap + reduce(operator.add, map(tuple,a), ())), **dict(kp.items() + k.items()))
+# return a closure that always returns ``n``.
+identity = lambda n: lambda *a, **k: n
+# return the first, second, or third item of a box.
+first, second, third = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2)
+# return a closure that executes a list of functions one after another from left-to-right
+compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+# return a closure that executes function ``f`` whilst discarding any extra arguments
+discard = lambda f: lambda *a, **k: f()
+# return a closure that executes function ``crit`` and then executes ``f`` or ``t`` based on whether or not it's successful.
+cond = lambda crit: lambda f, t: lambda *a, **k: t(*a, **k) if crit(*a, **k) else f(*a, **k)
+# return a closure that takes an aggregate and a list of functions to execute which receive each receive a copy of the arguments.
+fagg = lambda agg: lambda *fa: lambda *a, **k: agg(f(*a, **k) for f in fa)
+# return a closure that executes function ``f`` and includes the exception or None as the first element in the boxed result.
+def fexc(f, *a, **k):
+    def _fexc(*a, **k):
+        try: return None, f(*a, **k)
+        except: return sys.exc_info()[1], None
+    return functools.partial(_fexc, *a, **k)
+
+### decorators
 class multicase(object):
     CO_OPTIMIZED                = 0x00001
     CO_NEWLOCALS                = 0x00002
@@ -28,11 +54,12 @@ class multicase(object):
 
     cache_name = '__multicase_cache__'
 
-    def __new__(cls, *other, **types):
+    def __new__(cls, *other, **t_args):
         def result(wrapped):
             # extract the FunctionType and it's arg types
             cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
             args, defaults, (star, starstar) = cls.ex_args(func)
+            s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) else 0
 
             # determine if the user included the previous function
             if len(other):
@@ -54,23 +81,23 @@ class multicase(object):
                 res = cls.new_wrapper(func, cache)
 
             # calculate the priority by trying to match the most first
-            argtuple = args, defaults, (star, starstar)
-            priority = len(args) - len(types) + (len(args) and (next((float(i) for i,a in enumerate(args) if a in types), 0) / len(args))) + sum(0.3 for _ in filter(None, (star, starstar)))
+            argtuple = s_args, args, defaults, (star, starstar)
+            priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i,a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for _ in filter(None, (star, starstar)))
 
-            # check to see if our fnuc is already in the cache
-            current = tuple(types.get(_,None) for _ in args),(star,starstar)
+            # check to see if our func is already in the cache
+            current = tuple(t_args.get(_,None) for _ in args),(star,starstar)
             for i, (p, (_, t, a)) in enumerate(cache):
                 if p != priority: continue
                 # verify that it actually matches the entry
-                if current == (tuple(t.get(_,None) for _ in a[0]), a[2]):
+                if current == (tuple(t.get(_,None) for _ in a[1]), a[3]):
                     # yuuup, update it.
-                    cache[i] = (priority, (func, types, argtuple))
+                    cache[i] = (priority, (func, t_args, argtuple))
                     res.__doc__ = cls.document(func.__name__, [n for _, n in cache])
                     return cons(res)
                 continue
 
             # everything is ok...so should be safe to add it
-            heapq.heappush(cache, (priority, (func, types, argtuple)))
+            heapq.heappush(cache, (priority, (func, t_args, argtuple)))
 
             # now we can update the docs
             res.__doc__ = cls.document(func.__name__, [n for _, n in cache])
@@ -85,7 +112,7 @@ class multicase(object):
     @classmethod
     def document(cls, name, cache):
         res = []
-        for func, types, argtuple in cache:
+        for func, types, _ in cache:
             doc = (func.__doc__ or '').split('\n')
             if len(doc) > 1:
                 res.append('{:s} ->'.format(cls.prototype(func, types)))
@@ -105,17 +132,19 @@ class multicase(object):
     @classmethod
     def match(cls, (args, kwds), heap):
         # FIXME: yep, done in O(n) time.
-        for f, types, (af, defaults, (argname, kwdname)) in heap:
+        for f, types, (sa, af, defaults, (argname, kwdname)) in heap:
             # populate our arguments
             ac, kc = (n for n in args), dict(kwds)
-            a = tuple(kc.pop(n, defaults.pop(n)) if ac.gi_frame is None else ac.next() for n in af)
+            map(next, (ac,)*sa)
+
+            a = tuple(kc.pop(n, defaults.pop(n, None)) if n in kc or n in defaults or ac.gi_frame is None else next(ac) for n in af[sa:])
             try:
-                a += tuple(kc.pop(n, defaults.pop(n)) if ac.gi_frame is None else ac.next() for n in af[len(a):])
+                a += tuple(kc.pop(n, defaults.pop(n, None)) if n in kc or n in defaults or ac.gi_frame is None else next(ac) for n in af[sa+len(a):])
             except KeyError:
                 continue
 
             # check that our args matches all of our types
-            if any(not isinstance(v, types[k]) for k, v in zip(af, a) if k in types):
+            if any(not isinstance(v, types[k]) for k, v in zip(af[sa:], a) if k in types):
                 continue
 
             # now do wildcards
@@ -124,8 +153,7 @@ class multicase(object):
                 continue
 
             # we should have a match
-#            print (argname,kwdname),(wA,wK),a
-            return f, (a, wA, wK)
+            return f, (tuple(args[:sa]) + a, wA, wK)
 
         error_arguments = ('{:s}'.format(n.__class__.__name__) for n in args)
         error_keywords = ('{:s}={:s}'.format(n, kwds[n].__class__.__name__) for n in kwds)
@@ -186,12 +214,12 @@ class multicase(object):
     @classmethod
     def ex_args(cls, f):
         c = f.func_code
-        varnames_iter = iter(c.co_varnames)
-        args = tuple(itertools.islice(varnames_iter, c.co_argcount))
+        varnames_count, varnames_iter = c.co_argcount, iter(c.co_varnames)
+        args = tuple(itertools.islice(varnames_iter, varnames_count))
         res = { a : v for v,a in zip(reversed(f.func_defaults or []), reversed(args)) }
-        try: starargs = varnames_iter.next() if c.co_flags & cls.CO_VARARGS else ""
+        try: starargs = next(varnames_iter) if c.co_flags & cls.CO_VARARGS else ""
         except StopIteration: starargs = ""
-        try: kwdargs = varnames_iter.next() if c.co_flags & cls.CO_VARKEYWORDS else ""
+        try: kwdargs = next(varnames_iter) if c.co_flags & cls.CO_VARKEYWORDS else ""
         except StopIteration: kwdargs = ""
         return args, res, (starargs, kwdargs)
 
@@ -220,6 +248,7 @@ class alias(object):
         res.__doc__ = document
         return res
 
+### asynchronous process monitor
 import sys,os,threading,weakref,subprocess,time,itertools,operator
 
 # monitoring an external process' i/o via threads/queues
@@ -575,6 +604,7 @@ def spawn(stdout, command, **options):
     # spawn the sub-process
     return process(command, stdout=stdout, stderr=stderr, **options)
 
+### scheduler
 class execution(object):
     __slots__ = ('queue','state','result','ev_unpaused','ev_terminating')
     __slots__+= ('thread','lock')
@@ -779,9 +809,8 @@ class matcher(object):
     def __init__(self):
         self.__predicate__ = {}
     def __attrib__(self, *attribute):
-        identity = lambda n: n
         if not attribute:
-            return identity
+            return lambda n: n
         res = [(operator.attrgetter(a) if isinstance(a,basestring) else a) for a in attribute]
         return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
     def attribute(self, type, *attribute):

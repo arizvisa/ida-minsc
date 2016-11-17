@@ -30,12 +30,6 @@ def count():
     '''Return the total number of enumerations in the database.'''
     return idaapi.get_enum_qty()
 
-def iterate():
-    '''Yield the id of each enumeration within the database.'''
-    for n in xrange(idaapi.get_enum_qty()):
-        yield idaapi.getn_enum(n)
-    return
-    
 def by_name(name):
     '''Return an enum id with the specified ``name``.'''
     res = idaapi.get_enum(name)
@@ -165,6 +159,14 @@ __matcher__.attribute('identifier')
 __matcher__.predicate('pred')
 __matcher__.predicate('predicate')
 
+def iterate(**type):
+    '''Yield the id of each enumeration within the database.'''
+    if not type: type = {'predicate':lambda n: True}
+    res = __builtin__.range(idaapi.get_enum_qty())
+    for k,v in type.iteritems():
+        res = __builtin__.list(__matcher__.match(k, v, res))
+    for n in res: yield n
+
 @utils.multicase(string=basestring)
 def list(string):
     '''List any enumerations that match the glob in `string`.'''
@@ -180,20 +182,18 @@ def list(**type):
     identifier = particular id number
     pred = function predicate
     """
-    if not type: type = {'predicate':lambda n: True}
-    result = __builtin__.list(iterate())
-    size = utils.compose(idaapi.get_enum_width, lambda n:2**(n-1))
-    for k,v in type.iteritems():
-        res = map(None, __matcher__.match(k, v, iterate()))
-        maxindex = max(__builtin__.map(idaapi.get_enum_idx, res))
-        maxname = max(__builtin__.map(utils.compose(idaapi.get_enum_name, len), res))
-        maxsize = max(__builtin__.map(size, res))
-        cindex = math.ceil(math.log(maxindex)/math.log(10))
-        csize = math.ceil(math.log(maxsize)/math.log(16))
+    res = __builtin__.list(iterate(**type))
 
-        for n in res:
-            print('[{:{:d}d}] {:>{:d}s} +0x{:<{:d}x} ({:d} members){:s}'.format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, size(n), int(csize), len(__builtin__.list(members(n))), ' // {:s}'.format(comment(n)) if comment(n) else ''))
-        continue
+    # FIXME: this is all fucked up
+    size = utils.compose(idaapi.get_enum_width, lambda n:2**(n-1) if n > 0 else 0)
+    maxindex = max(__builtin__.map(idaapi.get_enum_idx, res))
+    maxname = max(__builtin__.map(utils.compose(idaapi.get_enum_name, len), res))
+    maxsize = max(__builtin__.map(size, res))
+    cindex = math.ceil(math.log(maxindex)/math.log(10))
+    csize = math.ceil(math.log(maxsize or 1)/math.log(16))
+
+    for n in res:
+        print('[{:{:d}d}] {:>{:d}s} +0x{:<{:d}x} ({:d} members){:s}'.format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, size(n), int(csize), len(__builtin__.list(members(n))), ' // {:s}'.format(comment(n)) if comment(n) else ''))
     return
 
 @utils.multicase(string=basestring)
@@ -209,13 +209,9 @@ def search(**type):
     index = particular index
     identifier or id = internal id number
     """
-
     searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
-    if len(type) != 1:
-        raise LookupError('{:s}.search({:s}) : More than one search type specified.', __name__, searchstring)
 
-    k,v = next(type.iteritems())
-    res = map(None,__matcher__.match(k, v, iterate()))
+    res = __builtin__.list(iterate(**type))
     if len(res) > 1:
         map(logging.info, (('[{:d}] {:s}'.format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n))) for i,n in enumerate(res)))
         logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format(__name__, searchstring, len(res)))

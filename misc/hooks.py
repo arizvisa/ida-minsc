@@ -398,7 +398,7 @@ def __rebase_globals(old, new, size, iterable):
 
 # address naming
 def rename(ea, newname):
-    fl = idaapi.getFlags(ea)        
+    fl = database.type.flags(ea)
     labelQ, customQ = (fl & n == n for n in (idaapi.FF_LABL,idaapi.FF_NAME))
     #r, fn = database.xref.up(ea), idaapi.get_func(ea)
     fn = idaapi.get_func(ea)

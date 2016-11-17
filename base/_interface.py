@@ -72,7 +72,7 @@ class typemap:
     @classmethod
     def dissolve(cls, flag, typeid, size):
         dt = flag & cls.FF_MASKSIZE
-        sf = -1 if idaapi.is_signed_data(flag) else +1
+        sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
         if dt == idaapi.FF_STRU and isinstance(typeid,six.integer_types):
             # FIXME: figure out how to fix this recursive module dependency
             t = sys.modules.get('structure', __import__('structure')).instance(typeid) 
@@ -88,7 +88,7 @@ class typemap:
             return [t,count] if count > 1 else t
         # if the size matches, then we assume it's a single element
         elif sz == size:
-            return t,sz
+            return t,(sz*sf)
         # otherwise it's an array
         return [(t,sz*sf),size // sz]
 
@@ -108,7 +108,7 @@ class typemap:
         if isinstance(pythonType, ().__class__):
             (t,sz),count = pythonType,1
             table = cls.typemap[t]
-            flag,typeid = table[sz if t in (int,long,float,type) else t]
+            flag,typeid = table[abs(sz) if t in (int,long,float,type) else t]
             
         elif isinstance(pythonType, [].__class__):
             # an array, which requires us to recurse...
@@ -128,7 +128,7 @@ class typemap:
             opinfo.tid = typeid
             return flag,typeid,idaapi.get_data_type_size(flag, opinfo)
 
-        return flag|(idaapi.signed_data_flag() if sz < 0 else 0),typeid,sz*count
+        return flag|(idaapi.FF_SIGN if sz < 0 else 0),typeid,abs(sz)*count
 
 class priorityhook(object):
     '''Helper class for hooking different parts of IDA.'''

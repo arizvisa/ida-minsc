@@ -14,14 +14,6 @@ from internal import utils,interface
 import __builtin__,idaapi
 
 ## enumerating
-def iterate():
-    '''Iterate through each segment defined in the database.'''
-    for idx in xrange(idaapi.get_segm_qty()):
-        seg = idaapi.getnseg(idx)
-        seg.index = idx
-        yield seg
-    return
-
 __matcher__ = utils.matcher()
 __matcher__.boolean('regex', re.search, idaapi.get_true_segm_name)
 __matcher__.attribute('index', 'index')
@@ -33,28 +25,37 @@ __matcher__.boolean('greater', operator.le, 'endEA'), __matcher__.boolean('gt', 
 __matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', operator.gt, 'startEA')
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 
+def iterate(**type):
+    '''Iterate through each segment defined in the database.'''
+    if not type: type = {'predicate':lambda n: True}
+    def newsegment(index):
+        res = idaapi.getnseg(index)
+        res.index = index
+        return res
+    res = __builtin__.map(newsegment, xrange(idaapi.get_segm_qty()))
+    for k,v in type.iteritems():
+        res = __builtin__.list(__matcher__.match(k, v, res))
+    for n in res: yield n
+
 @utils.multicase(string=basestring)
 def list(string):
     return list(like=string)
 @utils.multicase()
 def list(**type):
     '''List all the segments defined in the database by name.'''
-    if not type: type = {'predicate':lambda n: True}
-    result = __builtin__.list(iterate())
-    for k,v in type.iteritems():
-        res = __builtin__.list(__matcher__.match(k, v, result))
-        maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
-        maxaddr = max(__builtin__.map(operator.attrgetter('endEA'), res) or [1])
-        maxsize = max(__builtin__.map(operator.methodcaller('size'), res) or [1])
-        maxname = max(__builtin__.map(utils.compose(idaapi.get_true_segm_name,len), res) or [1])
-        cindex = math.ceil(math.log(maxindex)/math.log(10))
-        caddr = math.ceil(math.log(maxaddr)/math.log(16))
-        csize = math.ceil(math.log(maxsize)/math.log(16))
+    res = __builtin__.list(iterate(**type))
 
-        for seg in res:
-            comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
-            print('[{:{:d}d}] {:0{:d}x}:{:0{:d}x} {:>{:d}s} +0x{:<{:d}x} sel:{:04x} flags:{:02x}{:s}'.format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), maxname, seg.size(), int(csize), seg.sel, seg.flags, '// {:s}'.format(comment) if comment else ''))
-        continue
+    maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
+    maxaddr = max(__builtin__.map(operator.attrgetter('endEA'), res) or [1])
+    maxsize = max(__builtin__.map(operator.methodcaller('size'), res) or [1])
+    maxname = max(__builtin__.map(utils.compose(idaapi.get_true_segm_name,len), res) or [1])
+    cindex = math.ceil(math.log(maxindex)/math.log(10))
+    caddr = math.ceil(math.log(maxaddr)/math.log(16))
+    csize = math.ceil(math.log(maxsize)/math.log(16))
+
+    for seg in res:
+        comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
+        print('[{:{:d}d}] {:0{:d}x}:{:0{:d}x} {:>{:d}s} +0x{:<{:d}x} sel:{:04x} flags:{:02x}{:s}'.format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), maxname, seg.size(), int(csize), seg.sel, seg.flags, '// {:s}'.format(comment) if comment else ''))
     return
 
 ## searching

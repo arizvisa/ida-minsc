@@ -87,6 +87,27 @@ __matcher__.boolean('name', operator.eq, 'name')
 __matcher__.predicate('predicate')
 __matcher__.predicate('pred')
 
+def __iterate__():
+    '''Iterate through all structures defined in the database.'''
+    idx = idaapi.get_first_struc_idx()
+    while idx != idaapi.get_last_struc_idx():
+        identifier = idaapi.get_struc_by_idx(idx)
+        yield instance(identifier)
+        idx = idaapi.get_next_struc_idx(idx)
+    idx = idaapi.get_last_struc_idx()
+    yield instance(idaapi.get_struc_by_idx(idx))
+
+@utils.multicase(string=basestring)
+def iterate(string):
+    return cls.iterate(like=string)
+@utils.multicase()
+def iterate(**type):
+    if not type: type = {'predicate':lambda n: True}
+    res = __builtin__.list(__iterate__())
+    for k,v in type.iteritems():
+        res = __builtin__.list(__matcher__.match(k, v, res))
+    for n in res: yield n
+
 @utils.multicase(string=basestring)
 def list(string):
     '''List any structures that match the glob in `string`.'''
@@ -102,19 +123,14 @@ def list(**type):
     identifier = particular id number
     pred = function predicate
     """
-    if not type: type = {'predicate':lambda n: True}
-    result = __builtin__.list(iterate())
-    for k,v in type.iteritems():
-        res = map(None, __matcher__.match(k, v, result))
-        maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
-        maxname = max(__builtin__.map(utils.compose(operator.attrgetter('name'),len), res) or [1])
-        maxsize = max(__builtin__.map(operator.attrgetter('size'), res) or [1])
-        cindex = math.ceil(math.log(maxindex)/math.log(10))
-        csize = math.ceil(math.log(maxsize)/math.log(16))
+    res = __builtin__.list(iterate(**type))
 
-        for st in res:
-            print('[{:{:d}d}] {:>{:d}s} +0x{:<{:d}x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), int(cindex), st.name, maxname, st.size, int(csize), len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
-        continue
+    maxindex = max(__builtin__.map(utils.compose(operator.attrgetter('index'),'{:d}'.format,len), res) or [1])
+    maxname = max(__builtin__.map(utils.compose(operator.attrgetter('name'),len), res) or [1])
+    maxsize = max(__builtin__.map(utils.compose(operator.attrgetter('size'),'{:x}'.format,len), res) or [1])
+
+    for st in res:
+        print('[{:{:d}d}] {:>{:d}s} +0x{:<{:d}x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
     return
 
 @utils.multicase(string=basestring)
@@ -132,11 +148,8 @@ def search(**type):
     """
 
     searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
-    if len(type) != 1:
-        raise LookupError('{:s}.search({:s}) : Invalid number of search types specified.', __name__, searchstring)
 
-    k,v = next(type.iteritems())
-    res = map(None,__matcher__.match(k, v, iterate()))
+    res = __builtin__.list(iterate(**type))
     if len(res) > 1:
         map(logging.info, (('[{:d}] {:s}'.format(idaapi.get_struc_idx(st.id), st.name)) for i,st in enumerate(res)))
         logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format(__name__, searchstring, len(res)))
@@ -145,16 +158,6 @@ def search(**type):
     if res is None:
         raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format(__name__, searchstring))
     return res
-
-def iterate():
-    '''Iterate through all structures defined in the database.'''
-    idx = idaapi.get_first_struc_idx()
-    while idx != idaapi.get_last_struc_idx():
-        identifier = idaapi.get_struc_by_idx(idx)
-        yield instance(identifier)
-        idx = idaapi.get_next_struc_idx(idx)
-    idx = idaapi.get_last_struc_idx()
-    yield instance(idaapi.get_struc_by_idx(idx))
 
 @utils.multicase(struc=__structure_t)
 def size(struc):
@@ -190,7 +193,7 @@ def members(id):
         left,right = m.soff,m.eoff
 
         if offset < left:
-            yield (offset,left-offset), (None,None)
+            yield (offset,left-offset), (idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1))
             offset = left
 
         yield (offset,ms),(idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1))
@@ -498,6 +501,7 @@ class members_t(object):
     __member_matcher.attribute('index', 'index')
     __member_matcher.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
     __member_matcher.boolean('name', lambda v, n: fnmatch.fnmatch(n, v), 'name')
+    __member_matcher.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), 'name')
     __member_matcher.boolean('fullname', lambda v, n: fnmatch.fnmatch(n, v), 'fullname')
     __member_matcher.boolean('comment', lambda v, n: fnmatch.fnmatch(n, v), 'comment')
     __member_matcher.boolean('greater', operator.le, lambda m: m.offset+m.size), __member_matcher.boolean('gt', operator.lt, lambda m: m.offset+m.size)
@@ -505,6 +509,14 @@ class members_t(object):
     __member_matcher.predicate('predicate'), __member_matcher.predicate('pred')
 
     # searching members
+    @utils.multicase()
+    def iterate(self, **type):
+        if not type: type = {'predicate':lambda n: True}
+        res = __builtin__.list(iter(self))
+        for k,v in type.iteritems():
+            res = __builtin__.list(self.__member_matcher.match(k, v, res))
+        for n in res: yield n
+
     @utils.multicase(string=basestring)
     def list(self, string):
         '''List any members that match the glob in `string`.'''
@@ -520,32 +532,25 @@ class members_t(object):
         identifier = particular id number
         pred = function predicate
         """
-        if not type: type = {'predicate':lambda n: True}
-        result = __builtin__.list(self)
-        for k,v in type.iteritems():
-            res = __builtin__.list(self.__member_matcher.match(k, v, result))
-            maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
-            maxoffset = max(__builtin__.map(utils.compose(operator.attrgetter('offset'),'{:x}'.format,len), res) or [1])
-            maxsize = max(__builtin__.map(operator.attrgetter('size'), res) or [1])
-            maxname = max(__builtin__.map(utils.compose(operator.attrgetter('name'), len), res) or [1])
-            maxtype = max(__builtin__.map(utils.compose(operator.attrgetter('type'), repr, len), res) or [1])
-            cindex = math.ceil(math.log(maxindex)/math.log(10))
-            csize = math.ceil(math.log(maxsize)/math.log(16))
+        res = __builtin__.list(self.iterate(**type))
 
-            for m in res:
-                print '[{:{:d}d}] {:>{:d}x}:+{:0{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}'.format(m.index, int(cindex), m.offset, int(maxoffset), m.size, int(csize), "'{:s}'".format(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ',typeid={:s}'.format(m.typeid), ' // {:s}'.format(m.comment) if m.comment else '')
-            continue
+        escape = repr
+        maxindex = max(__builtin__.map(utils.compose(operator.attrgetter('index'),'{:d}'.format,len), res) or [1])
+        maxoffset = max(__builtin__.map(utils.compose(operator.attrgetter('offset'),'{:x}'.format,len), res) or [1])
+        maxsize = max(__builtin__.map(utils.compose(operator.attrgetter('size'),'{:x}'.format,len), res) or [1])
+        maxname = max(__builtin__.map(utils.compose(operator.attrgetter('name'), escape, len), res) or [1])
+        maxtype = max(__builtin__.map(utils.compose(operator.attrgetter('type'), repr, len), res) or [1])
+
+        for m in res:
+            print '[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}'.format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ',typeid={:x}'.format(m.typeid), ' // {:s}'.format(m.comment) if m.comment else '')
         return
 
     @utils.multicase()
     def by(self, **type):
         '''Return the member with the specified ``name``.'''
         searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
-        if len(type) != 1:
-            raise LookupError('{:s}.instance({:s}).members.by({:s}) : Invalid number of search types specified.'.format(__name__, self.owner.name, searchstring))
 
-        k,v = next(type.iteritems())
-        res = __builtin__.list(self.__member_matcher.match(k, v, self))
+        res = __builtin__.list(self.iterate(**type))
         if len(res) > 1:
             map(logging.info, (('[{:d}] {:x}:+{:x} {:s} {!r}'.format(m.index,m.offset,m.size,m.name,m.type)) for m in res))
             logging.warn('{:s}.instance({:s}).members.by({:s}) : Found {:d} matching results, returning the first one.'.format(__name__, self.owner.name, searchstring, len(res)))
@@ -580,8 +585,11 @@ class members_t(object):
     def by_offset(self, offset):
         '''Return the member at the specified ``offset``.'''
         min,max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr),idaapi.get_struc_last_offset(self.owner.ptr)))
-        if (offset < min) or (offset >= max):
-            raise LookupError('{:s}.instance({:s}).members.by_offset : Requested offset {:s} not within bounds (0x{:x},0x{:x})'.format(__name__, self.owner.name, '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset), min, max))
+
+        mptr = idaapi.get_member(self.owner.ptr, max - self.baseoffset)
+        msize = idaapi.get_member_size(mptr)
+        if (offset < min) or (offset >= max+msize):
+            raise LookupError('{:s}.instance({:s}).members.by_offset : Requested offset {:s} not within bounds ({:s},{:s})'.format(__name__, self.owner.name, '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset), '-0x{:x}'.format(abs(min)) if min < 0 else '0x{:x}'.format(abs(min)), '-0x{:x}'.format(abs(max)+msize) if max < 0 else '0x{:x}'.format(abs(max)+msize)))
 
         mem = idaapi.get_member(self.owner.ptr, offset - self.baseoffset)
         if mem is None:
@@ -614,8 +622,13 @@ class members_t(object):
 
     # adding/removing members
     @utils.multicase(name=basestring)
+    def add(self, name):
+        '''Append the specified member ``name`` with the default type at the end of the structure.'''
+        offset = self.owner.size + self.baseoffset
+        return self.add(name, int, offset)
+    @utils.multicase(name=basestring)
     def add(self, name, type):
-        '''Append the specified member ``name`` with the given ``type`` at the end of the structure'''
+        '''Append the specified member ``name`` with the given ``type`` at the end of the structure.'''
         offset = self.owner.size + self.baseoffset
         return self.add(name, type, offset)
     @utils.multicase(name=basestring, offset=six.integer_types)
@@ -675,15 +688,16 @@ class members_t(object):
     def __repr__(self):
         '''Display all the fields within the specified structure.'''
         result = []
-        mn = 0
+        mn, ms = 0, 0
         for i in xrange(len(self)):
             m = self[i]
             name,t,ofs,size,comment = m.name,m.type,m.offset,m.size,m.comment
             result.append((i,name,t,ofs,size,comment))
             mn = max((mn,len(name)))
+            ms = max((ms,len('{:x}'.format(size))))
         mi = len(str(len(self)))
         mo = max(map(len,map('{:x}'.format, (self.baseoffset,self.baseoffset+self.owner.size))))
-        return '{!r}\n{:s}'.format(self.owner, '\n'.join(' [{:{:d}d}] {:>{:d}x}:+{:x} {:<{:d}s} {!r} {:s}'.format(i,mi,o,mo,s,"'{:s}'".format(n),mn+2,t,' // {:s}'.format(c) if c else '') for i,n,t,o,s,c in result))
+        return '{!r}\n{:s}'.format(self.owner, '\n'.join(' [{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {!r} {:s}'.format(i,mi,o,mo,s,ms,"'{:s}'".format(n),mn+2,t,' // {:s}'.format(c) if c else '') for i,n,t,o,s,c in result))
 
 class member_t(object):
     '''Contains information about a particular member within a given structure'''
@@ -845,7 +859,7 @@ class member_t(object):
         flag,typeid,size = interface.typemap.resolve(type)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
-        return idaapi.set_member_type(self.__owner.ptr, self.offset, flag, opinfo, size)
+        return idaapi.set_member_type(self.__owner.ptr, self.offset - self.__owner.members.baseoffset, flag, opinfo, size)
 
     def __repr__(self):
         '''Display the specified member in a readable format.'''

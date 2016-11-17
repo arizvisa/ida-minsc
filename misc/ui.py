@@ -408,7 +408,7 @@ def makecall(ea=None, target=None):
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
 #    result = ['{:s}={:s}'.format(name,ins.op_repr(ea, 0)) for name,ea in result]
-    result = ['({:x}){:s}={:s}'.format(ea, name, ':'.join(ins.op_repr(database.address.prevreg(ea, ins.op_value(ea,0), write=1), n) for n in ins.ops_read(database.address.prevreg(ea, ins.op_value(ea,0), write=1))) if ins.op_type(ea,0) == 'opt_reg' else ins.op_repr(ea, 0)) for name,ea in result]
+    result = ['({:x}){:s}={:s}'.format(ea, name, ':'.join(ins.op_repr(database.address.prevreg(ea, ins.op_value(ea,0), write=1), n) for n in ins.ops_read(database.address.prevreg(ea, ins.op_value(ea,0), write=1))) if ins.op_type(ea,0) == 'reg' else ins.op_repr(ea, 0)) for name,ea in result]
 
     try:
         return '{:s}({:s})'.format(internal.declaration.demangle(function.name(function.by_address(fn))), ','.join(result))
@@ -425,8 +425,8 @@ def source(ea, *regs):
     return res
 
 def sourcechain(fn, *args, **kwds):
-#    sentinel = kwds.get('types', set(('opt_imm','opt_phrase','opt_addr','opt_void')))
-    sentinel = kwds.get('types', set(('opt_imm','opt_addr','opt_void')))
+#    sentinel = kwds.get('types', set(('imm','phrase','addr','void')))
+    sentinel = kwds.get('types', set(('imm','addr','void')))
 
     result = {}
     for ea,opi in source(*args):
@@ -435,17 +435,17 @@ def sourcechain(fn, *args, **kwds):
         for i,t in zip(opi,opt):
             if t in sentinel:
                 result.setdefault(ea,set()).add(i)
-            elif t in ('opt_reg',):
+            elif t in ('reg',):
                 result.setdefault(ea,set()).add(i)
                 r = ins.op_value(ea,i)
                 for a,b in sourcechain(fn, ea, r):
                     map(result.setdefault(a,set()).add, b)
-            elif t in ('opt_phrase',):
+            elif t in ('phrase',):
                 result.setdefault(ea,set()).add(i)
                 _,(r1,r2,_) = ins.op_value(ea,i)
                 for a,b in sourcechain(fn, ea, *tuple(r for r in (r1,r2) if r is not None)):
                     map(result.setdefault(a,set()).add, b)
-            elif t in ('opt_imm','opt_addr',):
+            elif t in ('imm','addr',):
                 result.setdefault(ea,set()).add(i)
             else:
                 raise ValueError, (t, ea, i)
