@@ -27,10 +27,18 @@ hex = '{:x}'.format
 # functional tools
 import functools,itertools,operator
 partial = functools.partial
-compose,box,unbox = map(functools.partial(getattr, __import__('internal').utils), ('compose','box','unbox'))
+fcompose,box,unbox = map(functools.partial(getattr, __import__('internal').utils), ('fcompose','box','unbox'))
 identity,first,second,third = map(functools.partial(getattr, __import__('internal').utils), ('identity','first','second','third'))
-fexc,cond = map(functools.partial(getattr, __import__('internal').utils), ('fexc', 'cond'))
-fagg,discard = map(functools.partial(getattr, __import__('internal').utils), ('fagg','discard'))
+fexception,fcondition = map(functools.partial(getattr, __import__('internal').utils), ('fexception','fcondition'))
+fap,fdiscard = map(functools.partial(getattr, __import__('internal').utils), ('fap','fdiscard'))
+lazy,fcurry = map(functools.partial(getattr, __import__('internal').utils), ('lazy','fcurry'))
+compose,fexc,condition = fcompose,fexception,fcondition
+
+# pattern matching
+AnyRegister = AnyReg = __import__('internal').utils.PatternAnyType(instruction.register_t)
+AnyInteger = AnyInt = __import__('internal').utils.PatternAnyType(__import__('six').integer_types)
+AnyString = AnyStr = __import__('internal').utils.PatternAnyType(basestring)
+Any = _ = __import__('internal').utils.PatternAny()
 
 import tools,ui
 from tools import remote

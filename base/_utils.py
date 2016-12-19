@@ -1,36 +1,73 @@
-import logging,sys
+import __builtin__
+import logging,sys,weakref
 import itertools,operator,functools
 import six,types,heapq,collections
 
 import multiprocessing,Queue
 import idaapi
 
-__all__ = ['compose','box','unbox','identity','first','second','cond','discard','fagg']
+__all__ = ['box','unbox','identity','first','second','third','fcompose','fdiscard','fcondition','fap','lazy','fcurry','fexception']
+__all__+= ['Pattern','PatternAny','PatternAnyType']
+__all__+= ['multicase','alias','matcher']
+__all__+= ['process','spawn']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
 # box any specified arguments
 box = lambda *a: a
 # return a closure that executes ``f`` with the arguments unboxed.
-unbox = lambda f, *ap, **kp: lambda *a, **k: f(*(ap + reduce(operator.add, map(tuple,a), ())), **dict(kp.items() + k.items()))
+unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple,ap), ())), **__builtin__.dict(k.items() + kp.items()))
 # return a closure that always returns ``n``.
 identity = lambda n: lambda *a, **k: n
 # return the first, second, or third item of a box.
 first, second, third = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2)
 # return a closure that executes a list of functions one after another from left-to-right
-compose = lambda *f: reduce(lambda f1,f2: lambda *a: f1(f2(*a)), reversed(f))
+fcompose = compose = lambda *f: __builtin__.reduce(lambda f1,f2: lambda *a: f1(f2(*a)), __builtin__.reversed(f))
 # return a closure that executes function ``f`` whilst discarding any extra arguments
-discard = lambda f: lambda *a, **k: f()
+fdiscard = lambda f: lambda *a, **k: f()
 # return a closure that executes function ``crit`` and then executes ``f`` or ``t`` based on whether or not it's successful.
-cond = lambda crit: lambda f, t: lambda *a, **k: t(*a, **k) if crit(*a, **k) else f(*a, **k)
-# return a closure that takes an aggregate and a list of functions to execute which receive each receive a copy of the arguments.
-fagg = lambda agg: lambda *fa: lambda *a, **k: agg(f(*a, **k) for f in fa)
+fcondition = lambda f, t: lambda crit: lambda *a, **k: t(*a, **k) if crit(*a, **k) else f(*a, **k)
+# return a closure that takes a list of functions to execute with the provided arguments
+fmaplist = fap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
+#lazy = lambda f, state={}: lambda *a, **k: state[(f,a,__builtin__.tuple(__builtin__.sorted(k.items())))] if (f,a,__builtin__.tuple(__builtin__.sorted(k.items()))) in state else state.setdefault((f,a,__builtin__.tuple(__builtin__.sorted(k.items()))), f(*a, **k))
+#lazy = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **dict(k.items() + kp.items()))
+# return a memoized closure that's lazy and only executes when evaluated
+def lazy(f, *a, **k):
+    sortedtuple, state = fcompose(__builtin__.sorted, __builtin__.tuple), {}
+    def closure(*ap, **kp):
+        A, K = a+ap, sortedtuple(k.items() + kp.items())
+        return state[(A,K)] if (A,K) in state else state.setdefault((A,K), f(*A, **__builtin__.dict(k.items()+kp.items())))
+    return closure
+# return a closure that will use the specified arguments to call the provided function
+fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a+ap), **__builtin__.dict(k.items() + kp.items()))
 # return a closure that executes function ``f`` and includes the exception or None as the first element in the boxed result.
-def fexc(f, *a, **k):
-    def _fexc(*a, **k):
-        try: return None, f(*a, **k)
-        except: return sys.exc_info()[1], None
-    return functools.partial(_fexc, *a, **k)
+def fexception(f, *a, **k):
+    def closure(*a, **k):
+        try: return __builtin__.None, f(*a, **k)
+        except: return sys.exc_info()[1], __builtin__.None
+    return functools.partial(closure, *a, **k)
+fexc = fexception
+
+# cheap pattern-like matching
+class Pattern(object):
+    def __eq__(self, other):
+        return False
+    def __repr__(self):
+        return 'Pattern()'
+class PatternAny(Pattern):
+    def __eq__(self, other):
+        return True
+    __call__ = __eq__
+    def __repr__(self):
+        return '{:s}({:s})'.format('Pattern', '*')
+class PatternAnyType(Pattern):
+    def __init__(self, other):
+        self.type = other
+    def __eq__(self, other):
+        return isinstance(other, self.type)
+    __call__ = __eq__
+    def __repr__(self):
+        return '{:s}({:s})'.format('Pattern', '|'.join(n.__name__ for n in self.type) if hasattr(self.type, '__iter__') else self.type.__name__)
 
 ### decorators
 class multicase(object):

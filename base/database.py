@@ -1271,8 +1271,8 @@ class imports(object):
     __matcher__.boolean('module', lambda v, n: fnmatch.fnmatch(n, v), utils.compose(utils.second, utils.first))
     __matcher__.mapping('ordinal', utils.compose(utils.second, lambda(m,n,o): o))
     __matcher__.boolean('regex', re.search, utils.compose(utils.second, __format__))
-    __matcher__.predicate('predicate', utils.identity)
-    __matcher__.predicate('pred', utils.identity)
+    __matcher__.predicate('predicate', lambda n:n)
+    __matcher__.predicate('pred', lambda n:n)
     __matcher__.mapping('index', utils.first)
 
     @staticmethod
@@ -1283,7 +1283,7 @@ class imports(object):
         for idx in xrange(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
             result = []
-            idaapi.enum_import_names(idx, utils.compose(utils.box,result.append,utils.discard(lambda:True)))
+            idaapi.enum_import_names(idx, utils.compose(utils.box,result.append,utils.fdiscard(lambda:True)))
             for ea,name,ordinal in result:
                 yield (ea,(module,name,ordinal))
             continue
@@ -1674,14 +1674,17 @@ class address(object):
             fwithin = functools.partial(operator.le, start)
         # otherwise ensure that we're not in the function and we're a code type.
         else:
-            fwithin = utils.fagg(all)(utils.compose(function.within, operator.not_), type.is_code)
+            fwithin = utils.compose(utils.fap(utils.compose(function.within, operator.not_), type.is_code), all)
+
+            start = cls.walk(ea, cls.prev, fwithin)
+            start = db.top() if start == idaapi.BADADDR else start
 
         prevea = cls.prev(ea)
         if prevea is None:
-            logging.fatal("{:s}.prevreg({:s}) : Unable to start walking from previous address. : {:x}".format('.'.join((__name__, cls.__name__)), args, prevea))
+            logging.fatal("{:s}.prevreg({:s}) : Unable to start walking from previous address. : {:x}".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
-        res = cls.walk(ea, cls.prev, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
-        if res == idaapi.BADADDR or res < start:
+        res = cls.walk(prevea, cls.prev, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
+        if res == idaapi.BADADDR or (cls == address and res < start):
             raise ValueError("{:s}.prevreg({:s}) : Unable to find register{:s} within chunk. {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
         modifiers['count'] = count - 1
         return cls.prevreg( cls.prev(res), *regs, **modifiers) if count > 1 else res
@@ -1723,14 +1726,17 @@ class address(object):
             fwithin = functools.partial(operator.gt, end)
         # otherwise ensure that we're not in a function and we're a code type.
         else:
-            fwithin = utils.fagg(all)(utils.compose(function.within, operator.not_), type.is_code)
+            fwithin = utils.compose(utils.fap(utils.compose(function.within, operator.not_), type.is_code), all)
+
+            end = cls.walk(ea, cls.next, fwithin)
+            end = db.bottom() if end == idaapi.BADADDR else end
 
         nextea = cls.next(ea)
         if nextea is None:
-            logging.fatal("{:s}.nextreg({:s}) : Unable to start walking from next address. : {:x}".format('.'.join((__name__, cls.__name__)), args, nextea))
+            logging.fatal("{:s}.nextreg({:s}) : Unable to start walking from next address. : {:x}".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
-        res = cls.walk(ea, cls.next, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
-        if res == idaapi.BADADDR or res >= end:
+        res = cls.walk(nextea, cls.next, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
+        if res == idaapi.BADADDR or (cls == address and res >= end):
             raise ValueError("{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
         modifiers['count'] = count - 1
         return cls.nextreg(cls.next(res), *regs, **modifiers) if count > 1 else res
@@ -1911,12 +1917,19 @@ class flow(address):
     def prev(cls, ea, count):
         ea = interface.address.within(ea)
         isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-        refs = xref.up(ea)
-        if len(refs) > 1 and isStop(address.prev(ea)):
+        invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
+        refs = filter(type.is_code, xref.up(ea))
+        if len(refs) > 1 and invalidQ(address.prev(ea)):
             logging.fatal("{:s}.prev({:x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map('{:x}'.format,refs))))
             return None
-        try: res = refs[0] if isStop(address.prev(ea)) else address.prev(ea)
-        except: res = ea
+        try:
+            if invalidQ(address.prev(ea)):
+                res = refs[0]
+                count += 1
+            else:
+                res = address.prev(ea)
+        except:
+            res = ea
         return cls.prev(res, count-1) if count > 1 else res
 
     @utils.multicase()
@@ -1934,11 +1947,12 @@ class flow(address):
     def next(cls, ea, count):
         ea = interface.address.within(ea)
         isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-        refs = xref.down(ea)
+        invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
+        refs = filter(type.is_code, xref.down(ea))
         if len(refs) > 1:
             logging.fatal("{:s}.next({:x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map('{:x}'.format,refs))))
             return None
-        if isStop(ea) and not _instruction.is_jmp(ea):
+        if invalidQ(ea) and not _instruction.is_jmp(ea):
 #            logging.fatal("{:s}.next({:x}, count={:d}) : Unable to move to next address. Flow has stopped.".format('.'.join((__name__, cls.__name__)), ea, count))
             return None
         res = refs[0] if _instruction.is_jmp(ea) else address.next(ea)

@@ -1,6 +1,6 @@
 import logging,__builtin__
 import itertools,functools,operator
-import six,types
+import six,types,collections
 
 import database,function,ui
 import structure,enum
@@ -8,6 +8,9 @@ import internal
 from internal import utils,interface
 
 import idaapi
+
+OBIS = collections.namedtuple('OffsetBaseIndexScale', ('offset','base','index','scale'))
+OREF = collections.namedtuple('AddressOpnumReftype', ('address','opnum','reftype'))
 
 @utils.multicase()
 def at():
@@ -286,17 +289,13 @@ def op_refs(ea, n):
 
     # sanity: returns whether the operand has a local or global xref
     ok = idaapi.op_adds_xrefs(F, n)
-    if not ok:
-        logging.warn('{:s}.op_refs(0x{:x}, {:d}) : Instruction operand does not directly contain any data references.'.format(__name__, ea, n))
-        # FIXME: try and match operand offset to structure
-        return ()
 
     # FIXME: gots to be a better way to determine operand representation
     ti = idaapi.opinfo_t()
     res = idaapi.get_opinfo(ea, n, F, ti)
 
     # stkvar
-    if res is None:
+    if ok and res is None:
         stkofs_ = idaapi.calc_stkvar_struc_offset(fn, ea, n)
         # check that the stkofs_ from get_stkvar and calc_stkvar are the same
         op = operand(ea, n)
@@ -307,10 +306,10 @@ def op_refs(ea, n):
         # build the xrefs
         xl = idaapi.xreflist_t()
         idaapi.build_stkvar_xrefs(xl, fn, member)
-        res = ((x.ea,x.opnum,Ref_T.get(x.type,'')) for x in xl)
+        res = [ OREF(x.ea,x.opnum,Ref_T.get(x.type,'')) for x in xl ]
 
     # struc member
-    elif res.tid != idaapi.BADADDR:    # FIXME: is this right?
+    elif ok and res.tid != idaapi.BADADDR:    # FIXME: is this right?
         # structures are defined in a supval at index 0xf+opnum
         # the supval has the format 0001c0xxxxxx where 'x' is the low 3 bytes of the structure id
 
@@ -323,7 +322,7 @@ def op_refs(ea, n):
             raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to get structure id for operand. : {:x}".format(__name__, ea, n, ea))
 
         # get the structure offset and then figure it's member
-        memofs = operand(ea, n).addr    # FIXME: this will be incorrect for an offsetted struct
+        memofs = operand(ea, n).value    # FIXME: this will be incorrect for an offsetted struct
         st = idaapi.get_struc(pathvar[0])
         if st is None:
             raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to get structure for id. : {:x}".format(__name__, ea, n, pathvar[0]))
@@ -334,11 +333,9 @@ def op_refs(ea, n):
         # extract the references
         x = idaapi.xrefblk_t()
         x.first_to(mem.id, 0)
-        if x is None:
-            return ()
-        refs = [(x.frm,x.iscode,x.type)]
+        refs = [ OREF(x.frm,x.iscode,x.type) ]
         while x.next_to():
-            refs.append((x.frm,x.iscode,x.type))
+            refs.append( OREF(x.frm,x.iscode,x.type) )
 
         # now figure out the operands if there are any
         res = []
@@ -346,11 +343,11 @@ def op_refs(ea, n):
             ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
             ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx,val in ops)
             ops = (idx for idx,ids in ops if st.id in ids)
-            res.extend( (ea,op,Ref_T.get(t,'')) for op in ops)
+            res.extend( OREF(ea,op,Ref_T.get(t,'')) for op in ops)
         res = res
 
     # enums
-    elif res.tid != idaapi.BADADDR:
+    elif ok and res.tid != idaapi.BADADDR:
         e = enum.by_identifier(res.tid)
         # enums are defined in a altval at index 0xb+opnum
         # the int points straight at the enumeration id
@@ -365,21 +362,22 @@ def op_refs(ea, n):
         x = idaapi.xrefblk_t()
         x.first_to(gid, 0)
         if x is None:
-            return ()
-        refs = [(x.frm,x.iscode,x.type)]
+            return []
+        refs = [ OREF(x.frm,x.iscode,x.type) ]
         while x.next_to():
-            refs.append((x.frm,x.iscode,x.type))
+            refs.append( OREF(x.frm,x.iscode,x.type) )
 
         # now figure out the operands if there are any
         res = []
         for ea,_,t in refs:
+            if ea == idaapi.BADADDR: continue
             if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
-                ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in (idaapi.o_imm,) else operand(ea,idx).addr) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 9+idx) is not None)
+                ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in (idaapi.o_imm,) else operand(ea,idx).addr) for idx in range(ops_count(ea)))
                 ops = (idx for idx,val in ops if val == gid)
-                res.extend( (ea,op,Ref_T.get(t,'')) for op in ops)
-            else: res.append((ea, None, Ref_T.get(t,'')))
+                res.extend( OREF(ea,op,Ref_T.get(t,'')) for op in ops)
+            else: res.append( OREF(ea, None, Ref_T.get(t,'')) )
         res = res
-    return tuple(res)
+    return res
 op_ref = utils.alias(op_refs)
 
 @utils.multicase(n=int)
@@ -440,7 +438,7 @@ class opt(object):
         elif op.type in (idaapi.o_mem,idaapi.o_phrase,idaapi.o_displ):
             dt = ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
             ofs,b,i,s = res
-            return ofs,None if b is None else reg.by_indextype(b,dt).name,None if i is None else reg.by_indextype(i,dt).name,s
+            return OBIS(ofs,None if b is None else reg.by_indextype(b,dt).name,None if i is None else reg.by_indextype(i,dt).name,s)
 
         elif op.type in (idaapi.o_far,idaapi.o_near):
             return res
@@ -531,7 +529,7 @@ def opt_phrase(op):
     signbit = 2**(database.config.bits()-1)
     maxint = 2**database.config.bits()
 
-    return (int(offset-maxint) if offset&signbit else offset),base,index,scale
+    return OBIS((int(offset-maxint) if offset&signbit else offset),base,index,scale)
 
 @opt.define(idaapi.o_reg)
 def opt_reg(op):
@@ -682,6 +680,64 @@ isCall = callQ = utils.alias(is_call)
 #def? op_offset(ea, n, type, target = BADADDR, base = 0, tdelta = 0) -> int
 
 ## register lookups and types
+class register_t(object):
+    '''A register type.'''
+    @property
+    def id(self):
+        '''Returns the index of the register.'''
+        res = idaapi.ph.regnames
+        try: return res.index(self.realname or self.name)
+        except ValueError: pass
+        return -1
+
+    @property
+    def name(self):
+        '''Returns the register's name.'''
+        return self.__name__
+    @property
+    def type(self):
+        '''Returns the IDA dtype of the register.'''
+        return self.dtyp
+    @property
+    def size(self):
+        '''Returns the size of the register.'''
+        return self.size
+    @property
+    def offset(self):
+        '''Returns the binary offset into the full register where it begins at.'''
+        return self.offset
+    def __repr__(self):
+        try:
+            dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi,name) == self.dtyp]
+        except ValueError:
+            dt = 'unknown'
+        return '<{:s}({:d},{:s}) {!r} {:d}:+{:d}>'.format('.'.join((__name__,'register',self.__class__.__name__)), self.id, dt, self.name, self.offset, self.size)
+        #return '{:s} {:s} {:d}:+{:d}'.format(self.__class__, dt, self.offset, self.size, dt)
+
+    def __contains__(self, other):
+        '''Returns True if the register ``other`` is a sub-register of ``self``.'''
+        return other in self.children.values()
+
+    def subsetQ(self, other):
+        '''Returns True if the register ``other`` is a part of ``self``.'''
+        def collect(node):
+            res = set([node])
+            [res.update(collect(n)) for n in node.children.values()]
+            return res
+        return other in self.alias or other in collect(self)
+
+    def supersetQ(self, other):
+        '''Returns True if the register ``other`` is a superset of ``self``.'''
+        res,pos = set(),self
+        while pos is not None:
+            res.add(pos)
+            pos = pos.parent
+        return other in self.alias or other in res
+
+    def relatedQ(self, other):
+        '''Returns True if the the register ``other`` affects ``self`` when it's modified'''
+        return self.supersetQ(other) or self.subsetQ(other)
+
 class reg(object):
     """
     Lookup register instances by their index or name.
@@ -694,77 +750,24 @@ class reg(object):
     """
     cache = {}
 
-    class type(object):
-        '''A register type.'''
-        @property
-        def id(self):
-            '''Returns the index of the register.'''
-            res = idaapi.ph.regnames
-            return res.index(self.realname or self.name)
-        @property
-        def name(self):
-            '''Returns the register's name.'''
-            return self.__name__
-        @property
-        def type(self):
-            '''Returns the IDA dtype of the register.'''
-            return self.dtyp
-        @property
-        def size(self):
-            '''Returns the size of the register.'''
-            return self.size
-        @property
-        def offset(self):
-            '''Returns the binary offset into the full register where it begins at.'''
-            return self.offset
-        def __repr__(self):
-            try:
-                dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi,name) == self.dtyp]
-            except ValueError:
-                dt = 'unknown'
-            return '<{:s}({:d},{:s}) {!r} {:d}:+{:d}>'.format('.'.join((__name__,reg.__name__)), self.id, dt, self.name, self.offset, self.size)
-            #return '{:s} {:s} {:d}:+{:d}'.format(self.__class__, dt, self.offset, self.size, dt)
-
-        def __contains__(self, other):
-            '''Returns True if the register ``other`` is a sub-register of ``self``.'''
-            return other in self.children.values()
-
-        def subsetQ(self, other):
-            '''Returns True if the register ``other`` is a part of ``self``.'''
-            def collect(node):
-                res = set([node])
-                [res.update(collect(n)) for n in node.children.values()]
-                return res
-            return other in collect(self)
-
-        def supersetQ(self, other):
-            '''Returns True if the register ``other`` is a superset of ``self``.'''
-            res,pos = set(),self
-            while pos is not None:
-                res.add(pos)
-                pos = pos.parent
-            return other in res
-
-        def relatedQ(self, other):
-            '''Returns True if the the register ``other`` affects ``self`` when it's modified'''
-            return self.supersetQ(other) or self.subsetQ(other)
-
     @classmethod
     def new(cls, name, bits, idaname=None, **kwds):
         dtyp = kwds.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
-        namespace = dict(cls.type.__dict__)
+        namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, 'parent':None, 'children':{}, 'dtyp':dtyp, 'offset':0, 'size':bits})
         namespace['realname'] = idaname
-        res = type(name, (cls.type,), namespace)()
+        namespace['alias'] = kwds.get('alias', set())
+        res = type(name, (register_t,), namespace)()
         cls.cache[name] = cls.cache[idaname or name,dtyp] = res
         return res
     @classmethod
     def child(cls, parent, name, offset, bits, idaname=None, **kwds):
         dtyp = kwds.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
-        namespace = dict(cls.type.__dict__)
+        namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, 'parent':parent, 'children':{}, 'dtyp':dtyp, 'offset':offset, 'size':bits})
         namespace['realname'] = idaname
-        res = type(name, (cls.type,), namespace)()
+        namespace['alias'] = kwds.get('alias', set())
+        res = type(name, (register_t,), namespace)()
         cls.cache[name] = cls.cache[idaname or name,dtyp] = res
         parent.children[offset] = res
         return res
@@ -823,6 +826,13 @@ class register: pass
 setattr(register, 'fpstack', reg.new('fptags', 80*8, dtyp=None))    # FIXME: is this the right IDA register name??
 
 # FIXME: rex-prefixed 32-bit registers are implicitly extended to the 64-bit regs which implies that 64-bit are children of 32-bit
+for _ in ('ax','cx','dx','bx','sp','bp','si','di','ip'):
+    r32, r64 = getattr(register, 'e'+_), getattr(register, 'r'+_)
+    r32.alias, r64.alias = { r64 }, { r32 }
+for _ in map(str,range(8,16)):
+    r32, r64 = getattr(register, 'r'+_+'d'), getattr(register, 'r'+_)
+    r32.alias, r64.alias = { r64 }, { r32 }
+
 
 # explicitly set the lookups for (word-register,idaapi.dt_byte) which exist due to ida's love for the inconsistent
 [ reg.cache.setdefault((_+'x', reg.by_name(_+'l').type), reg.by_name(_+'l')) for _ in ('a','c','d','b') ]
@@ -847,55 +857,60 @@ setattr(register, 'fpstack', reg.new('fptags', 80*8, dtyp=None))    # FIXME: is 
 
 # FIXME: implement switch_t to determine information about switch statements
 
-class ir:
-    """Returns an operand as a parseable intermediary representation"""
-    class operation:
-        class __base__(object):
-            def __init__(self, size=0):
-                self.__size = size
-            name = property(fget=lambda s: s.__class__.__name__)
-            size = property(fget=lambda s: s.__size)
-            def str(self):
-                return '{:s}({:d})'.format(self.name, self.size)
-            def __repr__(self):
-                return self.str()
-            def __eq__(self, other):
-                classname = self.__class__.__name__
-                if isinstance(other, basestring):
-                    if other.endswith(')'):
-                        other_name = other.split('(')[0]
-                        other_size = other.split('(')[-1].split(')')[0]
-                        try: return cmp(classname, other_name) == 0 and self.size == int(other_size)
-                        except ValueError: return False
-                    return cmp(classname, other) == 0
-                return isinstance(self, other) if isinstance(other, __builtin__.type) else cmp(self,other) == 0
-        class store(__base__): pass
-        class load(__base__): pass
-        class loadstore(__base__): pass
-        class assign(__base__): pass
-        class value(__base__): pass
-        class modify(__base__): pass
-        class unknown(__base__): pass
+# an intermediary representation for operands/operations
+OOBIS = collections.namedtuple('OpOffsetBaseIndexScale', ('op','offset','base','index','scale'))
 
+class ir_op:
+    """Returns an operand as a parseable intermediary representation"""
+    class __base__(object):
+        def __init__(self, size=0):
+            self.__size = size
+        name = property(fget=lambda s: s.__class__.__name__)
+        size = property(fget=lambda s: s.__size)
+        def str(self):
+            return '{:s}({:d})'.format(self.name, self.size)
+        def __repr__(self):
+            return self.str()
+        def __eq__(self, other):
+            classname = self.__class__.__name__
+            if isinstance(other, basestring):
+                if other.endswith(')'):
+                    other_name = other.split('(')[0]
+                    other_size = other.split('(')[-1].split(')')[0]
+                    try: return cmp(classname, other_name) == 0 and self.size == int(other_size)
+                    except ValueError: return False
+                return cmp(classname, other) == 0
+            return isinstance(self, other) if isinstance(other, __builtin__.type) else super(object, self) == other
+    class store(__base__): pass
+    class load(__base__): pass
+    class loadstore(__base__): pass
+    class assign(__base__): pass
+    class value(__base__): pass
+    class modify(__base__): pass
+    class unknown(__base__): pass
+
+
+class ir:
+    """Returns a sort-of intermediary representation that excludes the semantics of an instruction."""
     table = {
-        'opt_imm':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify, '':operation.value},
-        'opt_addr':    {'r':operation.load,    'w':operation.store, 'rw':operation.loadstore, '':operation.unknown},
-        'opt_phrase':  {'r':operation.load,    'w':operation.store, 'rw':operation.loadstore, '':operation.unknown},
-        'opt_reg':     {'r':operation.value,   'w':operation.assign, 'rw':operation.modify, '':operation.unknown},
+        'opt_imm':     {'r':ir_op.value,   'w':ir_op.assign, 'rw':ir_op.modify,    '':ir_op.value},
+        'opt_addr':    {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
+        'opt_phrase':  {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
+        'opt_reg':     {'r':ir_op.value,   'w':ir_op.assign, 'rw':ir_op.modify,    '':ir_op.unknown},
     }
 
-    @utils.multicase()
+    @utils.multicase(opnum=six.integer_types)
     @classmethod
     def op(cls, opnum): return cls.op(ui.current.address(), opnum)
     @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
     @classmethod
     def op(cls, ea, opnum):
-        """Returns an operand as a normalized type.
+        """Returns an operand as a tuple.
 
-        (store,(immediate,register,index,scale))
-        (load,(immediate,register,index,scale))
-        (value,(immediate,register,index,scale))
-        (assign,(immediate,register,index,scale))
+        (store,immediate,register,index,scale)
+        (load,immediate,register,index,scale)
+        (value,immediate,register,index,scale)
+        (assign,immediate,register,index,scale)
         """
         op,state = operand(ea, opnum), op_state(ea, opnum)
         t, sz = opt.type(op), opt.size(op)
@@ -904,10 +919,10 @@ class ir:
         # if mnemonic is lea, then demote it from a memory operation
         # FIXME: i don't like this hack.
         if mnem(ea).upper() == 'LEA':
-            if operation == cls.operation.load:
-                operation = cls.operation.value
-            elif operation == cls.operation.store:
-                operation = cls.operation.assign
+            if operation == ir_op.load:
+                operation = ir_op.value
+            elif operation == ir_op.store:
+                operation = ir_op.assign
             else:
                 operation = operation
 
@@ -918,13 +933,13 @@ class ir:
         else:
             imm,base,index,scale = None,t(op),None,None
 
-        if operation == cls.operation.load:
+        if operation == ir_op.load:
             sz = database.config.bits() // 8
 
         base = None if base is None else reg(base, size=sz)
         index = None if index is None else reg(index, size=sz)
 
-        return operation(opt.size(op)),(imm,base,index,scale)
+        return OOBIS(operation(opt.size(op)),*(imm,base,index,scale))
 
     @utils.multicase()
     @classmethod
@@ -932,34 +947,33 @@ class ir:
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def instruction(cls, ea):
-        operands = [cls.op(ea, i) for i in range(ops_count(ea))]
         result = []
         for opnum in range(ops_count(ea)):
-            operation,value = cls.op(ea, opnum)
+            operation,offset,base,index,scale = cls.op(ea, opnum)
             sz = operation.size
-            if operation == cls.operation.modify:
-                result.append((cls.operation.assign(sz),value))
-                result.append((cls.operation.value(sz),value))
-            elif operation == cls.operation.loadstore:
-                result.append((cls.operation.load(sz),value))
-                result.append((cls.operation.store(sz),value))
+            if operation == ir_op.modify:
+                result.append(OOBIS(ir_op.assign(sz),offset,base,index,scale))
+                result.append(OOBIS(ir_op.value(sz),offset,base,index,scale))
+            elif operation == ir_op.loadstore:
+                result.append(OOBIS(ir_op.load(sz),offset,base,index,scale))
+                result.append(OOBIS(ir_op.store(sz),offset,base,index,scale))
             else:
-                result.append((operation,value))
+                result.append(OOBIS(operation,offset,base,index,scale))
             continue
 
         # if mnemonic is stack-related, then add the other implicit operation
         # FIXME: ...and another pretty bad hack to figure out how to remove
         sp,sz = register.sp.id,database.config.bits()/8
         if mnem(ea).upper() == 'PUSH':
-            result.append((cls.operation.store(sz), (0, reg(sp,size=sz), 0, 1)))
+            result.append(OOBIS(ir_op.store(sz), 0, reg(sp,size=sz), 0, 1))
         elif mnem(ea).upper() == 'POP':
-            result.append((cls.operation.load(sz), (0, reg(sp,size=sz), 0, 1)))
+            result.append(OOBIS(ir_op.load(sz), 0, reg(sp,size=sz), 0, 1))
         elif mnem(ea).upper().startswith('RET'):
             if len(result) > 0:
-                result.append((cls.operation.modify(sz), (0, reg(sp,size=sz), 0, 1)))
-            result.append((cls.operation.load(sz), (0, reg(sp,size=sz), 0, 1)))
+                result.append(OOBIS(ir_op.modify(sz), 0, reg(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.load(sz), 0, reg(sp,size=sz), 0, 1))
         elif mnem(ea).upper() == 'CALL':
-            result.append((cls.operation.store(sz), (0, reg(sp,size=sz), 0, 1)))
+            result.append(OOBIS(ir_op.store(sz), 0, reg(sp,size=sz), 0, 1))
 
         return mnem(ea),result
     at = utils.alias(instruction, 'ir')
@@ -971,8 +985,8 @@ class ir:
     @classmethod
     def value(cls, ea):
         _,res = cls.at(ea)
-        value = [v for t,v in res if t == 'value']
-        return value or None
+        value = [v for v in res if v.op == 'value']
+        return value
 
     @utils.multicase()
     @classmethod
@@ -981,8 +995,8 @@ class ir:
     @classmethod
     def store(cls, ea):
         _,res = cls.at(ea)
-        store = [v for t,v in res if t == 'store']
-        return store or None
+        store = [v for v in res if v.op == 'store']
+        return store
 
     @utils.multicase()
     @classmethod
@@ -991,8 +1005,8 @@ class ir:
     @classmethod
     def load(cls, ea):
         _,res = cls.at(ea)
-        load = [v for t,v in res if t == 'load']
-        return load or None
+        load = [v for v in res if v.op == 'load']
+        return load
 
     @utils.multicase()
     @classmethod
@@ -1001,5 +1015,5 @@ class ir:
     @classmethod
     def assign(cls, ea):
         _,res = cls.at(ea)
-        assign = [v for t,v in res if t == 'assign']
-        return assign or None
+        assign = [v for v in res if v.op == 'assign']
+        return assign
