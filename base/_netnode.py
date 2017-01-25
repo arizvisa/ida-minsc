@@ -174,11 +174,11 @@ class value(object):
             return None
 
         if type is None:
-            return _ida_netnode.netnode_valobj(node) 
+            return _ida_netnode.netnode_valobj(node)
         elif issubclass(type, basestring):
-            return _ida_netnode.netnode_valstr(node) 
+            return _ida_netnode.netnode_valstr(node)
         elif issubclass(type, six.integer_types):
-            return _ida_netnode.netnode_long_value(node) 
+            return _ida_netnode.netnode_long_value(node)
         raise TypeError(type)
 
     @classmethod

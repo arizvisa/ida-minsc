@@ -94,6 +94,11 @@ class config(object):
         raise ValueError("{:s}.bits : Unknown bit size.".format('.'.join((__name__, cls.__name__))))
 
     @classmethod
+    def byteorder(cls):
+        res = idaapi.cvar.inf.mf
+        return 'big' if res else 'little'
+
+    @classmethod
     def processor(cls):
         '''Return processor name used by the database.'''
         return cls.info.procName
@@ -894,26 +899,57 @@ class entry(object):
     @classmethod
     def iterate(cls, **type):
         '''Iterate through all the entry-points in the database that match ``type``.'''
-        res = itertools.imap(cls.address, cls.__iterate__(**type))
-        for ea in res: yield ea    
+        res = itertools.imap(cls.__address__, cls.__iterate__(**type))
+        for ea in res: yield ea
 
+    @classmethod
+    def __index__(cls, ea):
+        '''Returns the index of the entry-point at the specified ``address``.'''
+        f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
+        iterable = itertools.imap(utils.compose(utils.fap(f, lambda n:n), __builtin__.tuple), __builtin__.range(idaapi.get_entry_qty()))
+        filterable = itertools.ifilter(utils.compose(utils.first, functools.partial(operator.eq, ea)), iterable)
+        result = itertools.imap(utils.second, filterable)
+        return __builtin__.next(result, None)
     @utils.multicase(index=six.integer_types)
     @classmethod
-    def ordinal(cls, index):
-        '''Returns the ordinal of the entry-point at the specified ``index``.'''
-        return idaapi.get_entry_ordinal(index)
-    @utils.multicase(index=six.integer_types)
-    @classmethod
-    def address(cls, index):
+    def __address__(cls, index):
         '''Returns the address of the entry-point at the specified ``index``.'''
-        res = cls.ordinal(index)
-        return idaapi.get_entry(res)
-    @utils.multicase(index=six.integer_types)
+        res = cls.__entryordinal__(index)
+        res = idaapi.get_entry(res)
+        return None if res == idaapi.BADADDR else res
+
+    # Returns the name of the entry-point at the specified ``index``.
+    __entryname__ = staticmethod(utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
+    # Returns the ordinal of the entry-point at the specified ``index``.
+    __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
+
+    @utils.multicase()
     @classmethod
-    def name(cls, index):
-        '''Returns the name of the entry-point at the specified ``index``.'''
-        res = cls.ordinal(index)
-        return idaapi.get_entry_name(res)
+    def ordinal(cls):
+        '''Returns the ordinal of the entry-point at the current address.'''
+        return cls.ordinal(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def ordinal(cls, ea):
+        '''Returns the ordinal of the entry-point at the address ``ea``.'''
+        res = cls.__index__(ea)
+        if res is not None:
+            return cls.__entryordinal__(res)
+        raise ValueError('{:s}.ordinal : No entry-point at specified address. : {:x}'.format('.'.join((__name__, cls.__name__)), ea))
+
+    @utils.multicase()
+    @classmethod
+    def name(cls):
+        '''Returns the name of the entry-point at the current address.'''
+        return cls.name(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def name(cls, ea):
+        '''Returns the name of the entry-point at the address ``ea``.'''
+        res = cls.__index__(ea)
+        if res is not None:
+            return cls.__entryname__(res)
+        raise ValueError('{:s}.name : No entry-point at specified address. : {:x}'.format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -947,7 +983,7 @@ class entry(object):
         cordinal = math.floor(math.log(maxordinal)/math.log(16))
 
         for index in res:
-            print '[{:{:d}d}] {:>{:d}x} : ({:{:d}x}) {:s}'.format(index, int(cindex), to_address(index), int(caddr), cls.ordinal(index), int(cindex), cls.name(index))
+            print '[{:{:d}d}] {:>{:d}x} : ({:{:d}x}) {:s}'.format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index))
         return
 
     @utils.multicase(string=basestring)
@@ -965,13 +1001,13 @@ class entry(object):
 
         res = __builtin__.list(cls.__iterate__(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, (('[{:d}] {:x} : ({:x}) {:s}'.format(idx, cls.address(idx), cls.ordinal(idx), cls.name(idx))) for idx in res))
+            __builtin__.map(logging.info, (('[{:d}] {:x} : ({:x}) {:s}'.format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
             logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format('.'.join((__name__,cls.__name__)), searchstring, len(res)))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
             raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), searchstring))
-        return cls.address(res)
+        return cls.__address__(res)
 
     @utils.multicase()
     @classmethod
@@ -1642,24 +1678,22 @@ class address(object):
         res = cls.walk(ea, cls.next, lambda n: len(xref.up(n)) == 0)
         return cls.nextref(cls.next(res), count-1) if count > 1 else res
 
-    @utils.multicase(ea=six.integer_types, reg=basestring)
+    @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
-        regs = (reg,) + regs
+        regs = [ _instruction.reg.by_name(r) if isinstance(r, basestring) else r for r in (reg,)+regs ]
         count = modifiers.get('count',1)
         args = ', '.join(['{:x}'.format(ea)] + __builtin__.map('"{:s}"'.format, regs) + __builtin__.map(utils.unbox('{:s}={!r}'.format), modifiers.items()))
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
-        match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).relatedQ,itertools.imap(_instruction.reg.by_name,regs))
+        match = lambda r,regs: any(itertools.imap(r.relatedQ,regs))
 
         def uses_register(ea, opnum, regs):
-            t, val = _instruction.op_type(ea, opnum), _instruction.op_value(ea, opnum)
-            if t == 'reg':
-                return any(match(val, regs))
-            if t == 'phrase':
-                _,base,index,_ = val
-                if (base and any(match(base,regs))) or (index and any(match(index,regs))):
-                    return True
+            val = _instruction.op_value(ea, opnum)
+            if isinstance(val, _instruction.register_t):
+                return match(val, regs)
+            elif hasattr(val, 'registers'):
+                return any(match(r, regs) for r in val.registers())
             return False
 
         iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
@@ -1688,30 +1722,28 @@ class address(object):
             raise ValueError("{:s}.prevreg({:s}) : Unable to find register{:s} within chunk. {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
         modifiers['count'] = count - 1
         return cls.prevreg( cls.prev(res), *regs, **modifiers) if count > 1 else res
-    @utils.multicase(reg=basestring)
+    @utils.multicase(reg=(basestring,_instruction.register_t))
     @classmethod
     def prevreg(cls, reg, *regs, **modifiers):
         '''Return the previous address containing an instruction that uses one of the specified registers ``regs``.'''
         return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
 
-    @utils.multicase(ea=six.integer_types, reg=basestring)
+    @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
-        regs = (reg,) + regs
+        regs = [ _instruction.reg.by_name(r) if isinstance(r, basestring) else r for r in (reg,)+regs ]
         count = modifiers.get('count',1)
         args = ', '.join(['{:x}'.format(ea)] + __builtin__.map('"{:s}"'.format, regs) + __builtin__.map(utils.unbox('{:s}={!r}'.format), modifiers.items()))
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
-        match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).relatedQ,itertools.imap(_instruction.reg.by_name,regs))
+        match = lambda r,regs: any(itertools.imap(r.relatedQ,regs))
 
         def uses_register(ea, opnum, regs):
-            t, val = _instruction.op_type(ea, opnum), _instruction.op_value(ea, opnum)
-            if t == 'reg':
-                return any(match(val, regs))
-            if t == 'phrase':
-                _,base,index,_ = val
-                if (base and any(match(base,regs))) or (index and any(match(index,regs))):
-                    return True
+            val = _instruction.op_value(ea, opnum)
+            if isinstance(val, _instruction.register_t):
+                return match(val, regs)
+            elif hasattr(val, 'registers'):
+                return any(match(r, regs) for r in val.registers())
             return False
 
         iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
@@ -1737,10 +1769,10 @@ class address(object):
             return ea
         res = cls.walk(nextea, cls.next, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
         if res == idaapi.BADADDR or (cls == address and res >= end):
-            raise ValueError("{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
+            raise ValueError("{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], end, ea, res))
         modifiers['count'] = count - 1
         return cls.nextreg(cls.next(res), *regs, **modifiers) if count > 1 else res
-    @utils.multicase(reg=basestring)
+    @utils.multicase(reg=(basestring,_instruction.register_t))
     @classmethod
     def nextreg(cls, reg, *regs, **modifiers):
         '''Return the next address containing an instruction that uses one of the specified registers ``regs``.'''
@@ -2202,10 +2234,21 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the values of the array at the current address.'''
+            '''Return the array at the current address.'''
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
+            '''Return the array at address ``ea``.'''
+            return cls.get(ea)
+
+        @utils.multicase()
+        @classmethod
+        def get(cls):
+            '''Return the values of the array at the current address.'''
+            return cls.get(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def get(cls, ea):
             '''Return the values of the array at address ``ea``.'''
             ea = interface.address.within(ea)
             numerics = {
@@ -2225,8 +2268,8 @@ class type(object):
             if fl & idaapi.FF_ASCI == idaapi.FF_ASCI:
                 t = strings[elesize]
             elif fl & idaapi.FF_STRU == idaapi.FF_STRU:
-                t = type.structure.id(ea)
-                raise TypeError("{:s} : Unable to handle an array of structures of type {:x}.".format('.'.join((__name__, 'type', cls.__name__)), t))
+                t, size = type.structure.id(ea), idaapi.get_item_size(ea)
+                return [ type.structure.get(ea, id=t) for ea in xrange(ea, ea+size, structure.size(t)) ]
             else:
                 ch = numerics[fl & idaapi.DT_TYPE]
                 t = ch.lower() if fl & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
@@ -2318,10 +2361,19 @@ class type(object):
             return type.structure.get(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @staticmethod
-        def get(ea):
-            '''Return the structure_t at address ``ea`` as a dict of ctypes.'''
+        def get(ea, **sid):
+            """Return the structure_t at address ``ea`` as a dict of ctypes.
+            If the structure ``sid`` is specified, then use that specific structure type.
+            """
             ea = interface.address.within(ea)
-            st = structure.instance(type.structure.id(ea), offset=ea)
+
+            if any(n in sid for n in ('sid','struc','structure','id')):
+                res = sid['sid'] if 'sid' in sid else sid['struc'] if 'struc' in sid else sid['structure'] if 'structure' in sid else sid['id'] if 'id' in sid else None
+                sid = res.id if isinstance(res, structure.structure_t) else res
+            else:
+                sid = type.structure.id(ea)
+
+            st = structure.instance(sid, offset=ea)
             typelookup = {
                 (int,-1) : ctypes.c_int8, (int,1) : ctypes.c_uint8,
                 (int,-2) : ctypes.c_int16, (int,2) : ctypes.c_uint16,

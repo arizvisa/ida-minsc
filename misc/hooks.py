@@ -331,9 +331,9 @@ def rebase(info):
     p.open()
     for si in xrange(info.size()):
         p.update(title='Rebasing segment {:d} of {:d} (+{:x}) : {:x} -> {:x}'.format(si, info.size(), info[si].size, info[si]._from, info[si].to))
-        
+
         # for each function (using target address because ida moved the netnodes for us)
-        res = [n for n in functions if info[si].to <= n < info[si].to + info[si].size] 
+        res = [n for n in functions if info[si].to <= n < info[si].to + info[si].size]
         for i, fn in __rebase_function(info[si]._from, info[si].to, info[si].size, res):
             text = 'Function {:d} of {:d} : {:x}'.format(i + fcount, len(functions), fn)
             p.update(value=sum((fcount,gcount,i)), text=text)

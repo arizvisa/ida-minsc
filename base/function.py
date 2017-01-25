@@ -585,6 +585,66 @@ class blocks(object):
         res = (bb for bb in blocks.iterate(fn) if bb.startEA <= ea < bb.endEA)
         return next(res)
 
+    @utils.multicase()
+    @classmethod
+    def nx(cls):
+        """Return a networkx.DiGraph of the function at the current address.
+        Requires the networkx module in order to build the graph.
+        """
+        return cls.nx(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def nx(cls, func):
+        """Return a networkx.DiGraph of the function at the address ``ea``.
+        Requires the networkx module in order to build the graph.
+        """
+        fn = by(func)
+
+        # create digraph
+        import networkx
+        attrs = tag(fn.startEA)
+        attrs.setdefault('__name__', database.name(fn.startEA))
+        attrs.setdefault('__address__', fn.startEA)
+        attrs.setdefault('__frame__', frame(fn))
+        res = networkx.DiGraph(name=name(fn.startEA), **attrs)
+
+        # create entry node
+        attrs = database.tag(fn.startEA)
+        operator.setitem(attrs, '__name__', name(fn.startEA))
+        operator.setitem(attrs, '__address__', fn.startEA)
+        operator.setitem(attrs, '__bounds__', block(fn.startEA))
+        block.color(fn.startEA) and operator.setitem(attrs, '__color__', block.color(fn.startEA))
+        res.add_node(fn.startEA, attrs)
+
+        # create a graph node for each basicblock
+        for b,e in cls(fn):
+            if b == fn.startEA: continue
+            attrs = database.tag(b)
+            operator.setitem(attrs, '__name__', database.name(b))
+            operator.setitem(attrs, '__address__', b)
+            operator.setitem(attrs, '__bounds__', (b,e))
+            block.color(b) and operator.setitem(attrs, '__color__', block.color(b))
+            res.add_node(b, attrs)
+
+        # for every single block...
+        for b in cls.iterate(fn):
+            # ...add an edge to it's predecessors
+            for p in b.preds():
+                # FIXME: find more attributes to add
+                attrs = {}
+                operator.setitem(attrs, '__contiguous__', b.startEA == p.endEA)
+                res.add_edge(p.startEA, b.startEA, attrs)
+
+            # ...add an edge to it's successors
+            for s in b.succs():
+                # FIXME: find more attributes to add
+                attrs = {}
+                operator.setitem(attrs, '__contiguous__', b.endEA == s.startEA)
+                res.add_edge(b.startEA, s.startEA, attrs)
+            continue
+        return res
+    graph = utils.alias(nx, 'blocks')
+
     # FIXME: Implement .register for filtering blocks
     # FIXME: Implement .search for filtering blocks
 
@@ -646,21 +706,39 @@ class block(object):
         res, fn, bb = cls.get_color(ea), by_address(ea), cls.id(ea)
         try: idaapi.clr_node_info2(fn.startEA, bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
         finally: idaapi.refresh_idaview_anyway()
-        # FIXME: update the colors of each item too
-        #        altval index is 0x14
+
+        # clear the color of each item too.
+        for ea in block.iterate(ea):
+            database.set_color(ea, None)
+            # internal.netnode.alt.remove(ea, 0x14)
         return res
     @utils.multicase(ea=six.integer_types, rgb=int)
     @classmethod
-    def set_color(cls, ea, rgb):
-        '''Sets the color of the basic-block at address ``ea`` to ``rgb``.'''
+    def set_color(cls, ea, rgb, **frame):
+        """Sets the color of the basic-block at address ``ea`` to ``rgb``.
+        If the color ``frame`` is specified, set the frame to the specified color.
+        """
         res, fn, bb = cls.get_color(ea), by_address(ea), cls.id(ea)
         n = idaapi.node_info_t()
+
+        # specify the bgcolor
         r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
         n.bg_color = n.frame_color = (b<<16)|(rgb&0x00ff00)|r
-        try: idaapi.set_node_info2(fn.startEA, bb, n, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+
+        # now the frame color
+        frgb = frame.get('frame', 0x000000)
+        fr, fb = (frgb & 0xff0000) >> 16, frgb&0x0000ff
+        n.frame_color = (fb<<16)|(frgb&0x00ff00)|fr
+
+        # set the node
+        f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
+        try: idaapi.set_node_info2(fn.startEA, bb, n, f)
         finally: idaapi.refresh_idaview_anyway()
-        # FIXME: update the colors of each item too
-        #        altval index is 0x14
+
+        # update the color of each item too
+        for ea in block.iterate(ea):
+            database.set_color(ea, rgb)
+            #internal.netnode.alt.set(ea, 0x14, n.bg_color)
         return res
     @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
     @classmethod
@@ -669,20 +747,38 @@ class block(object):
         res, fn = cls.get_color(bb), by_address(bb.startEA)
         try: idaapi.clr_node_info2(fn.startEA, bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
         finally: idaapi.refresh_idaview_anyway()
-        # FIXME: update the colors of each item too
-        #        altval index is 0x14
+
+        # clear the color of each item too.
+        for ea in block.iterate(bb):
+            database.set_color(ea, None)
+            #internal.netnode.alt.remove(ea, 0x14)
         return res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=int)
     @classmethod
-    def set_color(cls, bb, rgb):
-        '''Sets the color of the basic-block ``bb`` to ``rgb``.'''
+    def set_color(cls, bb, rgb, **frame):
+        """Sets the color of the basic-block ``bb`` to ``rgb``.
+        If the color ``frame`` is specified, set the frame to the specified color.
+        """
         res, fn, n = cls.get_color(bb), by_address(bb.startEA), idaapi.node_info_t()
+
+        # specify the bg color
         r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
         n.bg_color = n.frame_color = (b<<16)|(rgb&0x00ff00)|r
-        try: idaapi.set_node_info2(fn.startEA, bb.id, n, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+
+        # now the frame color
+        frgb = frame.get('frame', 0x000000)
+        fr, fb = (frgb & 0xff0000) >> 16, frgb&0x0000ff
+        n.frame_color = (fb<<16)|(frgb&0x00ff00)|fr
+
+        # set the node
+        f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
+        try: idaapi.set_node_info2(fn.startEA, bb.id, n, f)
         finally: idaapi.refresh_idaview_anyway()
-        # FIXME: update the colors of each item too
-        #        altval index is 0x14
+
+        # update the colors of each item too.
+        for ea in block.iterate(bb):
+            database.set_color(ea, rgb)
+            #internal.netnode.alt.set(ea, 0x14, n.bg_color)
         return res
 
     @utils.multicase()
@@ -745,14 +841,18 @@ class block(object):
         return cls.set_color(bb, None)
     @utils.multicase(ea=six.integer_types, rgb=int)
     @classmethod
-    def color(cls, ea, rgb):
-        '''Sets the color of the basic-block at the address ``ea`` to ``rgb``.'''
-        return cls.set_color(ea, rgb)
+    def color(cls, ea, rgb, **frame):
+        """Sets the color of the basic-block at the address ``ea`` to ``rgb``.
+        If the color ``frame`` is specified, set the frame to the specified color.
+        """
+        return cls.set_color(ea, rgb, **frame)
     @utils.multicase(bb=idaapi.BasicBlock, rgb=int)
     @classmethod
-    def color(cls, bb, rgb):
-        '''Sets the color of the basic-block ``bb`` to ``rgb``.'''
-        return cls.set_color(bb, rgb)
+    def color(cls, bb, rgb, **frame):
+        """Sets the color of the basic-block ``bb`` to ``rgb``.
+        If the color ``frame`` is specified, set the frame to the specified color.
+        """
+        return cls.set_color(bb, rgb, **frame)
 
     @utils.multicase()
     @classmethod
@@ -1080,7 +1180,7 @@ def tag_write(func, key, none):
     # if the user wants to remove the '__name__' tag then remove the name from the function.
     if key == '__name__':
         return set_name(fn, None)
-    
+
     state = internal.comment.decode(comment(fn, repeatable=1))
     res = state.pop(key)
     comment(fn, internal.comment.encode(state), repeatable=1)
@@ -1312,30 +1412,27 @@ class type(object):
         fn = by(func)
         return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
 
-@utils.multicase(reg=basestring)
+@utils.multicase(reg=(basestring,_instruction.register_t))
 def register(reg, *regs, **modifiers):
     """Yield all the addresses within the current function that touches one of the registers identified by ``regs``.
     """
     return register(ui.current.function(), reg, *regs, **modifiers)
-
-@utils.multicase(reg=basestring)
+@utils.multicase(reg=(basestring,_instruction.register_t))
 def register(func, reg, *regs, **modifiers):
     """Yield all the addresses within the function ``func`` that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the address if it's writing to the register.
     """
-    regs = (reg,) + regs
+    regs = [ _instruction.reg.by_name(r) if isinstance(r, basestring) else r for r in (reg,)+regs ]
 
     # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
-    match = lambda r,regs: itertools.imap(_instruction.reg.by_name(r).relatedQ,itertools.imap(_instruction.reg.by_name,regs))
+    match = lambda r,regs: any(itertools.imap(r.relatedQ,regs))
 
     def uses_register(ea, opnum, regs):
-        t, val = _instruction.op_type(ea, opnum), _instruction.op_value(ea, opnum)
-        if t == 'reg':
-            return any(match(val, regs))
-        if t == 'phrase':
-            _,base,index,_ = val
-            if (base and any(match(base,regs))) or (index and any(match(index,regs))):
-                return True
+        val = _instruction.op_value(ea, opnum)
+        if isinstance(val, _instruction.register_t):
+            return match(val, regs)
+        elif hasattr(val, 'registers'):
+            return any(match(r, regs) for r in val.registers())
         return False
 
     iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)

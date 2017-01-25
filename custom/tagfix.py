@@ -5,7 +5,7 @@ import idaapi
 
 def fetch_function(f):
     addr,tags = {},{}
-    
+
     for ea in fn.iterate(f):
         res = db.tag(ea)
         res.pop('name', None)
@@ -98,7 +98,7 @@ def function(ea):
     except LookupError:
         return {},{}
     f, addr, tags = fetch_function(ea)
-    
+
     for k in set(tags.keys()):
         if k in ('__tags__','__address__'):
             if f in addr:
@@ -124,7 +124,7 @@ def function(ea):
 def globals():
     '''Iterate through all globals in the database and update the tagcache with any found tags.'''
     addr, tags = do_globally()
-    
+
     print 'updating global name refs'
     for k, v in tags.iteritems():
         internal.comment.globals.set_name(k, v)

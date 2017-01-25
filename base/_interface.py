@@ -32,7 +32,7 @@ class typemap:
         str:(idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
         unicode:(idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
     }
-    
+
     ptrmap = { sz : (idaapi.offflag()|flg, tid) for sz,(flg,tid) in integermap.iteritems() }
     nonemap = { None :(idaapi.alignflag(),-1) }
 
@@ -75,7 +75,7 @@ class typemap:
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
         if dt == idaapi.FF_STRU and isinstance(typeid,six.integer_types):
             # FIXME: figure out how to fix this recursive module dependency
-            t = sys.modules.get('structure', __import__('structure')).instance(typeid) 
+            t = sys.modules.get('structure', __import__('structure')).instance(typeid)
             sz = t.size
             return t if sz == size else [t,size // sz]
         if dt not in cls.inverted:
@@ -109,7 +109,7 @@ class typemap:
             (t,sz),count = pythonType,1
             table = cls.typemap[t]
             flag,typeid = table[abs(sz) if t in (int,long,float,type) else t]
-            
+
         elif isinstance(pythonType, [].__class__):
             # an array, which requires us to recurse...
             res,count = pythonType
@@ -166,7 +166,7 @@ class priorityhook(object):
         for name in self.__cache:
             yield name
         return
-    
+
     def cycle(self, object=None):
         '''Cycle the hooks for this object with the idaapi.*_Hooks instance provided by ``object``.'''
         cls = self.__class__
@@ -178,7 +178,7 @@ class priorityhook(object):
         namespace = { name : self.__new(name) for name in self.__cache.viewkeys() }
         res = type(object.__class__.__name__, (self.__type__,), namespace)
         object = res()
-        
+
         ok = object.hook()
         if not ok:
             logging.debug('{:s}.{:s}.cycle : Unable to hook with object. : {!r}'.format('.'.join(('internal',__name__)), cls.__name__, object))
@@ -249,7 +249,7 @@ class priorityhook(object):
                         map(logging.warn, res)
 
                         res = self.STOP
-                    
+
                     if not isinstance(res, self.result) or res == self.CONTINUE:
                         continue
                     elif res == self.STOP:
@@ -399,5 +399,5 @@ class node(object):
         return id64(sup) if bit64Q else id32(sup)
 
 def tuplename(*names):
-    res = ('{:x}'.format(_) if isinstance(_, six.integer_types) else _ for _ in names)
+    res = ('{:x}'.format(abs(n)) if isinstance(n, six.integer_types) else n for n in names)
     return '_'.join(res)

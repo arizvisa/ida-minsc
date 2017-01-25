@@ -169,7 +169,7 @@ class InputBox(idaapi.PluginForm):
     """Creating an InputBox to interact with the user"""
     def OnCreate(self, form):
         self.parent = self.FormToPyQtWidget(form)
-        
+
     def OnClose(self, form):
         pass
 
@@ -233,7 +233,7 @@ class Strings(object):
 
     @classmethod
     def size(cls):
-        return idaapi.get_strlist_qty()       
+        return idaapi.get_strlist_qty()
     @classmethod
     def at(cls, index):
         string = idaapi.string_info_t()
@@ -335,7 +335,7 @@ try:
                     idaapi.unregister_timer(x)
                     del( cls.clock[i] )
                 return
-        
+
         # FIXME: add some support for actually manipulating menus
         class menu(object):
             state = {}
@@ -512,4 +512,4 @@ class hook(object):
                 res.disable(name)
             continue
         return
-                
+

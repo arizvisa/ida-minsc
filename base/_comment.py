@@ -50,7 +50,7 @@ class trie(dict):
                 return
             elif isinstance(head, trie.maybe):
                 head, res = tuple(head), trie()
-                res.assign(symbols[1:], value)   
+                res.assign(symbols[1:], value)
                 [ self.__setitem__(n, res) for n in head ]
                 self.assign(symbols[1:], value)
                 return
@@ -114,7 +114,7 @@ class cache(object):
 
             return definition
         return result
-    
+
     @classmethod
     def by(cls, instance):
         t = instance.__class__
@@ -310,7 +310,7 @@ class tagging(object):
     __tags__, __address__ = 'name', 'address'
 
     marshaller = __import__('marshal')
-    codec = __import__('codecs').lookup('bz2_codec')    
+    codec = __import__('codecs').lookup('bz2_codec')
 
     @classmethod
     def __init_tagcache__(cls, idp_modname):
@@ -411,7 +411,7 @@ class contents(tagging):
                 raise ValueError((sz,len(encdata)))
         except:
             raise IOError("{:s}.{:s}._read : Unable to decode contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, encdata))
-        
+
         try:
             result = cls.marshaller.loads(data)
         except:
@@ -565,7 +565,7 @@ class contents(tagging):
         ok = cls._write(target.get('target',None), address, state)
         assert ok
         return state
-        
+
 class globals(tagging):
     '''Tagging for a function-tag or a global'''
 
@@ -579,7 +579,7 @@ class globals(tagging):
 
         cName = (internal.netnode.hash.get(node, name, type=int) or 0) + 1
         cAddress = (internal.netnode.alt.get(node, address) or 0) + 1
-        
+
         internal.netnode.hash.set(node, name, cName)
         internal.netnode.alt.set(node, address, cAddress)
 

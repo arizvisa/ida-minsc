@@ -64,7 +64,7 @@ class internal_path(internal_api):
 
     def find_module(self, fullname, path=None):
         return self if path is None and fullname in self.cache else None
-    
+
     def load_module(self, fullname):
         self.cache = dict(self.iterate_api(**self.attrs))
         res = self.sys.modules[fullname] = self.new_api(fullname, self.cache[fullname])
@@ -114,6 +114,25 @@ class internal_object(object):
     def load_module(self, fullname):
         assert fullname == self.name
         return self.object
+
+class plugin_module(object):
+    def __init__(self, path, **attrs):
+        # FIXME: go through all files in plugin/ and call PLUGIN_ENTRY() on each module
+        #        this should return an idaapi.plugin_t.
+
+        # idaapi.plugin_t will contain an init, run, and term method.
+        # also, are some attributes to process:
+        # 'wanted_name' which is for idc.
+        # 'wanted_hotkey', which should be mapped to a keypress.
+        # 'comment' self-explanatory
+        # 'help' self-explanatory
+
+        # hotkey can be done by:
+        # idaapi.CompileLine('static myname() { RunPythonStateMent("CallSomePython()") }')
+        # idc.AddHotKey(module.wanted_hotkey, "myname")
+
+        # idaapi.require
+        pass
 
 # ida's native api
 if sys.platform == 'darwin':

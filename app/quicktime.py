@@ -35,7 +35,7 @@ def getMajorDispatchTableAddress():
     res = nextMnemonic(res, 'lea', idc.GetFunctionAttr(res, idc.FUNCATTR_END))
     assert res != idc.BADADDR
     return idc.GetOperandValue(res, 1)
-        
+
 def resolveDispatcher(code):
     major = (code & 0x00ff0000) >> 0x10
     minor = code & 0xff00ffff
@@ -67,7 +67,7 @@ def FindLastAssignment(ea, register):
         if m == 'mov' and r == register:
             return ea
         continue
-    
+
     raise ValueError('FindLastAssignment(0x%x, %s) Found no matches'% (ea, register))
 
 def nameDispatch(address):

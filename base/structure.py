@@ -621,17 +621,17 @@ class members_t(object):
     nearoffset = nearOffset = utils.alias(near_offset, 'members_t')
 
     # adding/removing members
-    @utils.multicase(name=basestring)
+    @utils.multicase(name=(basestring,tuple))
     def add(self, name):
         '''Append the specified member ``name`` with the default type at the end of the structure.'''
         offset = self.owner.size + self.baseoffset
         return self.add(name, int, offset)
-    @utils.multicase(name=basestring)
+    @utils.multicase(name=(basestring,tuple))
     def add(self, name, type):
         '''Append the specified member ``name`` with the given ``type`` at the end of the structure.'''
         offset = self.owner.size + self.baseoffset
         return self.add(name, type, offset)
-    @utils.multicase(name=basestring, offset=six.integer_types)
+    @utils.multicase(name=(basestring,tuple), offset=six.integer_types)
     def add(self, name, type, offset):
         """Add a member at ``offset`` with the given ``name`` and ``type``.
         To specify a particular size, ``type`` can be a tuple with the second element referring to the size.
@@ -642,27 +642,29 @@ class members_t(object):
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         realoffset = offset - self.baseoffset
-        realoffset_repr = '-0x{:x}'.format(abs(realoffset)) if realoffset < 0 else '0x{:x}'.format(realoffset)
+
         if name is None:
-            logging.warn('{:s}.instance({:s}).members.add : name is undefined, defaulting to offset {:s}'.format(__name__, self.owner.name, realoffset_repr))
-            name = 'v_{:s}'.format(realoffset)
+            logging.warn('{:s}.instance({:s}).members.add : name is undefined, defaulting to offset {:+#x}'.format(__name__, self.owner.name, realoffset))
+            name = 'v', realoffset
+        if isinstance(name, tuple):
+            name = interface.tuplename(*name)
 
         res = idaapi.add_struc_member(self.owner.ptr, name, realoffset, flag, opinfo, nbytes)
         if res == idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.info('{:s}.instance({:s}).members.add : idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:s}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x}) : Success'.format(__name__, self.owner.name, self.owner.name, name, realoffset_repr, flag, typeid, nbytes))
+            logging.info('{:s}.instance({:s}).members.add : idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:+#x}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x}) : Success'.format(__name__, self.owner.name, self.owner.name, name, realoffset, flag, typeid, nbytes))
         else:
             error = {
                 idaapi.STRUC_ERROR_MEMBER_NAME : 'Duplicate field name',
                 idaapi.STRUC_ERROR_MEMBER_OFFSET : 'Invalid offset',
                 idaapi.STRUC_ERROR_MEMBER_SIZE : 'Invalid size',
             }
-            callee = 'idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:s}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x})'.format(self.owner.name, name, realoffset_repr, flag, typeid, nbytes)
+            callee = 'idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:+#x}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x})'.format(self.owner.name, name, realoffset, flag, typeid, nbytes)
             logging.fatal(' : '.join(('members_t.add', callee, error.get(res, 'Error code 0x{:x}'.format(res)))))
             return None
 
         res = idaapi.get_member(self.owner.ptr, realoffset)
         if res is None:
-            logging.fatal("{:s}.instance({:s}.members.add : Failed creating member {!r} {:s}:+0x{:x}".format(__name__, self.owner.name, name, realoffset_repr, nbytes))
+            logging.fatal("{:s}.instance({:s}.members.add : Failed creating member {!r} {:s}:{:+#x}".format(__name__, self.owner.name, name, realoffset, nbytes))
 
         # sloppily figure out what the correct index is
         idx = self.index( idaapi.get_member(self.owner.ptr, realoffset) )
@@ -887,3 +889,7 @@ class member_t(object):
             ops = (idx for idx,ids in ops if self.__owner.id in ids)
             res.extend( (ea,op,Ref_T.get(t,'')) for op in ops)
         return tuple(res)
+
+#strpath_t
+#op_stroff(ea, n, tid_t* path, int path_len, adiff_t delta)
+#get_stroff_path(ea, n, tid_t* path, adiff_t delta)

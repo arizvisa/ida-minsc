@@ -284,7 +284,7 @@ class member(object):
         mid = cls.by(id, member)
         return cls.remove(mid)
     delete = destroy = utils.alias(remove)
-    
+
     @staticmethod
     def __iterate(id):
         bmask = -1&mask(id)

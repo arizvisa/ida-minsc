@@ -88,6 +88,9 @@ ui.hook.idb.add('extra_cmt_changed', __import__('hooks').extra_cmt_changed, 40)
 # rebase the tagcache if the entire database was rebased.
 ui.hook.idb.add('allsegs_moved', __import__('hooks').rebase, 50)
 
+# switch the instruction set
+ui.hook.idp.add('newprc', instruction.__newprc__, 50)
+
 #[ ui.hook.ui.add(n, __import__('hooks').notify(n), -100) for n in ('range','idcstop','idcstart','suspend','resume','term','ready_to_run') ]
 #[ ui.hook.idp.add(n, __import__('hooks').notify(n), -100) for n in ('newfile','oldfile','savebase','closebase','init','term','newprc','newasm','loader_finished','loader') ]
 #[ ui.hook.idp.add(n, __import__('hooks').notify(n), -100) for n in ('auto_empty','auto_queue_empty') ]

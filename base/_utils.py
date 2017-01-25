@@ -107,7 +107,7 @@ class multicase(object):
             # ..otherwise, first blood and we're not ok.
             else:
                 ok = False
-            
+
             # so, a wrapper was found and we need to steal it's cache
             res = ok and cls.ex_function(prev)
             if ok and hasattr(res, cls.cache_name):
@@ -707,7 +707,7 @@ class execution(object):
         while self.state:
             self.queue.notify()
         self.queue.release()
-                
+
         if self.result.empty():
             raise StopIteration
         return self.pop()
