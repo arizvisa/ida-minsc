@@ -1,6 +1,6 @@
 # some general python modules
 import sys,os,__builtin__
-import imp,fnmatch,ctypes
+import imp,fnmatch,ctypes,types
 import idaapi
 
 library = ctypes.WinDLL if os.name == 'nt' else ctypes.CDLL
@@ -81,13 +81,33 @@ class internal_submodule(internal_api):
     def find_module(self, fullname, path=None):
         return self if path is None and fullname == self.__name__ else None
 
-    class module(object):
-        def __init__(self, meta):
-            self.__metapath = meta
+    def filter_module(self, filename):
+        return self.fnmatch.fnmatch(filename, self.attrs['include']) and ('exclude' in self.attrs and not self.fnmatch.fnmatch(filename, self.attrs['exclude']))
+    def fetch_module(self, name):
+        cache = dict(self.iterate_api(**self.attrs))
+        return self.new_api(name, cache[name])
+
+    class module(types.ModuleType):
+        def __init__(self, path, **attrs):
+            self.__path__ = path
+            self.__filter__ = attrs['filter']
+            self.__module__ = attrs['getmodule']
+
             # FIXME: create a get-descriptor for each sub-module that will try to
             #        load the module continuously until it's finally successful
+
+        @property
+        def __dict__(self):
+            files = filter(self.__filter__, os.listdir(self.__path__))
+            return { n : self.__module__(n) for n in files }
+
         def __getattr__(self, name):
-            raise NotImplementedError("Unable to fetch module {:s} on-demand".format(name))
+            import os
+            res = self.__module__(n)
+            #res = self.new_api(name, os.path.join(self.__path__, name))
+            setattr(self, name, res)
+            return res
+            #raise NotImplementedError("Unable to fetch module {:s} on-demand".format(name))
 
     def load_module(self, fullname):
         # FIXME: make module a lazy-loaded object for fetching module-code on-demand
@@ -100,7 +120,7 @@ class internal_submodule(internal_api):
             try:
                 res = self.new_api(name, path)
             except:
-                __import__('logging').warn('{:s} : Unable to import module {:s} from {!r}'.format(self.__name__, name, path, exc_info=True))
+                __import__('logging').warn('{:s} : Unable to import module {:s} from {!r}'.format(self.__name__, name, path), exc_info=True)
             else:
                 setattr(module, name, res)
             continue

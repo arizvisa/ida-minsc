@@ -8,7 +8,7 @@ def fetch_function(f):
 
     for ea in fn.iterate(f):
         res = db.tag(ea)
-        res.pop('name', None)
+        #res.pop('name', None)
         for k, v in res.iteritems():
             addr[ea] = addr.get(ea,0) + 1
             tags[k] = tags.get(k,0) + 1
@@ -53,7 +53,7 @@ def do_functions():
     for i, ea in enumerate(db.functions()):
         print '{:x} : fetching function {:d} of {:d}'.format(ea, i, t)
         res = fn.tag(ea)
-        res.pop('name', None)
+        #res.pop('name', None)
         for k, v in res.iteritems():
             addr[ea] = addr.get(ea, 0) + 1
             tags[k] = tags.get(k, 0) + 1
@@ -68,7 +68,7 @@ def do_data():
         f = idaapi.get_func(ea)
         if f is not None: continue
         res = db.tag(ea)
-        res.pop('name', None)
+        #res.pop('name', None)
         for k, v in res.iteritems():
             addr[ea] = addr.get(ea, 0) + 1
             tags[k] = tags.get(k, 0) + 1

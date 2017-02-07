@@ -172,21 +172,30 @@ class multicase(object):
         for f, types, (sa, af, defaults, (argname, kwdname)) in heap:
             # populate our arguments
             ac, kc = (n for n in args), dict(kwds)
+
+            # skip some args in our tuple
             map(next, (ac,)*sa)
 
-            a = tuple(kc.pop(n, defaults.pop(n, None)) if n in kc or n in defaults or ac.gi_frame is None else next(ac) for n in af[sa:])
+            # build the argument tuple using the generator, kwds, or our defaults.
+            a = []
             try:
-                a += tuple(kc.pop(n, defaults.pop(n, None)) if n in kc or n in defaults or ac.gi_frame is None else next(ac) for n in af[sa+len(a):])
-            except KeyError:
-                continue
+                for n in af[sa:]:
+                    try: a.append(next(ac))
+                    except StopIteration: a.append(kc.pop(n) if n in kc else defaults.pop(n))
+            except KeyError: pass
+            finally: a = tuple(a)
 
-            # check that our args matches all of our types
-            if any(not isinstance(v, types[k]) for k, v in zip(af[sa:], a) if k in types):
-                continue
-
-            # now do wildcards
+            # now anything left in ac or kc goes in the wildcards. if there aren't any, then this iteration doesn't match.
             wA, wK = list(ac), dict(kc)
             if (not argname and len(wA)) or (not kwdname and wK):
+                continue
+
+            # if our perceived argument length doesn't match, then this iteration doesn't match either
+            if len(a) != len(af[sa:]):
+                continue
+
+            # now we can finally start checking that the types match
+            if any(not isinstance(v, types[k]) for k, v in zip(af[sa:], a) if k in types):
                 continue
 
             # we should have a match

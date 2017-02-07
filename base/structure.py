@@ -227,8 +227,59 @@ def fragment(id, offset, size):
         (m_offset,m_size),(m_name,m_cmt,m_rcmt) = member.next()
         yield (m_offset,m_size),(m_name,m_cmt,m_rcmt)
         size -= m_size
-
     return
+
+@utils.multicase(ea=six.integer_types, st=__structure_t)
+def apply(ea, st):
+    '''Apply the structure ``st`` to the address at ``ea``.'''
+    ea = interface.address.inside(ea)
+    ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
+    res = idaapi.get_opinfo(ea, 0, fl, ti)
+    ti.tid = st.id
+    return idaapi.set_opinfo(ea, 0, fl | idaapi.struflag(), ti)
+@utils.multicase(id=six.integer_types)
+def apply(id):
+    '''Apply the structure identified by ``id`` to the current address.'''
+    return apply(ui.current.address(), instance(id))
+@utils.multicase(st=__structure_t)
+def apply(st):
+    '''Apply the structure ``st`` to the current address.'''
+    return apply(ui.current.address(), st)
+@utils.multicase(ea=six.integer_types, id=six.integer_types)
+def apply(ea, id):
+    '''Apply the structure identified by ``id`` to the address at ``ea``.'''
+    return apply(ea, instance(id))
+
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
+def apply_op(id, ea, opnum, **delta):
+    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    ea = interface.address.inside(ea)
+    if not database.type.is_code(ea):
+        raise TypeError('{:s}.apply_op({:x}, {:x}, {:d}, delta={:d}) : Item type at requested address is not code.'.format(__name__, id, ea, opnum, delta.get('delta', 0)))
+    tid = idaapi.tid_array(1)
+    tid[0] = id
+    ok = idaapi.op_stroff(ea, opnum, tid, len(tid), delta.get('delta', 0))
+    return True if ok else False
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, st=__structure_t)
+def apply_op(st, ea, opnum, **delta):
+    """Apply the structure ``st`` to the instruction operand ``opnum`` at the address ``ea``.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    return apply_op(st.id, ea, opnum, **delta)
+@utils.multicase(opnum=six.integer_types, st=__structure_t)
+def apply_op(st, opnum, **delta):
+    """Apply the structure ``st`` to the instruction operand ``opnum`` at the current address.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    return apply_op(st.id, ui.current.address(), opnum, **delta)
+@utils.multicase(opnum=six.integer_types, st=__structure_t)
+def apply_op(id, opnum, **delta):
+    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    return apply_op(id, ui.current.address(), opnum, **delta)
 
 def get(name):
     '''Returns an instance of the structure named ``name``.'''

@@ -15,7 +15,7 @@ if __version__[0] >= 6 and __version__[1] >= 95:
 import segment,database,function,instruction
 import structure,enum
 
-import database as db,function as func,instruction as ins,structure as struc
+import database as db,function as func,instruction as ins,structure as struc,segment as seg
 
 # default logging that displays any info
 __import__('logging').root.level = __import__('logging').INFO

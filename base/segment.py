@@ -80,7 +80,7 @@ def by_address(ea):
         raise Exception("{:s}.by_address(0x{:x}) : Unable to locate segment".format(__name__, ea))
     return s
 byAddress = utils.alias(by_address)
-@utils.multicase(seg=idaapi.segment_t)
+@utils.multicase(segment=idaapi.segment_t)
 def by(segment):
     '''Return a segment by it's segment_t.'''
     return segment
@@ -123,16 +123,41 @@ def size(segment):
     return seg.endEA - seg.startEA
 
 @utils.multicase()
-def string():
-    '''Return the contents of the current segment as a string.'''
+def offset():
+    '''Return the offset of the current address from the beginning of the current segment.'''
+    return offset(ui.current.segment(), ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def offset(ea):
+    '''Return the offset of the address ``ea`` from the beginning of the current segment.'''
+    return offset(ui.current.segment(), ea)
+@utils.multicase(ea=six.integer_types)
+def offset(segment, ea):
+    '''Return the offset of the address ``ea`` from the beginning of ``segment``.'''
+    seg = by(segment)
+    return ea - segment.startEA
+
+@utils.multicase(offset=six.integer_types)
+def goof(offset):
+    '''Go to the ``offset`` of the current segment.'''
+    return goof(ui.current.segment(), offset)
+@utils.multicase(offset=six.integer_types)
+def goof(segment, offset):
+    '''Go to the ``offset`` of the specified ``segment``.'''
+    seg = by(segment)
+    return database.go(seg.startEA + offset)
+
+@utils.multicase()
+def read():
+    '''Return the contents of the current segment.'''
     segment = ui.current.segment()
-    if segment is None: raise LookupError("{:s}.string() : Not currently positioned within a segment".format(__name__))
+    if segment is None: raise LookupError("{:s}.read() : Not currently positioned within a segment".format(__name__))
     return idaapi.get_many_bytes(segment.startEA, segment.endEA-segment.startEA)
 @utils.multicase()
-def string(segment):
-    '''Return the contents of the segment identified by ``segment`` as a string.'''
+def read(segment):
+    '''Return the contents of the segment identified by ``segment``.'''
     seg = by(segment)
     return idaapi.get_many_bytes(seg.startEA, seg.endEA-seg.startEA)
+string = utils.alias(read)
 
 @utils.multicase()
 def repr():
@@ -289,7 +314,7 @@ def map(ea, size, newea, **kwds):
     #return create(newea, size, kwds.get('name', 'map_{:s}'.format(newea>>4)))
 
 # creation/destruction
-def create(offset, size, name, **kwds):
+def new(offset, size, name, **kwds):
     """Create a segment at ``offset`` with ``size`` and name it according to ``name``.
     ``bits`` can be used to specify the bit size of the segment
     ``comb`` can be used to specify any flags (idaapi.sc*)
@@ -333,8 +358,9 @@ def create(offset, size, name, **kwds):
         #assert res != 0
         return None
     return s
+create = utils.alias(new)
 
-def delete(segment, remove=False):
+def remove(segment, remove=False):
     """Remove the segment identified by ``segment``.
     If the bool ``remove`` is specified, then remove the content of the segment from the database.
     """
@@ -347,6 +373,7 @@ def delete(segment, remove=False):
     if res == 0:
         logging.warn("{:s}.delete({!r}):Unable to delete segment {:s} : {:s}".format(__name__, segment, segment.name, segment.sel))
     return res
+delete = utils.alias(remove)
 
 def save(filename, segment, offset=0):
     """Export the segment identified by ``segment`` to the file named ``filename``.
@@ -356,6 +383,7 @@ def save(filename, segment, offset=0):
     if isinstance(segment, idaapi.segment_t):
         return _save_file(filename, segment.startEA, size(segment), offset)
     return save(filename, by(segment))
+export = utils.alias(save)
 
 #res = idaapi.add_segment_translation(ea, selector)
 #res = idaapi.del_segment_translation(ea)

@@ -623,9 +623,7 @@ class register_t(object):
     def __eq__(self, other):
         if isinstance(other, basestring):
             return self.name.lower() == other.lower()
-        elif isinstance(other, register_t):
-            return self is other
-        return cmp(self, other) == 0
+        return self is other
 
     def __contains__(self, other):
         '''Returns True if the register ``other`` is a sub-register of ``self``.'''
@@ -910,31 +908,39 @@ class operand_types:
         res = long((offset-maxint) if offset&signbit else offset), reg.by_indextype(base, dt) if base else None, reg.by_indextype(index, dt) if index else None, scale
         return OBIS(*res)
 
+    @opt.define(idaapi.PLFM_ARM, idaapi.o_phrase)
+    def arm_phrase(op):
+        Rn, Rm = reg.by_index(op.reg), reg.by_index(op.specflag1)
+        return arm_phraseop(Rn, Rm)
+
     @opt.define(idaapi.PLFM_ARM, idaapi.o_displ)
     def arm_dispop(op):
         '''Convert an arm operand into an arm_dispop tuple (register, offset).'''
-        r = reg.by_index(op.reg)
-        return arm_dispop(r, long(op.addr))
+        Rn = reg.by_index(op.reg)
+        return arm_dispop(Rn, long(op.addr))
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def arm_memop(op):
         '''Convert an arm operand into an arm_memop tuple (address, dereferenced-value).'''
         # get the address and the operand size
         addr, size = op.addr, idaapi.get_dtyp_size(op.dtyp)
+        maxval = 1<<size*8
 
         # dereference the address and return it's integer.
         res = idaapi.get_many_bytes(addr, size) or ''
         res = reversed(res) if database.config.byteorder() == 'little' else iter(res)
         res = reduce(lambda t,c: (t*0x100) | ord(c), res, 0)
-        return arm_memop(long(addr), long(res))
+        sf = bool(res & maxval>>1)
+
+        return arm_memop(long(addr), long(res-maxval) if sf else long(res))
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
     def arm_flexop(op):
         '''Convert an arm operand into an arm_flexop tuple (register, type, immediate).'''
         # tag:arm, this is a register with a shift-op applied
-        r = reg.by_index(op.reg)
-        t = 0   # FIXME: find out where the shift-type is stored
-        return arm_flexop(r, int(t), int(op.value))
+        Rn = reg.by_index(op.reg)
+        shift = 0   # FIXME: find out where the shift-type is stored
+        return arm_flexop(Rn, int(shift), int(op.value))
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
     def arm_listop(op):
@@ -961,23 +967,17 @@ class OffsetBaseIndexScale(namedtypedtuple):
 OBIS = OffsetBaseIndexScale
 
 # tag:arm
-class arm_scaleop(namedtypedtuple):
-    '''A tuple containing an arm operand (register, scale).'''
-    _fields = ('register', 'scale')
-    _types = (register_t, int)
-
-    def registers(self):
-        r, _ = self
-        yield r
-
-# tag:arm
 class arm_flexop(namedtypedtuple):
-    """A tuple containing an arm flexible-operand (register, type, immediate).
+    """A tuple containing an arm flexible-operand (Rn, shift, n).
     A flexible operand is an operation that allows the architecture to apply
     a binary shift or rotation to the value of a register.
     """
-    _fields = ('register', 'type', 'immediate')
+    _fields = ('Rn', 'shift', 'n')
     _types = (register_t, int, int)
+
+    register = property(fget=operator.itemgetter(0))
+    t = type = property(fget=operator.itemgetter(1))
+    imm = immediate = property(fget=operator.itemgetter(2))
 
     def registers(self):
         r, _, _ = self
@@ -985,10 +985,10 @@ class arm_flexop(namedtypedtuple):
 
 # tag:arm
 class arm_listop(namedtypedtuple):
-    """A tuple containing an arm register list (list,).
+    """A tuple containing an arm register list (reglist,).
     `list` contains a set of register_t which can be used to test membership.
     """
-    _fields = ('list',)
+    _fields = ('reglist',)
     _types = (set,)
 
     def registers(self):
@@ -996,9 +996,25 @@ class arm_listop(namedtypedtuple):
         for r in res: yield r
 
 class arm_dispop(namedtypedtuple):
-    '''A tuple for an arm operand containing the (register, offset).'''
-    _fields = ('register', 'offset')
+    '''A tuple for an arm operand containing the (Rn, Offset).'''
+    _fields = ('Rn', 'offset')
     _types = (register_t, long)
+
+    register = property(fget=operator.itemgetter(0))
+    offset = property(fget=operator.itemgetter(1))
+
+    def registers(self):
+        r, _ = self
+        yield r
+
+class arm_phraseop(namedtypedtuple):
+    '''A tuple for an arm operand containing the (Rn, Rm).'''
+    _fields = ('Rn', 'Rm')
+    _types = (register_t, register_t)
+
+    register = property(fget=operator.itemgetter(0))
+    offset = property(fget=operator.itemgetter(1))
+
     def registers(self):
         r, _ = self
         yield r

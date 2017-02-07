@@ -325,7 +325,7 @@ def disasm(ea, **options):
     while count > 0:
         insn = idaapi.generate_disasm_line(ea)
         unformatted = idaapi.tag_remove(insn)
-        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted and options.get('comments',False) else unformatted
+        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted and not options.get('comments',False) else unformatted
         res.append('{:x}: {:s}'.format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
         ea = address.next(ea)
         count -= 1
@@ -2028,7 +2028,7 @@ class type(object):
     def flags(cls, ea):
         '''Returns the flags of the item at the address ``ea``.'''
         return idaapi.getFlags(interface.address.within(ea))
-    @utils.multicase(ea=six.integer_types, fl=six.integer_types)
+    @utils.multicase(ea=six.integer_types, mask=six.integer_types)
     @classmethod
     def flags(cls, ea, mask):
         '''Returns the flags at the address ``ea`` masked with ``mask``.'''
@@ -2052,6 +2052,7 @@ class type(object):
     def is_code(ea):
         '''Return True if the address specified by ``ea`` is marked as code.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE
+    codeQ = utils.alias(is_code, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2063,6 +2064,7 @@ class type(object):
     def is_data(ea):
         '''Return True if the address specified by ``ea`` is marked as data.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_DATA
+    dataQ = utils.alias(is_data, 'type')
 
     # True if ea marked unknown
     @utils.multicase()
@@ -2075,6 +2077,7 @@ class type(object):
     def is_unknown(ea):
         '''Return True if the address specified by ``ea`` is undefined.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
+    unknownQ = utils.alias(is_unknown, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2086,6 +2089,7 @@ class type(object):
     def is_head(ea):
         '''Return True if the address ``ea`` is aligned to a definition in the database.'''
         return type.flags(interface.address.within(ea), idaapi.FF_DATA) != 0
+    headQ = utils.alias(is_head, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2097,6 +2101,7 @@ class type(object):
     def is_tail(ea):
         '''Return True if the address ``ea`` is not-aligned to a definition in the database.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_TAIL
+    tailQ = utils.alias(is_tail, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2108,6 +2113,7 @@ class type(object):
     def is_align(ea):
         '''Return True if the address at ``ea`` is defined as an alignment.'''
         return idaapi.isAlign(type.flags(ea))
+    alignQ = utils.alias(is_align, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2119,6 +2125,7 @@ class type(object):
     def has_comment(ea):
         '''Return True if the address at ``ea`` is commented.'''
         return bool(type.flags(interface.address.within(ea), idaapi.FF_COMM) == idaapi.FF_COMM)
+    commentQ = utils.alias(has_comment, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2130,6 +2137,7 @@ class type(object):
     def has_reference(ea):
         '''Return True if the address at ``ea`` has a reference.'''
         return bool(type.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF)
+    referenceQ = refQ = utils.alias(has_reference, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2141,6 +2149,7 @@ class type(object):
     def has_name(ea):
         '''Return True if the address at ``ea`` has a name.'''
         return idaapi.has_any_name(type.flags(ea))
+    nameQ = utils.alias(has_name, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2152,6 +2161,7 @@ class type(object):
     def has_customname(ea):
         '''Return True if the address at ``ea`` has a custom-name.'''
         return bool(type.flags(interface.address.within(ea), idaapi.FF_NAME) == idaapi.FF_NAME)
+    customnameQ = utils.alias(has_customname, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2163,6 +2173,7 @@ class type(object):
     def has_dummyname(ea):
         '''Return True if the address at ``ea`` has a dummy-name.'''
         return bool(type.flags(ea, idaapi.FF_LABL) == idaapi.FF_LABL)
+    dummynameQ = utils.alias(has_dummyname, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2174,6 +2185,7 @@ class type(object):
     def has_autoname(ea):
         '''Return True if the address ``ea`` is automatically named.'''
         return idaapi.has_auto_name(type.flags(ea))
+    autonameQ = utils.alias(has_autoname, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2185,6 +2197,7 @@ class type(object):
     def has_publicname(ea):
         '''Return True if the address at ``ea`` has a public name.'''
         return idaapi.is_public_name(interface.address.within(ea))
+    publicnameQ = utils.alias(has_publicname, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2196,6 +2209,7 @@ class type(object):
     def has_weakname(ea):
         '''Return True if the address at ``ea`` has a weakly-typed name.'''
         return idaapi.is_weak_name(interface.address.within(ea))
+    weaknameQ = utils.alias(has_weakname, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2207,6 +2221,7 @@ class type(object):
     def has_listedname(ea):
         '''Return True if the address at ``ea`` has a name that is listed.'''
         return idaapi.is_in_nlist(interface.address.within(ea))
+    listednameQ = utils.alias(has_listedname, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2218,6 +2233,7 @@ class type(object):
     def is_label(ea):
         '''Return True if the address at ``ea`` has a label.'''
         return type.has_dummyname(ea) or type.has_customname(ea)
+    labelQ = utils.alias(is_label, 'type')
 
     class array(object):
         """Returns information about the array that is defined within a database.
@@ -2269,7 +2285,7 @@ class type(object):
                 t = strings[elesize]
             elif fl & idaapi.FF_STRU == idaapi.FF_STRU:
                 t, size = type.structure.id(ea), idaapi.get_item_size(ea)
-                return [ type.structure.get(ea, id=t) for ea in xrange(ea, ea+size, structure.size(t)) ]
+                return [ type.structure.at(ea, id=t) for ea in xrange(ea, ea+size, structure.size(t)) ]
             else:
                 ch = numerics[fl & idaapi.DT_TYPE]
                 t = ch.lower() if fl & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
@@ -2307,13 +2323,12 @@ class type(object):
         @staticmethod
         def size():
             '''Return the total size of the array at the current address.'''
-            return type.array.size(ui.current.address())
+            return type.size(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @staticmethod
         def size(ea):
             '''Return the total size of the array at address ``ea``.'''
-            ea = interface.address.within(ea)
-            return idaapi.get_item_size(ea)
+            return type.size(ea)
 
     class struc(object):
         """Returns information about the structure that is defined within a database.
@@ -2331,7 +2346,13 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the structure at address ``ea``.'''
-            return cls.get(ea)
+            return cls.at(ea)
+        @utils.multicase(ea=six.integer_types)
+        def __new__(cls, ea, **sid):
+            """Return the structure at address ``ea``.
+            If the structure ``sid`` is specified, then use that specific structure type.
+            """
+            return cls.at(ea, **sid)
 
         @utils.multicase()
         @staticmethod
@@ -2356,12 +2377,12 @@ class type(object):
 
         @utils.multicase()
         @staticmethod
-        def get():
+        def at():
             '''Return the structure_t at the current address as a dict of ctypes.'''
-            return type.structure.get(ui.current.address())
+            return type.structure.at(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @staticmethod
-        def get(ea, **sid):
+        def at(ea, **sid):
             """Return the structure_t at address ``ea`` as a dict of ctypes.
             If the structure ``sid`` is specified, then use that specific structure type.
             """
@@ -2399,32 +2420,19 @@ class type(object):
                 finally:
                     res[m.name] = val if any(_ is None for _ in (ct,val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)),ctypes.POINTER(ct)).contents
             return res
+            get = utils.alias(at, 'type.struc')
 
-        @utils.multicase(id=six.integer_types)
-        @staticmethod
-        def apply(id):
-            '''Apply the structure identified by ``id`` to the current address.'''
-            return type.structure.apply(ui.current.address(), structure.instance(id))
-        @utils.multicase(st=structure.structure_t)
-        @staticmethod
-        def apply(st):
-            '''Apply the structure ``st`` to the current address.'''
-            return type.structure.apply(ui.current.address(), st)
-        @utils.multicase(ea=six.integer_types, id=six.integer_types)
-        @staticmethod
-        def apply(ea, id):
-            '''Apply the structure identified by ``id`` to the address at ``ea``.'''
-            return type.structure.apply(ea, structure.instance(id))
-        @utils.multicase(ea=six.integer_types, st=structure.structure_t)
-        @staticmethod
-        def apply(ea, st):
-            '''Apply the structure ``st`` to the address at ``ea``.'''
-            ea = interface.address.inside(ea)
-            ti, fl = idaapi.opinfo_t(), type.flags(ea)
-            res = idaapi.get_opinfo(ea, 0, fl, ti)
-            ti.tid = st.id
-            return idaapi.set_opinfo(ea, 0, fl | idaapi.struflag(), ti)
-    structure = struc
+            @utils.multicase()
+            @staticmethod
+            def size():
+                '''Return the total size of the structure at the current address.'''
+                return type.size(ui.current.address())
+            @utils.multicase(ea=six.integer_types)
+            @staticmethod
+            def size(ea):
+                '''Return the total size of the structure at address ``ea``.'''
+                return type.size(ea)
+    structure = struct = struc
 
     class switch(object):
         @classmethod
@@ -2704,7 +2712,7 @@ class xref(object):
         return False if len(xref.data_down(ea)) > 0 else True
     @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
-    def del_data(ea, target=None):
+    def del_data(ea, target):
         '''Delete any data references at ``ea`` that point to address ``target``.'''
         ea = interface.address.inside(ea)
         idaapi.del_dref(ea, target)
@@ -2913,12 +2921,34 @@ class extra(object):
         return False
 
     @classmethod
-    def has_extra(cls, ea, base):
+    def __has_extra(cls, ea, base):
         sup = internal.netnode.sup
         return sup.get(ea, base) is not None
 
+    @utils.multicase()
     @classmethod
-    def count(cls, ea, base):
+    def has_prefix(cls):
+        '''Returns True if the item at the current address has extra prefix lines.'''
+        return cls.__has_extra(ui.current.address(), idaapi.E_PREV)
+    @utils.multicase()
+    @classmethod
+    def has_suffix(cls, ea):
+        '''Returns True if the item at the current address has extra suffix lines.'''
+        return cls.__has_extra(ui.current.address(), idaapi.E_NEXT)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def has_prefix(cls, ea):
+        '''Returns True if the item at the address ``ea`` has extra prefix lines.'''
+        return cls.__has_extra(ea, idaapi.E_PREV)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def has_suffix(cls, ea):
+        '''Returns True if the item at the address ``ea`` has extra suffix lines.'''
+        return cls.__has_extra(ea, idaapi.E_NEXT)
+    prefixQ, suffixQ = utils.alias(has_prefix, 'extra'), utils.alias(has_suffix, 'extra')
+
+    @classmethod
+    def __count(cls, ea, base):
         sup = internal.netnode.sup
         for i in xrange(cls.MAX_ITEM_LINES):
             row = sup.get(ea, base+i)
@@ -2928,7 +2958,7 @@ class extra(object):
     @classmethod
     def __get(cls, ea, base):
         sup = internal.netnode.sup
-        count = cls.count(ea, base)
+        count = cls.__count(ea, base)
         if count is None: return None
         res = (sup.get(ea, base+i) for i in xrange(count))
         return '\n'.join(row[:-1] if row.endswith('\x00') else row for row in res)
@@ -2940,7 +2970,7 @@ class extra(object):
     @classmethod
     def __del(cls, ea, base):
         sup = internal.netnode.sup
-        count = cls.count(ea, base)
+        count = cls.__count(ea, base)
         if count is None: return False
         [ sup.remove(ea, base+i) for i in xrange(count) ]
         return True
@@ -3040,7 +3070,6 @@ class extra(object):
     def prefix(cls, none):
         '''Delete the prefixed comment at the current address.'''
         return cls.del_prefix(ui.current.address())
-
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prefix(cls, ea):
@@ -3072,7 +3101,6 @@ class extra(object):
     def suffix(cls, none):
         '''Delete the suffixed comment at the current address.'''
         return cls.del_suffix(ui.current.address())
-
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def suffix(cls, ea):
@@ -3089,24 +3117,64 @@ class extra(object):
         '''Delete the suffixed comment at address ``ea``.'''
         return cls.del_suffix(ea)
 
+    @classmethod
+    def __insert_space(cls, ea, count, (getter, setter, remover)):
+        res = getter(ea)
+        lstripped, nl = ('', 0) if res is None else (res.lstrip('\n'), len(res) - len(res.lstrip('\n')) + 1)
+        return setter(ea, '\n'*(nl+count-1) + lstripped) if nl + count > 0 or lstripped else remover(ea)
+    @classmethod
+    def __append_space(cls, ea, count, (getter, setter, remover)):
+        res = getter(ea)
+        rstripped, nl = ('', 0) if res is None else (res.rstrip('\n'), len(res) - len(res.rstrip('\n')) + 1)
+        return setter(ea, rstripped + '\n'*(nl+count-1)) if nl + count > 0 or rstripped else remover(ea)
+
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
-    def insert(cls, ea, count):
+    def preinsert(cls, ea, count):
         '''Insert ``count`` lines in front of the item at address ``ea``.'''
-        return cls.set_prefix(ea, '\n'*(count-1)) if count > 0 else cls.del_prefix(ea)
+        res = cls.get_prefix, cls.set_prefix, cls.del_prefix
+        return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
-    def append(cls, ea, count):
+    def preappend(cls, ea, count):
+        '''Append ``count`` lines in front of the item at address ``ea``.'''
+        res = cls.get_prefix, cls.set_prefix, cls.del_prefix
+        return cls.__append_space(ea, count, res)
+
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def postinsert(cls, ea, count):
+        '''Insert ``count`` lines after the item at address ``ea``.'''
+        res = cls.get_suffix, cls.set_suffix, cls.del_suffix
+        return cls.__insert_space(ea, count, res)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def postappend(cls, ea, count):
         '''Append ``count`` lines after the item at address ``ea``.'''
-        return cls.set_suffix(ea, '\n'*(count-1)) if count > 0 else cls.del_suffix(ea)
+        res = cls.get_suffix, cls.set_suffix, cls.del_suffix
+        return cls.__append_space(ea, count, res)
 
     @utils.multicase(count=six.integer_types)
     @classmethod
-    def insert(cls, count):
+    def preinsert(cls, count):
         '''Insert ``count`` lines in front of the item at the current address.'''
-        return cls.insert(ui.current.address(), count)
+        return cls.preinsert(ui.current.address(), count)
     @utils.multicase(count=six.integer_types)
     @classmethod
-    def append(cls, count):
+    def preappend(cls, count):
+        '''Append ``count`` lines in front of the item at the current address.'''
+        return cls.preappend(ui.current.address(), count)
+
+    @utils.multicase(count=six.integer_types)
+    @classmethod
+    def postinsert(cls, count):
+        '''Insert ``count`` lines after the item at the current address.'''
+        return cls.postinsert(ui.current.address(), count)
+    @utils.multicase(count=six.integer_types)
+    @classmethod
+    def postappend(cls, count):
         '''Append ``count`` lines after the item at the current address.'''
-        return cls.append(ui.current.address(), count)
+        return cls.postappend(ui.current.address(), count)
+
+    insert, append = utils.alias(preinsert, 'extra'), utils.alias(preappend, 'extra')
+ex = extra
