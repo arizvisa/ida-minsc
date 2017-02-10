@@ -2,11 +2,9 @@
 
 EXPORT = [ 'nameDispatch', 'nameAllDispatches' ]
 
-import idc, comment
-
 import idc,idautils
-import function,comment,database
-#import __quicktime
+import function,database
+import app
 
 def nextMnemonic(ea, mnem, maxaddr=0xc0*0x1000000):
     res = idc.GetMnem(ea)
@@ -92,7 +90,7 @@ def nameDispatch(address):
     function.tag(start, 'code', hex(code))
     function.tag(start, 'group', 'dispatch')
     try:
-        function.tag(start, 'realname', __quicktime.qt_fv_list[code])
+        function.tag(start, 'realname', app.__quicktime.qt_fv_list[code])
     except KeyError:
         pass
 

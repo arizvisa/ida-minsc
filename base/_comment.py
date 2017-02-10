@@ -146,7 +146,7 @@ class _int(default):
         return isinstance(instance, six.integer_types)
     @classmethod
     def encode(cls, instance):
-        return '-0x{:x}'.format(abs(instance)) if instance < 0 else '0x{:x}'.format(abs(instance))
+        return '{:-#x}'.format(instance)
 
 @cache.register(object, trie.star(' \t'), *'float(')
 class _float(default):
@@ -163,32 +163,55 @@ class _str(default):
     def type(cls, instance):
         return isinstance(instance, str)
 
-    @staticmethod
-    def _unescape(iterable):
+    uncmap = { ch : chr(i) for i,ch in enumerate('0123456abtnvfr') }
+    @classmethod
+    def _unescape(cls, iterable):
         try:
             while True:
                 ch = next(iterable)
                 if ch == '\\':
                     ch = next(iterable)
-                    if   ch == '\\': yield '\\'
-                    elif ch == 'n' : yield '\n'
-                    elif ch == 'r' : yield '\r'
-                    elif ch == 't' : yield '\t'
-                    #else           : yield ch
-                    else           : yield '\\'; yield ch
+                    # double-backslash reduced down to a single one
+                    if ch == '\\':
+                        yield '\\'
+                    # standard escaped character
+                    elif ch in cls.uncmap:
+                        yield cls.uncmap[ch]
+                    # FIXME: read octal digits
+                    elif ch in string.digits:
+                        pass
+                    # FIXME: read hexadecimal digits
+                    elif ch in 'x':
+                        pass
+                    # otherwise it's mistakenly escaped, and python returns both
+                    else:
+                        yield '\\';
+                        yield ch
                     continue
                 yield ch
         except StopIteration: pass
-    @staticmethod
-    def _escape(iterable):
+
+    cmap = { chr(i) : ch for i,ch in enumerate('0123456abtnvfr') }
+    @classmethod
+    def _escape(cls, iterable):
         try:
             while True:
                 ch = next(iterable)
-                if   ch == '\\': yield '\\'; yield '\\'
-                elif ch == '\n': yield '\\'; yield 'n'
-                elif ch == '\r': yield '\\'; yield 'r'
-                elif ch == '\t': yield '\\'; yield 't'
-                else           : yield ch
+                # if it's a single backslash, then double it.
+                if ch == '\\':
+                    yield '\\'
+                    yield '\\'
+                # if it's a known escapable character, then return it
+                elif ch in cls.cmap:
+                    yield '\\'
+                    yield cls.cmap[ch]
+                # otherwise, it should be printable and doesn't need to be escaped
+                elif ch in string.printable:
+                    yield ch
+                # we don't know, so let python handle it
+                else:
+                    # FIXME: replace this repr() hack with a proper \x encoding
+                    yield repr(ch)[1:-1]
         except StopIteration: pass
 
     @classmethod
@@ -197,7 +220,6 @@ class _str(default):
         return str().join(cls._unescape(iter(res)))
     @classmethod
     def encode(cls, instance):
-        # FIXME: strip out newlines
         res = cls._escape(iter(instance))
         return '{:s}'.format(str().join(res))
 
@@ -212,24 +234,40 @@ class _dict(default):
     @classmethod
     def type(cls, instance):
         return isinstance(instance, dict)
+    @classmethod
+    def encode(cls, instance):
+        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
+        return '[' + ', '.join('{:x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n) for n in instance) + ']'
 
 @cache.register(list, trie.star(' \t'), '[')
 class _list(default):
     @classmethod
     def type(cls, instance):
         return isinstance(instance, list)
+    @classmethod
+    def encode(cls, instance):
+        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
+        return '[' + ', '.join(map(f, instance)) + ']'
 
 @cache.register(tuple, trie.star(' \t'), '(')
 class _tuple(default):
     @classmethod
     def type(cls, instance):
         return isinstance(instance, tuple)
+    @classmethod
+    def encode(cls, instance):
+        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
+        return '(' + ', '.join(map(f,instance)) + ')'
 
 @cache.register(set, trie.star(' \t'), *'set([')
 class _set(default):
     @classmethod
     def type(cls, instance):
         return isinstance(instance, set)
+    @classmethod
+    def encode(cls, instance):
+        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
+        return 'set([' + ', '.join(map(f,instance)) + '])'
 
 ### parsing functions
 def key_escape(iterable, sentinel):
@@ -271,10 +309,22 @@ def emit_line(key, value):
         '\\' : r'\\',
         '['  : r'\[',
         ']'  : r'\]',
-        '\n' : r'\n',
-        '\r' : r'\r',
+        '\0' : r'\0',
+        '\1' : r'\1',
+        '\2' : r'\2',
+        '\3' : r'\3',
+        '\4' : r'\4',
+        '\5' : r'\5',
+        '\6' : r'\6',
+        '\a' : r'\a',
+        '\b' : r'\b',
         '\t' : r'\t',
+        '\n' : r'\n',
+        '\v' : r'\v',
+        '\f' : r'\f',
+        '\r' : r'\r',
     }
+    # FIXME: should probably use _str.encode here
     k = str().join(escape.get(n, n) for n in key)
     t = cache.by(value)
     return '[{:s}] {:s}'.format(k, t.encode(value))

@@ -55,7 +55,7 @@ def list(**type):
 
     for seg in res:
         comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
-        print('[{:{:d}d}] {:0{:d}x}:{:0{:d}x} {:>{:d}s} +0x{:<{:d}x} sel:{:04x} flags:{:02x}{:s}'.format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), maxname, seg.size(), int(csize), seg.sel, seg.flags, '// {:s}'.format(comment) if comment else ''))
+        print('[{:{:d}d}] {:0{:d}x}:{:0{:d}x} {:>{:d}s} {:<+#{:d}x} sel:{:04x} flags:{:02x}{:s}'.format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), maxname, seg.size(), int(csize), seg.sel, seg.flags, '// {:s}'.format(comment) if comment else ''))
     return
 
 ## searching

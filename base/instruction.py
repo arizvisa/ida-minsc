@@ -745,7 +745,6 @@ class architecture_t(object):
 class opt(object):
     '''static lookup table for operand type decoders'''
     cache = {}
-
     @classmethod
     def define(cls, processor, type):
         def decorator(fn):
@@ -762,26 +761,18 @@ class opt(object):
     def decode(cls, op, processor=None):
         return cls.lookup(op.type, processor=processor)(op)
 
-    __otype__ = { n : getattr(idaapi, n) for n in dir(idaapi) if n.startswith('o_') }
-    __rotype__ = dict(map(reversed, __otype__.items()))
     @classmethod
     def type(cls, op, processor=None):
-        otype_prefix = 'o_'
-        res = cls.__rotype__[op.type]
-        if not res.startswith(otype_prefix):
-            raise TypeError('{:s}.type : Unexpected type was returned for the operand {:d} : {:s}'.format('.'.join((__name__,cls.__name__)), op.type, res))
-        return res[len(otype_prefix):]
-
-    @classmethod
-    def repr(cls, op, processor=None):
         return cls.lookup(op.type, processor=processor).__name__
 
     @classmethod
     def size(cls, op, processor=None):
         return idaapi.get_dtyp_size(op.dtyp)
 
+## XXX: This namespace is deleted after each method has been assigned to their lookup table
 class operand_types:
-    # FIXME: rename these operand types
+    """Namespace containing all of the operand type handlers.
+    """
     @opt.define(idaapi.PLFM_ARM, idaapi.o_void)
     @opt.define(idaapi.PLFM_386, idaapi.o_void)
     def void(op):
@@ -794,7 +785,7 @@ class operand_types:
         '''Return the operand as a register_t.'''
         if op.type in (idaapi.o_reg,):
             res, dt = op.reg, ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
-            return reg.by_indextype(res, dt)
+            return reg.by_indextype(res, op.dtyp)
         raise TypeError('{:s}.register : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_imm)
@@ -808,42 +799,42 @@ class operand_types:
 
     @opt.define(idaapi.PLFM_386, idaapi.o_far)
     @opt.define(idaapi.PLFM_386, idaapi.o_near)
-    def address(op):
+    def memory(op):
         '''Return the operand.addr field from an operand.'''
         if op.type in (idaapi.o_mem,idaapi.o_far,idaapi.o_near,idaapi.o_displ):
             return op.addr
         raise TypeError('{:s}.address : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
 
     @opt.define(idaapi.PLFM_386, idaapi.o_idpspec0)
-    def idpspec0(op):
+    def trregister(op):
         '''trreg'''
         raise NotImplementedError
     @opt.define(idaapi.PLFM_386, idaapi.o_idpspec1)
-    def idpspec1(op):
+    def dbregister(op):
         '''dbreg'''
         raise NotImplementedError
     @opt.define(idaapi.PLFM_386, idaapi.o_idpspec2)
-    def idpspec2(op):
+    def crregister(op):
         '''crreg'''
         raise NotImplementedError
         return getattr(register, 'cr{:d}'.format(op.reg)).id
     @opt.define(idaapi.PLFM_386, idaapi.o_idpspec3)
-    def idpspec3(op):
+    def fpregister(op):
         '''fpreg'''
         return getattr(register, 'st{:d}'.format(op.reg)).id
     @opt.define(idaapi.PLFM_386, idaapi.o_idpspec4)
-    def idpspec4(op):
+    def mmxregister(op):
         '''mmxreg'''
         return getattr(register, 'mmx{:d}'.format(op.reg)).id
     @opt.define(idaapi.PLFM_386, idaapi.o_idpspec5)
-    def idpspec5(op):
+    def xmmregister(op):
         '''xmmreg'''
         return getattr(register, 'xmm{:d}'.format(op.reg)).id
 
     @opt.define(idaapi.PLFM_386, idaapi.o_mem)
     @opt.define(idaapi.PLFM_386, idaapi.o_displ)
     @opt.define(idaapi.PLFM_386, idaapi.o_phrase)
-    def intel_phrase(op):
+    def phrase(op):
         """Returns an operand as a (offset, basereg, indexreg, scale) tuple."""
         if op.type in (idaapi.o_displ, idaapi.o_phrase):
             if op.specflag1 == 0:
@@ -855,7 +846,7 @@ class operand_types:
                 index = (op.specflag2&0x38) >> 3
 
             else:
-                raise TypeError('{:s}.intel_phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
+                raise TypeError('{:s}.phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
@@ -883,11 +874,11 @@ class operand_types:
                 index = (op.specflag2&0x38) >> 3
 
             else:
-                raise TypeError('{:s}.intel_phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
+                raise TypeError('{:s}.phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
             offset = op.addr
 
         else:
-            raise TypeError('{:s}.intel_phrase : Invalid operand type. : {:d}'.format(__name__, op.type))
+            raise TypeError('{:s}.phrase : Invalid operand type. : {:d}'.format(__name__, op.type))
 
         # if arch == x64, then index += 8
 
@@ -905,23 +896,23 @@ class operand_types:
         maxint = 2**database.config.bits()
 
         dt = ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
-        res = long((offset-maxint) if offset&signbit else offset), reg.by_indextype(base, dt) if base else None, reg.by_indextype(index, dt) if index else None, scale
-        return OBIS(*res)
+        res = long((offset-maxint) if offset&signbit else offset), None if base is None else reg.by_indextype(base, dt), None if index is None else reg.by_indextype(index, dt), scale
+        return intelop.OBIS(*res)
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_phrase)
-    def arm_phrase(op):
+    def phrase(op):
         Rn, Rm = reg.by_index(op.reg), reg.by_index(op.specflag1)
-        return arm_phraseop(Rn, Rm)
+        return armop.phrase(Rn, Rm)
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_displ)
-    def arm_dispop(op):
-        '''Convert an arm operand into an arm_dispop tuple (register, offset).'''
+    def disp(op):
+        '''Convert an arm operand into an armop.disp tuple (register, offset).'''
         Rn = reg.by_index(op.reg)
-        return arm_dispop(Rn, long(op.addr))
+        return armop.disp(Rn, long(op.addr))
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_mem)
-    def arm_memop(op):
-        '''Convert an arm operand into an arm_memop tuple (address, dereferenced-value).'''
+    def memory(op):
+        '''Convert an arm operand into an armop.mem tuple (address, dereferenced-value).'''
         # get the address and the operand size
         addr, size = op.addr, idaapi.get_dtyp_size(op.dtyp)
         maxval = 1<<size*8
@@ -932,104 +923,105 @@ class operand_types:
         res = reduce(lambda t,c: (t*0x100) | ord(c), res, 0)
         sf = bool(res & maxval>>1)
 
-        return arm_memop(long(addr), long(res-maxval) if sf else long(res))
+        return armop.mem(long(addr), long(res-maxval) if sf else long(res))
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
-    def arm_flexop(op):
-        '''Convert an arm operand into an arm_flexop tuple (register, type, immediate).'''
+    def flex(op):
+        '''Convert an arm operand into an arm.flexop tuple (register, type, immediate).'''
         # tag:arm, this is a register with a shift-op applied
         Rn = reg.by_index(op.reg)
         shift = 0   # FIXME: find out where the shift-type is stored
-        return arm_flexop(Rn, int(shift), int(op.value))
+        return arm.flexop(Rn, int(shift), int(op.value))
 
     @opt.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
-    def arm_listop(op):
-        '''Convert a bitmask of a registers into an arm_listop.'''
+    def list(op):
+        '''Convert a bitmask of a registers into an armop.list.'''
         # op.specval -- a bitmask specifying which registers are included
         res, n = [], op.specval
         for i in range(16):
             if n & 1:
                 res.append(reg.by_index(i))
             n >>= 1
-        return arm_listop(set(res))
+        return armop.list(set(res))
+del(operand_types)
 
-class OffsetBaseIndexScale(namedtypedtuple):
-    """A tuple containing an intel operand (offset, base, index, scale).
-    Within the tuple, `base` and `index` are registers.
-    """
-    _fields = ('offset','base','index','scale')
-    _types = (long, (None.__class__,register_t), (None.__class__,register_t), int)
+class intelop:
+    class OffsetBaseIndexScale(namedtypedtuple):
+        """A tuple containing an intel operand (offset, base, index, scale).
+        Within the tuple, `base` and `index` are registers.
+        """
+        _fields = ('offset','base','index','scale')
+        _types = (long, (types.NoneType,register_t), (types.NoneType,register_t), int)
 
-    def registers(self):
-        _, b, i, _ = self
-        if b is not None: yield b
-        if i is not None: yield i
-OBIS = OffsetBaseIndexScale
+        def registers(self):
+            _, b, i, _ = self
+            if b is not None: yield b
+            if i is not None: yield i
+    OBIS = OffsetBaseIndexScale
 
-# tag:arm
-class arm_flexop(namedtypedtuple):
-    """A tuple containing an arm flexible-operand (Rn, shift, n).
-    A flexible operand is an operation that allows the architecture to apply
-    a binary shift or rotation to the value of a register.
-    """
-    _fields = ('Rn', 'shift', 'n')
-    _types = (register_t, int, int)
+class armop:
+    class flex(namedtypedtuple):
+        """A tuple containing an arm flexible-operand (Rn, shift, n).
+        A flexible operand is an operation that allows the architecture to apply
+        a binary shift or rotation to the value of a register.
+        """
+        _fields = ('Rn', 'shift', 'n')
+        _types = (register_t, int, int)
 
-    register = property(fget=operator.itemgetter(0))
-    t = type = property(fget=operator.itemgetter(1))
-    imm = immediate = property(fget=operator.itemgetter(2))
+        register = property(fget=operator.itemgetter(0))
+        t = type = property(fget=operator.itemgetter(1))
+        imm = immediate = property(fget=operator.itemgetter(2))
 
-    def registers(self):
-        r, _, _ = self
-        yield r
+        def registers(self):
+            r, _, _ = self
+            yield r
 
-# tag:arm
-class arm_listop(namedtypedtuple):
-    """A tuple containing an arm register list (reglist,).
-    `list` contains a set of register_t which can be used to test membership.
-    """
-    _fields = ('reglist',)
-    _types = (set,)
+    class list(namedtypedtuple):
+        """A tuple containing an arm register list (reglist,).
+        `list` contains a set of register_t which can be used to test membership.
+        """
+        _fields = ('reglist',)
+        _types = (set,)
 
-    def registers(self):
-        res, = self
-        for r in res: yield r
+        def registers(self):
+            res, = self
+            for r in res: yield r
 
-class arm_dispop(namedtypedtuple):
-    '''A tuple for an arm operand containing the (Rn, Offset).'''
-    _fields = ('Rn', 'offset')
-    _types = (register_t, long)
+    class disp(namedtypedtuple):
+        '''A tuple for an arm operand containing the (Rn, Offset).'''
+        _fields = ('Rn', 'offset')
+        _types = (register_t, long)
 
-    register = property(fget=operator.itemgetter(0))
-    offset = property(fget=operator.itemgetter(1))
+        register = property(fget=operator.itemgetter(0))
+        offset = property(fget=operator.itemgetter(1))
 
-    def registers(self):
-        r, _ = self
-        yield r
+        def registers(self):
+            r, _ = self
+            yield r
 
-class arm_phraseop(namedtypedtuple):
-    '''A tuple for an arm operand containing the (Rn, Rm).'''
-    _fields = ('Rn', 'Rm')
-    _types = (register_t, register_t)
+    class phrase(namedtypedtuple):
+        '''A tuple for an arm operand containing the (Rn, Rm).'''
+        _fields = ('Rn', 'Rm')
+        _types = (register_t, register_t)
 
-    register = property(fget=operator.itemgetter(0))
-    offset = property(fget=operator.itemgetter(1))
+        register = property(fget=operator.itemgetter(0))
+        offset = property(fget=operator.itemgetter(1))
 
-    def registers(self):
-        r, _ = self
-        yield r
+        def registers(self):
+            r, _ = self
+            yield r
 
-class arm_memop(namedtypedtuple):
-    """A tuple for an arm memory operand containing the (address, value).
-    `address` contains the actual value that's stored within the operand.
-    `value` contains the dereferenced value at the operand's address.
-    """
-    _fields = ('address', 'value')
-    _types = (long, long)
+    class mem(namedtypedtuple):
+        """A tuple for an arm memory operand containing the (address, value).
+        `address` contains the actual value that's stored within the operand.
+        `value` contains the dereferenced value at the operand's address.
+        """
+        _fields = ('address', 'value')
+        _types = (long, long)
 
-    def registers(self):
-        raise StopIteration
-        yield   # so that this function is treated as a generator
+        def registers(self):
+            raise StopIteration
+            yield   # so that this function is treated as a generator
 
 class Intel(architecture_t):
     """An implementation of the Intel architecture.
@@ -1161,7 +1153,7 @@ class ir:
     table = {
         'immediate':     {'r':ir_op.value,   'w':ir_op.assign, 'rw':ir_op.modify,    '':ir_op.value},
         'address':    {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
-        'intel_phrase':  {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
+        'phrase':  {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
         'register':     {'r':ir_op.value,   'w':ir_op.assign, 'rw':ir_op.modify,    '':ir_op.unknown},
     }
 
@@ -1192,9 +1184,9 @@ class ir:
             else:
                 operation = operation
 
-        if t == operand_types.intel_phrase:
+        if t.__name__ == 'phrase':
             imm,base,index,scale = t(op)
-        elif t in (operand_types.immediate, operand_types.address):
+        elif t.__name__ in ('immediate', 'address'):
             imm,base,index,scale = t(op),None,None,None
         else:
             imm,base,index,scale = None,t(op),None,None

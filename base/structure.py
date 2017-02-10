@@ -130,7 +130,7 @@ def list(**type):
     maxsize = max(__builtin__.map(utils.compose(operator.attrgetter('size'),'{:x}'.format,len), res) or [1])
 
     for st in res:
-        print('[{:{:d}d}] {:>{:d}s} +0x{:<{:d}x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
+        print('[{:{:d}d}] {:>{:d}s} {:<+{:d}x} ({:d} members){:s}'.format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), ' // {:s}'.format(st.comment) if st.comment else ''))
     return
 
 @utils.multicase(string=basestring)
@@ -258,9 +258,11 @@ def apply_op(id, ea, opnum, **delta):
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
         raise TypeError('{:s}.apply_op({:x}, {:x}, {:d}, delta={:d}) : Item type at requested address is not code.'.format(__name__, id, ea, opnum, delta.get('delta', 0)))
-    tid = idaapi.tid_array(1)
+    # FIXME: allow one to specify more than one field for tid_array
+    length = 2
+    tid = idaapi.tid_array(length)
     tid[0] = id
-    ok = idaapi.op_stroff(ea, opnum, tid, len(tid), delta.get('delta', 0))
+    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
     return True if ok else False
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, st=__structure_t)
 def apply_op(st, ea, opnum, **delta):
@@ -509,7 +511,7 @@ class members_t(object):
         identifier = idaapi.get_struc_id(ownername)
         if identifier == idaapi.BADADDR:
             raise LookupError('{:s}.instance({:s}).members.__setstate__ : Failure creating a members_t for structure_t {!r}'.format(__name__, self.owner.name, ownername))
-            logging.warn('{:s}.instance({:s}).members.__setstate__ : Creating structure {:s} -- [0x{:x}] {:d} members'.format(__name__, self.owner.name, ownername, baseoffset, len(members)))
+            logging.warn('{:s}.instance({:s}).members.__setstate__ : Creating structure {:s} -- [{:+#x}] {:d} members'.format(__name__, self.owner.name, ownername, baseoffset, len(members)))
             identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
         self.baseoffset = baseoffset
         self.__owner = instance(identifier, offset=baseoffset)
@@ -640,11 +642,11 @@ class members_t(object):
         mptr = idaapi.get_member(self.owner.ptr, max - self.baseoffset)
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max+msize):
-            raise LookupError('{:s}.instance({:s}).members.by_offset : Requested offset {:s} not within bounds ({:s},{:s})'.format(__name__, self.owner.name, '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset), '-0x{:x}'.format(abs(min)) if min < 0 else '0x{:x}'.format(abs(min)), '-0x{:x}'.format(abs(max)+msize) if max < 0 else '0x{:x}'.format(abs(max)+msize)))
+            raise LookupError('{:s}.instance({:s}).members.by_offset : Requested offset {:+#x} not within bounds ({:#x},{:#x})'.format(__name__, self.owner.name, offset, min, max+msize))
 
         mem = idaapi.get_member(self.owner.ptr, offset - self.baseoffset)
         if mem is None:
-            raise LookupError('{:s}.instance({:s}).members.by_offset : Unable to find member at offset : {:s}'.format(__name__, self.owner.name, '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset)))
+            raise LookupError('{:s}.instance({:s}).members.by_offset : Unable to find member at offset : {:+#x}'.format(__name__, self.owner.name, offset))
 
         index = self.index(mem)
         return self[index]
@@ -652,20 +654,18 @@ class members_t(object):
 
     def near_offset(self, offset):
         '''Return the member near to the specified ``offset``.'''
-        offset_repr = '-0x{:x}'.format(abs(offset)) if offset < 0 else '0x{:x}'.format(offset)
         min,max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr),idaapi.get_struc_last_offset(self.owner.ptr)))
         if (offset < min) or (offset >= max):
-            logging.warn('{:s}.instance({:s}).members.near_offset : Requested offset {:s} not within bounds (0x{:x},0x{:x}). Trying anyways..'.format(__name__, self.owner.name, '-0x{:x}'.format(offset_repr), min, max))
+            logging.warn('{:s}.instance({:s}).members.near_offset : Requested offset {:+#x} not within bounds ({:#x},{:#x}). Trying anyways..'.format(__name__, self.owner.name, offset, min, max))
 
         res = offset - self.baseoffset
         mem = idaapi.get_member(self.owner.ptr, res)
         if mem is None:
-            res_repr = '-0x{:x}'.format(abs(res)) if res < 0 else '0x{:x}'.format(res)
-            logging.info('{:s}.instance({:s}).members.near_offset : Unable to locate member at offset {:s}. Trying get_best_fit_member instead.'.format(__name__, self.owner.name, res))
+            logging.info('{:s}.instance({:s}).members.near_offset : Unable to locate member at offset {:+#x}. Trying get_best_fit_member instead.'.format(__name__, self.owner.name, res))
             mem = idaapi.get_best_fit_member(self.owner.ptr, res)
 
         if mem is None:
-            raise LookupError('{:s}.instance({:s}).members.near_offset : Unable to find member near offset : 0x{:x}'.format(__name__, self.owner.name, offset))
+            raise LookupError('{:s}.instance({:s}).members.near_offset : Unable to find member near offset : {:+#x}'.format(__name__, self.owner.name, offset))
 
         index = self.index(mem)
         return self[index]
@@ -702,15 +702,15 @@ class members_t(object):
 
         res = idaapi.add_struc_member(self.owner.ptr, name, realoffset, flag, opinfo, nbytes)
         if res == idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.info('{:s}.instance({:s}).members.add : idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:+#x}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x}) : Success'.format(__name__, self.owner.name, self.owner.name, name, realoffset, flag, typeid, nbytes))
+            logging.info('{:s}.instance({:s}).members.add : idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x}) : Success'.format(__name__, self.owner.name, self.owner.name, name, realoffset, flag, typeid, nbytes))
         else:
             error = {
                 idaapi.STRUC_ERROR_MEMBER_NAME : 'Duplicate field name',
                 idaapi.STRUC_ERROR_MEMBER_OFFSET : 'Invalid offset',
                 idaapi.STRUC_ERROR_MEMBER_SIZE : 'Invalid size',
             }
-            callee = 'idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:+#x}, flag=0x{:x}, mt=0x{:x}, nbytes=0x{:x})'.format(self.owner.name, name, realoffset, flag, typeid, nbytes)
-            logging.fatal(' : '.join(('members_t.add', callee, error.get(res, 'Error code 0x{:x}'.format(res)))))
+            callee = 'idaapi.add_struc_member(sptr={!r}, fieldname={:s}, offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})'.format(self.owner.name, name, realoffset, flag, typeid, nbytes)
+            logging.fatal(' : '.join(('members_t.add', callee, error.get(res, 'Error code {:#x}'.format(res)))))
             return None
 
         res = idaapi.get_member(self.owner.ptr, realoffset)
@@ -772,7 +772,7 @@ class member_t(object):
 
         identifier = idaapi.get_struc_id(ownername)
         if identifier == idaapi.BADADDR:
-            logging.warn('{:s}.instance({:s}).member_t : Creating structure {:s} -- [0x{:x}] {:s}{:s}'.format(__name__, ownername, ownername, ofs, name, ' // {:s}'.format(cmtt or cmtf) if cmtt or cmtf else ''))
+            logging.warn('{:s}.instance({:s}).member_t : Creating structure {:s} -- [{:#x}] {:s}{:s}'.format(__name__, ownername, ownername, ofs, name, ' // {:s}'.format(cmtt or cmtf) if cmtt or cmtf else ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
         self.__owner = owner = instance(identifier, offset=0)
 
@@ -792,18 +792,18 @@ class member_t(object):
                 logging.warn('{:s}.instace({:s}).member_t : Duplicate name found for {:s}, renaming to {:s}'.format(__name__, ownername, name, newname))
                 idaapi.set_member_name(owner.ptr, ofs, newname)
             else:
-                logging.info('{:s}.instance({:s}).member_t : Field at 0x{:x} contains the same name {:s}'.format(__name__, ownername, ofs, name))
+                logging.info('{:s}.instance({:s}).member_t : Field at {:+#x} contains the same name {:s}'.format(__name__, ownername, ofs, name))
         # duplicate field
         elif res == idaapi.STRUC_ERROR_MEMBER_OFFSET:
-            logging.info('{:s}.instance({:s}).member_t : Field already found at 0x{:x}. Overwriting with {:s}'.format(__name__, ownername, ofs, name))
+            logging.info('{:s}.instance({:s}).member_t : Field already found at {:+#x}. Overwriting with {:s}'.format(__name__, ownername, ofs, name))
             idaapi.set_member_type(owner.ptr, ofs, flag, opinfo, nbytes)
             idaapi.set_member_name(owner.ptr, ofs, name)
         # invalid size
         elif res == idaapi.STRUC_ERROR_MEMBER_SIZE:
-            logging.warn('{:s}.instance({:s}).member_t : Issue creating structure member {:s}.{:s} : 0x{:x}'.format(__name__, ownername, ownername, name, res))
+            logging.warn('{:s}.instance({:s}).member_t : Issue creating structure member {:s}.{:s} : {:#x}'.format(__name__, ownername, ownername, name, res))
         # unknown
         elif res != idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.warn('{:s}.instance({:s}).member_t : Issue creating structure member {:s}.{:s} : 0x{:x}'.format(ownername, ownername, name, res))
+            logging.warn('{:s}.instance({:s}).member_t : Issue creating structure member {:s}.{:s} : {:#x}'.format(ownername, ownername, name, res))
 
         self.__index = index
         self.__owner = owner
@@ -917,8 +917,7 @@ class member_t(object):
     def __repr__(self):
         '''Display the specified member in a readable format.'''
         id,name,typ,comment = self.id,self.name,self.type,self.comment
-        offset_repr = '-0x{:x}'.format(abs(self.offset)) if self.offset < 0 else '0x{:x}'.format(self.offset)
-        return '{:s} [{:d}] {:s}:+0x{:x} \'{:s}\' {:s}{:s}'.format(self.__class__, self.index, offset_repr, self.size, name, typ, ' // {:s}'.format(comment) if comment else '')
+        return '{:s} [{:d}] {:-#x}:{:+#x} \'{:s}\' {:s}{:s}'.format(self.__class__, self.index, self.offset, self.size, name, typ, ' // {:s}'.format(comment) if comment else '')
 
     def refs(self):
         '''Return the (address, opnum, type) of all the references to this member within the database.'''
