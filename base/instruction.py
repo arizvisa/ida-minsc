@@ -150,6 +150,7 @@ def ops_type():
 def ops_type(ea):
     '''Returns a tuple of the types for all the operands of the instruction at the address ``ea``.'''
     return [ op_type(ea,i) for i in range(ops_count(ea)) ]
+opts = utils.alias(ops_type)
 
 @utils.multicase()
 def ops_state():
@@ -249,7 +250,8 @@ def op_type(ea, n):
     Some of the types returned are: imm, reg, phrase, or addr
     """
     res = operand(ea,n)
-    return opt.type(res)
+    return __optype__.type(res)
+opt = utils.alias(op_type)
 
 #@utils.multicase(n=int)
 #def op_decode(n):
@@ -266,7 +268,7 @@ def op_type(ea, n):
 #    phrase -> (offset, base-register index, index-register index, scale)
 #    """
 #    res = operand(ea, n)
-#    return opt.decode(res)
+#    return __optype__.decode(res)
 
 @utils.multicase(n=int)
 def op_value(n):
@@ -283,7 +285,7 @@ def op_value(ea, n):
     phrase -> (offset, base-register name, index-register name, scale)
     """
     res = operand(ea, n)
-    return opt.decode(res)
+    return __optype__.decode(res)
 op = op_decode = utils.alias(op_value)
 
 ## tag:intel
@@ -742,7 +744,7 @@ class architecture_t(object):
         return self.by_index(index)
 
 ## operand types
-class opt(object):
+class __optype__(object):
     '''static lookup table for operand type decoders'''
     cache = {}
     @classmethod
@@ -773,14 +775,14 @@ class opt(object):
 class operand_types:
     """Namespace containing all of the operand type handlers.
     """
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_void)
-    @opt.define(idaapi.PLFM_386, idaapi.o_void)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
     def void(op):
         '''An o_void operand...which is nothing.'''
         return ()
 
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_reg)
-    @opt.define(idaapi.PLFM_386, idaapi.o_reg)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_reg)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_reg)
     def register(op):
         '''Return the operand as a register_t.'''
         if op.type in (idaapi.o_reg,):
@@ -788,8 +790,8 @@ class operand_types:
             return reg.by_indextype(res, op.dtyp)
         raise TypeError('{:s}.register : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
 
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_imm)
-    @opt.define(idaapi.PLFM_386, idaapi.o_imm)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
     def immediate(op):
         '''Return the operand as an integer.'''
         if op.type in (idaapi.o_imm,idaapi.o_phrase):
@@ -797,43 +799,43 @@ class operand_types:
             return op.value & (2**bits-1)
         raise TypeError('{:s}.immediate : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
 
-    @opt.define(idaapi.PLFM_386, idaapi.o_far)
-    @opt.define(idaapi.PLFM_386, idaapi.o_near)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
     def memory(op):
         '''Return the operand.addr field from an operand.'''
         if op.type in (idaapi.o_mem,idaapi.o_far,idaapi.o_near,idaapi.o_displ):
             return op.addr
         raise TypeError('{:s}.address : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
 
-    @opt.define(idaapi.PLFM_386, idaapi.o_idpspec0)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(op):
         '''trreg'''
         raise NotImplementedError
-    @opt.define(idaapi.PLFM_386, idaapi.o_idpspec1)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
     def dbregister(op):
         '''dbreg'''
         raise NotImplementedError
-    @opt.define(idaapi.PLFM_386, idaapi.o_idpspec2)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
     def crregister(op):
         '''crreg'''
         raise NotImplementedError
         return getattr(register, 'cr{:d}'.format(op.reg)).id
-    @opt.define(idaapi.PLFM_386, idaapi.o_idpspec3)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
     def fpregister(op):
         '''fpreg'''
         return getattr(register, 'st{:d}'.format(op.reg)).id
-    @opt.define(idaapi.PLFM_386, idaapi.o_idpspec4)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
     def mmxregister(op):
         '''mmxreg'''
         return getattr(register, 'mmx{:d}'.format(op.reg)).id
-    @opt.define(idaapi.PLFM_386, idaapi.o_idpspec5)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
     def xmmregister(op):
         '''xmmreg'''
         return getattr(register, 'xmm{:d}'.format(op.reg)).id
 
-    @opt.define(idaapi.PLFM_386, idaapi.o_mem)
-    @opt.define(idaapi.PLFM_386, idaapi.o_displ)
-    @opt.define(idaapi.PLFM_386, idaapi.o_phrase)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
+    @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
     def phrase(op):
         """Returns an operand as a (offset, basereg, indexreg, scale) tuple."""
         if op.type in (idaapi.o_displ, idaapi.o_phrase):
@@ -899,18 +901,18 @@ class operand_types:
         res = long((offset-maxint) if offset&signbit else offset), None if base is None else reg.by_indextype(base, dt), None if index is None else reg.by_indextype(index, dt), scale
         return intelop.OBIS(*res)
 
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_phrase)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(op):
         Rn, Rm = reg.by_index(op.reg), reg.by_index(op.specflag1)
         return armop.phrase(Rn, Rm)
 
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_displ)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
     def disp(op):
         '''Convert an arm operand into an armop.disp tuple (register, offset).'''
         Rn = reg.by_index(op.reg)
         return armop.disp(Rn, long(op.addr))
 
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_mem)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(op):
         '''Convert an arm operand into an armop.mem tuple (address, dereferenced-value).'''
         # get the address and the operand size
@@ -925,7 +927,7 @@ class operand_types:
 
         return armop.mem(long(addr), long(res-maxval) if sf else long(res))
 
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
     def flex(op):
         '''Convert an arm operand into an arm.flexop tuple (register, type, immediate).'''
         # tag:arm, this is a register with a shift-op applied
@@ -933,7 +935,7 @@ class operand_types:
         shift = 0   # FIXME: find out where the shift-type is stored
         return arm.flexop(Rn, int(shift), int(op.value))
 
-    @opt.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
     def list(op):
         '''Convert a bitmask of a registers into an armop.list.'''
         # op.specval -- a bitmask specifying which registers are included
@@ -1171,7 +1173,7 @@ class ir:
         (assign,immediate,register,index,scale)
         """
         op,state = operand(ea, opnum), op_state(ea, opnum)
-        t, sz = opt.lookup(op), opt.size(op)
+        t, sz = __optype__.lookup(op), __optype__.size(op)
         operation = cls.table[t.__name__][state]
 
         # if mnemonic is lea, then demote it from a memory operation
@@ -1197,7 +1199,7 @@ class ir:
         base = None if base is None else reg(base, size=sz)
         index = None if index is None else reg(index, size=sz)
 
-        return OOBIS(operation(opt.size(op)),*(imm,base,index,scale))
+        return OOBIS(operation(__optype__.size(op)),*(imm,base,index,scale))
 
     @utils.multicase()
     @classmethod

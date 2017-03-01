@@ -22,7 +22,6 @@ __import__('logging').root.level = __import__('logging').INFO
 
 # shortcuts
 h,top,go,goof = database.h,func.top,database.go,database.goof
-hex = '{:x}'.format
 
 # functional tools
 import functools,itertools,operator

@@ -116,6 +116,7 @@ class multicase(object):
             else:
                 cache = []
                 res = cls.new_wrapper(func, cache)
+                res.__module__ = getattr(wrapped, '__module__', getattr(func, '__module__', '__main__'))
 
             # calculate the priority by trying to match the most first
             argtuple = s_args, args, defaults, (star, starstar)
