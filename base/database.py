@@ -1029,7 +1029,7 @@ class entry(object):
     @classmethod
     def new(cls):
         '''Makes an entry-point at the current address.'''
-        ea,entryname,ordinal = ui.current.address(), name(ui.current.address()), idaapi.get_entry_qty()
+        ea,entryname,ordinal = ui.current.address(), name(ui.current.address()) or function.name(ui.current.address()), idaapi.get_entry_qty()
         if entryname is None:
             raise ValueError('{:s}.new({:x}) : Unable to determine name at address.'.format( '.'.join((__name__,cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
@@ -1037,25 +1037,25 @@ class entry(object):
     @classmethod
     def new(cls, ea):
         '''Makes an entry-point at the specified address ``ea``.'''
-        entryname, ordinal = name(ea), idaapi.get_entry_qty()
+        entryname, ordinal = name(ea) or function.name(ea), idaapi.get_entry_qty()
         if entryname is None:
             raise ValueError('{:s}.new({:x}) : Unable to determine name at address.'.format( '.'.join((__name__,cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(name=basestring)
     @classmethod
     def new(cls, name):
-        '''Adds an entry-point to the database named ``name`` using the next available index as the ordinal.'''
+        '''Adds an entry-point to the database with the ``name`` using the next available index as the ordinal.'''
         return cls.new(ui.current.address(), name, idaapi.get_entry_qty())
     @utils.multicase(ea=six.integer_types, name=basestring)
     @classmethod
     def new(cls, ea, name):
-        '''Makes the specified address ``ea`` an entry-point named according to ``name``.'''
+        '''Makes the specified address ``ea`` an entry-point having the specified ``name``.'''
         ordinal = idaapi.get_entry_qty()
         return cls.new(ea, name, ordinal)
     @utils.multicase(name=basestring, ordinal=six.integer_types)
     @classmethod
     def new(cls, name, ordinal):
-        '''Adds an entry-point to the database named ``name`` with ``ordinal`` as it's index.'''
+        '''Adds an entry-point with the specified ``name`` to the database using ``ordinal`` as it's index.'''
         return cls.new(ui.current.address(), name, ordinal)
     @utils.multicase(ea=six.integer_types, name=basestring, ordinal=six.integer_types)
     @classmethod
@@ -1064,6 +1064,8 @@ class entry(object):
         res = idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
         idaapi.autoWait()
         return res
+
+    add = utils.alias(new, 'entry')
 
 def tags():
     '''Returns all of the tag names used globally.'''
