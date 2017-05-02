@@ -144,6 +144,10 @@ class priorityhook(object):
         self.__disabled = set()
         self.__traceback = {}
 
+    def remove(self):
+        '''Unhook the object completely.'''
+        return self.object.unhook()
+
     def enable(self, name):
         '''Enable any hooks for the ``name`` event that have been previously disabled.'''
         if name not in self.__disabled:

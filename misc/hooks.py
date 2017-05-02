@@ -303,12 +303,12 @@ def __process_functions():
     for i, fn in enumerate(funcs):
         chunks = list(function.chunks(fn))
 
-        text = functools.partial('Processing function {:d} of {:d} : {:x} : Chunk {:d} of {:d}'.format, i, len(funcs), fn)
+        text = functools.partial('{:x} : Processing function {:d} of {:d} : ({:d} chunk{:s})'.format, fn, i, len(funcs))
         p.update(current=i)
 
         contents = set(internal.comment.contents.address(fn))
         for ci, (l, r) in enumerate(chunks):
-            p.update(text=text(ci, len(chunks)), tooltip='Chunk #{:d} : {:x} - {:x}'.format(ci, l, r))
+            p.update(text=text(len(chunks), 's' if len(chunks) != 1 else ''), tooltip='Chunk #{:d} : {:x} - {:x}'.format(ci, l, r))
             for ea in database.iterate(l, r):
                 # FIXME: no need to iterate really since we should have
                 #        all of the addresses

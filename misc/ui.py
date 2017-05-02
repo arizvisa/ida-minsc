@@ -1,10 +1,8 @@
+import sys,os
 import logging
-import internal,database,segment,function,instruction as ins,structure
-import os
 
-import PyQt5.Qt
-from PyQt5.Qt import QObject
 import idaapi
+import internal,database,segment,function,instruction as ins,structure
 
 ## TODO:
 # locate window under current cursor position
@@ -54,116 +52,132 @@ class current(object):
         """Return the symbol name directly under the cursor"""
         return idaapi.get_highlighted_identifier()
 
-class root(object):
-    @classmethod
-    def application(cls):
-        return PyQt5.Qt.qApp
-    @classmethod
-    def window(cls):
-        return max(cls.windows(), key=lambda w: w.width() * w.height())
-    @classmethod
-    def windows(cls):
-        q = cls.application()
-        return q.topLevelWindows()
-    @classmethod
-    def refresh(cls):
-        idaapi.refresh_lists()
-        return idaapi.refresh_idaview_anyway()
+try:
+    import PyQt5.Qt
+    from PyQt5.Qt import QObject
 
-class progress(object):
-    def __init__(self, blocking=True):
-        self.object = res = PyQt5.Qt.QProgressDialog()
-        res.setVisible(False)
-        res.setWindowModality(blocking)
-        res.setAutoClose(True)
-        path = '{:s}/{:s}'.format(database.path(), database.filename())
-        self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
+    class root(object):
+        @classmethod
+        def application(cls):
+            return PyQt5.Qt.qApp
+        @classmethod
+        def window(cls):
+            return max(cls.windows(), key=lambda w: w.width() * w.height())
+        @classmethod
+        def windows(cls):
+            q = cls.application()
+            return q.topLevelWindows()
+        @classmethod
+        def refresh(cls):
+            idaapi.refresh_lists()
+            return idaapi.refresh_idaview_anyway()
 
-    # properties
-    canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s,v: s.object.canceled.connect(v))
-    maximum = property(fget=lambda s: s.object.maximum())
-    minimum = property(fget=lambda s: s.object.minimum())
-    current = property(fget=lambda s: s.object.value())
+    class progress(object):
+        def __init__(self, blocking=True):
+            self.object = res = PyQt5.Qt.QProgressDialog()
+            res.setVisible(False)
+            res.setWindowModality(blocking)
+            res.setAutoClose(True)
+            path = '{:s}/{:s}'.format(database.path(), database.filename())
+            self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
 
-    # methods
-    def open(self, width=0.8, height=0.1):
-        global root
-        window = root.window()
-        w, h = window.width() * width, window.height() * height
-        self.object.setFixedWidth(w), self.object.setFixedHeight(h)
+        # properties
+        canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s,v: s.object.canceled.connect(v))
+        maximum = property(fget=lambda s: s.object.maximum())
+        minimum = property(fget=lambda s: s.object.minimum())
+        current = property(fget=lambda s: s.object.value())
 
-        center = window.geometry().center()
-        x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
-        self.object.move(x, y)
+        # methods
+        def open(self, width=0.8, height=0.1):
+            global root
+            window = root.window()
+            w, h = window.width() * width, window.height() * height
+            self.object.setFixedWidth(w), self.object.setFixedHeight(h)
 
-        self.object.show()
+            center = window.geometry().center()
+            x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
+            self.object.move(x, y)
 
-    def close(self):
-        self.object.close()
+            self.object.show()
 
-    def update(self, **options):
-        minimum, maximum = options.get('min', None), options.get('max', None)
-        text,title,tooltip = (options.get(n, None) for n in ('text','title','tooltip'))
+        def close(self):
+            self.object.close()
 
-        if minimum is not None:
-            self.object.setMinimum(minimum)
-        if maximum is not None:
-            self.object.setMaximum(maximum)
-        if title is not None:
-            self.object.setWindowTitle(title)
-        if tooltip is not None:
-            self.object.setToolTip(tooltip)
-        if text is not None:
-            self.object.setLabelText(text)
+        def update(self, **options):
+            minimum, maximum = options.get('min', None), options.get('max', None)
+            text,title,tooltip = (options.get(n, None) for n in ('text','title','tooltip'))
 
-        res = self.object.value()
-        if 'current' in options:
-            self.object.setValue(options['current'])
-        elif 'value' in options:
-            self.object.setValue(options['value'])
-        return res
+            if minimum is not None:
+                self.object.setMinimum(minimum)
+            if maximum is not None:
+                self.object.setMaximum(maximum)
+            if title is not None:
+                self.object.setWindowTitle(title)
+            if tooltip is not None:
+                self.object.setToolTip(tooltip)
+            if text is not None:
+                self.object.setLabelText(text)
 
-class ProgressBar(object):
-    """
-    int progressDialog()
-    {
-     QProgressDialog dialog("Bytes received", "Stop reading", 0, 100); // expect 100 bytes
-     PipeReader reader(fileno(stdin));
-     QObject::connect(&reader, &PipeReader::channelClosed,
-     &dialog, &QProgressDialog::accept);
-     QObject::connect(&reader, &PipeReader::dataReceived, [&](const QByteArray &data) {
-         qDebug() << "Received" << data.length() << "bytes";
-         dialog.setValue(qMin(dialog.maximum(), dialog.value() + data.length()));
-     });
-     dialog.exec();
-     return dialog.result() == QDialog::Accepted ? 0 : 1;
-    }
-    """
+            res = self.object.value()
+            if 'current' in options:
+                self.object.setValue(options['current'])
+            elif 'value' in options:
+                self.object.setValue(options['value'])
+            return res
 
-#.setModal
-#.setRange
-#.setLabelText
-#.setMaximum
-#.setMinimum
-#.setValue
-#.setWindowTitle
-#.setStatusTip
-#.setToolTip
-#.setSizeHint
-#.setWindowRole
-#?.setWindowState
+except ImportError:
+    logging.warn("{:s}:Unable to import PyQt5.Qt. Using console-only variation of ui module.".format(__name__))
 
-class ProgressBar(object):
-    def __init__(self, title):
-        pass
-    def show(self, state):
-        pass
-    def start(self):
-        pass
-    def stop(self):
-        pass
-    def update(self, minimum, maximum, current):
-        pass
+    class root(object):
+        @classmethod
+        def application(cls):
+            return PyQt5.Qt.qApp
+        @classmethod
+        def window(cls):
+            return max(cls.windows(), key=lambda w: w.width() * w.height())
+        @classmethod
+        def windows(cls):
+            q = cls.application()
+            return q.topLevelWindows()
+        @classmethod
+        def refresh(cls):
+            idaapi.refresh_lists()
+            return idaapi.refresh_idaview_anyway()
+
+    class progress(object):
+        def __init__(self, blocking=True):
+            self.__path__ = '{:s}/{:s}'.format(database.path(), database.filename())
+            self.__value__ = 0
+            self.__min__, self.__max__ = 0, 0
+            return
+
+        canceled = property(fget=lambda s: False, fset=lambda s,v: None)
+        maximum = property(fget=lambda s: self.__max__)
+        minimum = property(fget=lambda s: self.__min__)
+        current = property(fget=lambda s: self.__value__)
+
+        def open(self, width=0.8, height=0.1):
+            return
+
+        def close(self):
+            return
+
+        def update(self, **options):
+            minimum, maximum = options.get('min', None), options.get('max', None)
+            text,title,tooltip = (options.get(n, None) for n in ('text','title','tooltip'))
+
+            if minimum is not None:
+                self.__min__ = minimum
+            if maximum is not None:
+                self.__max__ = maximum
+
+            if 'current' in options:
+                self.__value__ = options['current']
+            if 'value' in options:
+                self.__value__ = options['value']
+
+            logging.info(text)
+            return self.__value__
 
 class InputBox(idaapi.PluginForm):
     """Creating an InputBox to interact with the user"""
@@ -175,12 +189,6 @@ class InputBox(idaapi.PluginForm):
 
     def Show(self, caption, options=0):
         return super(InputBox,self).Show(caption, options)
-
-#import symath
-#from symath.directed import DirectedGraph
-
-#class navigation(object):
-#    pass
 
 class Names(object):
     @classmethod
@@ -355,10 +363,8 @@ try:
                     cls.rm(path,name)
                 return
 
-    #class MenuItem(QtGui.
-
 except ImportError:
-    logging.warn("__module__ : {:s} : Unable to load PySide.QtGui module. Certain UI.* methods might not work.".format(__name__))
+    logging.warn("__module__ : {:s} : Unable to load PyQt5.Qt module. Certain UI.* methods might not work.".format(__name__))
 
 def above(ea, includeSegment=False):
     '''Display all the callers of the function at /ea/'''
@@ -462,21 +468,22 @@ class queue(object):
             logging.warn("{:s}.{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format(__name__, cls.__name__, cls.execute))
             return
         cls.execute = internal.utils.execution()
+        return
 
     @classmethod
     def __stop_ida__(cls):
         if not hasattr(cls, 'execute'):
             logging.warn("{:s}.{:s}.stop : Refusing to release execution queue due to it not being initialized.".format(__name__, cls.__name__))
             return
-        cls.execute.release()
+        return cls.execute.release()
 
     @classmethod
     def __open_database__(cls, idp_modname):
-        cls.execute.start()
+        return cls.execute.start()
 
     @classmethod
     def __close_database__(cls):
-        cls.execute.stop()
+        return cls.execute.stop()
 
     @classmethod
     def add(cls, func, *args, **kwds):
@@ -508,8 +515,12 @@ class hook(object):
     def __stop_ida__(cls):
         for api in ('idp','idb','ui'):
             res = getattr(cls, api)
+
+            # disable every single hook
             for name in res:
                 res.disable(name)
-            continue
+
+            # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
+            res.remove()
         return
 

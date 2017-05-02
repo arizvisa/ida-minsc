@@ -157,7 +157,7 @@ class plugin_module(object):
 # ida's native api
 if sys.platform == 'darwin':
     sys.meta_path.append( internal_object('ida',library(idaapi.idadir('libida.dylib'))) )
-elif sys.platform == 'linux':
+elif sys.platform in 'linux2':
     sys.meta_path.append( internal_object('ida',library('libida.so')) )
 elif sys.platform == 'win32':
     sys.meta_path.append( internal_object('ida',library(idaapi.idadir('ida.wll'))) )

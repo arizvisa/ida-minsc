@@ -345,7 +345,7 @@ def instance(identifier, **options):
         res.offset = options['offset']
     return res
 
-by_identifier = byid = utils.alias(instance)
+by_identifier = by_id = byIdentifier = byId = utils.alias(instance)
 
 ### structure_t abstraction
 class structure_t(__structure_t):

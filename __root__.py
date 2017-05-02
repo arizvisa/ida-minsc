@@ -48,7 +48,7 @@ import custom,app
 ### begin hooking ida to monitor it's state
 # scope for execution queue and hooks
 ui.queue.__start_ida__(), ui.hook.__start_ida__()
-map(__import__('atexit').register, (ui.queue.__stop_ida__, ui.hook.__stop_ida__))
+ui.hook.ui.add('term', ui.queue.__stop_ida__, 1000), ui.hook.ui.add('term', ui.hook.__stop_ida__, 10000)
 
 # start and stop execution queue when database is open or closed
 ui.hook.idp.add('init', ui.queue.__open_database__, 0)

@@ -265,6 +265,28 @@ def color(segment, rgb):
     '''Sets the color of the segment identified by ``segment`` to ``rgb``.'''
     return set_color(segment, rgb)
 
+def contains():
+    '''Returns True if the current address is within a segment.'''
+    return contains(ui.current.segment(), ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def contains(ea):
+    '''Returns True if the address ``ea`` is contained within the current segment.'''
+    return contains(ui.current.segment(), ea)
+@utils.multicase(segaddr=six.integer_types, ea=six.integer_types)
+def contains(segaddr, ea):
+    '''Returns True if the address ``ea`` is contained within the segment owning the specified ``segaddr``.'''
+    seg = by_address(segaddr)
+    return contains(seg, ea)
+@utils.multicase(name=basestring, ea=six.integer_types)
+def contains(segname, ea):
+    '''Returns True if the address ``ea`` is contained within the segment named ``segname``.'''
+    seg = by_name(segname)
+    return contains(seg, ea)
+@utils.multicase(segment=idaapi.segment_t, ea=six.integer_types)
+def contains(segment, ea):
+    '''Returns True if the address ``ea`` is contained within the specified ``segment``.'''
+    return segment.startEA <= ea < segment.endEA
+
 ## functions
 # shamefully ripped from idc.py
 def _load_file(filename, ea, size, offset=0):

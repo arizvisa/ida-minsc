@@ -933,7 +933,7 @@ class operand_types:
         # tag:arm, this is a register with a shift-op applied
         Rn = reg.by_index(op.reg)
         shift = 0   # FIXME: find out where the shift-type is stored
-        return arm.flexop(Rn, int(shift), int(op.value))
+        return armop.flex(Rn, int(shift), int(op.value))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
     def list(op):
