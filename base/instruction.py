@@ -9,57 +9,6 @@ from internal import utils,interface
 
 import idaapi
 
-# copied mostly from the collections.namedtuple template
-class namedtypedtuple(tuple):
-    '''A subclass of tuple with named fields.'''
-    _fields = ()
-    _types = ()
-
-    def __new__(cls, *args):
-        res = args[:]
-        for n,t,x in zip(cls._fields, cls._types, args):
-            if not isinstance(x, t): raise TypeError("Unexpected type for field '{:s}' : {!r} != {!r}".format(n, t, type(x)))
-        return tuple.__new__(cls, res)
-
-    @classmethod
-    def _make(cls, iterable, new=tuple.__new__, len=len):
-        result = new(cls, iterable)
-        if len(result) != len(cls._fields):
-            raise TypeError('Expected {:d} arguemnts, got {:d}'.format(len(cls._fields), len(result)))
-        for n,t,x in zip(cls._fields, cls._types, result):
-            if not isinstance(x, t): raise TypeError("Unexpected type for field '{:s}' : {!r} != {!r}".format(n, t, type(x)))
-        return result
-
-    @classmethod
-    def _type(cls, name):
-        res = (t for n,t in zip(cls._fields, cls._types) if n == name)
-        try: return next(res)
-        except StopIteration:
-            raise ValueError('Got unexpected field name: {:s}'.format(name))
-
-    def __getattribute__(self, name):
-        try:
-            # honor the ._fields first
-            res = object.__getattribute__(self, '_fields')
-            res = operator.itemgetter(res.index(name))
-        except (IndexError,ValueError):
-            res = lambda s: object.__getattribute__(s, name)
-        return res(self)
-
-    def __repr__(self):
-        res = ('{:s}={!r}'.format(name, value) for name,value in zip(self._fields, self))
-        return '{:s}({:s})'.format(self.__class__.__name__, ', '.join(res))
-
-    def _replace(self, **kwds):
-        result = self._make(map(kwds.pop, self._fields, self))
-        if kwds:
-            raise ValueError('Got unexpected field names: {!r}'.format(kwds.keys()))
-        return result
-    def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
-    def __getnewargs__(self): return tuple(self)
-    def __getstate__(self): return
-
-########
 @utils.multicase()
 def at():
     '''Returns the insn_t instance at the current address.'''
@@ -69,7 +18,7 @@ def at(ea):
     '''Returns the insn_t instance at the address ``ea``.'''
     ea = interface.address.inside(ea)
     if not database.is_code(ea):
-        raise TypeError('{:s}.at : Unable to decode a non-instruction at address : 0x{:x}'.format(__name__, ea))
+        raise TypeError('{:s}.at({:x}) : Unable to decode a non-instruction at specified address.'.format(__name__, ea))
     length = idaapi.decode_insn(ea)
     return idaapi.cmd.copy()
 
@@ -190,7 +139,9 @@ def operand():
     return operand(ui.current.address(), None)
 @utils.multicase(none=types.NoneType)
 def operand(none):
-    '''Returns all the op_t's of the instruction at the current address.'''
+    """Returns all the op_t's of the instruction at the current address.
+    (Not really intended to be used. Please use the zero-argument version.))
+    """
     return operand(ui.current.address(), None)
 @utils.multicase(n=int)
 def operand(n):
@@ -305,7 +256,7 @@ def op_segment(ea, n):
         return 'ds'
     elif segment == 0x00210000:
         return 'fs'
-    raise NotImplementedError('{:s}.op_segment : Unable to determine the segment register for operand {:d} at 0x{:x} : {!r}'.format(__name__, n, ea, segment))
+    raise NotImplementedError('{:s}.op_segment({:x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}'.format(__name__, ea, n, segment))
 
 ## flags
 # idaapi.stroffflag()
@@ -359,7 +310,7 @@ def op_segment(ea, n):
 # pathvar = idaapi.tid_array(length)
 # res = idapi.get_stroff_path(ea, n, pathvar.cast(), delta)
 
-class AddressOpnumReftype(namedtypedtuple):
+class AddressOpnumReftype(interface.namedtypedtuple):
     '''A named tuple containing (address, operand-number, reference-type).'''
     _fields = ('address','opnum','reftype')
     _types = (long, int, basestring)
@@ -374,7 +325,7 @@ def op_refs(ea, n):
     '''Returns the (address, opnum, type) of all the instructions that reference the ``n``th operand of the instruction at ``ea``.'''
     fn = idaapi.get_func(ea)
     if fn is None:
-        raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to locate function for address. : {:x}".format(__name__, ea, n, ea))
+        raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to locate function for address. : {:x}".format(__name__, ea, n, ea))
     F = database.type.flags(ea)
 
     # reference types
@@ -406,7 +357,7 @@ def op_refs(ea, n):
         op = operand(ea, n)
         member,stkofs = idaapi.get_stkvar(op, op.addr)
         if stkofs != stkofs_:
-            logging.warn('{:s}.op_refs(0x{:x}, {:d}) : Stack offsets for instruction operand do not match. : {:x} != {:x}'.format(__name__, ea, n, stkofs, stkofs_))
+            logging.warn('{:s}.op_refs({:x}, {:d}) : Stack offsets for instruction operand do not match. : {:x} != {:x}'.format(__name__, ea, n, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
@@ -424,16 +375,16 @@ def op_refs(ea, n):
         delta.assign(0)
         ok = idaapi.get_stroff_path(ea, n, pathvar.cast(), delta.cast())
         if not ok:
-            raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to get structure id for operand. : {:x}".format(__name__, ea, n, ea))
+            raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to get structure id for operand. : {:x}".format(__name__, ea, n, ea))
 
         # get the structure offset and then figure it's member
         memofs = operand(ea, n).value    # FIXME: this will be incorrect for an offsetted struct
         st = idaapi.get_struc(pathvar[0])
         if st is None:
-            raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to get structure for id. : {:x}".format(__name__, ea, n, pathvar[0]))
+            raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to get structure for id. : {:x}".format(__name__, ea, n, pathvar[0]))
         mem = idaapi.get_member(st, memofs)
         if mem is None:
-            raise LookupError("{:s}.op_refs(0x{:x}, {:d}) : Unable to find member for offset in structure {:x}. : {:x}".format(__name__, ea, n, st.id, memofs))
+            raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to find member for offset in structure {:x}. : {:x}".format(__name__, ea, n, st.id, memofs))
 
         # extract the references
         x = idaapi.xrefblk_t()
@@ -588,8 +539,13 @@ isCall = callQ = utils.alias(is_call)
 #def? op_offset(ea, n, type, target = BADADDR, base = 0, tdelta = 0) -> int
 
 ## register lookups and types
-class register_t(object):
+class register_t(interface.symbol_t):
     '''A register type.'''
+
+    @property
+    def __symbols__(self):
+        yield self
+
     @property
     def id(self):
         '''Returns the index of the register.'''
@@ -668,33 +624,38 @@ class map_t(object):
         return '{:s} {!r}'.format(str(self.__class__), self.__state__)
 
 class architecture_t(object):
-    """Base class to represent registers for an architecture.
+    """Base class to represent how IDA maps the registers and types returned from an operand to a register that's uniquely identifiable by the user.
+
+    This is necessary as for some architectures IDA will not include all the register names and thus will use the same register-index to represent two registers that are of different types. As an example, on the Intel processor module the `al` and `ax` regs are returned in the operand as an index to the "ax" string. Similarly on the 64-bit version of the processor module, all of the registers `ax`, `eax`, and `rax` have the same index.
     """
-    __slots__ = ('__register__','__cache__',)
+    __slots__ = ('__register__', '__cache__',)
     r = register = property(fget=lambda s: s.__register__)
 
-    def __init__(self, cache={}):
-        self.__register__, self.__cache__ = map_t(), cache
+    def __init__(self, **cache):
+        """Instantiate an architecture_t object which represents the registers available to an architecture.
+        If ``cache`` is defined, then use the specified dictionary to map an ida (register-name, register-dtyp) to a string containing the commonly recognized register-name.
+        """
+        self.__register__, self.__cache__ = map_t(), cache.get('cache', {})
 
-    def new(self, name, bits, idaname=None, **kwds):
+    def new(self, name, bits, idaname=None, **kwargs):
         '''Add a register to the architecture's cache.'''
-        dtyp = kwds.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
+        dtyp = kwargs.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, 'parent':None, 'children':{}, 'dtyp':dtyp, 'offset':0, 'size':bits})
         namespace['realname'] = idaname
-        namespace['alias'] = kwds.get('alias', set())
+        namespace['alias'] = kwargs.get('alias', set())
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
         self.__cache__[idaname or name,dtyp] = name
         return res
 
-    def child(self, parent, name, offset, bits, idaname=None, **kwds):
+    def child(self, parent, name, offset, bits, idaname=None, **kwargs):
         '''Add a child-register to the architecture's cache.'''
-        dtyp = kwds.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
+        dtyp = kwargs.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, 'parent':parent, 'children':{}, 'dtyp':dtyp, 'offset':offset, 'size':bits})
         namespace['realname'] = idaname
-        namespace['alias'] = kwds.get('alias', set())
+        namespace['alias'] = kwargs.get('alias', set())
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
         self.__cache__[idaname or name,dtyp] = name
@@ -724,24 +685,6 @@ class architecture_t(object):
         '''Lookup a register according to it's ``index`` and ``size``.'''
         dtyp = idaapi.get_dtyp_by_size(size)
         return self.by_indextype(index, ord(dtyp))
-
-    ## remove thise?
-    @utils.multicase(name=basestring)
-    def reg(self, name):
-        '''Return the register with the specified ``name``.'''
-        return self.by_name(name)
-    @utils.multicase(index=six.integer_types)
-    def reg(self, index, dtyp):
-        '''Return the register matching the ``index`` and ``dtyp``.'''
-        return self.by_indextype(index, dtyp)
-    @utils.multicase(index=six.integer_types)
-    def reg(self, index, **size):
-        """Return the register identified by the specified ``index``.
-        If ``size`` is defined, then return the correct register for the one specified.
-        """
-        if 'size' in size:
-            return self.by_indexsize(index, size['size'])
-        return self.by_index(index)
 
 ## operand types
 class __optype__(object):
@@ -788,7 +731,8 @@ class operand_types:
         if op.type in (idaapi.o_reg,):
             res, dt = op.reg, ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
             return reg.by_indextype(res, op.dtyp)
-        raise TypeError('{:s}.register : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
+        optype = '{:s}({:d})'.format('idaapi.o_reg', idaapi.o_reg)
+        raise TypeError('{:s}.register(...) : {:s} : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), s_optype, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
@@ -797,7 +741,8 @@ class operand_types:
         if op.type in (idaapi.o_imm,idaapi.o_phrase):
             bits = idaapi.get_dtyp_size(op.dtyp) * 8
             return op.value & (2**bits-1)
-        raise TypeError('{:s}.immediate : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
+        optype = '{:s}({:d})'.format('idaapi.o_imm', idaapi.o_imm)
+        raise TypeError('{:s}.immediate(...) : {:s} : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), optype, op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
@@ -805,7 +750,8 @@ class operand_types:
         '''Return the operand.addr field from an operand.'''
         if op.type in (idaapi.o_mem,idaapi.o_far,idaapi.o_near,idaapi.o_displ):
             return op.addr
-        raise TypeError('{:s}.address : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), op.type))
+        optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
+        raise TypeError('{:s}.address(...) : {:s},{:s} : Invalid operand type. : {:d}'.format('.'.join((__name__, 'operand_types')), optype[0], optype[1], op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(op):
@@ -848,7 +794,8 @@ class operand_types:
                 index = (op.specflag2&0x38) >> 3
 
             else:
-                raise TypeError('{:s}.phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
+                optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
+                raise TypeError('{:s}.phrase(...) : {:s},{:s},{:s} : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
@@ -876,11 +823,13 @@ class operand_types:
                 index = (op.specflag2&0x38) >> 3
 
             else:
-                raise TypeError('{:s}.phrase : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, op.type, op.specflag1))
+                optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
+                raise TypeError('{:s}.phrase(...) : {:s} : Unable to determine the operand format for op.type {:d} : {:x}'.format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
             offset = op.addr
 
         else:
-            raise TypeError('{:s}.phrase : Invalid operand type. : {:d}'.format(__name__, op.type))
+            optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
+            raise TypeError('{:s}.phrase(...) : {:s},{:s},{:s} : Invalid operand type. : {:d}'.format(__name__, optype[0], optype[1], optype[2], op.type))
 
         # if arch == x64, then index += 8
 
@@ -948,21 +897,22 @@ class operand_types:
 del(operand_types)
 
 class intelop:
-    class OffsetBaseIndexScale(namedtypedtuple):
+    class OffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
         """A tuple containing an intel operand (offset, base, index, scale).
         Within the tuple, `base` and `index` are registers.
         """
         _fields = ('offset','base','index','scale')
         _types = (long, (types.NoneType,register_t), (types.NoneType,register_t), int)
 
-        def registers(self):
+        @property
+        def __symbols__(self):
             _, b, i, _ = self
             if b is not None: yield b
             if i is not None: yield i
     OBIS = OffsetBaseIndexScale
 
 class armop:
-    class flex(namedtypedtuple):
+    class flex(interface.namedtypedtuple, interface.symbol_t):
         """A tuple containing an arm flexible-operand (Rn, shift, n).
         A flexible operand is an operation that allows the architecture to apply
         a binary shift or rotation to the value of a register.
@@ -974,22 +924,24 @@ class armop:
         t = type = property(fget=operator.itemgetter(1))
         imm = immediate = property(fget=operator.itemgetter(2))
 
-        def registers(self):
+        @property
+        def __symbols__(self):
             r, _, _ = self
             yield r
 
-    class list(namedtypedtuple):
+    class list(interface.namedtypedtuple, interface.symbol_t):
         """A tuple containing an arm register list (reglist,).
         `list` contains a set of register_t which can be used to test membership.
         """
         _fields = ('reglist',)
         _types = (set,)
 
-        def registers(self):
+        @property
+        def __symbols__(self):
             res, = self
             for r in res: yield r
 
-    class disp(namedtypedtuple):
+    class disp(interface.namedtypedtuple, interface.symbol_t):
         '''A tuple for an arm operand containing the (Rn, Offset).'''
         _fields = ('Rn', 'offset')
         _types = (register_t, long)
@@ -997,11 +949,12 @@ class armop:
         register = property(fget=operator.itemgetter(0))
         offset = property(fget=operator.itemgetter(1))
 
-        def registers(self):
+        @property
+        def __symbols__(self):
             r, _ = self
             yield r
 
-    class phrase(namedtypedtuple):
+    class phrase(interface.namedtypedtuple, interface.symbol_t):
         '''A tuple for an arm operand containing the (Rn, Rm).'''
         _fields = ('Rn', 'Rm')
         _types = (register_t, register_t)
@@ -1009,11 +962,12 @@ class armop:
         register = property(fget=operator.itemgetter(0))
         offset = property(fget=operator.itemgetter(1))
 
-        def registers(self):
+        @property
+        def __symbols__(self):
             r, _ = self
             yield r
 
-    class mem(namedtypedtuple):
+    class mem(interface.namedtypedtuple, interface.symbol_t):
         """A tuple for an arm memory operand containing the (address, value).
         `address` contains the actual value that's stored within the operand.
         `value` contains the dereferenced value at the operand's address.
@@ -1021,9 +975,10 @@ class armop:
         _fields = ('address', 'value')
         _types = (long, long)
 
-        def registers(self):
+        @property
+        def __symbols__(self):
             raise StopIteration
-            yield   # so that this function is treated as a generator
+            yield   # so that this function is still treated as a generator
 
 class Intel(architecture_t):
     """An implementation of the Intel architecture.
@@ -1056,7 +1011,7 @@ class Intel(architecture_t):
             r32.alias, r64.alias = { r64 }, { r32 }
 
         # explicitly set the lookups for (word-register,idaapi.dt_byte) which exist due to ida's love for the inconsistent
-        [ self.__cache__.setdefault((_+'x', self.by_name(_+'l').type), self.by_name(_+'l')) for _ in ('a','c','d','b') ]
+        [ self.__cache__.setdefault((_+'x', self.by_name(_+'l').type), self.by_name(_+'l').__name__) for _ in ('a','c','d','b') ]
 
         fpstack = self.__register__.fpstack
         # single precision

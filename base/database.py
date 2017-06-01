@@ -95,7 +95,7 @@ class config(object):
             return 64
         elif cls.info.is_32bit():
             return 32
-        raise ValueError("{:s}.bits : Unknown bit size.".format('.'.join((__name__, cls.__name__))))
+        raise ValueError("{:s}.bits() : Unknown bit size.".format('.'.join((__name__, cls.__name__))))
 
     @classmethod
     def byteorder(cls):
@@ -279,16 +279,17 @@ class functions(object):
         """Search through all of the functions within the database and return the first result.
         Please review the help for functions.list for the definition of ``type``.
         """
-        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
 
         res = __builtin__.list(cls.iterate(**type))
         if len(res) > 1:
             __builtin__.map(logging.info, (('[{:d}] {:s}'.format(i, function.name(ea))) for i,ea in enumerate(res)))
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format('.'.join((__name__, cls.__name__)), searchstring, len(res)))
+            f = utils.compose(function.by,function.name)
+            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}'.format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__, cls.__name__)), searchstring))
+            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__, cls.__name__)), query_s))
         return res
 
 def segments():
@@ -469,16 +470,17 @@ class names(object):
         """Search through all of the names within the database and return the first result.
         Please review the help for names.list for the definition of ``type``.
         """
-        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
 
         res = __builtin__.list(cls.__iterate__(**type))
         if len(res) > 1:
             __builtin__.map(logging.info, (('[{:d}] {:x} {:s}'.format(idx, idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx))) for idx in res))
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format('.'.join((__name__, cls.__name__)), searchstring, len(res)))
+            f1, f2 = idaapi.get_nlist_ea, idaapi.get_nlist_name
+            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x} {!r}'.format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__, cls.__name__)), searchstring))
+            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__, cls.__name__)), query_s))
         return idaapi.get_nlist_ea(res)
 
     @classmethod
@@ -644,7 +646,7 @@ def set_name(ea, string, **listed):
 
     ea = interface.address.inside(ea)
     if idaapi.SN_NOCHECK != 0:
-        raise AssertionError('{:s}.set_name : idaapi.SN_NOCHECK != 0'.format(__name__))
+        raise AssertionError('{:s}.set_name({:x}, {!r}{:s}) : idaapi.SN_NOCHECK != 0'.format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else ''))
     SN_NOLIST = idaapi.SN_NOLIST
     SN_LOCAL = idaapi.SN_LOCAL
     SN_NON_PUBLIC = idaapi.SN_NON_PUBLIC
@@ -683,13 +685,13 @@ def set_name(ea, string, **listed):
 
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
-        logging.warn('{:s}.set_name : Stripping invalid chars from name {!r} at {:x}. : {!r}'.format(__name__, string, ea, res))
+        logging.warn('{:s}.set_name({:x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}'.format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else '', res))
         string = res
 
     res,ok = get_name(ea),idaapi.set_name(ea, string or "", flags)
 
     if not ok:
-        raise AssertionError('{:s}.set_name : Unable to call idaapi.set_name({:x}, {!r}, {:x})'.format(__name__, ea, string, flags))
+        raise ValueError('{:s}.set_name({:x}, {!r}{:s}) : Unable to call idaapi.set_name({:x}, {!r}, {:x})'.format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else '', ea, string, flags))
     return res
 
 @utils.multicase()
@@ -951,7 +953,7 @@ class entry(object):
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryordinal__(res)
-        raise ValueError('{:s}.ordinal : No entry-point at specified address. : {:x}'.format('.'.join((__name__, cls.__name__)), ea))
+        raise ValueError('{:s}.ordinal({:x}) : No entry-point at specified address.'.format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase()
     @classmethod
@@ -965,7 +967,7 @@ class entry(object):
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryname__(res)
-        raise ValueError('{:s}.name : No entry-point at specified address. : {:x}'.format('.'.join((__name__, cls.__name__)), ea))
+        raise ValueError('{:s}.name({:x}) : No entry-point at specified address.'.format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1013,16 +1015,17 @@ class entry(object):
         """Search through all of the entry-points within the database and return the first result.
         Please review the help for entry.list for the definition of ``type``.
         """
-        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
 
         res = __builtin__.list(cls.__iterate__(**type))
         if len(res) > 1:
             __builtin__.map(logging.info, (('[{:d}] {:x} : ({:x}) {:s}'.format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format('.'.join((__name__,cls.__name__)), searchstring, len(res)))
+            f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
+            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}'.format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), searchstring))
+            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), query_s))
         return cls.__address__(res)
 
     @utils.multicase()
@@ -1096,7 +1099,7 @@ def tag_read(ea):
     res = comment(ea, repeatable=not repeatable)
     d2 = internal.comment.decode(res)
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn('{:s}.tag_read : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+        logging.warn('{:s}.tag_read({:x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
     res = {}
     __builtin__.map(res.update, (d1,d2))
 
@@ -1130,7 +1133,7 @@ def tag_write(key, none):
 def tag_write(ea, key, value):
     '''Set the tag ``key`` to ``value`` at the address ``ea``.'''
     if value is None:
-        raise AssertionError('{:s}.tag_write : Tried to set tag {!r} to an invalid value.'.format(__name__, key))
+        raise ValueError('{:s}.tag_write({:x}, {!r}, ...) : Tried to set tag {!r} to an invalid value. : {!r}'.format(__name__, ea, key, key, value))
 
     # if the user wants to change the '__name__' tag, then
     # change the name fo' real.
@@ -1290,6 +1293,7 @@ def selectcontents(**boolean):
         # check to see that the dict's keys match
         res,d = set(res),internal.comment.contents._read(None, ea)
         if set(d.viewkeys()) != res:
+            # FIXME: include query in warning
             logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:x}".format(__name__, ea))
 
         # now start aggregating the keys that the user is looking for
@@ -1377,7 +1381,7 @@ class imports(object):
             return utils.second(__builtin__.next(res))
         except StopIteration:
             pass
-        raise LookupError("{:s}.get : Unable to determine import at address : {:x}".format('.'.join((__name__, cls.__name__)), ea))
+        raise LookupError("{:s}.get({:x}) : Unable to determine import at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase()
     @classmethod
@@ -1393,7 +1397,7 @@ class imports(object):
             if addr == ea:
                 return module
             continue
-        raise LookupError("{:s}.module : Unable to determine import module name at address {:x}.".format('.'.join((__name__, cls.__name__)), ea))
+        raise LookupError("{:s}.module({:x}) : Unable to determine import module name at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     # specific parts of the import
     @utils.multicase()
@@ -1457,7 +1461,6 @@ class imports(object):
         index = import name at index
         pred = function predicate
         """
-        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
         res = __builtin__.list(cls.iterate(**type))
 
         maxaddr = max(__builtin__.map(utils.first, res) or [idaapi.BADADDR])
@@ -1480,15 +1483,17 @@ class imports(object):
         """Search through all of the imports within the database and return the first result.
         Please review the help for imports.list for the definition of ``type``.
         """
-        searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+
         res = __builtin__.list(cls.iterate(**type))
         if len(res) > 1:
             __builtin__.map(logging.info, ('{:x} {:s}<{:d}> {:s}'.format(ea, module, ordinal, name) for ea,(module,name,ordinal) in res))
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format('.'.join((__name__,cls.__name__)), searchstring, len(res)))
+            f = utils.compose(utils.second, cls.__formatl__)
+            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}'.format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), searchstring))
+            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), query_s))
         return res[0]
 
 getImportModules = utils.alias(imports.modules, 'imports')
@@ -1722,10 +1727,8 @@ class address(object):
 
         def uses_register(ea, opnum, regs):
             val = _instruction.op_value(ea, opnum)
-            if isinstance(val, _instruction.register_t):
-                return match(val, regs)
-            elif hasattr(val, 'registers'):
-                return any(match(r, regs) for r in val.registers())
+            if isinstance(val, interface.symbol_t):
+                return any(match(r, regs) for r in val.__symbols__)
             return False
 
         iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
@@ -1747,11 +1750,13 @@ class address(object):
 
         prevea = cls.prev(ea)
         if prevea is None:
-            logging.fatal("{:s}.prevreg({:s}) : Unable to start walking from previous address. : {:x}".format('.'.join((__name__, cls.__name__)), args, ea))
+            # FIXME: include registers in message
+            logging.fatal("{:s}.prevreg({:s}, ...) : Unable to start walking from previous address. : {:x}".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
         res = cls.walk(prevea, cls.prev, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
         if res == idaapi.BADADDR or (cls == address and res < start):
-            raise ValueError("{:s}.prevreg({:s}) : Unable to find register{:s} within chunk. {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
+            # FIXME: include registers in message
+            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
         modifiers['count'] = count - 1
         return cls.prevreg( cls.prev(res), *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=(basestring,_instruction.register_t))
@@ -1772,10 +1777,8 @@ class address(object):
 
         def uses_register(ea, opnum, regs):
             val = _instruction.op_value(ea, opnum)
-            if isinstance(val, _instruction.register_t):
-                return match(val, regs)
-            elif hasattr(val, 'registers'):
-                return any(match(r, regs) for r in val.registers())
+            if isinstance(val, interface.symbol_t):
+                return any(match(r, regs) for r in val.__symbols__)
             return False
 
         iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
@@ -1797,11 +1800,13 @@ class address(object):
 
         nextea = cls.next(ea)
         if nextea is None:
+            # FIXME: include registers in message
             logging.fatal("{:s}.nextreg({:s}) : Unable to start walking from next address. : {:x}".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
         res = cls.walk(nextea, cls.next, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
         if res == idaapi.BADADDR or (cls == address and res >= end):
-            raise ValueError("{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], end, ea, res))
+            # FIXME: include registers in message
+            raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], end, ea, res))
         modifiers['count'] = count - 1
         return cls.nextreg(cls.next(res), *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=(basestring,_instruction.register_t))
@@ -1823,7 +1828,7 @@ class address(object):
         start,_ = function.chunk(ea)
         res = cls.walk(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res < start:
-            raise ValueError("{:s}.prevstack({:x}, {:d}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:x} : {:x} < {:x} ".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, start))
+            raise ValueError("{:s}.prevstack({:x}, {:+x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:x} : {:x} < {:x} ".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, start))
         return res
 
     @utils.multicase(delta=six.integer_types)
@@ -1839,7 +1844,7 @@ class address(object):
         _,end = function.chunk(ea)
         res = cls.walk(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res >= end:
-            raise ValueError("{:s}.nextstack({:x}, {:d}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:x} : {:x} >= {:x}".format('.'.join((__name__,cls.__name__)), ea, delta, fn, res, end))
+            raise ValueError("{:s}.nextstack({:x}, {:+x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:x} : {:x} >= {:x}".format('.'.join((__name__,cls.__name__)), ea, delta, fn, res, end))
         return res
 
     prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
@@ -2503,7 +2508,7 @@ class type(object):
                 t = ch.lower() if fl & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
             res = array.array(t, read(ea, cls.size(ea)))
             if len(res) != cls.length(ea):
-                logging.warn('{:s} : Unexpected length : ({:d} != {:d})'.format('.'.join((__name__, 'type', cls.__name__)), len(res), cls.length(ea)))
+                logging.warn('{:s}.get({:x}) : Unexpected length : ({:d} != {:d})'.format('.'.join((__name__, 'type', cls.__name__)), ea, len(res), cls.length(ea)))
             return res
 
         @utils.multicase()
@@ -2579,12 +2584,12 @@ class type(object):
 
             res = type(ea)
             if res != idaapi.FF_STRU:
-                raise AssertionError('{:s}.id : Specified IDA Type is not an FF_STRU({:x}) : {:x}'.format('.'.join((__name__, 'type', 'structure')), idaapi.FF_STRU, res))
+                raise TypeError('{:s}.id({:x}) : Specified IDA Type is not an FF_STRU({:x}) : {:x}'.format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
 
             ti, fl = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, fl, ti)
             if not res:
-                raise AssertionError('{:s}.id : idaapi.get_opinfo returned {:x} at {:x}'.format('.'.join((__name__, 'type', 'structure')), res, ea))
+                raise ValueError('{:s}.id({:x}) : idaapi.get_opinfo returned {:x} at {:x}'.format('.'.join((__name__, 'type', 'structure')), ea, res, ea))
             return ti.tid
 
         @utils.multicase()
@@ -2978,10 +2983,10 @@ class marks(object):
         try:
             idx = cls.get_slotindex(ea)
             ea,comm = cls.by_index(idx)
-            logging.warn("{:s}.new : Replacing mark {:d} at {:x} : {!r} -> {!r}".format('.'.join((__name__,cls.__name__)), idx, ea, comm, description))
+            logging.warn("{:s}.new({:x}, ...) : Replacing mark {:d} at {:x} : {!r} -> {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, comm, description))
         except KeyError:
             idx = cls.length()
-            logging.info("{:s}.new : Creating mark {:d} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), idx, ea, description))
+            logging.info("{:s}.new({:x}, ...) : Creating mark {:d} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, description))
 
         res = cls.location(ea=ea, x=0, y=0, lnnum=0)
         title,descr = description,description
@@ -3004,7 +3009,7 @@ class marks(object):
         res = cls.location(ea=idaapi.BADADDR)
         res.mark(idx, "", "")
 
-        logging.warn("{:s}.remove : Removed mark {:d} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), idx, ea, descr))
+        logging.warn("{:s}.remove({:x}) : Removed mark {:d} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, descr))
         return idx
 
     @classmethod
@@ -3035,7 +3040,7 @@ class marks(object):
         '''Return the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.get_slotaddress(index), cls.location().markdesc(index))
-        raise KeyError("{:s}.by_index : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__,cls.__name__)), ('{:d} < 0'.format(index)) if index < 0 else ('{:d} >= MAX_SLOT_COUNT'.format(index))))
+        raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__,cls.__name__)), index, ('{:d} < 0'.format(index)) if index < 0 else ('{:d} >= MAX_SLOT_COUNT'.format(index))))
     byIndex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
@@ -3062,10 +3067,10 @@ class marks(object):
         try:
             count = len(__builtin__.list(itertools.takewhile(lambda n: n != ea, res)))
         except IndexError:
-            raise KeyError(ea)
+            raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
         __builtin__.list(itertools.islice(iterable, count))
         if __builtin__.next(iterable) != ea:
-            raise KeyError(ea)
+            raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
         return count
     findSlotAddress = utils.alias(find_slotaddress, 'marks')
 
@@ -3090,7 +3095,7 @@ class marks(object):
         intp.assign(slotidx)
         res = loc.markedpos(intp)
         if res == idaapi.BADADDR:
-            raise KeyError(slotidx)
+            raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
         ea = address.head(res)
         cls.table[ea] = slotidx
         return ea

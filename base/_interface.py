@@ -382,22 +382,26 @@ class node(object):
             return tuple(res)
 
         # 64-bit
-        # 000002 888e00 889900 -- KEVENT.Header.anonymous_0.anonymous_0.Type
-        # 000002 888e00 889a00 -- KEVENT.Header.anonymous_0.Lock
-        # 000001 888e00        -- KEVENT.Header.anonymous_0
+        # 000002 c000888e00 c000889900 -- KEVENT.Header.anonymous_0.anonymous_0.Type
+        # 000002 c000888e00 c000889a00 -- KEVENT.Header.anonymous_0.Lock
+        # 000001 c000888e00        -- KEVENT.Header.anonymous_0
+        # 000001 c002bdc400
         # ff0000000000088e -- KEVENT
         # ff0000000000088f -- DISPATCHER_HEADER
         # ff00000000000890 -- _DISPATCHER_HEADER::*F98
         # ff00000000000891 -- _DISPATCHER_HEADER::*F98*0C
-        # (x ^ 0x8000ff) ror 8
+        # (x ^ 0xc0000000ff) ror 8
 
         def id64(sup):
-            chunks = zip(*((iter(sup),)*3))
-            count = le(chunks.pop(0))
+            iterable = iter(sup)
+            #chunks = zip(*((iter(sup),)*3))
+            count = le((next(iterable), next(iterable), next(iterable)))
+            chunks = zip(*((iterable,)*5))
+            #count = le(chunks.pop(0))
             if len(chunks) != count:
                 raise ValueError('{:s}.op_id -> id64 : Number of chunks does not match count : {:d} : {!r}'.format('.'.join(('internal',__name__)), count, map(''.join, chunks)))
             res = map(le, chunks)
-            res = map(functools.partial(operator.xor, 0x8000ff), res)
+            res = map(functools.partial(operator.xor, 0xc0000000ff), res)
             return tuple(ror(n, 8, 64) for n in res)
 
         return id64(sup) if bit64Q else id32(sup)
@@ -405,3 +409,64 @@ class node(object):
 def tuplename(*names):
     res = ('{:x}'.format(abs(n)) if isinstance(n, six.integer_types) else n for n in names)
     return '_'.join(res)
+
+# copied mostly from the collections.namedtuple template
+class namedtypedtuple(tuple):
+    '''A subclass of tuple with named fields.'''
+    _fields = ()
+    _types = ()
+
+    def __new__(cls, *args):
+        res = args[:]
+        for n,t,x in zip(cls._fields, cls._types, args):
+            if not isinstance(x, t): raise TypeError("Unexpected type for field '{:s}' : {!r} != {!r}".format(n, t, type(x)))
+        return tuple.__new__(cls, res)
+
+    @classmethod
+    def _make(cls, iterable, new=tuple.__new__, len=len):
+        result = new(cls, iterable)
+        if len(result) != len(cls._fields):
+            raise TypeError('Expected {:d} arguemnts, got {:d}'.format(len(cls._fields), len(result)))
+        for n,t,x in zip(cls._fields, cls._types, result):
+            if not isinstance(x, t): raise TypeError("Unexpected type for field '{:s}' : {!r} != {!r}".format(n, t, type(x)))
+        return result
+
+    @classmethod
+    def _type(cls, name):
+        res = (t for n,t in zip(cls._fields, cls._types) if n == name)
+        try: return next(res)
+        except StopIteration:
+            raise ValueError('Got unexpected field name: {:s}'.format(name))
+
+    def __getattribute__(self, name):
+        try:
+            # honor the ._fields first
+            res = object.__getattribute__(self, '_fields')
+            res = operator.itemgetter(res.index(name))
+        except (IndexError,ValueError):
+            res = lambda s: object.__getattribute__(s, name)
+        return res(self)
+
+    def __repr__(self):
+        res = ('{:s}={!r}'.format(name, value) for name,value in zip(self._fields, self))
+        return '{:s}({:s})'.format(self.__class__.__name__, ', '.join(res))
+
+    def _replace(self, **kwds):
+        result = self._make(map(kwds.pop, self._fields, self))
+        if kwds:
+            raise ValueError('Got unexpected field names: {!r}'.format(kwds.keys()))
+        return result
+    def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
+    def __getnewargs__(self): return tuple(self)
+    def __getstate__(self): return
+
+class symbol_t(object):
+    """A type that is used to describe a value that is symbolic in nature.
+    Used primarily as a type-checking mechanism.
+    """
+
+    @property
+    def __symbols__(self):
+        '''Must be implemented by each sub-class: Return a generator that returns each symbol described by ``self``.'''
+        raise NotImplementedError
+
