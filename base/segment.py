@@ -221,14 +221,14 @@ def set_color(segment, none):
     seg = by(segment)
     seg.color = 0xffffffff
     return bool(seg.update())
-@utils.multicase(rgb=int)
+@utils.multicase(rgb=six.integer_types)
 def set_color(segment, rgb):
     '''Set the color of the segment identified by ``segment`` to ``rgb``.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
     seg = by(segment)
     seg.color = (b<<16)|(rgb&0x00ff00)|r
     return bool(seg.update())
-@utils.multicase(rgb=int)
+@utils.multicase(rgb=six.integer_types)
 def set_color(rgb):
     '''Set the color of the current segment to ``rgb``.'''
     return set_color(ui.current.segment(), rgb)
@@ -268,7 +268,7 @@ def color(none):
 def color(segment, none):
     '''Clear the color of the segment identified by ``segment``.'''
     return set_color(segment, None)
-@utils.multicase(rgb=int)
+@utils.multicase(rgb=six.integer_types)
 def color(segment, rgb):
     '''Sets the color of the segment identified by ``segment`` to ``rgb``.'''
     return set_color(segment, rgb)
@@ -301,7 +301,7 @@ def _load_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     li = idaapi.open_linput(path, False)
     if not li:
-        raise IOError('{:s}.load_file({!r}, {:x}, {:#x}) : Unable to create loader_input_t : {:s}'.format(__name__, filename, ea, size, path))
+        raise IOError("{:s}.load_file({!r}, {:x}, {:#x}) : Unable to create loader_input_t : {:s}".format(__name__, filename, ea, size, path))
     res = idaapi.file2base(li, offset, ea, ea+size, True)
     idaapi.close_linput(li)
     return res
@@ -310,7 +310,7 @@ def _save_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     of = idaapi.fopenWB(path)
     if not of:
-        raise IOError('{:s}.save_file({!r}, {:x}, {:#x}) : Unable to open target file : {:s}'.format(__name__, filename, ea, size, path))
+        raise IOError("{:s}.save_file({!r}, {:x}, {:#x}) : Unable to open target file : {:s}".format(__name__, filename, ea, size, path))
     res = idaapi.base2file(of, offset, ea, ea+size)
     idaapi.eclose(of)
     return res
@@ -395,7 +395,7 @@ def remove(segment, remove=False):
     If the bool ``remove`` is specified, then remove the content of the segment from the database.
     """
     if not isinstance(segment, idaapi.segment_t):
-        raise TypeError('{:s}.remove({!r}) : segment is not of an idaapi.segment_t. : {!r}'.format(__name__, segment, type(segment)))
+        raise TypeError("{:s}.remove({!r}) : segment is not of an idaapi.segment_t. : {!r}".format(__name__, segment, type(segment)))
     res = idaapi.del_selector(segment.sel)
     if res == 0:
         logging.warn("{:s}.remove({!r}):Unable to delete selector {:x}".format(__name__, segment, segment.sel))

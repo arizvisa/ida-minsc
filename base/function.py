@@ -64,7 +64,7 @@ def __addressOfRtOrSt(func):
         # yep, we're an import
         return True, func
     if fn is None:
-        raise LookupError('{:s}.by({!r}) : Unable to locate function with the specified identifier.'.format(__name__, func))
+        raise LookupError("{:s}.by({!r}) : Unable to locate function with the specified identifier.".format(__name__, func))
     return False, fn.startEA
 
 @utils.multicase()
@@ -198,7 +198,7 @@ def set_name(func, string):
     else:
         res, ok = get_name(ea), idaapi.set_name(ea, string, idaapi.SN_PUBLIC)
     if not ok:
-        raise ValueError('{:s}.set_name({:x}, {!r}) : Unable to apply function name.'.format(__name__, ea, string))
+        raise ValueError("{:s}.set_name({:x}, {!r}) : Unable to apply function name.".format(__name__, ea, string))
     return res
 
 @utils.multicase()
@@ -278,7 +278,7 @@ def range(func):
 def set_color(none):
     '''Remove the color from the current function.'''
     return set_color(ui.current.function(), None)
-@utils.multicase(rgb=int)
+@utils.multicase(rgb=six.integer_types)
 def set_color(rgb):
     '''Set the color of the current function to ``rgb``.'''
     return set_color(ui.current.function(), rgb)
@@ -556,6 +556,16 @@ class blocks(object):
         for bb in cls.iterate(func):
             yield bb.startEA, bb.endEA
         return
+    @utils.multicase()
+    def __new__(cls, left, right):
+        '''Returns each basic-block contained within the addresses ``left`` and ``right``.'''
+        func = by_address(left)
+        (left,_), (_,right) = block(left), block(database.address.prev(right))
+        for bb in cls.iterate(func):
+            if (bb.startEA >= left and bb.endEA <= right):
+                yield bb.startEA, bb.endEA
+            continue
+        return
 
     @utils.multicase()
     @classmethod
@@ -689,11 +699,49 @@ class block(object):
     def __new__(cls, func, ea):
         '''Returns the boundaries of the basic-block at address ``ea`` in function ``func``.'''
         res = blocks.get(func, ea)
-        return res.startEA,res.endEA
+        return res.startEA, res.endEA
     @utils.multicase(bb=idaapi.BasicBlock)
     def __new__(cls, bb):
         '''Returns the boundaries of the basic-block ``bb``.'''
         return bb.startEA, bb.endEA
+
+    @utils.multicase()
+    @classmethod
+    def top(cls):
+        '''Return the top address of the basic-block at the current address.'''
+        left, _ = cls()
+        return left
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def top(cls, ea):
+        '''Return the top address of the basic-block at address ``ea``.'''
+        left, _ = cls(ea)
+        return left
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def top(cls, bb):
+        '''Return the top address of the basic-block ``bb``.'''
+        left, _ = cls(bb)
+        return left
+
+    @utils.multicase()
+    @classmethod
+    def bottom(cls):
+        '''Return the bottom address of the basic-block at the current address.'''
+        _, right = cls()
+        return right
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def bottom(cls, ea):
+        '''Return the bottom address of the basic-block at address ``ea``.'''
+        _, right = cls(ea)
+        return right
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def bottom(cls, bb):
+        '''Return the bottom address of the basic-block ``bb``.'''
+        _, right = cls(bb)
+        return right
 
     @utils.multicase(none=types.NoneType)
     @classmethod
@@ -718,7 +766,7 @@ class block(object):
             database.set_color(ea, None)
             # internal.netnode.alt.remove(ea, 0x14)
         return res
-    @utils.multicase(ea=six.integer_types, rgb=int)
+    @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
     @classmethod
     def set_color(cls, ea, rgb, **frame):
         """Sets the color of the basic-block at address ``ea`` to ``rgb``.
@@ -759,7 +807,7 @@ class block(object):
             database.set_color(ea, None)
             #internal.netnode.alt.remove(ea, 0x14)
         return res
-    @utils.multicase(bb=idaapi.BasicBlock, rgb=int)
+    @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
     def set_color(cls, bb, rgb, **frame):
         """Sets the color of the basic-block ``bb`` to ``rgb``.
@@ -845,14 +893,14 @@ class block(object):
     def color(cls, bb, none):
         '''Removes the color of the basic-block ``bb``.'''
         return cls.set_color(bb, None)
-    @utils.multicase(ea=six.integer_types, rgb=int)
+    @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
     @classmethod
     def color(cls, ea, rgb, **frame):
         """Sets the color of the basic-block at the address ``ea`` to ``rgb``.
         If the color ``frame`` is specified, set the frame to the specified color.
         """
         return cls.set_color(ea, rgb, **frame)
-    @utils.multicase(bb=idaapi.BasicBlock, rgb=int)
+    @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
     def color(cls, bb, rgb, **frame):
         """Sets the color of the basic-block ``bb`` to ``rgb``.
@@ -913,6 +961,36 @@ class block(object):
         '''Yield all the addresses in the basic-block ``bb``.'''
         l, r = bb.startEA, bb.endEA
         return database.iterate(l, database.address.prev(r))
+
+    @utils.multicase(reg=(basestring,_instruction.register_t))
+    @classmethod
+    def register(cls, reg, *regs, **modifiers):
+        """Yield each (address, operand-number, operand-state) within the current basic-block that touches one of the registers identified by ``regs``.
+        If the keyword ``write`` is True, then only return the result if it's writing to the register.
+        """
+        return cls.register(ui.current.address(), reg, *regs, **modifiers)
+    @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
+    @classmethod
+    def register(cls, ea, reg, *regs, **modifiers):
+        """Yield each (address, operand-number, operand-state) within the basic-block containing ``ea`` that touches one of the registers identified by ``regs``.
+        If the keyword ``write`` is True, then only return the result if it's writing to the register.
+        """
+        blk = blocks.get(ea)
+        return cls.register(blk, reg, *regs, **modifiers)
+    @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring,_instruction.register_t))
+    @classmethod
+    def register(cls, bb, reg, *regs, **modifiers):
+        """Yield each (address, operand-number, operand-state) within the basic-block ``bb`` that touches one of the registers identified by ``regs``.
+        If the keyword ``write`` is True, then only return the result if it's writing to the register.
+        """
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use( (reg,)+regs )
+
+        for ea in cls.iterate(bb):
+            for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
+                yield ea, opnum, _instruction.op_state(ea, opnum)
+            continue
+        return
 
     @utils.multicase()
     @classmethod
@@ -1133,7 +1211,7 @@ def tag_write(key, none):
 def tag_write(func, key, value):
     '''Set the tag ``key`` to ``value`` for the function ``func``.'''
     if value is None:
-        raise ValueError('{:s}.tag_write({!r}) : Tried to set tag {!r} to an invalid value.'.format(__name__, ea, key))
+        raise ValueError("{:s}.tag_write({!r}) : Tried to set tag {!r} to an invalid value.".format(__name__, ea, key))
 
     # Check to see if function tag is being applied to an import
     try:
@@ -1420,37 +1498,21 @@ class type(object):
 
 @utils.multicase(reg=(basestring,_instruction.register_t))
 def register(reg, *regs, **modifiers):
-    """Yield each (address, operand-number, operand-state) within the current fwwwwunction that touches one of the registers identified by ``regs``.
-    If the keyword ``write`` is True, then only return the address if it's writing to the register.
+    """Yield each (address, operand-number, operand-state) within the current function that touches one of the registers identified by ``regs``.
+    If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     return register(ui.current.function(), reg, *regs, **modifiers)
 @utils.multicase(reg=(basestring,_instruction.register_t))
 def register(func, reg, *regs, **modifiers):
     """Yield each (address, operand-number, operand-state) within the function ``func`` that touches one of the registers identified by ``regs``.
-    If the keyword ``write`` is True, then only return the address if it's writing to the register.
+    If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
-    regs = [ _instruction.reg.by_name(r) if isinstance(r, basestring) else r for r in (reg,)+regs ]
-
-    # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
-    match = lambda r,regs: any(itertools.imap(r.relatedQ,regs))
-
-    def uses_register(ea, opnum, regs):
-        val = _instruction.op_value(ea, opnum)
-        if isinstance(val, interface.symbol_t):
-            return any(match(r, regs) for r in val.__symbols__)
-        return False
-
-    iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
-    if modifiers.get('read', False):
-        iterops = _instruction.ops_read
-    if modifiers.get('write', False):
-        iterops = _instruction.ops_write
+    iterops = interface.regmatch.modifier(**modifiers)
+    uses_register = interface.regmatch.use( (reg,)+regs )
 
     for ea in iterate(func):
-        for opnum in iterops(ea):
-            if uses_register(ea, opnum, regs):
-                yield ea, opnum, _instruction.op_state(ea, opnum)
-            continue
+        for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
+            yield ea, opnum, _instruction.op_state(ea, opnum)
         continue
     return
 
@@ -1466,7 +1528,7 @@ def stackdelta(ea, delta, **direction):
     """
     dir = direction.get('direction', direction.get('dir', -1))
     if dir == 0:
-        raise ValueError('{:s}.stackdelta({:x}, {:+x}{:s}) : Invalid value specified for \'direction\' argument.'.format(__name__, ea, delta, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in direction.iteritems())) if direction else ''))
+        raise ValueError("{:s}.stackdelta({:x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in direction.iteritems())) if direction else ''))
     next = database.next if dir > 0 else database.prev
 
     sp, ea = get_spdelta(ea), interface.address.inside(ea)

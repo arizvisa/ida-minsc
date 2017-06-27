@@ -156,7 +156,7 @@ def search(**type):
 
     res = next(iter(res), None)
     if res is None:
-        raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format(__name__, searchstring))
+        raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
 @utils.multicase(struc=__structure_t)
@@ -257,7 +257,7 @@ def apply_op(id, ea, opnum, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise TypeError('{:s}.apply_op({:x}, {:x}, {:d}, delta={:d}) : Item type at requested address is not code.'.format(__name__, id, ea, opnum, delta.get('delta', 0)))
+        raise TypeError("{:s}.apply_op({:x}, {:x}, {:d}, delta={:d}) : Item type at requested address is not code.".format(__name__, id, ea, opnum, delta.get('delta', 0)))
     # FIXME: allow one to specify more than one field for tid_array
     length = 2
     tid = idaapi.tid_array(length)
@@ -322,7 +322,7 @@ def by_name(name, **options):
     '''Return a structure by it's name.'''
     id = idaapi.get_struc_id(name)
     if id == idaapi.BADADDR:
-        raise LookupError('{:s}.by_name : Unable to locate structure {!r}'.format(__name__, name))
+        raise LookupError("{:s}.by_name({!r}) : Unable to locate structure with given name.".format(__name__, name))
     return instance(id, **options)
 byName = utils.alias(by_name)
 
@@ -330,7 +330,7 @@ def by_index(index, **options):
     '''Return a structure by it's index.'''
     id = idaapi.get_struc_by_idx(index)
     if id == idaapi.BADADDR:
-        raise IndexError('{:s}.by_index : Unable to locate structure #{:d}'.format(__name__, index))
+        raise IndexError("{:s}.by_index({:d}) : Unable to locate structure at given index.".format(__name__, index))
     return instance(id, **options)
 byIndex = utils.alias(by_index)
 
@@ -573,7 +573,7 @@ class members_t(object):
         ownername,baseoffset,_ = state
         identifier = idaapi.get_struc_id(ownername)
         if identifier == idaapi.BADADDR:
-            raise LookupError('{:s}.instance({:s}).members.__setstate__ : Failure creating a members_t for structure_t {!r}'.format(__name__, self.owner.name, ownername))
+            raise LookupError("{:s}.instance({:s}).members.__setstate__ : Failure creating a members_t for structure_t {!r}".format(__name__, self.owner.name, ownername))
             logging.warn('{:s}.instance({:s}).members.__setstate__ : Creating structure {:s} -- [{:+#x}] {:d} members'.format(__name__, self.owner.name, ownername, baseoffset, len(members)))
             identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
         self.baseoffset = baseoffset
@@ -610,7 +610,7 @@ class members_t(object):
             if member_t.id == self[i].id:
                 return i
             continue
-        raise ValueError('{:s}.instance({:s}).members.index : {!r} not in list'.format(__name__, self.owner.name, member_t))
+        raise ValueError("{:s}.instance({:s}).members.index : {!r} not in list".format(__name__, self.owner.name, member_t))
 
     __member_matcher = utils.matcher()
     __member_matcher.boolean('regex', re.search, 'name')
@@ -674,7 +674,7 @@ class members_t(object):
 
         res = next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.instance({:s}).members.by({:s}) : Found 0 matching results.'.format(__name__, self.owner.name, searchstring))
+            raise LookupError("{:s}.instance({:s}).members.by({:s}) : Found 0 matching results.".format(__name__, self.owner.name, searchstring))
         return res
     @utils.multicase(name=basestring)
     def by(self, name):
@@ -688,14 +688,16 @@ class members_t(object):
     def by_name(self, name):
         '''Return the member with the specified ``name``.'''
         mem = idaapi.get_member_by_name(self.owner.ptr, str(name))
-        if mem is None: raise KeyError('{:s}.instance({:s}).members.by_name : Unable to find member with requested name : {!r}'.format(__name__, self.owner.name, name))
+        if mem is None:
+            raise KeyError("{:s}.instance({:s}).members.by_name : Unable to find member with requested name : {!r}".format(__name__, self.owner.name, name))
         index = self.index(mem)
         return self[index]
     byname = byName = utils.alias(by_name, 'members_t')
     def by_fullname(self, fullname):
         '''Return the member with the specified ``fullname``.'''
         mem = idaapi.get_member_by_fullname(self.owner.ptr, str(fullname))
-        if mem is None: raise KeyError('{:s}.instance({:s}).members.by_fullname : Unable to find member with full name : {!r}'.format(__name__, self.owner.name, fullname))
+        if mem is None:
+            raise KeyError("{:s}.instance({:s}).members.by_fullname : Unable to find member with full name : {!r}".format(__name__, self.owner.name, fullname))
         index = self.index(mem)
         return self[index]
     byfullname = byFullname = utils.alias(by_fullname, 'members_t')
@@ -706,11 +708,11 @@ class members_t(object):
         mptr = idaapi.get_member(self.owner.ptr, max - self.baseoffset)
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max+msize):
-            raise LookupError('{:s}.instance({:s}).members.by_offset : Requested offset {:+#x} not within bounds ({:#x},{:#x})'.format(__name__, self.owner.name, offset, min, max+msize))
+            raise LookupError("{:s}.instance({:s}).members.by_offset : Requested offset {:+#x} not within bounds ({:#x},{:#x})".format(__name__, self.owner.name, offset, min, max+msize))
 
         mem = idaapi.get_member(self.owner.ptr, offset - self.baseoffset)
         if mem is None:
-            raise LookupError('{:s}.instance({:s}).members.by_offset : Unable to find member at offset : {:+#x}'.format(__name__, self.owner.name, offset))
+            raise LookupError("{:s}.instance({:s}).members.by_offset : Unable to find member at offset : {:+#x}".format(__name__, self.owner.name, offset))
 
         index = self.index(mem)
         return self[index]
@@ -729,7 +731,7 @@ class members_t(object):
             mem = idaapi.get_best_fit_member(self.owner.ptr, res)
 
         if mem is None:
-            raise LookupError('{:s}.instance({:s}).members.near_offset : Unable to find member near offset : {:+#x}'.format(__name__, self.owner.name, offset))
+            raise LookupError("{:s}.instance({:s}).members.near_offset : Unable to find member near offset : {:+#x}".format(__name__, self.owner.name, offset))
 
         index = self.index(mem)
         return self[index]

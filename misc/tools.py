@@ -108,3 +108,20 @@ def checkmarks():
         print >>sys.stdout, '{:x} : in function {:s}'.format(k,function.name(function.byAddress(k)))
         print >>sys.stdout, '\n'.join( ('- {:x} : {:s}'.format(a,m) for a,m in sorted(v)) )
     return
+
+def collect(ea, sentinel):
+    if isinstance(sentinel, list):
+        sentinel = set(sentinel)
+    if not all((sentinel, isinstance(sentinel, set))):
+        raise AssertionError('{:s}.collect({:x}, {!r}) : Sentinel is empty or not a set.'.format(__name__, ea, sentinel))
+    def _collect(addr, result):
+        process = set()
+        for blk in map(function.block, function.block.after(addr)):
+            if any(blk in coll for coll in (result,sentinel)):
+                continue
+            process.add(blk)
+        for addr, _ in process:
+            result |= _collect(addr, result | process)
+        return result
+    addr, _ = blk = function.block(ea)
+    return _collect(addr, set([blk]))

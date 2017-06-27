@@ -38,6 +38,7 @@ AnyRegister = AnyReg = __import__('internal').utils.PatternAnyType(instruction.r
 AnyInteger = AnyInt = __import__('internal').utils.PatternAnyType(__import__('six').integer_types)
 AnyString = AnyStr = __import__('internal').utils.PatternAnyType(basestring)
 Any = _ = __import__('internal').utils.PatternAny()
+architecture_t, register_t, symbol_t = instruction.architecture_t, instruction.register_t, __import__('internal').interface.symbol_t
 
 import tools,ui
 from tools import remote

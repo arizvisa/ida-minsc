@@ -228,7 +228,7 @@ def search(**type):
 
     res = next(iter(res), None)
     if res is None:
-        raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format(__name__, searchstring))
+        raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
 ## members

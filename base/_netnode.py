@@ -15,9 +15,9 @@ class utils(object):
     def range(cls):
         this = _ida_netnode.new_netnode()
         ok, start = _ida_netnode.netnode_start(this), _ida_netnode.netnode_index(this)
-        if not ok: raise StandardError('{:s}.range : Unable to find first node.'.format('.'.join((__name__,cls.__name__))))
+        if not ok: raise StandardError("{:s}.range : Unable to find first node.".format('.'.join((__name__,cls.__name__))))
         ok, end = _ida_netnode.netnode_end(this), _ida_netnode.netnode_index(this)
-        if not ok: raise StandardError('{:s}.range : Unable to find last node.'.format('.'.join((__name__,cls.__name__))))
+        if not ok: raise StandardError("{:s}.range : Unable to find last node.".format('.'.join((__name__,cls.__name__))))
         return start, end
 
     @classmethod
@@ -198,7 +198,7 @@ class value(object):
     @classmethod
     def repr(cls, nodeidx):
         if not cls.exists(nodeidx):
-            raise ValueError('Node {:x} has no value.'.format(nodeidx))
+            raise ValueError("Node {:x} has no value.".format(nodeidx))
         res, s, val = cls.get(nodeidx), cls.get(nodeidx, type=str), cls.get(nodeidx, type=int)
         return '{!r} {!r} 0x{:x}'.format(res, s, val)
 

@@ -289,7 +289,7 @@ class functions(object):
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__, cls.__name__)), query_s))
+            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res
 
 def segments():
@@ -480,7 +480,7 @@ class names(object):
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__, cls.__name__)), query_s))
+            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return idaapi.get_nlist_ea(res)
 
     @classmethod
@@ -641,12 +641,13 @@ def set_name(string, **listed):
 @utils.multicase(ea=six.integer_types, string=basestring)
 def set_name(ea, string, **listed):
     """Rename the address specified by ``ea`` to ``string``.
-    If ``listed`` is True, then specify that the name is added to the Names list.
+    If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
+    If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
     """
 
     ea = interface.address.inside(ea)
     if idaapi.SN_NOCHECK != 0:
-        raise AssertionError('{:s}.set_name({:x}, {!r}{:s}) : idaapi.SN_NOCHECK != 0'.format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else ''))
+        raise AssertionError("{:s}.set_name({:x}, {!r}{:s}) : idaapi.SN_NOCHECK != 0".format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else ''))
     SN_NOLIST = idaapi.SN_NOLIST
     SN_LOCAL = idaapi.SN_LOCAL
     SN_NON_PUBLIC = idaapi.SN_NON_PUBLIC
@@ -660,14 +661,16 @@ def set_name(ea, string, **listed):
     flags |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
     flags |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
 
-    # If the bool ``listed`` is True, then ensure that this name is added to the name list.
-    flags = (flags & ~idaapi.SN_NOLIST) if listed.get('listed', False) else (flags | idaapi.SN_NOLIST)
-
     try:
         function.top(ea)
         flags |= idaapi.SN_LOCAL
     except Exception:
         flags &= ~idaapi.SN_LOCAL
+        if 'listed' not in listed:
+            flags &= ~idaapi.SN_NOLIST
+
+    # If the bool ``listed`` is True, then ensure that this name is added to the name list.
+    flags = (flags & ~idaapi.SN_NOLIST) if listed.get('listed', False) else (flags | idaapi.SN_NOLIST)
 
     try:
         # check if we're a label of some kind
@@ -691,7 +694,7 @@ def set_name(ea, string, **listed):
     res,ok = get_name(ea),idaapi.set_name(ea, string or "", flags)
 
     if not ok:
-        raise ValueError('{:s}.set_name({:x}, {!r}{:s}) : Unable to call idaapi.set_name({:x}, {!r}, {:x})'.format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else '', ea, string, flags))
+        raise ValueError("{:s}.set_name({:x}, {!r}{:s}) : Unable to call idaapi.set_name({:x}, {!r}, {:x})".format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else '', ea, string, flags))
     return res
 
 @utils.multicase()
@@ -809,7 +812,7 @@ def set_color(none):
 def set_color(ea, none):
     '''Remove the color at address ``ea``.'''
     return idaapi.set_item_color(interface.address.inside(ea), 0xffffffff)
-@utils.multicase(ea=six.integer_types, rgb=int)
+@utils.multicase(ea=six.integer_types, rgb=six.integer_types)
 def set_color(ea, rgb):
     '''Set the color at address ``ea`` to ``rgb``.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
@@ -831,7 +834,7 @@ def color(ea):
 def color(ea, none):
     '''Remove the color at the address ``ea``.'''
     return set_color(ea, None)
-@utils.multicase(ea=six.integer_types, rgb=int)
+@utils.multicase(ea=six.integer_types, rgb=six.integer_types)
 def color(ea, rgb):
     '''Set the color at address ``ea`` to ``rgb``.'''
     return set_color(ea, rgb)
@@ -953,7 +956,7 @@ class entry(object):
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryordinal__(res)
-        raise ValueError('{:s}.ordinal({:x}) : No entry-point at specified address.'.format('.'.join((__name__, cls.__name__)), ea))
+        raise ValueError("{:s}.ordinal({:x}) : No entry-point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase()
     @classmethod
@@ -967,7 +970,7 @@ class entry(object):
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryname__(res)
-        raise ValueError('{:s}.name({:x}) : No entry-point at specified address.'.format('.'.join((__name__, cls.__name__)), ea))
+        raise ValueError("{:s}.name({:x}) : No entry-point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1025,7 +1028,7 @@ class entry(object):
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), query_s))
+            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__,cls.__name__)), query_s))
         return cls.__address__(res)
 
     @utils.multicase()
@@ -1034,7 +1037,7 @@ class entry(object):
         '''Makes an entry-point at the current address.'''
         ea,entryname,ordinal = ui.current.address(), name(ui.current.address()) or function.name(ui.current.address()), idaapi.get_entry_qty()
         if entryname is None:
-            raise ValueError('{:s}.new({:x}) : Unable to determine name at address.'.format( '.'.join((__name__,cls.__name__)), ea))
+            raise ValueError("{:s}.new({:x}) : Unable to determine name at address.".format( '.'.join((__name__,cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -1042,7 +1045,7 @@ class entry(object):
         '''Makes an entry-point at the specified address ``ea``.'''
         entryname, ordinal = name(ea) or function.name(ea), idaapi.get_entry_qty()
         if entryname is None:
-            raise ValueError('{:s}.new({:x}) : Unable to determine name at address.'.format( '.'.join((__name__,cls.__name__)), ea))
+            raise ValueError("{:s}.new({:x}) : Unable to determine name at address.".format( '.'.join((__name__,cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(name=basestring)
     @classmethod
@@ -1133,7 +1136,7 @@ def tag_write(key, none):
 def tag_write(ea, key, value):
     '''Set the tag ``key`` to ``value`` at the address ``ea``.'''
     if value is None:
-        raise ValueError('{:s}.tag_write({:x}, {!r}, ...) : Tried to set tag {!r} to an invalid value. : {!r}'.format(__name__, ea, key, key, value))
+        raise ValueError("{:s}.tag_write({:x}, {!r}, ...) : Tried to set tag {!r} to an invalid value. : {!r}".format(__name__, ea, key, key, value))
 
     # if the user wants to change the '__name__' tag, then
     # change the name fo' real.
@@ -1493,7 +1496,7 @@ class imports(object):
 
         res = __builtin__.next(iter(res), None)
         if res is None:
-            raise LookupError('{:s}.search({:s}) : Found 0 matching results.'.format('.'.join((__name__,cls.__name__)), query_s))
+            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__,cls.__name__)), query_s))
         return res[0]
 
 getImportModules = utils.alias(imports.modules, 'imports')
@@ -1718,45 +1721,43 @@ class address(object):
     @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
-        regs = [ _instruction.reg.by_name(r) if isinstance(r, basestring) else r for r in (reg,)+regs ]
-        count = modifiers.get('count',1)
+        regs = (reg,) + regs
+        count = modifiers.get('count', 1)
         args = ', '.join(['{:x}'.format(ea)] + __builtin__.map('"{:s}"'.format, regs) + __builtin__.map(utils.unbox('{:s}={!r}'.format), modifiers.items()))
 
-        # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
-        match = lambda r,regs: any(itertools.imap(r.relatedQ,regs))
-
-        def uses_register(ea, opnum, regs):
-            val = _instruction.op_value(ea, opnum)
-            if isinstance(val, interface.symbol_t):
-                return any(match(r, regs) for r in val.__symbols__)
-            return False
-
-        iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
-        if modifiers.get('read', False):
-            iterops = _instruction.ops_read
-        if modifiers.get('write', False):
-            iterops = _instruction.ops_write
+        # generate each helper using the regmatch class
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use(regs)
 
         # if within a function, then sure we're within the chunk's bounds.
         if function.within(ea):
-            (start,_) = function.chunk(ea)
+            (start, _) = function.chunk(ea)
             fwithin = functools.partial(operator.le, start)
+
         # otherwise ensure that we're not in the function and we're a code type.
         else:
             fwithin = utils.compose(utils.fap(utils.compose(function.within, operator.not_), type.is_code), all)
 
             start = cls.walk(ea, cls.prev, fwithin)
-            start = db.top() if start == idaapi.BADADDR else start
+            start = top() if start == idaapi.BADADDR else start
 
+        # define a function for cls.walk to continue looping while
+        F = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+
+        # skip the current address
         prevea = cls.prev(ea)
         if prevea is None:
             # FIXME: include registers in message
             logging.fatal("{:s}.prevreg({:s}, ...) : Unable to start walking from previous address. : {:x}".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
-        res = cls.walk(prevea, cls.prev, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
+
+        # now walk while none of our registers match
+        res = cls.walk(prevea, cls.prev, F)
         if res == idaapi.BADADDR or (cls == address and res < start):
             # FIXME: include registers in message
             raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
+
+        # recurse if the user specified it
         modifiers['count'] = count - 1
         return cls.prevreg( cls.prev(res), *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=(basestring,_instruction.register_t))
@@ -1768,45 +1769,43 @@ class address(object):
     @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
-        regs = [ _instruction.reg.by_name(r) if isinstance(r, basestring) else r for r in (reg,)+regs ]
+        regs = (reg,) + regs
         count = modifiers.get('count',1)
         args = ', '.join(['{:x}'.format(ea)] + __builtin__.map('"{:s}"'.format, regs) + __builtin__.map(utils.unbox('{:s}={!r}'.format), modifiers.items()))
 
-        # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
-        match = lambda r,regs: any(itertools.imap(r.relatedQ,regs))
-
-        def uses_register(ea, opnum, regs):
-            val = _instruction.op_value(ea, opnum)
-            if isinstance(val, interface.symbol_t):
-                return any(match(r, regs) for r in val.__symbols__)
-            return False
-
-        iterops = utils.compose(_instruction.ops_count, xrange, __builtin__.list)
-        if modifiers.get('read', False):
-            iterops = _instruction.ops_read
-        if modifiers.get('write', False):
-            iterops = _instruction.ops_write
+        # generate each helper using the regmatch class
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use(regs)
 
         # if within a function, then sure we're within the chunk's bounds.
         if function.within(ea):
             (_,end) = function.chunk(ea)
             fwithin = functools.partial(operator.gt, end)
+
         # otherwise ensure that we're not in a function and we're a code type.
         else:
             fwithin = utils.compose(utils.fap(utils.compose(function.within, operator.not_), type.is_code), all)
 
             end = cls.walk(ea, cls.next, fwithin)
-            end = db.bottom() if end == idaapi.BADADDR else end
+            end = bottom() if end == idaapi.BADADDR else end
 
+        # define a function for cls.walk to continue looping while
+        F = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+
+        # skip the current address
         nextea = cls.next(ea)
         if nextea is None:
             # FIXME: include registers in message
             logging.fatal("{:s}.nextreg({:s}) : Unable to start walking from next address. : {:x}".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
-        res = cls.walk(nextea, cls.next, lambda ea: fwithin(ea) and not any(uses_register(ea, opnum, regs) for opnum in iterops(ea)))
+
+        # now walk while none of our registers match
+        res = cls.walk(nextea, cls.next, F)
         if res == idaapi.BADADDR or (cls == address and res >= end):
             # FIXME: include registers in message
             raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:x}:{:x} : {:x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], end, ea, res))
+
+        # recurse if the user specified it
         modifiers['count'] = count - 1
         return cls.nextreg(cls.next(res), *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=(basestring,_instruction.register_t))
@@ -2502,7 +2501,7 @@ class type(object):
                 t = strings[elesize]
             elif fl & idaapi.FF_STRU == idaapi.FF_STRU:
                 t, size = type.structure.id(ea), idaapi.get_item_size(ea)
-                return [ type.structure.at(ea, id=t) for ea in xrange(ea, ea+size, structure.size(t)) ]
+                return [ type.structure.at(ea, id=t) for ea in __builtin__.range(ea, ea+size, structure.size(t)) ]
             else:
                 ch = numerics[fl & idaapi.DT_TYPE]
                 t = ch.lower() if fl & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
@@ -2584,12 +2583,12 @@ class type(object):
 
             res = type(ea)
             if res != idaapi.FF_STRU:
-                raise TypeError('{:s}.id({:x}) : Specified IDA Type is not an FF_STRU({:x}) : {:x}'.format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
+                raise TypeError("{:s}.id({:x}) : Specified IDA Type is not an FF_STRU({:x}) : {:x}".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
 
             ti, fl = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, fl, ti)
             if not res:
-                raise ValueError('{:s}.id({:x}) : idaapi.get_opinfo returned {:x} at {:x}'.format('.'.join((__name__, 'type', 'structure')), ea, res, ea))
+                raise ValueError("{:s}.id({:x}) : idaapi.get_opinfo returned {:x} at {:x}".format('.'.join((__name__, 'type', 'structure')), ea, res, ea))
             return ti.tid
 
         @utils.multicase()

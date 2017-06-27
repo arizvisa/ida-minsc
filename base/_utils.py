@@ -14,11 +14,15 @@ __all__+= ['process','spawn']
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
 # box any specified arguments
-box = lambda *a: a
+box = fbox = lambda *a: a
 # return a closure that executes ``f`` with the arguments unboxed.
-unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple,ap), ())), **__builtin__.dict(k.items() + kp.items()))
-# return a closure that always returns ``n``.
-identity = lambda n: lambda *a, **k: n
+unbox = funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple,ap), ())), **__builtin__.dict(k.items() + kp.items()))
+# return a closure that will check that ``object`` is an instance of ``type``.
+finstance = lambda type: lambda object: isinstance(object, type)
+# return a closure that always returns ``object``.
+fconstant = fconst = lambda object: lambda *a, **k: object
+# a closure that returns it's argument
+fpassthru = fpass = fidentity = identity = lambda object: object
 # return the first, second, or third item of a box.
 first, second, third = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2)
 # return a closure that executes a list of functions one after another from left-to-right
@@ -26,7 +30,8 @@ fcompose = compose = lambda *f: __builtin__.reduce(lambda f1,f2: lambda *a: f1(f
 # return a closure that executes function ``f`` whilst discarding any extra arguments
 fdiscard = lambda f: lambda *a, **k: f()
 # return a closure that executes function ``crit`` and then executes ``f`` or ``t`` based on whether or not it's successful.
-fcondition = lambda f, t: lambda crit: lambda *a, **k: t(*a, **k) if crit(*a, **k) else f(*a, **k)
+fcondition = fcond = lambda crit: lambda t, f: \
+    lambda *a, **k: t(*a, **k) if crit(*a, **k) else f(*a, **k)
 # return a closure that takes a list of functions to execute with the provided arguments
 fmaplist = fap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
 #lazy = lambda f, state={}: lambda *a, **k: state[(f,a,__builtin__.tuple(__builtin__.sorted(k.items())))] if (f,a,__builtin__.tuple(__builtin__.sorted(k.items()))) in state else state.setdefault((f,a,__builtin__.tuple(__builtin__.sorted(k.items()))), f(*a, **k))
@@ -34,19 +39,19 @@ fmaplist = fap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
 # return a memoized closure that's lazy and only executes when evaluated
 def lazy(f, *a, **k):
     sortedtuple, state = fcompose(__builtin__.sorted, __builtin__.tuple), {}
-    def closure(*ap, **kp):
+    def lazy(*ap, **kp):
         A, K = a+ap, sortedtuple(k.items() + kp.items())
         return state[(A,K)] if (A,K) in state else state.setdefault((A,K), f(*A, **__builtin__.dict(k.items()+kp.items())))
-    return closure
+    return lazy
 # return a closure that will use the specified arguments to call the provided function
 fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a+ap), **__builtin__.dict(k.items() + kp.items()))
 # return a closure that executes function ``f`` and includes the exception or None as the first element in the boxed result.
-def fexception(f, *a, **k):
-    def closure(*a, **k):
+def fcatch(f, *a, **k):
+    def fcatch(*a, **k):
         try: return __builtin__.None, f(*a, **k)
         except: return sys.exc_info()[1], __builtin__.None
-    return functools.partial(closure, *a, **k)
-fexc = fexception
+    return functools.partial(fcatch, *a, **k)
+fexc = fexception = fcatch
 
 # cheap pattern-like matching
 class Pattern(object):
@@ -204,7 +209,7 @@ class multicase(object):
 
         error_arguments = ('{:s}'.format(n.__class__.__name__) for n in args)
         error_keywords = ('{:s}={:s}'.format(n, kwds[n].__class__.__name__) for n in kwds)
-        raise LookupError('@multicase.call({:s}, {{{:s}}}) : does not match any defined prototypes : {:s}'.format(', '.join(error_arguments), ', '.join(error_keywords), ', '.join(cls.prototype(f,t) for f,t,_ in heap)))
+        raise LookupError("@multicase.call({:s}, {{{:s}}}) : does not match any defined prototypes : {:s}".format(', '.join(error_arguments), ', '.join(error_keywords), ', '.join(cls.prototype(f,t) for f,t,_ in heap)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
@@ -517,20 +522,20 @@ class process(object):
         if self.running and not self.program.stdin.closed:
             if self.updater and self.updater.is_alive():
                 return self.program.stdin.write(data)
-            raise IOError('Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.'.format(self.id))
-        raise IOError('Unable to write to stdin for process. {:s}.'.format(self.__format_process_state()))
+            raise IOError("Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.".format(self.id))
+        raise IOError("Unable to write to stdin for process. {:s}.".format(self.__format_process_state()))
 
     def close(self):
         """Closes stdin of the program"""
         if self.running and not self.program.stdin.closed:
             return self.program.stdin.close()
-        raise IOError('Unable to close stdin for process. {:s}.'.format(self.__format_process_state()))
+        raise IOError("Unable to close stdin for process. {:s}.".format(self.__format_process_state()))
 
     def signal(self, signal):
         """Raise a signal to the program"""
         if self.running:
             return self.program.send_signal(signal)
-        raise IOError('Unable to raise signal {!r} to process. {:s}.'.format(signal, self.__format_process_state()))
+        raise IOError("Unable to raise signal {!r} to process. {:s}.".format(signal, self.__format_process_state()))
 
     def exception(self):
         """Grab an exception if there's any in the queue"""
@@ -543,7 +548,7 @@ class process(object):
         """Wait a given amount of time for the process to terminate"""
         program = self.program
         if program is None:
-            raise RuntimeError('Program {:s} is not running.'.format(self.commandline))
+            raise RuntimeError("Program {:s} is not running.".format(self.commandline))
 
         if not self.running: return program.returncode
         self.updater.is_alive() and self.eventWorking.wait()
