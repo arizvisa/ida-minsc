@@ -869,7 +869,7 @@ class member_t(object):
             logging.warn('{:s}.instance({:s}).member_t : Issue creating structure member {:s}.{:s} : {:#x}'.format(__name__, ownername, ownername, name, res))
         # unknown
         elif res != idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.warn('{:s}.instance({:s}).member_t : Issue creating structure member {:s}.{:s} : {:#x}'.format(ownername, ownername, name, res))
+            logging.warn('{:s}.instance({:s}).member_t : Issue creating structure member {:s}.{:s} : {:#x}'.format(__name__, ownername, ownername, name, res))
 
         self.__index = index
         self.__owner = owner

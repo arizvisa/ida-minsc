@@ -1247,12 +1247,12 @@ def tag(ea, key, none):
 @utils.multicase(tag=basestring)
 def select(tag, *tags, **boolean):
     tags = (tag,) + tags
-    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    boolean['And'] = tuple(__builtin__.set(boolean.get('And',__builtin__.set())).union(tags))
     return select(**boolean)
 @utils.multicase()
 def select(**boolean):
     '''Fetch all of the functions containing the specified tags within it's declaration'''
-    boolean = dict((k,set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
+    boolean = dict((k,__builtin__.set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
         for ea in internal.comment.globals.address():
@@ -1263,10 +1263,10 @@ def select(**boolean):
     for ea in internal.comment.globals.address():
         res,d = {},function.tag(ea) if function.within(ea) else tag(ea)
 
-        Or = boolean.get('Or', set())
+        Or = boolean.get('Or', __builtin__.set())
         res.update((k,v) for k,v in d.iteritems() if k in Or)
 
-        And = boolean.get('And', set())
+        And = boolean.get('And', __builtin__.set())
         if And:
             if And.intersection(d.viewkeys()) == And:
                 res.update((k,v) for k,v in d.iteritems() if k in And)
@@ -1279,12 +1279,12 @@ def select(**boolean):
 @utils.multicase(tag=basestring)
 def selectcontents(tag, *tags, **boolean):
     tags = (tag,) + tags
-    boolean['Or'] = tuple(set(boolean.get('Or',set())).union(tags))
+    boolean['Or'] = tuple(__builtin__.set(boolean.get('Or',__builtin__.set())).union(tags))
     return selectcontents(**boolean)
 @utils.multicase()
 def selectcontents(**boolean):
     '''Fetch all of the functions containing the specified tags within it's contents'''
-    boolean = dict((k,set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
+    boolean = dict((k,__builtin__.set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
         for ea,_ in internal.comment.contents.iterate():
@@ -1294,18 +1294,18 @@ def selectcontents(**boolean):
 
     for ea, res in internal.comment.contents.iterate():
         # check to see that the dict's keys match
-        res,d = set(res),internal.comment.contents._read(None, ea)
-        if set(d.viewkeys()) != res:
+        res,d = __builtin__.set(res),internal.comment.contents._read(None, ea)
+        if __builtin__.set(d.viewkeys()) != res:
             # FIXME: include query in warning
             logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:x}".format(__name__, ea))
 
         # now start aggregating the keys that the user is looking for
-        res, d = set(), internal.comment.contents.name(ea)
+        res, d = __builtin__.set(), internal.comment.contents.name(ea)
 
-        Or = boolean.get('Or', set())
+        Or = boolean.get('Or', __builtin__.set())
         res.update(Or.intersection(d))
 
-        And = boolean.get('And', set())
+        And = boolean.get('And', __builtin__.set())
         if And:
             if And.intersection(d) == And:
                 res.update(And)
@@ -1968,7 +1968,7 @@ class flow(address):
     def walk(ea, next, match):
         '''Used internally. Please see .iterate() instead.'''
         ea = interface.address.inside(ea)
-        res = set()
+        res = __builtin__.set()
         while ea not in (None,idaapi.BADADDR) and is_code(ea) and ea not in res and match(ea):
             res.add(ea)
             ea = next(ea)
@@ -2121,7 +2121,7 @@ class type(object):
     def is_unknown(ea):
         '''Return True if the address specified by ``ea`` is undefined.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
-    unknownQ = utils.alias(is_unknown, 'type')
+    unknownQ = undefined = utils.alias(is_unknown, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2665,7 +2665,7 @@ class type(object):
         def __getarray(cls, ea):
             try:
                 c, = xref.data_up(ea)
-                sidata,each = type.array(ea),set(xref.code_down(c))
+                sidata,each = type.array(ea),__builtin__.set(xref.code_down(c))
 
                 # check to see if first element is the correct dataref
                 lastea, = xref.data_down(c)
@@ -2760,6 +2760,7 @@ class xref(object):
             start,next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
         else:
             start,next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
+
         for addr in xref.iterate(ea, start, next):
             yield addr
         return
@@ -2789,6 +2790,7 @@ class xref(object):
             start,next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
         else:
             start,next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
+
         for addr in xref.iterate(ea, start, next):
             yield addr
         return
@@ -2827,7 +2829,7 @@ class xref(object):
     @staticmethod
     def code_down(ea):
         '''Return all of the code xrefs that are referenced by the address ``ea``.'''
-        result = set(xref.code(ea, True))
+        result = __builtin__.set(xref.code(ea, True))
         result.discard(address.next(ea))
         return sorted(result)
     cd = utils.alias(code_down, 'xref')
@@ -2841,7 +2843,7 @@ class xref(object):
     @staticmethod
     def code_up(ea):
         '''Return all of the code xrefs that refer to the address ``ea``.'''
-        result = set(xref.code(ea, False))
+        result = __builtin__.set(xref.code(ea, False))
         result.discard(address.prev(ea))
         return sorted(result)
     cu = utils.alias(code_up, 'xref')
@@ -2855,7 +2857,7 @@ class xref(object):
     @staticmethod
     def up(ea):
         '''Return all of the references that refer to the address ``ea``.'''
-        return sorted(set(xref.data_up(ea) + xref.code_up(ea)))
+        return sorted(__builtin__.set(xref.data_up(ea) + xref.code_up(ea)))
     u = utils.alias(up, 'xref')
 
     # All locations that are referenced by the specified address
@@ -2868,7 +2870,7 @@ class xref(object):
     @staticmethod
     def down(ea):
         '''Return all of the references that are referred by the address ``ea``.'''
-        return sorted(set(xref.data_down(ea) + xref.code_down(ea)))
+        return sorted(__builtin__.set(xref.data_down(ea) + xref.code_down(ea)))
     d = utils.alias(down, 'xref')
 
     @utils.multicase(target=six.integer_types)
@@ -3407,3 +3409,158 @@ class extra(object):
 
     insert, append = utils.alias(preinsert, 'extra'), utils.alias(preappend, 'extra')
 ex = extra
+
+class set(object):
+    @utils.multicase()
+    @classmethod
+    def unknown(cls):
+        '''Set the data at the current address to undefined.'''
+        return cls.unknown(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def unknown(cls, ea):
+        '''Set the data at address ``ea`` to undefined.'''
+        cb = idaapi.get_item_size(ea)
+        idaapi.do_unknown_range(ea, cb, idaapi.DOUNK_SIMPLE)
+        return cb
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @classmethod
+    def unknown(cls, ea, size):
+        '''Set the data at address ``ea`` to undefined.'''
+        idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
+        return size
+    undefine = undefined = utils.alias(unknown, 'set')
+
+    @utils.multicase()
+    @classmethod
+    def code(cls):
+        '''Set the data at the current address to code.'''
+        return cls.code(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def code(cls, ea):
+        '''Set the data at address ``ea`` to code.'''
+        return idaapi.create_insn(ea)
+
+    @utils.multicase(size=six.integer_types)
+    @classmethod
+    def data(cls, size, **type):
+        '''Set the data at the current address to have the specified ``size`` and ``type``.'''
+        return cls.data(ui.current.address(), size, **type)
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @classmethod
+    def data(cls, ea, size, **type):
+        """Set the data at address ``ea`` to have the specified ``size`` and ``type``.
+        If ``type`` is not specified, then choose the correct type based on the size.
+        """
+        lookup = {
+            1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWRD,
+            8 : idaapi.FF_QWRD, 16 : idaapi.FF_OWRD
+        }
+        type = type['type'] if 'type' in type else lookup[size]
+        ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(type, structure.structure_t) else type, size, type.id if isinstance(type, structure.structure_t) else 0)
+        return idaapi.get_item_size(ea) if ok else 0
+
+    @utils.multicase()
+    @classmethod
+    def align(cls, **alignment):
+        '''Set the data at the current address as aligned with the specified ``alignment``.'''
+        return cls.align(ui.current.address(), **alignment)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def align(cls, ea, **alignment):
+        '''Set the data at address ``ea`` as aligned with the specified ``alignment``.'''
+        if not type.is_unknown(ea):
+            raise TypeError("{:s}.set.align({:x}, ...) : Data at specified address has already been defined.".format('.'.join((__name__,cls.__name__)), ea))
+        res = alignment.get('alignment', alignment.get('size', address.next(ea)-ea))
+        return cls.data(ea, res, type=idaapi.FF_ALIGN)
+    aligned = utils.alias(align, 'set')
+
+    @utils.multicase()
+    @classmethod
+    def string(cls, **type):
+        '''Set the data at the current address to a string with the specified ``type``.'''
+        return cls.string(ui.current.address(), **type)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def string(cls, ea, **type):
+        '''Set the data at address ``ea`` to a string with the specified ``type``.'''
+        type = type.get('type', idaapi.ASCSTR_LAST)
+        ok = idaapi.make_ascii_string(ea, 0, type)
+        return idaapi.get_item_size(ea) if ok else 0
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @classmethod
+    def string(cls, ea, size, **type):
+        """Set the data at address ``ea`` to a string with the specified ``size``.
+        If ``type`` is specified, use a string of the specified type.
+        """
+        type = type.get('type', idaapi.ASCSTR_LAST)
+        ok = idaapi.make_ascii_string(ea, size, type)
+        return idaapi.get_item_size(ea) if ok else 0
+
+    class integer(object):
+        @utils.multicase()
+        @classmethod
+        def byte(cls):
+            '''Set the data at the current address to a byte.'''
+            return cls.byte(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def byte(cls, ea):
+            '''Set the data at address ``ea`` to a byte.'''
+            return set.data(ea, 1, type=idaapi.FF_BYTE)
+
+        @utils.multicase()
+        @classmethod
+        def word(cls):
+            '''Set the data at the current address to a word.'''
+            return cls.word(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def word(cls, ea):
+            '''Set the data at address ``ea`` to a word.'''
+            return set.data(ea, 2, type=idaapi.FF_WORD)
+
+        @utils.multicase()
+        @classmethod
+        def dword(cls):
+            '''Set the data at the current address to a double-word.'''
+            return cls.dword(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def dword(cls, ea):
+            '''Set the data at address ``ea`` to a double-word.'''
+            return set.data(ea, 4, type=idaapi.FF_DWRD)
+
+        @utils.multicase()
+        @classmethod
+        def qword(cls):
+            '''Set the data at the current address to a quad-word.'''
+            return cls.qword(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def qword(cls, ea):
+            '''Set the data at address ``ea`` to a quad-word.'''
+            return set.data(ea, 8, type=idaapi.FF_QWRD)
+
+        @utils.multicase()
+        @classmethod
+        def oword(cls):
+            '''Set the data at the current address to an octal-word.'''
+            return cls.owrd(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def oword(cls, ea):
+            '''Set the data at address ``ea`` to an octal-word.'''
+            return set.data(ea, 16, type=idaapi.FF_OWRD)
+
+    @utils.multicase(type=structure.structure_t)
+    @classmethod
+    def struct(cls, type):
+        '''Set the data at the current address to the structure_t specified by ``type``.'''
+        return cls.struct(ui.current.address(), type)
+    @utils.multicase(ea=six.integer_types, type=structure.structure_t)
+    @classmethod
+    def struct(cls, ea, type):
+        '''Set the data at address ``ea`` to the structure_t specified by ``type``.'''
+        return set.data(ea, type.size, type=type)

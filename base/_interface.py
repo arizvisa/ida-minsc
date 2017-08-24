@@ -289,6 +289,7 @@ class address(object):
     def __head1__(cls, ea):
         # Ensures that ``ea`` is pointing to a valid address
         entryframe = cls.pframe()
+
         res = idaapi.get_item_head(ea)
         if res != ea:
             logging.warn("{:s} : Address {:x} not aligned to the beginning of an item. Fixing it to {:x}.".format(entryframe.f_code.co_name, ea, res))
@@ -296,7 +297,9 @@ class address(object):
         return ea
     @classmethod
     def __head2__(cls, start, end):
+        # Ensures that both ``start`` and ``end`` are pointing to valid addresses
         entryframe = cls.pframe()
+
         res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
         # FIXME: off-by-one here, as end can be the size of the db.
         if res_start != start:
@@ -315,12 +318,17 @@ class address(object):
     @classmethod
     def __inside1__(cls, ea):
         # Ensures that ``ea`` is within the database and pointing at a valid address
+        entryframe = cls.pframe()
+
         if not isinstance(ea, six.integer_types):
             raise TypeError("{:s} : Specified address is not of the correct type. : {!r} -> {!r}".format(entryframe.f_code.co_name, ea, ea.__class__))
         res = cls.within(ea)
         return cls.head(res)
     @classmethod
     def __inside2__(cls, start, end):
+        # Ensures that both ``start`` and ``end`` are within the database and pointing at a valid address
+
+        entryframe = cls.pframe()
         start, end = cls.within(start, end)
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
             raise TypeError("{:s} : Specified addresses are not of the correct type. : ({!r}, {!r}) -> ({!r}, {!r})".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
@@ -335,6 +343,7 @@ class address(object):
     def __within1__(cls, ea):
         # Ensures that ``ea`` is within the database
         entryframe = cls.pframe()
+
         if not isinstance(ea, six.integer_types):
             raise TypeError("{:s} : Specified address is not of the correct type. : {!r} -> {!r}".format(entryframe.f_code.co_name, ea, ea.__class__))
 
@@ -344,7 +353,9 @@ class address(object):
         return ea
     @classmethod
     def __within2__(cls, start, end):
+        # Ensures that both ``start`` and ``end`` are within the database
         entryframe = cls.pframe()
+
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
             raise TypeError("{:s} : Specified addresses are not of the correct type. : ({!r}, {!r}) -> ({!r}, {!r})".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
 
