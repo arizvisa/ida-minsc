@@ -47,6 +47,8 @@ def by(ea): return by_address(ea)
 @utils.multicase(name=basestring)
 def by(name): return by_name(name)
 
+# FIXME: implement a matcher class for func_t
+
 # FIXME: document this despite it being internal
 def __addressOfRtOrSt(func):
     '''Returns (F,address) if a statically linked address, or (T,address) if a runtime-linked address'''
@@ -189,7 +191,7 @@ def set_name(func, string):
 
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
-        logging.warn('{:s}.set_name({:x}, {!r}) : Stripping invalid chars from function name. : {!r}'.format(__name__, ea, string, res))
+        logging.warn("{:s}.set_name({:x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
         string = res
 
     if rt:
@@ -235,7 +237,7 @@ def prototype():
 def prototype(func):
     '''Return the prototype of the function ``func`` if it has one.'''
     rt,ea = __addressOfRtOrSt(func)
-    funcname = database.name(ea)
+    funcname = database.name(ea) or get_name(ea)
     try:
         res = internal.declaration.function(ea)
         idx = res.find('(')
@@ -444,7 +446,7 @@ class chunk(object):
     @classmethod
     def add(cls, start, end):
         '''Add the chunk ``start`` to ``end`` to the current function.'''
-        return cls.add_chunk(ui.current.function(), start, end)
+        return cls.add(ui.current.function(), start, end)
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
     def add(cls, func, start, end):
@@ -453,11 +455,16 @@ class chunk(object):
         start, end = interface.address.inside(start, end)
         return idaapi.append_func_tail(fn, start, end)
 
+    @utils.multicase()
+    @classmethod
+    def remove(cls):
+        return cls.remove(ui.current.address())
+
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, ea):
         '''Remove the chunk at ``ea`` it's function.'''
-        return cls.remove_chunk(ea, ea)
+        return cls.remove(ea, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, func, ea):
@@ -537,7 +544,7 @@ def arguments(func):
 
     # FIXME: figure out calling convention and grab correct arguments
     if database.config.bits() != 32:
-        logging.warn('{:s}.arguments({:x}) : Possibility that register-based arguments will not be listed due to {:d}-bit calling convention.'.format(__name__, fn.startEA, database.config.bits()))
+        logging.warn("{:s}.arguments({:x}) : Possibility that register-based arguments will not be listed due to {:d}-bit calling convention.".format(__name__, fn.startEA, database.config.bits()))
 
     base = get_vars_size(fn)+get_regs_size(fn)
     for (off,size),(name,_,_) in structure.fragment(fr.id, base, get_args_size(fn)):
@@ -1170,11 +1177,11 @@ def tag_read(func):
     try:
         rt,ea = __addressOfRtOrSt(func)
     except LookupError:
-        logging.warn('{:s}.tag_read({!r}) : Attempted to read tag from a non-function. Falling back to a database tag.'.format(__name__, func))
+        logging.warn("{:s}.tag_read({!r}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, func))
         return database.tag_read(func)
 
     if rt:
-        logging.warn('{:s}.tag_read({:x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.'.format(__name__, ea))
+        logging.warn("{:s}.tag_read({:x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
         return database.tag_read(ea)
 
     fn,repeatable = by_address(ea), True
@@ -1183,7 +1190,7 @@ def tag_read(func):
     res = comment(fn, repeatable=not repeatable)
     d2 = internal.comment.decode(res)
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn('{:s}.tag_read({:x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+        logging.warn("{:s}.tag_read({:x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
     res = {}
     map(res.update, (d1,d2))
 
@@ -1218,12 +1225,12 @@ def tag_write(func, key, value):
         rt,ea = __addressOfRtOrSt(func)
     except LookupError:
         # If we're not even in a function, then use a database tag.
-        logging.warn('{:s}.tag_write({!r}, {!r}, ...) : Attempted to set tag for a non-function. Falling back to a database tag.'.format(__name__, func, key))
+        logging.warn("{:s}.tag_write({!r}, {!r}, ...) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, func, key))
         return database.tag_write(func, key, value)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn('{:s}.tag_write({:x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.'.format(__name__, ea, key))
+        logging.warn("{:s}.tag_write({:x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
         return database.tag_write(ea, key, value)
 
     # Otherwise, it's a function.
@@ -1250,12 +1257,12 @@ def tag_write(func, key, none):
         rt,ea = __addressOfRtOrSt(func)
     except LookupError:
         # If we're not even in a function, then use a database tag.
-        logging.warn('{:s}.tag_write({!r}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.'.format(__name__, func, key))
+        logging.warn("{:s}.tag_write({!r}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, func, key))
         return database.tag_write(func, key, none)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn('{:s}.tag_write({:x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.'.format(__name__, ea, key))
+        logging.warn("{:s}.tag_write({:x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
         return database.tag_write(ea, key, none)
 
     # Otherwise, it's a function.
@@ -1376,7 +1383,7 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and _instruction.is_call(ea):
-                    logging.warn('{:s}.down({:x}) : Discovered a dynamically resolved call that is unable to be resolved. : {:s}'.format(__name__, fn.startEA, database.disasm(ea)))
+                    logging.warn("{:s}.down({:x}) : Discovered a dynamically resolved call that is unable to be resolved. : {:s}".format(__name__, fn.startEA, database.disasm(ea)))
                     #resultCode.append((ea, 0))
                 continue
             resultData.extend( (ea,x) for x in database.dxdown(ea) )
@@ -1462,6 +1469,19 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def has_name(cls):
+        '''Return True if the current function has a user-defined name.'''
+        return cls.has_name(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def has_name(cls, func):
+        '''Return True if the function ``func`` has a user-defined name.'''
+        ea = address(func)
+        return database.type.has_customname(ea)
+    nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
+
+    @utils.multicase()
+    @classmethod
     def has_noreturn(cls):
         '''Return True if the current function does not return.'''
         return cls.has_noreturn(ui.current.function())
@@ -1528,7 +1548,7 @@ def stackdelta(ea, delta, **direction):
     """
     dir = direction.get('direction', direction.get('dir', -1))
     if dir == 0:
-        raise ValueError("{:s}.stackdelta({:x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in direction.iteritems())) if direction else ''))
+        raise ValueError("{:s}.stackdelta({:x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in direction.iteritems())) if direction else ''))
     next = database.next if dir > 0 else database.prev
 
     sp, ea = get_spdelta(ea), interface.address.inside(ea)

@@ -17,7 +17,7 @@ def frame(ea):
         if any(member.name.startswith(n) for n in ('arg_', 'var_', ' ')) and not member.comment:
             continue
         if isinstance(member.type, st.structure_t) or any(isinstance(n, st.structure_t) for n in member.type):
-            logging.warn('{:s}.frame({:#x}) : Skipping structure-based type for field {:+#x} : {!r}'.format(__name__, ea, member.offset, member.type))
+            logging.warn("{:s}.frame({:#x}) : Skipping structure-based type for field {:+#x} : {!r}".format(__name__, ea, member.offset, member.type))
             yield member.offset, (member.name, None, member.comment)
             continue
         yield member.offset, (member.name, member.type, member.comment)
@@ -133,7 +133,7 @@ def load((g, f, h), **tagmap):
             logging.warn("{:s}.load : {:x} : Unable to apply tags to contents. : {!r}".format(__name__, ea, d), exc_info=True)
         continue
 
-    print >>output, '--> Applying frames to each function... ({:d} entr{:s})'.format(len(h), 'y' if len(h) == 1 else 'ies')
+    print >>output, "--> Applying frames to each function... ({:d} entr{:s})".format(len(h), 'y' if len(h) == 1 else 'ies')
     for ea, d in sorted(h.items(), key=first):
         try:
             apply_frame(ea, d)

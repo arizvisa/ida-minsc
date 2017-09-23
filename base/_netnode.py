@@ -1,53 +1,132 @@
 import six
 import idaapi
 
-try:
-    # XXX: fuck you ida 6.95 for breaking your api
-    import _ida_netnode
-except ImportError:
-    import idaapi as _ida_netnode
-
 MAXSPECSIZE = idaapi.MAXSTR
 MAXNAMESIZE = idaapi.MAXNAMELEN
+
+class netnode(object):
+    try:
+        # XXX: fuck you ida 6.95 for breaking your api
+        import _ida_netnode
+    except ImportError:
+        import idaapi as _ida_netnode
+
+    new = _ida_netnode.new_netnode
+    delete = _ida_netnode.delete_netnode
+    start = _ida_netnode.netnode_start
+    end = _ida_netnode.netnode_end
+    index = _ida_netnode.netnode_index
+    kill = _ida_netnode.netnode_kill
+    long_value = _ida_netnode.netnode_long_value
+    next = _ida_netnode.netnode_next
+    prev = _ida_netnode.netnode_prev
+    rename = _ida_netnode.netnode_rename
+    #copyto = _ida_netnode.netnode_copyto
+    #create = _ida_netnode.netnode_create
+    #moveto = _ida_netnode.netnode_moveto
+    set = _ida_netnode.netnode_set
+    set_long = _ida_netnode.netnode_set_long
+    delvalue = _ida_netnode.netnode_delvalue
+
+    blobsize = _ida_netnode.netnode_blobsize
+    getblob = _ida_netnode.netnode_getblob
+    setblob = _ida_netnode.netnode_setblob
+    delblob = _ida_netnode.netnode_delblob
+
+    altdel = _ida_netnode.netnode_altdel
+    altlast = _ida_netnode.netnode_altlast
+    altprev = _ida_netnode.netnode_altprev
+    altset = _ida_netnode.netnode_altset
+    altval = _ida_netnode.netnode_altval
+
+    charlast = _ida_netnode.netnode_charlast
+    charprev = _ida_netnode.netnode_charprev
+    chardel = _ida_netnode.netnode_chardel
+    charset = _ida_netnode.netnode_charset
+    charval = _ida_netnode.netnode_charval
+
+    hashdel = _ida_netnode.netnode_hashdel
+    hashlast = _ida_netnode.netnode_hashlast
+    hashprev = _ida_netnode.netnode_hashprev
+    hashset = _ida_netnode.netnode_hashset
+    hashset_buf = _ida_netnode.netnode_hashset_buf
+    hashset_idx = _ida_netnode.netnode_hashset_idx
+    hashstr = _ida_netnode.netnode_hashstr
+    hashstr_buf = _ida_netnode.netnode_hashstr_buf
+    hashval = _ida_netnode.netnode_hashval
+    hashval_long = _ida_netnode.netnode_hashval_long
+
+    supdel = _ida_netnode.netnode_supdel
+    suplast = _ida_netnode.netnode_suplast
+    supprev = _ida_netnode.netnode_supprev
+    supset = _ida_netnode.netnode_supset
+    supstr = _ida_netnode.netnode_supstr
+    supval = _ida_netnode.netnode_supval
+
+    valobj = _ida_netnode.netnode_valobj
+    valstr = _ida_netnode.netnode_valstr
+    value_exists = _ida_netnode.netnode_value_exists
+
+    # now to fix up the version skew as a result of IDA 7.0
+    if idaapi.__version__ < 7.0:
+        sup1st = _ida_netnode.netnode_sup1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_supfirst
+        supnxt = _ida_netnode.netnode_supnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_supnext
+        hashnxt = _ida_netnode.netnode_hashnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_hashnext
+        hash1st = _ida_netnode.netnode_hash1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_hashfirst
+        char1st = _ida_netnode.netnode_char1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_charfirst
+        charnxt = _ida_netnode.netnode_charnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_charnext
+        name = _ida_netnode.netnode_name if idaapi.__version__ < 7.0 else _ida_netnode.netnode_get_name
+        alt1st = _ida_netnode.netnode_alt1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_altfirst
+        altnxt = _ida_netnode.netnode_altnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_altnext
+    else:   # >= 7.0
+        sup1st = _ida_netnode.netnode_supfirst
+        supnxt = _ida_netnode.netnode_supnext
+        hashnxt = _ida_netnode.netnode_hashnext
+        hash1st = _ida_netnode.netnode_hashfirst
+        char1st = _ida_netnode.netnode_charfirst
+        charnxt = _ida_netnode.netnode_charnext
+        name = _ida_netnode.netnode_get_name
+        alt1st = _ida_netnode.netnode_altfirst
+        altnxt = _ida_netnode.netnode_altnext
 
 class utils(object):
     @classmethod
     def range(cls):
-        this = _ida_netnode.new_netnode()
-        ok, start = _ida_netnode.netnode_start(this), _ida_netnode.netnode_index(this)
+        this = netnode.new()
+        ok, start = netnode.start(this), netnode.index(this)
         if not ok: raise StandardError("{:s}.range : Unable to find first node.".format('.'.join((__name__,cls.__name__))))
-        ok, end = _ida_netnode.netnode_end(this), _ida_netnode.netnode_index(this)
+        ok, end = netnode.end(this), netnode.index(this)
         if not ok: raise StandardError("{:s}.range : Unable to find last node.".format('.'.join((__name__,cls.__name__))))
         return start, end
 
     @classmethod
     def renumerate(cls):
         start, end = cls.range()
-        this = _ida_netnode.new_netnode()
-        ok = _ida_netnode.netnode_end(this)
+        this = netnode.new()
+        ok = netnode.end(this)
         assert ok
 
-        yield end, _ida_netnode.new_netnode(end)
+        yield end, netnode.new(end)
         while end != start:
-            ok = _ida_netnode.netnode_prev(this)
+            ok = netnode.prev(this)
             if not ok: break
-            end = _ida_netnode.netnode_index(this)
-            yield end, _ida_netnode.new_netnode(end)
+            end = netnode.index(this)
+            yield end, netnode.new(end)
         return
 
     @classmethod
     def fenumerate(cls):
         start, end = cls.range()
-        this = _ida_netnode.new_netnode()
-        ok = _ida_netnode.netnode_start(this)
+        this = netnode.new()
+        ok = netnode.start(this)
         assert ok
 
-        yield start, _ida_netnode.new_netnode(start)
+        yield start, netnode.new(start)
         while start != end:
-            ok = _ida_netnode.netnode_next(this)
+            ok = netnode.next(this)
             if not ok: break
-            start = _ida_netnode.netnode_index(this)
-            yield start, _ida_netnode.new_netnode(start)
+            start = netnode.index(this)
+            yield start, netnode.new(start)
         return
 
     @classmethod
@@ -92,139 +171,139 @@ class utils(object):
 
     @classmethod
     def falt(cls, node):
-        for res in cls.valfiter(node, _ida_netnode.netnode_alt1st, _ida_netnode.netnode_altlast, _ida_netnode.netnode_altnxt, _ida_netnode.netnode_altval):
+        for res in cls.valfiter(node, netnode.alt1st, netnode.altlast, netnode.altnxt, netnode.altval):
             yield res
         return
     @classmethod
     def ralt(cls, node):
-        for res in cls.valriter(node, _ida_netnode.netnode_alt1st, _ida_netnode.netnode_altprev, _ida_netnode.netnode_altnxt, _ida_netnode.netnode_altval):
+        for res in cls.valriter(node, netnode.alt1st, netnode.altprev, netnode.altnxt, netnode.altval):
             yield res
         return
 
     @classmethod
     def fsup(cls, node):
-        for res in cls.valfiter(node, _ida_netnode.netnode_sup1st, _ida_netnode.netnode_suplast, _ida_netnode.netnode_supnxt, _ida_netnode.netnode_supval):
+        for res in cls.valfiter(node, netnode.sup1st, netnode.suplast, netnode.supnxt, netnode.supval):
             yield res
         return
     @classmethod
     def rsup(cls, node):
-        for res in cls.valriter(node, _ida_netnode.netnode_sup1st, _ida_netnode.netnode_supprev, _ida_netnode.netnode_supnxt, _ida_netnode.netnode_supval):
+        for res in cls.valriter(node, netnode.sup1st, netnode.supprev, netnode.supnxt, netnode.supval):
             yield res
         return
 
     @classmethod
     def fhash(cls, node):
-        for res in cls.hfiter(node, _ida_netnode.netnode_hash1st, _ida_netnode.netnode_hashlast, _ida_netnode.netnode_hashnxt, _ida_netnode.netnode_hashval):
+        for res in cls.hfiter(node, netnode.hash1st, netnode.hashlast, netnode.hashnxt, netnode.hashval):
             yield res
         return
     @classmethod
     def rhash(cls, node):
-        for res in cls.hriter(node, _ida_netnode.netnode_hash1st, _ida_netnode.netnode_hashprev, _ida_netnode.netnode_hashnxt, _ida_netnode.netnode_hashval):
+        for res in cls.hriter(node, netnode.hash1st, netnode.hashprev, netnode.hashnxt, netnode.hashval):
             yield res
         return
 
     @classmethod
     def fchar(cls, node):
-        for res in cls.valfiter(node, _ida_netnode.netnode_char1st, _ida_netnode.netnode_charlast, _ida_netnode.netnode_charnxt, _ida_netnode.netnode_charval):
+        for res in cls.valfiter(node, netnode.char1st, netnode.charlast, netnode.charnxt, netnode.charval):
             yield res
         return
     @classmethod
     def rchar(cls, node):
-        for res in cls.valriter(node, _ida_netnode.netnode_char1st, _ida_netnode.netnode_charprev, _ida_netnode.netnode_charnxt, _ida_netnode.netnode_charval):
+        for res in cls.valriter(node, netnode.char1st, netnode.charprev, netnode.charnxt, netnode.charval):
             yield res
         return
 
 def new(name):
-    node = _ida_netnode.new_netnode(name, len(name), True)
-    return _ida_netnode.netnode_index(node)
+    node = netnode.new(name, len(name), True)
+    return netnode.index(node)
 
 def get(name):
     if isinstance(name, six.integer_types):
-        node = _ida_netnode.new_netnode(name)
-        return _ida_netnode.netnode_index(node)
-    node = _ida_netnode.new_netnode(name, len(name), False)
-    return _ida_netnode.netnode_index(node)
+        node = netnode.new(name)
+        return netnode.index(node)
+    node = netnode.new(name, len(name), False)
+    return netnode.index(node)
 
 def remove(nodeidx):
-    node = _ida_netnode.new_netnode(nodeidx)
-    return _ida_netnode.netnode_kill(node)
+    node = netnode.new(nodeidx)
+    return netnode.kill(node)
 
 ### node name
 class name(object):
     @classmethod
     def get(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_name(node)
+        node = netnode.new(nodeidx)
+        return netnode.name(node)
     @classmethod
     def set(cls, nodeidx, string):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_rename(node, string)
+        node = netnode.new(nodeidx)
+        return netnode.rename(node, string)
 
 ### node value (?)
 class value(object):
     @classmethod
     def exists(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_value_exists(node)
+        node = netnode.new(nodeidx)
+        return netnode.value_exists(node)
 
     @classmethod
     def get(cls, nodeidx, type=None):
-        node = _ida_netnode.new_netnode(nodeidx)
-        if not _ida_netnode.netnode_value_exists(node):
+        node = netnode.new(nodeidx)
+        if not netnode.value_exists(node):
             return None
 
         if type is None:
-            return _ida_netnode.netnode_valobj(node)
+            return netnode.valobj(node)
         elif issubclass(type, basestring):
-            return _ida_netnode.netnode_valstr(node)
+            return netnode.valstr(node)
         elif issubclass(type, six.integer_types):
-            return _ida_netnode.netnode_long_value(node)
+            return netnode.long_value(node)
         raise TypeError(type)
 
     @classmethod
     def set(cls, nodeidx, value, type=None):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         if type is None:
-            return _ida_netnode.netnode_set(node, value)
+            return netnode.set(node, value)
         elif issubclass(type, six.integer_types):
-            return _ida_netnode.netnode_set_long(node, value)
+            return netnode.set_long(node, value)
         raise TypeError(type)
 
     @classmethod
     def remove(cls, nodeidx, value):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_delvalue(node)
+        node = netnode.new(nodeidx)
+        return netnode.delvalue(node)
 
     @classmethod
     def repr(cls, nodeidx):
         if not cls.exists(nodeidx):
             raise ValueError("Node {:x} has no value.".format(nodeidx))
         res, s, val = cls.get(nodeidx), cls.get(nodeidx, type=str), cls.get(nodeidx, type=int)
-        return '{!r} {!r} 0x{:x}'.format(res, s, val)
+        return "{!r} {!r} {:#x}".format(res, s, val)
 
 ### node blob
 class blob(object):
     @classmethod
     def get(cls, nodeidx, tag, start=0):
-        node = _ida_netnode.new_netnode(nodeidx)
-        sz = _ida_netnode.netnode_blobsize(node, start, tag)
-        res = _ida_netnode.netnode_getblob(node, start, tag)
+        node = netnode.new(nodeidx)
+        sz = netnode.blobsize(node, start, tag)
+        res = netnode.getblob(node, start, tag)
         return None if res is None else res[:sz]
 
     @classmethod
     def set(cls, nodeidx, tag, val, start=0):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_setblob(node, val, start, tag)
+        node = netnode.new(nodeidx)
+        return netnode.setblob(node, val, start, tag)
 
     @classmethod
     def remove(cls, nodeidx, tag, start=0):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_delblob(node, start, tag)
+        node = netnode.new(nodeidx)
+        return netnode.delblob(node, start, tag)
 
     @classmethod
     def size(cls, nodeidx, tag, start=0):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_blobsize(node, start, tag)
+        node = netnode.new(nodeidx)
+        return netnode.blobsize(node, start, tag)
 
     @classmethod
     def repr(cls, nodeidx, tag):
@@ -248,29 +327,29 @@ class alt(object):
     '''Sparse array[int] of int'''
     @classmethod
     def get(cls, nodeidx, idx):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_altval(node, idx)
+        node = netnode.new(nodeidx)
+        return netnode.altval(node, idx)
 
     @classmethod
     def set(cls, nodeidx, idx, val):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_altset(node, idx, val)
+        node = netnode.new(nodeidx)
+        return netnode.altset(node, idx, val)
 
     @classmethod
     def remove(cls, nodeidx, idx):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_altdel(node, idx)
+        node = netnode.new(nodeidx)
+        return netnode.altdel(node, idx)
 
     @classmethod
     def fiter(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         for idx,val in utils.falt(node):
             yield idx,val
         return
 
     @classmethod
     def riter(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         for idx,val in utils.ralt(node):
             yield idx,val
         return
@@ -279,7 +358,7 @@ class alt(object):
     def repr(cls, nodeidx):
         res = []
         for idx, val in cls.fiter(nodeidx):
-            res.append('{0:x} : 0x{1:x} ({1:d})'.format(idx, val))
+            res.append("{0:x} : {1:#x} ({1:d})".format(idx, val))
         if not res:
             raise ValueError("Node {:x} has no alts.".format(nodeidx))
         return '\n'.join(res)
@@ -290,33 +369,33 @@ class sup(object):
 
     @classmethod
     def get(cls, nodeidx, idx, type=None):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         if type is None:
-            return _ida_netnode.netnode_supval(node, idx)
+            return netnode.supval(node, idx)
         elif issubclass(type, basestring):
-            return _ida_netnode.netnode_supstr(node, idx)
+            return netnode.supstr(node, idx)
         raise TypeError(type)
 
     @classmethod
     def set(cls, nodeidx, idx, val):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_supset(node, idx, val)
+        node = netnode.new(nodeidx)
+        return netnode.supset(node, idx, val)
 
     @classmethod
     def remove(cls, nodeidx, idx):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_supdel(node, idx)
+        node = netnode.new(nodeidx)
+        return netnode.supdel(node, idx)
 
     @classmethod
     def fiter(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         for idx,_ in utils.fsup(node):
             yield idx
         return
 
     @classmethod
     def riter(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         for idx,_ in utils.rsup(node):
             yield idx
         return
@@ -326,7 +405,7 @@ class sup(object):
         res = []
         for i, idx in enumerate(cls.fiter(nodeidx)):
             val = cls.get(nodeidx, idx)
-            res.append('[{:d}] {:x} : {!r}'.format(i, idx, val))
+            res.append("[{:d}] {:x} : {!r}".format(i, idx, val))
         if not res:
             raise ValueError("Node {:x} has no sups.".format(nodeidx))
         return '\n'.join(res)
@@ -336,44 +415,44 @@ class hash(object):
     '''Dictionary[char*510] of 1024b strings'''
     @classmethod
     def get(cls, nodeidx, key, type=None):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         if type is None:
-            return _ida_netnode.netnode_hashval(node, key or '')
+            return netnode.hashval(node, key or '')
         elif issubclass(type, basestring):
-            return _ida_netnode.netnode_hashstr(node, key or '')
+            return netnode.hashstr(node, key or '')
         elif issubclass(type, buffer):
-            return _ida_netnode.netnode_hashstr_buf(node, key or '')
+            return netnode.hashstr_buf(node, key or '')
         elif issubclass(type, six.integer_types):
-            return _ida_netnode.netnode_hashval_long(node, key or '')
+            return netnode.hashval_long(node, key or '')
         raise TypeError(type)
 
     @classmethod
     def set(cls, nodeidx, key, val):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         # in my testing the type really doesn't matter
         if isinstance(val, basestring):
-            return _ida_netnode.netnode_hashset(node, key, val)
+            return netnode.hashset(node, key, val)
         elif isinstance(val, buffer):
-            return _ida_netnode.netnode_hashset_buf(node, key, val)
+            return netnode.hashset_buf(node, key, val)
         elif isinstance(val, six.integer_types):
-            return _ida_netnode.netnode_hashset_idx(node, key, val)
+            return netnode.hashset_idx(node, key, val)
         raise TypeError(type)
 
     @classmethod
     def remove(cls, nodeidx, key):
-        node = _ida_netnode.new_netnode(nodeidx)
-        return _ida_netnode.netnode_hashdel(node, key)
+        node = netnode.new(nodeidx)
+        return netnode.hashdel(node, key)
 
     @classmethod
     def fiter(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         for key,_ in utils.fhash(node):
             yield key
         return
 
     @classmethod
     def riter(cls, nodeidx):
-        node = _ida_netnode.new_netnode(nodeidx)
+        node = netnode.new(nodeidx)
         for key,_ in utils.rhash(node):
             yield key
         return
@@ -388,8 +467,8 @@ class hash(object):
             l1, l2 = 0, 2
 
         for i, key in enumerate(cls.fiter(nodeidx)):
-            val = '{:<{:d}s} : str="{:s}", buffer={!r}, int=0x{:x}({:d})'.format(repr(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, str), cls.get(nodeidx, key, buffer), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
-            res.append('[{:d}] {:<{:d}s} -> {:s}'.format(i, key, l1, val))
+            val = "{:<{:d}s} : str=\"{:s}\", buffer={!r}, int={:#x}({:d})".format(repr(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, str), cls.get(nodeidx, key, buffer), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
+            res.append("[{:d}] {:<{:d}s} -> {:s}".format(i, key, l1, val))
         if not res:
             raise ValueError("Node {:x} has no hashes.".format(nodeidx))
         return '\n'.join(res)

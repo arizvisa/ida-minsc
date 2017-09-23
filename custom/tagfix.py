@@ -51,7 +51,7 @@ def do_functions():
     addr,tags = {},{}
     t = len(list(db.functions()))
     for i, ea in enumerate(db.functions()):
-        print '{:x} : fetching function {:d} of {:d}'.format(ea, i, t)
+        print "{:x} : fetching function {:d} of {:d}".format(ea, i, t)
         res = fn.tag(ea)
         #res.pop('name', None)
         for k, v in res.iteritems():
@@ -86,8 +86,8 @@ def do_globally():
     for k, v in dtags.iteritems():
         tags[k] = tags.get(k, 0) + v
 
-    print 'found {:d} addrs'.format(len(addr))
-    print 'found {:d} tags'.format(len(tags))
+    print "found {:d} addrs".format(len(addr))
+    print "found {:d} tags".format(len(tags))
 
     return addr,tags
 
@@ -140,7 +140,7 @@ def all():
     total = len(list(db.functions()))
     addr,tags = {}, {}
     for i, ea in enumerate(db.functions()):
-        print '{:x} : updating references for contents : {:d} of {:d}'.format(ea, i, total)
+        print "{:x} : updating references for contents : {:d} of {:d}".format(ea, i, total)
         _, _ = function(ea)
     print 'updating references for globals'
     _, _ = globals()
@@ -219,10 +219,10 @@ def erase():
 
     current = 0
     for idx, ea in iter1:
-        print 'erasing contents for function {:x} : {:d} of {:d}'.format(ea, idx, total)
+        print "erasing contents for function {:x} : {:d} of {:d}".format(ea, idx, total)
 
     for idx, res in iter2:
-        print 'erasing global {!r} : {:d} of {:d}'.format(res, t1+idx, total)
+        print "erasing global {!r} : {:d} of {:d}".format(res, t1+idx, total)
     return
 
 __all__ = ['everything','globals','function']

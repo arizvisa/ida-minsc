@@ -19,7 +19,7 @@ def noapi(*args):
 def notify(name):
     def notification(*args):
         logging.warn("{:s}.notify : Received notification for {!r} : {!r}".format(__name__, name, args))
-    notification.__name__ = 'notify({:s})'.format(name)
+    notification.__name__ = "notify({:s})".format(name)
     return notification
 
 ### comment hooks
@@ -85,7 +85,7 @@ class address(comment):
                 ncmt,repeatable = idaapi.get_cmt(ea, rpt), cls._is_repeatable(ea)
 
                 if (ncmt or '') != new:
-                    logging.warn('internal.{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}'.format('.'.join((__name__,cls.__name__)), ea, new, ncmt))
+                    logging.warn("internal.{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}".format('.'.join((__name__,cls.__name__)), ea, new, ncmt))
 
                 # delete it if it's the wrong type
 #                if nrpt != repeatable:
@@ -105,12 +105,12 @@ class address(comment):
                 continue
 
             # if the changed event doesn't happen in the right order
-            logging.fatal("{:s}.{:s}.event : Comment events are out of sync, updating tags from previous comment. : {!r} : {!r}".format(__name__, cls.__name__, o, n))
+            logging.fatal("{:s}.event : Comment events are out of sync, updating tags from previous comment. : {!r} : {!r}".format('.'.join((__name__,cls.__name__)), o, n))
 
             # delete the old comment
             cls._delete_refs(ea, o)
             idaapi.set_cmt(ea, '', rpt)
-            logging.warn("{:s}.{:s}.event : Previous comment at {:x} : {!r}".format(__name__, cls.__name__, o))
+            logging.warn("{:s}.event : Previous comment at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), o))
 
             # new comment
             new = idaapi.get_cmt(newea, nrpt)
@@ -125,7 +125,7 @@ class address(comment):
         oldcmt = idaapi.get_cmt(ea, repeatable_cmt)
         try: cls.event.send((ea, bool(repeatable_cmt), newcmt))
         except StopIteration, e:
-            logging.fatal("{:s}.{:s}.changing : Unexpected termination of event handler. Re-instantiating it.".format(__name__, cls.__name__))
+            logging.fatal("{:s}.changing : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__,cls.__name__))))
             cls.event = cls._event(); next(cls.event)
 
     @classmethod
@@ -133,7 +133,7 @@ class address(comment):
         newcmt = idaapi.get_cmt(ea, repeatable_cmt)
         try: cls.event.send((ea, bool(repeatable_cmt), None))
         except StopIteration, e:
-            logging.fatal("{:s}.{:s}.changed : Unexpected termination of event handler. Re-instantiating it.".format(__name__, cls.__name__))
+            logging.fatal("{:s}.changed : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__,cls.__name__))))
             cls.event = cls._event(); next(cls.event)
 
 class globals(comment):
@@ -179,7 +179,7 @@ class globals(comment):
                 ncmt = idaapi.get_func_cmt(fn, rpt)
 
                 if (ncmt or '') != new:
-                    logging.warn("{:s}.{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}".format(__name__, cls.__name__, ea, new, ncmt))
+                    logging.warn("{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}".format('.'.join((__name__,cls.__name__)), ea, new, ncmt))
 
                 # if it's non-repeatable, then fix it.
 #                if not nrpt:
@@ -199,12 +199,12 @@ class globals(comment):
                 continue
 
             # if the changed event doesn't happen in the right order
-            logging.fatal("{:s}.{:s}.event : Comment events are out of sync, updating tags from previous comment. : {!r} : {!r}".format(__name__, cls.__name__, o, n))
+            logging.fatal("{:s}.event : Comment events are out of sync, updating tags from previous comment. : {!r} : {!r}".format('.'.join((__name__,cls.__name__)), o, n))
 
             # delete the old comment
             cls._delete_refs(fn, o)
             idaapi.set_func_cmt(fn, '', rpt)
-            logging.warn("{:s}.{:s}.event : Previous comment at {:x} : {!r}".format(__name__, cls.__name__, o))
+            logging.warn("{:s}.event : Previous comment at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), o))
 
             # new comment
             newfn = idaapi.get_func(newea)
@@ -221,7 +221,7 @@ class globals(comment):
         oldcmt = idaapi.get_func_cmt(fn, repeatable)
         try: cls.event.send((fn.startEA, bool(repeatable), cmt))
         except StopIteration, e:
-            logging.fatal("{:s}.{:s}.changing : Unexpected termination of event handler. Re-instantiating it.".format(__name__, cls.__name__))
+            logging.fatal("{:s}.changing : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__,cls.__name__))))
             cls.event = cls._event(); next(cls.event)
 
     @classmethod
@@ -230,7 +230,7 @@ class globals(comment):
         newcmt = idaapi.get_func_cmt(fn, repeatable)
         try: cls.event.send((fn.startEA, bool(repeatable), None))
         except StopIteration, e:
-            logging.fatal("{:s}.{:s}.changed : Unexpected termination of event handler. Re-instantiating it.".format(__name__, cls.__name__))
+            logging.fatal("{:s}.changed : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__,cls.__name__))))
             cls.event = cls._event(); next(cls.event)
 
 ### database scope
@@ -293,6 +293,9 @@ def on_ready():
     else:
         logging.debug("{:s}.on_ready : Received unexpected state transition. : {!r}".format(__name__, State))
 
+def auto_queue_empty(type):
+    on_ready()
+
 def __process_functions():
     p = ui.progress()
     globals = internal.comment.globals.address()
@@ -303,12 +306,12 @@ def __process_functions():
     for i, fn in enumerate(funcs):
         chunks = list(function.chunks(fn))
 
-        text = functools.partial('{:x} : Processing function {:d} of {:d} : ({:d} chunk{:s})'.format, fn, i, len(funcs))
+        text = functools.partial("{:x} : Processing function {:d} of {:d} : ({:d} chunk{:s})".format, fn, i, len(funcs))
         p.update(current=i)
 
         contents = set(internal.comment.contents.address(fn))
         for ci, (l, r) in enumerate(chunks):
-            p.update(text=text(len(chunks), 's' if len(chunks) != 1 else ''), tooltip='Chunk #{:d} : {:x} - {:x}'.format(ci, l, r))
+            p.update(text=text(len(chunks), 's' if len(chunks) != 1 else ''), tooltip="Chunk #{:d} : {:x} - {:x}".format(ci, l, r))
             for ea in database.iterate(l, r):
                 # FIXME: no need to iterate really since we should have
                 #        all of the addresses
@@ -330,12 +333,12 @@ def rebase(info):
     # for each segment
     p.open()
     for si in xrange(info.size()):
-        p.update(title='Rebasing segment {:d} of {:d} (+{:x}) : {:x} -> {:x}'.format(si, info.size(), info[si].size, info[si]._from, info[si].to))
+        p.update(title="Rebasing segment {:d} of {:d} (+{:x}) : {:x} -> {:x}".format(si, info.size(), info[si].size, info[si]._from, info[si].to))
 
         # for each function (using target address because ida moved the netnodes for us)
         res = [n for n in functions if info[si].to <= n < info[si].to + info[si].size]
         for i, fn in __rebase_function(info[si]._from, info[si].to, info[si].size, res):
-            text = 'Function {:d} of {:d} : {:x}'.format(i + fcount, len(functions), fn)
+            text = "Function {:d} of {:d} : {:x}".format(i + fcount, len(functions), fn)
             p.update(value=sum((fcount,gcount,i)), text=text)
         fcount += len(res)
 
@@ -343,7 +346,7 @@ def rebase(info):
         res = [(ea,count) for ea,count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
         for i, ea in __rebase_globals(info[si]._from, info[si].to, info[si].size, res):
             time.sleep(0.001)
-            text = 'Global {:d} of {:d} : {:x}'.format(i + gcount, len(globals), ea)
+            text = "Global {:d} of {:d} : {:x}".format(i + gcount, len(globals), ea)
             p.update(value=sum((fcount,gcount,i)), text=text)
         gcount += len(res)
     p.close()

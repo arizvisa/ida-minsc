@@ -26,10 +26,13 @@ def filename():
     return idaapi.get_root_filename()
 def idb():
     '''Return the full path to the database.'''
-    return idaapi.cvar.database_idb.replace(os.sep, '/')
+    res = idaapi.cvar.database_idb if idaapi.__version__ < 7.0 else idaapi.get_path(idaapi.PATH_TYPE_IDB)
+    return res.replace(os.sep, '/')
 def module():
     '''Return the module name as per the windows loader.'''
-    return os.path.splitext(os.path.split(filename())[1])[0]
+    res = filename()
+    res = os.path.split(res)
+    return os.path.splitext(res[1])[0]
 def path():
     '''Return the full path to the directory containing the database.'''
     return os.path.split(idb())[0]
@@ -70,6 +73,25 @@ class config(object):
     """
 
     info = idaapi.get_inf_structure()
+
+    if idaapi.__version__ >= 7.0:
+        @classmethod
+        def readonly(cls):
+            return cls.info.readonly_idb()
+
+        @classmethod
+        def sharedobject(cls):
+            return cls.info.is_dll()
+        is_sharedobject = sharedQ = sharedobject
+
+        @classmethod
+        def changes(cls):
+            return cls.info.database_change_count
+
+        @classmethod
+        def processor(cls):
+            return cls.info.get_procName()
+
     @classmethod
     def compiler(cls):
         return cls.info.cc
@@ -86,7 +108,7 @@ class config(object):
             'long':'size_l',
             'longlong':'size_ll',
         }
-        return getattr(cls.compiler, lookup.get(typestr.lower(),typestr) )
+        return getattr(cls.compiler(), lookup.get(typestr.lower(),typestr) )
 
     @classmethod
     def bits(cls):
@@ -99,8 +121,10 @@ class config(object):
 
     @classmethod
     def byteorder(cls):
-        res = idaapi.cvar.inf.mf
-        return 'big' if res else 'little'
+        if idaapi.__version__ < 7.0:
+            res = idaapi.cvar.inf.mf
+            return 'big' if res else 'little'
+        return 'big' if cls.info.is_be() else 'little'
 
     @classmethod
     def processor(cls):
@@ -110,7 +134,9 @@ class config(object):
     @classmethod
     def graphview(cls):
         '''Returns True if the user is currently using graph view.'''
-        return cls.info.graph_view != 0
+        if idaapi.__version__ < 7.0:
+            return cls.info.graph_view != 0
+        return cls.info.is_graph_view()
 
     @classmethod
     def main(cls):
@@ -118,8 +144,9 @@ class config(object):
 
     @classmethod
     def entry(cls):
-        return cls.info.beginEA
-        #return cls.info.startIP
+        if idaapi.__version__ < 7.0:
+            return cls.info.beginEA
+        return cls.info.start_ip
 
     @classmethod
     def margin(cls):
@@ -254,7 +281,7 @@ class functions(object):
         clvars = math.floor(math.log(lvars)/math.log(10)) if lvars else 1
 
         for index,ea in enumerate(res):
-            print '[{:>{:d}d}] Entry:{:0{:d}x} {:0{:d}x}:{:0{:d}x}({:<{:d}d}) {:<{:d}s} args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}'.format(
+            print "[{:>{:d}d}] Entry:{:0{:d}x} {:0{:d}x}:{:0{:d}x}({:<{:d}d}) {:<{:d}s} args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
                 ea, int(cmaxentry),
                 fminaddr(ea), int(cminaddr), fmaxaddr(ea), int(cmaxaddr),
@@ -279,13 +306,13 @@ class functions(object):
         """Search through all of the functions within the database and return the first result.
         Please review the help for functions.list for the definition of ``type``.
         """
-        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
         res = __builtin__.list(cls.iterate(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, (('[{:d}] {:s}'.format(i, function.name(ea))) for i,ea in enumerate(res)))
+            __builtin__.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i,ea in enumerate(res)))
             f = utils.compose(function.by,function.name)
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}'.format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
@@ -294,16 +321,17 @@ class functions(object):
 
 def segments():
     '''Returns a list of all segments in the current database.'''
-    return [segment.by_name(s).startEA for s in segment.list()]
+    return [s.startEA for s in segment.iterate()]
 
 @utils.multicase()
 def decode():
     '''Decode the instruction at the current address.'''
-    return decode(ui.current.address())
+    res = ui.current.address()
+    return read(res, _instruction.size(res))
 @utils.multicase(ea=six.integer_types)
 def decode(ea):
     '''Decode the instruction at the address ``ea``.'''
-    return _instruction.decode(interface.address.inside(ea))
+    return read(ea, _instruction.size(ea))
 
 @utils.multicase()
 def instruction():
@@ -314,7 +342,7 @@ def instruction(ea):
     '''Return the instruction at the specified address ``ea``.'''
     insn = idaapi.generate_disasm_line(interface.address.inside(ea))
     unformatted = idaapi.tag_remove(insn)
-    nocomment = unformatted[:unformatted.rfind(';')]
+    nocomment = unformatted[:unformatted.rfind(idaapi.cvar.ash.cmnt)]
     return reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
 
 @utils.multicase()
@@ -333,8 +361,8 @@ def disasm(ea, **options):
     while count > 0:
         insn = idaapi.generate_disasm_line(ea)
         unformatted = idaapi.tag_remove(insn)
-        nocomment = unformatted[:unformatted.rfind(';')] if ';' in unformatted and not options.get('comments',False) else unformatted
-        res.append('{:x}: {:s}'.format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
+        nocomment = unformatted[:unformatted.rfind(idaapi.cvar.ash.cmnt)] if idaapi.cvar.ash.cmnt in unformatted and not options.get('comments', options.get('comment', False)) else unformatted
+        res.append("{:x}: {:s}".format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
         ea = address.next(ea)
         count -= 1
     return '\n'.join(res)
@@ -383,7 +411,9 @@ def iterate(start, end, step=None):
     while start != idaapi.BADADDR and op(start,end):
         yield start
         start = step(start)
-    yield end
+
+    _, right = config.bounds()
+    if end < right: yield end
 
 class names(object):
     """
@@ -456,7 +486,7 @@ class names(object):
         caddr = math.floor(math.log(maxaddr)/math.log(16))
 
         for index in res:
-            print '[{:>{:d}d}] {:0{:d}x} {:s}'.format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index))
+            print "[{:>{:d}d}] {:0{:d}x} {:s}".format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index))
         return
 
     @utils.multicase(string=basestring)
@@ -470,13 +500,13 @@ class names(object):
         """Search through all of the names within the database and return the first result.
         Please review the help for names.list for the definition of ``type``.
         """
-        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
         res = __builtin__.list(cls.__iterate__(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, (('[{:d}] {:x} {:s}'.format(idx, idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx))) for idx in res))
+            __builtin__.map(logging.info, (("[{:d}] {:x} {:s}".format(idx, idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx))) for idx in res))
             f1, f2 = idaapi.get_nlist_ea, idaapi.get_nlist_name
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x} {!r}'.format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x} {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
@@ -646,8 +676,8 @@ def set_name(ea, string, **listed):
     """
 
     ea = interface.address.inside(ea)
-    if idaapi.SN_NOCHECK != 0:
-        raise AssertionError("{:s}.set_name({:x}, {!r}{:s}) : idaapi.SN_NOCHECK != 0".format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else ''))
+    SN_NOCHECK = idaapi.SN_NOCHECK
+    SN_CHECK = idaapi.SN_CHECK
     SN_NOLIST = idaapi.SN_NOLIST
     SN_LOCAL = idaapi.SN_LOCAL
     SN_NON_PUBLIC = idaapi.SN_NON_PUBLIC
@@ -657,6 +687,7 @@ def set_name(ea, string, **listed):
         pass
 
     flags = idaapi.SN_NON_AUTO
+    flags |= idaapi.SN_NOCHECK
     flags |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
     flags |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
     flags |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
@@ -670,7 +701,8 @@ def set_name(ea, string, **listed):
             flags &= ~idaapi.SN_NOLIST
 
     # If the bool ``listed`` is True, then ensure that this name is added to the name list.
-    flags = (flags & ~idaapi.SN_NOLIST) if listed.get('listed', False) else (flags | idaapi.SN_NOLIST)
+    if 'listed' in listed:
+        flags = (flags & ~idaapi.SN_NOLIST) if listed.get('listed', False) else (flags | idaapi.SN_NOLIST)
 
     try:
         # check if we're a label of some kind
@@ -688,13 +720,13 @@ def set_name(ea, string, **listed):
 
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
-        logging.warn('{:s}.set_name({:x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}'.format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else '', res))
+        logging.warn("{:s}.set_name({:x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in listed.iteritems())) if listed else '', res))
         string = res
 
     res,ok = get_name(ea),idaapi.set_name(ea, string or "", flags)
 
     if not ok:
-        raise ValueError("{:s}.set_name({:x}, {!r}{:s}) : Unable to call idaapi.set_name({:x}, {!r}, {:x})".format(__name__, ea, string, ', {:s}'.format(', '.join('{:s}={!r}'.format(k, v) for k,v in listed.iteritems())) if listed else '', ea, string, flags))
+        raise ValueError("{:s}.set_name({:x}, {!r}{:s}) : Unable to call idaapi.set_name({:x}, {!r}, {:x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in listed.iteritems())) if listed else '', ea, string, flags))
     return res
 
 @utils.multicase()
@@ -706,18 +738,18 @@ def name(ea):
     '''Returns the name at the address ``ea``.'''
     return get_name(ea) or None
 @utils.multicase(string=basestring)
-def name(string, *suffix):
+def name(string, *suffix, **listed):
     '''Renames the current address to ``string``.'''
-    return name(ui.current.address(), string, *suffix)
+    return name(ui.current.address(), string, *suffix, **listed)
 @utils.multicase(none=types.NoneType)
 def name(none):
     '''Removes the name at the current address.'''
     return set_name(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types, string=basestring)
-def name(ea, string, *suffix):
+def name(ea, string, *suffix, **listed):
     '''Renames the address ``ea`` to ``string``.'''
     res = (string,) + suffix
-    return set_name(ea, interface.tuplename(*res))
+    return set_name(ea, interface.tuplename(*res), **listed)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none):
     '''Removes the name at address ``ea``.'''
@@ -994,7 +1026,7 @@ class entry(object):
         res = __builtin__.list(cls.__iterate__(**type))
 
         to_address = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
-        to_numlen = utils.compose('{:x}'.format, len)
+        to_numlen = utils.compose("{:x}".format, len)
 
         maxindex = max(res+[1])
         maxaddr = max(__builtin__.map(to_address, res) or [idaapi.BADADDR])
@@ -1004,7 +1036,7 @@ class entry(object):
         cordinal = math.floor(math.log(maxordinal)/math.log(16))
 
         for index in res:
-            print '[{:{:d}d}] {:>{:d}x} : ({:{:d}x}) {:s}'.format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index))
+            print "[{:{:d}d}] {:>{:d}x} : ({:{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index))
         return
 
     @utils.multicase(string=basestring)
@@ -1018,13 +1050,13 @@ class entry(object):
         """Search through all of the entry-points within the database and return the first result.
         Please review the help for entry.list for the definition of ``type``.
         """
-        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
         res = __builtin__.list(cls.__iterate__(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, (('[{:d}] {:x} : ({:x}) {:s}'.format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
+            __builtin__.map(logging.info, (("[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
             f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}'.format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}".format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
@@ -1072,6 +1104,7 @@ class entry(object):
         return res
 
     add = utils.alias(new, 'entry')
+exports = entry
 
 def tags():
     '''Returns all of the tag names used globally.'''
@@ -1102,7 +1135,7 @@ def tag_read(ea):
     res = comment(ea, repeatable=not repeatable)
     d2 = internal.comment.decode(res)
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn('{:s}.tag_read({:x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.'.format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+        logging.warn("{:s}.tag_read({:x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
     res = {}
     __builtin__.map(res.update, (d1,d2))
 
@@ -1323,8 +1356,8 @@ class imports(object):
         return cls.__iterate__()
 
     # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
-    __formats__ = staticmethod(lambda (module, name, ordinal): name or 'Ordinal{:d}'.format(ordinal))
-    __formatl__ = staticmethod(lambda (module, name, ordinal): '{:s}!{:s}'.format(module, imports.__formats__((module,name,ordinal))))
+    __formats__ = staticmethod(lambda (module, name, ordinal): name or "Ordinal{:d}".format(ordinal))
+    __formatl__ = staticmethod(lambda (module, name, ordinal): "{:s}!{:s}".format(module, imports.__formats__((module,name,ordinal))))
     __format__ = __formatl__
 
     __matcher__ = utils.matcher()
@@ -1469,10 +1502,10 @@ class imports(object):
         maxaddr = max(__builtin__.map(utils.first, res) or [idaapi.BADADDR])
         maxmodule = max(__builtin__.map(utils.compose(utils.second, utils.first, len), res) or [''])
         caddr = math.floor(math.log(maxaddr)/math.log(16))
-        cordinal = max(__builtin__.map(utils.compose(utils.second, operator.itemgetter(2), '{:d}'.format, len), res) or [1])
+        cordinal = max(__builtin__.map(utils.compose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
 
         for ea,(module,name,ordinal) in res:
-            print '{:0{:d}x} {:s}<{:<d}>{:s} {:s}'.format(ea, int(caddr), module, ordinal, ' '*(cordinal-len('{:d}'.format(ordinal)) + (maxmodule-len(module))), name)
+            print "{:0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name)
         return
 
     @utils.multicase(string=basestring)
@@ -1486,13 +1519,13 @@ class imports(object):
         """Search through all of the imports within the database and return the first result.
         Please review the help for imports.list for the definition of ``type``.
         """
-        query_s = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
         res = __builtin__.list(cls.iterate(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, ('{:x} {:s}<{:d}> {:s}'.format(ea, module, ordinal, name) for ea,(module,name,ordinal) in res))
+            __builtin__.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea,(module,name,ordinal) in res))
             f = utils.compose(utils.second, cls.__formatl__)
-            logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}'.format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
 
         res = __builtin__.next(iter(res), None)
         if res is None:
@@ -1723,7 +1756,7 @@ class address(object):
     def prevreg(cls, ea, reg, *regs, **modifiers):
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = ', '.join(['{:x}'.format(ea)] + __builtin__.map('"{:s}"'.format, regs) + __builtin__.map(utils.unbox('{:s}={!r}'.format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + __builtin__.map("\"{:s}\"".format, regs) + __builtin__.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -1771,7 +1804,7 @@ class address(object):
     def nextreg(cls, ea, reg, *regs, **modifiers):
         regs = (reg,) + regs
         count = modifiers.get('count',1)
-        args = ', '.join(['{:x}'.format(ea)] + __builtin__.map('"{:s}"'.format, regs) + __builtin__.map(utils.unbox('{:s}={!r}'.format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + __builtin__.map("\"{:s}\"".format, regs) + __builtin__.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -1893,7 +1926,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevbranch(cls, ea, count):
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: _instruction.is_call(n) and not _instruction.is_branch(n))
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: _instruction.is_call(n) or not _instruction.is_branch(n))
         return cls.prevbranch(res, count-1) if count > 1 else res
 
     @utils.multicase()
@@ -1908,7 +1941,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextbranch(cls, ea, count):
-        res = cls.walk(ea, cls.next, lambda n: _instruction.is_call(n) and not _instruction.is_branch(n))
+        res = cls.walk(ea, cls.next, lambda n: _instruction.is_call(n) or not _instruction.is_branch(n))
         return cls.nextbranch(cls.next(res), count-1) if count > 1 else res
 
     @utils.multicase()
@@ -1992,7 +2025,7 @@ class flow(address):
         invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
         refs = filter(type.is_code, xref.up(ea))
         if len(refs) > 1 and invalidQ(address.prev(ea)):
-            logging.fatal("{:s}.prev({:x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map('{:x}'.format,refs))))
+            logging.fatal("{:s}.prev({:x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map("{:x}".format,refs))))
             return None
         try:
             if invalidQ(address.prev(ea)):
@@ -2022,7 +2055,7 @@ class flow(address):
         invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
         refs = filter(type.is_code, xref.down(ea))
         if len(refs) > 1:
-            logging.fatal("{:s}.next({:x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map('{:x}'.format,refs))))
+            logging.fatal("{:s}.next({:x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map("{:x}".format,refs))))
             return None
         if invalidQ(ea) and not _instruction.is_jmp(ea):
 #            logging.fatal("{:s}.next({:x}, count={:d}) : Unable to move to next address. Flow has stopped.".format('.'.join((__name__, cls.__name__)), ea, count))
@@ -2071,20 +2104,22 @@ class type(object):
     @classmethod
     def flags(cls, ea):
         '''Returns the flags of the item at the address ``ea``.'''
-        return idaapi.getFlags(interface.address.within(ea))
+        return idaapi.get_flags(interface.address.within(ea))
     @utils.multicase(ea=six.integer_types, mask=six.integer_types)
     @classmethod
     def flags(cls, ea, mask):
         '''Returns the flags at the address ``ea`` masked with ``mask``.'''
-        return idaapi.getFlags(interface.address.within(ea)) & mask
+        return idaapi.get_flags(interface.address.within(ea)) & mask
     @utils.multicase(ea=six.integer_types, mask=six.integer_types, value=six.integer_types)
     @classmethod
     def flags(cls, ea, mask, value):
         '''Sets the flags at the address ``ea`` masked with ``mask`` set to ``value``.'''
-        ea = interface.address.within(ea)
-        res = idaapi.getFlags(ea)
-        idaapi.setFlags(ea, (res&~mask) | value)
-        return res & mask
+        if idaapi.__version__ < 7.0:
+            ea = interface.address.within(ea)
+            res = idaapi.get_flags(ea)
+            idaapi.setFlags(ea, (res&~mask) | value)
+            return res & mask
+        raise DeprecationWarning("{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated idaapi.setFlags(...).".format('.'.join((__name__, cls.__name__)), ea, mask, value))
 
     @utils.multicase()
     @staticmethod
@@ -2279,178 +2314,6 @@ class type(object):
         return type.has_dummyname(ea) or type.has_customname(ea)
     labelQ = utils.alias(is_label, 'type')
 
-    @utils.multicase()
-    @classmethod
-    def unsigned(cls, **byteorder):
-        '''Read an unsigned integer from the current address.'''
-        ea = ui.current.address()
-        return cls.unsigned(ea, cls.size(ea), **byteorder)
-    @utils.multicase(size=six.integer_types)
-    @classmethod
-    def unsigned(cls, ea, **byteorder):
-        '''Read an unsigned integer from the address ``ea`` using the size defined in the database.'''
-        return cls.unsigned(ea, cls.size(ea), **byteorder)
-    @utils.multicase(ea=six.integer_types, size=six.integer_types)
-    @classmethod
-    def unsigned(cls, ea, size, **byteorder):
-        """Read an unsigned integer from the address ``ea`` with the specified ``size``.
-        If ``byteorder`` is 'big' then read in big-endian form.
-        If ``byteorder`` is 'little' then read in little-endian form.
-        ``byteorder`` defaults to the format used by the database architecture.
-        """
-        data = read(ea, size)
-        endian = byteorder.get('order', byteorder.get('byteorder', sys.byteorder))
-        if endian.lower().startswith('little'):
-            data = data[::-1]
-        return reduce(lambda x,y: x << 8 | ord(y), data, 0)
-
-    @utils.multicase()
-    @classmethod
-    def signed(cls, **byteorder):
-        '''Read a signed integer from the current address.'''
-        ea = ui.current.address()
-        return cls.signed(ea, cls.size(ea), **byteorder)
-    @utils.multicase(size=six.integer_types)
-    @classmethod
-    def signed(cls, ea, **byteorder):
-        '''Read a signed integer from the address ``ea`` using the size defined in the database.'''
-        return cls.signed(ea, cls.size(ea), **byteorder)
-    @utils.multicase(ea=six.integer_types, size=six.integer_types)
-    @classmethod
-    def signed(cls, ea, size, **byteorder):
-        """Read a signed integer from the address ``ea`` with the specified ``size``.
-        If ``byteorder`` is 'big' then read in big-endian form.
-        If ``byteorder`` is 'little' then read in little-endian form.
-        ``byteorder`` defaults to the format used by the database architecture.
-        """
-        bits = size*8
-        sf = (2**bits)>>1
-        res = cls.unsigned(ea, size, **byteorder)
-        return (res - (2**bits)) if res&sf else res
-
-    class integer(object):
-        '''Read different integer types out of the database.'''
-        @utils.multicase()
-        def __new__(cls, **byteorder):
-            return type.unsigned(**byteorder)
-        @utils.multicase(ea=six.integer_types)
-        def __new__(cls, ea, **byteorder):
-            return type.unsigned(ea, **byteorder)
-        @utils.multicase(ea=six.integer_types, size=six.integer_types)
-        def __new__(cls, ea, size, **byteorder):
-            return type.unsigned(ea, size, **byteorder)
-
-        @utils.multicase()
-        @classmethod
-        def uint8_t(cls, **byteorder):
-            '''Read a uint8_t from the current address.'''
-            return type.unsigned(ui.current.address(), 1, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def uint8_t(cls, ea, **byteorder):
-            '''Read a uint8_t from the address ``ea``.'''
-            return type.unsigned(ea, 1, **byteorder)
-        @utils.multicase()
-        @classmethod
-        def sint8_t(cls, **byteorder):
-            '''Read a sint8_t from the current address.'''
-            return type.signed(ui.current.address(), 1, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def sint8_t(cls, ea, **byteorder):
-            '''Read a sint8_t from the address ``ea``.'''
-            return type.signed(ea, 1, **byteorder)
-        ubyte1, sbyte1 = utils.alias(uint8_t, 'type.integer'), utils.alias(sint8_t, 'type.integer')
-
-        @utils.multicase()
-        @classmethod
-        def uint16_t(cls, **byteorder):
-            '''Read a uint16_t from the current address.'''
-            return type.unsigned(ui.current.address(), 2, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def uint16_t(cls, ea, **byteorder):
-            '''Read a uint16_t from the address ``ea``.'''
-            return type.unsigned(ea, 2, **byteorder)
-        @utils.multicase()
-        @classmethod
-        def sint16_t(cls, **byteorder):
-            '''Read a sint16_t from the current address.'''
-            return type.signed(ui.current.address(), 2, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def sint16_t(cls, ea, **byteorder):
-            '''Read a sint16_t from the address ``ea``.'''
-            return type.signed(ea, 2, **byteorder)
-        uint2, sint2 = utils.alias(uint16_t, 'type.integer'), utils.alias(sint16_t, 'type.integer')
-
-        @utils.multicase()
-        @classmethod
-        def uint32_t(cls, **byteorder):
-            '''Read a uint32_t from the current address.'''
-            return type.unsigned(ui.current.address(), 4, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def uint32_t(cls, ea, **byteorder):
-            '''Read a uint32_t from the address ``ea``.'''
-            return type.unsigned(ea, 4, **byteorder)
-        @utils.multicase()
-        @classmethod
-        def sint32_t(cls, **byteorder):
-            '''Read a sint32_t from the current address.'''
-            return type.signed(ui.current.address(), 4, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def sint32_t(cls, ea, **byteorder):
-            '''Read a sint32_t from the address ``ea``.'''
-            return type.signed(ea, 4, **byteorder)
-        uint4, sint4 = utils.alias(uint32_t, 'type.integer'), utils.alias(sint32_t, 'type.integer')
-
-        @utils.multicase()
-        @classmethod
-        def uint64_t(cls, **byteorder):
-            '''Read a uint64_t from the current address.'''
-            return type.unsigned(ui.current.address(), 8, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def uint64_t(cls, ea, **byteorder):
-            '''Read a uint64_t from the address ``ea``.'''
-            return type.unsigned(ea, 8, **byteorder)
-        @utils.multicase()
-        @classmethod
-        def sint64_t(cls, **byteorder):
-            '''Read a sint64_t from the current address.'''
-            return type.signed(ui.current.address(), 8, **byteorder)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def sint64_t(cls, ea, **byteorder):
-            '''Read a sint64_t from the address ``ea``.'''
-            return type.signed(ea, 8, **byteorder)
-        uint8, sint8 = utils.alias(uint64_t, 'type.integer'), utils.alias(sint64_t, 'type.integer')
-
-        @utils.multicase()
-        @classmethod
-        def uint128_t(cls, **byteorder):
-            '''Read a uint128_t from the current address.'''
-            return type.unsigned(ui.current.address(), 16)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def uint128_t(cls, ea, **byteorder):
-            '''Read a uint128_t from the address ``ea``.'''
-            return type.unsigned(ea, 16, **byteorder)
-        @utils.multicase()
-        @classmethod
-        def sint128_t(cls, **byteorder):
-            '''Read a sint128_t from the current address.'''
-            return type.signed(ui.current.address(), 16)
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def sint128_t(cls, ea, **byteorder):
-            '''Read a sint128_t from the address ``ea``.'''
-            return type.signed(ea, 16, **byteorder)
-
-    i = integer
-
     class array(object):
         """Returns information about an array that is defined within the database.
 
@@ -2467,82 +2330,45 @@ class type(object):
         @utils.multicase()
         def __new__(cls):
             '''Return the array at the current address.'''
-            return cls(ui.current.address())
+            return get.array(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the array at address ``ea``.'''
-            return cls.get(ea)
+            return get.array(ea)
 
         @utils.multicase()
         @classmethod
-        def get(cls):
-            '''Return the values of the array at the current address.'''
-            return cls.get(ui.current.address())
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def get(cls, ea):
-            '''Return the values of the array at address ``ea``.'''
-            ea = interface.address.within(ea)
-            numerics = {
-                idaapi.FF_BYTE : 'B',
-                idaapi.FF_WORD : 'H',
-                idaapi.FF_DWRD : 'L',
-                idaapi.FF_QWRD : 'Q',
-                idaapi.FF_FLOAT : 'f',
-                idaapi.FF_DOUBLE : 'd',
-            }
-            strings = {
-                1 : 'c',
-                2 : 'u',
-            }
-            fl = type.flags(ea)
-            elesize = idaapi.get_full_data_elsize(ea, fl)
-            if fl & idaapi.FF_ASCI == idaapi.FF_ASCI:
-                t = strings[elesize]
-            elif fl & idaapi.FF_STRU == idaapi.FF_STRU:
-                t, size = type.structure.id(ea), idaapi.get_item_size(ea)
-                return [ type.structure.at(ea, id=t) for ea in __builtin__.range(ea, ea+size, structure.size(t)) ]
-            else:
-                ch = numerics[fl & idaapi.DT_TYPE]
-                t = ch.lower() if fl & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
-            res = array.array(t, read(ea, cls.size(ea)))
-            if len(res) != cls.length(ea):
-                logging.warn('{:s}.get({:x}) : Unexpected length : ({:d} != {:d})'.format('.'.join((__name__, 'type', cls.__name__)), ea, len(res), cls.length(ea)))
-            return res
-
-        @utils.multicase()
-        @staticmethod
-        def element():
+        def element(cls):
             '''Return the size of an element in the array at the current address.'''
-            return type.array.element(ui.current.address())
+            return cls.element(ui.current.address())
         @utils.multicase(ea=six.integer_types)
-        @staticmethod
-        def element(ea):
+        @classmethod
+        def element(cls, ea):
             '''Return the size of an element in the array at address ``ea``.'''
             ea, fl = interface.address.within(ea), type.flags(ea)
             return idaapi.get_full_data_elsize(ea, fl)
 
         @utils.multicase()
-        @staticmethod
-        def length():
+        @classmethod
+        def length(cls):
             '''Return the number of elements of the array at the current address.'''
-            return type.array.length(ui.current.address())
+            return cls.length(ui.current.address())
         @utils.multicase(ea=six.integer_types)
-        @staticmethod
-        def length(ea):
+        @classmethod
+        def length(cls, ea):
             '''Return the number of elements in the array at address ``ea``.'''
             ea, fl = interface.address.within(ea), type.flags(ea)
             sz,ele = idaapi.get_item_size(ea),idaapi.get_full_data_elsize(ea, fl)
             return sz // ele
 
         @utils.multicase()
-        @staticmethod
-        def size():
+        @classmethod
+        def size(cls):
             '''Return the total size of the array at the current address.'''
             return type.size(ui.current.address())
         @utils.multicase(ea=six.integer_types)
-        @staticmethod
-        def size(ea):
+        @classmethod
+        def size(cls, ea):
             '''Return the total size of the array at address ``ea``.'''
             return type.size(ea)
 
@@ -2558,17 +2384,17 @@ class type(object):
         @utils.multicase()
         def __new__(cls):
             '''Return the structure at the current address.'''
-            return cls(ui.current.address())
+            return get.struc(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the structure at address ``ea``.'''
-            return cls.at(ea)
+            return get.struc(ea)
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea, **sid):
             """Return the structure at address ``ea``.
             If the structure ``sid`` is specified, then use that specific structure type.
             """
-            return cls.at(ea, **sid)
+            return get.struc(ea, **sid)
 
         @utils.multicase()
         @staticmethod
@@ -2593,61 +2419,14 @@ class type(object):
 
         @utils.multicase()
         @staticmethod
-        def at():
-            '''Return the structure_t at the current address as a dict of ctypes.'''
-            return type.structure.at(ui.current.address())
+        def size():
+            '''Return the total size of the structure at the current address.'''
+            return type.size(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @staticmethod
-        def at(ea, **sid):
-            """Return the structure_t at address ``ea`` as a dict of ctypes.
-            If the structure ``sid`` is specified, then use that specific structure type.
-            """
-            ea = interface.address.within(ea)
-
-            if any(n in sid for n in ('sid','struc','structure','id')):
-                res = sid['sid'] if 'sid' in sid else sid['struc'] if 'struc' in sid else sid['structure'] if 'structure' in sid else sid['id'] if 'id' in sid else None
-                sid = res.id if isinstance(res, structure.structure_t) else res
-            else:
-                sid = type.structure.id(ea)
-
-            st = structure.instance(sid, offset=ea)
-            typelookup = {
-                (int,-1) : ctypes.c_int8, (int,1) : ctypes.c_uint8,
-                (int,-2) : ctypes.c_int16, (int,2) : ctypes.c_uint16,
-                (int,-4) : ctypes.c_int32, (int,4) : ctypes.c_uint32,
-                (int,-8) : ctypes.c_int64, (int,8) : ctypes.c_uint64,
-                (float,4) : ctypes.c_float, (float,8) : ctypes.c_double,
-            }
-
-            res = {}
-            for m in st.members:
-                t, val = m.type, read(m.offset, m.size) or ''
-                try:
-                    ct = typelookup[t]
-                except KeyError:
-                    ty,sz = t if hasattr(t, '__iter__') else (m.type, 0)
-                    if isinstance(t, __builtin__.list):
-                        t = typelookup[tuple(ty)]
-                        ct = t*sz
-                    elif ty in (chr,str):
-                        ct = ctypes.c_char*sz
-                    else:
-                        ct = None
-                finally:
-                    res[m.name] = val if any(_ is None for _ in (ct,val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)),ctypes.POINTER(ct)).contents
-            return res
-            get = utils.alias(at, 'type.struc')
-
-            @utils.multicase()
-            @staticmethod
-            def size():
-                '''Return the total size of the structure at the current address.'''
-                return type.size(ui.current.address())
-            @utils.multicase(ea=six.integer_types)
-            @staticmethod
-            def size(ea):
-                '''Return the total size of the structure at address ``ea``.'''
-                return type.size(ea)
+        def size(ea):
+            '''Return the total size of the structure at address ``ea``.'''
+            return type.size(ea)
     structure = struct = struc
 
     class switch(object):
@@ -2885,7 +2664,7 @@ class xref(object):
         If the reftype ``call`` is True, then specify this ref as a function call.
         """
         ea, target = interface.address.inside(ea, target)
-        isCall = reftype.get('call', reftype.get('is_call', reftype.get('isCall', reftype.get('callQ', False))))
+        isCall = reftype['call'] if 'call' in reftype else reftype['is_call'] if 'is_call' in reftype else reftype['isCall'] if 'isCall' in reftype else reftype.get('callQ', False)
         if abs(target-ea) > 2**(config.bits()/2):
             flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
         else:
@@ -2958,7 +2737,6 @@ class marks(object):
     """
     Interact with all of the marks defined within the database.
     """
-
     MAX_SLOT_COUNT = 0x400
     table = {}
 
@@ -2966,7 +2744,7 @@ class marks(object):
 
     def __new__(cls):
         '''Yields each of the marked positions within the database.'''
-        res = __builtin__.list(cls.iterate()) # make a copy in-case someone is actively it
+        res = __builtin__.list(cls.iterate()) # make a copy in-case someone is actively modifying it
         for ea,comment in cls.iterate():
             yield ea, comment
         return
@@ -2978,7 +2756,7 @@ class marks(object):
         return cls.new(ui.current.address(), description)
     @utils.multicase(ea=six.integer_types, description=basestring)
     @classmethod
-    def new(cls, ea, description):
+    def new(cls, ea, description, **extra):
         '''Create a mark at the address ``ea`` with the given ``description``.'''
         ea = interface.address.inside(ea)
         try:
@@ -2986,13 +2764,9 @@ class marks(object):
             ea,comm = cls.by_index(idx)
             logging.warn("{:s}.new({:x}, ...) : Replacing mark {:d} at {:x} : {!r} -> {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, comm, description))
         except KeyError:
-            idx = cls.length()
+            idx = cls.free_slotindex()
             logging.info("{:s}.new({:x}, ...) : Creating mark {:d} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, description))
-
-        res = cls.location(ea=ea, x=0, y=0, lnnum=0)
-        title,descr = description,description
-        res.mark(idx, title, descr)
-        return idx
+        return cls.set_description(idx, ea, description, **extra)
 
     @utils.multicase()
     @classmethod
@@ -3005,11 +2779,8 @@ class marks(object):
         '''Remove the mark at the specified address ``ea``.'''
         ea = interface.address.inside(ea)
         idx = cls.get_slotindex(ea)
-        descr = cls.location().markdesc(idx)
-
-        res = cls.location(ea=idaapi.BADADDR)
-        res.mark(idx, "", "")
-
+        descr = cls.get_description(idx)
+        res = cls.set_description(idx, idaapi.BADADDR, '')
         logging.warn("{:s}.remove({:x}) : Removed mark {:d} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, descr))
         return idx
 
@@ -3018,7 +2789,7 @@ class marks(object):
         '''Iterate through all of the marks in the database.'''
         count = 0
         try:
-            for count,idx in enumerate(xrange(cls.MAX_SLOT_COUNT)):
+            for count, idx in enumerate(xrange(cls.MAX_SLOT_COUNT)):
                 yield cls.by_index(idx)
         except KeyError:
             pass
@@ -3030,18 +2801,11 @@ class marks(object):
         return len(__builtin__.list(cls.iterate()))
 
     @classmethod
-    def location(cls, **attrs):
-        '''Return a location_t object with the specified attributes.'''
-        res = idaapi.curloc()
-        __builtin__.list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
-        return res
-
-    @classmethod
     def by_index(cls, index):
         '''Return the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
-            return (cls.get_slotaddress(index), cls.location().markdesc(index))
-        raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__,cls.__name__)), index, ('{:d} < 0'.format(index)) if index < 0 else ('{:d} >= MAX_SLOT_COUNT'.format(index))))
+            return (cls.get_slotaddress(index), cls.get_description(index))
+        raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__,cls.__name__)), index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
     byIndex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
@@ -3056,25 +2820,6 @@ class marks(object):
         return cls.by_index(cls.get_slotindex(ea))
     byAddress = utils.alias(by_address, 'marks')
 
-    @utils.multicase()
-    @classmethod
-    def find_slotaddress(cls): return cls.find_slotaddress(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def find_slotaddress(cls, ea):
-        # FIXME: figure out how to fail if this address isn't found
-        res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
-        res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
-        try:
-            count = len(__builtin__.list(itertools.takewhile(lambda n: n != ea, res)))
-        except IndexError:
-            raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
-        __builtin__.list(itertools.islice(iterable, count))
-        if __builtin__.next(iterable) != ea:
-            raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
-        return count
-    findSlotAddress = utils.alias(find_slotaddress, 'marks')
-
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def get_slotindex(cls):
@@ -3084,22 +2829,115 @@ class marks(object):
     @classmethod
     def get_slotindex(cls, ea):
         '''Get the index of the mark at address ``ea``.'''
-        # FIXME: figure out how to fail if this address isn't found
-        return cls.table.get(ea, cls.find_slotaddress(ea))
-    getSlotIndex = utils.alias(get_slotindex, 'marks')
+        res = cls.table.get(ea, None)
+        if res is None:
+            # FIXME: figure out good way to fail if this address isn't found
+            return cls.find_slotaddress(ea)
+        return res
 
+    @utils.multicase()
     @classmethod
-    def get_slotaddress(cls, slotidx):
-        '''Get the address of the mark at index ``slotidx``.'''
-        loc = cls.location()
-        intp = idaapi.int_pointer()
-        intp.assign(slotidx)
-        res = loc.markedpos(intp)
-        if res == idaapi.BADADDR:
-            raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
-        ea = address.head(res)
-        cls.table[ea] = slotidx
-        return ea
+    def find_slotaddress(cls):
+        return cls.find_slotaddress(ui.current.address())
+
+    if idaapi.__version__ < 7.0:
+        @classmethod
+        def location(cls, **attrs):
+            '''Return a location_t object with the specified attributes.'''
+            res = idaapi.curloc()
+            __builtin__.list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
+            return res
+
+        @classmethod
+        def set_description(cls, index, ea, description, **extra):
+            res = cls.location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
+            title,descr = description,description
+            res.mark(index, title, descr)
+            if cls.get_slotaddress(index) != ea:
+                raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems())) if extra else '')))
+            return index
+
+        @classmethod
+        def get_description(cls, index):
+            return cls.location().markdesc(index)
+
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def find_slotaddress(cls, ea):
+            # FIXME: figure out how to fail if this address isn't found
+            res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
+            res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
+            try:
+                count = len(__builtin__.list(itertools.takewhile(lambda n: n != ea, res)))
+            except IndexError:
+                raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+            __builtin__.list(itertools.islice(iterable, count))
+            if __builtin__.next(iterable) != ea:
+                raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+            return count
+
+        @classmethod
+        def free_slotindex(cls):
+            return cls.length()
+
+        @classmethod
+        def get_slotaddress(cls, slotidx):
+            '''Get the address of the mark at index ``slotidx``.'''
+            loc = cls.location()
+            intp = idaapi.int_pointer()
+            intp.assign(slotidx)
+            res = loc.markedpos(intp)
+            if res == idaapi.BADADDR:
+                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
+            ea = address.head(res)
+            cls.table[ea] = slotidx
+            return ea
+
+    else:   # idaapi.__version__ >= 7.0
+        @classmethod
+        def set_description(cls, index, ea, description, **extra):
+            idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, description)
+            if cls.get_slotaddress(index) != ea:
+                raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems())) if extra else '')))
+            return index
+
+        @classmethod
+        def get_description(cls, index):
+            return idaapi.get_mark_comment(index)
+
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def find_slotaddress(cls, ea):
+            res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
+            res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
+            try:
+                count = len(__builtin__.list(itertools.takewhile(lambda n: n != ea, res)))
+            except IndexError:
+                raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+            __builtin__.list(itertools.islice(iterable, count))
+            if __builtin__.next(iterable) != ea:
+                raise KeyError("{:s}.find_slotaddress({:x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+            return count
+
+        @classmethod
+        def free_slotindex(cls):
+            res = __builtin__.next((i for i in xrange(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
+            if res is None:
+                raise ValueError("{:s}.free_slotindex : No free slots available for mark.".format('.'.join((__name__, 'bookmarks', cls.__name__))))
+            return res
+
+        @classmethod
+        def get_slotaddress(cls, slotidx):
+            '''Get the address of the mark at index ``slotidx``.'''
+            res = idaapi.get_marked_pos(slotidx)
+            if res == idaapi.BADADDR:
+                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
+            ea = address.head(res)
+            cls.table[ea] = slotidx
+            return ea
+
+    getSlotIndex = utils.alias(get_slotindex, 'marks')
+    findSlotAddress = utils.alias(find_slotaddress, 'marks')
 
 @utils.multicase()
 def mark():
@@ -3138,20 +2976,6 @@ class extra(object):
     MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
 
     @classmethod
-    def __hide(cls, ea):
-        if type.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
-            type.flags(ea, idaapi.FF_LINE, 0)
-            return True
-        return False
-
-    @classmethod
-    def __show(cls, ea):
-        if type.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
-            type.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE)
-            return True
-        return False
-
-    @classmethod
     def __has_extra(cls, ea, base):
         sup = internal.netnode.sup
         return sup.get(ea, base) is not None
@@ -3186,25 +3010,61 @@ class extra(object):
             if row is None: break
         return i or None
 
-    @classmethod
-    def __get(cls, ea, base):
-        sup = internal.netnode.sup
-        count = cls.__count(ea, base)
-        if count is None: return None
-        res = (sup.get(ea, base+i) for i in xrange(count))
-        return '\n'.join(row[:-1] if row.endswith('\x00') else row for row in res)
-    @classmethod
-    def __set(cls, ea, string, base):
-        sup = internal.netnode.sup
-        [ sup.set(ea, base+i, row+'\x00') for i,row in enumerate(string.split('\n')) ]
-        return True
-    @classmethod
-    def __del(cls, ea, base):
-        sup = internal.netnode.sup
-        count = cls.__count(ea, base)
-        if count is None: return False
-        [ sup.remove(ea, base+i) for i in xrange(count) ]
-        return True
+    if idaapi.__version__ < 7.0:
+        @classmethod
+        def __hide(cls, ea):
+            if type.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
+                type.flags(ea, idaapi.FF_LINE, 0)
+                return True
+            return False
+
+        @classmethod
+        def __show(cls, ea):
+            if type.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
+                type.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE)  # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
+                return True
+            return False
+
+        @classmethod
+        def __get(cls, ea, base):
+            sup = internal.netnode.sup
+            count = cls.__count(ea, base)
+            if count is None: return None
+            res = (sup.get(ea, base+i) for i in xrange(count))
+            return '\n'.join(row[:-1] if row.endswith('\x00') else row for row in res)
+        @classmethod
+        def __set(cls, ea, string, base):
+            cls.__hide(ea)
+            sup = internal.netnode.sup
+            [ sup.set(ea, base+i, row+'\x00') for i,row in enumerate(string.split('\n')) ]
+            cls.__show(ea)
+            return True
+        @classmethod
+        def __del(cls, ea, base):
+            sup = internal.netnode.sup
+            count = cls.__count(ea, base)
+            if count is None: return False
+            cls.__hide(ea)
+            [ sup.remove(ea, base+i) for i in xrange(count) ]
+            cls.__show(ea)
+            return True
+    else:
+        @classmethod
+        def __get(cls, ea, base):
+            count = cls.__count(ea, base)
+            if count is None: return None
+            res = (idaapi.get_extra_cmt(ea, base+i) or '' for i in xrange(count))
+            return '\n'.join(res)
+        @classmethod
+        def __set(cls, ea, string, base):
+            [ idaapi.update_extra_cmt(ea, base+i, row) for i, row in enumerate(string.split('\n')) ]
+            return string.count('\n')
+        @classmethod
+        def __del(cls, ea, base):
+            res = cls.__count(ea, base)
+            if res is None: return 0
+            [idaapi.del_extra_cmt(ea, base+i) for i in xrange(res)]
+            return res
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -3223,36 +3083,28 @@ class extra(object):
     def del_prefix(cls, ea):
         '''Delete the prefixed comment at address ``ea``.'''
         res = cls.__get(ea, idaapi.E_PREV)
-        cls.__hide(ea)
         cls.__del(ea, idaapi.E_PREV)
-        cls.__show(ea)
         return res
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def del_suffix(cls, ea):
         '''Delete the suffixed comment at address ``ea``.'''
         res = cls.__get(ea, idaapi.E_NEXT)
-        cls.__hide(ea)
         cls.__del(ea, idaapi.E_NEXT)
-        cls.__show(ea)
         return res
 
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def set_prefix(cls, ea, string):
         '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
-        cls.__hide(ea)
         res, ok = cls.del_prefix(ea), cls.__set(ea, string, idaapi.E_PREV)
         ok = cls.__set(ea, string, idaapi.E_PREV)
-        cls.__show(ea)
         return res
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def set_suffix(cls, ea, string):
         '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
-        cls.__hide(ea)
         res, ok = cls.del_suffix(ea), cls.__set(ea, string, idaapi.E_NEXT)
-        cls.__show(ea)
         return res
 
     @utils.multicase()
@@ -3458,7 +3310,12 @@ class set(object):
             8 : idaapi.FF_QWRD, 16 : idaapi.FF_OWRD
         }
         type = type['type'] if 'type' in type else lookup[size]
-        ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(type, structure.structure_t) else type, size, type.id if isinstance(type, structure.structure_t) else 0)
+        if idaapi.__version__ < 7.0:
+            ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(type, structure.structure_t) else type, size, type.id if isinstance(type, structure.structure_t) else 0)
+        elif isinstance(type, structure.structure_t):
+            ok = idaapi.create_struct(ea, size, type.id)
+        else:
+            ok = idaapi.create_data(ea, type, size, 0)
         return idaapi.get_item_size(ea) if ok else 0
 
     @utils.multicase()
@@ -3563,4 +3420,270 @@ class set(object):
     @classmethod
     def struct(cls, ea, type):
         '''Set the data at address ``ea`` to the structure_t specified by ``type``.'''
-        return set.data(ea, type.size, type=type)
+        return cls.data(ea, type.size, type=type)
+    structure = struc = struct
+
+    @utils.multicase(length=six.integer_types)
+    @classmethod
+    def array(cls, type, length):
+        raise NotImplementedError
+    @utils.multicase(ea=six.integer_types, length=six.integer_types)
+    @classmethod
+    def array(cls, ea, type, length):
+        raise NotImplementedError
+
+class get(object):
+    @utils.multicase()
+    @classmethod
+    def unsigned(cls, **byteorder):
+        '''Read an unsigned integer from the current address.'''
+        ea = ui.current.address()
+        return cls.unsigned(ea, type.size(ea), **byteorder)
+    @utils.multicase(size=six.integer_types)
+    @classmethod
+    def unsigned(cls, ea, **byteorder):
+        '''Read an unsigned integer from the address ``ea`` using the size defined in the database.'''
+        return cls.unsigned(ea, type.size(ea), **byteorder)
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @classmethod
+    def unsigned(cls, ea, size, **byteorder):
+        """Read an unsigned integer from the address ``ea`` with the specified ``size``.
+        If ``byteorder`` is 'big' then read in big-endian form.
+        If ``byteorder`` is 'little' then read in little-endian form.
+        ``byteorder`` defaults to the format used by the database architecture.
+        """
+        data = read(ea, size)
+        endian = byteorder.get('order', None) or byteorder.get('byteorder', sys.byteorder)
+        if endian.lower().startswith('little'):
+            data = data[::-1]
+        return reduce(lambda x,y: x << 8 | ord(y), data, 0)
+
+    @utils.multicase()
+    @classmethod
+    def signed(cls, **byteorder):
+        '''Read a signed integer from the current address.'''
+        ea = ui.current.address()
+        return cls.signed(ea, type.size(ea), **byteorder)
+    @utils.multicase(size=six.integer_types)
+    @classmethod
+    def signed(cls, ea, **byteorder):
+        '''Read a signed integer from the address ``ea`` using the size defined in the database.'''
+        return cls.signed(ea, type.size(ea), **byteorder)
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @classmethod
+    def signed(cls, ea, size, **byteorder):
+        """Read a signed integer from the address ``ea`` with the specified ``size``.
+        If ``byteorder`` is 'big' then read in big-endian form.
+        If ``byteorder`` is 'little' then read in little-endian form.
+        ``byteorder`` defaults to the format used by the database architecture.
+        """
+        bits = size*8
+        sf = (2**bits)>>1
+        res = cls.unsigned(ea, size, **byteorder)
+        return (res - (2**bits)) if res&sf else res
+
+    class integer(object):
+        '''Read different integer types out of the database.'''
+        @utils.multicase()
+        def __new__(cls, **byteorder):
+            return get.unsigned(**byteorder)
+        @utils.multicase(ea=six.integer_types)
+        def __new__(cls, ea, **byteorder):
+            return get.unsigned(ea, **byteorder)
+        @utils.multicase(ea=six.integer_types, size=six.integer_types)
+        def __new__(cls, ea, size, **byteorder):
+            return get.unsigned(ea, size, **byteorder)
+
+        @utils.multicase()
+        @classmethod
+        def uint8_t(cls, **byteorder):
+            '''Read a uint8_t from the current address.'''
+            return get.unsigned(ui.current.address(), 1, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def uint8_t(cls, ea, **byteorder):
+            '''Read a uint8_t from the address ``ea``.'''
+            return get.unsigned(ea, 1, **byteorder)
+        @utils.multicase()
+        @classmethod
+        def sint8_t(cls, **byteorder):
+            '''Read a sint8_t from the current address.'''
+            return get.signed(ui.current.address(), 1, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint8_t(cls, ea, **byteorder):
+            '''Read a sint8_t from the address ``ea``.'''
+            return get.signed(ea, 1, **byteorder)
+        ubyte1, sbyte1 = utils.alias(uint8_t, 'get.integer'), utils.alias(sint8_t, 'get.integer')
+
+        @utils.multicase()
+        @classmethod
+        def uint16_t(cls, **byteorder):
+            '''Read a uint16_t from the current address.'''
+            return get.unsigned(ui.current.address(), 2, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def uint16_t(cls, ea, **byteorder):
+            '''Read a uint16_t from the address ``ea``.'''
+            return get.unsigned(ea, 2, **byteorder)
+        @utils.multicase()
+        @classmethod
+        def sint16_t(cls, **byteorder):
+            '''Read a sint16_t from the current address.'''
+            return get.signed(ui.current.address(), 2, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint16_t(cls, ea, **byteorder):
+            '''Read a sint16_t from the address ``ea``.'''
+            return get.signed(ea, 2, **byteorder)
+        uint2, sint2 = utils.alias(uint16_t, 'get.integer'), utils.alias(sint16_t, 'get.integer')
+
+        @utils.multicase()
+        @classmethod
+        def uint32_t(cls, **byteorder):
+            '''Read a uint32_t from the current address.'''
+            return get.unsigned(ui.current.address(), 4, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def uint32_t(cls, ea, **byteorder):
+            '''Read a uint32_t from the address ``ea``.'''
+            return get.unsigned(ea, 4, **byteorder)
+        @utils.multicase()
+        @classmethod
+        def sint32_t(cls, **byteorder):
+            '''Read a sint32_t from the current address.'''
+            return get.signed(ui.current.address(), 4, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint32_t(cls, ea, **byteorder):
+            '''Read a sint32_t from the address ``ea``.'''
+            return get.signed(ea, 4, **byteorder)
+        uint4, sint4 = utils.alias(uint32_t, 'get.integer'), utils.alias(sint32_t, 'get.integer')
+
+        @utils.multicase()
+        @classmethod
+        def uint64_t(cls, **byteorder):
+            '''Read a uint64_t from the current address.'''
+            return get.unsigned(ui.current.address(), 8, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def uint64_t(cls, ea, **byteorder):
+            '''Read a uint64_t from the address ``ea``.'''
+            return get.unsigned(ea, 8, **byteorder)
+        @utils.multicase()
+        @classmethod
+        def sint64_t(cls, **byteorder):
+            '''Read a sint64_t from the current address.'''
+            return get.signed(ui.current.address(), 8, **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint64_t(cls, ea, **byteorder):
+            '''Read a sint64_t from the address ``ea``.'''
+            return get.signed(ea, 8, **byteorder)
+        uint8, sint8 = utils.alias(uint64_t, 'get.integer'), utils.alias(sint64_t, 'get.integer')
+
+        @utils.multicase()
+        @classmethod
+        def uint128_t(cls, **byteorder):
+            '''Read a uint128_t from the current address.'''
+            return get.unsigned(ui.current.address(), 16)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def uint128_t(cls, ea, **byteorder):
+            '''Read a uint128_t from the address ``ea``.'''
+            return get.unsigned(ea, 16, **byteorder)
+        @utils.multicase()
+        @classmethod
+        def sint128_t(cls, **byteorder):
+            '''Read a sint128_t from the current address.'''
+            return get.signed(ui.current.address(), 16)
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint128_t(cls, ea, **byteorder):
+            '''Read a sint128_t from the address ``ea``.'''
+            return get.signed(ea, 16, **byteorder)
+
+    i = integer
+
+    @utils.multicase()
+    @classmethod
+    def array(cls):
+        '''Return the values of the array at the current address.'''
+        return cls.array(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def array(cls, ea):
+        '''Return the values of the array at address ``ea``.'''
+        ea = interface.address.within(ea)
+        numerics = {
+            idaapi.FF_BYTE : 'B',
+            idaapi.FF_WORD : 'H',
+            idaapi.FF_DWRD : 'L',
+            idaapi.FF_QWRD : 'Q',
+            idaapi.FF_FLOAT : 'f',
+            idaapi.FF_DOUBLE : 'd',
+        }
+        strings = {
+            1 : 'c',
+            2 : 'u',
+        }
+        fl = type.flags(ea)
+        elesize = idaapi.get_full_data_elsize(ea, fl)
+        if fl & idaapi.FF_ASCI == idaapi.FF_ASCI:
+            t = strings[elesize]
+        elif fl & idaapi.FF_STRU == idaapi.FF_STRU:
+            t, size = type.structure.id(ea), idaapi.get_item_size(ea)
+            return [ cls.struc(ea, id=t) for ea in __builtin__.range(ea, ea+size, structure.size(t)) ]
+        else:
+            ch = numerics[fl & idaapi.DT_TYPE]
+            t = ch.lower() if fl & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
+        res = array.array(t, read(ea, type.array.size(ea)))
+        if len(res) != type.array.length(ea):
+            logging.warn("{:s}.get({:x}) : Unexpected length : ({:d} != {:d})".format('.'.join((__name__, cls.__name__)), ea, len(res), type.array.length(ea)))
+        return res
+
+    @utils.multicase()
+    @classmethod
+    def struct(cls):
+        return cls.struc(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def struct(cls, ea, **sid):
+        """Return the structure_t at address ``ea`` as a dict of ctypes.
+        If the structure ``sid`` is specified, then use that specific structure type.
+        """
+        ea = interface.address.within(ea)
+
+        if any(n in sid for n in ('sid','struc','structure','id')):
+            res = sid['sid'] if 'sid' in sid else sid['struc'] if 'struc' in sid else sid['structure'] if 'structure' in sid else sid['id'] if 'id' in sid else None
+            sid = res.id if isinstance(res, structure.structure_t) else res
+        else:
+            sid = type.structure.id(ea)
+
+        st = structure.instance(sid, offset=ea)
+        typelookup = {
+            (int,-1) : ctypes.c_int8, (int,1) : ctypes.c_uint8,
+            (int,-2) : ctypes.c_int16, (int,2) : ctypes.c_uint16,
+            (int,-4) : ctypes.c_int32, (int,4) : ctypes.c_uint32,
+            (int,-8) : ctypes.c_int64, (int,8) : ctypes.c_uint64,
+            (float,4) : ctypes.c_float, (float,8) : ctypes.c_double,
+        }
+
+        res = {}
+        for m in st.members:
+            t, val = m.type, read(m.offset, m.size) or ''
+            try:
+                ct = typelookup[t]
+            except KeyError:
+                ty, sz = t if isinstance(t, __builtin__.tuple) else (m.type, 0)
+                if isinstance(t, __builtin__.list):
+                    t = typelookup[tuple(ty)]
+                    ct = t*sz
+                elif ty in (chr,str):
+                    ct = ctypes.c_char*sz
+                else:
+                    ct = None
+            finally:
+                res[m.name] = val if any(_ is None for _ in (ct,val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)),ctypes.POINTER(ct)).contents
+        return res
+    structure = struc = struct

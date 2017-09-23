@@ -36,7 +36,7 @@ class current(object):
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
-            raise StandardError("{:s}.{:s}.function : Not currently inside a function.".format(__name__, cls.__name__))
+            raise StandardError("{:s}.function : Not currently inside a function.".format('.'.join((__name__,cls.__name__))))
         return res
     @classmethod
     def segment(cls):
@@ -78,7 +78,7 @@ try:
             res.setVisible(False)
             res.setWindowModality(blocking)
             res.setAutoClose(True)
-            path = '{:s}/{:s}'.format(database.path(), database.filename())
+            path = "{:s}/{:s}".format(database.path(), database.filename())
             self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
 
         # properties
@@ -146,7 +146,7 @@ except ImportError:
 
     class progress(object):
         def __init__(self, blocking=True):
-            self.__path__ = '{:s}/{:s}'.format(database.path(), database.filename())
+            self.__path__ = "{:s}/{:s}".format(database.path(), database.filename())
             self.__value__ = 0
             self.__min__, self.__max__ = 0, 0
             return
@@ -234,7 +234,7 @@ class Strings(object):
         res = [idaapi.ASCSTR_TERMCHR,idaapi.ASCSTR_PASCAL,idaapi.ASCSTR_LEN2,idaapi.ASCSTR_UNICODE,idaapi.ASCSTR_LEN4,idaapi.ASCSTR_ULEN2,idaapi.ASCSTR_ULEN4]
         config.strtypes = reduce(lambda t,c: t | (2**c), res, 0)
         assert idaapi.set_strlist_options(config)
-        #assert idaapi.refresh_strlist(config.ea1, config.ea2), '{:x}:{:x}'.format(config.ea1, config.ea2)
+        #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:x}:{:x}".format(config.ea1, config.ea2)
 
     # FIXME: I don't think that these callbacks are stackable
     idaapi.notify_when(idaapi.NW_OPENIDB, on_openidb)
@@ -247,7 +247,7 @@ class Strings(object):
         string = idaapi.string_info_t()
         res = idaapi.get_strlist_item(index, string)
         if not res:
-            raise RuntimeError, 'idaapi.get_strlist_item({:d}) -> {!r}'.format(index, res)
+            raise RuntimeError, "idaapi.get_strlist_item({:d}) -> {!r}".format(index, res)
         return string
     @classmethod
     def get(cls, index):
@@ -368,12 +368,12 @@ except ImportError:
 
 def above(ea, includeSegment=False):
     '''Display all the callers of the function at /ea/'''
-    tryhard = lambda ea: '{:s}+{:x}'.format(database.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else '+{:x}'.format(ea) if database.name(ea) is None else database.name(ea)
+    tryhard = lambda ea: "{:s}+{:x}".format(database.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "+{:x}".format(ea) if database.name(ea) is None else database.name(ea)
     return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in function.up(ea))
 
 def below(ea, includeSegment=False):
     '''Display all the functions that the function at /ea/ can call'''
-    tryhard = lambda ea: '{:s}+{:x}'.format(database.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else '+{:x}'.format(ea) if database.name(ea) is None else database.name(ea)
+    tryhard = lambda ea: "{:s}+{:x}".format(database.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "+{:x}".format(ea) if database.name(ea) is None else database.name(ea)
     return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in function.down(ea))
 
 # FIXME: this only works on x86 where args are pushed via stack
@@ -395,10 +395,10 @@ def makecall(ea=None, target=None):
                 ea = database.next(ea)
                 continue
             result = database.cxdown(ea)
-            if len(result) == 0: raise TypeError('{:s}.makecall({!r},{!r}) : Unable to determine number of arguments'.format(__name__, ea, target))
+            if len(result) == 0: raise TypeError("{:s}.makecall({!r},{!r}) : Unable to determine number of arguments".format(__name__, ea, target))
 
         if len(result) != 1:
-            raise ValueError('{:s}.makecall({!r},{!r}) : Too many targets for call at {:x} : {!r}'.format(__name__, ea, result))
+            raise ValueError("{:s}.makecall({!r},{!r}) : Too many targets for call at {:x} : {!r}".format(__name__, ea, result))
         fn, = result
     else:
         fn = target
@@ -413,14 +413,14 @@ def makecall(ea=None, target=None):
         raise LookupError("{:s}.makecall({!r},{!r}) : Unable to get arguments for target function".format(__name__, ea, target))
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
-#    result = ['{:s}={:s}'.format(name,ins.op_repr(ea, 0)) for name,ea in result]
-    result = ['({:x}){:s}={:s}'.format(ea, name, ':'.join(ins.op_repr(database.address.prevreg(ea, ins.op_value(ea,0), write=1), n) for n in ins.ops_read(database.address.prevreg(ea, ins.op_value(ea,0), write=1))) if ins.op_type(ea,0) == 'reg' else ins.op_repr(ea, 0)) for name,ea in result]
+#    result = ["{:s}={:s}".format(name,ins.op_repr(ea, 0)) for name,ea in result]
+    result = ["({:x}){:s}={:s}".format(ea, name, ':'.join(ins.op_repr(database.address.prevreg(ea, ins.op_value(ea,0), write=1), n) for n in ins.ops_read(database.address.prevreg(ea, ins.op_value(ea,0), write=1))) if ins.op_type(ea,0) == 'reg' else ins.op_repr(ea, 0)) for name,ea in result]
 
     try:
-        return '{:s}({:s})'.format(internal.declaration.demangle(function.name(function.by_address(fn))), ','.join(result))
+        return "{:s}({:s})".format(internal.declaration.demangle(function.name(function.by_address(fn))), ','.join(result))
     except:
         pass
-    return '{:s}({:s})'.format(internal.declaration.demangle(database.name(fn)), ','.join(result))
+    return "{:s}({:s})".format(internal.declaration.demangle(database.name(fn)), ','.join(result))
 
 def source(ea, *regs):
     '''Return the addresses and which specific operands write to the specified regs'''
@@ -465,7 +465,7 @@ class queue(object):
     @classmethod
     def __start_ida__(cls):
         if hasattr(cls, 'execute') and not cls.execute.dead:
-            logging.warn("{:s}.{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format(__name__, cls.__name__, cls.execute))
+            logging.warn("{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format('.'.join((__name__,cls.__name__)), cls.execute))
             return
         cls.execute = internal.utils.execution()
         return
@@ -473,7 +473,7 @@ class queue(object):
     @classmethod
     def __stop_ida__(cls):
         if not hasattr(cls, 'execute'):
-            logging.warn("{:s}.{:s}.stop : Refusing to release execution queue due to it not being initialized.".format(__name__, cls.__name__))
+            logging.warn("{:s}.stop : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__,cls.__name__))))
             return
         return cls.execute.release()
 
@@ -488,7 +488,7 @@ class queue(object):
     @classmethod
     def add(cls, func, *args, **kwds):
         if not cls.execute.running:
-            logging.warn("{:s}.{:s}.add : Unable to execute {!r} due to queue not running.".format(__name__, cls.__name__, func))
+            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__,cls.__name__)), func))
         return cls.execute.push(func, *args, **kwds)
 
     @classmethod
@@ -523,4 +523,3 @@ class hook(object):
             # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
             res.remove()
         return
-

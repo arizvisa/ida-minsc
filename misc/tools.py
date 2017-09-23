@@ -59,21 +59,21 @@ def recovermarks():
     # create tags
     for x,y in result.items():
         if x in current:
-            logging.warning('{:x}: skipping already existing mark : {!r}'.format(x, current[x]))
+            logging.warning("{:x}: skipping already existing mark : {!r}".format(x, current[x]))
             continue
 
         # x not in current
         if x not in current:
-            logging.info('{:x}: adding missing mark due to tag : {!r}'.format(x, result[x]))
+            logging.info("{:x}: adding missing mark due to tag : {!r}".format(x, result[x]))
         elif current[x] != result[x]:
-            logging.info('{:x}: database tag is different than mark description : {!r}'.format(x, result[x]))
+            logging.info("{:x}: database tag is different than mark description : {!r}".format(x, result[x]))
         else:
             assert current[x] == result[x]
         database.mark(x, y)
 
     # marks that aren't reachable in the database
     for ea in set(current.viewkeys()).difference(result.viewkeys()):
-        logging.warning('{:x}: unreachable mark (global) : {!r}'.format(ea, current[ea]))
+        logging.warning("{:x}: unreachable mark (global) : {!r}".format(ea, current[ea]))
 
     # color them
     colormarks()
@@ -105,15 +105,15 @@ def checkmarks():
         return
 
     for k,v in functions:
-        print >>sys.stdout, '{:x} : in function {:s}'.format(k,function.name(function.byAddress(k)))
-        print >>sys.stdout, '\n'.join( ('- {:x} : {:s}'.format(a,m) for a,m in sorted(v)) )
+        print >>sys.stdout, "{:x} : in function {:s}".format(k,function.name(function.byAddress(k)))
+        print >>sys.stdout, '\n'.join( ("- {:x} : {:s}".format(a,m) for a,m in sorted(v)) )
     return
 
 def collect(ea, sentinel):
     if isinstance(sentinel, list):
         sentinel = set(sentinel)
     if not all((sentinel, isinstance(sentinel, set))):
-        raise AssertionError('{:s}.collect({:x}, {!r}) : Sentinel is empty or not a set.'.format(__name__, ea, sentinel))
+        raise AssertionError("{:s}.collect({:x}, {!r}) : Sentinel is empty or not a set.".format(__name__, ea, sentinel))
     def _collect(addr, result):
         process = set()
         for blk in map(function.block, function.block.after(addr)):

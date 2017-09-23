@@ -89,15 +89,15 @@ class trie(dict):
             data = (k for k,v in node.viewitems() if not isinstance(v, trie))
             result = []
             for k in data:
-                result.append('{:s}{!r} -> {!r}'.format(tab * indent, k, node[k]))
+                result.append("{:s}{!r} -> {!r}".format(tab * indent, k, node[k]))
 
             branches = [k for k,v in node.viewitems() if isinstance(v, trie)]
             for k in branches:
-                result.append('{:s}{!r}'.format(tab * indent, k))
+                result.append("{:s}{!r}".format(tab * indent, k))
                 branch_data = stringify(node[k], indent+1, tab=tab)
                 result.extend(branch_data)
             return result
-        return '\n'.join(('{!r}({:d})'.format(cls, self.id),'\n'.join(stringify(self))))
+        return '\n'.join(("{!r}({:d})".format(cls, self.id),'\n'.join(stringify(self))))
 
 class cache(object):
     state, tree = collections.defaultdict(set), trie()
@@ -146,7 +146,7 @@ class _int(default):
         return isinstance(instance, six.integer_types)
     @classmethod
     def encode(cls, instance):
-        return '{:-#x}'.format(instance)
+        return "{:-#x}".format(instance)
 
 @cache.register(object, trie.star(' \t'), *'float(')
 class _float(default):
@@ -155,7 +155,7 @@ class _float(default):
         return isinstance(instance, float)
     @classmethod
     def encode(cls, instance):
-        return 'float({:f})'.format(instance)
+        return "float({:f})".format(instance)
 
 @cache.register(str)
 class _str(default):
@@ -221,13 +221,13 @@ class _str(default):
     @classmethod
     def encode(cls, instance):
         res = cls._escape(iter(instance))
-        return '{:s}'.format(str().join(res))
+        return str().join(res)
 
 @cache.register(unicode, trie.star(' \t'), *"u'")
 class _unicode(default):
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, str)
+        return isinstance(instance, unicode)
 
 @cache.register(dict, trie.star(' \t'), '{')
 class _dict(default):
@@ -236,8 +236,8 @@ class _dict(default):
         return isinstance(instance, dict)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
-        return '[' + ', '.join('{:x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n) for n in instance) + ']'
+        f = lambda n: "{:-#x}".format(n) if isinstance(n,six.integer_types) else "{!r}".format(n)
+        return '{' + ', '.join("{:s} : {!r}".format(f(n), instance[n]) for n in instance) + '}'
 
 @cache.register(list, trie.star(' \t'), '[')
 class _list(default):
@@ -246,7 +246,7 @@ class _list(default):
         return isinstance(instance, list)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
+        f = lambda n: "{:-#x}".format(n) if isinstance(n,six.integer_types) else "{!r}".format(n)
         return '[' + ', '.join(map(f, instance)) + ']'
 
 @cache.register(tuple, trie.star(' \t'), '(')
@@ -256,7 +256,7 @@ class _tuple(default):
         return isinstance(instance, tuple)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
+        f = lambda n: "{:-#x}".format(n) if isinstance(n,six.integer_types) else "{!r}".format(n)
         return '(' + ', '.join(map(f,instance)) + ')'
 
 @cache.register(set, trie.star(' \t'), *'set([')
@@ -266,7 +266,7 @@ class _set(default):
         return isinstance(instance, set)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: '{:-#x}'.format(n) if isinstance(n,six.integer_types) else '{!r}'.format(n)
+        f = lambda n: "{:-#x}".format(n) if isinstance(n,six.integer_types) else "{!r}".format(n)
         return 'set([' + ', '.join(map(f,instance)) + '])'
 
 ### parsing functions
@@ -300,7 +300,7 @@ def parse_line(iterable):
         res = t.decode(value)
     except:
         res = _str.decode(value)
-        logging.debug("{:s}.parse_line : Assuming tag {!r} is of type _str. : {!r}".format( '.'.join(("internal", __name__)), key, value))
+        logging.debug("{:s}.parse_line : Assuming tag {!r} is of type _str. : {!r}".format( '.'.join(('internal', __name__)), key, value))
         #raise ValueError("Unable to decode data with {!r} : {!r}".format(t, value))
     return key, res
 
@@ -327,15 +327,19 @@ def emit_line(key, value):
     # FIXME: should probably use _str.encode here
     k = str().join(escape.get(n, n) for n in key)
     t = cache.by(value)
-    return '[{:s}] {:s}'.format(k, t.encode(value))
+    return "[{:s}] {:s}".format(k, t.encode(value))
 
 ### Encoding and decoding of a comment
-def decode(data):
+def decode(data, default=''):
+    """Decode all the (key, value) pairs from the string ``data`` delimited by newlines.
+    
+    If unable to decode the key and value from a line in ``data``, then use ``default`` as the key name.
+    """
     res = {}
     try:
         for line in (data or '').split('\n'):
             try: k, v = parse_line(iter(line))
-            except KeyError: k, v = '', line
+            except KeyError: k, v = default, line
             res[k] = v
     except StopIteration: pass
     return res
@@ -365,7 +369,7 @@ class tagging(object):
     @classmethod
     def __init_tagcache__(cls, idp_modname):
         cls.node()
-        logging.debug("{:s}.{:s}.init_tagcache : Initialized tagcache with netnode {!r} : {:x}".format('.'.join(("internal",__name__)), cls.__name__, cls.__node__, cls.__nodeid__))
+        logging.debug("{:s}.init_tagcache : Initialized tagcache with netnode {!r} : {:x}".format('.'.join(('internal',__name__,cls.__name__)), cls.__node__, cls.__nodeid__))
 
     @classmethod
     def node(cls):
@@ -397,7 +401,7 @@ class contents(tagging):
     def _read_header(cls, target, ea):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}.{:s}._read_header : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
+            raise LookupError("{:s}._read_header : Unable to find a function for {:x} at {:x}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea))
 
         encdata = internal.netnode.sup.get(node, key)
         if encdata is None:
@@ -408,19 +412,19 @@ class contents(tagging):
             if len(encdata) != sz:
                 raise ValueError((sz,len(encdata)))
         except:
-            raise IOError("{:s}.{:s}._read_header : Unable to decode contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, encdata))
+            raise IOError("{:s}._read_header : Unable to decode contents for {:x} at {:x} : {!r}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
         except:
-            raise IOError("{:s}.{:s}._read_header : Unable to unmarshal contents for {:x} at {:x}: {!r}".format( '.'.join(("internal", __name__)), cls__name__, key, ea, data))
+            raise IOError("{:s}._read_header : Unable to unmarshal contents for {:x} at {:x}: {!r}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea, data))
         return result
 
     @classmethod
     def _write_header(cls, target, ea, value):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}.{:s}._write_header : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
+            raise LookupError("{:s}._write_header : Unable to find a function for {:x} at {:x}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea))
 
         if not value:
             ok = internal.netnode.sup.remove(node, key)
@@ -429,17 +433,17 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(value)
         except:
-            raise IOError("{:s}.{:s}._write_header : Unable to marshal contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, value))
+            raise IOError("{:s}._write_header : Unable to marshal contents for {:x} at {:x} : {!r}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea, value))
 
         try:
             encdata,sz = cls.codec.encode(data)
             if sz != len(data):
                 raise ValueError((value,sz,len(data)))
         except:
-            raise IOError("{:s}.{:s}._write_header : Unable to encode contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, data))
+            raise IOError("{:s}._write_header : Unable to encode contents for {:x} at {:x} : {!r}".format( '.'.join(('internal',__name__,cls__name__)), key, ea, data))
 
         if len(encdata) > 1024:
-            logging.warn("{:s}.{:s}._write_header : Too many tags within function. Size must be < 0x400. Ignoring. : {:x}".format('.'.join(("internal", __name__)), cls.__name__, len(encdata)))
+            logging.warn("{:s}._write_header : Too many tags within function. Size must be < 0x400. Ignoring. : {:x}".format('.'.join(('internal',__name__,cls.__name__)), len(encdata)))
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
@@ -449,7 +453,7 @@ class contents(tagging):
         '''Reads a dictionary from the specific object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}.{:s}._read : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
+            raise LookupError("{:s}._read : Unable to find a function for {:x} at {:x}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea))
 
         encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
@@ -460,12 +464,12 @@ class contents(tagging):
             if len(encdata) != sz:
                 raise ValueError((sz,len(encdata)))
         except:
-            raise IOError("{:s}.{:s}._read : Unable to decode contents for {:x} at {:x} : {!r}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea, encdata))
+            raise IOError("{:s}._read : Unable to decode contents for {:x} at {:x} : {!r}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
         except:
-            raise IOError("{:s}.{:s}._read : Unable to unmarshal contents for {:x} at {:x}: {!r}".format( '.'.join(("internal", __name__)), cls__name__, key, ea, data))
+            raise IOError("{:s}._read : Unable to unmarshal contents for {:x} at {:x}: {!r}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea, data))
         return result
 
     @classmethod
@@ -473,14 +477,14 @@ class contents(tagging):
         '''Writes a dictionary to the specified object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}.{:s}._write : Unable to find a function for {:x} at {:x}".format( '.'.join(("internal", __name__)), cls.__name__, key, ea))
+            raise LookupError("{:s}._write : Unable to find a function for {:x} at {:x}".format( '.'.join(('internal',__name__,cls.__name__)), key, ea))
 
         # erase cache and blob if no data is specified
         if not value:
             try:
                 ok = cls._write_header(target, ea, None)
                 if not ok:
-                    logging.info("{:s}.{:s}._write : Unable to remove address from sup cache. : {:x}".format('.'.join(("internal", __name__)), cls.__name__, key))
+                    logging.info("{:s}._write : Unable to remove address from sup cache. : {:x}".format('.'.join(('internal',__name__,cls.__name__)), key))
             finally:
                 return internal.netnode.blob.remove(key, cls.btag)
 
@@ -489,12 +493,12 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(res)
         except:
-            raise IOError("{:s}.{:s}._write : Unable to marshal contents for {:x} at {:x} : {!r}".format(__name__, cls.__name__, key, ea, res))
+            raise IOError("{:s}._write : Unable to marshal contents for {:x} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), key, ea, res))
 
         try:
             encdata,sz = cls.codec.encode(data)
         except:
-            raise IOError("{:s}.{:s}._write : Unable to encode contents for {:x} at {:x} : {!r}".format(__name__, cls.__name__, key, ea, data))
+            raise IOError("{:s}._write : Unable to encode contents for {:x} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), key, ea, data))
         if sz != len(data):
             raise ValueError((res,sz,len(data)))
 
@@ -503,7 +507,7 @@ class contents(tagging):
             ok = internal.netnode.blob.set(key, cls.btag, encdata)
             assert ok
         except:
-            raise IOError("{:s}.{:s}._write : Unable to set contents for {:x} at {:x} : {!r}".format(__name__, cls.__name__, key, ea, encdata))
+            raise IOError("{:s}._write : Unable to set contents for {:x} at {:x} : {!r}".format('.'.join((__name__,cls.__name__)), key, ea, encdata))
 
         # update sup cache with keys
         res = set(value.viewkeys())
@@ -511,7 +515,7 @@ class contents(tagging):
             ok = cls._write_header(target, ea, res)
             assert ok
         except:
-            logging.fatal("{:s}.{:s}._write : Unable to set address to sup cache. : {:x}".format('.'.join(("internal", __name__)), cls.__name__, key))
+            logging.fatal("{:s}._write : Unable to set address to sup cache. : {:x}".format('.'.join(('internal',__name__,cls.__name__)), key))
         return ok
 
     @classmethod

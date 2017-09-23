@@ -56,7 +56,7 @@ byIndex = utils.alias(by_index)
 
 @utils.multicase(index=six.integer_types)
 def by(index):
-    bits = int(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
+    bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
     highbyte = 0xff << (bits-8)
     if index & highbyte == highbyte:
         return index
@@ -64,6 +64,30 @@ def by(index):
 @utils.multicase(name=basestring)
 def by(name):
     return by_name(name)
+@utils.multicase()
+def by(**type):
+    """Search through all the enumerations within the database and return the first result.
+
+    like = glob match
+    regex = regular expression
+    index = particular index
+    identifier or id = internal id number
+    """
+    searchstring = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
+
+    res = __builtin__.list(iterate(**type))
+    if len(res) > 1:
+        map(logging.info, ("[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(__builtin__.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
+        logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one.".format(__name__, searchstring, len(res)))
+
+    res = next(iter(res), None)
+    if res is None:
+        raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
+    return res
+
+def search(string):
+    '''Search through all the enumerations using globbing.'''
+    return by(like=string)
 
 def keys(id):
     '''Return the names of all of the elements of the enumeration ``id``.'''
@@ -121,24 +145,22 @@ def comment(enum, comment, **repeatable):
 
 @utils.multicase()
 def size(enum):
-    '''Return the size of the enumeration identified by ``enum``.'''
+    '''Return the number of bits for the enumeration identified by ``enum``.'''
     eid = by(enum)
     res = idaapi.get_enum_width(eid)
-    return 2**(res-1) if res > 0 else 0
+    return res * 8
 @utils.multicase(width=six.integer_types)
 def size(enum, width):
-    '''Set the size of the enumeration identified by ``enum`` to ``width``.'''
+    '''Set the number of bits for the enumeration identified by ``enum`` to ``width``.'''
     eid = by(enum)
-    res = int(math.log(width, 2))
+    res = math.trunc(math.ceil(width / 8.0))
     return idaapi.set_enum_width(eid, int(res)+1)
 
 def mask(enum):
     '''Return the bitmask for the enumeration identified by ``enum``.'''
     eid = by(enum)
-    res = min((size(eid), 4))    # FIXME: is uval_t/bmask_t a maximum of 32bits on ida64 too?
-    if res > 0:
-        return 2**(res*8)-1
-    return sys.maxint*2+1
+    res = size(eid)
+    return 2**res-1 if res > 0 else idaapi.BADADDR
 
 def members(enum):
     '''Return the name of each member from the enumeration identified by ``enum``.'''
@@ -152,8 +174,8 @@ def repr(enum):
     eid = by(enum)
     w = size(eid)*2
     result = [(member.name(n),member.value(n),member.mask(n),member.comment(n)) for n in member.iterate(eid)]
-    aligned = max((len(n) for n,_,_,_ in result))
-    return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(('[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}'.format(i, name, value, bmask, width=w+2, align=aligned)+((' # '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(result)))
+    aligned = max([len(n) for n,_,_,_ in result] or [0])
+    return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned)+((' # '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(result)))
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
@@ -200,36 +222,11 @@ def list(**type):
     maxname = max(__builtin__.map(utils.compose(idaapi.get_enum_name, len), res))
     maxsize = max(__builtin__.map(size, res))
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    cmask = max(__builtin__.map(utils.compose(mask, math.log, functools.partial(operator.mul, 1.0/math.log(16)), math.ceil), res) or [database.config.bits()/4.0])
+    cmask = max(__builtin__.map(utils.compose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
 
     for n in res:
-        print('[{:{:d}d}] {:>{:d}s} & {:#<{:d}x} ({:d} members){:s}'.format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(__builtin__.list(members(n))), ' // {:s}'.format(comment(n)) if comment(n) else ''))
+        print("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(__builtin__.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
     return
-
-@utils.multicase(string=basestring)
-def search(string):
-    '''Search through all the enumerations using globbing.'''
-    return search(like=string)
-@utils.multicase()
-def search(**type):
-    """Search through all the enumerations within the database and return the first result.
-
-    like = glob match
-    regex = regular expression
-    index = particular index
-    identifier or id = internal id number
-    """
-    searchstring = ', '.join('{:s}={!r}'.format(k,v) for k,v in type.iteritems())
-
-    res = __builtin__.list(iterate(**type))
-    if len(res) > 1:
-        map(logging.info, ('[{:d}] {:s} & {:#x} ({:d} members){:s}'.format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(__builtin__.list(members(n))), ' // {:s}'.format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
-        logging.warn('{:s}.search({:s}) : Found {:d} matching results, returning the first one.'.format(__name__, searchstring, len(res)))
-
-    res = next(iter(res), None)
-    if res is None:
-        raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
-    return res
 
 ## members
 class member(object):
@@ -274,8 +271,9 @@ class member(object):
         res = interface.tuplename(name) if isinstance(name, tuple) else name
         ok = idaapi.add_enum_member(eid, res, value, bmask)
 
-        if ok in (idaapi.ENUM_MEMBER_ERROR_NAME, idaapi.ENUM_MEMBER_ERROR_VALUE, idaapi.ENUM_MEMBER_ERROR_ENUM, idaapi.ENUM_MEMBER_ERROR_MASK, idaapi.ENUM_MEMBER_ERROR_ILLV):
-            raise ValueError("{:s}.add({:x}, {!r}, {:x}, bitmask={!r}) : Unable to add member to enumeration.".format('.'.join((__name__,cls.__name__)), eid, name, value, bitmask))
+        err = {getattr(idaapi, n) : n for n in ('ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV')}
+        if ok in err.viewkeys():
+            raise ValueError("{:s}.add({:x}, {!r}, {:x}, bitmask={!r}) : Unable to add member to enumeration. : {:s}({:d})".format('.'.join((__name__,cls.__name__)), eid, name, value, bitmask, err[ok], ok))
         return cls.by_value(eid, value)
     new = create = utils.alias(add, 'member')
 
@@ -308,7 +306,7 @@ class member(object):
         raise LookupError("{:s}.by_index({:x}, {:d}) : Unable to locate member by index.".format('.'.join((__name__,cls.__name__)), eid, index))
 
     @classmethod
-    def by_identifer(cls, enum, mid):
+    def by_identifier(cls, enum, mid):
         eid = by(enum)
         if cls.parent(mid) != eid:
             raise LookupError("{:s}.by_identifier({:x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__,cls.__name__)), eid, index))
@@ -340,7 +338,7 @@ class member(object):
     @classmethod
     def by(cls, enum, n):
         '''Return the member belonging to ``enum`` identified by it's index, or it's id.'''
-        bits = int(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
+        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
         highbyte = 0xff << (bits-8)
         if n & highbyte == highbyte:
             return cls.by_identifier(enum, n)
@@ -490,7 +488,7 @@ class member(object):
         eid = by(enum)
         res = __builtin__.list(cls.iterate(eid))
         maxindex = max(__builtin__.map(utils.first, enumerate(res)) or [1])
-        maxvalue = max(__builtin__.map(utils.compose(cls.value, '{:x}'.format, len), res) or [1])
+        maxvalue = max(__builtin__.map(utils.compose(cls.value, "{:x}".format, len), res) or [1])
         for i, mid in enumerate(res):
-             print('[{:d}] {:>0{:d}x} {:s}'.format(i, cls.value(mid), maxvalue, cls.name(mid)))
+             print("[{:d}] {:>0{:d}x} {:s}".format(i, cls.value(mid), maxvalue, cls.name(mid)))
         return

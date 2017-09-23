@@ -6,25 +6,22 @@ import six,types,heapq,collections
 import multiprocessing,Queue
 import idaapi
 
-__all__ = ['box','unbox','identity','first','second','third','fcompose','fdiscard','fcondition','fap','lazy','fcurry','fexception']
-__all__+= ['Pattern','PatternAny','PatternAnyType']
-__all__+= ['multicase','alias','matcher']
-__all__+= ['process','spawn']
+__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','itake','iget','imap','ifilter']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
 # box any specified arguments
-box = fbox = lambda *a: a
+fbox = fboxed = box = boxed = lambda *a: a
 # return a closure that executes ``f`` with the arguments unboxed.
-unbox = funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple,ap), ())), **__builtin__.dict(k.items() + kp.items()))
+funbox = unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple,ap), ())), **__builtin__.dict(k.items() + kp.items()))
 # return a closure that will check that ``object`` is an instance of ``type``.
 finstance = lambda type: lambda object: isinstance(object, type)
 # return a closure that always returns ``object``.
 fconstant = fconst = lambda object: lambda *a, **k: object
 # a closure that returns it's argument
-fpassthru = fpass = fidentity = identity = lambda object: object
+fpassthru = fpass = fidentity = fid = lambda object: object
 # return the first, second, or third item of a box.
-first, second, third = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2)
+first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right
 fcompose = compose = lambda *f: __builtin__.reduce(lambda f1,f2: lambda *a: f1(f2(*a)), __builtin__.reversed(f))
 # return a closure that executes function ``f`` whilst discarding any extra arguments
@@ -37,21 +34,36 @@ fmaplist = fap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
 #lazy = lambda f, state={}: lambda *a, **k: state[(f,a,__builtin__.tuple(__builtin__.sorted(k.items())))] if (f,a,__builtin__.tuple(__builtin__.sorted(k.items()))) in state else state.setdefault((f,a,__builtin__.tuple(__builtin__.sorted(k.items()))), f(*a, **k))
 #lazy = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **dict(k.items() + kp.items()))
 # return a memoized closure that's lazy and only executes when evaluated
-def lazy(f, *a, **k):
+def flazy(f, *a, **k):
     sortedtuple, state = fcompose(__builtin__.sorted, __builtin__.tuple), {}
     def lazy(*ap, **kp):
         A, K = a+ap, sortedtuple(k.items() + kp.items())
         return state[(A,K)] if (A,K) in state else state.setdefault((A,K), f(*A, **__builtin__.dict(k.items()+kp.items())))
     return lazy
-# return a closure that will use the specified arguments to call the provided function
+fmemo = flazy
+# return a closure with the function's arglist partially applied
+fpartial = partial = functools.partial
+# return a closure that applies the provided arguments to the function ``f``.
+fapply = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **__builtin__.dict(k.items() + kp.items()))
+# return a closure that will use the specified arguments to call the provided function.
 fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a+ap), **__builtin__.dict(k.items() + kp.items()))
-# return a closure that executes function ``f`` and includes the exception or None as the first element in the boxed result.
+# return a closure that applies the initial arglist to the end of function ``f``.
+frpartial = lambda f, *a, **k: lambda *ap, **kp: f(*(ap + __builtin__.tuple(__builtin__.reversed(a))), **__builtin__.dict(k.items() + kp.items()))
+# return a closure that applies the arglist to function ``f`` in reverse.
+freversed = frev = lambda f, *a, **k: lambda *ap, **kp: f(*__builtin__.reversed(a + ap), **__builtin__.dict(k.items() + kp.items()))
+# return a closure that executes function ``f`` and includes the caught exception (or None) as the first element in the boxed result.
 def fcatch(f, *a, **k):
     def fcatch(*a, **k):
         try: return __builtin__.None, f(*a, **k)
         except: return sys.exc_info()[1], __builtin__.None
     return functools.partial(fcatch, *a, **k)
 fexc = fexception = fcatch
+# take ``count`` number of elements from an iterator
+itake = lambda count: compose(iter, fap(*(next,)*count), tuple)
+# get the ``nth`` element from an iterator
+iget = lambda count: compose(iter, fap(*(next,)*(count)), tuple, operator.itemgetter(-1))
+# copy from itertools
+imap, ifilter = itertools.imap, itertools.ifilter
 
 # cheap pattern-like matching
 class Pattern(object):
@@ -64,7 +76,7 @@ class PatternAny(Pattern):
         return True
     __call__ = __eq__
     def __repr__(self):
-        return '{:s}({:s})'.format('Pattern', '*')
+        return "{:s}({:s})".format('Pattern', '*')
 class PatternAnyType(Pattern):
     def __init__(self, other):
         self.type = other
@@ -72,7 +84,7 @@ class PatternAnyType(Pattern):
         return isinstance(other, self.type)
     __call__ = __eq__
     def __repr__(self):
-        return '{:s}({:s})'.format('Pattern', '|'.join(n.__name__ for n in self.type) if hasattr(self.type, '__iter__') else self.type.__name__)
+        return "{:s}({:s})".format('Pattern', '|'.join(n.__name__ for n in self.type) if hasattr(self.type, '__iter__') else self.type.__name__)
 
 ### decorators
 class multicase(object):
@@ -149,7 +161,7 @@ class multicase(object):
             return cons(res)
 
         if len(other) > 1:
-            raise SyntaxError("{:s}.{:s} : More than one callable was specified. Not sure which callable to clone state from. : {!r}".format(__name__, cls.__name__, other))
+            raise SyntaxError("{:s} : More than one callable was specified. Not sure which callable to clone state from. : {!r}".format('.'.join((__name__, cls.__name__)), other))
         return result
 
     @classmethod
@@ -158,19 +170,19 @@ class multicase(object):
         for func, types, _ in cache:
             doc = (func.__doc__ or '').split('\n')
             if len(doc) > 1:
-                res.append('{:s} ->'.format(cls.prototype(func, types)))
-                res.extend('{: >{padding:d}s}'.format(n, padding=len(name)+len(n)+1) for n in map(operator.methodcaller('strip'), doc))
+                res.append("{:s} ->".format(cls.prototype(func, types)))
+                res.extend("{: >{padding:d}s}".format(n, padding=len(name)+len(n)+1) for n in map(operator.methodcaller('strip'), doc))
             elif len(doc) == 1:
-                res.append(cls.prototype(func, types) + (' -> {:s}'.format(doc[0]) if len(doc[0]) else ''))
+                res.append(cls.prototype(func, types) + (" -> {:s}".format(doc[0]) if len(doc[0]) else ''))
             continue
         return '\n'.join(res)
 
     @classmethod
     def prototype(cls, func, types={}):
         args, defaults, (star, starstar) = cls.ex_args(func)
-        argsiter = (('{:s}={:s}'.format(n, '{:s}'.format('|'.join(t.__name__ for t in types[n])) if hasattr(types[n], '__iter__') else types[n].__name__) if types.has_key(n) else n) for n in args)
-        res = (argsiter, ('*{:s}'.format(star),) if star else (), ('**{:s}'.format(starstar),) if starstar else ())
-        return '{:s}({:s})'.format(func.func_name, ', '.join(itertools.chain(*res)))
+        argsiter = (("{:s}={:s}".format(n, "{:s}".format('|'.join(t.__name__ for t in types[n])) if hasattr(types[n], '__iter__') else types[n].__name__) if types.has_key(n) else n) for n in args)
+        res = (argsiter, ("*{:s}".format(star),) if star else (), ("**{:s}".format(starstar),) if starstar else ())
+        return "{:s}({:s})".format(func.func_name, ', '.join(itertools.chain(*res)))
 
     @classmethod
     def match(cls, (args, kwds), heap):
@@ -207,9 +219,9 @@ class multicase(object):
             # we should have a match
             return f, (tuple(args[:sa]) + a, wA, wK)
 
-        error_arguments = ('{:s}'.format(n.__class__.__name__) for n in args)
-        error_keywords = ('{:s}={:s}'.format(n, kwds[n].__class__.__name__) for n in kwds)
-        raise LookupError("@multicase.call({:s}, {{{:s}}}) : does not match any defined prototypes : {:s}".format(', '.join(error_arguments), ', '.join(error_keywords), ', '.join(cls.prototype(f,t) for f,t,_ in heap)))
+        error_arguments = (n.__class__.__name__ for n in args)
+        error_keywords = ("{:s}={:s}".format(n, kwds[n].__class__.__name__) for n in kwds)
+        raise LookupError("@multicase.call({:s}, {{{:s}}}) : does not match any defined prototypes : {:s}".format(', '.join(error_arguments) if args else '*()', ', '.join(error_keywords), ', '.join(cls.prototype(f,t) for f,t,_ in heap)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
@@ -284,10 +296,10 @@ class alias(object):
     def __new__(cls, other, klass=None):
         cons,func = multicase.reconstructor(other), multicase.ex_function(other)
         if isinstance(other, types.MethodType) or klass:
-            module = '{:s}.{:s}'.format(func.__module__, klass or other.im_self.__name__)
+            module = (func.__module__, klass or other.im_self.__name__)
         else:
-            module = '{:s}'.format(func.__module__)
-        document = 'Alias for `{:s}.{:s}`.'.format(module, func.func_name)
+            module = (func.__module__,)
+        document = "Alias for `{:s}`.".format('.'.join(module + (func.func_name,)))
         res = cls.new_wrapper(func, document)
         return cons(res)
 
@@ -439,7 +451,7 @@ class process(object):
     def __start_monitoring(self, stdout, stderr=None):
         """Start monitoring threads. **used internally**"""
         program = self.program
-        name = 'thread-{:x}'.format(program.pid)
+        name = "thread-{:x}".format(program.pid)
 
         # create monitoring threads + coroutines
         if stderr:
@@ -481,7 +493,7 @@ class process(object):
             while True: q.put(key+((yield),))
 
         for id,pipe in itertools.chain([(id,pipe)],more):
-            res,name = stuff(q,id), '{:s}<{!r}>'.format(options.get('name',''),id)
+            res,name = stuff(q,id), "{:s}<{!r}>".format(options.get('name',''),id)
             yield process.monitor(res.next() or res.send, pipe, name=name),res
         return
 
@@ -513,9 +525,9 @@ class process(object):
 
     def __format_process_state(self):
         if self.program is None:
-            return 'Process "{:s}" {:s}.'.format(self.commandline, 'was never started')
+            return "Process \"{:s}\" {:s}.".format(self.commandline, 'was never started')
         res = self.program.poll()
-        return 'Process {:d} {:s}'.format(self.id, 'is still running' if res is None else 'has terminated with code {:d}'.format(res))
+        return "Process {:d} {:s}".format(self.id, 'is still running' if res is None else "has terminated with code {:d}".format(res))
 
     def write(self, data):
         """Write `data` directly to program's stdin"""
@@ -627,12 +639,12 @@ class process(object):
 
     def __repr__(self):
         ok = self.exceptionQueue.empty()
-        state = 'running pid:{:d}'.format(self.id) if self.running else 'stopped cmd:"{:s}"'.format(self.commandline)
+        state = "running pid:{:d}".format(self.id) if self.running else "stopped cmd:\"{:s}\"".format(self.commandline)
         threads = [
             ('updater', 0 if self.updater is None else self.updater.is_alive()),
             ('input/output', len(self.threads))
         ]
-        return '<process {:s}{:s} threads{{{:s}}}>'.format(state, (' !exception!' if not ok else ''), ' '.join('{:s}:{:d}'.format(n,v) for n,v in threads))
+        return "<process {:s}{:s} threads{{{:s}}}>".format(state, (' !exception!' if not ok else ''), ' '.join("{:s}:{:d}".format(n,v) for n,v in threads))
 
 ## interface for wrapping the process class
 def spawn(stdout, command, **options):
@@ -675,7 +687,7 @@ class execution(object):
         # thread management
         self.ev_unpaused = multiprocessing.Event()
         self.ev_terminating = multiprocessing.Event()
-        self.thread = threading.Thread(target=self.__run__, name='Thread-{:s}-{:x}'.format(self.__class__.__name__, id(self)))
+        self.thread = threading.Thread(target=self.__run__, name="Thread-{:s}-{:x}".format(self.__class__.__name__, id(self)))
 
         # FIXME: we can support multiple threads, but since this is
         #        being bound by a single lock due to my distrust for IDA
@@ -704,14 +716,14 @@ class execution(object):
         if not self.thread.is_alive():
             state = 'dead'
         res = tuple(self.state)
-        return "<class '{:s}.{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal',__name__)), cls.__name__, state, len(res), self.result.unfinished_tasks)
+        return "<class '{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal',__name__,cls.__name__)), state, len(res), self.result.unfinished_tasks)
 
     running = property(fget=lambda s: s.thread.is_alive() and s.ev_unpaused.is_set() and not s.ev_terminating.is_set())
     dead = property(fget=lambda s: s.thread.is_alive())
 
     def notify(self):
         '''Notify the execution queue that it should process anything that is queued.'''
-        logging.debug("{:s}.{:s}.notify : Waking up execution queue. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+        logging.debug("{:s}.notify : Waking up execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
         self.queue.acquire()
         self.queue.notify()
         self.queue.release()
@@ -728,16 +740,18 @@ class execution(object):
         return self.pop()
 
     def __start(self):
-        logging.debug("{:s}.{:s}.start : Starting execution queue thread. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        cls = self.__class__
+        logging.debug("{:s}.start : Starting execution queue thread. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         self.ev_terminating.clear(), self.ev_unpaused.clear()
         self.thread.daemon = True
         return self.thread.start()
 
     def __stop(self):
-        logging.debug("{:s}.{:s}.stop : Terminating execution queue thread. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        cls = self.__class__
+        logging.debug("{:s}.stop : Terminating execution queue thread. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         if not self.thread.is_alive():
             cls = self.__class__
-            logging.warn("{:s}.{:s}.stop : Execution queue has already been terminated. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self))
+            logging.warn("{:s}.stop : Execution queue has already been terminated. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
             return
         self.ev_unpaused.set(), self.ev_terminating.set()
         self.queue.acquire()
@@ -747,11 +761,11 @@ class execution(object):
 
     def start(self):
         '''Start to dispatch callables in the execution queue.'''
+        cls = self.__class__
         if not self.thread.is_alive():
-            cls = self.__class__
-            logging.fatal("{:s}.{:s}.start : Unable to resume an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+            logging.fatal("{:s}.start : Unable to resume an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
             return False
-        logging.info("{:s}.{:s}.start : Resuming execution queue. :{!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        logging.info("{:s}.start : Resuming execution queue. :{!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.set()
         self.queue.acquire()
         self.queue.notify_all()
@@ -760,11 +774,11 @@ class execution(object):
 
     def stop(self):
         '''Pause the execution queue.'''
+        cls = self.__class__
         if not self.thread.is_alive():
-            cls = self.__class__
-            logging.fatal("{:s}.{:s}.stop : Unable to pause an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+            logging.fatal("{:s}.stop : Unable to pause an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
             return False
-        logging.info("{:s}.{:s}.stop : Pausing execution queue. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        logging.info("{:s}.stop : Pausing execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.clear()
         self.queue.acquire()
         self.queue.notify_all()
@@ -776,7 +790,8 @@ class execution(object):
         # package it all into a single function
         res = functools.partial(callable, *args, **kwds)
 
-        logging.debug("{:s}.{:s}.push : Adding callable {!r} to execution queue. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, callable, self))
+        cls = self.__class__
+        logging.debug("{:s}.push : Adding callable {!r} to execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), callable, self))
         # shove it down a multiprocessing.Queue
         self.queue.acquire()
         self.state.append(res)
@@ -786,12 +801,12 @@ class execution(object):
 
     def pop(self):
         '''Pop a result off of the result queue.'''
+        cls = self.__class__
         if not self.thread.is_alive():
-            cls = self.__class__
-            logging.fatal("{:s}.{:s}.pop : Refusing to wait for a result when execution queue has already terminated. : {!r}".format('.'.join(('internal',__name__)), cls.__name__, self))
+            logging.fatal("{:s}.pop : Refusing to wait for a result when execution queue has already terminated. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
             raise Queue.Empty
 
-        logging.debug("{:s}.{:s}.pop : Popping result off of execution queue. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self))
+        logging.debug("{:s}.pop : Popping result off of execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
         try:
             _, res, err = self.result.get(block=0)
             if err != (None, None, None):
@@ -826,17 +841,18 @@ class execution(object):
         return
 
     def __run__(self):
+        cls = self.__class__
         consumer = self.__consume(self.ev_terminating, self.queue, self.state)
         executor = self.__dispatch(self.lock); next(executor)
 
-        logging.debug("{:s}.{:s}.running : Execution queue is now running. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+        logging.debug("{:s}.running : Execution queue is now running. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         while not self.ev_terminating.is_set():
             # check if we're allowed to execute
             if not self.ev_unpaused.is_set():
                 self.ev_unpaused.wait()
 
             # pull a callable out of the queue
-            logging.debug("{:s}.{:s}.running : Waiting for an item.. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, self.thread))
+            logging.debug("{:s}.running : Waiting for an item.. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
             self.queue.acquire()
             item = next(consumer)
             self.queue.release()
@@ -848,11 +864,11 @@ class execution(object):
             if self.ev_terminating.is_set(): break
 
             # now we can execute it
-            logging.debug("{:s}.{:s}.running : Executing {!r} asynchronously. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, item, self.thread))
+            logging.debug("{:s}.running : Executing {!r} asynchronously. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), item, self.thread))
             res, err = executor.send(item)
 
             # and stash our result
-            logging.debug("{:s}.{:s}.running : Received result {!r} from {!r}. : {!r}".format('.'.join(('internal',__name__)), self.__class__.__name__, (res,err), item, self.thread))
+            logging.debug("{:s}.running : Received result {!r} from {!r}. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), (res,err), item, self.thread))
             self.result.put((item,res,err))
         return
 

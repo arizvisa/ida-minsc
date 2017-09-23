@@ -1,11 +1,11 @@
-import logging,__builtin__
-import itertools,functools,operator
-import six,types,collections
+import logging, __builtin__
+import itertools, functools, operator
+import six, types, collections
 
-import database,function,ui
-import structure,enum
+import database, function, ui
+import structure, enum
 import internal
-from internal import utils,interface
+from internal import utils, interface
 
 import idaapi
 
@@ -43,15 +43,15 @@ class register_t(interface.symbol_t):
         return self.offset
 
     def __str__(self):
-        return '%{:s}'.format(self.name)
+        return "%{:s}".format(self.name)
 
     def __repr__(self):
         try:
             dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi,name) == self.dtyp]
         except ValueError:
             dt = 'unknown'
-        return '<{:s}({:d},{:s}) {!r} {:d}:+{:d}>'.format('.'.join((__name__,'register',self.__class__.__name__)), self.id, dt, self.name, self.offset, self.size)
-        #return '{:s} {:s} {:d}:+{:d}'.format(self.__class__, dt, self.offset, self.size, dt)
+        return "<{:s}({:d},{:s}) {!r} {:d}:+{:d}>".format('.'.join((__name__,'register',self.__class__.__name__)), self.id, dt, self.name, self.offset, self.size)
+        #return "{:s} {:s} {:d}:+{:d}".format(self.__class__, dt, self.offset, self.size, dt)
 
     def __eq__(self, other):
         if isinstance(other, basestring):
@@ -96,7 +96,7 @@ class map_t(object):
         return res.__setitem__(name, register)
 
     def __repr__(self):
-        return '{:s} {!r}'.format(str(self.__class__), self.__state__)
+        return "{:s} {!r}".format(str(self.__class__), self.__state__)
 
 class architecture_t(object):
     """Base class to represent how IDA maps the registers and types returned from an operand to a register that's uniquely identifiable by the user.
@@ -114,7 +114,15 @@ class architecture_t(object):
 
     def new(self, name, bits, idaname=None, **kwargs):
         '''Add a register to the architecture's cache.'''
-        dtyp = kwargs.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
+
+        # older
+        if idaapi.__version__ < 7.0:
+            dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord)
+        # newer
+        else:
+            dtype_by_size = idaapi.get_dtyp_by_size
+
+        dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, 'parent':None, 'children':{}, 'dtyp':dtyp, 'offset':0, 'size':bits})
         namespace['realname'] = idaname
@@ -126,7 +134,15 @@ class architecture_t(object):
 
     def child(self, parent, name, offset, bits, idaname=None, **kwargs):
         '''Add a child-register to the architecture's cache.'''
-        dtyp = kwargs.get('dtyp', idaapi.dt_bitfld if bits == 1 else ord(idaapi.get_dtyp_by_size(bits//8)))
+
+        # older
+        if idaapi.__version__ < 7.0:
+            dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord)
+        # newer
+        else:
+            dtype_by_size = idaapi.get_dtyp_by_size
+
+        dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, 'parent':parent, 'children':{}, 'dtyp':dtyp, 'offset':offset, 'size':bits})
         namespace['realname'] = idaname
@@ -154,11 +170,14 @@ class architecture_t(object):
     byIndexType = utils.alias(by_indextype, 'architecture')
     def by_name(self, name):
         '''Lookup a register according to it's ``name``.'''
+        if name.startswith('%'):        # at&t
+            return getattr(self.__register__, name[1:].lower())
         return getattr(self.__register__, name.lower())
     byName = utils.alias(by_name, 'architecture')
     def by_indexsize(self, index, size):
         '''Lookup a register according to it's ``index`` and ``size``.'''
-        dtyp = idaapi.get_dtyp_by_size(size)
+        dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+        dtyp = dtype_by_size(size)
         return self.by_indextype(index, ord(dtyp))
     def promote(self, register, size=None):
         cls = self.__class__
@@ -168,7 +187,7 @@ class architecture_t(object):
                 return parent(register)
             return register if register.size == size else self.promote(parent(register), size=size)
         except StopIteration: pass
-        raise LookupError("{:s}.promote({:s}{:s}) : Unable to find register to promote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ', size={:d}'.format(size)))
+        raise LookupError("{:s}.promote({:s}{:s}) : Unable to find register to promote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
     def demote(self, register, size=None):
         cls = self.__class__
         childitems = utils.compose(operator.attrgetter('children'), operator.methodcaller('iteritems'))
@@ -178,11 +197,11 @@ class architecture_t(object):
                 return firstchild(register)
             return register if register.size == size else self.demote(firstchild(register), size=size)
         except StopIteration: pass
-        raise LookupError("{:s}.demote({:s}{:s}) : Unable to find register to demote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ', size={:d}'.format(size)))
+        raise LookupError("{:s}.demote({:s}{:s}) : Unable to find register to demote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
 
 ## operand types
 class __optype__(object):
-    '''static lookup table for operand type decoders'''
+    '''Registration/Lookup table for all the different operand type decoders in an architecture.'''
     cache = {}
     @classmethod
     def define(cls, processor, type):
@@ -222,7 +241,12 @@ def at(ea):
     if not database.is_code(ea):
         raise TypeError("{:s}.at({:x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
     length = idaapi.decode_insn(ea)
-    return idaapi.cmd.copy()
+    if idaapi.__version__ < 7.0:
+        return idaapi.cmd.copy()
+
+    tmp = idaapi.insn_t()
+    tmp.assign(idaapi.cmd)
+    return tmp
 
 @utils.multicase()
 def size():
@@ -274,8 +298,9 @@ def ops_repr():
 def ops_repr(ea):
     '''Returns a tuple of the repr of all the operands at the instruction at the address ``ea``.'''
     insn = at(ea)
-    res = (idaapi.ua_outop2(insn.ea, n) for n in range(ops_count(insn.ea)))
-    return tuple(idaapi.tag_remove(res) if res else str(op_value(insn.ea, i)) for i, res in enumerate(res))
+    outop = utils.compose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.compose(idaapi.print_operand, idaapi.tag_remove)
+    res = (outop(insn.ea, n) for n in range(ops_count(insn.ea)))
+    return tuple(res or str(op_value(insn.ea, i)) for i, res in enumerate(res))
 
 @utils.multicase()
 def ops_value():
@@ -320,7 +345,7 @@ def ops_state(ea):
     res = ( ((f&ops_state.read[i]),(f&ops_state.write[i])) for i in range(ops_count(ea)) )
     return tuple((r and 'r' or '') + (w and 'w' or '') for r,w in res)
 # pre-cache the CF_ flags inside idaapi for ops_state
-ops_state.read, ops_state.write = zip(*((getattr(idaapi,'CF_USE{:d}'.format(_+1)), getattr(idaapi,'CF_CHG{:d}'.format(_+1))) for _ in range(idaapi.UA_MAXOP)))
+ops_state.read, ops_state.write = zip(*((getattr(idaapi,"CF_USE{:d}".format(_+1), 1<<(7+_)), getattr(idaapi,"CF_CHG{:d}".format(_+1), 1<<(1+_))) for _ in range(idaapi.UA_MAXOP)))
 
 @utils.multicase()
 def ops_read():
@@ -342,9 +367,11 @@ def ops_write(ea):
 
 @utils.multicase()
 def ops_constant():
+    '''Return all the indexes of operands in the current instruction that are constants.'''
     return ops_constant(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_constant(ea):
+    '''Return all the indexes of operands in the instruction at ``ea`` that are constants.'''
     return tuple(i for i,v in enumerate(ops_value(ea)) if isinstance(v, six.integer_types))
 ops_const = utils.alias(ops_constant)
 
@@ -383,13 +410,21 @@ def operand(n):
 def operand(ea, none):
     '''Return all the op_t's of the instruction at ``ea``.'''
     insn = at(ea)
-    res = itertools.takewhile(lambda n: n.type != idaapi.o_void, (n.copy() for n in insn.Operands))
-    return tuple(res)
+    res = itertools.takewhile(utils.compose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), insn.Operands)
+    if idaapi.__version__ < 7.0:
+        return tuple(op.copy() for op in res)
+    res = ((idaapi.op_t(), op) for op in res)
+    return tuple([n.assign(op), n][1] for n, op in res)
+    
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def operand(ea, n):
     '''Returns the ``n``th op_t of the instruction at the address ``ea``.'''
     insn = at(ea)
-    return insn.Operands[n].copy()
+    if idaapi.__version__ < 7.0:
+        return insn.Operands[n].copy()
+    res = idaapi.op_t()
+    res.assign(insn.Operands[n])
+    return res
 
 @utils.multicase(n=six.integer_types)
 def op_repr(n):
@@ -399,8 +434,8 @@ def op_repr(n):
 def op_repr(ea, n):
     '''Returns a repr of the ``n``th operand of the instruction at the address ``ea``.'''
     insn = at(ea)
-    res = idaapi.ua_outop2(insn.ea, n)
-    return idaapi.tag_remove(res) if res else str(op_value(insn.ea, n))
+    outop = utils.compose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.compose(idaapi.print_operand, idaapi.tag_remove)
+    return outop(insn.ea, n) or str(op_value(insn.ea, n))
 
 @utils.multicase(n=six.integer_types)
 def op_state(n):
@@ -539,12 +574,6 @@ def op_segment(ea, n):
 # pathvar = idaapi.tid_array(length)
 # res = idapi.get_stroff_path(ea, n, pathvar.cast(), delta)
 
-class AddressOpnumReftype(interface.namedtypedtuple):
-    '''A named tuple containing (address, operand-number, reference-type).'''
-    _fields = ('address','opnum','reftype')
-    _types = (long, int, basestring)
-OREF = AddressOpnumReftype
-
 @utils.multicase(n=six.integer_types)
 def op_refs(n):
     '''Returns the (address, opnum, type) of all the instructions that reference the ``n``th operand of the current instruction.'''
@@ -557,41 +586,35 @@ def op_refs(ea, n):
         raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to locate function for address. : {:x}".format(__name__, ea, n, ea))
     F = database.type.flags(ea)
 
-    # reference types
-    #Ref_Types = {
-    #    0 : 'Data_Unknown', 1 : 'Data_Offset',
-    #    2 : 'Data_Write', 3 : 'Data_Read', 4 : 'Data_Text',
-    #    5  : 'Data_Informational',
-    #    16 : 'Code_Far_Call', 17 : 'Code_Near_Call',
-    #    18 : 'Code_Far_Jump', 19 : 'Code_Near_Jump',
-    #    20 : 'Code_User', 21 : 'Ordinary_Flow'
-    #}
-    Ref_T = {
-        2 : 'w', 3 : 'r',
-        # 16:'x', 17:'x', 18:'x', 19:'x', 20:'x', 21:'x'
-    }
-
     # sanity: returns whether the operand has a local or global xref
     ok = idaapi.op_adds_xrefs(F, n) ## FIXME: on tag:arm, this returns T for some operands
 
     # FIXME: gots to be a better way to determine operand representation
+    inst = at(ea)
     ti = idaapi.opinfo_t()
     res = idaapi.get_opinfo(ea, n, F, ti)
 
     # FIXME: this is incorrect on ARM for the 2nd op in `ADD R7, SP, #0x430+lv_dest_41c`
     # stkvar
     if ok and res is None:
-        stkofs_ = idaapi.calc_stkvar_struc_offset(fn, ea, n)
+        stkofs_ = idaapi.calc_stkvar_struc_offset(fn, ea if idaapi.__version__ < 7.0 else inst, n)
         # check that the stkofs_ from get_stkvar and calc_stkvar are the same
         op = operand(ea, n)
-        member,stkofs = idaapi.get_stkvar(op, op.addr)
+
+        res = interface.sval_t(op.addr).value
+        if idaapi.__version__ < 7.0:
+            member, stkofs = idaapi.get_stkvar(op, res)
+        else:
+            member, stkofs = idaapi.get_stkvar(inst, op, res)
+
         if stkofs != stkofs_:
-            logging.warn('{:s}.op_refs({:x}, {:d}) : Stack offsets for instruction operand do not match. : {:x} != {:x}'.format(__name__, ea, n, stkofs, stkofs_))
+            logging.warn("{:s}.op_refs({:x}, {:d}) : Stack offsets for instruction operand do not match. : {:x} != {:x}".format(__name__, ea, n, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
         idaapi.build_stkvar_xrefs(xl, fn, member)
-        res = [ OREF(x.ea,x.opnum,Ref_T.get(x.type,'')) for x in xl ]
+        res = [ interface.OREF(x.ea, int(x.opnum), interface.ref_t.of(x.type)) for x in xl ]
+        # FIXME: how do we handle the type for an LEA instruction which should include '&'...
 
     # struc member
     elif ok and res.tid != idaapi.BADADDR:    # FIXME: is this right?
@@ -602,22 +625,31 @@ def op_refs(ea, n):
         pathvar = idaapi.tid_array(1)
         delta = idaapi.sval_pointer()
         delta.assign(0)
-        ok = idaapi.get_stroff_path(ea, n, pathvar.cast(), delta.cast())
+        if idaapi.__version__ < 7.0:
+            ok = idaapi.get_stroff_path(ea, n, pathvar.cast(), delta.cast())
+        else:
+            ok = idaapi.get_stroff_path(pathvar.cast(), delta.cast(), ea, n)
         if not ok:
             raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to get structure id for operand. : {:x}".format(__name__, ea, n, ea))
 
         # get the structure offset and then figure it's member
-        memofs = operand(ea, n).value    # FIXME: this will be incorrect for an offsetted struct
+        addr = operator.attrgetter('value' if idaapi.__version__ < 7.0 else 'addr')     # FIXME: this will be incorrect for an offsetted struct
+        memofs = addr(operand(ea, n))
+
         st = idaapi.get_struc(pathvar[0])
         if st is None:
             raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to get structure for id. : {:x}".format(__name__, ea, n, pathvar[0]))
+
         mem = idaapi.get_member(st, memofs)
         if mem is None:
             raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to find member for offset in structure {:x}. : {:x}".format(__name__, ea, n, st.id, memofs))
 
         # extract the references
         x = idaapi.xrefblk_t()
-        x.first_to(mem.id, 0)
+
+        if not x.first_to(mem.id, 0):
+            logging.warn("{:s}.op_refs({:x}, {:d}) : No references found to struct member {:s}.".format(__name__, ea, n, mem.fullname))
+
         refs = [ (x.frm,x.iscode,x.type) ]
         while x.next_to():
             refs.append( (x.frm,x.iscode,x.type) )
@@ -628,7 +660,7 @@ def op_refs(ea, n):
             ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
             ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx,val in ops)
             ops = (idx for idx,ids in ops if st.id in ids)
-            res.extend( OREF(ea,op,Ref_T.get(t,'')) for op in ops)
+            res.extend( interface.OREF(ea, int(op), interface.ref_t.of(t)) for op in ops)
         res = res
 
     # enums
@@ -646,9 +678,9 @@ def op_refs(ea, n):
         # 9 -- '\x02' -- offset to segment 2
         gid = operand(ea, n).value if operand(ea, n).type in (idaapi.o_imm,) else operand(ea, n).addr
         x = idaapi.xrefblk_t()
-        x.first_to(gid, 0)
-        if x is None:
+        if not x.first_to(gid, 0):
             return []
+
         refs = [ (x.frm,x.iscode,x.type) ]
         while x.next_to():
             refs.append( (x.frm,x.iscode,x.type) )
@@ -660,8 +692,10 @@ def op_refs(ea, n):
             if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
                 ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in (idaapi.o_imm,) else operand(ea,idx).addr) for idx in range(ops_count(ea)))
                 ops = (idx for idx,val in ops if val == gid)
-                res.extend( OREF(ea,op,Ref_T.get(t,'')) for op in ops)
-            else: res.append( OREF(ea, None, Ref_T.get(t,'')) )
+                res.extend( interface.OREF(ea, int(op), interface.ref_t.of(t)) for op in ops)
+            else:
+                res.append( interface.OREF(ea, None, interface.ref_t.of(t)) )
+            continue
         res = res
     return res
 op_ref = utils.alias(op_refs)
@@ -802,10 +836,11 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_reg)
     def register(op):
         '''Return the operand as a register_t.'''
+        dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         if op.type in (idaapi.o_reg,):
-            res, dt = op.reg, ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
+            res, dt = op.reg, dtype_by_size(database.config.bits()//8)
             return reg.by_indextype(res, op.dtyp)
-        optype = '{:s}({:d})'.format('idaapi.o_reg', idaapi.o_reg)
+        optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
         raise TypeError("{:s}.register(...) : {:s} : Invalid operand type. : {:d}".format('.'.join((__name__, 'operand_types')), s_optype, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
@@ -815,7 +850,7 @@ class operand_types:
         if op.type in (idaapi.o_imm,idaapi.o_phrase):
             bits = idaapi.get_dtyp_size(op.dtyp) * 8
             return op.value & (2**bits-1)
-        optype = '{:s}({:d})'.format('idaapi.o_imm', idaapi.o_imm)
+        optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
         raise TypeError("{:s}.immediate(...) : {:s} : Invalid operand type. : {:d}".format('.'.join((__name__, 'operand_types')), optype, op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
@@ -825,7 +860,7 @@ class operand_types:
         if op.type in (idaapi.o_mem,idaapi.o_far,idaapi.o_near,idaapi.o_displ):
             seg,sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
             return op.addr
-        optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
+        optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
         raise TypeError("{:s}.address(...) : {:s},{:s} : Invalid operand type. : {:d}".format('.'.join((__name__, 'operand_types')), optype[0], optype[1], op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
@@ -840,19 +875,19 @@ class operand_types:
     def crregister(op):
         '''crreg'''
         raise NotImplementedError
-        return getattr(register, 'cr{:d}'.format(op.reg)).id
+        return getattr(register, "cr{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
     def fpregister(op):
         '''fpreg'''
-        return getattr(register, 'st{:d}'.format(op.reg)).id
+        return getattr(register, "st{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
     def mmxregister(op):
         '''mmxreg'''
-        return getattr(register, 'mmx{:d}'.format(op.reg)).id
+        return getattr(register, "mmx{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
     def xmmregister(op):
         '''xmmreg'''
-        return getattr(register, 'xmm{:d}'.format(op.reg)).id
+        return getattr(register, "xmm{:d}".format(op.reg)).id
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
@@ -869,7 +904,7 @@ class operand_types:
                 index = (op.specflag2&0x38) >> 3
 
             else:
-                optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
+                optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
                 raise TypeError("{:s}.phrase(...) : {:s},{:s},{:s} : Unable to determine the operand format for op.type {:d} : {:x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
 
             if op.type == idaapi.o_displ:
@@ -898,12 +933,12 @@ class operand_types:
                 index = (op.specflag2&0x38) >> 3
 
             else:
-                optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
+                optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
                 raise TypeError("{:s}.phrase(...) : {:s} : Unable to determine the operand format for op.type {:d} : {:x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
             offset = op.addr
 
         else:
-            optype = map(utils.unbox('{:s}({:d})'.format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
+            optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
             raise TypeError("{:s}.phrase(...) : {:s},{:s},{:s} : Invalid operand type. : {:d}".format(__name__, optype[0], optype[1], optype[2], op.type))
 
         # if arch == x64, then index += 8
@@ -923,7 +958,9 @@ class operand_types:
 
         seg,sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
-        dt = ord(idaapi.get_dtyp_by_size(database.config.bits()//8))
+        dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+
+        dt = dtype_by_size(database.config.bits()//8)
         res = long((offset-maxint) if offset&signbit else offset), None if base is None else reg.by_indextype(base, dt), None if index is None else reg.by_indextype(index, dt), scale
         return intelop.OffsetBaseIndexScale(*res)
 
@@ -1120,18 +1157,18 @@ class Intel(architecture_t):
 
         fpstack = self.__register__.fpstack
         # single precision
-        [ setitem('st{:d}f'.format(_), self.child(fpstack, 'st{:d}f'.format(_), _*80, 80, 'st{:d}'.format(_), dtyp=idaapi.dt_float)) for _ in range(8) ]
+        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtyp=idaapi.dt_float)) for _ in range(8) ]
         # double precision
-        [ setitem('st{:d}d'.format(_), self.child(fpstack, 'st{:d}d'.format(_), _*80, 80, 'st{:d}'.format(_), dtyp=idaapi.dt_double)) for _ in range(8) ]
+        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtyp=idaapi.dt_double)) for _ in range(8) ]
         # umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
-        [ setitem('st{:d}'.format(_), self.child(fpstack, 'st{:d}'.format(_), _*80, 80, 'st{:d}'.format(_), dtyp=idaapi.dt_tbyte)) for _ in range(8) ]
+        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtyp=idaapi.dt_tbyte)) for _ in range(8) ]
 
         # not sure if the mmx registers trash the other 16 bits of an fp register
-        [ setitem('mm{:d}'.format(_), self.child(fpstack, 'mm{:d}'.format(_), _*80, 64, dtyp=idaapi.dt_qword)) for _ in range(8) ]
+        [ setitem("mm{:d}".format(_), self.child(fpstack, "mm{:d}".format(_), _*80, 64, dtyp=idaapi.dt_qword)) for _ in range(8) ]
 
         # sse1/sse2 simd registers
-        [ setitem('xmm{:d}'.format(_), self.new('xmm{:d}'.format(_), 128, dtyp=idaapi.dt_byte16)) for _ in range(16) ]
-        [ setitem('ymm{:d}'.format(_), self.new('ymm{:d}'.format(_), 128, dtyp=idaapi.dt_ldbl)) for _ in range(16) ]
+        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtyp=idaapi.dt_byte16)) for _ in range(16) ]
+        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 128, dtyp=idaapi.dt_ldbl)) for _ in range(16) ]
 
         ##fpctrl, fpstat, fptags
         ##mxcsr
@@ -1145,18 +1182,18 @@ class AArch32(architecture_t):
         super(AArch32, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
 
-        [ setitem('v{:d}'.format(_), self.new('v{:d}'.format(_), 128, idaname='V{:d}'.format(_))) for _ in range(32) ]
-        [ setitem('q{:d}'.format(_), self.new('q{:d}'.format(_), 128, idaname='Q{:d}'.format(_))) for _ in range(32) ]
+        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), 128, idaname="V{:d}".format(_))) for _ in range(32) ]
+        [ setitem("q{:d}".format(_), self.new("q{:d}".format(_), 128, idaname="Q{:d}".format(_))) for _ in range(32) ]
 
         for _ in range(32):
-            rv, rq = getitem('v{:d}'.format(_)), getitem('q{:d}'.format(_))
+            rv, rq = getitem("v{:d}".format(_)), getitem("q{:d}".format(_))
             rv.alias, rq.alias = { rq }, { rv }
 
-        [ setitem('r{:d}'.format(_), self.new('r{:d}'.format(_), 32, idaname='R{:d}'.format(_))) for _ in range(13) ]
+        [ setitem("r{:d}".format(_), self.new("r{:d}".format(_), 32, idaname="R{:d}".format(_))) for _ in range(13) ]
         [ setitem(_, self.new(_, 32, _.upper())) for _ in ('sp', 'lr', 'pc') ]
 
-        [ setitem('d{:d}'.format(_), self.child(getitem('v{:d}'.format(_)), 'd{:d}'.format(_), 0, 64, idaname='D{:d}'.format(_))) for _ in range(32) ]
-        [ setitem('s{:d}'.format(_), self.child(getitem('d{:d}'.format(_)), 's{:d}'.format(_), 0, 32, idaname='S{:d}'.format(_))) for _ in range(32) ]
+        [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_))) for _ in range(32) ]
+        [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_))) for _ in range(32) ]
 
         # FIXME: include x registers
 
@@ -1170,9 +1207,12 @@ def __newprc__(id):
         m.reg = AArch32()
         m.register = m.reg.r
     else:
-        logging.warn('{:s} : IDP_Hooks.newprc({:d}) : {:d} : Unknown processor type. instruction module might not work properly.'.format(__name__, id, plfm))
+        logging.warn("{:s} : IDP_Hooks.newprc({:d}) : {:d} : Unknown processor type. instruction module might not work properly.".format(__name__, id, plfm))
     return
 __newprc__(0)
+
+def __ev_newprc__(pnum, keep_cfg):
+    return __newprc__(pnum)
 
 # FIXME: implement switch_t to determine information about switch statements with an instruction
 
@@ -1189,7 +1229,7 @@ class ir_op:
         name = property(fget=lambda s: s.__class__.__name__)
         size = property(fget=lambda s: s.__size)
         def str(self):
-            return '{:s}({:d})'.format(self.name, self.size)
+            return "{:s}({:d})".format(self.name, self.size)
         def __repr__(self):
             return self.str()
         def __eq__(self, other):
