@@ -218,6 +218,7 @@ class globals(comment):
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
         fn = idaapi.get_func(a.startEA)
+        if fn is None and not cmt: return
         oldcmt = idaapi.get_func_cmt(fn, repeatable)
         try: cls.event.send((fn.startEA, bool(repeatable), cmt))
         except StopIteration, e:
@@ -227,6 +228,7 @@ class globals(comment):
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
         fn = idaapi.get_func(a.startEA)
+        if fn is None and not cmt: return
         newcmt = idaapi.get_func_cmt(fn, repeatable)
         try: cls.event.send((fn.startEA, bool(repeatable), None))
         except StopIteration, e:

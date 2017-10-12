@@ -2104,19 +2104,21 @@ class type(object):
     @classmethod
     def flags(cls, ea):
         '''Returns the flags of the item at the address ``ea``.'''
-        return idaapi.get_flags(interface.address.within(ea))
+        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
+        return getflags(interface.address.within(ea))
     @utils.multicase(ea=six.integer_types, mask=six.integer_types)
     @classmethod
     def flags(cls, ea, mask):
         '''Returns the flags at the address ``ea`` masked with ``mask``.'''
-        return idaapi.get_flags(interface.address.within(ea)) & mask
+        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
+        return getflags(interface.address.within(ea)) & mask
     @utils.multicase(ea=six.integer_types, mask=six.integer_types, value=six.integer_types)
     @classmethod
     def flags(cls, ea, mask, value):
         '''Sets the flags at the address ``ea`` masked with ``mask`` set to ``value``.'''
         if idaapi.__version__ < 7.0:
             ea = interface.address.within(ea)
-            res = idaapi.get_flags(ea)
+            res = idaapi.getFlags(ea)
             idaapi.setFlags(ea, (res&~mask) | value)
             return res & mask
         raise DeprecationWarning("{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated idaapi.setFlags(...).".format('.'.join((__name__, cls.__name__)), ea, mask, value))

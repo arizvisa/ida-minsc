@@ -43,7 +43,7 @@ class register_t(interface.symbol_t):
         return self.offset
 
     def __str__(self):
-        return "%{:s}".format(self.name)
+        return self.architecture.prefix + self.name
 
     def __repr__(self):
         try:
@@ -88,12 +88,17 @@ class map_t(object):
         object.__setattr__(self, '__state__', {})
 
     def __getattr__(self, name):
+        if name.startswith('__'):
+            return getattr(self.__class__, name)
         res = self.__state__
         return res[name]
 
     def __setattr__(self, name, register):
         res = self.__state__
         return res.__setitem__(name, register)
+
+    def __contains__(self, name):
+        return name in self.__state__
 
     def __repr__(self):
         return "{:s} {!r}".format(str(self.__class__), self.__state__)
@@ -127,6 +132,7 @@ class architecture_t(object):
         namespace.update({'__name__':name, 'parent':None, 'children':{}, 'dtyp':dtyp, 'offset':0, 'size':bits})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', set())
+        namespace['architecture'] = self
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
         self.__cache__[idaname or name,dtyp] = name
@@ -147,6 +153,7 @@ class architecture_t(object):
         namespace.update({'__name__':name, 'parent':parent, 'children':{}, 'dtyp':dtyp, 'offset':offset, 'size':bits})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', set())
+        namespace['architecture'] = self
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
         self.__cache__[idaname or name,dtyp] = name
@@ -170,15 +177,17 @@ class architecture_t(object):
     byIndexType = utils.alias(by_indextype, 'architecture')
     def by_name(self, name):
         '''Lookup a register according to it's ``name``.'''
-        if name.startswith('%'):        # at&t
+        if any(name.startswith(prefix) for prefix in ('%', '$')):        # at&t, mips
             return getattr(self.__register__, name[1:].lower())
-        return getattr(self.__register__, name.lower())
+        if name.lower() in self.__register__:
+            return getattr(self.__register__, name.lower())
+        return getattr(self.__register__, name)
     byName = utils.alias(by_name, 'architecture')
     def by_indexsize(self, index, size):
         '''Lookup a register according to it's ``index`` and ``size``.'''
         dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         dtyp = dtype_by_size(size)
-        return self.by_indextype(index, ord(dtyp))
+        return self.by_indextype(index, dtyp)
     def promote(self, register, size=None):
         cls = self.__class__
         parent = utils.compose(operator.attrgetter('parent'), utils.box, functools.partial(filter, None), iter, next)
@@ -519,7 +528,8 @@ def op_segment(ea, n):
     segment  = (op.specval & 0xffff0000) >> 16
     selector = (op.specval & 0x0000ffff) >> 0
     if segment:
-        return reg.by_index(segment)
+        global register
+        return register.by_index(segment)
     raise NotImplementedError("{:s}.op_segment({:x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
 
 ## flags
@@ -826,25 +836,29 @@ isCall = callQ = utils.alias(is_call)
 class operand_types:
     """Namespace containing all of the operand type handlers.
     """
-    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_void)
     def void(op):
         '''An o_void operand...which is nothing.'''
         return ()
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_reg)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_reg)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg)
     def register(op):
         '''Return the operand as a register_t.'''
+        global register
         dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         if op.type in (idaapi.o_reg,):
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
-            return reg.by_indextype(res, op.dtyp)
+            return register.by_indextype(res, op.dtyp)
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
         raise TypeError("{:s}.register(...) : {:s} : Invalid operand type. : {:d}".format('.'.join((__name__, 'operand_types')), s_optype, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
     def immediate(op):
         '''Return the operand as an integer.'''
         if op.type in (idaapi.o_imm,idaapi.o_phrase):
@@ -855,6 +869,8 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_mem)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
     def memory(op):
         '''Return the operand.addr field from an operand.'''
         if op.type in (idaapi.o_mem,idaapi.o_far,idaapi.o_near,idaapi.o_displ):
@@ -875,19 +891,19 @@ class operand_types:
     def crregister(op):
         '''crreg'''
         raise NotImplementedError
-        return getattr(register, "cr{:d}".format(op.reg)).id
+        return getattr(reg, "cr{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
     def fpregister(op):
         '''fpreg'''
-        return getattr(register, "st{:d}".format(op.reg)).id
+        return getattr(reg, "st{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
     def mmxregister(op):
         '''mmxreg'''
-        return getattr(register, "mmx{:d}".format(op.reg)).id
+        return getattr(reg, "mmx{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
     def xmmregister(op):
         '''xmmreg'''
-        return getattr(register, "xmm{:d}".format(op.reg)).id
+        return getattr(reg, "xmm{:d}".format(op.reg)).id
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
@@ -960,19 +976,22 @@ class operand_types:
 
         dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
 
+        global register
         dt = dtype_by_size(database.config.bits()//8)
-        res = long((offset-maxint) if offset&signbit else offset), None if base is None else reg.by_indextype(base, dt), None if index is None else reg.by_indextype(index, dt), scale
+        res = long((offset-maxint) if offset&signbit else offset), None if base is None else register.by_indextype(base, dt), None if index is None else register.by_indextype(index, dt), scale
         return intelop.OffsetBaseIndexScale(*res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(op):
-        Rn, Rm = reg.by_index(op.reg), reg.by_index(op.specflag1)
+        global register
+        Rn, Rm = register.by_index(op.reg), register.by_index(op.specflag1)
         return armop.phrase(Rn, Rm)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
     def disp(op):
         '''Convert an arm operand into an armop.disp tuple (register, offset).'''
-        Rn = reg.by_index(op.reg)
+        global register
+        Rn = register.by_index(op.reg)
         return armop.disp(Rn, long(op.addr))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
@@ -994,7 +1013,8 @@ class operand_types:
     def flex(op):
         '''Convert an arm operand into an arm.flexop tuple (register, type, immediate).'''
         # tag:arm, this is a register with a shift-op applied
-        Rn = reg.by_index(op.reg)
+        global register
+        Rn = register.by_index(op.reg)
         shift = 0   # FIXME: find out where the shift-type is stored
         return armop.flex(Rn, int(shift), int(op.value))
 
@@ -1002,19 +1022,30 @@ class operand_types:
     def list(op):
         '''Convert a bitmask of a registers into an armop.list.'''
         # op.specval -- a bitmask specifying which registers are included
+        global register
         res, n = [], op.specval
         for i in range(16):
             if n & 1:
-                res.append(reg.by_index(i))
+                res.append(register.by_index(i))
             n >>= 1
         return armop.list(set(res))
+
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
+    def phrase(op):
+        global register
+        rt, imm = register.by_index(op.reg), op.addr
+        return mipsop.phrase(rt, imm)
+
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
+    def coprocessor(op):
+        return mipsop.coproc(op.reg)
 del(operand_types)
 
 ## intel operands
 class intelop:
     class SegmentOffset(interface.namedtypedtuple, interface.symbol_t):
         _fields = ('segment','offset')
-        _types = ((types.NoneType,register_t), long)
+        _types = ((types.NoneType,register_t), six.integer_types)
 
         @property
         def __symbols__(self):
@@ -1059,7 +1090,7 @@ class armop:
         a binary shift or rotation to the value of a register.
         """
         _fields = ('Rn', 'shift', 'n')
-        _types = (register_t, int, int)
+        _types = (register_t, six.integer_types, six.integer_types)
 
         register = property(fget=operator.itemgetter(0))
         t = type = property(fget=operator.itemgetter(1))
@@ -1085,7 +1116,7 @@ class armop:
     class disp(interface.namedtypedtuple, interface.symbol_t):
         '''A tuple for an arm operand containing the (Rn, Offset).'''
         _fields = ('Rn', 'offset')
-        _types = (register_t, long)
+        _types = (register_t, six.integer_types)
 
         register = property(fget=operator.itemgetter(0))
         offset = property(fget=operator.itemgetter(1))
@@ -1114,12 +1145,41 @@ class armop:
         `value` contains the dereferenced value at the operand's address.
         """
         _fields = ('address', 'value')
-        _types = (long, long)
+        _types = (six.integer_types, six.integer_types)
 
         @property
         def __symbols__(self):
             raise StopIteration
             yield   # so that this function is still treated as a generator
+
+## mips operands
+class mipsop:
+    class phrase(interface.namedtypedtuple, interface.symbol_t):
+        '''A tuple for an arm operand containing the (Rn, Offset).'''
+        _fields = ('rt', 'imm')
+        _types = (register_t, six.integer_types)
+
+        register = property(fget=operator.itemgetter(0))
+        immediate = property(fget=operator.itemgetter(1))
+
+        @property
+        def __symbols__(self):
+            r, _ = self
+            yield r
+
+    @staticmethod
+    def coproc(regnum):
+        global reg, register
+        res = {
+            0x00 : reg.Index, 0x01 : reg.Random, 0x02 : reg.EntryLo0, 0x03 : reg.EntryLo1,
+            0x04 : reg.Context, 0x05 : reg.PageMask, 0x06 : reg.Wired, 0x08 : reg.BadVAddr,
+            0x09 : reg.Count, 0x0a : reg.EntryHi, 0x0b : reg.Compare, 0x0c : reg.SR,
+            0x0d : reg.Cause, 0x0e : reg.EPC, 0x0f : reg.PRId, 0x10 : reg.Config,
+            0x11 : reg.LLAddr, 0x12 : reg.WatchLo, 0x13 : reg.WatchHi, 0x14 : reg.XContext,
+            0x1a : reg.ECC, 0x1b : reg.CacheErr, 0x1c : reg.TagLo, 0x1d : reg.TagHi,
+            0x1e : reg.ErrorEPC,
+        }
+        return res[regnum] if regnum in res else register.by_name(str(regnum))
 
 ## architecture registers
 class Intel(architecture_t):
@@ -1127,6 +1187,7 @@ class Intel(architecture_t):
     This can be used to locate registers that are of a specific size
     or are related to another set of registers.
     """
+    prefix = ''
     def __init__(self):
         super(Intel, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
@@ -1178,6 +1239,7 @@ class AArch32(architecture_t):
     """An implementation of the AArch32 architecture.
     This class is used to locate registers by name, index, or size.
     """
+    prefix = '%'
     def __init__(self):
         super(AArch32, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
@@ -1197,15 +1259,74 @@ class AArch32(architecture_t):
 
         # FIXME: include x registers
 
+class Mips(architecture_t):
+    """An implementation of the Mips architecture.
+    This class is used to locate registers by name, index, or size.
+    """
+    prefix = '$'
+    def __init__(self):
+        super(Mips, self).__init__()
+        getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
+
+        setitem('zero', self.new('zero', 32, idaname='$zero'))
+        setitem('at', self.new('at', 32, idaname='$at'))
+        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), 32, idaname="$v{:d}".format(_))) for _ in range(2) ]
+        [ setitem("a{:d}".format(_), self.new("a{:d}".format(_), 32, idaname="$a{:d}".format(_))) for _ in range(4) ]
+        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), 32, idaname="$t{:d}".format(_))) for _ in range(8) ]
+        [ setitem("s{:d}".format(_), self.new("s{:d}".format(_), 32, idaname="$s{:d}".format(_))) for _ in range(8) ]
+        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), 32, idaname="$t{:d}".format(_))) for _ in range(8,10) ]
+        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), 32, idaname="$k{:d}".format(_))) for _ in range(2) ]
+        setitem('gp', self.new('gp', 32, idaname='$gp'))
+        setitem('sp', self.new('sp', 32, idaname='$sp'))
+        setitem('fp', self.new('fp', 32, idaname='$fp'))
+        setitem('ra', self.new('ra', 32, idaname='$ra'))
+        [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), 32, idaname="$f{:d}".format(_))) for _ in range(32) ]
+        setitem('pc', self.new('pc', 32))
+
+        # FIXME: add the register definitions for : cs, ds, mips16
+
+        # coprocessor registers
+        setitem('Index', self.new('Index', 32, id=0))
+        setitem('Random', self.new('Random', 32, id=0))
+        setitem('EntryLo0', self.new('EntryLo0', 32, id=0))
+        setitem('EntryLo1', self.new('EntryLo1', 32, id=0))
+        setitem('Context', self.new('Context', 32, id=0))
+        setitem('PageMask', self.new('PageMask', 32, id=0))
+        setitem('Wired', self.new('Wired', 32, id=0))
+        setitem('BadVAddr', self.new('BadVAddr', 32, id=0))
+        setitem('Count', self.new('Count', 32, id=0))
+        setitem('EntryHi', self.new('EntryHi', 32, id=0))
+        setitem('Compare', self.new('Compare', 32, id=0))
+        setitem('SR', self.new('SR', 32, id=0))
+        setitem('Cause', self.new('Cause', 32, id=0))
+        setitem('EPC', self.new('EPC', 32, id=0))
+        setitem('PRId', self.new('PRId', 32, id=0))
+        setitem('Config', self.new('Config', 32, id=0))
+        setitem('LLAddr', self.new('LLAddr', 32, id=0))
+        setitem('WatchLo', self.new('WatchLo', 32, id=0))
+        setitem('WatchHi', self.new('WatchHi', 32, id=0))
+        setitem('XContext', self.new('XContext', 32, id=0))
+        setitem('ECC', self.new('ECC', 32, id=0))
+        setitem('CacheErr', self.new('CacheErr', 32, id=0))
+        setitem('TagLo', self.new('TagLo', 32, id=0))
+        setitem('TagHi', self.new('TagHi', 32, id=0))
+        setitem('ErrorEPC', self.new('ErrorEPC', 32, id=0))
+
+        # unmarked coprocessor registers
+        [ setitem(str(_), self.new(str(_), 32)) for _ in [7,31] + range(20, 26)]
+
 ## global initialization
 def __newprc__(id):
     plfm, m = idaapi.ph.id, __import__('sys').modules[__name__]
     if plfm == idaapi.PLFM_386:     # id == 15
-        m.reg = Intel()
-        m.register = m.reg.r
+        m.register = Intel()
+        m.reg = m.register.r
     elif plfm == idaapi.PLFM_ARM:   # id == 1
-        m.reg = AArch32()
-        m.register = m.reg.r
+        m.register = AArch32()
+        m.reg = m.register.r
+    elif plfm == idaapi.PLFM_MIPS:
+        m.register = Mips()
+        m.reg = m.register.r
     else:
         logging.warn("{:s} : IDP_Hooks.newprc({:d}) : {:d} : Unknown processor type. instruction module might not work properly.".format(__name__, id, plfm))
     return
@@ -1255,7 +1376,7 @@ class ir:
     """Returns a sort-of intermediary representation that excludes the semantics of an instruction."""
     table = {
         'immediate':     {'r':ir_op.value,   'w':ir_op.assign, 'rw':ir_op.modify,    '':ir_op.value},
-        'address':    {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
+        'memory':    {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
         'phrase':  {'r':ir_op.load,    'w':ir_op.store,  'rw':ir_op.loadstore, '':ir_op.unknown},
         'register':     {'r':ir_op.value,   'w':ir_op.assign, 'rw':ir_op.modify,    '':ir_op.unknown},
     }
@@ -1274,7 +1395,7 @@ class ir:
         (assign,immediate,register,index,scale)
         """
         op,state = operand(ea, opnum), op_state(ea, opnum)
-        t, sz = __optype__.lookup(op), __optype__.size(op)
+        t, sz = __optype__.lookup(op.type), __optype__.size(op)
         operation = cls.table[t.__name__][state]
 
         # if mnemonic is lea, then demote it from a memory operation
@@ -1289,7 +1410,7 @@ class ir:
 
         if t.__name__ == 'phrase':
             imm,base,index,scale = t(op)
-        elif t.__name__ in ('immediate', 'address'):
+        elif t.__name__ in ('immediate', 'memory'):
             imm,base,index,scale = t(op),None,None,None
         else:
             imm,base,index,scale = None,t(op),None,None
@@ -1297,8 +1418,8 @@ class ir:
         if operation == ir_op.load:
             sz = database.config.bits() // 8
 
-        base = None if base is None else reg(base, size=sz)
-        index = None if index is None else reg(index, size=sz)
+        base = None if base is None else base if isinstance(base, register_t) else register.by_indexsize(base, size=sz)
+        index = None if index is None else index if isinstance(base, register_t) else register.by_indexsize(index, size=sz)
 
         return OOBIS(operation(__optype__.size(op)),*(imm,base,index,scale))
 
@@ -1324,17 +1445,17 @@ class ir:
 
         # if mnemonic is stack-related, then add the other implicit operation
         # FIXME: ...and another pretty bad hack to figure out how to remove
-        sp,sz = register.sp.id,database.config.bits()/8
+        sp,sz = reg.sp.id,database.config.bits()/8
         if mnem(ea).upper() == 'PUSH':
-            result.append(OOBIS(ir_op.store(sz), 0, reg(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.store(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
         elif mnem(ea).upper() == 'POP':
-            result.append(OOBIS(ir_op.load(sz), 0, reg(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.load(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
         elif mnem(ea).upper().startswith('RET'):
             if len(result) > 0:
-                result.append(OOBIS(ir_op.modify(sz), 0, reg(sp,size=sz), 0, 1))
-            result.append(OOBIS(ir_op.load(sz), 0, reg(sp,size=sz), 0, 1))
+                result.append(OOBIS(ir_op.modify(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.load(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
         elif mnem(ea).upper() == 'CALL':
-            result.append(OOBIS(ir_op.store(sz), 0, reg(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.store(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
 
         return mnem(ea),result
     at = utils.alias(instruction, 'ir')

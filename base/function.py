@@ -1122,7 +1122,7 @@ def iterate():
 def iterate(func):
     '''Iterate through all the instructions for each chunk in the function ``func``.'''
     for start,end in chunks(func):
-        end = database.address.prev(end)
+        end = database.address.prev(end) if end < database.bottom() else end
         for ea in itertools.ifilter(database.type.is_code, database.iterate(start, end)):
             yield ea
         continue
