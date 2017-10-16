@@ -296,7 +296,8 @@ def on_ready():
         logging.debug("{:s}.on_ready : Received unexpected state transition. : {!r}".format(__name__, State))
 
 def auto_queue_empty(type):
-    on_ready()
+    if type == idaapi.AU_FINAL:
+        on_ready()
 
 def __process_functions():
     p = ui.progress()

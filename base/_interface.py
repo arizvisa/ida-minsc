@@ -519,7 +519,7 @@ class regmatch(object):
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # convert any regs that are strings into their correct object type
-        regs = { _instruction.reg.by_name(r) if isinstance(r, basestring) else r for r in regs }
+        regs = { _instruction.architecture.by_name(r) if isinstance(r, basestring) else r for r in regs }
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
         match = lambda r, regs=regs: any(itertools.imap(r.relatedQ, regs))

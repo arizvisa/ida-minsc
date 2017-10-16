@@ -26,13 +26,13 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
-        raise LookupError("{:s}.by_address({:x}) : Unable to locate function".format(__name__, ea))
+        raise LookupError("{:s}.by_address({:#x}) : Unable to locate function".format(__name__, ea))
     return res
 byAddress = by_address
 
 def by_name(name):
     '''Return the function with the name ``name``.'''
-    ea = idaapi.get_name_ea(-1, name)
+    ea = idaapi.get_name_ea(idaapi.BADADDR, name)
     if ea == idaapi.BADADDR:
         raise LookupError("{:s}.by_name({!r}) : Unable to locate function".format(__name__, name))
     return idaapi.get_func(ea)
@@ -49,7 +49,7 @@ def by(name): return by_name(name)
 
 # FIXME: implement a matcher class for func_t
 
-# FIXME: document this despite it being internal
+# FIXME: document this despite it only being used internally
 def __addressOfRtOrSt(func):
     '''Returns (F,address) if a statically linked address, or (T,address) if a runtime-linked address'''
     try:
@@ -74,7 +74,7 @@ def address():
     '''Return the address of the current function.'''
     fn = ui.current.function()
     if fn is None:
-        raise LookupError("{:s}.address({:x}) : Not currently positioned within a function.".format(__name__, ui.current.address()))
+        raise LookupError("{:s}.address({:#x}) : Not currently positioned within a function.".format(__name__, ui.current.address()))
     return fn.startEA
 @utils.multicase()
 def address(func):
@@ -105,7 +105,7 @@ def guess(ea):
         if left <= ea < right:
             return left, right
         continue
-    raise LookupError("{:s}.guess({:x}) : Unable to determine function chunk's bounds.".format(__name__, ea))
+    raise LookupError("{:s}.guess({:#x}) : Unable to determine function chunk's bounds.".format(__name__, ea))
 
 ## properties
 @utils.multicase()
@@ -157,13 +157,15 @@ def get_name():
 @utils.multicase()
 def get_name(func):
     '''Return the name of the function ``func``.'''
+    get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
+
     rt,ea = __addressOfRtOrSt(func)
     if rt:
-        res = idaapi.get_name(-1, ea)
+        res = get_name(ea)
         return internal.declaration.demangle(res) if internal.declaration.mangled(res) else res
         #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     res = idaapi.get_func_name(ea)
-    if not res: res = idaapi.get_name(-1, ea)
+    if not res: res = get_name(ea)
     if not res: res = idaapi.get_true_name(ea, ea)
     return res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
@@ -191,7 +193,7 @@ def set_name(func, string):
 
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
-        logging.warn("{:s}.set_name({:x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
+        logging.warn("{:s}.set_name({:#x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
         string = res
 
     if rt:
@@ -200,7 +202,7 @@ def set_name(func, string):
     else:
         res, ok = get_name(ea), idaapi.set_name(ea, string, idaapi.SN_PUBLIC)
     if not ok:
-        raise ValueError("{:s}.set_name({:x}, {!r}) : Unable to apply function name.".format(__name__, ea, string))
+        raise ValueError("{:s}.set_name({:#x}, {!r}) : Unable to apply function name.".format(__name__, ea, string))
     return res
 
 @utils.multicase()
@@ -260,8 +262,8 @@ def frame(func):
     res = idaapi.get_frame(fn.startEA)
     if res is not None:
         return structure.instance(res.id, offset=-fn.frsize)
-    logging.info("{:s}.frame({:x}) : Function {:s} does not have a frame.".format(__name__, fn.startEA, name(fn.startEA)))
-    return structure.instance(-1)
+    logging.info("{:s}.frame({:#x}) : Function {:s} does not have a frame.".format(__name__, fn.startEA, name(fn.startEA)))
+    return structure.instance(idaapi.BADADDR)
 
 # FIXME: fix the naming
 @utils.multicase()
@@ -419,7 +421,7 @@ def chunks(func):
     fn = by(func)
     fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
     if not fci.main():
-        raise ValueError("{:s}.chunks({:x}) : Unable to create a func_tail_iterator_t".format(__name__, fn.startEA))
+        raise ValueError("{:s}.chunks({:#x}) : Unable to create a func_tail_iterator_t".format(__name__, fn.startEA))
 
     while True:
         ch = fci.chunk()
@@ -440,7 +442,7 @@ class chunk(object):
             if l <= ea < r:
                 return l, r
             continue
-        raise LookupError("{:s}.chunk({:x}) : Unable to locate chunk for function {:x}.".format(__name__, ea, address(func)))
+        raise LookupError("{:s}.chunk({:#x}) : Unable to locate chunk for function {:#x}.".format(__name__, ea, address(func)))
 
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
@@ -540,11 +542,11 @@ def arguments(func):
     # grab from structure
     fr = idaapi.get_frame(fn)
     if fr is None:  # unable to figure out arguments
-        raise LookupError("{:s}.arguments({:x}) : Unable to determine function frame.".format(__name__, fn.startEA))
+        raise LookupError("{:s}.arguments({:#x}) : Unable to determine function frame.".format(__name__, fn.startEA))
 
     # FIXME: figure out calling convention and grab correct arguments
     if database.config.bits() != 32:
-        logging.warn("{:s}.arguments({:x}) : Possibility that register-based arguments will not be listed due to {:d}-bit calling convention.".format(__name__, fn.startEA, database.config.bits()))
+        logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to {:d}-bit calling convention.".format(__name__, fn.startEA, database.config.bits()))
 
     base = get_vars_size(fn)+get_regs_size(fn)
     for (off,size),(name,_,_) in structure.fragment(fr.id, base, get_args_size(fn)):
@@ -1177,11 +1179,11 @@ def tag_read(func):
     try:
         rt,ea = __addressOfRtOrSt(func)
     except LookupError:
-        logging.warn("{:s}.tag_read({!r}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, func))
+        logging.warn("{:s}.tag_read({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func)))
         return database.tag_read(func)
 
     if rt:
-        logging.warn("{:s}.tag_read({:x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
+        logging.warn("{:s}.tag_read({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
         return database.tag_read(ea)
 
     fn,repeatable = by_address(ea), True
@@ -1190,7 +1192,7 @@ def tag_read(func):
     res = comment(fn, repeatable=not repeatable)
     d2 = internal.comment.decode(res)
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag_read({:x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+        logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
     res = {}
     map(res.update, (d1,d2))
 
@@ -1230,7 +1232,7 @@ def tag_write(func, key, value):
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag_write({:x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
+        logging.warn("{:s}.tag_write({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
         return database.tag_write(ea, key, value)
 
     # Otherwise, it's a function.
@@ -1257,12 +1259,12 @@ def tag_write(func, key, none):
         rt,ea = __addressOfRtOrSt(func)
     except LookupError:
         # If we're not even in a function, then use a database tag.
-        logging.warn("{:s}.tag_write({!r}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, func, key))
+        logging.warn("{:s}.tag_write({:s}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key))
         return database.tag_write(func, key, none)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag_write({:x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
+        logging.warn("{:s}.tag_write({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
         return database.tag_write(ea, key, none)
 
     # Otherwise, it's a function.
@@ -1383,7 +1385,7 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and _instruction.is_call(ea):
-                    logging.warn("{:s}.down({:x}) : Discovered a dynamically resolved call that is unable to be resolved. : {:s}".format(__name__, fn.startEA, database.disasm(ea)))
+                    logging.warn("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. : {:s}".format(__name__, fn.startEA, database.disasm(ea)))
                     #resultCode.append((ea, 0))
                 continue
             resultData.extend( (ea,x) for x in database.dxdown(ea) )
@@ -1548,7 +1550,7 @@ def stackdelta(ea, delta, **direction):
     """
     dir = direction.get('direction', direction.get('dir', -1))
     if dir == 0:
-        raise ValueError("{:s}.stackdelta({:x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in direction.iteritems())) if direction else ''))
+        raise ValueError("{:s}.stackdelta({:#x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in direction.iteritems())) if direction else ''))
     next = database.next if dir > 0 else database.prev
 
     sp, ea = get_spdelta(ea), interface.address.inside(ea)

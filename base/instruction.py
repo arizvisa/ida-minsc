@@ -528,8 +528,8 @@ def op_segment(ea, n):
     segment  = (op.specval & 0xffff0000) >> 16
     selector = (op.specval & 0x0000ffff) >> 0
     if segment:
-        global register
-        return register.by_index(segment)
+        global architecture
+        return architecture.by_index(segment)
     raise NotImplementedError("{:s}.op_segment({:x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
 
 ## flags
@@ -848,11 +848,11 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg)
     def register(op):
         '''Return the operand as a register_t.'''
-        global register
+        global architecture
         dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         if op.type in (idaapi.o_reg,):
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
-            return register.by_indextype(res, op.dtyp)
+            return architecture.by_indextype(res, op.dtyp)
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
         raise TypeError("{:s}.register(...) : {:s} : Invalid operand type. : {:d}".format('.'.join((__name__, 'operand_types')), s_optype, op.type))
 
@@ -976,22 +976,22 @@ class operand_types:
 
         dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
 
-        global register
+        global architecture
         dt = dtype_by_size(database.config.bits()//8)
-        res = long((offset-maxint) if offset&signbit else offset), None if base is None else register.by_indextype(base, dt), None if index is None else register.by_indextype(index, dt), scale
+        res = long((offset-maxint) if offset&signbit else offset), None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
         return intelop.OffsetBaseIndexScale(*res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(op):
-        global register
-        Rn, Rm = register.by_index(op.reg), register.by_index(op.specflag1)
+        global architecture
+        Rn, Rm = architecture.by_index(op.reg), architecture.by_index(op.specflag1)
         return armop.phrase(Rn, Rm)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
     def disp(op):
         '''Convert an arm operand into an armop.disp tuple (register, offset).'''
-        global register
-        Rn = register.by_index(op.reg)
+        global architecture
+        Rn = architecture.by_index(op.reg)
         return armop.disp(Rn, long(op.addr))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
@@ -1013,8 +1013,8 @@ class operand_types:
     def flex(op):
         '''Convert an arm operand into an arm.flexop tuple (register, type, immediate).'''
         # tag:arm, this is a register with a shift-op applied
-        global register
-        Rn = register.by_index(op.reg)
+        global architecture
+        Rn = architecture.by_index(op.reg)
         shift = 0   # FIXME: find out where the shift-type is stored
         return armop.flex(Rn, int(shift), int(op.value))
 
@@ -1022,18 +1022,18 @@ class operand_types:
     def list(op):
         '''Convert a bitmask of a registers into an armop.list.'''
         # op.specval -- a bitmask specifying which registers are included
-        global register
+        global architecture
         res, n = [], op.specval
         for i in range(16):
             if n & 1:
-                res.append(register.by_index(i))
+                res.append(architecture.by_index(i))
             n >>= 1
         return armop.list(set(res))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(op):
-        global register
-        rt, imm = register.by_index(op.reg), op.addr
+        global architecture
+        rt, imm = architecture.by_index(op.reg), op.addr
         return mipsop.phrase(rt, imm)
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
@@ -1169,17 +1169,17 @@ class mipsop:
 
     @staticmethod
     def coproc(regnum):
-        global reg, register
+        global register, architecture
         res = {
-            0x00 : reg.Index, 0x01 : reg.Random, 0x02 : reg.EntryLo0, 0x03 : reg.EntryLo1,
-            0x04 : reg.Context, 0x05 : reg.PageMask, 0x06 : reg.Wired, 0x08 : reg.BadVAddr,
-            0x09 : reg.Count, 0x0a : reg.EntryHi, 0x0b : reg.Compare, 0x0c : reg.SR,
-            0x0d : reg.Cause, 0x0e : reg.EPC, 0x0f : reg.PRId, 0x10 : reg.Config,
-            0x11 : reg.LLAddr, 0x12 : reg.WatchLo, 0x13 : reg.WatchHi, 0x14 : reg.XContext,
-            0x1a : reg.ECC, 0x1b : reg.CacheErr, 0x1c : reg.TagLo, 0x1d : reg.TagHi,
-            0x1e : reg.ErrorEPC,
+            0x00 : register.Index, 0x01 : register.Random, 0x02 : register.EntryLo0, 0x03 : register.EntryLo1,
+            0x04 : register.Context, 0x05 : register.PageMask, 0x06 : register.Wired, 0x08 : register.BadVAddr,
+            0x09 : register.Count, 0x0a : register.EntryHi, 0x0b : register.Compare, 0x0c : register.SR,
+            0x0d : register.Cause, 0x0e : register.EPC, 0x0f : register.PRId, 0x10 : register.Config,
+            0x11 : register.LLAddr, 0x12 : register.WatchLo, 0x13 : register.WatchHi, 0x14 : register.XContext,
+            0x1a : register.ECC, 0x1b : register.CacheErr, 0x1c : register.TagLo, 0x1d : register.TagHi,
+            0x1e : register.ErrorEPC,
         }
-        return res[regnum] if regnum in res else register.by_name(str(regnum))
+        return res[regnum] if regnum in res else architecture.by_name(str(regnum))
 
 ## architecture registers
 class Intel(architecture_t):
@@ -1319,17 +1319,16 @@ class Mips(architecture_t):
 def __newprc__(id):
     plfm, m = idaapi.ph.id, __import__('sys').modules[__name__]
     if plfm == idaapi.PLFM_386:     # id == 15
-        m.register = Intel()
-        m.reg = m.register.r
+        res = Intel()
     elif plfm == idaapi.PLFM_ARM:   # id == 1
-        m.register = AArch32()
-        m.reg = m.register.r
+        res = AArch32()
     elif plfm == idaapi.PLFM_MIPS:
-        m.register = Mips()
-        m.reg = m.register.r
+        res = Mips()
     else:
         logging.warn("{:s} : IDP_Hooks.newprc({:d}) : {:d} : Unknown processor type. instruction module might not work properly.".format(__name__, id, plfm))
-    return
+        return
+    m.architecture, m.register = res, res.r
+    m.arch, m.reg = m.architecture, m.register
 __newprc__(0)
 
 def __ev_newprc__(pnum, keep_cfg):
@@ -1418,8 +1417,9 @@ class ir:
         if operation == ir_op.load:
             sz = database.config.bits() // 8
 
-        base = None if base is None else base if isinstance(base, register_t) else register.by_indexsize(base, size=sz)
-        index = None if index is None else index if isinstance(base, register_t) else register.by_indexsize(index, size=sz)
+        global architecture
+        base = None if base is None else base if isinstance(base, register_t) else architecture.by_indexsize(base, size=sz)
+        index = None if index is None else index if isinstance(base, register_t) else architecture.by_indexsize(index, size=sz)
 
         return OOBIS(operation(__optype__.size(op)),*(imm,base,index,scale))
 
@@ -1445,17 +1445,18 @@ class ir:
 
         # if mnemonic is stack-related, then add the other implicit operation
         # FIXME: ...and another pretty bad hack to figure out how to remove
-        sp,sz = reg.sp.id,database.config.bits()/8
+        global register, architecture
+        sp, sz = register.sp.id, database.config.bits()/8
         if mnem(ea).upper() == 'PUSH':
-            result.append(OOBIS(ir_op.store(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.store(sz), 0, architecture.by_indexsize(sp,size=sz), 0, 1))
         elif mnem(ea).upper() == 'POP':
-            result.append(OOBIS(ir_op.load(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.load(sz), 0, architecture.by_indexsize(sp,size=sz), 0, 1))
         elif mnem(ea).upper().startswith('RET'):
             if len(result) > 0:
-                result.append(OOBIS(ir_op.modify(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
-            result.append(OOBIS(ir_op.load(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
+                result.append(OOBIS(ir_op.modify(sz), 0, architecture.by_indexsize(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.load(sz), 0, architecture.by_indexsize(sp,size=sz), 0, 1))
         elif mnem(ea).upper() == 'CALL':
-            result.append(OOBIS(ir_op.store(sz), 0, reg.by_indexsize(sp,size=sz), 0, 1))
+            result.append(OOBIS(ir_op.store(sz), 0, architecture.by_indexsize(sp,size=sz), 0, 1))
 
         return mnem(ea),result
     at = utils.alias(instruction, 'ir')
