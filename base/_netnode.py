@@ -6,10 +6,13 @@ MAXNAMESIZE = idaapi.MAXNAMELEN
 
 class netnode(object):
     try:
-        # XXX: fuck you ida 6.95 for breaking your api
+        # ida 6.95 splits up their idaapi module into smaller namespaces
         import _ida_netnode
     except ImportError:
+        # _ida_netnode has got to be in at least one of these idaapi modules...
         import idaapi as _ida_netnode
+        if not hasattr(idaapi, 'new_netnode'):
+            import _idaapi as _ida_netnode
 
     new = _ida_netnode.new_netnode
     delete = _ida_netnode.delete_netnode

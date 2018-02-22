@@ -218,7 +218,7 @@ except Exception, e:
     __import__('traceback').print_exc()
 
 ## stupid fucking idapython hax
-# prevent idapython from trying to write it's banner to the message window since we called it up above.
+# prevent idapython from trying to write its banner to the message window since we called it up above.
 print_banner = lambda: None
 
 # find the frame that fucks with our sys.modules, and save it for later

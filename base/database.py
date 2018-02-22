@@ -269,19 +269,19 @@ class functions(object):
         except RuntimeError:
             args, fargs = 1, lambda ea: []
 
-        cindex = math.ceil(math.log(maxindex)/math.log(10)) if maxindex else 1
-        cmaxentry = math.floor(math.log(maxentry)/math.log(16))
-        cmaxaddr = math.floor(math.log(maxaddr)/math.log(16))
-        cminaddr = math.floor(math.log(minaddr)/math.log(16))
-        cchunks = math.floor(math.log(chunks)/math.log(10)) if chunks else 1
-        cmarks = math.floor(math.log(marks)/math.log(10)) if marks else 1
-        cblocks = math.floor(math.log(blocks)/math.log(10)) if blocks else 1
-        cargs = math.floor(math.log(args)/math.log(10)) if args else 1
-        cexits = math.floor(math.log(exits)/math.log(10)) if exits else 1
-        clvars = math.floor(math.log(lvars)/math.log(10)) if lvars else 1
+        cindex = math.ceil(math.log(maxindex or 1)/math.log(10)) if maxindex else 1
+        cmaxentry = math.floor(math.log(maxentry or 1)/math.log(16))
+        cmaxaddr = math.floor(math.log(maxaddr or 1)/math.log(16))
+        cminaddr = math.floor(math.log(minaddr or 1)/math.log(16))
+        cchunks = math.floor(math.log(chunks or 1)/math.log(10)) if chunks else 1
+        cmarks = math.floor(math.log(marks or 1)/math.log(10)) if marks else 1
+        cblocks = math.floor(math.log(blocks or 1)/math.log(10)) if blocks else 1
+        cargs = math.floor(math.log(args or 1)/math.log(10)) if args else 1
+        cexits = math.floor(math.log(exits or 1)/math.log(10)) if exits else 1
+        clvars = math.floor(math.log(lvars or 1)/math.log(10)) if lvars else 1
 
         for index,ea in enumerate(res):
-            print "[{:>{:d}d}] Entry:{:0{:d}x} {:0{:d}x}:{:0{:d}x}({:<{:d}d}) {:<{:d}s} args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
+            print "[{:>{:d}d}] {:#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
                 ea, int(cmaxentry),
                 fminaddr(ea), int(cminaddr), fmaxaddr(ea), int(cmaxaddr),
@@ -482,11 +482,11 @@ class names(object):
 
         maxindex = max(res or [1])
         maxaddr = max(__builtin__.map(idaapi.get_nlist_ea, res) or [idaapi.BADADDR])
-        cindex = math.ceil(math.log(maxindex)/math.log(10))
-        caddr = math.floor(math.log(maxaddr)/math.log(16))
+        cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
+        caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
 
         for index in res:
-            print "[{:>{:d}d}] {:0{:d}x} {:s}".format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index))
+            print "[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index))
         return
 
     @utils.multicase(string=basestring)
@@ -710,10 +710,10 @@ def set_name(ea, string, **listed):
             # that is referenced by an array with a correctly sized pointer inside it
             (r,sidata), = ((r,type.array(r)) for r in xref.data_up(ea))
             if config.bits() == sidata.itemsize*8 and ea in sidata:
-                # which we check to see if it's a switch_info_t
+                # which we check to see if its a switch_info_t
                 si = next(idaapi.get_switch_info_ex(r) for r in xref.data_up(r))
                 if si is not None:
-                    # because it's name has it's local flag cleared
+                    # because its name has its local flag cleared
                     flags |= idaapi.SN_LOCAL
     except: pass
 
@@ -1030,12 +1030,12 @@ class entry(object):
         maxindex = max(res+[1])
         maxaddr = max(__builtin__.map(to_address, res) or [idaapi.BADADDR])
         maxordinal = max(__builtin__.map(idaapi.get_entry_ordinal, res) or [1])
-        cindex = math.ceil(math.log(maxindex)/math.log(10))
-        caddr = math.floor(math.log(maxaddr)/math.log(16))
-        cordinal = math.floor(math.log(maxordinal)/math.log(16))
+        cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
+        caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
+        cordinal = math.floor(math.log(maxordinal or 1)/math.log(16))
 
         for index in res:
-            print "[{:{:d}d}] {:>{:d}x} : ({:{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index))
+            print "[{:{:d}d}] {:>#{:d}x} : ({:#{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index))
         return
 
     @utils.multicase(string=basestring)
@@ -1092,7 +1092,7 @@ class entry(object):
     @utils.multicase(name=basestring, ordinal=six.integer_types)
     @classmethod
     def new(cls, name, ordinal):
-        '''Adds an entry-point with the specified ``name`` to the database using ``ordinal`` as it's index.'''
+        '''Adds an entry-point with the specified ``name`` to the database using ``ordinal`` as its index.'''
         return cls.new(ui.current.address(), name, ordinal)
     @utils.multicase(ea=six.integer_types, name=basestring, ordinal=six.integer_types)
     @classmethod
@@ -1230,7 +1230,7 @@ def tag_write(ea, key, none):
     res = state.pop(key)
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
 
-    # delete it's reference
+    # delete its reference
     if func:
         internal.comment.contents.dec(ea, key)
     else:
@@ -1283,7 +1283,7 @@ def select(tag, *tags, **boolean):
     return select(**boolean)
 @utils.multicase()
 def select(**boolean):
-    '''Fetch all of the functions containing the specified tags within it's declaration'''
+    '''Fetch all of the functions containing the specified tags within its declaration'''
     boolean = dict((k,__builtin__.set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
@@ -1315,7 +1315,7 @@ def selectcontents(tag, *tags, **boolean):
     return selectcontents(**boolean)
 @utils.multicase()
 def selectcontents(**boolean):
-    '''Fetch all of the functions containing the specified tags within it's contents'''
+    '''Fetch all of the functions containing the specified tags within its contents'''
     boolean = dict((k,__builtin__.set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
 
     if not boolean:
@@ -1500,11 +1500,11 @@ class imports(object):
 
         maxaddr = max(__builtin__.map(utils.first, res) or [idaapi.BADADDR])
         maxmodule = max(__builtin__.map(utils.compose(utils.second, utils.first, len), res) or [''])
-        caddr = math.floor(math.log(maxaddr)/math.log(16))
+        caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
         cordinal = max(__builtin__.map(utils.compose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
 
         for ea,(module,name,ordinal) in res:
-            print "{:0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name)
+            print "{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name)
         return
 
     @utils.multicase(string=basestring)
@@ -1787,7 +1787,7 @@ class address(object):
         res = cls.walk(prevea, cls.prev, F)
         if res == idaapi.BADADDR or (cls == address and res < start):
             # FIXME: include registers in message
-            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x}:{:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
+            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x} - {:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2320,7 +2320,7 @@ class type(object):
 
         Example:
         > print type.array(ea)
-        array('u', u'License key is invalid\x00')
+        array('u', u'License key is invalid\\x00')
         > print type.array.element(ea)
         2
         > print type.array.length(ea)
@@ -2452,7 +2452,7 @@ class type(object):
                 # check to see if first element is the correct dataref
                 lastea, = xref.data_down(c)
                 if ea != lastea: raise TypeError
-                # then copy the first element since it's been decoded already
+                # then copy the first element since its been decoded already
                 each.add(sidata[0])
 
                 # ensure that each element matches
@@ -2972,7 +2972,7 @@ def mark(ea, description):
 
 class extra(object):
     """
-    Allow one to manipulate the extra comments that suffix or prefix a given address
+    Allow one to manipulate the extra comments that suffix or prefix a given address.
     """
 
     MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
@@ -3266,6 +3266,11 @@ class extra(object):
 ex = extra
 
 class set(object):
+    """
+    Sets values (or really types) of addresses within the database.
+
+    Returns the size of the item that the type was successfully applied to.
+    """
     @utils.multicase()
     @classmethod
     def unknown(cls):
@@ -3310,15 +3315,22 @@ class set(object):
         """
         lookup = {
             1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWRD,
-            8 : idaapi.FF_QWRD, 16 : idaapi.FF_OWRD
+            8 : idaapi.FF_QWRD
         }
-        type = type['type'] if 'type' in type else lookup[size]
+
+        # Older versions of IDA might not define FF_OWRD, so we just
+        # try and add if its available. We fall back to an array anyways.
+        if hasattr(idaapi, 'FF_OWRD'): lookup[16] = idaapi.FF_OWRD
+
+        res = type['type'] if 'type' in type else lookup[size]
         if idaapi.__version__ < 7.0:
-            ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(type, structure.structure_t) else type, size, type.id if isinstance(type, structure.structure_t) else 0)
-        elif isinstance(type, structure.structure_t):
-            ok = idaapi.create_struct(ea, size, type.id)
+            ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(res, structure.structure_t) else res, size, res.id if isinstance(res, structure.structure_t) else 0)
+        elif isinstance(res, structure.structure_t):
+            ok = idaapi.create_struct(ea, size, res.id)
+        elif res == idaapi.FF_ALIGN and hasattr(idaapi, 'create_align'):
+            ok = idaapi.create_align(ea, size, 0)
         else:
-            ok = idaapi.create_data(ea, type, size, 0)
+            ok = idaapi.create_data(ea, res, size, 0)
         return idaapi.get_item_size(ea) if ok else 0
 
     @utils.multicase()
@@ -3332,7 +3344,10 @@ class set(object):
         '''Set the data at address ``ea`` as aligned with the specified ``alignment``.'''
         if not type.is_unknown(ea):
             raise TypeError("{:s}.set.align({:#x}, ...) : Data at specified address has already been defined.".format('.'.join((__name__,cls.__name__)), ea))
-        res = alignment.get('alignment', alignment.get('size', address.next(ea)-ea))
+        res = alignment.get('alignment', alignment.get('size', address.next(ea) - ea))
+        # FIXME: figure out how to properly calculate the alignment
+        #        and allow the users to choose it. the alignment arg
+        #        for idaapi.create_align is a power of 2.
         return cls.data(ea, res, type=idaapi.FF_ALIGN)
     aligned = utils.alias(align, 'set')
 
@@ -3436,6 +3451,11 @@ class set(object):
         raise NotImplementedError
 
 class get(object):
+    """
+    Reads the value from an address within the database.
+
+    Unless specified otherwise, the size and type will correspond with what is specified by the database.
+    """
     @utils.multicase()
     @classmethod
     def unsigned(cls, **byteorder):
@@ -3624,21 +3644,31 @@ class get(object):
             idaapi.FF_BYTE : 'B',
             idaapi.FF_WORD : 'H',
             idaapi.FF_DWRD : 'L',
-            idaapi.FF_QWRD : 'Q',
             idaapi.FF_FLOAT : 'f',
             idaapi.FF_DOUBLE : 'd',
         }
+
+        # Some 32-bit versions of python might not have array.array('Q')
+        # and some versions of IDA also might not have FF_QWRD..
         try:
             array.array('Q')
             numerics[idaapi.FF_QWRD] = 'Q'
-        except ValueError:
+        except (AttributeError,ValueError):
             pass
+
         lnumerics = {
             idaapi.FF_QWRD : 8,
             idaapi.FF_OWORD : 16,
-            idaapi.FF_YWORD : 32,
-            idaapi.FF_ZWORD : 64,
         }
+
+        # FF_YWORD and FF_ZWORD might not exist in older versions of IDA
+        # so try to add them to lnumerics "softly".
+        try:
+            lnumerics[idaapi.FF_YWORD] = 32
+            lnumerics[idaapi.FF_ZWORD] = 64
+        except AttributeError:
+            pass
+
         strings = {
             1 : 'c',
             2 : 'u',

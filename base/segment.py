@@ -58,13 +58,13 @@ def list(**type):
     maxaddr = max(__builtin__.map(operator.attrgetter('endEA'), res) or [1])
     maxsize = max(__builtin__.map(operator.methodcaller('size'), res) or [1])
     maxname = max(__builtin__.map(utils.compose(idaapi.get_true_segm_name,len), res) or [1])
-    cindex = math.ceil(math.log(maxindex)/math.log(10))
-    caddr = math.ceil(math.log(maxaddr)/math.log(16))
-    csize = math.ceil(math.log(maxsize)/math.log(16))
+    cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
+    caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
+    csize = math.ceil(math.log(maxsize or 1)/math.log(16))
 
     for seg in res:
         comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
-        print("[{:{:d}d}] {:0{:d}x}:{:0{:d}x} {:>{:d}s} {:<+#{:d}x} sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), maxname, seg.size(), int(csize), seg.sel, seg.flags, "// {:s}".format(comment) if comment else ''))
+        print("[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), seg.size(), int(csize), idaapi.get_true_segm_name(seg), maxname, seg.sel, seg.flags, "// {:s}".format(comment) if comment else ''))
     return
 
 ## searching
@@ -79,23 +79,23 @@ def by_selector(selector):
     '''Return the segment associated with ``selector``.'''
     s = idaapi.get_segm_by_sel(selector)
     if s is None:
-        raise LookupError("{:s}.by_selector({:x}) : Unable to locate segment".format(__name__, selector))
+        raise LookupError("{:s}.by_selector({:#x}) : Unable to locate segment".format(__name__, selector))
     return s
 bySelector = utils.alias(by_selector)
 def by_address(ea):
     '''Return the segment that contains the specified ``ea``.'''
     s = idaapi.getseg(interface.address.within(ea))
     if s is None:
-        raise LookupError("{:s}.by_address({:x}) : Unable to locate segment".format(__name__, ea))
+        raise LookupError("{:s}.by_address({:#x}) : Unable to locate segment".format(__name__, ea))
     return s
 byAddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
 def by(segment):
-    '''Return a segment by it's segment_t.'''
+    '''Return a segment by its segment_t.'''
     return segment
 @utils.multicase(name=basestring)
 def by(name):
-    '''Return the segment by it's ``name``.'''
+    '''Return the segment by its ``name``.'''
     return by_name(name)
 @utils.multicase(ea=six.integer_types)
 def by(ea):
@@ -356,18 +356,18 @@ def contains(segment, ea):
 # shamefully ripped from idc.py
 def _load_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
-    li = idaapi.open_linput(path, False)
-    if not li:
-        raise IOError("{:s}.load_file({!r}, {:x}, {:#x}) : Unable to create loader_input_t : {:s}".format(__name__, filename, ea, size, path))
-    res = idaapi.file2base(li, offset, ea, ea+size, True)
-    idaapi.close_linput(li)
-    return res
+    res = idaapi.open_linput(path, False)
+    if not res:
+        raise IOError("{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create loader_input_t : {:s}".format(__name__, filename, ea, size, path))
+    ok = idaapi.file2base(res, offset, ea, ea+size, False)
+    idaapi.close_linput(res)
+    return ok
 
 def _save_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     of = idaapi.fopenWB(path)
     if not of:
-        raise IOError("{:s}.save_file({!r}, {:x}, {:#x}) : Unable to open target file : {:s}".format(__name__, filename, ea, size, path))
+        raise IOError("{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file : {:s}".format(__name__, filename, ea, size, path))
     res = idaapi.base2file(of, offset, ea, ea+size)
     idaapi.eclose(of)
     return res
@@ -380,12 +380,11 @@ def load(filename, ea, size=None, offset=0, **kwds):
     """
     filesize = os.stat(filename).st_size
 
-    if size is None:
-        size = filesize - offset
-    res = _load_file(filename, size, ea, offset)
+    cb = filesize - offset if size is None else size
+    res = _load_file(filename, ea, cb, offset)
     if not res:
-        raise IOError("{:s}.load({!r}, {:x}, {:#x}, {:x}) : Unable to load file into {:#x}:{:+#x} : {:s}".format(__name__, filename, ea, size, offset, ea, size, os.path.relpath(filename)))
-    return create(ea, size, kwds.get('name', os.path.split(filename)[1]))
+        raise IOError("{:s}.load({!r}, {:#x}, {:+#x}, {:#x}) : Unable to load file into {:#x}:{:+#x} : {:s}".format(__name__, filename, ea, cb, offset, ea, cb, os.path.relpath(filename)))
+    return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
 
 def map(ea, size, newea, **kwds):
     """Map ``size`` bytes of data from ``ea`` into a new segment at ``newea``.
@@ -393,11 +392,11 @@ def map(ea, size, newea, **kwds):
     """
     fpos,data = idaapi.get_fileregion_offset(ea),database.read(ea, size)
     if len(data) != size:
-        raise ValueError("{:s}.map({:x}, {:#x}, {:x}) : Unable to read {:#x} bytes from {:#x}".format(__name__, ea, size, newea, size, ea))
+        raise ValueError("{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to read {:#x} bytes from {:#x}".format(__name__, ea, size, newea, size, ea))
     res = idaapi.mem2base(data, newea, fpos)
     if not res:
-        raise ValueError("{:s}.map({:x}, {:#x}, {:x}) : Unable to remap {:#x}:{:+#x} to {:#x}".format(__name__, ea, size, newea, ea, size, newea))
-    return create(newea, size, kwds.get("name', 'map_{:x}".format(ea)))
+        raise ValueError("{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to remap {:#x}:{:+#x} to {:#x}".format(__name__, ea, size, newea, ea, size, newea))
+    return new(newea, size, kwds.get("name', 'map_{:x}".format(ea)))
     #return create(newea, size, kwds.get("name', 'map_{:s}".format(newea>>4)))
 
 # creation/destruction
@@ -415,8 +414,8 @@ def new(offset, size, name, **kwds):
 
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits()) # FIXME: use disassembler default bit length instead of 32
 
+    ## create a selector with the requested origin
     if bits == 16:
-        ## create a selector with the requested origin
         org = kwds.get('org',0)
         if org&0xf > 0:
             logging.fatal("{:s}.new({:x}, {:x}, {!r}, {!r}) : origin (.org) is not aligned to the size of a paragraph (0x10) : {:x}".format(__name__, offset, size, name, kwds, org))
@@ -425,9 +424,24 @@ def new(offset, size, name, **kwds):
         para = offset/16
         sel = idaapi.allocate_selector(para)
         idaapi.set_selector(sel, (para-kwds.get('org',0)/16)&0xffffffff)
+
+    ## if the user specified a selector, then use it
+    elif 'sel' in kwds or 'selector' in kwds:
+        sel = kwds.get('sel', kwds.get('selector', idaapi.find_free_selector()))
+
+    ## choose the paragraph size defined by the user
+    elif 'para' in kwds or 'paragraphs' in kwds:
+        para = kwds.get('paragraph', kwds.get('para', 1))
+        sel = idaapi.setup_selector(res)
+
+    ## find a selector that is 1 paragraph size,
+    elif idaapi.get_selector_qty():
+        sel = idaapi.find_selector(1)
+
+    # otherwise find a free one and set it.
     else:
-        ## auto-create a selector for everything else
-        sel = idaapi.setup_selector(kwds['selector']) if 'selector' in kwds else idaapi.find_free_selector()
+        sel = idaapi.find_free_selector()
+        idaapi.set_selector(sel, 1)
 
     # create segment. ripped from idc
     s = idaapi.segment_t()

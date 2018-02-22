@@ -58,12 +58,15 @@ class register_t(interface.symbol_t):
             return self.name.lower() == other.lower()
         return self is other
 
+    def __ne__(self, other):
+        return not (self == other)
+
     def __contains__(self, other):
-        '''Returns True if the register ``other`` is a sub-register of ``self``.'''
+        '''Returns True if the ``other`` register is a sub-register of ``self``.'''
         return other in self.children.values()
 
     def subsetQ(self, other):
-        '''Returns True if the register ``other`` is a part of ``self``.'''
+        '''Returns True if the ``other`` register is a part of ``self``.'''
         def collect(node):
             res = set([node])
             [res.update(collect(n)) for n in node.children.values()]
@@ -71,7 +74,7 @@ class register_t(interface.symbol_t):
         return other in self.alias or other in collect(self)
 
     def supersetQ(self, other):
-        '''Returns True if the register ``other`` is a superset of ``self``.'''
+        '''Returns True if the ``other`` register is a superset of ``self``.'''
         res,pos = set(),self
         while pos is not None:
             res.add(pos)
@@ -79,7 +82,7 @@ class register_t(interface.symbol_t):
         return other in self.alias or other in res
 
     def relatedQ(self, other):
-        '''Returns True if the the register ``other`` affects ``self`` when it's modified'''
+        '''Returns True if the ``other`` register affects ``self`` when it's modified'''
         return self.supersetQ(other) or self.subsetQ(other)
 
 class map_t(object):
@@ -161,14 +164,14 @@ class architecture_t(object):
         return res
 
     def by_index(self, index):
-        """Lookup a register according to it's ``index``.
+        """Lookup a register according to its ``index``.
         Size is the default that's set according to the IDA version.
         """
         res = idaapi.ph.regnames[index]
         return self.by_name(res)
     byIndex = utils.alias(by_index, 'architecture')
     def by_indextype(self, index, dtyp):
-        """Lookup a register according to it's ``index`` and ``dtyp``.
+        """Lookup a register according to its ``index`` and ``dtyp``.
         Some examples of dtypes: idaapi.dt_byte, idaapi.dt_word, idaapi.dt_dword, idaapi.dt_qword
         """
         res = idaapi.ph.regnames[index]
@@ -176,7 +179,7 @@ class architecture_t(object):
         return getattr(self.__register__, name)
     byIndexType = utils.alias(by_indextype, 'architecture')
     def by_name(self, name):
-        '''Lookup a register according to it's ``name``.'''
+        '''Lookup a register according to its ``name``.'''
         if any(name.startswith(prefix) for prefix in ('%', '$')):        # at&t, mips
             return getattr(self.__register__, name[1:].lower())
         if name.lower() in self.__register__:
@@ -184,7 +187,7 @@ class architecture_t(object):
         return getattr(self.__register__, name)
     byName = utils.alias(by_name, 'architecture')
     def by_indexsize(self, index, size):
-        '''Lookup a register according to it's ``index`` and ``size``.'''
+        '''Lookup a register according to its ``index`` and ``size``.'''
         dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, ord) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         dtyp = dtype_by_size(size)
         return self.by_indextype(index, dtyp)
@@ -307,9 +310,7 @@ def ops_repr():
 def ops_repr(ea):
     '''Returns a tuple of the repr of all the operands at the instruction at the address ``ea``.'''
     insn = at(ea)
-    outop = utils.compose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.compose(idaapi.print_operand, idaapi.tag_remove)
-    res = (outop(insn.ea, n) for n in range(ops_count(insn.ea)))
-    return tuple(res or str(op_value(insn.ea, i)) for i, res in enumerate(res))
+    return tuple(op_repr(ea, n) for n in range(ops_count(insn.ea)))
 
 @utils.multicase()
 def ops_value():
@@ -424,7 +425,7 @@ def operand(ea, none):
         return tuple(op.copy() for op in res)
     res = ((idaapi.op_t(), op) for op in res)
     return tuple([n.assign(op), n][1] for n, op in res)
-    
+
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def operand(ea, n):
     '''Returns the ``n``th op_t of the instruction at the address ``ea``.'''
@@ -443,8 +444,14 @@ def op_repr(n):
 def op_repr(ea, n):
     '''Returns a repr of the ``n``th operand of the instruction at the address ``ea``.'''
     insn = at(ea)
+    oppr = idaapi.ua_outop2 if idaapi.__version__ < 7.0 else idaapi.print_operand
     outop = utils.compose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.compose(idaapi.print_operand, idaapi.tag_remove)
-    return outop(insn.ea, n) or str(op_value(insn.ea, n))
+    try:
+        res = outop(insn.ea, n) or str(op_value(insn.ea, n))
+    except ValueError, e:
+        logging.warn("{:s}({:#x}, {:d}) : Unable to strip tags from operand. Returning the result from {:s} instead. : {!r}".format('.'.join((__name__,'op_repr')), ea, n, '.'.join((__name__,'op_value')), oppr(insn.ea, n)))
+        return str(op_value(insn.ea, n))
+    return res
 
 @utils.multicase(n=six.integer_types)
 def op_state(n):
@@ -530,6 +537,7 @@ def op_segment(ea, n):
     if segment:
         global architecture
         return architecture.by_index(segment)
+    return None
     raise NotImplementedError("{:s}.op_segment({:x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
 
 ## flags
@@ -642,7 +650,7 @@ def op_refs(ea, n):
         if not ok:
             raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to get structure id for operand. : {:x}".format(__name__, ea, n, ea))
 
-        # get the structure offset and then figure it's member
+        # get the structure offset and then figure its member
         addr = operator.attrgetter('value' if idaapi.__version__ < 7.0 else 'addr')     # FIXME: this will be incorrect for an offsetted struct
         memofs = addr(operand(ea, n))
 
@@ -1001,7 +1009,7 @@ class operand_types:
         addr, size = op.addr, idaapi.get_dtyp_size(op.dtyp)
         maxval = 1<<size*8
 
-        # dereference the address and return it's integer.
+        # dereference the address and return its integer.
         res = idaapi.get_many_bytes(addr, size) or ''
         res = reversed(res) if database.config.byteorder() == 'little' else iter(res)
         res = reduce(lambda t,c: (t*0x100) | ord(c), res, 0)

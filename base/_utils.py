@@ -6,24 +6,24 @@ import six,types,heapq,collections
 import multiprocessing,Queue
 import idaapi
 
-__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','itake','iget','imap','ifilter']
+__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
 # box any specified arguments
 fbox = fboxed = box = boxed = lambda *a: a
 # return a closure that executes ``f`` with the arguments unboxed.
-funbox = unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple,ap), ())), **__builtin__.dict(k.items() + kp.items()))
+funbox = unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple, ap), ())), **__builtin__.dict(k.items() + kp.items()))
 # return a closure that will check that ``object`` is an instance of ``type``.
 finstance = lambda type: lambda object: isinstance(object, type)
 # return a closure that always returns ``object``.
-fconstant = fconst = lambda object: lambda *a, **k: object
-# a closure that returns it's argument
+fconstant = fconst = falways = always = lambda object: lambda *a, **k: object
+# a closure that returns its argument
 fpassthru = fpass = fidentity = fid = lambda object: object
 # return the first, second, or third item of a box.
 first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right
-fcompose = compose = lambda *f: __builtin__.reduce(lambda f1,f2: lambda *a: f1(f2(*a)), __builtin__.reversed(f))
+fcompose = compose = lambda *f: __builtin__.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), __builtin__.reversed(f))
 # return a closure that executes function ``f`` whilst discarding any extra arguments
 fdiscard = lambda f: lambda *a, **k: f()
 # return a closure that executes function ``crit`` and then executes ``f`` or ``t`` based on whether or not it's successful.
@@ -31,14 +31,14 @@ fcondition = fcond = lambda crit: lambda t, f: \
     lambda *a, **k: t(*a, **k) if crit(*a, **k) else f(*a, **k)
 # return a closure that takes a list of functions to execute with the provided arguments
 fmaplist = fap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
-#lazy = lambda f, state={}: lambda *a, **k: state[(f,a,__builtin__.tuple(__builtin__.sorted(k.items())))] if (f,a,__builtin__.tuple(__builtin__.sorted(k.items()))) in state else state.setdefault((f,a,__builtin__.tuple(__builtin__.sorted(k.items()))), f(*a, **k))
+#lazy = lambda f, state={}: lambda *a, **k: state[(f, a, __builtin__.tuple(__builtin__.sorted(k.items())))] if (f, a, __builtin__.tuple(__builtin__.sorted(k.items()))) in state else state.setdefault((f, a, __builtin__.tuple(__builtin__.sorted(k.items()))), f(*a, **k))
 #lazy = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **dict(k.items() + kp.items()))
 # return a memoized closure that's lazy and only executes when evaluated
 def flazy(f, *a, **k):
     sortedtuple, state = fcompose(__builtin__.sorted, __builtin__.tuple), {}
     def lazy(*ap, **kp):
         A, K = a+ap, sortedtuple(k.items() + kp.items())
-        return state[(A,K)] if (A,K) in state else state.setdefault((A,K), f(*A, **__builtin__.dict(k.items()+kp.items())))
+        return state[(A, K)] if (A, K) in state else state.setdefault((A, K), f(*A, **__builtin__.dict(k.items()+kp.items())))
     return lazy
 fmemo = flazy
 # return a closure with the function's arglist partially applied
@@ -58,6 +58,12 @@ def fcatch(f, *a, **k):
         except: return sys.exc_info()[1], __builtin__.None
     return functools.partial(fcatch, *a, **k)
 fexc = fexception = fcatch
+# boolean inversion of the result of a function
+fcomplement = fnot = complement = frpartial(fcompose, operator.not_)
+# converts a list to an iterator, or an iterator to a list
+ilist, liter = compose(list, iter), compose(iter, list)
+# converts a tuple to an iterator, or an iterator to a tuple
+ituple, titer = compose(tuple, iter), compose(iter, tuple)
 # take ``count`` number of elements from an iterator
 itake = lambda count: compose(iter, fap(*(next,)*count), tuple)
 # get the ``nth`` element from an iterator
@@ -110,7 +116,7 @@ class multicase(object):
 
     def __new__(cls, *other, **t_args):
         def result(wrapped):
-            # extract the FunctionType and it's arg types
+            # extract the FunctionType and its arg types
             cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
             args, defaults, (star, starstar) = cls.ex_args(func)
             s_args = 1 if isinstance(wrapped, (classmethod, types.MethodType)) else 0
@@ -125,7 +131,7 @@ class multicase(object):
             else:
                 ok = False
 
-            # so, a wrapper was found and we need to steal it's cache
+            # so, a wrapper was found and we need to steal its cache
             res = ok and cls.ex_function(prev)
             if ok and hasattr(res, cls.cache_name):
                 cache = getattr(res, cls.cache_name)
@@ -157,7 +163,7 @@ class multicase(object):
             # now we can update the docs
             res.__doc__ = cls.document(func.__name__, [n for _, n in cache])
 
-            # ..and then restore the wrapper to it's former glory
+            # ..and then restore the wrapper to its former glory
             return cons(res)
 
         if len(other) > 1:

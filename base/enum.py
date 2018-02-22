@@ -337,7 +337,7 @@ class member(object):
     @utils.multicase(n=six.integer_types)
     @classmethod
     def by(cls, enum, n):
-        '''Return the member belonging to ``enum`` identified by it's index, or it's id.'''
+        '''Return the member belonging to ``enum`` identified by its index, or its id.'''
         bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
         highbyte = 0xff << (bits-8)
         if n & highbyte == highbyte:

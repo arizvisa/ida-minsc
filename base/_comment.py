@@ -7,7 +7,7 @@ Each comment stores a dictionary that has the following format:
     [key2] value2
     ...
 
-If a comment does not follow the specified format, then it is assumed that the comment's value is unencoded and it's key is "" (empty). This implies that if your comment at an address is simply "HeapHandle", then it's dictionary is {'':'HeapHandle'}. Most basic pythonic objects can be stored, if one needs to store a more complex type it is suggested that the developer either marshal/pickle it and then base64 encode it at a given address w/ a key.
+If a comment does not follow the specified format, then it is assumed that the comment's value is unencoded and its key is "" (empty). This implies that if your comment at an address is simply "HeapHandle", then its dictionary is {'':'HeapHandle'}. Most basic pythonic objects can be stored, if one needs to store a more complex type it is suggested that the developer either marshal/pickle it and then base64 encode it at a given address w/ a key.
 
 Some value types are encoded in order to retain any specific information about the value as well as to allow a user to read the value's immediate contents. For example:
 
@@ -332,7 +332,7 @@ def emit_line(key, value):
 ### Encoding and decoding of a comment
 def decode(data, default=''):
     """Decode all the (key, value) pairs from the string ``data`` delimited by newlines.
-    
+
     If unable to decode the key and value from a line in ``data``, then use ``default`` as the key name.
     """
     res = {}

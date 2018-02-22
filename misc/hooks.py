@@ -95,7 +95,7 @@ class address(comment):
 #                if internal.comment.check(new): idaapi.set_cmt(ea, internal.comment.encode(n), repeatable)
 #                # write the comment back if it's non-empty
 #                elif new: idaapi.set_cmt(ea, new, repeatable)
-#                # otherwise, remove it's reference since it's being deleted
+#                # otherwise, remove its reference since it's being deleted
 #                else: cls._delete_refs(ea, n)
 
                 if internal.comment.check(new): idaapi.set_cmt(ea, internal.comment.encode(n), rpt)
@@ -189,7 +189,7 @@ class globals(comment):
 #                if internal.comment.check(new): idaapi.set_func_cmt(fn, internal.comment.encode(n), True)
 #                # otherwise, write the comment back as long as it's valid
 #                elif new: idaapi.set_func_cmt(fn, new, True)
-#                # otherwise, the user has deleted it..so update it's refs.
+#                # otherwise, the user has deleted it..so update its refs.
 #                else: cls._delete_refs(fn, n)
 
                 # write the tag back to the function

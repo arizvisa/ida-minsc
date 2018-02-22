@@ -51,6 +51,15 @@ class current(object):
     def symbol(cls):
         """Return the symbol name directly under the cursor"""
         return idaapi.get_highlighted_identifier()
+    @classmethod
+    def selection(cls):
+        view = idaapi.get_current_viewer()
+        left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
+        ok = idaapi.read_selection(view, left, right)
+        if not ok:
+            raise StandardError("{:s}.selection : Unable to read selection.".format('.'.join((__name__,cls.__name__))))
+        pl_l, pl_r = left.place(view), right.place(view)
+        return database.address.head(pl_l.ea), database.address.tail(pl_r.ea)
 
 try:
     import PyQt5.Qt

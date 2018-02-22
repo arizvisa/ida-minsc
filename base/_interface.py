@@ -303,7 +303,7 @@ class address(object):
 
         res = idaapi.get_item_head(ea)
         if res != ea:
-            logging.warn("{:s} : Address {:x} not aligned to the beginning of an item. Fixing it to {:x}.".format(entryframe.f_code.co_name, ea, res))
+            logging.warn("{:s} : Address {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, ea, res))
             ea = res
         return ea
     @classmethod
@@ -314,10 +314,10 @@ class address(object):
         res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
         # FIXME: off-by-one here, as end can be the size of the db.
         if res_start != start:
-            logging.warn("{:s} : Starting address of {:x} not aligned to the beginning of an item. Fixing it to {:x}.".format(entryframe.f_code.co_name, start, res_start))
+            logging.warn("{:s} : Starting address of {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
             start = res_start
         if res_end != end:
-            logging.warn("{:s} : Ending address of {:x} not aligned to the beginning of an item. Fixing it to {:x}.".format(entryframe.f_code.co_name, end, res_end))
+            logging.warn("{:s} : Ending address of {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
             end = res_end
         return start, end
     @classmethod
@@ -360,7 +360,7 @@ class address(object):
 
         if not cls.__within__(ea):
             l, r = cls.__bounds__()
-            raise StandardError("{:s} : Address {:x} not within bounds of database ({:x} - {:x}.)".format(entryframe.f_code.co_name, ea, l, r))
+            raise StandardError("{:s} : Address {:#x} not within bounds of database ({:#x}<>{:#x}.)".format(entryframe.f_code.co_name, ea, l, r))
         return ea
     @classmethod
     def __within2__(cls, start, end):
@@ -373,7 +373,7 @@ class address(object):
         # FIXME: off-by-one here, as end can be the size of the db.
         if any(not cls.__within__(ea) for ea in (start, end-1)):
             l, r = cls.__bounds__()
-            raise StandardError("{:s} : Address range ({:x} - {:x}) not within bounds of database ({:x} - {:x}.)".format(entryframe.f_code.co_name, start, end, l, r))
+            raise StandardError("{:s} : Address range ({:#x}<>{:#x}) not within bounds of database ({:#x}<>{:#x}.)".format(entryframe.f_code.co_name, start, end, l, r))
         return start, end
     @classmethod
     def within(cls, *args):

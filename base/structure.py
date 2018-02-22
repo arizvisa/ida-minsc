@@ -272,7 +272,7 @@ def new(name):
     return new(name, 0)
 @utils.multicase(name=basestring, offset=six.integer_types)
 def new(name, offset):
-    '''Returns a new structure ``name`` using ``offset`` as it's base-offset.'''
+    '''Returns a new structure ``name`` using ``offset`` as its base-offset.'''
     id = idaapi.add_struc(idaapi.BADADDR, name)
     assert id != idaapi.BADADDR
     # FIXME: we should probably move the new structure to the end of the list via set_struc_idx
@@ -293,7 +293,7 @@ def remove(name):
     return remove(res)
 @utils.multicase(id=six.integer_types)
 def remove(id):
-    '''Remove a structure by it's index or ``id``.'''
+    '''Remove a structure by its index or ``id``.'''
     res = by(id)
     return remove(res)
 @utils.multicase()
@@ -305,11 +305,11 @@ delete = utils.alias(remove)
 
 @utils.multicase(name=basestring)
 def by(name, **options):
-    '''Return a structure by it's name.'''
+    '''Return a structure by its name.'''
     return by_name(name, **options)
 @utils.multicase(id=six.integer_types)
 def by(id, **options):
-    '''Return a structure by it's index or id.'''
+    '''Return a structure by its index or id.'''
     res = id
     bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
     highbyte = 0xff << (bits-8)
@@ -343,7 +343,7 @@ def search(string):
     return by(like=string)
 
 def by_name(name, **options):
-    '''Return a structure by it's name.'''
+    '''Return a structure by its name.'''
     id = idaapi.get_struc_id(name)
     if id == idaapi.BADADDR:
         raise LookupError("{:s}.by_name({!r}) : Unable to locate structure with given name.".format(__name__, name))
@@ -351,7 +351,7 @@ def by_name(name, **options):
 byName = utils.alias(by_name)
 
 def by_index(index, **options):
-    '''Return a structure by it's index.'''
+    '''Return a structure by its index.'''
     id = idaapi.get_struc_by_idx(index)
     if id == idaapi.BADADDR:
         raise IndexError("{:s}.by_index({:d}) : Unable to locate structure at given index.".format(__name__, index))
@@ -433,7 +433,7 @@ class structure_t(__structure_t):
         if not ok:
             return []
 
-        # collect rest of it's references
+        # collect the rest of its references
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
             refs.append((x.frm, x.iscode, x.type))
@@ -998,7 +998,7 @@ class member_t(object):
         return (max+flag) if flag < 0 else (flag-max) if flag > max else flag
     @property
     def type(self):
-        '''Return the member's type in it's pythonic form.'''
+        '''Return the member's type in its pythonic form.'''
         res = interface.typemap.dissolve(self.flag, self.typeid, self.size)
         if isinstance(res, structure_t):
             res = instance(res.id, offset=self.offset)

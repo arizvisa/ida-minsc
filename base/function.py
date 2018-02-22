@@ -390,7 +390,7 @@ def add():
 @utils.multicase(start=six.integer_types)
 def add(start, **end):
     """Make a function at the address ``start``.
-    If the address ``end`` is specified, then stop processing the function at it's address.
+    If the address ``end`` is specified, then stop processing the function at its address.
     """
     start = interface.address.inside(start)
     end = end.get('end', idaapi.BADADDR)
@@ -410,7 +410,7 @@ def remove(func):
     return idaapi.del_func(fn.startEA)
 
 ## chunks
-# FIXME: put this into it's own class
+# FIXME: put this into its own class
 @utils.multicase()
 def chunks():
     '''Return all the chunks for the current function.'''
@@ -465,7 +465,7 @@ class chunk(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, ea):
-        '''Remove the chunk at ``ea`` it's function.'''
+        '''Remove the chunk at ``ea`` from its function.'''
         return cls.remove(ea, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -497,7 +497,7 @@ def within(ea):
     ea = interface.address.within(ea)
     return idaapi.get_func(ea) is not None
 
-# Checks if ea is contained in function or in any of it's chunks
+# Checks if ea is contained in function or in any of its chunks
 @utils.multicase()
 def contains():
     '''Returns True if the current address is within a function.'''
@@ -653,14 +653,14 @@ class blocks(object):
 
         # for every single block...
         for b in cls.iterate(fn):
-            # ...add an edge to it's predecessors
+            # ...add an edge to its predecessors
             for p in b.preds():
                 # FIXME: find more attributes to add
                 attrs = {}
                 operator.setitem(attrs, '__contiguous__', b.startEA == p.endEA)
                 res.add_edge(p.startEA, b.startEA, attrs)
 
-            # ...add an edge to it's successors
+            # ...add an edge to its successors
             for s in b.succs():
                 # FIXME: find more attributes to add
                 attrs = {}
@@ -1106,11 +1106,11 @@ def get_regs_size(func):
 
 @utils.multicase()
 def get_spdelta():
-    '''Returns the stack delta for the current address within it's function.'''
+    '''Returns the stack delta for the current address within its function.'''
     return get_spdelta(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def get_spdelta(ea):
-    '''Returns the stack delta for the address ``ea`` within it's given function.'''
+    '''Returns the stack delta for the address ``ea`` within its given function.'''
     fn, ea = by_address(ea), interface.address.inside(ea)
     return idaapi.get_spd(fn, ea)
 delta = get_sp = spdelta = utils.alias(get_spdelta)

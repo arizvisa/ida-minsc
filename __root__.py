@@ -21,7 +21,11 @@ def __version__():
 idaapi.__version_major__, idaapi.__version_minor__, idaapi.__version__ = __version__()
 del __version__
 
-#  IDA 6.95 requires these modules to exist in the global namespace
+# IDA 6.9 requires the _idaapi module to exist in the global namespace
+if idaapi.__version__ <= 6.9:
+    import _idaapi
+
+# IDA 6.95 requires these modules to exist in the global namespace
 if idaapi.__version__ >= 6.95:
     import ida_idaapi, ida_kernwin, ida_diskio
 
@@ -39,7 +43,7 @@ h, top, go, goof = database.h, func.top, database.go, database.goof
 
 # functional tools
 import functools, itertools, operator
-fbox,fboxed,box,boxed,funbox,unbox,finstance,fconstant,fpassthru,fpass,fidentity,fid,first,second,third,last,fcompose,compose,fdiscard,fcondition,fmaplist,fap,flazy,fmemo,fpartial,partial,fapply,fcurry,frpartial,freversed,frev,fexc,fexception,fcatch,itake,iget,imap,ifilter = map(functools.partial(getattr, __import__('internal').utils), __import__('internal').utils.__all__)
+fbox,fboxed,box,boxed,funbox,unbox,finstance,fconstant,fpassthru,fpass,fidentity,fid,first,second,third,last,fcompose,compose,fdiscard,fcondition,fmaplist,fap,flazy,fmemo,fpartial,partial,fapply,fcurry,frpartial,freversed,frev,fexc,fexception,fcatch,fcomplement,fnot,ilist,liter,ituple,titer,itake,iget,imap,ifilter = map(functools.partial(getattr, __import__('internal').utils), __import__('internal').utils.__all__)
 
 # pattern matching
 AnyRegister = AnyReg = __import__('internal').utils.PatternAnyType(instruction.register_t)
