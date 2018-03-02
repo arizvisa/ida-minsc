@@ -31,9 +31,15 @@ if idaapi.__version__ >= 6.95:
 
 ## contextual modules
 import segment, database, function, instruction
-import structure, enum
+import structure, enumeration
 
-import database as db, function as func, instruction as ins, structure as struc, segment as seg, segment as seg
+# aliases for them
+import database as db
+import function as func
+import instruction as ins
+import structure as struc
+import enumeration as enum
+import segment as seg
 
 # default logging that displays any info
 __import__('logging').root.level = __import__('logging').INFO

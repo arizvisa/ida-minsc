@@ -3,7 +3,7 @@ import itertools, functools, operator
 import six, types, collections
 
 import database, function, ui
-import structure, enum
+import structure, enumeration
 import internal
 from internal import utils, interface
 
@@ -683,7 +683,7 @@ def op_refs(ea, n):
 
     # enums
     elif ok and res.tid != idaapi.BADADDR:
-        e = enum.by_identifier(res.tid)
+        e = enumeration.by_identifier(res.tid)
         # enums are defined in a altval at index 0xb+opnum
         # the int points straight at the enumeration id
         # FIXME: references to enums don't seem to work

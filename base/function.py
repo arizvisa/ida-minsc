@@ -430,6 +430,9 @@ def chunks(func):
     return
 
 class chunk(object):
+    """
+    Modify the chunks associated with a given function.
+    """
     @utils.multicase()
     def __new__(cls):
         '''Return a tuple containing the bounds of the function chunk at the current address.'''
@@ -555,6 +558,9 @@ def arguments(func):
 args = utils.alias(arguments)
 
 class blocks(object):
+    """
+    Interact with all the basic-blocks within the specified function.
+    """
     @utils.multicase()
     def __new__(cls):
         '''Return the bounds of each basic-block for the current function.'''
@@ -674,6 +680,9 @@ class blocks(object):
     # FIXME: Implement .search for filtering blocks
 
 class block(object):
+    """
+    Interact with a specific basic-block within the given function.
+    """
     @utils.multicase()
     @classmethod
     def id(cls):
@@ -1457,6 +1466,9 @@ def switches(func):
     return
 
 class type(object):
+    """
+    Query any information about the type of the given function.
+    """
     @utils.multicase()
     @classmethod
     def has_noframe(cls):

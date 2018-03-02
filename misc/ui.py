@@ -12,7 +12,8 @@ import internal,database,segment,function,instruction as ins,structure
 # find the QAction associated with a command (or keypress)
 
 class current(object):
-    """Fetching things from current visual state.
+    """
+    Fetching things from current visual state.
 
     Pretty much used for doing friendly user-interface type stuff.
     """
@@ -200,6 +201,9 @@ class InputBox(idaapi.PluginForm):
         return super(InputBox,self).Show(caption, options)
 
 class Names(object):
+    """
+    Getting information about the Names window.
+    """
     @classmethod
     def size(cls):
         return idaapi.get_nlist_size()
@@ -227,7 +231,9 @@ class Names(object):
         return
 
 class Strings(object):
-    """Grabbing contents from the Strings window"""
+    """
+    Grabbing contents from the Strings window
+    """
 
     @classmethod
     def on_openidb(cls, code, is_old_database):
@@ -471,6 +477,12 @@ def sourcechain(fn, *args, **kwds):
 # for exposing the ability queueing functions asynchronously..
 # which is probably pretty unsafe in IDA, but let's hope.
 class queue(object):
+    """
+    Exposes the ability to queue the execution of functions so they
+    run asynchronously.
+
+    This is probably pretty unsafe in IDA, but let's hope.
+    """
     @classmethod
     def __start_ida__(cls):
         if hasattr(cls, 'execute') and not cls.execute.dead:
@@ -504,8 +516,10 @@ class queue(object):
     def pop(cls):
         return next(cls.execute)
 
-# for exposing the ability to hook different parts of IDA
 class hook(object):
+    """
+    Exposes the ability of hooking different parts of IDA.
+    """
     @classmethod
     def __start_ida__(cls):
         api = [

@@ -230,7 +230,8 @@ def list(**type):
 
 ## members
 class member(object):
-    '''This class allows one to interact with the members of a defined enumeration.
+    """
+    This class allows one to interact with the members of a defined enumeration.
 
     Examples:
         e = enum.byName('example_enumeration')
@@ -252,7 +253,7 @@ class member(object):
             print enum.member.name(n)
             print enum.member.value(n)
             print enum.member.comment(n)
-    '''
+    """
 
     @classmethod
     def parent(cls, mid):
