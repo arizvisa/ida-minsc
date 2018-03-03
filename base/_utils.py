@@ -300,7 +300,7 @@ class multicase(object):
 
 class alias(object):
     def __new__(cls, other, klass=None):
-        cons,func = multicase.reconstructor(other), multicase.ex_function(other)
+        cons, func = multicase.reconstructor(other), multicase.ex_function(other)
         if isinstance(other, types.MethodType) or klass:
             module = (func.__module__, klass or other.im_self.__name__)
         else:

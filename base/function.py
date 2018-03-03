@@ -251,20 +251,6 @@ def prototype(func):
         result = internal.declaration.demangle(funcname)
     return result
 
-@utils.multicase()
-def frame():
-    '''Return the frame of the current function.'''
-    return frame(ui.current.function())
-@utils.multicase()
-def frame(func):
-    '''Return the frame of the function ``func``.'''
-    fn = by(func)
-    res = idaapi.get_frame(fn.startEA)
-    if res is not None:
-        return structure.instance(res.id, offset=-fn.frsize)
-    logging.info("{:s}.frame({:#x}) : Function {:s} does not have a frame.".format(__name__, fn.startEA, name(fn.startEA)))
-    return structure.instance(idaapi.BADADDR)
-
 # FIXME: fix the naming
 @utils.multicase()
 def range():
@@ -277,6 +263,7 @@ def range(func):
     if fn is None:
         raise ValueError("{:s}.range({!r}) : Specified location is not contained within a function.".format(__name__, func, ea))
     return fn.startEA, fn.endEA
+bounds = utils.alias(range)
 
 @utils.multicase(none=types.NoneType)
 def set_color(none):
@@ -410,28 +397,32 @@ def remove(func):
     return idaapi.del_func(fn.startEA)
 
 ## chunks
-# FIXME: put this into its own class
-@utils.multicase()
-def chunks():
-    '''Return all the chunks for the current function.'''
-    return chunks(ui.current.function())
-@utils.multicase()
-def chunks(func):
-    '''Return all the chunks for the function ``func``.'''
-    fn = by(func)
-    fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
-    if not fci.main():
-        raise ValueError("{:s}.chunks({:#x}) : Unable to create a func_tail_iterator_t".format(__name__, fn.startEA))
+class chunks(object):
+    """
+    List all the chunks associated with a given function.
+    """
+    @utils.multicase()
+    def __new__(cls):
+        '''Yield the bounds of each chunk within current function.'''
+        return chunks(ui.current.function())
 
-    while True:
-        ch = fci.chunk()
-        yield ch.startEA, ch.endEA
-        if not fci.next(): break
-    return
+    @utils.multicase()
+    def __new__(cls, func):
+        '''Yield the bounds of each chunk for the function ``func``.'''
+        fn = by(func)
+        fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
+        if not fci.main():
+            raise ValueError("{:s}.chunks({:#x}) : Unable to create a func_tail_iterator_t".format(__name__, fn.startEA))
+
+        while True:
+            ch = fci.chunk()
+            yield ch.startEA, ch.endEA
+            if not fci.next(): break
+        return
 
 class chunk(object):
     """
-    Modify the chunks associated with a given function.
+    Modify a specific chunk associated with a given function.
     """
     @utils.multicase()
     def __new__(cls):
@@ -518,45 +509,6 @@ def contains(func, ea):
     ea = interface.address.within(ea)
     return any(start <= ea < end for start,end in chunks(fn))
 
-@utils.multicase()
-def arguments():
-    '''Returns the arguments for the current function.'''
-    return arguments(ui.current.address())
-@utils.multicase()
-def arguments(func):
-    """Yields the arguments for the function ``func`` in order.
-    Each result is of the format (offset into stack, name, size).
-    """
-    try:
-        fn = by(func)
-
-    except LookupError:
-        target = func
-        database.imports.get(target)
-
-        # grab from declaration
-        o = 0
-        for arg in internal.declaration.arguments(target):
-            sz = internal.declaration.size(arg)
-            yield o,arg,sz
-            o += sz
-        return
-
-    # grab from structure
-    fr = idaapi.get_frame(fn)
-    if fr is None:  # unable to figure out arguments
-        raise LookupError("{:s}.arguments({:#x}) : Unable to determine function frame.".format(__name__, fn.startEA))
-
-    # FIXME: figure out calling convention and grab correct arguments
-    if database.config.bits() != 32:
-        logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to {:d}-bit calling convention.".format(__name__, fn.startEA, database.config.bits()))
-
-    base = get_vars_size(fn)+get_regs_size(fn)
-    for (off,size),(name,_,_) in structure.fragment(fr.id, base, get_args_size(fn)):
-        yield off-base,name,size
-    return
-args = utils.alias(arguments)
-
 class blocks(object):
     """
     Interact with all the basic-blocks within the specified function.
@@ -618,6 +570,19 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
+    def flow(cls):
+        '''Return an IDAPython FlowChart object for the current function.'''
+        return cls.flow(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def flow(cls, func):
+        '''Return an IDAPython FlowChart object for the function ``func``.'''
+        fn = by(func)
+        fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
+        return fc
+
+    @utils.multicase()
+    @classmethod
     def nx(cls):
         """Return a networkx.DiGraph of the function at the current address.
         Requires the networkx module in order to build the graph.
@@ -661,14 +626,14 @@ class blocks(object):
         for b in cls.iterate(fn):
             # ...add an edge to its predecessors
             for p in b.preds():
-                # FIXME: find more attributes to add
+                # FIXME: figure out more attributes to add
                 attrs = {}
                 operator.setitem(attrs, '__contiguous__', b.startEA == p.endEA)
                 res.add_edge(p.startEA, b.startEA, attrs)
 
             # ...add an edge to its successors
             for s in b.succs():
-                # FIXME: find more attributes to add
+                # FIXME: figure out more attributes to add
                 attrs = {}
                 operator.setitem(attrs, '__contiguous__', b.endEA == s.startEA)
                 res.add_edge(b.startEA, s.startEA, attrs)
@@ -678,6 +643,8 @@ class blocks(object):
 
     # FIXME: Implement .register for filtering blocks
     # FIXME: Implement .search for filtering blocks
+
+flow = utils.alias(blocks.flow, 'blocks')
 
 class block(object):
     """
@@ -1035,15 +1002,15 @@ class block(object):
         return cls.disasm(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def disasm(cls, ea):
+    def disassemble(cls, ea):
         '''Returns the disassembly of the basic-block at the address ``ea``.'''
         return '\n'.join(map(database.disasm, cls.iterate(ea)))
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
-    def disasm(cls, bb):
+    def disassemble(cls, bb):
         '''Returns the disassembly of the basic-block ``bb``.'''
         return '\n'.join(map(database.disasm, cls.iterate(bb)))
-    disassemble = utils.alias(disasm, 'block')
+    disasm = utils.alias(disassemble, 'block')
 
     # FIXME: implement .decompile for an idaapi.BasicBlock type too
     @utils.multicase()
@@ -1062,67 +1029,160 @@ class block(object):
         formatted = reduce(lambda t,c: t if t[-1].ea == c.ea else t+[c], res, [next(res)])
 
         res = []
-        # FIXME: This is pretty damn unstable in my tests.
+        # FIXME: This has been pretty damn unstable in my tests.
         try:
             for fmt in formatted:
                 res.append( fmt.print1(source.__deref__()) )
         except TypeError: pass
         return '\n'.join(map(idaapi.tag_remove,res))
 
-# function frame attributes
-# FIXME: put these in their own object and replace them with aliases
-@utils.multicase()
-def get_frameid():
-    '''Returns the structure id for the current function's frame.'''
-    return get_frameid(ui.current.function())
-@utils.multicase()
-def get_frameid(func):
-    '''Returns the structure id for the function ``func``.'''
-    fn = by(func)
-    return fn.frame
+class frame(object):
+    """
+    Interact with a function's frame.
+    """
+    @utils.multicase()
+    def __new__(cls):
+        '''Return the frame of the current function.'''
+        return cls(ui.current.function())
 
-@utils.multicase()
-def get_args_size():
-    '''Returns the size of the arguments for the current function.'''
-    return get_args_size(ui.current.function())
-@utils.multicase()
-def get_args_size(func):
-    '''Returns the size of the arguments for the function ``func``.'''
-    fn = by(func)
-    max = structure.size(get_frameid(fn))
-    total = get_vars_size(fn) + get_regs_size(fn)
-    return max - total
+    @utils.multicase()
+    def __new__(cls, func):
+        '''Return the frame of the function ``func``.'''
+        fn = by(func)
+        res = idaapi.get_frame(fn.startEA)
+        if res is not None:
+            return structure.instance(res.id, offset=-fn.frsize)
+        logging.info("{:s}.frame({:#x}) : Function {:s} does not have a frame.".format(__name__, fn.startEA, name(fn.startEA)))
+        return structure.instance(idaapi.BADADDR)
 
-@utils.multicase()
-def get_vars_size():
-    '''Returns the size of the local variables for the current function.'''
-    return get_vars_size(ui.current.function())
-@utils.multicase()
-def get_vars_size(func):
-    '''Returns the size of the local variables for the function ``func``.'''
-    fn = by(func)
-    return fn.frsize
+    @utils.multicase()
+    @classmethod
+    def id(cls):
+        '''Returns the structure id for the current function's frame.'''
+        return cls.id(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def id(cls, func):
+        '''Returns the structure id for the function ``func``.'''
+        fn = by(func)
+        return fn.frame
 
-@utils.multicase()
-def get_regs_size():
-    '''Returns the number of bytes occupied by the saved registers in the current function.'''
-    return get_regs_size(ui.current.function())
-@utils.multicase()
-def get_regs_size(func):
-    '''Returns the number of bytes occupied by the saved registers for the function ``func``.'''
-    fn = by(func)
-    return fn.frregs + database.config.bits()/8   # +wordsize for the pc because ida doesn't count it
+    @utils.multicase()
+    @classmethod
+    def delta(cls):
+        '''Returns the stack delta for the current address within its function.'''
+        return cls.delta(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def delta(cls, ea):
+        '''Returns the stack delta for the address ``ea`` within its given function.'''
+        fn, ea = by_address(ea), interface.address.inside(ea)
+        return idaapi.get_spd(fn, ea)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def delta(cls, func, ea):
+        '''Returns the stack delta for the address ``ea`` within the function ``func``.'''
+        fn, ea = by(func), interface.address.inside(ea)
+        return idaapi.get_spd(fn, ea)
 
-@utils.multicase()
-def get_spdelta():
-    '''Returns the stack delta for the current address within its function.'''
-    return get_spdelta(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def get_spdelta(ea):
-    '''Returns the stack delta for the address ``ea`` within its given function.'''
-    fn, ea = by_address(ea), interface.address.inside(ea)
-    return idaapi.get_spd(fn, ea)
-delta = get_sp = spdelta = utils.alias(get_spdelta)
+    class args(object):
+        """
+        Information about the function frame's arguments.
+        """
+
+        @utils.multicase()
+        def __new__(cls):
+            '''Yield each argument in the current function.'''
+            return cls(ui.current.address())
+        @utils.multicase()
+        def __new__(cls, func):
+            """Yield each argument for the function ``func`` in order.
+            Each result is of the format (offset into stack, name, size).
+            """
+            try:
+                fn = by(func)
+
+            except LookupError:
+                target = func
+                database.imports.get(target)
+
+                # grab from declaration
+                o = 0
+                for arg in internal.declaration.arguments(target):
+                    sz = internal.declaration.size(arg)
+                    yield o, arg, sz
+                    o += sz
+                return
+
+            # grab from structure
+            fr = idaapi.get_frame(fn)
+            if fr is None:  # unable to figure out arguments
+                raise LookupError("{:s}.arguments({:#x}) : Unable to determine function frame.".format(__name__, fn.startEA))
+
+            # FIXME: figure out calling convention and grab correct arguments
+            if database.config.bits() != 32:
+                logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to {:d}-bit calling convention.".format(__name__, fn.startEA, database.config.bits()))
+
+            base = get_vars_size(fn)+get_regs_size(fn)
+            for (off,size),(name,_,_) in structure.fragment(fr.id, base, get_args_size(fn)):
+                yield off-base,name,size
+            return
+
+        @utils.multicase()
+        @classmethod
+        def size(cls):
+            '''Returns the size of the arguments for the current function.'''
+            return cls.size(ui.current.function())
+        @utils.multicase()
+        @classmethod
+        def size(cls, func):
+            '''Returns the size of the arguments for the function ``func``.'''
+            fn = by(func)
+            max = structure.size(get_frameid(fn))
+            total = get_vars_size(fn) + get_regs_size(fn)
+            return max - total
+
+    class lvars(object):
+        """
+        Information about the function frame's lvars.
+        """
+        @utils.multicase()
+        @classmethod
+        def size(cls):
+            '''Returns the size of the local variables for the current function.'''
+            return cls.size(ui.current.function())
+        @utils.multicase()
+        @classmethod
+        def size(cls, func):
+            '''Returns the size of the local variables for the function ``func``.'''
+            fn = by(func)
+            return fn.frsize
+
+    vars = lvars    # XXX: ns alias
+
+    class regs(object):
+        """
+        Information about the function frame's saved registers.
+        """
+
+        @utils.multicase()
+        @classmethod
+        def size(cls):
+            '''Returns the number of bytes occupied by the saved registers in the current function.'''
+            return cls.size(ui.current.function())
+        @utils.multicase()
+        @classmethod
+        def size(cls, func):
+            '''Returns the number of bytes occupied by the saved registers for the function ``func``.'''
+            fn = by(func)
+            return fn.frregs + database.config.bits()/8   # +wordsize for the pc because ida doesn't count it
+
+get_frameid = utils.alias(frame.id, 'frame')
+get_args_size = utils.alias(frame.args.size, 'frame.args')
+get_vars_size = utils.alias(frame.lvars.size, 'frame.lvars')
+get_regs_size = utils.alias(frame.regs.size, 'frame.regs')
+get_spdelta = get_sp = spdelta = delta = utils.alias(frame.delta, 'frame')
+arguments = args = frame.args
 
 ## instruction iteration/searching
 @utils.multicase()
@@ -1139,7 +1199,7 @@ def iterate(func):
         continue
     return
 
-# FIXME: maybe rename this to filter? or something??
+# XXX: deprecate this as it's more of a tool than something related to a function.
 class search(object):
     @utils.multicase(regex=basestring)
     def __new__(cls, regex):
@@ -1172,6 +1232,7 @@ class search(object):
                 yield ea
             continue
         return
+filter = search     # XXX: ns alias
 
 ## tagging
 @utils.multicase()
@@ -1289,8 +1350,6 @@ def tag_write(func, key, none):
 
     internal.comment.globals.dec(fn.startEA, key)
     return res
-
-#FIXME: define tag_erase
 
 @utils.multicase()
 def tag():
@@ -1417,52 +1476,16 @@ def up(func):
     # regular
     return database.up(ea)
 
-## switch stuff
-# FIXME: document this and consolidate it somehow with database.type.switch
-class switch_t(object):
-    #x.defjump -- default case
-    #x.jcases,x.jumps -- number of branches,address of branch data
-    #x.ncases,x.lowcase -- number of cases,address of switch data
-    #x.startea -- beginning of basicblock that is switch
-    # get_jtable_element_size -- table entry size
-    # need some way to get pointer size
-    def __init__(self, switch_info_ex):
-        self.object = switch_info_ex
-    @property
-    def default(self):
-        # address of default case
-        return self.object.defjump
-    @property
-    def ea(self):
-        # address of beginning of switch code
-        return self.object.startea
-    @property
-    def branch_ea(self):
-        # address of branch table
-        return self.object.jumps
-    @property
-    def table_ea(self):
-        # address of case table
-        return self.object.lowcase
-    @property
-    def branch(self):
-        # return the branch table as an array
-        pass
-    @property
-    def table(self):
-        # return the index table as an array
-        pass
-    def get_case(self, case):
-        # return the ea of the specified case number
-        raise NotImplementedError
-
 @utils.multicase()
-def switches(): return switches(ui.current.function())
+def switches():
+    '''Yield each switch found in the current function.'''
+    return switches(ui.current.function())
 @utils.multicase()
 def switches(func):
+    '''Yield each switch found in the function identifed by ``func``.'''
     for ea in iterate(func):
         res = idaapi.get_switch_info_ex(ea)
-        if res: yield switch_t(res)
+        if res: yield interface.switch_t(res)
     return
 
 class type(object):
@@ -1480,6 +1503,7 @@ class type(object):
         '''Return True if the function ``func`` has no frame.'''
         fn = by(func)
         return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_FRAME == 0)
+    noframeQ = utils.alias(has_noframe, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1505,6 +1529,7 @@ class type(object):
         '''Return True if the function ``func`` does not return.'''
         fn = by(func)
         return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
+    noreturnQ = utils.alias(has_noreturn, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1517,6 +1542,7 @@ class type(object):
         '''Return True if the function ``func`` is considered a library function.'''
         fn = by(func)
         return fn.flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
+    libraryQ = utils.alias(is_library, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1529,6 +1555,7 @@ class type(object):
         '''Return True if the function ``func`` is considered a code thunk.'''
         fn = by(func)
         return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
+    thunkQ = utils.alias(is_thunk, 'type')
 
 @utils.multicase(reg=(basestring,_instruction.register_t))
 def register(reg, *regs, **modifiers):
@@ -1550,7 +1577,7 @@ def register(func, reg, *regs, **modifiers):
         continue
     return
 
-# FIXME: deprecate this
+# FIXME: deprecate this?
 @utils.multicase(delta=six.integer_types)
 def stackdelta(delta, **direction):
     '''Return the boundaries of current address that fit within the specified stack ``delta``.'''
@@ -1575,18 +1602,6 @@ def stackdelta(ea, delta, **direction):
         return ea+idaapi.decode_insn(ea),start[0]+idaapi.decode_insn(start[0])
     return (start[0],ea)
 stackwindow = stack_window = utils.alias(stackdelta)
-
-# FIXME: deprecate this?
-@utils.multicase()
-def flow():
-    '''Return a flow chart object for the current function.'''
-    return flow(ui.current.function())
-@utils.multicase()
-def flow(func):
-    '''Return a flow chart object for the function ``func``.'''
-    fn = by(func)
-    fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
-    return fc
 
 # FIXME: document this
 #def refs(func, member):

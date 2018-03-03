@@ -9,17 +9,18 @@ import functools,itertools,operator
 import math,types,array
 import six,fnmatch,re,ctypes
 
-import function,segment,structure,ui,internal
+import function,segment,ui,internal
+import structure as _structure
 import instruction as _instruction
 from internal import utils,interface
 
 import idaapi
 
 ## properties
-def h():
+def here():
     '''Return the current address.'''
     return ui.current.address()
-here = utils.alias(h)
+h = utils.alias(here)
 
 def filename():
     '''Returns the filename that the database was built from.'''
@@ -247,7 +248,7 @@ class functions(object):
         """
         res = __builtin__.list(cls.iterate(**type))
 
-        flvars = lambda ea: structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
+        flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
         fminaddr = utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)
         fmaxaddr = utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)
 
@@ -319,6 +320,7 @@ class functions(object):
             raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res
 
+# XXX: should this be a matcher class?
 def segments():
     '''Returns a list of all segments in the current database.'''
     return [s.startEA for s in segment.iterate()]
@@ -346,11 +348,11 @@ def instruction(ea):
     return reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
 
 @utils.multicase()
-def disasm(**options):
+def disassemble(**options):
     '''Disassemble the instructions at the current address.'''
-    return disasm(ui.current.address(), **options)
+    return disassemble(ui.current.address(), **options)
 @utils.multicase(ea=six.integer_types)
-def disasm(ea, **options):
+def disassemble(ea, **options):
     """Disassemble the instructions at the address ``ea``.
     If the integer ``count`` is specified, then return ``count`` number of instructions.
     If the bool ``comments`` is True, then return the comments for each instruction as well.
@@ -366,11 +368,12 @@ def disasm(ea, **options):
         ea = address.next(ea)
         count -= 1
     return '\n'.join(res)
+disasm = utils.alias(disassemble)
 
 def block(start, end):
     '''Return the block of bytes from address ``start`` to ``end``.'''
     if start > end:
-        start,end=end,start
+        start, end = end, start
     start, end = interface.address.within(start, end)
     length = end-start
     return read(start, length)
@@ -527,8 +530,6 @@ class names(object):
         res = idaapi.get_nlist_idx(ea)
         return idaapi.get_nlist_ea(res), idaapi.get_nlist_name(res)
 
-## searching by stuff
-# FIXME: bounds-check all of these addresses
 class search(object):
     """
     Search the database for arbitrary data using IDA's searching functionality.
@@ -619,7 +620,6 @@ def offset():
 def offset(ea):
     '''Return the address ``ea`` converted to an offset from the base-address of the database.'''
     return interface.address.inside(ea) - baseaddress()
-
 getoffset = getOffset = o = utils.alias(offset)
 
 def translate(offset):
@@ -794,25 +794,6 @@ if False:
                 block = nextea
             continue
         return
-
-def map(l, *args, **kwds):
-    """Execute provided callback on all functions in database. Synonymous to map(l,db.functions()).
-    ``l`` is defined as a function(address, *args, **kwds).
-    Any other arguments are passed to ``l`` unmodified.
-    """
-    i,x = 0,here()
-    current = x
-    all = functions()
-    result = []
-    try:
-        for i,x in enumerate(all):
-            go(x)
-            print("{:x}: processing # {:d} of {:d} : {:s}".format(x, i+1, len(all), name(x)))
-            result.append( l(x, *args, **kwds) )
-    except KeyboardInterrupt:
-        print("{:x}: terminated at # {:d} of {:d} : {:s}".format(x, i+1, len(all), name(x)))
-    go(current)
-    return result
 
 @utils.multicase()
 def erase():
@@ -1103,7 +1084,7 @@ class entry(object):
         return res
 
     add = utils.alias(new, 'entry')
-exports = entry
+exports = entry     # XXX: ns alias
 
 def tags():
     '''Returns all of the tag names used globally.'''
@@ -1237,8 +1218,6 @@ def tag_write(ea, key, none):
         internal.comment.globals.dec(ea, key)
 
     return res
-
-#FIXME: define tag_erase
 
 @utils.multicase()
 def tag():
@@ -1466,7 +1445,7 @@ class imports(object):
     @classmethod
     def ordinal(cls, ea):
         '''Return the ordinal of the import at the address ``ea``.'''
-        _,_,ordinal = cls.get(ea)
+        _, _, ordinal = cls.get(ea)
         return ordinal
 
     # FIXME: maybe implement a modules class for getting information on import modules
@@ -1980,14 +1959,14 @@ class address(object):
         res = cls.walk(ea, cls.next, lambda n: not (type.has_comment(n) if tagname is None else tagname in tag(n)))
         return cls.nextbranch(cls.next(res), count-1) if count > 1 else res
 
-a = addr = address
+a = addr = address  # XXX: ns alias
 
-prev,next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'address')
-prevdata,nextdata = utils.alias(address.prevdata, 'address'), utils.alias(address.nextdata, 'address')
-prevcode,nextcode = utils.alias(address.prevcode, 'address'), utils.alias(address.nextcode, 'address')
-prevref,nextref = utils.alias(address.prevref, 'address'), utils.alias(address.nextref, 'address')
-prevreg,nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.nextreg, 'address')
-head,tail = utils.alias(address.head, 'address'), utils.alias(address.tail, 'address')
+prev, next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'address')
+prevdata, nextdata = utils.alias(address.prevdata, 'address'), utils.alias(address.nextdata, 'address')
+prevcode, nextcode = utils.alias(address.prevcode, 'address'), utils.alias(address.nextcode, 'address')
+prevref, nextref = utils.alias(address.prevref, 'address'), utils.alias(address.nextref, 'address')
+prevreg, nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.nextreg, 'address')
+head, tail = utils.alias(address.head, 'address'), utils.alias(address.tail, 'address')
 
 class flow(address):
     """
@@ -2061,7 +2040,7 @@ class flow(address):
             return None
         res = refs[0] if _instruction.is_jmp(ea) else address.next(ea)
         return cls.next(res, count-1) if count > 1 else res
-f = flow
+f = flow    # XXX: ns alias
 
 class type(object):
     """
@@ -2375,7 +2354,7 @@ class type(object):
             '''Return the total size of the array at address ``ea``.'''
             return type.size(ea)
 
-    class struc(object):
+    class structure(object):
         """Returns information about a structure that is defined within the database.
 
         Example:
@@ -2430,7 +2409,7 @@ class type(object):
         def size(ea):
             '''Return the total size of the structure at address ``ea``.'''
             return type.size(ea)
-    structure = struct = struc
+    struc = struct = structure  # ns alias
 
     class switch(object):
         @classmethod
@@ -2440,7 +2419,7 @@ class type(object):
                 if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
                     r, = xref.data_up(ea)
                     return cls.__getarray(r)
-            except TypeError: pass
+            except (ValueError, TypeError): pass
             raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
@@ -2468,7 +2447,7 @@ class type(object):
             res = idaapi.get_switch_info_ex(ea)
             if res is None:
                 raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
-            return res
+            return interface.switch_t(res)
 
         @utils.multicase()
         def __new__(cls):
@@ -2485,7 +2464,7 @@ class type(object):
             try: return cls.__getlabel(ea)
             except TypeError: pass
             raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t.".format('.'.join((__name__, 'type', cls.__name__)), ea))
-t = type
+t = type    # XXX: ns alias
 
 ## information about a given address
 size = utils.alias(type.size, 'type')
@@ -2667,7 +2646,8 @@ class xref(object):
         If the reftype ``call`` is True, then specify this ref as a function call.
         """
         ea, target = interface.address.inside(ea, target)
-        isCall = reftype['call'] if 'call' in reftype else reftype['is_call'] if 'is_call' in reftype else reftype['isCall'] if 'isCall' in reftype else reftype.get('callQ', False)
+
+        isCall = __builtin__.next((reftype[k] for k in ('call', 'is_call', 'isCall', 'iscall', 'callQ') if k in reftype), None)
         if abs(target-ea) > 2**(config.bits()/2):
             flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
         else:
@@ -2728,12 +2708,12 @@ class xref(object):
     def clear(ea):
         ea = interface.address.inside(ea)
         return all((res is True) for res in (xref.del_code(ea),xref.del_data(ea)))
-x = xref
+x = xref    # XXX: ns alias
 
-drefs,crefs = utils.alias(xref.data, 'xref'), utils.alias(xref.code, 'xref')
-dxdown,dxup = utils.alias(xref.data_down, 'xref'), utils.alias(xref.data_up, 'xref')
-cxdown,cxup = utils.alias(xref.code_down, 'xref'), utils.alias(xref.code_up, 'xref')
-up,down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
+drefs, crefs = utils.alias(xref.data, 'xref'), utils.alias(xref.code, 'xref')
+dxdown, dxup = utils.alias(xref.data_down, 'xref'), utils.alias(xref.data_up, 'xref')
+cxdown, cxup = utils.alias(xref.code_down, 'xref'), utils.alias(xref.code_up, 'xref')
+up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
 
 # create/erase a mark at the specified address in the .idb
 class marks(object):
@@ -2854,7 +2834,7 @@ class marks(object):
         @classmethod
         def set_description(cls, index, ea, description, **extra):
             res = cls.location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
-            title,descr = description,description
+            title, descr = description, description
             res.mark(index, title, descr)
             if cls.get_slotaddress(index) != ea:
                 raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems())) if extra else '')))
@@ -3263,7 +3243,7 @@ class extra(object):
         return cls.postappend(ui.current.address(), count)
 
     insert, append = utils.alias(preinsert, 'extra'), utils.alias(preappend, 'extra')
-ex = extra
+ex = extra  # XXX: ns alias
 
 class set(object):
     """
@@ -3324,8 +3304,8 @@ class set(object):
 
         res = type['type'] if 'type' in type else lookup[size]
         if idaapi.__version__ < 7.0:
-            ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(res, structure.structure_t) else res, size, res.id if isinstance(res, structure.structure_t) else 0)
-        elif isinstance(res, structure.structure_t):
+            ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
+        elif isinstance(res, _structure.structure_t):
             ok = idaapi.create_struct(ea, size, res.id)
         elif res == idaapi.FF_ALIGN and hasattr(idaapi, 'create_align'):
             ok = idaapi.create_align(ea, size, 0)
@@ -3429,17 +3409,17 @@ class set(object):
             '''Set the data at address ``ea`` to an octal-word.'''
             return set.data(ea, 16, type=idaapi.FF_OWRD)
 
-    @utils.multicase(type=structure.structure_t)
+    @utils.multicase(type=_structure.structure_t)
     @classmethod
-    def struct(cls, type):
+    def structure(cls, type):
         '''Set the data at the current address to the structure_t specified by ``type``.'''
         return cls.struct(ui.current.address(), type)
-    @utils.multicase(ea=six.integer_types, type=structure.structure_t)
+    @utils.multicase(ea=six.integer_types, type=_structure.structure_t)
     @classmethod
-    def struct(cls, ea, type):
+    def structure(cls, ea, type):
         '''Set the data at address ``ea`` to the structure_t specified by ``type``.'''
         return cls.data(ea, type.size, type=type)
-    structure = struc = struct
+    struc = struct = utils.alias(structure, 'set')
 
     @utils.multicase(length=six.integer_types)
     @classmethod
@@ -3626,7 +3606,7 @@ class get(object):
             '''Read a sint128_t from the address ``ea``.'''
             return get.signed(ea, 16, **byteorder)
 
-    i = integer
+    i = integer # XXX: ns alias
 
     @utils.multicase()
     @classmethod
@@ -3679,7 +3659,7 @@ class get(object):
             t = strings[elesize]
         elif T == idaapi.FF_STRU:
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
-            cb = structure.size(t)
+            cb = _structure.size(t)
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
             return [ cls.struc(ea + i*cb, id=t) for i in __builtin__.range(count) ]
         elif T in numerics:
@@ -3705,23 +3685,24 @@ class get(object):
 
     @utils.multicase()
     @classmethod
-    def struct(cls):
+    def structure(cls):
         return cls.struc(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def struct(cls, ea, **sid):
+    def structure(cls, ea, **structure):
         """Return the structure_t at address ``ea`` as a dict of ctypes.
-        If the structure ``sid`` is specified, then use that specific structure type.
+        If the ``structure`` argument is specified, then use that specific structure type.
         """
         ea = interface.address.within(ea)
 
-        if any(n in sid for n in ('sid','struc','structure','id')):
-            res = sid['sid'] if 'sid' in sid else sid['struc'] if 'struc' in sid else sid['structure'] if 'structure' in sid else sid['id'] if 'id' in sid else None
-            sid = res.id if isinstance(res, structure.structure_t) else res
-        else:
+        key = __builtin__.next((k for k in ('structure', 'struct', 'struc', 'sid', 'id') if k in structure), None)
+        if key is None:
             sid = type.structure.id(ea)
+        else:
+            res = structure.get(key, None)
+            sid = res.id if isinstance(res, _structure.structure_t) else res
 
-        st = structure.instance(sid, offset=ea)
+        st = _structure.instance(sid, offset=ea)
         typelookup = {
             (int,-1) : ctypes.c_int8, (int,1) : ctypes.c_uint8,
             (int,-2) : ctypes.c_int16, (int,2) : ctypes.c_uint16,
@@ -3747,4 +3728,4 @@ class get(object):
             finally:
                 res[m.name] = val if any(_ is None for _ in (ct,val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)),ctypes.POINTER(ct)).contents
         return res
-    structure = struc = struct
+    struc = struct = utils.alias(structure, 'get')

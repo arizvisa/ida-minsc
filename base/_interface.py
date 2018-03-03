@@ -617,3 +617,72 @@ class AddressOpnumReftype(namedtypedtuple):
     _fields = ('address', 'opnum', 'reftype')
     _types = (long, (types.NoneType, int), ref_t)
 OREF = AddressOpnumReftype
+
+# FIXME: document this and consolidate it somehow with database.type.switch
+class switch_t(object):
+    def __init__(self, switch_info_ex):
+        self.object = switch_info_ex
+    @property
+    def ea(self):
+        # address of beginning of switch code
+        return self.object.startea
+    @property
+    def branch_ea(self):
+        # address of branch table
+        return self.object.jumps
+    @property
+    def table_ea(self):
+        # address of case table
+        return self.object.lowcase
+    @property
+    def default(self):
+        # address of default case
+        return self.object.defjump
+    @property
+    def branch(self):
+        # return the branch table as an array
+        import database
+        if self.indirectQ():
+            ea, count = self.object.jumps, self.object.jcases
+            return database.type.array(ea, length=count)
+        ea, count = self.object.jumps, self.object.ncases
+        return database.type.array(ea, length=count)
+    @property
+    def index(self):
+        # return the index table as an array
+        import database
+        if self.indirectQ():
+            ea, count = self.object.lowcase, self.object.ncases
+            return database.type.array(ea, length=count)
+        return database.type.array(self.object.jumps, length=0)
+    @property
+    def register(self):
+        import instruction
+        ri, rt = self.object.regnum, self.object.regdtyp
+        return instruction.architecture.by_indextype(ri, rt)
+    @property
+    def base(self):
+        return self.object.elbase
+    @property
+    def count(self):
+        return self.object.ncases
+    def indirectQ(self):
+        return self.object.is_indirect()
+    def subtractQ(self):
+        return self.object.is_subtract()
+    def case(self, case):
+        # return the ea of the specified case number
+        # FIXME: check that this works with a different .elbase
+        if case < self.base or case >= self.count + self.base:
+            cls = self.__class__
+            raise ValueError("{:s}.case({:#x}) : Specified case was out of bounds. : ({:#x}<>{:#x})".format(cls.__name__, case, self.base, self.base+self.count - 1))
+        idx = case - self.base
+        if self.indirectQ():
+            idx = self.index[idx]
+        return self.branch[idx]
+    def __repr__(self):
+        cls = self.__class__
+        if self.indirectQ():
+            return "<type '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
+        return "<type '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
+
