@@ -28,6 +28,7 @@ import internal
 import idaapi
 output = sys.stderr
 
+@document.parameters(fn='the function to fetch the contents tags from')
 def fetch_contents(fn):
     """Fetch the reference count for the contents of function `fn` in the database.
 
@@ -48,6 +49,7 @@ def fetch_contents(fn):
         continue
     return func.address(fn), addr, tags
 
+@document.parameters(ea='the address of the function to verify the contents tags for')
 def check_contents(ea):
     '''Validate the cache defined for the contents of the function `ea`.'''
     node, key = internal.netnode.get(internal.comment.tagging.node()), internal.comment.contents._key(ea)
@@ -61,6 +63,7 @@ def check_contents(ea):
     if '__tags__' not in tag: return False
     return True
 
+@document.parameters(ea='the address of the global to verify the tags for')
 def check_global(ea):
     '''Validate the cache defined for the global at the address `ea`.'''
     if func.within(ea): return False
@@ -147,6 +150,7 @@ def fetch_globals():
 
     return addr, tags
 
+@document.parameters(ea='the address of the function to build the cache for')
 def contents(ea):
     '''Re-build the cache for the contents of the function `ea`.'''
     try:

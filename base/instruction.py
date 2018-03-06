@@ -51,6 +51,7 @@ from internal import utils, interface, exceptions as E
 import idaapi
 
 ## operand types
+@document.hidden
 class __optype__(object):
     """
     This namespace is a registration table for all the different operand
@@ -96,6 +97,7 @@ def at():
     '''Returns the ``idaapi.insn_t`` instance at the current address.'''
     return at(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def at(ea):
     '''Returns the ``idaapi.insn_t`` instance at the address `ea`.'''
     ea = interface.address.inside(ea)
@@ -114,6 +116,7 @@ def size():
     '''Returns the length of the instruction at the current address.'''
     return size(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def size(ea):
     '''Returns the length of the instruction at the address `ea`.'''
     return at(ea).size
@@ -123,17 +126,21 @@ def feature():
     '''Returns the feature bitmask of the instruction at the current address.'''
     return feature(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def feature(ea):
     '''Return the feature bitmask for the instruction at the address `ea`.'''
     if database.is_code(ea):
         return at(ea).get_canon_feature()
     return None
 
+@document.aliases('mnem')
 @utils.multicase()
 def mnemonic():
     '''Returns the mnemonic of the instruction at the current address.'''
     return mnemonic(ui.current.address())
+@document.aliases('mnem')
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def mnemonic(ea):
     '''Returns the mnemonic of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
@@ -147,6 +154,7 @@ def operands():
     '''Returns all of the ``idaapi.op_t`` instances for the instruction at the current address.'''
     return operands(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def operands(ea):
     '''Returns all of the ``idaapi.op_t`` instances for the instruction at the address `ea`.'''
     insn = at(ea)
@@ -163,10 +171,12 @@ def operands(ea):
     return tuple([n.assign(op), n][1] for n, op in res)
 
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def operand(opnum):
     '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the current address.'''
     return operand(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def operand(ea, opnum):
     '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn = at(ea)
@@ -186,6 +196,7 @@ def ops_count():
     '''Returns the number of operands of the instruction at the current address.'''
     return ops_count(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops_count(ea):
     '''Returns the number of operands of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
@@ -196,17 +207,21 @@ def ops_repr():
     '''Returns a tuple of the ``op_repr`` of all the operands for the instruction at the current address.'''
     return ops_repr(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops_repr(ea):
     '''Returns a tuple of the ``op_repr`` of all the operands for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(op_repr, ea)
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
+@document.aliases('ops_value')
 @utils.multicase()
 def ops():
     '''Returns a tuple of all the operands for the instruction at the current address.'''
     return ops(ui.current.address())
+@document.aliases('ops_value')
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops(ea):
     '''Returns a tuple of all the operands for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
@@ -219,17 +234,21 @@ def ops_size():
     '''Returns a tuple with all the sizes of each operand for the instruction at the current address.'''
     return ops_size(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops_size(ea):
     '''Returns a tuple with all the sizes of each operand for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = utils.fcompose(functools.partial(operand, ea), operator.attrgetter('dtyp'), idaapi.get_dtyp_size, int)
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
+@document.aliases('ops_type')
 @utils.multicase()
 def opts():
     '''Returns a tuple of the types for all the operands in the instruction at the current address.'''
     return ops_type(ui.current.address())
+@document.aliases('ops_type')
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def opts(ea):
     '''Returns a tuple of the types for all the operands in the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
@@ -242,6 +261,7 @@ def ops_state():
     '''Returns a tuple for all the operands containing one of the states "r", "w", or "rw"` describing how the operands for the current instruction operands are modified.'''
     return ops_state(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops_state(ea):
     '''Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address `ea`.'''
     ea = interface.address.inside(ea)
@@ -257,6 +277,7 @@ def ops_read():
     '''Returns the indices of any operands that are being read from by the instruction at the current address.'''
     return ops_read(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops_read(ea):
     '''Returns the indices of any operands that are being read from by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
@@ -267,30 +288,38 @@ def ops_write():
     '''Returns the indices of the operands that are being written to by the instruction at the current address.'''
     return ops_write(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops_write(ea):
     '''Returns the indices of the operands that are being written to by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, state in enumerate(ops_state(ea)) if 'w' in state)
 
+@document.aliases('ops_const')
 @utils.multicase()
 def ops_constant():
     '''Return the indices of any operands in the current instruction that are constants.'''
     return ops_constant(ui.current.address())
+@document.aliases('ops_const')
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='the address of an instruction')
 def ops_constant(ea):
     '''Return the indices of any operands in the instruction at `ea` that are constants.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, value in enumerate(ops_value(ea)) if isinstance(value, six.integer_types))
 ops_const = utils.alias(ops_constant)
 
+@document.aliases('ops_reg', 'ops_regs')
 @utils.multicase(reg=(basestring, interface.register_t))
+@document.parameters(reg='the register to search the operands for', regs='any other registers to include', modifiers='if ``write`` is specified, then only return operands that write to the specified registers. if ``read`` is specified then do the same but for operands that read from them.')
 def ops_register(reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.
 
     If the keyword `write` is true, then only return the result if it's writing to the register.
     """
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
+@document.aliases('ops_reg', 'ops_regs')
 @utils.multicase(reg=(basestring, interface.register_t))
+@document.parameters(ea='the address of an instruction', reg='the register to search the operands for', regs='any other registers to include', modifiers='if ``write`` is specified, then only return operands that write to the specified registers. if ``read`` is specified then do the same but for operands that read from them.')
 def ops_register(ea, reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
 
@@ -304,10 +333,12 @@ ops_reg = ops_regs = utils.alias(ops_register)
 
 ## functions vs a specific operand of an insn
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_repr(opnum):
     '''Returns the representation for the operand `opnum` belonging to the instruction at the current address.'''
     return op_repr(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_repr(ea, opnum):
     '''Returns the representation for the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn = at(ea)
@@ -321,10 +352,12 @@ def op_repr(ea, opnum):
     return utils.string.of(res)
 
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_state(opnum):
     '''Returns the modification state for the operand `opnum` belonging to the current instruction.'''
     return op_state(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_state(ea, opnum):
     """Returns the modification state for the operand `opnum` belonging to the instruction at the address `ea`.
 
@@ -336,28 +369,36 @@ def op_state(ea, opnum):
     return (r and 'r' or '') + (w and 'w' or '')
 
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_size(opnum):
     '''Returns the size for the operand `opnum` belonging to the current instruction.'''
     return op_size(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_size(ea, opnum):
     '''Returns the size for the operand `opnum` belonging to the instruction at the address `ea`.'''
     res = operand(ea, opnum)
     return 0 if res.type == idaapi.o_void else idaapi.get_dtyp_size(res.dtyp)
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_bits(opnum):
     '''Returns the size (in bits) for the operand `opnum` belonging to the current instruction.'''
     return 8 * op_size(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_bits(ea, opnum):
     '''Returns the size (in bits) for the operand `opnum` belonging to the instruction at the address `ea`.'''
     return 8 * op_size(ea, opnum)
 
+@document.aliases('op_type')
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def opt(opnum):
     '''Returns the type of the operand `opnum` belonging to the current instruction.'''
     return opt(ui.current.address(), opnum)
+@document.aliases('op_type')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def opt(ea, opnum):
     """Returns the type of the operand `opnum` belonging to the instruction at the address `ea`.
 
@@ -368,19 +409,25 @@ def opt(ea, opnum):
 op_type = utils.alias(opt)
 
 #@utils.multicase(opnum=six.integer_types)
+#@document.parameters(opnum='the operand number of the current instruction')
 #def op_decode(opnum):
 #    '''Returns the value of the operand `opnum` in byte form belonging to the current instruction (if possible).'''
 #    raise NotImplementedError
 #@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+#@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 #def op_decode(ea, opnum):
 #    '''Returns the value of the operand `opnum` in byte form belonging to the instruction at address `ea`.'''
 #    raise NotImplementedError
 
+@document.aliases('op_value', 'op_decode')
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op(opnum):
     '''Decodes the operand `opnum` for the current instruction.'''
     return op(ui.current.address(), opnum)
+@document.aliases('op_value', 'op_decode')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op(ea, opnum):
     '''Decodes the operand `opnum` for the instruction at the address `ea`.'''
     res = operand(ea, opnum)
@@ -412,10 +459,12 @@ op_value = op_decode = utils.alias(op)
 
 ## XXX: deprecate this, and somehow associate the segment register with the operand for the intel arch
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_segment(opnum):
     '''Returns the segment register used by the operand `opnum` for the instruction at the current address.'''
     return op_segment(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_segment(ea, opnum):
     '''Returns the segment register used by the operand `opnum` for the instruction at the address `ea`.'''
     op = operand(ea, opnum)
@@ -428,11 +477,15 @@ def op_segment(ea, opnum):
     return None
 # FIXME: maybe use idaapi.op_seg(*args) to apply a segment to an operand?
 
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_structure(opnum):
     '''Return the structure that operand `opnum` at the current instruction actually references.'''
     return op_structure(ui.current.address(), opnum)
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_structure(ea, opnum):
     '''Return the structure that operand `opnum` for instruction `ea` actually references.'''
     ti, fl, op = idaapi.opinfo_t(), database.type.flags(ea), operand(ea, opnum)
@@ -483,23 +536,33 @@ def op_structure(ea, opnum):
 
     ofs = delta - moff + value
     return tuple(res + [ofs]) if ofs != 0 else tuple(res)
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
+@document.parameters(opnum='the operand number of the current instruction', structure='the `structure_t` to apply', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, [structure], **delta)
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types, id=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction', id='the id of a structure', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(opnum, id, **delta):
     '''Apply the structure identified by `id` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, id, **delta)
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types, path=(types.TupleType, types.ListType))
+@document.parameters(opnum='the operand number of the current instruction', path='an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', structure='the `structure_t` to apply', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(ea, opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the address `ea`.'''
     return op_structure(ea, opnum, structure.id, **delta)
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', id='the id of a structure', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(ea, opnum, id, **delta):
     """Apply the structure identified by `id` to the instruction operand `opnum` at the address `ea`.
 
@@ -531,7 +594,9 @@ def op_structure(ea, opnum, id, **delta):
     st = structure.by(sid)
     m = st.by_identifier(mid)
     return op_structure(ea, opnum, [st, m], **delta)
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(types.TupleType, types.ListType))
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', path='an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(ea, opnum, path, **delta):
     """Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.
 
@@ -613,11 +678,15 @@ def op_structure(ea, opnum, path, **delta):
     return True if ok else False
 op_struc = op_struct = utils.alias(op_structure)
 
+@document.aliases('op_enum')
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_enumeration(opnum):
     '''Return the enumeration id of operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum)
+@document.aliases('op_enum')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_enumeration(ea, opnum):
     '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
@@ -631,27 +700,35 @@ def op_enumeration(ea, opnum):
     if res is None:
         raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
     return enumeration.by(res.ec.tid)
+@document.aliases('op_enum')
 @utils.multicase(opnum=six.integer_types, name=basestring)
 @utils.string.decorate_arguments('name')
+@document.parameters(opnum='the operand number of the current instruction', name='the name of the enumeration to apply')
 def op_enumeration(opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
+@document.aliases('op_enum')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=basestring)
 @utils.string.decorate_arguments('name')
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', name='the name of the enumeration to apply')
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
     return op_enumeration(ea, opnum, enumeration.by(name))
+@document.aliases('op_enum')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types+(types.TupleType,))
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', id='the identifer of an enumeration to apply')
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration `id` to operand `opnum` of the instruction at `ea`.'''
     return idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
 op_enum = utils.alias(op_enumeration)
 
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_string(opnum):
     '''Return the string type of operand `opnum` for the current instruction.'''
     return op_string(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
@@ -664,6 +741,7 @@ def op_string(ea, opnum):
 
     return res.strtype
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', strtype='an IDA string type to apply to the operand')
 def op_string(ea, opnum, strtype):
     '''Set the string type used by operand `opnum` for the instruction at `ea` to `strtype`.'''
     res, fl = idaapi.opinfo_t(), database.type.flags(ea)
@@ -677,11 +755,15 @@ def op_string(ea, opnum, strtype):
     return True if ok else False
 
 ## flags
+@document.aliases('op_ref')
 @utils.multicase(opnum=six.integer_types)
+@document.parameters(opnum='the operand number of the current instruction')
 def op_refs(opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the current instruction.'''
     return op_refs(ui.current.address(), opnum)
+@document.aliases('op_ref')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_refs(ea, opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
     inst = at(ea)
@@ -837,13 +919,16 @@ class type(object):
         > print instruction.type.is_branch(ea)
 
     """
+    @document.aliases('is_return', 'type.isReturn', 'type.returnQ', 'type.retQ', 'isReturn', 'returnQ', 'retQ')
     @utils.multicase()
     @classmethod
     def is_return(cls):
         '''Returns true if the current instruction is a return-type instruction.'''
         return cls.is_return(ui.current.address())
+    @document.aliases('is_return', 'type.isReturn', 'type.returnQ', 'type.retQ', 'isReturn', 'returnQ', 'retQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_return(cls, ea):
         '''Returns true if the instruction at `ea` is a return-type instruction.'''
         ea = interface.address.inside(ea)
@@ -857,39 +942,48 @@ class type(object):
         return database.is_code(ea) and returnQ(ea)
     isReturn = returnQ = retQ = utils.alias(is_return, 'type')
 
+    @document.aliases('is_shift', 'type.isShift', 'type.shiftQ', 'isShift', 'shiftQ')
     @utils.multicase()
     @classmethod
     def is_shift(cls):
         '''Returns true if the current instruction is a bit-shifting instruction.'''
         return cls.is_shift(ui.current.address())
+    @document.aliases('is_shift', 'type.isShift', 'type.shiftQ', 'isShift', 'shiftQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_shift(cls, ea):
         '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
         ea = interface.address.inside(ea)
         return database.is_code(ea) and feature(ea) & idaapi.CF_SHFT == idaapi.CF_SHFT
     isShift = shiftQ = utils.alias(is_shift, 'type')
 
+    @document.aliases('is_branch', 'type.isBranch', 'type.branchQ', 'isBranch', 'branchQ')
     @utils.multicase()
     @classmethod
     def is_branch(cls):
         '''Returns true if the current instruction is any kind of branch.'''
         return cls.is_branch(ui.current.address())
+    @document.aliases('is_branch', 'type.isBranch', 'type.branchQ', 'isBranch', 'branchQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_branch(cls, ea):
         '''Returns true if the instruction at `ea` is any kind of branch.'''
         ea = interface.address.inside(ea)
         return database.is_code(ea) and cls.is_jmp(ea) or cls.is_jxx(ea) or cls.is_jmpi(ea)
     isBranch = branchQ = utils.alias(is_branch, 'type')
 
+    @document.aliases('is_jmp', 'type.isJmp', 'type.JmpQ', 'type.jmpQ', 'isJmp', 'JmpQ', 'jmpQ', 'isJmp')
     @utils.multicase()
     @classmethod
     def is_jmp(cls):
         '''Returns true if the current instruction is an immediate and indirect branch.'''
         return cls.is_jmp(ui.current.address())
+    @document.aliases('is_jmp', 'type.isJmp', 'type.JmpQ', 'type.jmpQ', 'isJmp', 'JmpQ', 'jmpQ', 'isJmp')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_jmp(cls, ea):
         '''Returns true if the instruction at `ea` is an immediate and indrect branch.'''
         ea = interface.address.inside(ea)
@@ -898,13 +992,16 @@ class type(object):
         return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_STOP == idaapi.CF_STOP) and len(list(X)) == 1 and not cls.is_return(ea)
     isJmp = jmpQ = utils.alias(is_jmp, 'type')
 
+    @document.aliases('is_jxx', 'type.isJxx', 'type.JxxQ', 'type.jxxQ', 'isJxx', 'JxxQ', 'jxxQ')
     @utils.multicase()
     @classmethod
     def is_jxx(cls):
         '''Returns true if the current instruction is a conditional branch.'''
         return cls.is_jxx(ui.current.address())
+    @document.aliases('is_jxx', 'type.isJxx', 'type.JxxQ', 'type.jxxQ', 'isJxx', 'JxxQ', 'jxxQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_jxx(cls, ea):
         '''Returns true if the instruction at `ea` is a conditional branch.'''
         ea = interface.address.inside(ea)
@@ -913,13 +1010,16 @@ class type(object):
         return database.is_code(ea) and all((F&x != x) for x in {idaapi.CF_CALL, idaapi.CF_STOP}) and len(list(X)) > 1
     isJxx = jxxQ = utils.alias(is_jxx, 'type')
 
+    @document.aliases('is_jmpi', 'type.isJmpi', 'type.JmpiQ', 'type.jmpiQ', 'isJmpi', 'JmpiQ', 'jmpiQ')
     @utils.multicase()
     @classmethod
     def is_jmpi(cls):
         '''Returns true if the instruction at the current address is an indirect branch.'''
         return cls.is_jmpi(ui.current.address())
+    @document.aliases('is_jmpi', 'type.isJmpi', 'type.JmpiQ', 'type.jmpiQ', 'isJmpi', 'JmpiQ', 'jmpiQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_jmpi(cls, ea):
         '''Returns true if the instruction at `ea` is an indirect branch.'''
         ea = interface.address.inside(ea)
@@ -927,13 +1027,16 @@ class type(object):
         return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_JUMP == idaapi.CF_JUMP)
     isJmpi = jmpiQ = utils.alias(is_jmpi, 'type')
 
+    @document.aliases('is_call', 'type.isCall', 'type.callQ', 'isCall', 'callQ')
     @utils.multicase()
     @classmethod
     def is_call(cls):
         '''Returns true if the current instruction is a call.'''
         return cls.is_call(ui.current.address())
+    @document.aliases('is_call', 'type.isCall', 'type.callQ', 'isCall', 'callQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_call(cls, ea):
         '''Returns true if the instruction at `ea` is a call.'''
         ea = interface.address.inside(ea)
@@ -945,13 +1048,16 @@ class type(object):
         return database.is_code(ea) and (feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL)
     isCall = callQ = utils.alias(is_call, 'type')
 
+    @document.aliases('is_calli', 'type.isCalli', 'type.calliQ', 'isCalli', 'calliQ')
     @utils.multicase()
     @classmethod
     def is_calli(cls):
         '''Return true if the current instruction is an indirect call.'''
         return cls.is_calli(ui.current.address())
+    @document.aliases('is_calli', 'type.isCalli', 'type.calliQ', 'isCalli', 'calliQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address of an instruction')
     def is_calli(cls, ea):
         '''Returns true if the instruction at `ea` is an indirect call.'''
         ea = interface.address.inside(ea)
@@ -972,6 +1078,7 @@ is_calli = calliQ = utils.alias(type.is_calli, 'type')
 
 ## operand type registration
 ## XXX: This namespace is deleted after each method has been assigned to their lookup table
+@document.hidden
 class operand_types:
     """
     This internal namespace is responsible for registering the operand
@@ -1200,11 +1307,13 @@ class operand_types:
 del(operand_types)
 
 ## intel operands
+@document.namespace
 class intelops:
     """
     This internal namespace contains the different operand types that
     can be returned for the Intel architecture.
     """
+    @document.classdef
     class SegmentOffset(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple representing an address with a segment register attached for Intel.
@@ -1224,6 +1333,7 @@ class intelops:
             if s is not None: yield s
     SO = SegmentOffset
 
+    @document.classdef
     class SegmentOffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple representing a memory phrase for the Intel architecture.
@@ -1250,6 +1360,7 @@ class intelops:
             if i is not None: yield i
     SOBIS = SegmentOffsetBaseIndexScale
 
+    @document.classdef
     class OffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple representing a memory phrase for the Intel architecture.
@@ -1274,12 +1385,14 @@ class intelops:
     OBIS = OffsetBaseIndexScale
 
 ## arm operands
+@document.namespace
 class armops:
     """
     This internal namespace contains the different operand types that
     can be returned for the ARM architecture.
     """
 
+    @document.classdef
     class flex(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple representing a flexible operand as available on the ARM architecture.
@@ -1304,6 +1417,7 @@ class armops:
             r, _, _ = self
             yield r
 
+    @document.classdef
     class list(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple representing a register list on the ARM architecture.
@@ -1320,6 +1434,7 @@ class armops:
             res, = self
             for r in res: yield r
 
+    @document.classdef
     class disp(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple representing a memory displacement on the ARM architecture.
@@ -1342,6 +1457,7 @@ class armops:
             r, _ = self
             yield r
 
+    @document.classdef
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple for representing a memory phrase on the ARM architecture
@@ -1365,6 +1481,7 @@ class armops:
             yield rn
             yield rm
 
+    @document.classdef
     class mem(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple for representing a memory operand on the ARM architecture.
@@ -1382,12 +1499,14 @@ class armops:
             yield   # so that this function is still treated as a generator
 
 ## mips operands
+@document.namespace
 class mipsops:
     """
     This internal namespace contains the different operand types that
     can be returned for the MIPS architecture.
     """
 
+    @document.classdef
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple for representing a memory phrase on the MIPS architecture.
@@ -1407,6 +1526,7 @@ class mipsops:
             r, _ = self
             yield r
 
+    @document.hidden
     @staticmethod
     def coproc(regnum):
         """
@@ -1427,6 +1547,7 @@ class mipsops:
         return res[regnum] if regnum in res else architecture.by_name("{:d}".format(regnum))
 
 ## architecture registers
+@document.classdef
 class Intel(interface.architecture_t):
     """
     An implementation of all the registers available on the Intel architecture.
@@ -1486,6 +1607,7 @@ class Intel(interface.architecture_t):
         ##mxcsr
         ## 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
 
+@document.classdef
 class AArch32(interface.architecture_t):
     """
     An implementation of all the registers available on the AArch32 (ARM) architecture.
@@ -1515,6 +1637,7 @@ class AArch32(interface.architecture_t):
 
         # FIXME: include x registers
 
+@document.classdef
 class Mips(interface.architecture_t):
     """
     An implementation of all the registers available on the MIPS architecture.
