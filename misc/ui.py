@@ -36,6 +36,7 @@ def application():
     '''Return the current instance of the IDA Application.'''
     raise internal.exceptions.MissingMethodError
 
+@document.namespace
 class ask(object):
     """
     This namespace contains utilities for asking the user for some
@@ -52,6 +53,7 @@ class ask(object):
         '''Request the user choose from the options "yes", "no", or "cancel".'''
         return cls(u'', **default)
     @internal.utils.multicase(message=basestring)
+    @document.parameters(message='the message to display when asking the user for input', default='if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default')
     def __new__(cls, message, **default):
         '''Request the user choose from the options "yes", "no", or "cancel" using the specified `message` as the prompt.'''
         return cls.yn(message, **default)
@@ -63,6 +65,7 @@ class ask(object):
         return cls.yn(u'', **default)
     @internal.utils.multicase(message=basestring)
     @classmethod
+    @document.parameters(message='the message to display when asking the user for input', default='if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default')
     @internal.utils.string.decorate_arguments('message')
     def yn(cls, message, **default):
         """Request the user choose from the options "yes", "no", or "cancel" using the specified `message` as the prompt.
@@ -90,6 +93,7 @@ class ask(object):
         return cls.address(u'', **default)
     @internal.utils.multicase(message=basestring)
     @classmethod
+    @document.parameters(message='the message to display when asking the user for input', default='the default address for the user to change. if one was not specified, then use the current address.')
     @internal.utils.string.decorate_arguments('message')
     def address(cls, message, **default):
         """Request the user provide an address using the specified `message` as the prompt.
@@ -128,6 +132,7 @@ class ask(object):
         '''Request the user provide an integer.'''
         return cls.integer(u'', **default)
     @internal.utils.multicase(message=basestring)
+    @document.parameters(message='the message to display when asking the user for input', default='the default integer for the user to change. if one was not specified, then use the previous integer that the user input.')
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def integer(cls, message, **default):
@@ -150,6 +155,7 @@ class ask(object):
         '''Request the user provide a segment.'''
         return cls.segment(u'', **default)
     @internal.utils.multicase(message=basestring)
+    @document.parameters(message='the message to display when asking the user for input', default='the default segment for the user to change. if one was not specified, then use the address of the current segment.')
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def segment(cls, message, **default):
@@ -176,6 +182,7 @@ class ask(object):
         '''Request the user provide a string.'''
         return cls.string(u'', **default)
     @internal.utils.multicase(message=basestring)
+    @document.parameters(message='the message to display when asking the user for input', default='the default string for the user to change')
     @classmethod
     @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
     def string(cls, message, **default):
@@ -195,6 +202,7 @@ class ask(object):
         '''Request the user provide a multi-lined string.'''
         return cls.note(u'', **default)
     @internal.utils.multicase(message=basestring)
+    @document.parameters(message='the message to display when asking the user for input', default='the default string for the user to change')
     @classmethod
     @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
     def note(cls, message, **default):
@@ -208,6 +216,7 @@ class ask(object):
         result = idaapi.ask_text(length, internal.utils.string.to(dflt), internal.utils.string.to(message))
         return internal.utils.string.of(result)
 
+@document.namespace
 class current(object):
     """
     This namespace contains tools for fetching information about the
@@ -253,6 +262,7 @@ class current(object):
         if res and res[1]:
             return res[0]
         return res
+    @document.aliases('current.selected')
     @classmethod
     def selection(cls):
         '''Return the current address range of whatever is selected'''
@@ -283,6 +293,7 @@ class current(object):
         # FIXME: cast this to a QWindow somehow?
         return window.main()
 
+@document.namespace
 class state(object):
     """
     This namespace is for fetching or interacting with the current
@@ -298,16 +309,19 @@ class state(object):
             return res.graph_view != 0
         return res.is_graph_view()
 
+    @document.aliases('wait')
     @classmethod
     def wait(cls):
         '''Wait until IDA's autoanalysis queues are empty.'''
         return idaapi.autoWait() if idaapi.__version__ < 7.0 else idaapi.auto_wait()
 
+    @document.aliases('beep')
     @classmethod
     def beep(cls):
         '''Beep using IDA's interface.'''
         return idaapi.beep()
 
+    @document.aliases('refresh')
     @classmethod
     def refresh(cls):
         '''Refresh all of IDA's windows.'''
@@ -317,11 +331,13 @@ class state(object):
 
 wait, beep, refresh = internal.utils.alias(state.wait, 'state'), internal.utils.alias(state.beep, 'state'), internal.utils.alias(state.refresh, 'state')
 
+@document.namespace
 class appwindow(object):
     """
     Base namespace used for interacting with the windows provided by IDA.
     """
     @classmethod
+    @document.parameters(args='any options or arguments to pass to the windows open function')
     def open(cls, *args):
         '''Open or show the window belonging to the namespace.'''
         global widget
@@ -334,6 +350,7 @@ class appwindow(object):
         res = cls.open()
         return res.deleteLater()
 
+@document.namespace
 class disassembly(appwindow):
     """
     This namespace is for interacting with the Disassembly window.
@@ -346,6 +363,7 @@ class disassembly(appwindow):
         '''Refresh the main IDA disassembly view.'''
         return idaapi.refresh_idaview_anyway()
 
+@document.namespace
 class exports(appwindow):
     """
     This namespace is for interacting with the Exports window.
@@ -353,6 +371,7 @@ class exports(appwindow):
     __open__ = staticmethod(idaapi.open_exports_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
+@document.namespace
 class imports(appwindow):
     """
     This namespace is for interacting with the Imports window.
@@ -360,6 +379,7 @@ class imports(appwindow):
     __open__ = staticmethod(idaapi.open_imports_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
+@document.namespace
 class names(appwindow):
     """
     This namespace is for interacting with the Names window.
@@ -376,25 +396,30 @@ class names(appwindow):
         '''Return the number of elements in the names list.'''
         return idaapi.get_nlist_size()
     @classmethod
+    @document.parameters(ea='the address of the symbol to check')
     def contains(cls, ea):
         '''Return whether the address `ea` is referenced in the names list.'''
         return idaapi.is_in_nlist(ea)
     @classmethod
+    @document.parameters(ea='the address of the symbol to return the index for')
     def search(cls, ea):
         '''Return the index of the address `ea` in the names list.'''
         return idaapi.get_nlist_idx(ea)
 
     @classmethod
+    @document.parameters(index='the index in the list to return')
     def at(cls, index):
         '''Return the address and the symbol name of the specified `index`.'''
         ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
         return ea, internal.utils.string.of(name)
     @classmethod
+    @document.parameters(index='the index in the list to return')
     def name(cls, index):
         '''Return the name at the specified `index`.'''
         res = idaapi.get_nlist_name(index)
         return internal.utils.string.of(res)
     @classmethod
+    @document.parameters(index='the index in the list to return')
     def ea(cls, index):
         '''Return the address at the specified `index`.'''
         return idaapi.get_nlist_ea(index)
@@ -406,6 +431,7 @@ class names(appwindow):
             yield cls.at(idx)
         return
 
+@document.namespace
 class functions(appwindow):
     """
     This namespace is for interacting with the Functions window.
@@ -413,6 +439,7 @@ class functions(appwindow):
     __open__ = staticmethod(idaapi.open_funcs_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
+@document.namespace
 class structures(appwindow):
     """
     This namespace is for interacting with the Structures window.
@@ -420,6 +447,7 @@ class structures(appwindow):
     __open__ = staticmethod(idaapi.open_structs_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
 
+@document.namespace
 class strings(appwindow):
     """
     This namespace is for interacting with the Strings window.
@@ -460,6 +488,7 @@ class strings(appwindow):
         '''Return the number of elements in the strings list.'''
         return idaapi.get_strlist_qty()
     @classmethod
+    @document.parameters(index='the index of the string item to return')
     def at(cls, index):
         '''Return the string at the specified `index`.'''
         si = idaapi.string_info_t()
@@ -470,6 +499,7 @@ class strings(appwindow):
             raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
         return si
     @classmethod
+    @document.parameters(index='the index of the string to return')
     def get(cls, index):
         '''Return the address and the string at the specified `index`.'''
         si = cls.at(index)
@@ -483,6 +513,7 @@ class strings(appwindow):
             yield cls.get(index)
         return
 
+@document.namespace
 class segments(appwindow):
     """
     This namespace is for interacting with the Segments window.
@@ -490,6 +521,7 @@ class segments(appwindow):
     __open__ = staticmethod(idaapi.open_segments_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
+@document.namespace
 class notepad(appwindow):
     """
     This namespace is for interacting with the Notepad window.
@@ -497,12 +529,14 @@ class notepad(appwindow):
     __open__ = staticmethod(idaapi.open_notepad_window)
     __open_defaults__ = ()
 
+@document.namespace
 class timer(object):
     """
     This namespace is for registering a python callable to a timer in IDA.
     """
     clock = {}
     @classmethod
+    @document.parameters(id='a unique id used to refer to the callable being registered in the timer', interval='what interval to execute the callable at', callable='a python callable to execute when the timer ticks')
     def register(cls, id, interval, callable):
         '''Register the specified `callable` with the requested `id` to be called at every `interval`.'''
         if id in cls.clock:
@@ -512,6 +546,7 @@ class timer(object):
         cls.clock[id] = res = idaapi.register_timer(interval, callable)
         return res
     @classmethod
+    @document.parameters(id='the unique id of the callable to unregister')
     def unregister(cls, id):
         '''Unregister the specified `id`.'''
         raise internal.exceptions.UnsupportedCapability(u"{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
@@ -526,6 +561,7 @@ class timer(object):
         return
 
 ### updating the state of the colored navigation band
+@document.namespace
 class navigation(object):
     """
     This namespace is for updating the state of the colored navigation band.
@@ -541,11 +577,13 @@ class navigation(object):
         __auto__ = staticmethod(idaapi.showAuto if idaapi.__version__ < 7.0 else idaapi.show_auto)
 
     @classmethod
+    @document.parameters(ea='the address to set the navigation bar pointer to')
     def set(cls, ea):
         '''Set the auto-analysis address on the navigation bar to `ea`.'''
         return cls.__set__(ea)
 
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis address to on the navigation bar', type='if ``type`` is specified as an `idaapi.AU_*`, then use this as the navigation type')
     def auto(cls, ea, **type):
         """Set the auto-analysis address and type on the navigation bar to `ea`.
 
@@ -554,34 +592,46 @@ class navigation(object):
         return cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
 
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis unknown address to on the navigation bar')
     def unknown(cls, ea): return cls.auto(ea, type=idaapi.AU_UNK)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis code address to on the navigation bar')
     def code(cls, ea): return cls.auto(ea, type=idaapi.AU_CODE)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis weak address to on the navigation bar')
     def weak(cls, ea): return cls.auto(ea, type=idaapi.AU_WEAK)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis procedure address to on the navigation bar')
     def procedure(cls, ea): return cls.auto(ea, type=idaapi.AU_PROC)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis tail address to on the navigation bar')
     def tail(cls, ea): return cls.auto(ea, type=idaapi.AU_TAIL)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis stackpointer address to on the navigation bar')
     def stackpointer(cls, ea): return cls.auto(ea, type=idaapi.AU_TRSP)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis analyze address to on the navigation bar')
     def analyze(cls, ea): return cls.auto(ea, type=idaapi.AU_USED)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis type address to on the navigation bar')
     def type(cls, ea): return cls.auto(ea, type=idaapi.AU_TYPE)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis signature address to on the navigation bar')
     def signature(cls, ea): return cls.auto(ea, type=idaapi.AU_LIBF)
     @classmethod
+    @document.parameters(ea='the address to set the auto-analysis final address to on the navigation bar')
     def final(cls, ea): return cls.auto(ea, type=idaapi.AU_FINAL)
 
 ### interfacing with IDA's menu system
 # FIXME: add some support for actually manipulating menus
+@document.namespace
 class menu(object):
     """
     This namespace is for registering items in IDA's menu system.
     """
     state = {}
     @classmethod
+    @document.parameters(path='the menu path to add the item to', name='the name of the item to add', callable='the callable to execute when the item is clicked', hotkey='the key mapping to map the menu item to', args='any parameters to pass to the callable', flags='any extra flags to pass to `idaapi.add_menu_item`')
     def add(cls, path, name, callable, hotkey='', flags=0, args=()):
         '''Register a `callable` as a menu item at the specified `path` with the provided `name`.'''
 
@@ -595,6 +645,7 @@ class menu(object):
         ctx = idaapi.add_menu_item(path, res, hotkey, flags, callable, args)
         cls.state[path, name] = ctx
     @classmethod
+    @document.parameters(path='the menu path containing the item to remove', name='the name of the item to remove')
     def rm(cls, path, name):
         '''Remove the menu item at the specified `path` with the provided `name`.'''
         res = cls.state[path, name]
@@ -608,6 +659,7 @@ class menu(object):
         return
 
 ### Qt wrappers and namespaces
+@document.namespace
 class window(object):
     """
     This namespace is for selecting a specific or particular window.
@@ -623,6 +675,7 @@ class window(object):
         q = application()
         return q.activeWindow()
 
+@document.namespace
 class windows(object):
     """
     Interact with any or all of the top-level windows for the application.
@@ -633,25 +686,30 @@ class windows(object):
         q = application()
         return q.topLevelWindows()
 
+@document.namespace
 class widget(object):
     """
     This namespace is for selecting a specific or particular widget.
     """
+    @document.parameters(x='the X coordinate of the widget', y='the Y coordinate of the widget')
     def __new__(self, (x, y)):
         '''Return the widget at the specified `x` and `y` coordinate.'''
         res = (x, y)
         return cls.at(res)
     @classmethod
+    @document.parameters(x='the X coordinate of the widget', y='the Y coordinate of the widget')
     def at(cls, (x, y)):
         '''Return the widget at the specified `x` and `y` coordinate.'''
         global application
         q = application()
         return q.widgetAt(x, y)
     @classmethod
+    @document.parameters(twidget='the IDA plugin form to convert to a Qt widget')
     def form(cls, twidget):
         '''Return an IDA plugin form as a UI widget.'''
         raise internal.exceptions.MissingMethodError
 
+@document.namespace
 class clipboard(object):
     """
     This namespace is for interacting with the current clipboard state.
@@ -662,6 +720,7 @@ class clipboard(object):
         clp = application()
         return clp.clipboard()
 
+@document.namespace
 class mouse(object):
     """
     Base namespace for interacting with the mouse input.
@@ -678,6 +737,7 @@ class mouse(object):
         '''Return the current `(x, y)` position of the cursor.'''
         raise internal.exceptions.MissingMethodError
 
+@document.namespace
 class keyboard(object):
     """
     Base namespace for interacting with the keyboard input.
@@ -756,7 +816,9 @@ class keyboard(object):
     # Create a cache to store the hotkey context, and the callable that was mapped to it
     __cache__ = {}
 
+    @document.aliases('keyboard.add')
     @classmethod
+    @document.parameters(key='the key to map', callable='a python callable to execute when the specified key is pressed')
     def map(cls, key, callable):
         """Map the specified `key` combination to a python `callable` in IDA.
 
@@ -806,7 +868,9 @@ class keyboard(object):
         cls.__cache__[hotkey] = ctx, callable
         return res
 
+    @document.aliases('keyboard.rm')
     @classmethod
+    @document.parameters(key='the key mapping to unmap')
     def unmap(cls, key):
         '''Unmap the specified `key` from IDA and return the callable that it was assigned to.'''
         frepr = lambda hotkey: internal.utils.string.repr(cls.__of_key__(hotkey))
@@ -861,11 +925,13 @@ try:
     import PyQt5.Qt
     from PyQt5.Qt import QObject
 
+    @document.hidden
     def application():
         '''Return the current instance of the IDA Application.'''
         q = PyQt5.Qt.qApp
         return q.instance()
 
+    @document.hidden
     class mouse(mouse):
         """
         This namespace is for interacting with the mouse input.
@@ -877,6 +943,7 @@ try:
             res = qt.pos()
             return res.x(), res.y()
 
+    @document.hidden
     class keyboard(keyboard):
         """
         This namespace is for interacting with the keyboard input.
@@ -886,12 +953,14 @@ try:
             '''Return the current keyboard input context.'''
             raise internal.exceptions.MissingMethodError
 
+    @document.classdef
     class UIProgress(object):
         """
         Helper class used to simplify the showing of a progress bar in IDA's UI.
         """
         timeout = 5.0
 
+        @document.parameters(blocking='whether to render the progress bar synchronously or asynchronously')
         def __init__(self, blocking=True):
             self.object = res = PyQt5.Qt.QProgressDialog()
             res.setVisible(False)
@@ -907,6 +976,7 @@ try:
         current = property(fget=lambda s: s.object.value())
 
         # methods
+        @document.parameters(width="the percentage of IDA's dimensions to set the width to", height="the percentange of IDA's dimensions to set the height to")
         def open(self, width=0.8, height=0.1):
             '''Open a progress bar with the specified `width` and `height` relative to the dimensions of IDA's window.'''
             global window
@@ -951,6 +1021,18 @@ try:
             '''Close the current progress bar.'''
             self.object.close()
 
+        @document.parameters(
+            options="""
+            The options to update the progress bar with. Some of these options are:
+
+                - ``minimum`` - the minimum value on the progress bar
+                - ``maximum`` - the maximum value on the progress bar
+                - ``text`` - the current text to display
+                - ``title`` - the title of the progress bar
+                - ``tooltip`` - what to emit when the user hovers over the progress bar
+
+            """
+        )
         def update(self, **options):
             '''Update the current state of the progress bar.'''
             minimum, maximum = options.get('min', None), options.get('max', None)
@@ -974,11 +1056,13 @@ try:
                 self.object.setValue(options['value'])
             return res
 
+    @document.hidden
     class widget(widget):
         """
         This namespace is for selecting a specific or particular widget.
         """
         @classmethod
+        @document.parameters(twidget='the IDA plugin form to convert to a Qt widget')
         def form(cls, twidget):
             '''Return an IDA plugin form as a UI widget.'''
             ns = idaapi.PluginForm
@@ -992,11 +1076,13 @@ try:
     import PySide
     import PySide.QtCore, PySide.QtGui
 
+    @document.hidden
     def application():
         '''Return the current instance of the IDA Application.'''
         res = PySide.QtCore.QCoreApplication
         return res.instance()
 
+    @document.hidden
     class mouse(mouse):
         """
         This namespace is for interacting with the mouse input.
@@ -1008,6 +1094,7 @@ try:
             res = qt.pos()
             return res.x(), res.y()
 
+    @document.hidden
     class keyboard(keyboard):
         """
         PySide keyboard interface.
@@ -1017,11 +1104,13 @@ try:
             '''Return the current keyboard input context.'''
             return q.inputContext()
 
+    @document.hidden
     class widget(widget):
         """
         This namespace is for selecting a specific or particular widget.
         """
         @classmethod
+        @document.parameters(twidget='the IDA plugin form to convert to a Qt widget')
         def form(cls, twidget):
             '''Return an IDA plugin form as a UI widget.'''
             ns = idaapi.PluginForm
@@ -1031,6 +1120,7 @@ except ImportError:
     logging.info(u"{:s}:Unable to locate `PySide` module.".format(__name__))
 
 ### wrapper that uses a priorityhook around IDA's hooking capabilities.
+@document.hidden
 class hook(object):
     """
     This namespace exposes the ability to hook different parts of IDA.
@@ -1080,25 +1170,30 @@ class hook(object):
 
 ### Helper classes to use or inherit from
 # XXX: why was this base class implemented again??
+@document.classdef
 class InputBox(idaapi.PluginForm):
     """
     A class designed to be inherited from that can be used
     to interact with the user.
     """
+    @document.parameters(form='an `idaapi.PluginForm` that is created')
     def OnCreate(self, form):
         '''A method to overload to be notified when the plugin form is created.'''
         self.parent = self.FormToPyQtWidget(form)
 
+    @document.parameters(form='an `idaapi.PluginForm` that is created')
     def OnClose(self, form):
         '''A method to overload to be notified when the plugin form is destroyed.'''
         pass
 
+    @document.parameters(caption='the title of the form to show', options='any flags to show the form with')
     def Show(self, caption, options=0):
         '''Show the form with the specified `caption` and `options`.'''
         res = internal.utils.string.to(caption)
         return super(InputBox, self).Show(res, options)
 
 ### Console-only progress bar
+@document.classdef
 class ConsoleProgress(object):
     """
     Helper class used to simplify the showing of a progress bar in IDA's console.
@@ -1114,6 +1209,7 @@ class ConsoleProgress(object):
     minimum = property(fget=lambda s: self.__min__)
     current = property(fget=lambda s: self.__value__)
 
+    @document.parameters(width="the percentage of IDA's dimensions to set the width to", height="the percentange of IDA's dimensions to set the height to")
     def open(self, width=0.8, height=0.1):
         '''Open a progress bar with the specified `width` and `height` relative to the dimensions of IDA's window.'''
         return
@@ -1122,6 +1218,18 @@ class ConsoleProgress(object):
         '''Close the current progress bar.'''
         return
 
+    @document.parameters(
+        options="""
+        The options to update the progress bar with. Some of these options are:
+
+            - ``minimum`` - the minimum value on the progress bar
+            - ``maximum`` - the maximum value on the progress bar
+            - ``text`` - the current text to display
+            - ``title`` - the title of the progress bar
+            - ``tooltip`` - what to emit when the user hovers over the progress bar
+
+        """
+    )
     def update(self, **options):
         '''Update the current state of the progress bar.'''
         minimum, maximum = options.get('min', None), options.get('max', None)
@@ -1144,6 +1252,7 @@ class ConsoleProgress(object):
         return res
 
 ### Fake progress bar class that instantiates whichever one is available
+@document.classdef
 class Progress(object):
     """
     The default progress bar in with which to show progress. This class will
@@ -1153,6 +1262,7 @@ class Progress(object):
 
     timeout = 5.0
 
+    @document.parameters(args='any variable arguments to pass to the determined progress bar', kwargs='any keyword arguments to pass to the determined progress bar')
     def __new__(cls, *args, **kwargs):
         '''Figure out which progress bar to use and instantiate it with the provided parameters `args` and `kwargs`.'''
         if 'UIProgress' not in globals():
@@ -1173,6 +1283,7 @@ class Progress(object):
         return UIProgress(*args, **kwargs)
 
 ### Re-implementation of IDAPython's displayhook that doesn't tamper with classes that inherit from base classes
+@document.hidden
 class DisplayHook(object):
     def __init__(self, displayhook=None):
         if displayhook:
