@@ -34,6 +34,8 @@ import idaapi
 def by_address():
     '''Return the function at the current address.'''
     return by_address(ui.current.address())
+@document.aliases('byaddress')
+@document.parameters(ea='the address of the function to return')
 @utils.multicase(ea=six.integer_types)
 def by_address(ea):
     '''Return the function containing the address `ea`.'''
@@ -44,6 +46,8 @@ def by_address(ea):
     return res
 byaddress = utils.alias(by_address)
 
+@document.aliases('byname')
+@document.parameters(name='the name of the function to return')
 @utils.string.decorate_arguments('name')
 def by_name(name):
     '''Return the function with the specified `name`.'''
@@ -66,19 +70,23 @@ byname = utils.alias(by_name)
 def by():
     '''Return the current function.'''
     return by_address(ui.current.address())
+@document.parameters(func='an `idaapi.func_t` to return')
 @utils.multicase(func=idaapi.func_t)
 def by(func):
     '''Return the function identified by `func`.'''
     return func
+@document.parameters(ea='the address of the function to return')
 @utils.multicase(ea=six.integer_types)
 def by(ea):
     '''Return the function at the address `ea`.'''
     return by_address(ea)
+@document.parameters(name='the name of the function to return')
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def by(name):
     '''Return the function with the specified `name`.'''
     return by_name(name)
+@document.parameters(frame='the `idaapi.struc_t` of the frame to return the function for')
 @utils.multicase(frame=idaapi.struc_t)
 def by(frame):
     '''Return the function that owns the specified `frame`.'''
@@ -86,6 +94,7 @@ def by(frame):
         ea = idaapi.get_func_by_frame(frame.id)
         return by(ea)
     raise E.FunctionNotFoundError(u"{:s}.by({:#x}) : Unable to locate function using a structure that is not a frame.".format(__name__, frame.id))
+@document.parameters(frame='the `strucure_t` of the frame to return the function for')
 @utils.multicase(frame=structure.structure_t)
 def by(frame):
     '''Return the function that owns the specified `frame`.'''
@@ -98,6 +107,7 @@ def offset():
     '''Return the offset from the base of the database for the current function.'''
     func = ui.current.function()
     return offset(func, 0)
+@document.parameters(func='anything referring to a function to return the offset for')
 @utils.multicase()
 def offset(func):
     '''Return the offset from the base of the database for the function `func`.'''
@@ -109,12 +119,14 @@ def offset(func, offset):
     return database.address.offset(ea) + offset
 
 ## properties
+@document.parameters(repeatable='a boolean specifying that the repeatable comment should be returned')
 @utils.multicase()
 def comment(**repeatable):
     '''Return the comment for the current function.'''
     fn = ui.current.function()
     res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
     return utils.string.of(res)
+@document.parameters(func='the function to return the comment for', repeatable='a boolean specifying that the repeatable comment should be returned')
 @utils.multicase()
 def comment(func, **repeatable):
     """Return the comment for the function `func`.
@@ -124,17 +136,20 @@ def comment(func, **repeatable):
     fn = by(func)
     res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
     return utils.string.of(res)
+@document.parameters(string='the comment to apply', repeatable='a boolean specifying that the repeatable comment should be modified')
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
 def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
     fn = ui.current.function()
     return comment(fn, string, **repeatable)
+@document.parameters(none='the python value `None`', repeatable='a boolean specifying that the repeatable comment should be removed')
 @utils.multicase(none=None.__class__)
 def comment(none, **repeatable):
     '''Remove the comment for the current function.'''
     fn = ui.current.function()
     return comment(fn, none or '', **repeatable)
+@document.parameters(func='the function to assign the comment to', string='the comment to apply', repeatable='a boolean specifying that the repeatable comment should be modified')
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
 def comment(func, string, **repeatable):
@@ -148,6 +163,7 @@ def comment(func, string, **repeatable):
     if not ok:
         raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.to(string), repeatable.get('repeatable', True)))
     return res
+@document.parameters(func='the function to remove the comment from', none='the python value `None`', repeatable='a boolean specifying that the repeatable comment should be removed')
 @utils.multicase(none=None.__class__)
 def comment(func, none, **repeatable):
     """Remove the comment for the function `func`.
@@ -160,6 +176,7 @@ def comment(func, none, **repeatable):
 def name():
     '''Return the name of the current function.'''
     return name(ui.current.address())
+@document.parameters(func='the function to return the name for')
 @utils.multicase()
 def name(func):
     '''Return the name of the function `func`.'''
@@ -189,6 +206,7 @@ def name(func):
     #return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
+@document.parameters(none='the python value `None`', flags='any extra flags to use when removing the name')
 @utils.multicase(none=None.__class__)
 def name(none, **flags):
     '''Remove the custom-name from the current function.'''
@@ -196,23 +214,28 @@ def name(none, **flags):
     # in case the user might be hovering over an import table
     # function and wanting to rename that instead.
     return name(ui.current.address(), none or '', **flags)
+@document.parameters(packed='a tuple of integers or strings to use for the name', flags='any extra flags to use when setting the name. if ``listed`` is set to true, then ensure the name is added to the "names" list')
 @utils.multicase(packed=tuple)
 def name(packed, **flags):
     '''Set the name of the current function to the given `packed` name.'''
     return name(ui.current.address(), *packed, **flags)
+@document.parameters(string='the string containing the new name to use', suffix='any extra names to append to the name', flags='any extra flags to use when setting the name. if ``listed`` is set to true, then ensure the name is added to the "names" list')
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
     '''Set the name of the current function to `string`.'''
     return name(ui.current.address(), string, *suffix, **flags)
+@document.parameters(func='the function to remove the name for', none='the python value `None`', flags='any extra flags to use when removing the name')
 @utils.multicase(none=None.__class__)
 def name(func, none, **flags):
     '''Remove the custom-name from the function `func`.'''
     return name(func, none or '', **flags)
+@document.parameters(func='the function to set the name of', packed='a tuple of integers or strings to use for the name', flags='any extra flags to use when setting the name. if ``listed`` is set to true, then ensure the name is added to the "names" list')
 @utils.multicase(packed=tuple)
 def name(func, packed, **flags):
     '''Set the name of the function `func` to the given `packed` name.'''
     return name(func, *packed, **flags)
+@document.parameters(func='the function to set the name of', string='the string containing the new name to use', suffix='any extra names to append to the name', flags='any extra flags to use when setting the name. if ``listed`` is set to true, then ensure the name is added to the "names" list')
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(func, string, *suffix, **flags):
@@ -250,6 +273,7 @@ def prototype():
     '''Return the prototype of the current function if it has one.'''
     # use ui.current.address() instead of ui.current.function() to deal with import table entries
     return prototype(ui.current.address())
+@document.parameters(func='the function to return the prototype for')
 @utils.multicase()
 def prototype(func):
     '''Return the prototype of the function `func` if it has one.'''
@@ -266,11 +290,14 @@ def prototype(func):
         return internal.declaration.demangle(funcname)
     return res
 
+@document.aliases('range')
 @utils.multicase()
 def bounds():
     '''Return a tuple containing the bounds of the first chunk of the current function.'''
     fn = ui.current.function()
     return interface.range.bounds(fn)
+@document.aliases('range')
+@document.parameters(func='the function to return the boundaries for')
 @utils.multicase()
 def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function `func`.'''
@@ -285,12 +312,14 @@ range = utils.alias(bounds)
 def color():
     '''Return the color (RGB) of the current function.'''
     return color(ui.current.function())
+@document.parameters(func='the function to return the color for')
 @utils.multicase()
 def color(func):
     '''Return the color (RGB) of the function `func`.'''
     fn, DEFCOLOR = by(func), 0xffffffff
     b, r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
     return None if fn.color == DEFCOLOR else (r<<16) | (fn.color&0x00ff00) | b
+@document.parameters(func='the function to remove the color from', none='the python value `None`')
 @utils.multicase(none=None.__class__)
 def color(func, none):
     '''Remove the color for the function `func`.'''
@@ -301,6 +330,7 @@ def color(func, none):
         raise E.DisassemblerError(u"{:s}.color({:#x}, {!s}) : Unable to clear the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, none, ea, '.'.join([F.__module__ or '', F.__name__]), ea))
     b, r = (res&0xff0000)>>16, res&0x0000ff
     return None if res == DEFCOLOR else (r<<16) | (res&0x00ff00) | b
+@document.parameters(func='the function to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)')
 @utils.multicase(rgb=six.integer_types)
 def color(func, rgb):
     '''Set the color (RGB) of the function `func` to `rgb`.'''
@@ -312,11 +342,13 @@ def color(func, rgb):
         raise E.DisassemblerError(u"{:s}.color({:#x}, {:#x}) : Unable to set the color of the function at {:#x} with `{:s}({:#x})`.".format(__name__, ea, rgb, ea, '.'.join([F.__module__ or '', F.__name__]), ea))
     b, r = (res&0xff0000)>>16, res&0x0000ff
     return None if res == DEFCOLOR else (r<<16) | (res&0x00ff00) | b
+@document.parameters(none='the python value `None`')
 @utils.multicase(none=None.__class__)
 def color(none):
     '''Remove the color from the current function.'''
     return color(ui.current.function(), None)
 
+@document.aliases('top', 'addr')
 @utils.multicase()
 def address():
     '''Return the address of the entrypoint for the current function.'''
@@ -325,10 +357,14 @@ def address():
     except E.ItemNotFoundError:
         raise E.FunctionNotFoundError(u"{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
     return interface.range.start(res)
+@document.aliases('top', 'addr')
+@document.parameters(func='the function to return the address for')
 @utils.multicase()
 def address(func):
     '''Return the address for the entrypoint belonging to the function `func`.'''
     return address(func, 0)
+@document.aliases('top', 'addr')
+@document.parameters(func='the function to return the address for', offset='the amount to add to the returned address')
 @utils.multicase(offset=six.integer_types)
 def address(func, offset):
     '''Return the address for the entrypoint belonging to the function `func` and add the provided `offset` to it.'''
@@ -340,6 +376,7 @@ top = addr = utils.alias(address)
 def bottom():
     '''Return the exit-points of the current function.'''
     return bottom(ui.current.function())
+@document.parameters(func='the function to return the exit-points for')
 @utils.multicase()
 def bottom(func):
     '''Return the exit-points of the function `func`.'''
@@ -358,6 +395,7 @@ def bottom(func):
 def marks():
     '''Return all the marks in the current function.'''
     return marks(ui.current.function())
+@document.parameters(func='the function containing the marks to return')
 @utils.multicase()
 def marks(func):
     '''Return all the marks in the function `func`.'''
@@ -372,10 +410,13 @@ def marks(func):
     return res
 
 ## functions
+@document.aliases('make', 'add')
 @utils.multicase()
 def new():
     '''Create a new function at the current address.'''
     return new(ui.current.address())
+@document.aliases('make', 'add')
+@document.parameters(ea='the starting address of the function to create')
 @utils.multicase(ea=six.integer_types)
 def new(ea):
     '''Create a new function at the address specified by `ea`.'''
@@ -385,6 +426,8 @@ def new(ea):
         raise E.DisassemblerError(u"{:s}.new({:#x}) : Unable create a new function at the given address ({:#x}) with `{:s}`.".format(__name__, ea, start, fullname))
     ui.state.wait()
     return interface.range.bounds(by_address(start))
+@document.aliases('make', 'add')
+@document.parameters(start='the starting address of the function to create', end='the end address of the function to create')
 @utils.multicase(start=six.integer_types, end=six.integer_types)
 def new(start, end):
     '''Create a new function from the address `start` until `end`.'''
@@ -394,6 +437,8 @@ def new(start, end):
         raise E.DisassemblerError(u"{:s}.new({:#x}, {:#x}) : Unable create a new function for the given boundaries ({:s}) with `{:s}`.".format(__name__, start, end, bounds, fullname))
     ui.state.wait()
     return interface.range.bounds(by_address(ea))
+@document.aliases('make', 'add')
+@document.parameters(bounds='the boundaries of the function to create')
 @utils.multicase(bounds=tuple)
 def new(bounds):
     '''Create a new function using the specified `bounds`.'''
@@ -406,6 +451,7 @@ make = add = utils.alias(new)
 def remove():
     '''Remove the current function from the database.'''
     return remove(ui.current.function())
+@document.parameters(func='the function to remove')
 @utils.multicase()
 def remove(func):
     '''Remove the function `func` from the database.'''
@@ -415,6 +461,7 @@ def remove(func):
         fullname = '.'.join([getattr(idaapi.del_func, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.del_func, attribute)])
         raise E.DisassemblerError(u"{:s}.remove({!r}) : Unable to delete the function at {:#x} ({:s}) with `{:s}`.".format(__name__, func, interface.range.start(fn), bounds, fullname))
     return bounds
+@document.parameters(func='the boundaries of the function to remove')
 @utils.multicase(bounds=tuple)
 def remove(bounds):
     '''Remove the function specified by `bounds` from the database.'''
@@ -422,6 +469,7 @@ def remove(bounds):
     return remove(ea)
 
 ## chunks
+@document.namespace
 class chunks(object):
     """
     This namespace is for interacting with the different chunks
@@ -438,6 +486,7 @@ class chunks(object):
     def __new__(cls):
         '''Yield the bounds of each chunk within current function.'''
         return cls(ui.current.function())
+    @document.parameters(func='the function to yield the chunks for')
     @utils.multicase()
     def __new__(cls, func):
         '''Yield the bounds of each chunk for the function `func`.'''
@@ -453,11 +502,14 @@ class chunks(object):
             if not fci.next(): break
         return results
 
+    @document.aliases('iterate')
     @utils.multicase()
     @classmethod
     def iterate(cls):
         '''Iterate through all the instructions for each chunk in the current function.'''
         return cls.iterate(ui.current.function())
+    @document.aliases('iterate')
+    @document.parameters(func='the function to iterate through')
     @utils.multicase()
     @classmethod
     def iterate(cls, func):
@@ -475,12 +527,14 @@ class chunks(object):
     def at(cls):
         '''Return an ``idaapi.range_t`` describing the bounds of the current function chunk.'''
         return cls.at(ui.current.address())
+    @document.parameters(ea='the address belonging to the chunk to return')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea):
         '''Return an ``idaapi.range_t`` describing the bounds of the function chunk at the address `ea`.'''
         fn = by_address(ea)
         return cls.at(fn, ea)
+    @document.parameters(func='the function containing the chunk', ea='the address belonging to the chunk to return')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, func, ea):
@@ -493,16 +547,21 @@ class chunks(object):
             continue
         raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate the chunk for the given address ({:#x}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
+    @document.aliases('contains')
     @utils.multicase()
     @classmethod
     def contains(cls):
         '''Returns True if the current function contains the current address in any of its chunks.'''
         return cls.contains(ui.current.function(), ui.current.address())
+    @document.aliases('contains')
+    @document.parameters(ea='the address of the chunk to check')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def contains(cls, ea):
         '''Returns True if the current function contains the address `ea` in any of its chunks.'''
         return cls.contains(ui.current.function(), ea)
+    @document.aliases('contains')
+    @document.parameters(func='the function to check the chunk against', ea='the address of the chunk to check')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def contains(cls, func, ea):
@@ -523,11 +582,15 @@ class chunks(object):
         # Now we can just iterate through each chunk whilst checking the bounds.
         return any(start <= ea < end for start, end in iterable)
 
+    @document.aliases('register')
+    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the current function that uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.function(), reg, *regs, **modifiers)
+    @document.aliases('register')
+    @document.parameters(func='the function to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, func, reg, *regs, **modifiers):
@@ -546,11 +609,14 @@ class chunks(object):
             continue
         return
 
+    @document.aliases('chunks.stackpoints')
     @utils.multicase()
     @classmethod
     def points(cls):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the current function.'''
         return cls.points(ui.current.function())
+    @document.aliases('chunks.stackpoints')
+    @document.parameters(func='the function containing the chunks to return the stack points from')
     @utils.multicase()
     @classmethod
     def points(cls, func):
@@ -567,6 +633,7 @@ iterate = utils.alias(chunks.iterate, 'chunks')
 contains = utils.alias(chunks.contains, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
 
+@document.namespace
 class chunk(object):
     """
     This namespace is for interacting with a specific chunk belonging
@@ -585,6 +652,7 @@ class chunk(object):
     def __new__(cls):
         '''Return a tuple containing the bounds of the function chunk at the current address.'''
         return cls(ui.current.address())
+    @document.parameters(ea='the address containing the chunk to return')
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
         '''Return a tuple containing the bounds of the function chunk at the address `ea`.'''
@@ -596,6 +664,7 @@ class chunk(object):
     def owner(cls):
         '''Return the primary owner of the function chunk containing the current address.'''
         return cls.owner(ui.current.address())
+    @document.parameters(ea='the address of the chunk to return the owner of')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def owner(cls, ea):
@@ -603,12 +672,14 @@ class chunk(object):
         if within(ea):
             return next(item for item in cls.owners(ea))
         raise E.FunctionNotFoundError(u"{:s}.owner({:#x}) : Unable to locate a function at the specified address ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, ea))
+    @document.parameters(bounds='the boundaries of the chunk to return the owner of')
     @utils.multicase(bounds=tuple)
     @classmethod
     def owner(cls, bounds):
         '''Return the primary owner of the function chunk specified by `bounds`.'''
         ea, _ = bounds
         return cls.owner(ea)
+    @document.parameters(ea='the address of the chunk to change the owner of', func='the desired function that should own the chunk')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def owner(cls, ea, func):
@@ -619,6 +690,7 @@ class chunk(object):
             fullname = '.'.join([getattr(idaapi.set_tail_owner, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.set_tail_owner, attribute)])
             raise E.DisassemblerError(u"{:s}.owner({#x}, {!r}) : Unable to modify the owner of the chunk at {:#x} to the given function ({:#x}) with `{:s}`.".format('.'.join([__name__, cls.__name__]), ea, func, ea, interface.range.start(fn), fullname))
         return result
+    @document.parameters(bounds='the boundaries of the chunk to change the owner of', func='the desired function that should own the chunk')
     @utils.multicase(bounds=tuple)
     @classmethod
     def owner(cls, bounds, func):
@@ -632,6 +704,7 @@ class chunk(object):
         '''Yield each of the owners which have the current function chunk associated with it.'''
         ea = ui.current.address()
         return (item for item in cls.owners(ea))
+    @document.parameters(ea='the address of the chunk to return each of the functions for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def owners(cls, ea):
@@ -702,6 +775,7 @@ class chunk(object):
         for ea in cls.iterate(ui.current.address()):
             yield ea
         return
+    @document.parameters(ea='the address belonging to the function chunk to iterate through')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def iterate(cls, ea):
@@ -713,11 +787,13 @@ class chunk(object):
             continue
         return
 
+    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the function chunk containing the current address which uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
+    @document.parameters(ea='the address belonging to the function chunk to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
@@ -735,17 +811,22 @@ class chunk(object):
             continue
         return
 
+    @document.aliases('chunk.stackpoints')
     @utils.multicase()
     @classmethod
     def points(cls):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the current function chunk.'''
         return cls.points(ui.current.function(), ui.current.address())
+    @document.aliases('chunk.stackpoints')
+    @document.parameters(ea='the address of the chunk to yield each of the stack points for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def points(cls, ea):
         '''Yield the `(address, delta)` for each stack point where the delta changes in the chunk containing the address `ea`.'''
         fn = by_address(ea)
         return cls.points(fn, ea)
+    @document.aliases('chunk.stackpoints')
+    @document.parameters(func='the function containing the chunk', ea='the address of the chunk to yield each of the stack points for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def points(cls, func, ea):
@@ -797,12 +878,14 @@ class chunk(object):
     def at(cls):
         '''Return an ``idaapi.range_t`` describing the bounds of the current function chunk.'''
         return cls.at(ui.current.function(), ui.current.address())
+    @document.parameters(ea='the address of the chunk to return')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea):
         '''Return an ``idaapi.range_t`` describing the bounds of the function chunk at the address `ea`.'''
         fn = by_address(ea)
         return cls.at(fn, ea)
+    @document.parameters(func='the function containing the chunk', ea='the address of the chunk to return')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, func, ea):
@@ -815,12 +898,14 @@ class chunk(object):
         '''Return the top address of the chunk at the current address.'''
         left, _ = cls()
         return left
+    @document.parameters(ea='the address of the chunk')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def top(cls, ea):
         '''Return the top address of the chunk at address `ea`.'''
         left, _ = cls(ea)
         return left
+    @document.parameters(ea='the address of the chunk to modify', address='the new address to set the top of the chunk with')
     @utils.multicase(ea=six.integer_types, address=six.integer_types)
     @classmethod
     def top(cls, ea, address):
@@ -843,12 +928,14 @@ class chunk(object):
         '''Return the bottom address of the chunk at the current address.'''
         _, right = cls()
         return right
+    @document.parameters(ea='the address of the chunk')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def bottom(cls, ea):
         '''Return the bottom address of the chunk at address `ea`.'''
         _, right = cls(ea)
         return right
+    @document.parameters(ea='the address of the chunk to modify', address='the new address to set the bottom of the chunk with')
     @utils.multicase(ea=six.integer_types, address=six.integer_types)
     @classmethod
     def bottom(cls, ea, address):
@@ -864,11 +951,13 @@ class chunk(object):
     def address(cls):
         '''Return the top address of the function chunk containing the current address.'''
         return cls.address(ui.current.address(), 0)
+    @document.parameters(ea='the address of the chunk')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def address(cls, ea):
         '''Return the top address of the function chunk containing the address `ea`.'''
         return cls.address(ea, 0)
+    @document.parameters(ea='the address of the chunk', offset='the offset to add to the chunk address')
     @utils.multicase(ea=six.integer_types, offset=six.integer_types)
     @classmethod
     def address(cls, ea, offset):
@@ -881,11 +970,13 @@ class chunk(object):
     def offset(cls):
         '''Return the offset from the base of the database for the current function chunk.'''
         return cls.offset(ui.current.address(), 0)
+    @document.parameters(ea='the address of the chunk to return the offset of')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def offset(cls, ea):
         '''Return the offset from the base of the database for the function chunk containing the address `ea`.'''
         return cls.offset(ea, 0)
+    @document.parameters(ea='the address of the chunk to return the offset of', offset='the offset to add to the result')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def offset(cls, ea, offset):
@@ -893,16 +984,22 @@ class chunk(object):
         left, _ = cls(ea)
         return database.address.offset(left) + offset
 
+    @document.aliases('add_chunk')
+    @document.parameters(start='the starting address of the chunk to add')
     @utils.multicase(start=six.integer_types)
     @classmethod
     def add(cls, start):
         '''Add the chunk starting at the address `start` to the current function.'''
         return cls.add(ui.current.function(), start)
+    @document.aliases('add_chunk')
+    @document.parameters(bounds='the boundaries of the chunk to add')
     @utils.multicase(bounds=tuple)
     @classmethod
     def add(cls, bounds):
         '''Add the chunk specified by `bounds` to the current function.'''
         return cls.add(ui.current.function(), bounds)
+    @document.aliases('add_chunk')
+    @document.parameters(func='the function to add the chunk to', ea='the starting address of the chunk to add to the function')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def add(cls, func, ea):
@@ -914,6 +1011,8 @@ class chunk(object):
             raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}) : Unable add the chunk at the specified address ({:#x}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, start, interface.range.start(fn), fullname))
         ui.state.wait()
         return cls(start)
+    @document.aliases('add_chunk')
+    @document.parameters(func='the function to add the chunk to', start='the starting address of the chunk to add to the function', end='the ending address of the chunk')
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
     def add(cls, func, start, end):
@@ -925,6 +1024,8 @@ class chunk(object):
             raise E.DisassemblerError(u"{:s}.add({!r}, {:#x}, {:#x}) : Unable add the specified chunk ({:s}) to the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, start, end, bounds, interface.range.start(fn), fullname))
         ui.state.wait()
         return cls(ea)
+    @document.aliases('add_chunk')
+    @document.parameters(func='the function to add the chunk to', bounds='the boundaries of the chunk to add to the function')
     @utils.multicase(bounds=tuple)
     @classmethod
     def add(cls, func, bounds):
@@ -932,22 +1033,29 @@ class chunk(object):
         start, end = bounds
         return cls.add(func, start, end)
 
+    @document.aliases('remove_chunk')
     @utils.multicase()
     @classmethod
     def remove(cls):
         '''Remove the chunk containing the current address from its function.'''
         return cls.remove(ui.current.address())
+    @document.aliases('remove_chunk')
+    @document.parameters(ea='the address of the chunk to remove')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, ea):
         '''Remove the chunk at `ea` from its function.'''
         return cls.remove(ea, ea)
+    @document.aliases('remove_chunk')
+    @document.parameters(bounds='a tuple describing the boundaries of the chunk to remove')
     @utils.multicase(bounds=tuple)
     @classmethod
     def remove(cls, bounds):
         '''Remove the chunk specified by `bounds` from its function.'''
         ea, _ = bounds
         return cls.remove(ea, ea)
+    @document.aliases('remove_chunk')
+    @document.parameters(func='the function containing the chunk', ea='the address of the chunk to remove from the function')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, func, ea):
@@ -958,6 +1066,8 @@ class chunk(object):
             fullname = '.'.join([getattr(idaapi.remove_func_tail, attribute) for attribute in ['__module__', '__name__'] if hasattr(idaapi.remove_func_tail, attribute)])
             raise E.DisassemblerError(u"{:s}.remove({!r}, {:#x}) : Unable to delete the chunk ({:s}) for the function at {:#x} with `{:s}`.".format('.'.join([__name__, cls.__name__]), func, ea, bounds, interface.range.start(fn), fullname))
         return bounds
+    @document.aliases('remove_chunk')
+    @document.parameters(func='the function containing the chunk', bounds='a tuple describing the boundaries of the chunk to remove')
     @utils.multicase(bounds=tuple)
     @classmethod
     def remove(cls, func, bounds):
@@ -970,6 +1080,7 @@ add_chunk, remove_chunk = utils.alias(chunk.add, 'chunk'), utils.alias(chunk.rem
 def within():
     '''Return if the current address is within a function.'''
     return within(ui.current.address())
+@document.parameters(ea='the address to check for function membership')
 @utils.multicase(ea=six.integer_types)
 def within(ea):
     '''Return if the address `ea` is within a function.'''
@@ -979,6 +1090,7 @@ def within(ea):
         return False
     return idaapi.get_func(ea) is not None and idaapi.segtype(ea) != idaapi.SEG_XTRN
 
+@document.namespace
 class blocks(object):
     """
     This namespace is for interacting with all of the basic blocks within
@@ -1001,20 +1113,24 @@ class blocks(object):
         > G = function.blocks.graph()
 
     """
+    @document.parameters(external='a boolean specifying to include external blocks in the blocks that are returned')
     @utils.multicase()
     def __new__(cls, **external):
         '''Return the bounds of each basic block for the current function.'''
         return cls(ui.current.function(), **external)
+    @document.parameters(func='the function to return the basic blocks for', external='a boolean specifying to include external blocks in the blocks that are returned')
     @utils.multicase()
     def __new__(cls, func, **external):
         '''Returns the bounds of each basic block for the function `func`.'''
         iterable = cls.iterate(func, **external)
         return [ interface.range.bounds(bb) for bb in iterable ]
+    @document.parameters(bounds='the boundaries to use when constraining the returned list of basic blocks', external='a boolean specifying to include external blocks in the blocks that are returned')
     @utils.multicase(bounds=tuple)
     def __new__(cls, bounds, **external):
         '''Return each basic block contained within the specified `bounds`.'''
         (left, _), (_, right) = map(interface.range.unpack, map(cls.at, bounds))
         return cls(left, right + 1, **external)
+    @document.parameters(left='the top address of the basic block', right='the bottom address of the basic block', external='a boolean specifying to include external blocks in the blocks that are returned')
     @utils.multicase()
     def __new__(cls, left, right, **external):
         """Returns each basic block contained between the addresses `left` and `right`.
@@ -1036,11 +1152,13 @@ class blocks(object):
         (left, _), (_, right) = map(interface.range.unpack, map(cls.at, [left, right]))
         return [ bounds for bounds in filtered(left, right) ]
 
+    @document.parameters(external='a boolean specifying to include external blocks in the blocks that are returned')
     @utils.multicase()
     @classmethod
     def iterate(cls, **external):
         '''Return each ``idaapi.BasicBlock`` for the current function.'''
         return cls.iterate(ui.current.function(), **external)
+    @document.parameters(func='the function containing the basic blocks to yield', external='a boolean specifying to include external blocks in the blocks that are returned')
     @utils.multicase()
     @classmethod
     def iterate(cls, func, **external):
@@ -1054,6 +1172,7 @@ class blocks(object):
         fc_flags |= 0 if any(external.get(item, False) for item in ['external', 'externals']) else FC_NOEXT
         fc_flags |= 0 if any(not external[item] for item in ['call', 'calls', 'split'] if item in external) else FC_CALL_ENDS
         return cls.iterate(func, fc_flags, **external)
+    @document.parameters(func='the function containing the basic blocks to yield', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart', silent='a boolean specifying to exclude warnings about blocks that are outside the function')
     @utils.multicase(flags=six.integer_types)
     @classmethod
     def iterate(cls, func, flags, **silent):
@@ -1104,62 +1223,73 @@ class blocks(object):
             continue
         return
 
+    @document.parameters(flags='the flags from ``idaapi.FC_*`` to use when building the flowchart to traverse')
     @utils.multicase()
     @classmethod
     def walk(cls, **flags):
         '''Traverse each of the successor blocks starting from the beginning of the current function.'''
         fn = ui.current.function()
         return cls.traverse(fn, interface.range.start(fn), operator.methodcaller('succs'), **flags)
+    @document.parameters(func='the function containing to traverse the successors of', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart to traverse')
     @utils.multicase()
     @classmethod
     def walk(cls, func, **flags):
         '''Traverse each of the successor blocks starting from the beginning of the function `func`.'''
         fn = by(func)
         return cls.traverse(fn, interface.range.start(fn), operator.methodcaller('succs'), **flags)
+    @document.parameters(func='the function containing the block to traverse the successors of', ea='the address of the block to start at', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def walk(cls, func, ea, **flags):
         '''Traverse each of the successor blocks of the block identified by `ea` belonging to the function `func`.'''
         return cls.traverse(func, ea, operator.methodcaller('succs'), **flags)
+    @document.parameters(bb='the ``idaapi.BasicBlock`` to traverse the successors of')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def walk(cls, bb):
         '''Traverse each of the successor blocks from the ``idaapi.BasicBlock`` identified by `bb`.'''
         return cls.traverse(bb, operator.methodcaller('succs'))
+    @document.parameters(flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase()
     @classmethod
     def moonwalk(cls, **flags):
         '''Traverse each of the predecessor blocks for the current function starting with the block at the current address.'''
         ea = ui.current.address()
         return cls.traverse(ea, ea, operator.methodcaller('preds'), **flags)
+    @document.parameters(ea='the address of the block to start at', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def moonwalk(cls, ea, **flags):
         '''Traverse each of the predecessor blocks for a function starting with the block at the address `ea`.'''
         return cls.traverse(ea, ea, operator.methodcaller('preds'), **flags)
+    @document.parameters(func='the function containing the block to traverse the predecessors of', ea='the address of the block to start at', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def moonwalk(cls, func, ea, **flags):
         '''Traverse each of the predecessor blocks from the block at address `ea` belonging to the function `func`.'''
         return cls.traverse(func, ea, operator.methodcaller('preds'), **flags)
+    @document.parameters(bb='the ``idaapi.BasicBlock`` to traverse the predecessors of')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def moonwalk(cls, bb):
         '''Traverse each of the predecessor blocks from the ``idaapi.BasicBlock`` identified by `bb`.'''
         return cls.traverse(bb, operator.methodcaller('preds'))
 
+    @document.parameters(flags='the flags from ``idaapi.FC_*`` to use when building the flowchart to traverse')
     @utils.multicase()
     @classmethod
     def traverse(cls, **flags):
         '''Traverse each of the successor blocks starting from the beginning of the current function.'''
         fn = ui.current.function()
         return cls.traverse(fn, interface.range.start(fn), operator.methodcaller('succs'), **flags)
+    @document.parameters(predicate='a callable (such as `block.before` or `block.after`) returning the blocks to choose from', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart to traverse')
     @utils.multicase(predicate=callable)
     @classmethod
     def traverse(cls, predicate, **flags):
         '''Traverse the blocks from the beginning of the current function until the callable `predicate` returns no more elements.'''
         fn = ui.current.function()
         return cls.traverse(fn, interface.range.start(fn), predicate, **flags)
+    @document.parameters(func='the function to traverse', predicate='a callable (such as `block.before` or `block.after`) returning the blocks to choose from', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart to traverse')
     @utils.multicase(predicate=callable)
     @classmethod
     def traverse(cls, func, predicate, **flags):
@@ -1167,6 +1297,7 @@ class blocks(object):
         fn = by(func)
         ea = interface.range.start(fn)
         return cls.traverse(fn, ea, predicate, **flags)
+    @document.parameters(func='the function containing the block', ea='the address of the block to start at', predicate='a callable (such as `block.before` or `block.after`) returning the blocks to choose from', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase(ea=six.integer_types, predicate=callable)
     @classmethod
     def traverse(cls, func, ea, predicate, **flags):
@@ -1174,6 +1305,7 @@ class blocks(object):
         fn = by(func)
         bb = cls.at(fn, ea, **flags)
         return cls.traverse(bb, predicate)
+    @document.parameters(bb='the ``idaapi.BasicBlock`` to start at', predicate='a callable (such as `block.before` or `block.after`) returning the blocks to choose from')
     @utils.multicase(bb=idaapi.BasicBlock, predicate=callable)
     @classmethod
     def traverse(cls, bb, predicate):
@@ -1221,17 +1353,20 @@ class blocks(object):
             choices = [item for item in available]
         return
 
+    @document.parameters(flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase()
     @classmethod
     def at(cls, **flags):
         '''Return the ``idaapi.BasicBlock`` at the current address in the current function.'''
         return cls.at(ui.current.function(), ui.current.address(), **flags)
+    @document.parameters(ea='the address of the basic block to return', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` of address `ea` in the current function.'''
         fn = by_address(ea)
         return cls.at(fn, ea, **flags)
+    @document.parameters(func='the function containing the basic block', ea='the address of the basic block to return', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, func, ea, **flags):
@@ -1240,6 +1375,7 @@ class blocks(object):
         fc_flags = flags.get('flags', idaapi.FC_PREDS | FC_NOEXT)
         fc_flags |= 0 if any(not flags[item] for item in ['call', 'calls', 'split'] if item in flags) else FC_CALL_ENDS
         return cls.at(func, ea, fc_flags)
+    @document.parameters(func='the function containing the basic block', ea='the address of the basic block to return', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase(ea=six.integer_types, flags=six.integer_types)
     @classmethod
     def at(cls, func, ea, flags):
@@ -1250,6 +1386,7 @@ class blocks(object):
                 return bb
             continue
         raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in the specified function ({:#x}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+    @document.parameters(func='the function containing the basic block', bb='the ``idaapi.BasicBlock`` containing the boundaries to match')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def at(cls, bb):
@@ -1302,16 +1439,22 @@ class blocks(object):
             raise E.ItemNotFoundError(u"{:s}.at({:#x}, {!s}) : Unable to locate the `idaapi.BasicBlock` for the given bounds ({:s}) in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), bounds, bounds, interface.range.start(fn)))
         return result
 
+    @document.aliases('flowchart')
+    @document.parameters(flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase()
     @classmethod
     def flowchart(cls, **flags):
         '''Return an ``idaapi.FlowChart`` object for the current function.'''
         return cls.flowchart(ui.current.function(), **flags)
+    @document.aliases('flowchart')
+    @document.parameters(func='the function to return the flowchart for', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase()
     @classmethod
     def flowchart(cls, func, **flags):
         '''Return an ``idaapi.FlowChart`` object for the function `func`.'''
         return cls.flowchart(func, flags.get('flags', idaapi.FC_PREDS))
+    @document.aliases('flowchart')
+    @document.parameters(func='the function to return the flowchart for', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase(flags=six.integer_types)
     @classmethod
     def flowchart(cls, func, flags):
@@ -1420,11 +1563,14 @@ class blocks(object):
             if collected: yield interface.range.bounds(results[ea]), collected
         return
 
+    @document.aliases('blocks.graph', 'graph', 'digraph')
     @utils.multicase()
     @classmethod
     def digraph(cls):
         '''Return a ``networkx.DiGraph`` of the function at the current address.'''
         return cls.digraph(ui.current.function())
+    @document.aliases('blocks.graph', 'graph', 'digraph')
+    @document.parameters(func='the function to return a graph for', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart')
     @utils.multicase()
     @classmethod
     def digraph(cls, func, **flags):
@@ -1589,11 +1735,13 @@ class blocks(object):
         return G
     graph = utils.alias(digraph, 'blocks')
 
+    @document.parameters(start='the address of the basic block to start from', exits='the addresses of basic blocks to stop at')
     @utils.multicase(start=six.integer_types, exits=(six.integer_types, builtins.list, builtins.tuple, builtins.set))
     @classmethod
     def subgraph(cls, start, exits):
         '''Return a ``networkx.DiGraph`` subgraph of the current function from address `start` and terminating at any address in `exits`.'''
         return cls.subgraph(ui.current.function(), start, exits)
+    @document.parameters(func='the function to return the graph from', start='the address of the basic block to start from', exits='the addresses of basic blocks to stop at')
     @utils.multicase(start=six.integer_types, exits=(six.integer_types, builtins.list, builtins.tuple, builtins.set))
     @classmethod
     def subgraph(cls, func, start, exits):
@@ -1620,6 +1768,7 @@ class blocks(object):
 flowchart = utils.alias(blocks.flowchart, 'blocks')
 digraph = graph = utils.alias(blocks.digraph, 'blocks')
 
+@document.namespace
 class block(object):
     """
     This namespace is for interacting with a single basic block
@@ -1640,17 +1789,20 @@ class block(object):
         > print( function.block.disasm(ea) )
 
     """
+    @document.parameters(flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase()
     @classmethod
     def at(cls, **flags):
         '''Return the ``idaapi.BasicBlock`` of the current address in the current function.'''
         return cls.at(ui.current.function(), ui.current.address(), **flags)
+    @document.parameters(ea='the address of the basic block to return', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea, **flags):
         '''Return the ``idaapi.BasicBlock`` of address `ea` in the current function.'''
         fn = by_address(ea)
         return cls.at(fn, ea, **flags)
+    @document.parameters(func='the function containing the basic block', ea='the address of the basic block to return', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, func, ea, **flags):
@@ -1658,9 +1810,11 @@ class block(object):
         return blocks.at(func, ea, **flags)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
+    @document.parameters(bb='the basic block to return')
     def at(cls, bb):
         '''Return the ``idaapi.BasicBlock`` of the basic block `bb`.'''
         return bb
+    @document.parameters(bounds='the boundaries of the basic block to return', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def at(cls, bounds, **flags):
@@ -1673,21 +1827,25 @@ class block(object):
     def id(cls):
         '''Return the block id of the current address in the current function.'''
         return cls.at(ui.current.function(), ui.current.address()).id
+    @document.parameters(ea='the address of the basic block to return the id for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def id(cls, ea):
         '''Return the block id of address `ea` in the current function.'''
         return cls.at(ea).id
+    @document.parameters(func='the function containing the basic block', ea='the address of the basic block to return the id for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def id(cls, func, ea):
         '''Return the block id of address `ea` in the function `func`.'''
         return cls.at(func, ea).id
+    @document.parameters(bb='the basic block to return the id for')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def id(cls, bb):
         '''Return the block id of the basic block `bb`.'''
         return bb.id
+    @document.parameters(bounds='the boundaries of the basic block to return the id for')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def id(cls, bounds):
@@ -1699,10 +1857,12 @@ class block(object):
         '''Returns the boundaries of the current basic block.'''
         return cls(ui.current.function(), ui.current.address(), **flags)
     @utils.multicase(ea=six.integer_types)
+    @document.parameters(ea='the address containing the basic block to return the boundaries for', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     def __new__(cls, ea, **flags):
         '''Returns the boundaries of the basic block at address `ea`.'''
         return cls(by_address(ea), ea, **flags)
     @utils.multicase(ea=six.integer_types)
+    @document.parameters(func='the function containing the basic block', ea='the address containing the basic block to return the boundaries for', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     def __new__(cls, func, ea, **flags):
         '''Returns the boundaries of the basic block at address `ea` in function `func`.'''
         res = blocks.at(func, ea, **flags)
@@ -1713,10 +1873,12 @@ class block(object):
         res = blocks.at(func, ea, flags)
         return interface.range.bounds(res)
     @utils.multicase(bb=idaapi.BasicBlock)
+    @document.parameters(bb='the basic block to return the boundaries for')
     def __new__(cls, bb):
         '''Returns the boundaries of the basic block `bb`.'''
         return interface.range.bounds(bb)
     @utils.multicase(bounds=builtins.tuple)
+    @document.parameters(bounds='the boundaries of the basic block to return the basic block for', flags='the flags from ``idaapi.FC_*`` to use when building the flowchart the block comes from')
     def __new__(cls, bounds, **flags):
         '''Return the boundaries of the basic block identified by `bounds`.'''
         left, _ = bounds
@@ -1724,53 +1886,65 @@ class block(object):
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @document.parameters(ea='the address to be checked')
     def contains(cls, ea):
         '''Return whether the address `ea` is within the current basic block.'''
         left, right = cls()
         return left <= ea < right
     @utils.multicase(address=six.integer_types, ea=six.integer_types)
     @classmethod
+    @document.parameters(address='the address of the basic block', ea='the address to be checked')
     def contains(cls, address, ea):
         '''Return whether the address `ea` is within the basic block at the specified `address`.'''
         left, right = cls(address)
         return left <= ea < right
     @utils.multicase(address=six.integer_types, ea=six.integer_types)
     @classmethod
+    @document.parameters(func='the function containing the basic block', address='the address of the basic block', ea='the address to be checked')
     def contains(cls, func, address, ea):
         '''Return whether the address `ea` is within the basic block for the function `func` at the specified `address`.'''
         left, right = cls(func, address)
         return left <= ea < right
     @utils.multicase(bb=idaapi.BasicBlock, ea=six.integer_types)
     @classmethod
+    @document.parameters(bb='the basic block to check', ea='the address to be checked')
     def contains(cls, bb, ea):
         '''Return whether the address `ea` is within the basic block `bb`.'''
         left, right = cls(bb)
         return left <= ea < right
     @utils.multicase(bounds=builtins.tuple, ea=six.integer_types)
     @classmethod
+    @document.parameters(bounds='the boundaries of the basic block to check', ea='the address to be checked')
     def contains(cls, bounds, ea):
         '''Return whether the address `ea` is within the basic block identified by `bounds`.'''
         left, right = cls(bounds)
         return left <= ea < right
 
+    @document.aliases('block.address', 'block.addr')
     @utils.multicase()
     @classmethod
     def top(cls):
         '''Return the top address of the basic block at the current address.'''
         left, _ = cls()
         return left
+    @document.aliases('block.address', 'block.addr')
+    @document.parameters(ea='the address belonging to the basic block to return the top address for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def top(cls, ea):
         '''Return the top address of the basic block at address `ea`.'''
         left, _ = cls(ea)
         return left
+    @document.aliases('block.address', 'block.addr')
+    @document.parameters(bb='the basic block to return the top address for')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def top(cls, bb):
         '''Return the top address of the basic block `bb`.'''
         left, _ = cls(bb)
         return left
+    @document.aliases('block.address', 'block.addr')
+    @document.parameters(bounds='the boundaries of the basic block to return the top address for')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def top(cls, bounds):
@@ -1785,18 +1959,21 @@ class block(object):
         '''Return the bottom address of the basic block at the current address.'''
         _, right = cls()
         return right
+    @document.parameters(ea='the address belonging to the basic block to return the bottom address for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def bottom(cls, ea):
         '''Return the bottom address of the basic block at address `ea`.'''
         _, right = cls(ea)
         return right
+    @document.parameters(bb='the basic block to return the bottom address for')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def bottom(cls, bb):
         '''Return the bottom address of the basic block `bb`.'''
         _, right = cls(bb)
         return right
+    @document.parameters(bounds='the boundaries of the basic block to return the bottom address for')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def bottom(cls, bounds):
@@ -1809,11 +1986,13 @@ class block(object):
     def address(cls):
         '''Return the top address for the basic block containing the current address.'''
         return cls.address(ui.current.address(), 0)
+    @document.parameters(ea='the address of the basic block to return the address of')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def address(cls, ea):
         '''Return the top address for the basic block containing the address `ea`.'''
         return cls.address(ea, 0)
+    @document.parameters(ea='the address of the basic block to return the address of', offset='the amount to add to the returned address')
     @utils.multicase(ea=six.integer_types, offset=six.integer_types)
     @classmethod
     def address(cls, ea, offset):
@@ -1826,11 +2005,13 @@ class block(object):
     def offset(cls):
         '''Return the offset from the base of the database for the basic block at the current address.'''
         return cls.offset(ui.current.address(), 0)
+    @document.parameters(ea='the address of the basic block to return the offset of')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def offset(cls, ea):
         '''Return the offset from the base of the database for the basic block at the address `ea`.'''
         return cls.offset(ea, 0)
+    @document.parameters(ea='the address of the basic block to return the offset of', offset='the amount to add to the returned offset')
     @utils.multicase(ea=six.integer_types, offset=six.integer_types)
     @classmethod
     def offset(cls, ea, offset):
@@ -1843,17 +2024,20 @@ class block(object):
     def color(cls):
         '''Returns the color of the basic block at the current address.'''
         return cls.color(ui.current.address())
+    @document.parameters(none='the python value `None`')
     @utils.multicase(none=None.__class__)
     @classmethod
     def color(cls, none):
         '''Removes the color of the basic block at the current address.'''
         return cls.color(ui.current.address(), None)
+    @document.parameters(ea='the address of the basic block to return the color of')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def color(cls, ea):
         '''Returns the color of the basic block at the address `ea`.'''
         bb = cls.at(ea)
         return cls.color(bb)
+    @document.parameters(bb='the basic block to return the color of')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def color(cls, bb):
@@ -1867,12 +2051,14 @@ class block(object):
             b, r = (res&0xff0000)>>16, res&0x0000ff
             return (r<<16) | (res&0x00ff00) | b
         return None
+    @document.parameters(bounds='the boundaries of the basic block to return the color for')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def color(cls, bounds):
         '''Returns the color of the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.color(bb)
+    @document.parameters(ea='the address of the basic block to remove the color from', none='the python value `None`')
     @utils.multicase(ea=six.integer_types, none=None.__class__)
     @classmethod
     def color(cls, ea, none):
@@ -1887,12 +2073,14 @@ class block(object):
         for ea in block.iterate(ea):
             database.color(ea, None)
         return res
+    @document.parameters(bounds='the boundaries of the basic block to remove the color from', none='the python value `None`')
     @utils.multicase(bounds=builtins.tuple, none=None.__class__)
     @classmethod
     def color(cls, bounds, none):
         '''Removes the color of the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.color(bb, None)
+    @document.parameters(bb='the basic block to remove the color from', none='the python value `None`')
     @utils.multicase(bb=idaapi.BasicBlock, none=None.__class__)
     @classmethod
     def color(cls, bb, none):
@@ -1907,6 +2095,7 @@ class block(object):
         for ea in block.iterate(bb):
             database.color(ea, None)
         return res
+    @document.parameters(ea='the address belonging to the basic block to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
     @classmethod
     def color(cls, ea, rgb, **frame):
@@ -1937,6 +2126,7 @@ class block(object):
         for ea in block.iterate(ea):
             database.color(ea, rgb)
         return res
+    @document.parameters(bb='the basic block to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
     def color(cls, bb, rgb, **frame):
@@ -1962,6 +2152,7 @@ class block(object):
         for ea in block.iterate(bb):
             database.color(ea, rgb)
         return res
+    @document.parameters(bounds='the boundaries of the basic block to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     @utils.multicase(bounds=builtins.tuple, rgb=six.integer_types)
     @classmethod
     def color(cls, bounds, rgb, **frame):
@@ -1969,23 +2160,30 @@ class block(object):
         bb = cls.at(bounds)
         return cls.color(bb, rgb, **frame)
 
+    @document.aliases('block.predecessors', 'block.preds')
     @utils.multicase()
     @classmethod
     def before(cls):
         '''Return the addresses of all the instructions that branch to the current basic block.'''
         return cls.before(ui.current.address())
+    @document.aliases('block.predecessors', 'block.preds')
+    @document.parameters(ea='the address of the basic block to return the predecessors for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def before(cls, ea):
         '''Return the addresses of all the instructions that branch to the basic block at address `ea`.'''
         res = blocks.at(ea)
         return cls.before(res)
+    @document.aliases('block.predecessors', 'block.preds')
+    @document.parameters(bounds='the boundaries of the basic block to return the predecessors for')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def before(cls, bounds):
         '''Return the addresses of all the instructions that branch to the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.before(bb)
+    @document.aliases('block.predecessors', 'block.preds')
+    @document.parameters(bb='the basic block to return the predecessors for')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def before(cls, bb):
@@ -1993,23 +2191,30 @@ class block(object):
         return [ database.address.prev(interface.range.end(bb)) for bb in bb.preds() ]
     predecessors = preds = utils.alias(before, 'block')
 
+    @document.aliases('block.successors', 'block.succs')
     @utils.multicase()
     @classmethod
     def after(cls):
         '''Return the addresses of all the instructions that the current basic block leaves to.'''
         return cls.after(ui.current.address())
+    @document.aliases('block.successors', 'block.succs')
+    @document.parameters(ea='the address of the basic block to return the successors for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def after(cls, ea):
         '''Return the addresses of all the instructions that the basic block at address `ea` leaves to.'''
         bb = cls.at(ea)
         return cls.after(bb)
+    @document.aliases('block.successors', 'block.succs')
+    @document.parameters(bounds='the boundaries of the basic block to return the successors for')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def after(cls, bounds):
         '''Return the addresses of all the instructions that branch to the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.after(bb)
+    @document.aliases('block.successors', 'block.succs')
+    @document.parameters(bb='the basic block to return the successors for')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def after(cls, bb):
@@ -2022,17 +2227,20 @@ class block(object):
     def iterate(cls):
         '''Yield all the addresses in the current basic block.'''
         return cls.iterate(ui.current.address())
+    @document.parameters(ea='the address of the basic block to iterate through')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def iterate(cls, ea):
         '''Yield all the addresses in the basic block at address `ea`.'''
         left, right = cls(ea)
         return database.address.iterate(left, right)
+    @document.parameters(bounds='the boundaries of the basic block to iterate through')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def iterate(cls, bounds):
         '''Yield all the addresses in the basic block identified by `bounds`.'''
         return database.address.iterate(bounds)
+    @document.parameters(bb='the basic block to iterate through')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def iterate(cls, bb):
@@ -2046,18 +2254,21 @@ class block(object):
     def tag(cls):
         '''Returns all the tags defined for the current basic block.'''
         return cls.tag(ui.current.address())
+    @document.parameters(key='a string representing the tag name to return')
     @utils.multicase(key=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('key')
     def tag(cls, key):
         '''Returns the value of the tag identified by `key` for the current basic block.'''
         return cls.tag(ui.current.address(), key)
+    @document.parameters(key='a string representing the tag name to assign', value='a python object to store at the tag')
     @utils.multicase(key=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('key')
     def tag(cls, key, value):
         '''Sets the value for the tag `key` to `value` for the current basic block.'''
         return cls.tag(ui.current.address(), key, value)
+    @document.parameters(key='a string representing the tag name to remove', none='the python value `None`')
     @utils.multicase(key=six.string_types, none=None.__class__)
     @classmethod
     @utils.string.decorate_arguments('key')
@@ -2066,12 +2277,14 @@ class block(object):
         return cls.tag(ui.current.address(), key, none)
 
     # address or bounds of block
+    @document.parameters(ea='the address of the basic block')
     @utils.multicase(ea=(six.integer_types, tuple))
     @classmethod
     def tag(cls, ea):
         '''Returns all the tags defined for the basic block at `ea`.'''
         bb = cls.at(ea)
         return cls.tag(bb)
+    @document.parameters(ea='the address of the basic block', key='a string representing the tag name to return')
     @utils.multicase(ea=(six.integer_types, tuple), key=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('key')
@@ -2079,6 +2292,7 @@ class block(object):
         '''Returns the value of the tag identified by `key` for the basic block at `ea`.'''
         bb = cls.at(ea)
         return cls.tag(bb, key)
+    @document.parameters(ea='the address of the basic block', key='a string representing the tag name to assign', value='a python object to store at the tag')
     @utils.multicase(ea=(six.integer_types, tuple), key=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('key', 'value')
@@ -2086,6 +2300,7 @@ class block(object):
         '''Sets the value for the tag `key` to `value` for the basic block at `ea`.'''
         bb = cls.at(ea)
         return cls.tag(bb, key, value)
+    @document.parameters(ea='the address of the basic block', key='a string representing the tag name to remove', none='the python value `None`')
     @utils.multicase(ea=(six.integer_types, tuple), key=six.string_types, none=None.__class__)
     @classmethod
     @utils.string.decorate_arguments('key')
@@ -2095,6 +2310,7 @@ class block(object):
         return cls.tag(bb, key, none)
 
     # actual basic block
+    @document.parameters(bb='the basic block to return the tags from')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     @utils.string.decorate_arguments('key', 'value')
@@ -2113,6 +2329,7 @@ class block(object):
 
         # that was pretty much it, so we can just return our results.
         return res
+    @document.parameters(bb='the basic block to return the tag from', key='a string representing the tag name to return')
     @utils.multicase(bb=idaapi.BasicBlock, key=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('key', 'value')
@@ -2123,6 +2340,7 @@ class block(object):
             return res[key]
         bounds = interface.range.bounds(bb)
         raise E.MissingTagError(u"{:s}.tag({!s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the basic block ({:s}).".format(__name__, bounds, key, utils.string.escape(key, '"'), bounds))
+    @document.parameters(bb='the basic block to assign the tag to', key='a string representing the tag name to assign', value='a python object to store at the tag')
     @utils.multicase(bb=idaapi.BasicBlock, key=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('key', 'value')
@@ -2137,6 +2355,7 @@ class block(object):
 
         # now we can passthrough to database.tag for everything else.
         return database.tag(ea, key, value)
+    @document.parameters(bb='the basic block to remove the tag from', key='a string representing the tag name to remove', none='the python value `None`')
     @utils.multicase(bb=idaapi.BasicBlock, key=six.string_types, none=None.__class__)
     @classmethod
     @utils.string.decorate_arguments('key')
@@ -2151,17 +2370,20 @@ class block(object):
         # passthrough to database.tag for removing the ones we don't handle.
         return database.tag(ea, key, none)
 
+    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the current block that uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
+    @document.parameters(ea='the address belonging to the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(ea=six.integer_types, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
         bb = cls.at(ea, **modifiers)
         return cls.register(bb, reg, *regs, **modifiers)
+    @document.parameters(bounds='the boundaries of the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(bounds=builtins.tuple, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
@@ -2177,6 +2399,7 @@ class block(object):
                 continue
             continue
         return
+    @document.parameters(bb='the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     @utils.multicase(bb=idaapi.BasicBlock, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
@@ -2201,18 +2424,21 @@ class block(object):
     def read(cls):
         '''Return all the bytes contained in the current basic block.'''
         return cls.read(ui.current.address())
+    @document.parameters(ea='the address of the basic block to return bytes for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def read(cls, ea):
         '''Return all the bytes contained in the basic block at address `ea`.'''
         bb = cls.at(ea)
         return cls.read(bb)
+    @document.parameters(bounds='the boundaries of the basic block to return bytes for')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def read(cls, bounds):
         '''Return all the bytes contained in the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.read(bb)
+    @document.parameters(bb='the basic block to return bytes for')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def read(cls, bb):
@@ -2220,23 +2446,31 @@ class block(object):
         bounds = interface.range.bounds(bb)
         return database.read(bounds)
 
+    @document.aliases('block.disasm')
+    @document.parameters(options='any options to pass to `database.disassemble`')
     @utils.multicase()
     @classmethod
     def disassemble(cls, **options):
         '''Returns the disassembly of the basic block at the current address.'''
         return cls.disassemble(ui.current.address(), **options)
+    @document.aliases('block.disasm')
+    @document.parameters(ea='the address of the basic block to disassemble', options='any options to pass to `database.disassemble`')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def disassemble(cls, ea, **options):
         '''Returns the disassembly of the basic block at the address `ea`.'''
         F = functools.partial(database.disassemble, **options)
         return '\n'.join(map(F, cls.iterate(ea)))
+    @document.aliases('block.disasm')
+    @document.parameters(bounds='the boundaries of the basic block to disassemble', options='any options to pass to `database.disassemble`')
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def disassemble(cls, bounds, **options):
         '''Returns the disassembly of the basic block identified by `bounds`.'''
         bb = cls.at(bounds, **options)
         return cls.disassemble(bb, **options)
+    @document.aliases('block.disasm')
+    @document.parameters(bb='the basic block to disassemble', options='any options to pass to `database.disassemble`')
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def disassemble(cls, bb, **options):
@@ -2251,6 +2485,7 @@ class block(object):
     def decompile(cls):
         '''(UNSTABLE) Returns the decompiled code of the basic block at the current address.'''
         return cls.decompile(ui.current.address())
+    @document.parameters(ea='the address of the basic block to decompile')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def decompile(cls, ea):
@@ -2270,6 +2505,7 @@ class block(object):
         res = map(idaapi.tag_remove, res)
         return '\n'.join(map(utils.string.of, res))
 
+@document.namespace
 class frame(object):
     """
     This namespace is for getting information about the selected
@@ -2289,6 +2525,7 @@ class frame(object):
         '''Return the frame of the current function.'''
         return cls(ui.current.function())
 
+    @document.parameters(func='the function containing the frame to return')
     @utils.multicase()
     def __new__(cls, func):
         '''Return the frame of the function `func`.'''
@@ -2304,17 +2541,20 @@ class frame(object):
         '''Add an empty frame to the current function.'''
         _r = database.config.bits() // 8
         return cls.new(ui.current.function(), 0, _r, 0)
+    @document.parameters(lvars='the number of bytes to allocate for local variables', args='the number of bytes to allocate for arguments')
     @utils.multicase(lvars=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, lvars, args):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
         _r = database.config.bits() // 8
         return cls.new(ui.current.function(), lvars, _r, args)
+    @document.parameters(lvars='the number of bytes to allocate for local variables', regs='the number of bytes to allocate for registers', args='the number of bytes to allocate for arguments')
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, lvars, regs, args):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.'''
         return cls.new(ui.current.function(), lvars, regs, args)
+    @document.parameters(func='the function to add the frame to', lvars='the number of bytes to allocate for local variables', regs='the number of bytes to allocate for registers', args='the number of bytes to allocate for arguments')
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, func, lvars, regs, args):
@@ -2329,11 +2569,14 @@ class frame(object):
             raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), lvars, regs - _r, args, interface.range.start(fn), lvars, regs - _r, args))
         return cls(fn)
 
+    @document.aliases('get_frameid')
     @utils.multicase()
     @classmethod
     def id(cls):
         '''Returns the structure id for the current function's frame.'''
         return cls.id(ui.current.function())
+    @document.aliases('get_frameid')
+    @document.parameters(func='the function to return the frame id for')
     @utils.multicase()
     @classmethod
     def id(cls, func):
@@ -2341,17 +2584,22 @@ class frame(object):
         fn = by(func)
         return fn.frame
 
+    @document.aliases('get_spdelta')
     @utils.multicase()
     @classmethod
     def delta(cls):
         '''Returns the stack delta for the current address within its function.'''
         return cls.delta(ui.current.address())
+    @document.aliases('get_spdelta')
+    @document.parameters(ea='the address to return the stack delta for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def delta(cls, ea):
         '''Returns the stack delta for the address `ea` within its given function.'''
         fn, ea = by_address(ea), interface.address.inside(ea)
         return idaapi.get_spd(fn, ea)
+    @document.aliases('get_spdelta')
+    @document.parameters(func='the function to get the stack delta from', ea='the address to return the stack delta for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def delta(cls, func, ea):
@@ -2359,6 +2607,8 @@ class frame(object):
         fn, ea = by(func), interface.address.inside(ea)
         return idaapi.get_spd(fn, ea)
 
+    @document.aliases('frame.args')
+    @document.namespace
     class arguments(object):
         """
         This namespace is for returning information about the arguments
@@ -2378,6 +2628,7 @@ class frame(object):
         def __new__(cls):
             '''Yield the `(offset, name, size)` of each argument belonging to the current function.'''
             return cls(ui.current.address())
+        @document.parameters(func='the function containing the arguments to yield')
         @utils.multicase()
         def __new__(cls, func):
             '''Yield the `(offset, name, size)` of each argument belonging to the function `func`.'''
@@ -2498,11 +2749,14 @@ class frame(object):
                 current = stkoff + ti.get_size()
             return results
 
+        @document.aliases('frame.args.locations')
         @utils.multicase()
         @classmethod
         def location(cls):
             '''Return the list of address locations for each of the parameters that are passed to the function call at the current address.'''
             return cls.location(ui.current.address())
+        @document.aliases('frame.args.locations')
+        @document.parameters(ea='the address of the reference to the function')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def location(cls, ea):
@@ -2514,6 +2768,8 @@ class frame(object):
             if items is None:
                 raise E.DisassemblerError(u"{:s}.location({:#x}) : Unable to retrieve the initialization addresses for the arguments to the function call at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
             return [ea for ea in items]
+        @document.aliases('frame.args.locations')
+        @document.parameters(ea='the address of the reference to the function', index='the index of the parameter to return the address of')
         @utils.multicase(ea=six.integer_types, index=six.integer_types)
         @classmethod
         def location(cls, ea, index):
@@ -2529,6 +2785,7 @@ class frame(object):
         def iterate(cls):
             '''Yield the `(member, type, name)` associated with the arguments for the current function.'''
             return cls.iterate(ui.current.address())
+        @document.parameters(func='the function containing the argument information to yield')
         @utils.multicase()
         @classmethod
         def iterate(cls, func):
@@ -2693,11 +2950,14 @@ class frame(object):
                 continue
             return
 
+        @document.aliases('frame.args.regs')
         @utils.multicase()
         @classmethod
         def registers(cls):
             '''Return the register information associated with the arguments of the current function.'''
             return cls.registers(ui.current.address())
+        @document.aliases('frame.args.regs')
+        @document.parameters(func='the function containing the argument register information to return')
         @utils.multicase()
         @classmethod
         def registers(cls, func):
@@ -2708,11 +2968,14 @@ class frame(object):
             return result
         regs = utils.alias(registers, 'frame.args')
 
+        @document.aliases('get_args_size')
         @utils.multicase()
         @classmethod
         def size(cls):
             '''Returns the size of the arguments for the current function.'''
             return cls.size(ui.current.function())
+        @document.aliases('get_args_size')
+        @document.parameters(func='the function containing the argument size to return')
         @utils.multicase()
         @classmethod
         def size(cls, func):
@@ -2723,6 +2986,8 @@ class frame(object):
             return max - total
     args = arg = arguments  # XXX: ns alias
 
+    @document.aliases('frame.vars')
+    @document.namespace
     class lvars(object):
         """
         This namespace provides information about the local variables
@@ -2737,6 +3002,7 @@ class frame(object):
         def __new__(cls):
             '''Yield the `(offset, name, size)` of each local variable relative to the stack pointer for the current function.'''
             return cls(ui.current.address())
+        @document.parameters(func='the function containing the local variables to return')
         @utils.multicase()
         def __new__(cls, func):
             '''Yield the `(offset, name, size)` of each local variable relative to the stack pointer for the function `func`.'''
@@ -2752,11 +3018,14 @@ class frame(object):
                 results.append((off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size))
             return results
 
+        @document.aliases('get_vars_size')
         @utils.multicase()
         @classmethod
         def size(cls):
             '''Returns the size of the local variables for the current function.'''
             return cls.size(ui.current.function())
+        @document.aliases('get_vars_size')
+        @document.parameters(func='the function containing the local variable size to return')
         @utils.multicase()
         @classmethod
         def size(cls, func):
@@ -2765,6 +3034,7 @@ class frame(object):
             return fn.frsize
     vars = lvars    # XXX: ns alias
 
+    @document.namespace
     class regs(object):
         """
         This namespace provides information about the registers that
@@ -2780,6 +3050,7 @@ class frame(object):
         def __new__(cls):
             '''Yield the `(offset, name, size)` of each saved register relative to the stack pointer of the current function.'''
             return cls(ui.current.address())
+        @document.parameters(func='the function containing the registers to return')
         @utils.multicase()
         def __new__(cls, func):
             '''Yield the `(offset, name, size)` of each saved register relative to the stack pointer of the function `func`.'''
@@ -2795,11 +3066,14 @@ class frame(object):
                 results.append((off - sum([fn.frsize, fn.frregs]), content.get('__name__', None), size))
             return results
 
+        @document.aliases('get_regs_size')
         @utils.multicase()
         @classmethod
         def size(cls):
             '''Returns the number of bytes occupied by the saved registers in the current function.'''
             return cls.size(ui.current.function())
+        @document.aliases('get_regs_size')
+        @document.parameters(func='the function containing the register size to return')
         @utils.multicase()
         @classmethod
         def size(cls, func):
@@ -2820,16 +3094,19 @@ get_spdelta = spdelta = utils.alias(frame.delta, 'frame')
 def tag():
     '''Returns all the tags defined for the current function.'''
     return tag(ui.current.address())
+@document.parameters(key='a string representing the tag name to return')
 @utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key')
 def tag(key):
     '''Returns the value of the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key)
+@document.parameters(key='a string representing the tag name', value='a python object to store at the tag')
 @utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key', 'value')
 def tag(key, value):
     '''Sets the value for the tag `key` to `value` for the current function.'''
     return tag(ui.current.address(), key, value)
+@document.parameters(func='the function to return the tag for', key='a string representing the tag name to return')
 @utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key')
 def tag(func, key):
@@ -2838,6 +3115,7 @@ def tag(func, key):
     if key in res:
         return res[key]
     raise E.MissingFunctionTagError(u"{:s}.tag({:s}, {!r}) : Unable to read the specified tag (\"{:s}\") from the function.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, utils.string.escape(key, '"')))
+@document.parameters(func='the function to return all the tags for')
 @utils.multicase()
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
@@ -2913,6 +3191,7 @@ def tag(func):
 
     # Finally we can hand our result back to the caller.
     return res
+@document.parameters(func='the function to assign the tag to', key='a string representing the tag name to assign', value='a python object to store at the tag')
 @utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key', 'value')
 def tag(func, key, value):
@@ -2983,11 +3262,13 @@ def tag(func, key, value):
 
     # return what we fetched from the dict
     return res
+@document.parameters(key='a string representing the tag name to remove', none='the python value `None`')
 @utils.multicase(key=six.string_types, none=None.__class__)
 @utils.string.decorate_arguments('key')
 def tag(key, none):
     '''Removes the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key, None)
+@document.parameters(func='the function to remove the tag from', key='a string representing the tag name to remove', none='the python value `None`')
 @utils.multicase(key=six.string_types, none=None.__class__)
 @utils.string.decorate_arguments('key')
 def tag(func, key, none):
@@ -3060,6 +3341,7 @@ def tag(func, key, none):
 def tags():
     '''Returns all of the content tags for the function at the current address.'''
     return tags(ui.current.address())
+@document.parameters(ea='the address of the function containing the content tags to return')
 @utils.multicase(ea=six.integer_types)
 def tags(ea):
     '''Returns all of the content tags for the function at the address `ea`.'''
@@ -3077,6 +3359,7 @@ def tags(ea):
     if interface.range.start(fn) not in owners:
         logging.warning(u"{:s}.tags({:#x}) : Returning the tags for the function at address ({:#x}) as the chunk address ({:#x}) is not referencing a function ({:s}).".format(__name__, ea, item, interface.range.start(fn), ', '.join(map("{:#x}".format, owners))))
     return internal.comment.contents.name(item, target=item)
+@document.parameters(func='the function containing the content tags to return')
 @utils.multicase()
 def tags(func):
     '''Returns all of the content tags for the function `func`.'''
@@ -3084,11 +3367,13 @@ def tags(func):
     ea = interface.range.start(fn)
     return tags(ea)
 
+@document.parameters(boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
 def select(**boolean):
     '''Query the contents of the current function for any tags specified by `boolean`'''
     return select(ui.current.function(), **boolean)
+@document.parameters(tag='a required tag name to search the contents for', Or='any other tag names to include', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 @utils.multicase(tag=six.string_types)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(tag, *Or, **boolean):
@@ -3096,6 +3381,7 @@ def select(tag, *Or, **boolean):
     res = {tag} | {item for item in Or}
     boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return select(ui.current.function(), **boolean)
+@document.parameters(func='the function containing the contents tags to select', tag='a required tag name to search the contents for', Or='any other tag names to include', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 @utils.multicase(tag=six.string_types)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *Or, **boolean):
@@ -3103,6 +3389,7 @@ def select(func, tag, *Or, **boolean):
     res = {tag} | {item for item in Or}
     boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return select(func, **boolean)
+@document.parameters(func='the function containing the contents tags to select', tag='a list of tag names to search the contents for', Or='any other tag names to include', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 @utils.multicase(tag=(builtins.set, builtins.list))
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *Or, **boolean):
@@ -3110,6 +3397,7 @@ def select(func, tag, *Or, **boolean):
     res = {item for item in tag} | {item for item in Or}
     boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return select(func, **boolean)
+@document.parameters(func='the function containing the contents tags to select', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
 def select(func, **boolean):
@@ -3155,6 +3443,7 @@ def select(func, **boolean):
 def switches():
     '''Yield each switch found in the current function.'''
     return switches(ui.current.function())
+@document.parameters(func='the function to yield all the switches for')
 @utils.multicase()
 def switches(func):
     '''Yield each switch found in the function identifed by `func`.'''
@@ -3164,6 +3453,7 @@ def switches(func):
         if si: yield interface.switch_t(si)
     return
 
+@document.namespace
 class type(object):
     """
     This namespace allows one to query type information about a
@@ -3189,14 +3479,17 @@ class type(object):
     def __new__(cls):
         '''Return the type information for the current function as an ``idaapi.tinfo_t``.'''
         return cls(ui.current.address())
+    @document.parameters(info='the type information to apply', guessed='a boolean describing whether the type is guessed by the disassembler or the user')
     @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
     def __new__(cls, info, **guessed):
         '''Apply the type information in `info` to the current function.'''
         return cls(ui.current.address(), info, **guessed)
+    @document.parameters(none='the python value `None` which will remove the type information from the function')
     @utils.multicase(none=None.__class__)
     def __new__(cls, none):
         '''Remove the type information for the current function.'''
         return cls(ui.current.address(), None)
+    @document.parameters(func='the address or function to return the type information from')
     @utils.multicase(func=(six.integer_types, idaapi.func_t))
     def __new__(cls, func):
         '''Return the type information for the function `func` as an ``idaapi.tinfo_t``.'''
@@ -3211,6 +3504,7 @@ class type(object):
         # If we can find a proper typeinfo then use that, otherwise return
         # whatever it was that was guessed.
         return database.type(ea) or ti
+    @document.parameters(func='the address or function to apply the type information to', info='the type information string to apply to the function', guessed='a boolean describing whether the type is guessed by the disassembler or the user')
     @utils.multicase(info=idaapi.tinfo_t)
     def __new__(cls, func, info, **guessed):
         '''Apply the ``idaapi.tinfo_t`` in `info` to the function `func`.'''
@@ -3246,6 +3540,7 @@ class type(object):
         if guessed.get('guessed', False):
             interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
         return result
+    @document.parameters(func='the address or function to apply the type information to', info='the `idaapi.tinfo_t` containing the type information to apply to the function', guessed='a boolean describing whether the type is guessed by the disassembler or the user')
     @utils.multicase(info=six.string_types)
     @utils.string.decorate_arguments('info')
     def __new__(cls, func, info, **guessed):
@@ -3300,6 +3595,7 @@ class type(object):
         if guessed.get('guessed', False):
             interface.node.aflags(ea, idaapi.AFL_USERTI, 0)
         return result
+    @document.parameters(func='the address or function to remove the type information from', none='the python value `None` which will remove the type information from the function')
     @utils.multicase(none=None.__class__)
     def __new__(cls, func, none):
         '''Remove the type information for the function `func`.'''
@@ -3333,18 +3629,21 @@ class type(object):
     def flags(cls):
         '''Return the flags for the current function.'''
         return cls.flags(ui.current.function())
+    @document.parameters(func='the function to return the flags of')
     @utils.multicase()
     @classmethod
     def flags(cls, func):
         '''Return the flags for the function `func`.'''
         fn = by(func)
         return idaapi.as_uint32(fn.flags)
+    @document.parameters(func='the function to return the flags of', mask='a bitmask used to select the explicit flag bits to return')
     @utils.multicase(mask=six.integer_types)
     @classmethod
     def flags(cls, func, mask):
         '''Return the flags for the function `func` selected with the specified `mask`.'''
         fn = by(func)
         return idaapi.as_uint32(fn.flags & mask)
+    @document.parameters(func='the function with the flags that are to be modified', mask='a bitmask used to specify the explicit flags to set', integer='the flags to set on the function')
     @utils.multicase(mask=six.integer_types, integer=(bool, six.integer_types))
     @classmethod
     def flags(cls, func, mask, integer):
@@ -3356,11 +3655,14 @@ class type(object):
             logging.fatal(u"{:s}.flags({:s}, {:#x}, {!s}) : Unable to change the flags ({:#x}) for function at {:s} to requested value ({:#x}).".format('.'.join([__name__, cls.__name__]), description, mask, value, idaapi.as_uint32(res), description, idaapi.as_uint32(fn.flags)))
         return idaapi.as_uint32(res & mask)
 
+    @document.aliases('type.problem')
     @utils.multicase()
     @classmethod
     def has_problem(cls):
         '''Return if the current function has a problem associated with it.'''
         return cls.has_problem(ui.current.address())
+    @document.aliases('type.problem')
+    @document.parameters(func='the function to check for problems')
     @utils.multicase()
     @classmethod
     def has_problem(cls, func):
@@ -3377,6 +3679,8 @@ class type(object):
         # Figure out the function's address, and check if any of the problems apply.
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return any(Fproblem(problem, ea) for problem in problems)
+    @document.aliases('type.problem')
+    @document.parameters(func='the function to check for problems', problem='the `idaapi.PR_` problem type representing the queue to search for problems in')
     @utils.multicase(problem=six.integer_types)
     @classmethod
     def has_problem(cls, func, problem):
@@ -3395,6 +3699,7 @@ class type(object):
     def problems(cls):
         '''Return the problems within the current function as set of integers which correspond to one of the ``idaapi.PR_*`` constants.'''
         return cls.problems(ui.current.function())
+    @document.parameters(func='the function to check for problems')
     @utils.multicase()
     @classmethod
     def problems(cls, func):
@@ -3405,11 +3710,14 @@ class type(object):
         _, ea = interface.addressOfRuntimeOrStatic(func)
         return {problem for problem in builtins.range(1, PR_END) if Fproblem(problem, ea)}
 
+    @document.aliases('type.decompiled')
     @utils.multicase()
     @classmethod
     def is_decompiled(cls):
         '''Return if the current function has been decompiled.'''
         return cls.is_decompiled(ui.current.address())
+    @document.aliases('type.decompiled')
+    @document.parameters(func='the function to check if it is decompiled')
     @utils.multicase()
     @classmethod
     def is_decompiled(cls, func):
@@ -3419,11 +3727,14 @@ class type(object):
         return interface.node.aflags(ea, AFL_HR_DETERMINED)
     decompiled = decompiledQ = utils.alias(is_decompiled, 'type')
 
+    @document.aliases('type.frame')
     @utils.multicase()
     @classmethod
     def has_frame(cls):
         '''Return if the current function has a frame allocated to it.'''
         return cls.has_frame(ui.current.function())
+    @document.aliases('type.frameQ')
+    @document.parameters(func='the function to check for the existence of a frame')
     @utils.multicase()
     @classmethod
     def has_frame(cls, func):
@@ -3432,11 +3743,14 @@ class type(object):
         return fn.frame != idaapi.BADADDR
     frame = frameQ = utils.alias(has_frame, 'type')
 
+    @document.aliases('type.frameptr')
     @utils.multicase()
     @classmethod
     def has_frameptr(cls):
         '''Return if the current function uses a frame pointer (register).'''
         return cls.has_frameptr(ui.current.function())
+    @document.aliases('type.frameptrQ')
+    @document.parameters(func='the function to check for the existence of a frame pointer')
     @utils.multicase()
     @classmethod
     def has_frameptr(cls, func):
@@ -3444,11 +3758,14 @@ class type(object):
         return True if cls.flags(func, idaapi.FUNC_FRAME) else False
     frameptr = frameptrQ = utils.alias(has_frameptr, 'type')
 
+    @document.aliases('type.named', 'type.has_customname', 'type.customname')
     @utils.multicase()
     @classmethod
     def has_name(cls):
         '''Return if the current function has a user-defined name.'''
         return cls.has_name(ui.current.address())
+    @document.aliases('type.named', 'type.has_customname', 'type.customname')
+    @document.parameters(func='the function to use when checking for a name')
     @utils.multicase()
     @classmethod
     def has_name(cls, func):
@@ -3457,11 +3774,14 @@ class type(object):
         return database.type.has_customname(ea)
     named = nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
 
+    @document.aliases('type.returns')
     @utils.multicase()
     @classmethod
     def has_return(cls):
         '''Return if the current function returns.'''
         return cls.has_return(ui.current.function())
+    @document.aliases('type.returns')
+    @document.parameters(func='the function to use when checking if it returns')
     @utils.multicase()
     @classmethod
     def has_return(cls, func):
@@ -3477,6 +3797,7 @@ class type(object):
     def is_library(cls):
         '''Return a boolean describing whether the current function is considered a library function.'''
         return cls.is_library(ui.current.function())
+    @document.parameters(func='the function to use when checking if it is a library function')
     @utils.multicase()
     @classmethod
     def is_library(cls, func):
@@ -3489,11 +3810,13 @@ class type(object):
     def library(cls):
         '''Return a boolean describing whether the current function is considered a library function.'''
         return cls.is_library(ui.current.function())
+    @document.parameters(func='the desired function to return the library attribute from')
     @utils.multicase()
     @classmethod
     def library(cls, func):
         '''Return a boolean describing whether the function `func` is considered a library function.'''
         return cls.is_library(func)
+    @document.parameters(func='the desired function to modify the attributes of', boolean='a boolean value representing whether the function should be set as a library function or not')
     @utils.multicase()
     @classmethod
     def library(cls, func, boolean):
@@ -3505,6 +3828,7 @@ class type(object):
     def is_thunk(cls):
         '''Return a boolean describing whether the current function was determined to be a code thunk.'''
         return cls.is_thunk(ui.current.function())
+    @document.parameters(func='the function to use when checking if it is a code thunk')
     @utils.multicase()
     @classmethod
     def is_thunk(cls, func):
@@ -3519,22 +3843,27 @@ class type(object):
         return cls.is_thunk(ui.current.function())
     @utils.multicase()
     @classmethod
+    @document.parameters(func='the function to return the thunk attribute from')
     def thunk(cls, func):
         '''Return a boolean describing whether the function `func` was determined to be a code thunk.'''
         return cls.is_thunk(func)
+    @document.parameters(func='the function to modify the thunk attribute', boolean='a boolean value representing whether the function should be set as a code thunk or not')
     @utils.multicase()
     @classmethod
     def thunk(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a code thunk depending on the value of `boolean`.'''
         return cls.flags(func, idaapi.FUNC_THUNK, -1 if boolean else 0) == idaapi.FUNC_THUNK
 
+    @document.aliases('type.far')
     @utils.multicase()
     @classmethod
     def is_far(cls):
         '''Return a boolean describing whether the current function is considered a "far" function by IDA or the user.'''
         return cls.is_far(ui.current.function())
+    @document.aliases('type.far')
     @utils.multicase()
     @classmethod
+    @document.parameters(func='the function to use when checking if it is typically called from outside its segment')
     def is_far(cls, func):
         '''Return a boolean describing whether the function `func` is considered a "far" function by IDA or the user.'''
         return True if cls.flags(func, idaapi.FUNC_FAR | idaapi.FUNC_USERFAR) else False
@@ -3547,6 +3876,7 @@ class type(object):
         return cls.is_static(ui.current.function())
     @utils.multicase()
     @classmethod
+    @document.parameters(func='the function to use when checking if it is a static function')
     def is_static(cls, func):
         '''Return a boolean describing whether the function `func` is defined as a static function.'''
         FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
@@ -3558,11 +3888,13 @@ class type(object):
     def static(cls):
         '''Return a boolean describing whether the current function is defined as a static function.'''
         return cls.is_static(ui.current.function())
+    @document.parameters(func='the function to return the static attribute from')
     @utils.multicase()
     @classmethod
     def static(cls, func):
         '''Return a boolean describing whether the function `func` is defined as a static function.'''
         return cls.is_static(func)
+    @document.parameters(func='the function to modify the static attribute', boolean='a boolean value representing whether the function should be set as a static function or not')
     @utils.multicase()
     @classmethod
     def static(cls, func, boolean):
@@ -3575,6 +3907,7 @@ class type(object):
     def is_hidden(cls):
         '''Return a boolean describing whether the current function is hidden.'''
         return cls.is_hidden(ui.current.function())
+    @document.parameters(func='the function to check for its visibility')
     @utils.multicase()
     @classmethod
     def is_hidden(cls, func):
@@ -3587,22 +3920,27 @@ class type(object):
     def hidden(cls):
         '''Return a boolean describing whether the current function is hidden.'''
         return cls.is_hidden(ui.current.function())
+    @document.parameters(func='the function to return the hidden attribute from')
     @utils.multicase()
     @classmethod
     def hidden(cls, func):
         '''Return a boolean describing whether the function `func` is hidden.'''
         return cls.is_hidden(func)
+    @document.parameters(func='the function to modify the hidden attribute', boolean='a boolean value representing whether the function is hidden or not')
     @utils.multicase()
     @classmethod
     def hidden(cls, func, boolean):
         '''Modify the attributes of the function `func` to set it as a hidden function depending on the value of `boolean`.'''
         return cls.flags(func, idaapi.FUNC_HIDDEN, -1 if boolean else 0) == idaapi.FUNC_HIDDEN
 
+    @document.aliases('type.prototype', 'type.has_typeinfo')
     @utils.multicase()
     @classmethod
     def has_prototype(cls):
         '''Return a boolean describing whether the current function has a prototype associated with it.'''
         return cls.has_prototype(ui.current.address())
+    @document.aliases('type.prototype', 'type.has_typeinfo')
+    @document.parameters(func='the address or function to check for the existence of a prototype')
     @utils.multicase()
     @classmethod
     def has_prototype(cls, func):
@@ -3611,12 +3949,15 @@ class type(object):
         return database.type.has_typeinfo(ea)
     prototype = prototypeQ = has_typeinfo = typeinfoQ = utils.alias(has_prototype, 'type')
 
+    @document.aliases('type.cc', 'convention', 'cc')
     @utils.multicase()
     @classmethod
     def convention(cls):
         '''Return the calling convention of the current function.'''
         # we avoid ui.current.function() so that we can also act on pointers.
         return cls.convention(ui.current.address())
+    @document.aliases('type.cc', 'convention', 'cc')
+    @document.parameters(func='the address or function to return the calling convention from')
     @utils.multicase()
     @classmethod
     def convention(cls, func):
@@ -3644,6 +3985,8 @@ class type(object):
         _, ftd = interface.tinfo.function_details(ea, ti)
         result, spoiled_count = ftd.cc & idaapi.CM_CC_MASK, ftd.cc & ~idaapi.CM_CC_MASK
         return result
+    @document.aliases('type.cc', 'convention', 'cc')
+    @document.parameters(func='the address or function using the calling convention to modify', convention='the calling convention to apply to the function prototype as a string')
     @utils.multicase(convention=six.string_types)
     @classmethod
     def convention(cls, func, convention):
@@ -3671,6 +4014,8 @@ class type(object):
 
         # Now we have the calling convention integer that we can use.
         return cls.convention(func, cc)
+    @document.aliases('type.cc', 'convention', 'cc')
+    @document.parameters(func='the address or function using the calling convention to modify', convention='the calling convention to apply to the function specified as an `idaapi.CM_CC_MASK`')
     @utils.multicase(convention=six.integer_types)
     @classmethod
     def convention(cls, func, convention):
@@ -3702,6 +4047,7 @@ class type(object):
         return result & idaapi.CM_CC_MASK
     cc = utils.alias(convention, 'type')
 
+    @document.namespace
     class result(object):
         """
         This namespace allows one to interact with the result as defined
@@ -3714,15 +4060,20 @@ class type(object):
             > print( function.type.result.location() )
 
         """
+        @document.aliases('result')
         @utils.multicase()
         def __new__(cls):
             '''Return the result type for the current function as an ``idaapi.tinfo_t``.'''
             # we avoid ui.current.function() so that we can also act on function pointers.
             return cls(ui.current.address())
+        @document.aliases('result')
+        @document.parameters(info='the `idaapi.tinfo_t` containing the type information to apply to the result')
         @utils.multicase(info=idaapi.tinfo_t)
         def __new__(cls, info):
             '''Modify the result type for the current function to the type information provided as an ``idaapi.tinfo_t`` provided in `info`.'''
             return cls(ui.current.address(), info)
+        @document.aliases('result')
+        @document.parameters(func='the address or function containing the result to return')
         @utils.multicase()
         def __new__(cls, func):
             '''Return the result type for the function `func` as an ``idaapi.tinfo_t``.'''
@@ -3742,6 +4093,8 @@ class type(object):
             # Now we can grab our function details and then return the type.
             _, ftd = interface.tinfo.function_details(ea, ti)
             return ftd.rettype
+        @document.aliases('result')
+        @document.parameters(func='the address or function using the result to modify', info='the type information to apply to the result of the function')
         @utils.multicase(info=six.string_types)
         @utils.string.decorate_arguments('info')
         def __new__(cls, func, info):
@@ -3752,6 +4105,8 @@ class type(object):
             if tinfo is None:
                 raise E.InvalidTypeOrValueError(u"{:s}.result({!r}, {!r}) : Unable to parse the provided type information ({!r})".format('.'.join([__name__, cls.__name__]), func, info, info))
             return cls(func, tinfo)
+        @document.aliases('result')
+        @document.parameters(func='the address or function using the result to modify', info='the `idaapi.tinfo_t` containing the type information to apply to the result')
         @utils.multicase(info=idaapi.tinfo_t)
         def __new__(cls, func, info):
             '''Modify the result type for the function `func` to the type information provided as an ``idaapi.tinfo_t`` in `info`.'''
@@ -3782,6 +4137,7 @@ class type(object):
             return cls.storage(ui.current.address())
         @utils.multicase()
         @classmethod
+        @document.parameters(func='the address or function using the result to return the location of')
         def storage(cls, func):
             '''Return the storage location of the result belonging to the function `func`.'''
             _, ea = internal.interface.addressOfRuntimeOrStatic(func)
@@ -3799,6 +4155,7 @@ class type(object):
                 return result if offset else reg
             return result
 
+    @document.namespace
     class argument(object):
         """
         This namespace allows one to interact with individual arguments
@@ -3819,14 +4176,17 @@ class type(object):
 
         """
 
+        @document.parameters(index='the index of the argument to return')
         @utils.multicase(index=six.integer_types)
         def __new__(cls, index):
             '''Return the type information for the parameter at the specified `index` of the current function.'''
             return cls(ui.current.address(), index)
+        @document.parameters(index='the index of the argument to apply the type to', info='the type information to apply to the specified argument')
         @utils.multicase(index=six.integer_types, info=(six.string_types, idaapi.tinfo_t))
         def __new__(cls, index, info):
             '''Modify the type information for the parameter at the specified `index` of the current function to `info`.'''
             return cls(ui.current.address(), index, info)
+        @document.parameters(func='the address or function containing the prototype', index='the index of the argument to return')
         @utils.multicase(index=six.integer_types)
         def __new__(cls, func, index):
             '''Return the type information for the parameter at the specified `index` of the function `func`.'''
@@ -3842,6 +4202,7 @@ class type(object):
             # Now we can grab the argument using the index we were given and return its type.
             result = ftd[index]
             return result.type
+        @document.parameters(func='the address or function containing the prototype', index='the index of the argument to apply type information to', info='the `idaapi.tinfo_t` containing the type information to apply')
         @utils.multicase(index=six.integer_types, info=idaapi.tinfo_t)
         def __new__(cls, func, index, info):
             '''Modify the type information for the parameter at the specified `index` of the function `func` to `info`.'''
@@ -3865,6 +4226,7 @@ class type(object):
             # Then we can send it back to our updater, and return the previous value.
             updater.send(ftd), updater.close()
             return result
+        @document.parameters(func='the address or function containing the prototype', index='the index of the argument to apply type information to', info='the type information as a string to apply to the argument')
         @utils.multicase(index=six.integer_types, info=six.string_types)
         @utils.string.decorate_arguments('info')
         def __new__(cls, func, index, info):
@@ -3874,21 +4236,25 @@ class type(object):
                 raise E.InvalidTypeOrValueError(u"{:s}({!r}, {:d}, {!r}) : Unable to parse the provided type information ({!r}).".format('.'.join([__name__, cls.__name__]), func, index, info, info))
             return cls(func, index, tinfo)
 
+        @document.parameters(index='the index of the argument to return the name of')
         @utils.multicase(index=six.integer_types)
         @classmethod
         def name(cls, index):
             '''Return the name of the parameter at the specified `index` in the current function.'''
             return cls.name(ui.current.address(), index)
+        @document.parameters(index='the index of the argument to remove the name from', none='the python value `None`')
         @utils.multicase(index=six.integer_types, none=None.__class__)
         @classmethod
         def name(cls, index, none):
             '''Remove the name from the parameter at the specified `index` in the current function.'''
             return cls.name(ui.current.address(), index, none)
+        @document.parameters(index='the index of the argument to rename', name='the string to rename the argument to')
         @utils.multicase(index=six.integer_types, string=six.string_types)
         @classmethod
         def name(cls, index, string, *suffix):
             '''Modify the name of the parameter at the specified `index` of the current function to `string`.'''
             return cls.name(ui.current.address(), index, string, *suffix)
+        @document.parameters(func='the address or function containing the parameter', index='the index of the argument to return the name of')
         @utils.multicase(index=six.integer_types)
         @classmethod
         def name(cls, func, index):
@@ -3905,11 +4271,13 @@ class type(object):
             # Now we can grab the argument using the index we were given and return its name.
             result = ftd[index]
             return utils.string.of(result.name) or None
+        @document.parameters(func='the address or function containing the parameter', index='the index of the argument to remove the name from', none='the python value `None`')
         @utils.multicase(index=six.integer_types, none=None.__class__)
         @classmethod
         def name(cls, func, index, none):
             '''Remove the name from the parameter at the specified `index` in the function `func`.'''
             return cls.name(func, index, '')
+        @document.parameters(func='the address or function containing the parameter', index='the index of the argument to rename', string='the string to rename the argument to', suffix='any other integers or strings to append to the name')
         @utils.multicase(index=six.integer_types, string=six.string_types)
         @classmethod
         @utils.string.decorate_arguments('string', 'suffix')
@@ -3936,11 +4304,13 @@ class type(object):
             updater.send(ftd), updater.close()
             return result or None
 
+        @document.parameters(index='the index of the parameter to return the location of')
         @utils.multicase(index=six.integer_types)
         @classmethod
         def storage(cls, index):
             '''Return the storage location of the parameter at the specified `index` in the current function.'''
             return cls.storage(ui.current.address(), index)
+        @document.parameters(func='the address or function containing the parameter', index='the index of the parameter to return the location of')
         @utils.multicase(index=six.integer_types)
         @classmethod
         def storage(cls, func, index):
@@ -3963,11 +4333,15 @@ class type(object):
                 return location
             return location
 
+        @document.aliases('type.argument.pop')
+        @document.parameters(index='the index of the parameter to remove')
         @utils.multicase(index=six.integer_types)
         @classmethod
         def remove(cls, index):
             '''Remove the parameter at the specified `index` from the current function.'''
             return cls.remove(ui.current.address(), index)
+        @document.aliases('type.argument.pop')
+        @document.parameters(func='the address or function to containing the parameter', index='the index of the parameter to remove')
         @utils.multicase(index=six.integer_types)
         @classmethod
         def remove(cls, func, index):
@@ -4012,6 +4386,7 @@ class type(object):
 
     arg = parameter = argument  # XXX: ns alias
 
+    @document.namespace
     class arguments(object):
         """
         This namespace allows one to interact the with the arguments
@@ -4025,6 +4400,7 @@ class type(object):
         def __new__(cls):
             '''Return the type information for each of the parameters belonging to the current function.'''
             return cls(ui.current.address())
+        @document.parameters(func='the address or function containing the prototype with the types to return')
         @utils.multicase()
         def __new__(cls, func):
             '''Return the type information for each of the parameters belonging to the function `func`.'''
@@ -4036,6 +4412,7 @@ class type(object):
             _, ftd = interface.tinfo.function_details(ea, ti)
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [item.type for item in iterable]
+        @document.parameters(func='the address or function containing the prototype to modify', types='a tuple or list of types to use for the parameters')
         @utils.multicase(types=(builtins.list, builtins.tuple))
         def __new__(cls, func, types):
             '''Overwrite the type information for the parameters belonging to the function `func` with the provided list of `types`.'''
@@ -4068,6 +4445,7 @@ class type(object):
         def count(cls):
             '''Return the number of parameters in the prototype for the current function.'''
             return cls.count(ui.current.address())
+        @document.parameters(func='the address or function to return the number of arguments from')
         @utils.multicase()
         @classmethod
         def count(cls, func):
@@ -4075,16 +4453,21 @@ class type(object):
             ti = type(func)
             return ti.get_nargs()
 
+        @document.aliases('type.arguments.type')
         @utils.multicase()
         @classmethod
         def types(cls):
             '''Return the type information for each of the parameters belonging to the current function.'''
             return cls(ui.current.address())
+        @document.aliases('type.arguments.type')
+        @document.parameters(func='the address or function containing the prototype with the argument types to return')
         @utils.multicase()
         @classmethod
         def types(cls, func):
             '''Return the type information for each of the parameters belonging to the function `func`.'''
             return cls(func)
+        @document.aliases('type.arguments.type')
+        @document.parameters(func='the address or function containing the prototype to modify', types='a tuple or list of types to use for the parameters')
         @utils.multicase(types=(builtins.list, builtins.tuple))
         @classmethod
         def types(cls, func, types):
@@ -4092,11 +4475,14 @@ class type(object):
             return cls(func, types)
         type = utils.alias(types, 'type.arguments')
 
+        @document.aliases('type.arguments.name')
         @utils.multicase()
         @classmethod
         def names(cls):
             '''Return the names for each of the parameters belonging to the current function.'''
             return cls.names(ui.current.address())
+        @document.aliases('type.arguments.name')
+        @document.parameters(func='the address or function containing the prototype with the argument names to return')
         @utils.multicase()
         @classmethod
         def names(cls, func):
@@ -4107,6 +4493,8 @@ class type(object):
             # Iterate through the function details and return each name as a list.
             iterable = (ftd[index] for index in builtins.range(ftd.size()))
             return [utils.string.to(item.name) for item in iterable]
+        @document.aliases('type.arguments.name')
+        @document.parameters(func='the address or function containing the prototype to modify', names='a tuple or list of names to apply to the parameters')
         @utils.multicase(names=(builtins.list, builtins.tuple))
         @classmethod
         def names(cls, func, names):
@@ -4142,6 +4530,7 @@ class type(object):
         def iterate(cls):
             '''Yield the `(name, type, storage)` of each of the parameters belonging to the current function.'''
             return cls.iterate(ui.current.address())
+        @document.parameters(func='the address or function containing the prototype with the argument locations to return')
         @utils.multicase()
         @classmethod
         def iterate(cls, func):
@@ -4177,11 +4566,14 @@ class type(object):
                 yield name, ti, result
             return
 
+        @document.aliases('type.arguments.regs')
         @utils.multicase()
         @classmethod
         def registers(cls):
             '''Return the registers for each of the parameters belonging to the current function.'''
             return cls.registers(ui.current.address())
+        @document.aliases('type.arguments.regs')
+        @document.parameters(func='the address or function containing the prototype with the registers to return')
         @utils.multicase()
         @classmethod
         def registers(cls, func):
@@ -4201,6 +4593,7 @@ class type(object):
         def storage(cls):
             '''Return the storage location for each of the parameters belonging to the current function.'''
             return cls.storage(ui.current.address())
+        @document.parameters(func='the address or function containing the prototype with the locations to return')
         @utils.multicase()
         @classmethod
         def storage(cls, func):
@@ -4216,16 +4609,22 @@ class type(object):
                 continue
             return result
 
+        @document.aliases('type.arguments.append')
+        @document.parameters(info='the type information of the parameter')
         @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
         @classmethod
         def add(cls, info):
             '''Add the provided type information in `info` as another parameter to the current function.'''
             return cls.add(ui.current.address(), info, '')
+        @document.aliases('type.arguments.append')
+        @document.parameters(func='the address or function to add a parameter to', info='the type information of the parameter')
         @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
         @classmethod
         def add(cls, func, info):
             '''Add the provided type information in `info` as another parameter to the function `func`.'''
             return cls.add(func, info, '')
+        @document.aliases('type.arguments.append')
+        @document.parameters(func='the address or function to add a parameter to', info='the type information of the parameter', name='the name of the parameter', suffix='any integers or strings to append to the name')
         @utils.multicase(info=(six.string_types, idaapi.tinfo_t), name=six.string_types)
         @classmethod
         @utils.string.decorate_arguments('name', 'suffix')
@@ -4279,6 +4678,7 @@ result = type.result # XXX: ns alias
 arguments = args = type.arguments   # XXX: ns alias
 argument = arg = type.argument  # XXX: ns alias
 
+@document.namespace
 class xref(object):
     """
     This namespace is for navigating the cross-references (xrefs)
@@ -4302,11 +4702,15 @@ class xref(object):
     """
 
     ## referencing
+    @document.aliases('down')
+    @document.parameters(references='a boolean specifying to include the address of the instruction with the yielded reference')
     @utils.multicase()
     @classmethod
     def down(cls, **references):
         '''Return all of the addresses that are referenced by a branch instruction from the current function.'''
         return down(ui.current.function(), **references)
+    @document.aliases('down')
+    @document.parameters(func='the function to return the references for', references='a boolean specifying to include the address of the instruction with the yielded refrence')
     @utils.multicase()
     @classmethod
     def down(cls, func, **references):
@@ -4383,11 +4787,14 @@ class xref(object):
         results = {ea : d for ea, d in iterable}
         return [(ea, results[ea]) for ea in sorted(results)]
 
+    @document.aliases('up')
     @utils.multicase()
     @classmethod
     def up(cls):
         '''Return all of the addresses that reference the current function.'''
         return up(ui.current.address())
+    @document.aliases('up')
+    @document.parameters(func='the function to return the references for')
     @utils.multicase()
     @classmethod
     def up(cls, func):
@@ -4399,18 +4806,24 @@ class xref(object):
         # regular
         return database.xref.up(ea)
 
+    @document.aliases('xref.arg')
+    @document.parameters(index='the index of the parameter to return the address of')
     @utils.multicase(index=six.integer_types)
     @classmethod
     def argument(cls, index):
         '''Return the address of the parameter being passed to the function reference at the current address for the specified `index`.'''
         items = cls.arguments(ui.current.address())
         return items[index]
+    @document.aliases('xref.arg')
+    @document.parameters(index='the index of the parameter to return the address of', ea='the address of the reference to the function')
     @utils.multicase(index=six.integer_types, ea=six.integer_types)
     @classmethod
     def argument(cls, index, ea):
         '''Return the address of the parameter being passed to the function reference at the address `ea` for the specified `index`.'''
         items = cls.arguments(ea)
         return items[index]
+    @document.aliases('xref.arg')
+    @document.parameters(func='the function to return the argument from', index='the index of the parameter to return the address of', ea='the address of the reference to the function')
     @utils.multicase(index=six.integer_types, ea=six.integer_types)
     @classmethod
     def argument(cls, func, index, ea):
@@ -4419,11 +4832,14 @@ class xref(object):
         return items[index]
     arg = utils.alias(argument, 'xref')
 
+    @document.aliases('xref.args')
     @utils.multicase()
     @classmethod
     def arguments(cls):
         '''Return the address of each of the parameters being passed to the function reference at the current address.'''
         return cls.arguments(ui.current.address())
+    @document.aliases('xref.args')
+    @document.parameters(ea='the address of the reference to the function')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def arguments(cls, ea):
@@ -4432,6 +4848,8 @@ class xref(object):
             raise E.InvalidTypeOrValueError(u"{:s}.arguments({:#x}) : Unable to return any parameters as the provided address ({:#x}) {:s} code references.".format('.'.join([__name__, cls.__name__]), ea, ea, 'does not have any' if instruction.type.is_call(ea) else 'is not a call instruction with'))
         items = idaapi.get_arg_addrs(ea)
         return [] if items is None else [ea for ea in items]
+    @document.aliases('xref.args')
+    @document.parameters(func='the address of the reference to the function', ea='the address of the reference to the function to return the arguments for')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def arguments(cls, func, ea):

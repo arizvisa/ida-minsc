@@ -28,6 +28,7 @@ import internal
 import idaapi
 output = sys.stderr
 
+@document.parameters(fn='the function to fetch the contents tags from')
 def fetch_contents(fn):
     """Fetch the number of references for the contents of function `fn` from the database.
 
@@ -123,6 +124,7 @@ def fetch_globals():
     six.print_(u"globals: found {:d} tags to include in index".format(len(tags)), file=output)
     return address, tags
 
+@document.parameters(ea='the address of the function to build the cache for')
 def contents(ea):
     '''Generate the cache for the contents of the function `ea`.'''
     try:
@@ -288,6 +290,7 @@ def verify_index():
         continue
     return ok
 
+@document.parameters(ea='the address of the function to verify the cache for')
 def verify_content(ea):
     '''Iterate through the contents cache for an individual function and verify that the addresses in its cache are correct.'''
     cls = internal.comment.contents

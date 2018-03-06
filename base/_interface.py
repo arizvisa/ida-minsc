@@ -413,6 +413,7 @@ class typemap(object):
         '''This updates the refinfo for the given `identifer` according to the provided `flag`.'''
         return address.update_refinfo(identifier, flag)
 
+@document.hidden
 class prioritybase(object):
     result = type('result', (object,), {})
     CONTINUE = type('continue', (result,), {})()
@@ -806,6 +807,7 @@ class prioritybase(object):
         # That's it!
         return closure
 
+@document.hidden
 class priorityhook(prioritybase):
     """
     Helper class for allowing one to apply a number of hooks to the
@@ -1051,6 +1053,7 @@ class priorityhook(prioritybase):
             return '\n'.join([res] + items[1:])
         return "Events currently connected to {:s}: {:s}".format(klass.__name__, 'No events are connected.')
 
+@document.hidden
 class prioritynotification(prioritybase):
     """
     Helper class for allowing one to apply an arbitrary number of hooks to the
@@ -1114,6 +1117,7 @@ class prioritynotification(prioritybase):
             return '\n'.join([res] + items[1:])
         return "Notifications currently tracked: {:s}".format('No notifications are being tracked.')
 
+@document.hidden
 class priorityhxevent(prioritybase):
     """
     Helper class for allowing one to apply an arbitrary number of hooks to the
@@ -1994,6 +1998,7 @@ class node(object):
         flag = AFL_BNOT1 if opnum else AFL_BNOT0
         return result & flag == flag
 
+@document.hidden
 class strpath(object):
     """
     This namespace contains utilities that interact with a structure path
@@ -2629,6 +2634,7 @@ class strpath(object):
         delta, _ = builtins.next(calculator), calculator.close()
         return delta, result
 
+@document.hidden
 class tinfo(object):
     """
     This namespace provides miscellaneous utilities for interacting
@@ -2876,6 +2882,7 @@ class tinfo(object):
             pass
         return
 
+@document.hidden
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     iterable = ("{:x}".format(abs(item)) if isinstance(item, six.integer_types) else item for item in names)
@@ -3314,6 +3321,7 @@ else:
 #    18 : 'Code_Far_Jump', 19 : 'Code_Near_Jump',
 #    20 : 'Code_User', 21 : 'Ordinary_Flow'
 #}
+@document.classdef
 class reftype_t(object):
     """
     An object representing a reference type that allows one to easily extract
@@ -3427,6 +3435,7 @@ class reftype_t(object):
         resP = str().join(sorted(res))
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a valid cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), resP, resP, cls.__name__))
 
+@document.classdef
 class ref_t(integerish):
     """
     This tuple is used to represent references that include an operand number
@@ -3464,6 +3473,7 @@ class ref_t(integerish):
         res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
+@document.classdef
 class opref_t(integerish):
     """
     This tuple is used to represent references that include an operand number
@@ -3499,6 +3509,7 @@ class opref_t(integerish):
 # XXX: is .startea always guaranteed to point to an instruction that modifies
 #      the switch's register? if so, then we can use this to calculate the
 #      .range/.cases more accurately instead of them being based on .elbase.
+@document.classdef
 class switch_t(object):
     """
     This object is a wrapper around the ``idaapi.switch_info_ex_t`` class and
@@ -3629,6 +3640,7 @@ class switch_t(object):
     def __repr__(self):
         return u"{!s}".format(self)
 
+@document.hidden
 def xiterate(ea, start, next):
     '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
     addr = start(ea)
@@ -3637,6 +3649,7 @@ def xiterate(ea, start, next):
         addr = next(ea, addr)
     return
 
+@document.hidden
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
@@ -3762,6 +3775,7 @@ class collect_t(object):
         t = self.__cons__
         return "{!s} {!s} -> {!r}".format(self.__class__, getattr(t, '__name__', t), self.__state__)
 
+@document.classdef
 class architecture_t(object):
     """
     Base class to represent how IDA maps the registers and types
@@ -3916,6 +3930,7 @@ class architecture_t(object):
             raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to demote the specified register ({!s}) to a size smaller than {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), register, register))
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({!s}{:s}) : Unable to find a register of the required number of bits ({:d}) to demote {!r}.".format('.'.join([cls.__module__, cls.__name__]), register, '' if bits is None else ", bits={:d}".format(bits), bits, register))
 
+@document.classdef
 class bounds_t(integerish):
     """
     This tuple is used to represent references that describe a bounds
@@ -4047,6 +4062,7 @@ class bounds_t(integerish):
         return "{:#x}".format(left)
 
 # FIXME: should probably be a register_t, but with the different attributes
+@document.classdef
 class partialregister_t(namedtypedtuple, symbol_t):
     _fields = 'register', 'position', 'bits'
     _types = register_t, six.integer_types, six.integer_types
@@ -4091,6 +4107,7 @@ class partialregister_t(namedtypedtuple, symbol_t):
         '''Return the floating-point value of the current register part.'''
         raise internal.exceptions.InvalidTypeOrValueError(u"{!s} : Unable to resolve as a floating-point number.".format(self, rv.rvtype))
 
+@document.classdef
 class location_t(integerish):
     """
     This tuple is used to represent the size at a given location and has the format `(offset, size)`.
@@ -4170,6 +4187,7 @@ class location_t(integerish):
         return self.bounds.contains(offset)
     __contains__ = contains
 
+@document.classdef
 class phrase_t(integerish, symbol_t):
     """
     This tuple is used to represent a phrase relative to a register and has the format `(register, offset)`.
