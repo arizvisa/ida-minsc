@@ -28,6 +28,7 @@ import internal
 import idaapi
 output = sys.stderr
 
+@document.parameters(fn='the function to fetch the contents tags from')
 def fetch_contents(fn):
     """Fetch the reference count for the contents of function `fn` in the database.
 
@@ -129,6 +130,7 @@ def fetch_globals():
 
     return addr, tags
 
+@document.parameters(ea='the address of the function to build the cache for')
 def contents(ea):
     '''Re-build the cache for the contents of the function `ea`.'''
     try:

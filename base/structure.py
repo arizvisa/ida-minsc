@@ -102,11 +102,13 @@ def __iterate__():
 
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
+@document.parameters(string='the glob to filter the structure names with')
 def iterate(string):
     '''Iterate through all of the structures in the database with a glob that matches `string`.'''
     return iterate(like=string)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
+@document.parameters(type='any keyword that can be used to filter structures with')
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
     if not type: type = {'predicate': lambda item: True}
@@ -117,11 +119,13 @@ def iterate(**type):
 
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
+@document.parameters(string='the glob to filter the structure names with')
 def list(string):
     '''List any structures that match the glob in `string`.'''
     return list(like=string)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
+@document.parameters(type='any keyword that can be used to filter structures with')
 def list(**type):
     '''List all the structures within the database that match the keyword specified by `type`.'''
     res = [item for item in iterate(**type)]
@@ -136,11 +140,13 @@ def list(**type):
 
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
+@document.parameters(name='the name of the structure to create')
 def new(name):
     '''Returns a new structure `name`.'''
     return new(name, 0)
 @utils.multicase(name=six.string_types, offset=six.integer_types)
 @utils.string.decorate_arguments('name')
+@document.parameters(name='the name of the structure to create', offset='the base offset of the structure')
 def new(name, offset):
     '''Returns a new structure `name` using `offset` as its base offset.'''
     res = utils.string.to(name)
@@ -157,10 +163,12 @@ def new(name, offset):
 
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
+@document.parameters(name='the name of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by(name, **options):
     '''Return a structure by its name.'''
     return by_name(name, **options)
 @utils.multicase(id=six.integer_types)
+@document.parameters(id='the identifier or the index of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by(id, **options):
     '''Return a structure by its index or id.'''
     if interface.node.is_identifier(id):
@@ -168,6 +176,7 @@ def by(id, **options):
     return by_index(id, **options)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
+@document.parameters(type='any keyword that can be used to match the structure with')
 def by(**type):
     '''Return the structure matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
@@ -185,15 +194,19 @@ def by(**type):
     return res
 
 @utils.multicase(string=six.string_types)
+@document.parameters(string='the glob to match the structure name with')
 def search(string):
     '''Search through all the structure names matching the glob `string`.'''
     return by(like=string)
 @utils.multicase()
+@document.parameters(type='any keyword that can be used to filter the structures with')
 def search(**type):
     '''Search through all of the structures and return the first result matching the keyword specified by `type`.'''
     return by(**type)
 
 @utils.string.decorate_arguments('name')
+@document.aliases('byname')
+@document.parameters(name='the name of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by_name(name, **options):
     '''Return a structure by its name.'''
     res = utils.string.to(name)
@@ -207,6 +220,8 @@ def by_name(name, **options):
     return __instance__(id, **options)
 byname = utils.alias(by_name)
 
+@document.aliases('byindex')
+@document.parameters(index='the index of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by_index(index, **options):
     '''Return a structure by its index.'''
     id = idaapi.get_struc_by_idx(index)
@@ -217,6 +232,8 @@ def by_index(index, **options):
     return __instance__(id, **options)
 byindex = utils.alias(by_index)
 
+@document.aliases('by_id', 'byidentifier', 'byid')
+@document.parameters(identifier='the identifier of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by_identifier(identifier, **options):
     '''Return the structure identified by `identifier`.'''
     return __instance__(identifier, **options)
@@ -227,6 +244,7 @@ by_id = byidentifier = byId = utils.alias(by_identifier)
 ##        that defines whether a structure is a union or not.
 
 ### structure_t abstraction
+@document.classdef
 class structure_t(object):
     """
     This object is an abstraction around an IDA structure type. This
@@ -411,14 +429,17 @@ class structure_t(object):
 
         return res
 
+    @document.details('The identifier for this `structure_t`.')
     @property
     def id(self):
         '''Return the identifier of the structure.'''
         return self.__id__
+    @document.details('The ``idaapi.struc_t`` that this `structure_t` wraps.')
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.struc_t``.'''
         return idaapi.get_struc(self.id)
+    @document.details('The `members_t` for accessing the structure members.')
     @property
     def members(self):
         '''Return the members belonging to the structure.'''
@@ -455,6 +476,7 @@ class structure_t(object):
         self.__members__ = members
         return
 
+    @document.details('The name of the `structure_t`.')
     @property
     def name(self):
         '''Return the name of the structure.'''
@@ -462,6 +484,7 @@ class structure_t(object):
         return utils.string.of(res)
     @name.setter
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='a string representing the new name of the structure')
     def name(self, string):
         '''Set the name of the structure to `string`.'''
         if isinstance(string, tuple):
@@ -490,6 +513,7 @@ class structure_t(object):
             logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
         return assigned
 
+    @document.details('The comment belonging to the `structure_t`.')
     @property
     def comment(self, repeatable=True):
         '''Return the repeatable comment for the structure.'''
@@ -497,6 +521,7 @@ class structure_t(object):
         return utils.string.of(res)
     @comment.setter
     @utils.string.decorate_arguments('value')
+    @document.parameters(value='a string repesenting the comment to apply', repeatable='whether the comment should be repeatable or not')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
         res = utils.string.to(value or '')
@@ -533,12 +558,14 @@ class structure_t(object):
         return res
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key')
+    @document.parameters(key='a string representing the tag name')
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the structure.'''
         res = self.tag()
         return res[key]
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key', 'value')
+    @document.parameters(key='a string representing the tag name', value='a python object to store at the tag')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the structure.'''
         state = self.tag()
@@ -547,6 +574,7 @@ class structure_t(object):
         return res
     @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
+    @document.parameters(key='a string representing the tag name', none='the value `None`')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the structure.'''
         state = self.tag()
@@ -554,11 +582,13 @@ class structure_t(object):
         ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
 
+    @document.details('The total size of the `structure_t`.')
     @property
     def size(self):
         '''Return the size of the structure.'''
         return idaapi.get_struc_size(self.ptr)
     @size.setter
+    @document.parameters(size='an integer representing the new size to expand the structure to')
     def size(self, size):
         '''Expand the structure to the new `size` that is specified.'''
         res = idaapi.get_struc_size(self.ptr)
@@ -572,20 +602,24 @@ class structure_t(object):
             logging.info(u"{:s}({:#x}).size({:+d}) : The size that was assigned to the structure ({:+d}) does not match what was requested ({:+d}).".format('.'.join([__name__, cls.__name__]), self.id, size, res, size))
         return res
 
+    @document.details('The base offset of the `structure_t`.')
     @property
     def offset(self):
         '''Return the base offset of the structure.'''
         return self.members.baseoffset
     @offset.setter
+    @document.parameters(offset='the new base offset to assign to the structure')
     def offset(self, offset):
         '''Set the base offset of the structure to `offset`.'''
         res, self.members.baseoffset = self.members.baseoffset, offset
         return res
+    @document.details('''The index of this `structure_t` within the IDA's structure list.''')
     @property
     def index(self):
         '''Return the index of the structure.'''
         return idaapi.get_struc_idx(self.id)
     @index.setter
+    @document.parameters(index='the new index to move the structure to')
     def index(self, index):
         '''Set the index of the structure to `idx`.'''
         res = idaapi.get_struc_idx(self.id)
@@ -648,10 +682,12 @@ class structure_t(object):
     def __repr__(self):
         return u"{!s}".format(self)
 
+    @document.parameters(offset='the offset of the member to return')
     def field(self, offset):
         '''Return the member at the specified offset.'''
         return self.members.by_offset(offset + self.members.baseoffset)
 
+    @document.hidden
     def copy(self, name):
         '''Copy members into the structure `name`.'''
         raise NotImplementedError
@@ -659,6 +695,7 @@ class structure_t(object):
     def __getattr__(self, name):
         return getattr(self.members, name)
 
+    @document.parameters(offset='the offset to check')
     def contains(self, offset):
         '''Return whether the specified `offset` is contained by the structure.'''
         res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
@@ -671,15 +708,18 @@ class structure_t(object):
         return member in self.members
 
 @utils.multicase()
+@document.parameters(id='the identifier of the structure to return the name for')
 def name(id):
     '''Return the name of the structure identified by `id`.'''
     res = idaapi.get_struc_name(id)
     return utils.string.of(res)
 @utils.multicase(structure=structure_t)
+@document.parameters(structure='the `structure_t` to return the name for')
 def name(structure):
     return name(structure.id)
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
+@document.parameters(id='the identifier of the structure to return the name for', string='the name to rename the structure to', suffix='any other names to append to the base name')
 def name(id, string, *suffix):
     '''Set the name of the structure identified by `id` to `string`.'''
     res = (string,) + suffix
@@ -698,11 +738,13 @@ def name(id, string, *suffix):
     return idaapi.set_struc_name(id, ida_string)
 @utils.multicase(structure=structure_t, string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
+@document.parameters(structure='the `structure_t` to rename', string='the name to rename the structure to', suffix='any other names to append to the base name')
 def name(structure, string, *suffix):
     '''Set the name of the specified `structure` to `string`.'''
     return name(structure.id, string, *suffix)
 
 @utils.multicase(id=six.integer_types)
+@document.parameters(id='the identifier of the structure', repeatable='whether the comment should be repeatable or not')
 def comment(id, **repeatable):
     """Return the comment of the structure identified by `id`.
 
@@ -711,20 +753,24 @@ def comment(id, **repeatable):
     res = idaapi.get_struc_cmt(id, repeatable.get('repeatable', True))
     return utils.string.of(res)
 @utils.multicase(structure=structure_t)
+@document.parameters(structure='the `structure_t` to return the comment for', repeatable='whether the comment should be repeatable or not')
 def comment(structure, **repeatable):
     '''Return the comment for the specified `structure`.'''
     return comment(structure.id, **repeatable)
 @utils.multicase(structure=structure_t, cmt=six.string_types)
 @utils.string.decorate_arguments('cmt')
+@document.parameters(structure='the `structure_t` to apply the comment to', cmt='the comment to apply', repeatable='whether the comment should be repeatable or not')
 def comment(structure, cmt, **repeatable):
     '''Set the comment to `cmt` for the specified `structure`.'''
     return comment(structure.id, cmt, **repeatable)
 @utils.multicase(structure=structure_t, none=None.__class__)
+@document.parameters(structure='the `structure_t` to remove the comment from', none='the value `None`', repeatable='whether the removed comment should be the repeatable one')
 def comment(structure, none, **repeatable):
     '''Remove the comment from the specified `structure`.'''
     return comment(structure.id, none or '', **repeatable)
 @utils.multicase(id=six.integer_types, cmt=six.string_types)
 @utils.string.decorate_arguments('cmt')
+@document.parameters(id='the identifier of the structure', cmt='the comment to apply', repeatable='whether the comment should be repeatable or not')
 def comment(id, cmt, **repeatable):
     """Set the comment of the structure identified by `id` to `cmt`.
 
@@ -733,41 +779,50 @@ def comment(id, cmt, **repeatable):
     res = utils.string.to(cmt)
     return idaapi.set_struc_cmt(id, res, repeatable.get('repeatable', True))
 @utils.multicase(id=six.integer_types, none=None.__class__)
+@document.parameters(id='the identifier of the structure', none='the value `None`', repeatable='whether the removed comment should be the repeatable one')
 def comment(id, none, **repeatable):
     '''Remove the comment from the structure identified by `id`.'''
     return comment(id, none or '', **repeatable)
 
 @utils.multicase(id=six.integer_types)
+@document.parameters(id='the identifier of the structure to return the index for')
 def index(id):
     '''Return the index of the structure identified by `id`.'''
     return idaapi.get_struc_idx(id)
 @utils.multicase(structure=structure_t)
+@document.parameters(structure='the `structure_t` to return the index for')
 def index(structure):
     '''Return the index of the specified `structure`.'''
     return index(structure.id)
 @utils.multicase(id=six.integer_types, index=six.integer_types)
+@document.parameters(id='the identifier of the structure', index='the index to move the structure to')
 def index(id, index):
     '''Move the structure identified by `id` to the specified `index` in the structure list.'''
     return idaapi.set_struc_idx(id, index)
 @utils.multicase(structure=structure_t, index=six.integer_types)
+@document.parameters(structure='the `structure_t` to move', index='the index to move the structure to')
 def index(structure, index):
     '''Move the specified `structure` to the specified `index` in the structure list.'''
     return index(structure.id, index)
 
 @utils.multicase(structure=structure_t)
+@document.parameters(structure='the `structure_t` to return the size for')
 def size(structure):
     '''Return the size of the specified `structure`.'''
     return size(structure.id)
 @utils.multicase(id=six.integer_types)
+@document.parameters(id='the identifier of the structure to return the size for')
 def size(id):
     '''Return the size of the structure identified by `id`.'''
     return idaapi.get_struc_size(id)
 
 @utils.multicase(structure=structure_t)
+@document.parameters(structure='the `structure_t` to yield the members for')
 def members(structure):
     '''Yield each member of the specified `structure`.'''
     return members(structure.id)
 @utils.multicase(id=six.integer_types)
+@document.parameters(id='the identifier of the structure to yield the members for')
 def members(id):
     """Yield each member of the structure identified by `id`.
 
@@ -809,10 +864,12 @@ def members(id):
     return
 
 @utils.multicase(structure=structure_t, offset=six.integer_types, size=six.integer_types)
+@document.parameters(structure='the `structure_t` to yield the members for', offset='the starting offset of the fragment', size='the size of the members to yield')
 def fragment(structure, offset, size):
     '''Yield each member of the specified `structure` from the `offset` up to the `size`.'''
     return fragment(structure.id, offset, size)
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
+@document.parameters(id='the identifer of the structure to yield the members for', offset='the starting offset of the fragment', size='the size of the members to yield')
 def fragment(id, offset, size):
     """Yield each member of the structure identified by `id` from the `offset` up to the `size`.
 
@@ -849,30 +906,39 @@ def fragment(id, offset, size):
         continue
     return
 
+@document.aliases('delete')
 @utils.multicase(structure=structure_t)
+@document.parameters(structure='the `structure_t` to remove from the database')
 def remove(structure):
     '''Remove the specified `structure` from the database.'''
     if not idaapi.del_struc(structure.ptr):
         raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to remove structure {:#x}.".format(__name__, structure, structure.id))
     return True
+@document.aliases('delete')
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
+@document.parameters(name='the name of the structure to remove from the database')
 def remove(name):
     '''Remove the structure with the specified `name`.'''
     res = by_name(name)
     return remove(res)
+@document.aliases('delete')
 @utils.multicase(id=six.integer_types)
+@document.parameters(id='the identifier of the structure to remove from the database')
 def remove(id):
     '''Remove a structure by its index or `id`.'''
     res = by(id)
     return remove(res)
+@document.aliases('delete')
 @utils.multicase()
+@document.parameters(type='any keyword that can be used to match the structure with')
 def remove(**type):
     '''Remove the first structure that matches the result described by `type`.'''
     res = by(**type)
     return remove(res)
 delete = utils.alias(remove)
 
+@document.classdef
 class members_t(object):
     """
     This object is an abstraction around all the members belonging to
@@ -910,10 +976,12 @@ class members_t(object):
     __slots__ = ('__parent', 'baseoffset')
 
     # members state
+    @document.details('The `structure_t` that owns this `members_t`.')
     @property
     def parent(self):
         '''Return the ``structure_t`` that owns this ``members_t``.'''
         return self.__parent
+    @document.details('The ``idaapi.member_t`` that this `members_t` wraps.')
     @property
     def ptr(self):
         '''Return the pointer to the ``idaapi.member_t`` that contains all the members.'''
@@ -969,6 +1037,7 @@ class members_t(object):
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({!r}) : Unable to find the member that was requested.".format('.'.join([__name__, cls.__name__]), self.parent.id, index))
         return res
 
+    @document.parameters(member='the `member_t` to return the index for')
     def index(self, member):
         '''Return the index of the specified `member`.'''
         if not hasattr(member, 'id'):
@@ -1002,6 +1071,7 @@ class members_t(object):
 
     # searching members
     @utils.multicase()
+    @document.parameters(type='any keyword that can be used to filter the structure members with')
     def iterate(self, **type):
         '''Iterate through all of the members in the structure that match the keyword specified by `type`.'''
         if not type: type = {'predicate': lambda item: True}
@@ -1011,17 +1081,20 @@ class members_t(object):
         for item in listable: yield item
     @utils.multicase(string=six.string_types)
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='the glob to filter the structure member names with')
     def iterate(self, string):
         '''Iterate through all of the members in the structure with a name that matches the glob in `string`.'''
         return self.iterate(like=string)
 
     @utils.multicase(string=six.string_types)
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='the glob to filter the structure member names with')
     def list(self, string):
         '''List any members that match the glob in `string`.'''
         return self.list(like=string)
     @utils.multicase()
     @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
+    @document.parameters(type='any keyword that can be used to filter the structure members with')
     def list(self, **type):
         '''List all the members within the structure that match the keyword specified by `type`.'''
         res = [item for item in self.iterate(**type)]
@@ -1039,6 +1112,7 @@ class members_t(object):
 
     @utils.multicase()
     @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
+    @document.parameters(type='any keyword that can be used to match the structure member with')
     def by(self, **type):
         '''Return the member that matches the keyword specified by `type`.'''
         searchstring = utils.string.kwargs(type)
@@ -1058,15 +1132,19 @@ class members_t(object):
         return res
     @utils.multicase(name=six.string_types)
     @utils.string.decorate_arguments('name')
+    @document.parameters(name='the name of the member to return')
     def by(self, name):
         '''Return the member with the specified `name`.'''
         return self.by_name(name)
     @utils.multicase(offset=six.integer_types)
+    @document.parameters(offset='the offset of the member to return')
     def by(self, offset):
         '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
 
+    @document.aliases('members_t.byname')
     @utils.string.decorate_arguments('name')
+    @document.parameters(name='the name of the member to return')
     def by_name(self, name):
         '''Return the member with the specified `name`.'''
         res = utils.string.to(name)
@@ -1083,6 +1161,8 @@ class members_t(object):
     byname = utils.alias(by_name, 'members_t')
 
     @utils.string.decorate_arguments('fullname')
+    @document.aliases('members_t.byfullname')
+    @document.parameters(fullname='the full name of the member to return')
     def by_fullname(self, fullname):
         '''Return the member with the specified `fullname`.'''
         res = utils.string.to(fullname)
@@ -1099,6 +1179,8 @@ class members_t(object):
         return self[index]
     byfullname = utils.alias(by_fullname, 'members_t')
 
+    @document.aliases('members_t.byoffset')
+    @document.parameters(offset='the offset of the member to return')
     def by_offset(self, offset):
         '''Return the member at the specified `offset` from the base offset of the structure.'''
 
@@ -1128,6 +1210,8 @@ class members_t(object):
         return self.by_realoffset(offset - self.baseoffset)
     byoffset = utils.alias(by_offset, 'members_t')
 
+    @document.aliases('members_t.byrealoffset')
+    @document.parameters(offset='the real offset of the member to return')
     def by_realoffset(self, offset):
         '''Return the member at the specified `offset` of the structure.'''
         min, max = idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)
@@ -1161,6 +1245,8 @@ class members_t(object):
         return self[index]
     byrealoffset = utils.alias(by_realoffset, 'members_t')
 
+    @document.aliases('members_t.by_id', 'members_t.byid')
+    @document.parameters(id='the identifier of the member to return')
     def by_identifier(self, id):
         '''Return the member in the structure that has the specified `id`.'''
         res = idaapi.get_member_by_id(id)
@@ -1242,6 +1328,8 @@ class members_t(object):
         # have any other way of representing these things.
         return [m], arrayoffset
 
+    @document.aliases('members_t.near', 'members_t.nearoffset')
+    @document.parameters(offset='the offset nearest to the member to return')
     def near_offset(self, offset):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
         min, max = map(lambda sz: sz + self.baseoffset, [idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)])
@@ -1253,6 +1341,7 @@ class members_t(object):
         return self.near_realoffset(offset - self.baseoffset)
     near = nearoffset = utils.alias(near_offset, 'members_t')
 
+    @document.parameters(offset='the real offset nearest to the member to return')
     def near_realoffset(self, offset):
         '''Return the member nearest to the specified `offset`.'''
         min, max = idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)
@@ -1291,18 +1380,21 @@ class members_t(object):
     # adding/removing members
     @utils.multicase(name=(six.string_types, tuple))
     @utils.string.decorate_arguments('name')
+    @document.parameters(name='the name of the member to add')
     def add(self, name):
         '''Append the specified member `name` with the default type at the end of the structure.'''
         offset = self.parent.size + self.baseoffset
         return self.add(name, int, offset)
     @utils.multicase(name=(six.string_types, tuple))
     @utils.string.decorate_arguments('name')
+    @document.parameters(name='the name of the member to add', type='the pythonic type of the new member to add')
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` at the end of the structure.'''
         offset = self.parent.size + self.baseoffset
         return self.add(name, type, offset)
     @utils.multicase(name=(six.string_types, tuple), offset=six.integer_types)
     @utils.string.decorate_arguments('name')
+    @document.parameters(name='the name of the member to add', type='the pythonic type of the new member to add', offset='the offset to add the member at')
     def add(self, name, type, offset):
         """Add a member at `offset` with the given `name` and `type`.
 
@@ -1351,6 +1443,7 @@ class members_t(object):
         # and then create a new instance of the member at our guessed index
         return member_t(self.parent, idx)
 
+    @document.parameters(index='the index of the member to remove')
     def pop(self, index):
         '''Remove the member at the specified `index`.'''
         item = self[index]
@@ -1360,10 +1453,12 @@ class members_t(object):
         return self.pop(index)
 
     @utils.multicase()
+    @document.parameters(offset='the offset of the member to remove')
     def remove(self, offset):
         '''Remove the member at `offset` from the structure.'''
         return idaapi.del_struc_member(self.parent.ptr, offset - self.baseoffset)
     @utils.multicase()
+    @document.parameters(offset='the offset of the starting member to remove', size='the size of the members that follow to remove')
     def remove(self, offset, size):
         '''Remove all the members from the structure from `offset` up to `size`.'''
         res = offset - self.baseoffset
@@ -1424,6 +1519,7 @@ class members_t(object):
     def __repr__(self):
         return u"{!s}".format(self)
 
+@document.classdef
 class member_t(object):
     """
     This object is an abstraction around a single member belonging to
@@ -1511,36 +1607,44 @@ class member_t(object):
         return
 
     # read-only properties
+    @document.details('The ``idaapi.member_t`` that this `member_t` wraps.')
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.member_t``.'''
         return self.__parent.ptr.get_member(self.__index)
+    @document.details('The member identifier for this `member_t`.')
     @property
     def id(self):
         '''Return the identifier of the member.'''
         return self.ptr.id
+    @document.details('The size of this `member_t`.')
     @property
     def size(self):
         '''Return the size of the member.'''
         return idaapi.get_member_size(self.ptr)
+    @document.details('The real offset of this `member_t`.')
     @property
     def realoffset(self):
         '''Return the real offset of the member.'''
         return self.ptr.get_soff()
+    @document.details('The offset of this `member_t` relative to the structure\'s base offset.')
     @property
     def offset(self):
         '''Return the offset of the member.'''
         return self.ptr.get_soff() + self.__parent.members.baseoffset
+    @document.details('The flags for this specific `member_t`.')
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
         m = idaapi.get_member(self.__parent.ptr, self.offset - self.__parent.members.baseoffset)
         return 0 if m is None else m.flag
+    @document.details('''The full name for this `member_t` including its structure's name.''')
     @property
     def fullname(self):
         '''Return the fullname of the member.'''
         res = idaapi.get_member_fullname(self.id)
         return utils.string.of(res)
+    @document.details('The type identifier for this `member_t`.')
     @property
     def typeid(self):
         '''Return the identifier of the type of the member.'''
@@ -1551,18 +1655,22 @@ class member_t(object):
         else:
             res = idaapi.retrieve_member_info(opinfo, self.ptr)
         return None if opinfo.tid == idaapi.BADADDR else opinfo.tid
+    @document.details('The index of this `member_t` into its structure.')
     @property
     def index(self):
         '''Return the index of the member.'''
         return self.__index
+    @document.details('The starting offset of the `member_t`.')
     @property
     def left(self):
         '''Return the beginning offset of the member.'''
         return self.ptr.soff
+    @document.details('The ending offset of the `member_t` (starting offset plus its size).')
     @property
     def right(self):
         '''Return the ending offset of the member.'''
         return self.ptr.eoff
+    @document.details('The `structure_t` that owns this `member_t`.')
     @property
     def realbounds(self):
         '''Return the real boundaries of the member.'''
@@ -1579,6 +1687,7 @@ class member_t(object):
         return self.__parent
 
     # read/write properties
+    @document.details('The name of this `member_t`.')
     @property
     def name(self):
         '''Return the name of the member.'''
@@ -1586,6 +1695,7 @@ class member_t(object):
         return utils.string.of(res)
     @name.setter
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='the new name to rename the member to')
     def name(self, string):
         '''Set the name of the member to `string`.'''
         if isinstance(string, tuple):
@@ -1614,13 +1724,16 @@ class member_t(object):
             logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
         return assigned
 
+    @document.details('The comment of this `member_t`.')
     @property
+    @document.parameters(repeatable='whether the comment should be repeatable or not')
     def comment(self, repeatable=True):
         '''Return the repeatable comment of the member.'''
         res = idaapi.get_member_cmt(self.id, repeatable) or idaapi.get_member_cmt(self.id, not repeatable)
         return utils.string.of(res)
     @comment.setter
     @utils.string.decorate_arguments('value')
+    @document.parameters(value='the comment to apply to the member', repeatable='whether the comment should be repeatable or not')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment of the member to `value`.'''
         res = utils.string.to(value or '')
@@ -1660,12 +1773,14 @@ class member_t(object):
         return res
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key')
+    @document.parameters(key='a string representing the tag name')
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the member.'''
         res = self.tag()
         return res[key]
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key', 'value')
+    @document.parameters(key='a string representing the tag name', value='a python object to store at the tag')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the member.'''
         state = self.tag()
@@ -1676,6 +1791,7 @@ class member_t(object):
         return res
     @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
+    @document.parameters(key='a string representing the tag name', none='the value `None`')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
         state = self.tag()
@@ -1685,6 +1801,7 @@ class member_t(object):
             raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
         return res
 
+    @document.details('The ``.dt_type`` attribute of the ``idaapi.member_t`` that is wrapped by this `member_t`.')
     @property
     def dt_type(self):
         '''Return the `dt_type` attribute of the member.'''
@@ -1693,6 +1810,7 @@ class member_t(object):
             return 0
         flag = m.flag & idaapi.DT_TYPE
         return idaapi.as_uint32(flag)
+    @document.details('The pythonic type of this `member_t`.')
     @property
     def type(self):
         '''Return the type of the member in its pythonic form.'''
@@ -1708,6 +1826,7 @@ class member_t(object):
             res = t, sz
         return res
     @type.setter
+    @document.parameters(type='the pythonic type to set the member type to')
     def type(self, type):
         '''Set the type of the member to the provided `type`.'''
         flag, typeid, nbytes = interface.typemap.resolve(type)
@@ -1750,6 +1869,7 @@ class member_t(object):
         return ti
 
     @typeinfo.setter
+    @document.parameters(info='the typeinfo to set the member type to')
     def typeinfo(self, info):
         '''Set the type info of the member to `info`.'''
 

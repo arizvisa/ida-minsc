@@ -1,0 +1,15 @@
+div.top-margin {
+    padding-top: 9pt;
+}
+
+div.right-floating {
+    padding-right: 3%;
+    -webkit-transform: scaleX(-1);
+    transform: scaleX(-1);
+    vertical-align: middle;
+    float: right;
+}
+
+.logo-content {
+    height: 100pt;
+}
