@@ -75,11 +75,13 @@ def __iterate__(**type):
 
 @utils.multicase(string=basestring)
 @utils.string.decorate_arguments('string')
+@document.parameters(string='the glob to filter the segment names with')
 def list(string):
     '''List all of the segments whose name matches the glob specified by `string`.'''
     return list(like=string)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
+@document.parameters(type='any keyword that can be used to filter the segments with')
 def list(**type):
     '''List all of the segments in the database that match the keyword specified by `type`.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -111,6 +113,8 @@ def list(**type):
 
 ## searching
 @utils.string.decorate_arguments('name')
+@document.aliases('byName')
+@document.parameters(name='the name of the segment to return')
 def by_name(name):
     '''Return the segment with the given `name`.'''
     res = utils.string.to(name)
@@ -119,6 +123,8 @@ def by_name(name):
         raise E.SegmentNotFoundError(u"{:s}.by_name({!r}) : Unable to locate the segment with the specified name.".format(__name__, name))
     return seg
 byName = utils.alias(by_name)
+@document.aliases('bySelector')
+@document.parameters(selector='the selector belonging to the segment to return')
 def by_selector(selector):
     '''Return the segment associated with `selector`.'''
     seg = idaapi.get_segm_by_sel(selector)
@@ -126,6 +132,8 @@ def by_selector(selector):
         raise E.SegmentNotFoundError(u"{:s}.by_selector({:#x}) : Unable to locate the segment with the specified selector.".format(__name__, selector))
     return seg
 bySelector = utils.alias(by_selector)
+@document.aliases('byAddress')
+@document.parameters(ea='an address belonging to the segment to return')
 def by_address(ea):
     '''Return the segment that contains the specified `ea`.'''
     seg = idaapi.getseg(interface.address.within(ea))
@@ -134,15 +142,18 @@ def by_address(ea):
     return seg
 byAddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
+@document.parameters(segment='an `idaapi.segment_t` to return')
 def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
     return segment
 @utils.multicase(name=basestring)
 @utils.string.decorate_arguments('name')
+@document.parameters(name='the name of the segment to return')
 def by(name):
     '''Return the segment by its `name`.'''
     return by_name(name)
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='an address belonging to the segment to return')
 def by(ea):
     '''Return the segment containing the address `ea`.'''
     return by_address(ea)
@@ -152,6 +163,7 @@ def by():
     return ui.current.segment()
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
+@document.parameters(type='any keyword that can be used to match the segment with')
 def by(**type):
     '''Return the segment matching the specified keywords in `type`.'''
     searchstring = utils.string.kwargs(type)
@@ -171,16 +183,19 @@ def by(**type):
 
 @utils.multicase(name=basestring)
 @utils.string.decorate_arguments('name')
+@document.parameters(name='the glob to match the segment name with')
 def search(name):
     '''Search through all the segments and return the first one matching the glob `name`.'''
     return by(like=name)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
+@document.parameters(type='any keyword that can be used to filter segments with')
 def search(**type):
     '''Search through all the segments and return the first one that matches the keyword specified by `type`.'''
     return by(**type)
 
 ## properties
+@document.aliases('range')
 @utils.multicase()
 def bounds():
     '''Return the bounds of the current segment.'''
@@ -188,7 +203,9 @@ def bounds():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.bounds() : Unable to locate the current segment.".format(__name__))
     return interface.range.bounds(seg)
+@document.aliases('range')
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def bounds(segment):
     '''Return the bounds of the segment specified by `segment`.'''
     seg = by(segment)
@@ -203,11 +220,13 @@ def iterate():
         raise E.SegmentNotFoundError(u"{:s}.iterate() : Unable to locate the current segment.".format(__name__))
     return iterate(seg)
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def iterate(segment):
     '''Iterate through all of the addresses within the specified `segment`.'''
     seg = by(segment)
     return iterate(seg)
 @utils.multicase(segment=idaapi.segment_t)
+@document.parameters(segment='an `idaapi.segment_t` to iterate through')
 def iterate(segment):
     '''Iterate through all of the addresses within the ``idaapi.segment_t`` represented by `segment`.'''
     for ea in database.address.iterate(*interface.range.unpack(segment)):
@@ -222,6 +241,7 @@ def size():
         raise E.SegmentNotFoundError(u"{:s}.size() : Unable to locate the current segment.".format(__name__))
     return interface.range.size(seg)
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def size(segment):
     '''Return the size of the segment specified by `segment`.'''
     seg = by(segment)
@@ -232,26 +252,33 @@ def offset():
     '''Return the offset of the current address from the beginning of the current segment.'''
     return offset(ui.current.segment(), ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='an address within the current segment')
 def offset(ea):
     '''Return the offset of the address `ea` from the beginning of the current segment.'''
     return offset(ui.current.segment(), ea)
 @utils.multicase(ea=six.integer_types)
+@document.parameters(segment='an identifier used to describe a segment', ea='an address within the segment')
 def offset(segment, ea):
     '''Return the offset of the address `ea` from the beginning of `segment`.'''
     seg = by(segment)
     return ea - interface.range.start(seg)
 
+@document.aliases('goof',' gooffset', 'gotooffset')
 @utils.multicase(offset=six.integer_types)
+@document.parameters(offset='an offset into the current segment')
 def go_offset(offset):
     '''Go to the `offset` of the current segment.'''
     return go_offset(ui.current.segment(), offset)
+@document.aliases('goof',' gooffset', 'gotooffset')
 @utils.multicase(offset=six.integer_types)
+@document.parameters(segment='an identifier used to describe a segment', offset='an offset into the segment')
 def go_offset(segment, offset):
     '''Go to the `offset` of the specified `segment`.'''
     seg = by(segment)
     return database.go(offset + interface.range.start(seg))
 goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
 
+@document.aliases('string')
 @utils.multicase()
 def read():
     '''Return the contents of the current segment.'''
@@ -261,7 +288,9 @@ def read():
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.read() : Unable to locate the current segment.".format(__name__))
     return get_bytes(interface.range.start(seg), interface.range.size(seg))
+@document.aliases('string')
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def read(segment):
     '''Return the contents of the segment identified by `segment`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
@@ -278,6 +307,7 @@ def repr():
         raise E.SegmentNotFoundError(u"{:s}.repr() : Unable to locate the current segment.".format(__name__))
     return repr(segment)
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def repr(segment):
     '''Return the specified `segment` in a printable form.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -293,6 +323,7 @@ def top():
         raise E.SegmentNotFoundError(u"{:s}.top() : Unable to locate the current segment.".format(__name__))
     return interface.range.start(seg)
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def top(segment):
     '''Return the top address of the segment identified by `segment`.'''
     seg = by(segment)
@@ -306,6 +337,7 @@ def bottom():
         raise E.SegmentNotFoundError(u"{:s}.bottom() : Unable to locate the current segment.".format(__name__))
     return interface.range.end(seg)
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def bottom(segment):
     '''Return the bottom address of the segment identified by `segment`.'''
     seg = by(segment)
@@ -322,6 +354,7 @@ def name():
     res = get_segment_name(seg)
     return utils.string.of(res)
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def name(segment):
     '''Return the name of the segment identified by `segment`.'''
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
@@ -339,22 +372,26 @@ def color():
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
 @utils.multicase()
+@document.parameters(segment='an identifier used to describe a segment')
 def color(segment):
     '''Return the color of the segment identified by `segment`.'''
     seg = by(segment)
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
 @utils.multicase(none=types.NoneType)
+@document.parameters(none='the value `None`')
 def color(none):
     '''Clear the color of the current segment.'''
     return color(ui.current.segment(), None)
 @utils.multicase(none=types.NoneType)
+@document.parameters(segment='an identifier used to describe a segment', none='the value `None`')
 def color(segment, none):
     '''Clear the color of the segment identified by `segment`.'''
     seg = by(segment)
     seg.color = 0xffffffff
     return bool(seg.update())
 @utils.multicase(rgb=six.integer_types)
+@document.parameters(segment='an identifier used to describe a segment', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)')
 def color(segment, rgb):
     '''Sets the color of the segment identified by `segment` to `rgb`.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
@@ -367,26 +404,31 @@ def within():
     '''Returns true if the current address is within any segment.'''
     return within(ui.current.address())
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='an address in the database')
 def within(ea):
     '''Returns true if the address `ea` is within any segment.'''
     return any(interface.range.within(ea, seg) for seg in __iterate__())
 
 @utils.multicase(ea=six.integer_types)
+@document.parameters(ea='an address in the database')
 def contains(ea):
     '''Returns true if the address `ea` is contained within the current segment.'''
     return contains(ui.current.segment(), ea)
 @utils.multicase(segaddr=six.integer_types, ea=six.integer_types)
+@document.parameters(address='an address belonging to a segment', ea='an address in the database')
 def contains(address, ea):
     '''Returns true if the address `ea` is contained within the segment belonging to the specified `address`.'''
     seg = by_address(address)
     return contains(seg, ea)
 @utils.multicase(name=basestring, ea=six.integer_types)
 @utils.string.decorate_arguments('name')
+@document.parameters(name='the name of a segment', ea='an address in the database')
 def contains(name, ea):
     '''Returns true if the address `ea` is contained within the segment with the specified `name`.'''
     seg = by_name(name)
     return contains(seg, ea)
 @utils.multicase(segment=idaapi.segment_t, ea=six.integer_types)
+@document.parameters(segment='an `idaapi.segment_t` to check', ea='an address in the database')
 def contains(segment, ea):
     '''Returns true if the address `ea` is contained within the ``idaapi.segment_t`` specified by `segment`.'''
     return interface.range.within(ea, segment)
@@ -422,6 +464,7 @@ def __save_file(filename, ea, size, offset=0):
     return res
 
 @utils.string.decorate_arguments('filename')
+@document.parameters(filename='a filename to read from', ea='the address to map to', size='the number of bytes to map', offset='the offset into the file to read from', kwds='if ``name`` is specified as a string, then use it as the name for the new segment')
 def load(filename, ea, size=None, offset=0, **kwds):
     """Load the specified `filename` to the address `ea` as a segment.
 
@@ -437,6 +480,7 @@ def load(filename, ea, size=None, offset=0, **kwds):
         raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}{:s}) : Unable to load file into {:#x}{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', ea, cb, utils.string.escape(os.path.relpath(filename), '"')))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
 
+@document.parameters(ea='the address of the data to map', size='the number of bytes to map', newea='the target address to map the data to', kwds='if ``name`` is specified as a string, then use it as the name for the new segment')
 def map(ea, size, newea, **kwds):
     """Map `size` bytes of data from `ea` into a new segment at `newea`.
 
@@ -459,6 +503,13 @@ def map(ea, size, newea, **kwds):
 
 # creation/destruction
 @utils.string.decorate_arguments('name')
+@document.aliases('create')
+@document.parameters(
+    offset='the offset to create the segment at',
+    size='the size of the segment',
+    name='the name of the segment',
+    kwds='If `bits` is specified, then specify the bit size of the segment. `align` can be used to specify the paragraph alignment. `org` can be used to set the origin and `comb` can be used to specify any other flags'
+)
 def new(offset, size, name, **kwds):
     """Create a segment at `offset` with `size` and name it according to `name`.
 
@@ -532,6 +583,8 @@ def new(offset, size, name, **kwds):
     return seg
 create = utils.alias(new)
 
+@document.aliases('delete')
+@document.parameters(segment='an identifier used to describe a segment', contents='whether to remove the contents of the segment from the database')
 def remove(segment, contents=False):
     """Remove the specified `segment`.
 
@@ -554,6 +607,8 @@ def remove(segment, contents=False):
 delete = utils.alias(remove)
 
 @utils.string.decorate_arguments('filename')
+@document.aliases('export')
+@document.parameters(filename='the path to the filename to write the segment to', segment='an identifier used to specify a segment', offset='the offset into the file to start writing the segment')
 def save(filename, segment, offset=0):
     """Export the segment identified by `segment` to the file named `filename`.
 

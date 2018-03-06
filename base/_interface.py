@@ -231,6 +231,7 @@ class typemap:
         typeid = idaapi.BADADDR if typeid < 0 else typeid
         return flag|(idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz)*count
 
+@document.hidden
 class prioritybase(object):
     result = type('result', (object,), {})
     CONTINUE = type('continue', (result,), {})()
@@ -399,6 +400,7 @@ class prioritybase(object):
         # That's it!
         return closure
 
+@document.hidden
 class priorityhook(prioritybase):
     """
     Helper class for allowing one to apply a number of hooks to the
@@ -510,6 +512,7 @@ class priorityhook(prioritybase):
             raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, method))
         return super(priorityhook, self).apply(name)
 
+@document.hidden
 class prioritynotification(prioritybase):
     """
     Helper class for allowing one to apply an arbitrary number of hooks to the
@@ -890,6 +893,7 @@ class node(object):
         OP_REPR, INVERT_BIT = 8, 0x100000
         return internal.netnode.alt.get(ea, OP_REPR) & (INVERT_BIT << opnum) != 0
 
+@document.hidden
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     res = ("{:x}".format(abs(n)) if isinstance(n, six.integer_types) else n for n in names)
@@ -1200,6 +1204,7 @@ class ref_t(set):
             continue
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to find the cross-reference type that matches requested state.".format('.'.join(('internal', __name__, cls.__name__)), str().join(sorted(res))))
 
+@document.classdef
 class AddressOpnumReftype(namedtypedtuple):
     """
     This tuple is used to represent references that include an operand number
@@ -1213,6 +1218,7 @@ OREF = AddressOpnumReftype
 # XXX: is .startea always guaranteed to point to an instruction that modifies
 #      the switch's register? if so, then we can use this to calculate the
 #      .range/.cases more accurately instead of them being based on .elbase.
+@document.classdef
 class switch_t(object):
     """
     This object is a wrapper around the ``idaapi.switch_info_ex_t`` class and
@@ -1309,6 +1315,7 @@ class switch_t(object):
             return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
         return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
 
+@document.hidden
 def xiterate(ea, start, next):
     '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
     getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
@@ -1320,6 +1327,7 @@ def xiterate(ea, start, next):
         addr = next(ea, addr)
     return
 
+@document.hidden
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
@@ -1444,6 +1452,7 @@ class collect_t(object):
         t = self.__cons__
         return "{:s} {!s} -> {!r}".format(self.__class__, getattr(t, '__name__', t), self.__state__)
 
+@document.classdef
 class architecture_t(object):
     """
     Base class to represent how IDA maps the registers and types
@@ -1569,6 +1578,7 @@ class architecture_t(object):
         cls = self.__class__
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({:s}{:s}) : Unable to determine the register to demote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
 
+@document.classdef
 class bounds_t(namedtypedtuple):
     """
     This tuple is used to represent references that describe a bounds
