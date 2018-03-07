@@ -325,14 +325,56 @@ class segments(object):
     Enumerate all of the segments within the database.
     """
     def __new__(cls):
-        '''Yield the bound of each segment for all segments within the current database.'''
+        '''Yield the bounds of each segment within the current database.'''
         for s in segment.__iterate__():
             yield s.startEA, s.endEA
         return
 
-    list = utils.alias(staticmethod(segment.list))
-    iterate = utils.alias(staticmethod(segment.__iterate__))
-    search = utils.alias(staticmethod(segment.search))
+    @utils.multicase(name=basestring)
+    @classmethod
+    def iterate(cls, name):
+        '''List all of the segments defined in the database that match the glob ``name``.'''
+        return cls.list(like=string)
+    @utils.multicase()
+    @classmethod
+    def list(cls, **type):
+        """List all the segments defined in the database.
+
+        Search type can be identified by providing a named argument.
+        like = glob match
+        regex = regular expression
+        selector = segment selector
+        index = particular index
+        name = specific segment name
+        predicate = function predicate
+        """
+        return segment.list(**type)
+
+    @utils.multicase(name=basestring)
+    @classmethod
+    def iterate(cls, name):
+        '''Iterate through all of the segments in the database with a glob that matches ``name``.'''
+        return cls.iterate(like=string)
+    @utils.multicase()
+    @classmethod
+    def iterate(cls, **type):
+        """Iterate through each segment defined in the database.
+        Please review the help for segments.list for the definition of ``type``.
+        """
+        return segment.__iterate__(**type)
+
+    @utils.multicase(name=basestring)
+    @classmethod
+    def search(cls, name):
+        '''Search through all of the segments matching the glob ``name`` and return the first result.'''
+        return cls.search(like=name)
+    @utils.multicase()
+    @classmethod
+    def search(cls, **type):
+        """Search through all of the segments within the database and return the first result.
+        Please review the help for segments.list for the definition of ``type``.
+        """
+        return segment.search(**type)
 
 @utils.multicase()
 def decode():

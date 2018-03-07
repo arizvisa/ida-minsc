@@ -41,23 +41,34 @@ import structure as struc
 import enumeration as enum
 import segment as seg
 
-# default logging that displays any info
+## default logging that displays any info
 __import__('logging').root.level = __import__('logging').INFO
 
-# shortcuts
+## shortcuts
 h, top, go, goof = database.h, func.top, database.go, database.goof
 
-# functional tools
+## useful moduels
 import functools, itertools, operator
-fbox,fboxed,box,boxed,funbox,unbox,finstance,fconstant,fpassthru,fpass,fidentity,fid,first,second,third,last,fcompose,compose,fdiscard,fcondition,fmaplist,fap,flazy,fmemo,fpartial,partial,fapply,fcurry,frpartial,freversed,frev,fexc,fexception,fcatch,fcomplement,fnot,ilist,liter,ituple,titer,itake,iget,imap,ifilter = map(functools.partial(getattr, __import__('internal').utils), __import__('internal').utils.__all__)
 
-# pattern matching
-AnyRegister = AnyReg = __import__('internal').utils.PatternAnyType(instruction.register_t)
-AnyInteger = AnyInt = __import__('internal').utils.PatternAnyType(__import__('six').integer_types)
-AnyString = AnyStr = __import__('internal').utils.PatternAnyType(basestring)
-Any = _ = __import__('internal').utils.PatternAny()
+## useful utilities
+utils = __import__('internal').utils
+
+# functional combinators
+locals().update({name : item for name, item in utils.__dict__.iteritems() if name in utils.__all__})
+
+# pattern matching utilities
+AnyRegister = AnyReg = utils.PatternAnyType(instruction.register_t)
+AnyInteger = AnyInt = utils.PatternAnyType(__import__('six').integer_types)
+AnyString = AnyStr = utils.PatternAnyType(basestring)
+Any = _ = utils.PatternAny()
+
+# ...that's all for utils
+del(utils)
+
+## some types that the user might use
 architecture_t, register_t, symbol_t = instruction.architecture_t, instruction.register_t, __import__('internal').interface.symbol_t
 
+## miscellaneous modules
 import tools, ui
 from tools import remote
 

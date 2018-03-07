@@ -6,7 +6,7 @@ import six,types,heapq,collections
 import multiprocessing,Queue
 import idaapi
 
-__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter']
+__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -15,7 +15,11 @@ fbox = fboxed = box = boxed = lambda *a: a
 # return a closure that executes ``f`` with the arguments unboxed.
 funbox = unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + __builtin__.reduce(operator.add, __builtin__.map(__builtin__.tuple, ap), ())), **__builtin__.dict(k.items() + kp.items()))
 # return a closure that will check that ``object`` is an instance of ``type``.
-finstance = lambda type: lambda object: isinstance(object, type)
+finstance = lambda type: frpartial(isinstance, type)
+# return a closure that will check if its argument has an item ``key``.
+fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), iter, next, fpartial(operator.eq, None))
+# return a closure that will check if its argument has an ``attribute``.
+fhasattr = fattributeQ = fattrQ = lambda attribute: frpartial(hasattr, attribute)
 # return a closure that always returns ``object``.
 fconstant = fconst = falways = always = lambda object: lambda *a, **k: object
 # a closure that returns its argument

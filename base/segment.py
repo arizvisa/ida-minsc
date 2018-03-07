@@ -131,10 +131,16 @@ def by(**type):
         raise LookupError("{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
-# FIXME: This should probaby be a matcher class that returns the first instance.
-def search(string):
+@utils.multicase(name=basestring)
+def search(name):
     '''Search through all the segments using globbing.'''
     return by(like=string)
+@utils.multicase()
+def search(**type):
+    """Search through all the segments for one that matches ``type``.
+    Please review the help for segment.list for the definition of ``type``.
+    """
+    return by(**type)
 
 ## properties
 @utils.multicase()
