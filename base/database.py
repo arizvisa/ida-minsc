@@ -320,10 +320,19 @@ class functions(object):
             raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res
 
-# XXX: should this be a matcher class?
-def segments():
-    '''Returns a list of all segments in the current database.'''
-    return [s.startEA for s in segment.iterate()]
+class segments(object):
+    """
+    Enumerate all of the segments within the database.
+    """
+    def __new__(cls):
+        '''Yield the bound of each segment for all segments within the current database.'''
+        for s in segment.__iterate__():
+            yield s.startEA, s.endEA
+        return
+
+    list = utils.alias(staticmethod(segment.list))
+    iterate = utils.alias(staticmethod(segment.__iterate__))
+    search = utils.alias(staticmethod(segment.search))
 
 @utils.multicase()
 def decode():

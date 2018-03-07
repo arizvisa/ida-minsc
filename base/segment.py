@@ -131,6 +131,7 @@ def by(**type):
         raise LookupError("{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
+# FIXME: This should probaby be a matcher class that returns the first instance.
 def search(string):
     '''Search through all the segments using globbing.'''
     return by(like=string)
@@ -330,9 +331,15 @@ def color(segment, rgb):
     '''Sets the color of the segment identified by ``segment`` to ``rgb``.'''
     return set_color(segment, rgb)
 
-def contains():
-    '''Returns True if the current address is within a segment.'''
-    return contains(ui.current.segment(), ui.current.address())
+@utils.multicase()
+def within():
+    '''Returns True if the current address is within any segment.'''
+    return within(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def within(ea):
+    '''Returns True if the address ``ea`` is within any segment.'''
+    return any(segment.startEA <= ea < segment.endEA for segment in __iterate__())
+
 @utils.multicase(ea=six.integer_types)
 def contains(ea):
     '''Returns True if the address ``ea`` is contained within the current segment.'''
