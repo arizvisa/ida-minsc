@@ -1356,7 +1356,7 @@ def selectcontents(**boolean):
 
     for ea, res in internal.comment.contents.iterate():
         # check to see that the dict's keys match
-        res,d = __builtin__.set(res),internal.comment.contents._read(None, ea)
+        res,d = __builtin__.set(res),internal.comment.contents._read(None, ea) or {}
         if __builtin__.set(d.viewkeys()) != res:
             # FIXME: include query in warning
             logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:#x}".format(__name__, ea))
