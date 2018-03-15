@@ -271,6 +271,7 @@ class functions(object):
             args, fargs = 1, lambda ea: []
 
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10)) if maxindex else 1
+        cmaxoffset = math.floor(math.log(offset(maxentry)) or 1)/math.log(16)
         cmaxentry = math.floor(math.log(maxentry or 1)/math.log(16))
         cmaxaddr = math.floor(math.log(maxaddr or 1)/math.log(16))
         cminaddr = math.floor(math.log(minaddr or 1)/math.log(16))
@@ -282,9 +283,9 @@ class functions(object):
         clvars = math.floor(math.log(lvars or 1)/math.log(10)) if lvars else 1
 
         for index,ea in enumerate(res):
-            print "[{:>{:d}d}] {:#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
+            print "[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
-                ea, int(cmaxentry),
+                offset(ea), int(cmaxoffset),
                 fminaddr(ea), int(cminaddr), fmaxaddr(ea), int(cmaxaddr),
                 len(list(function.chunks(ea))), int(cchunks),
                 function.name(ea), int(maxname),
@@ -2791,16 +2792,19 @@ class marks(object):
     @utils.multicase(ea=six.integer_types, description=basestring)
     @classmethod
     def new(cls, ea, description, **extra):
-        '''Create a mark at the address ``ea`` with the given ``description``.'''
+        """Create a mark at the address ``ea`` with the given ``description``.
+        Returns the index of the newly created mark.
+        """
         ea = interface.address.inside(ea)
         try:
             idx = cls.get_slotindex(ea)
-            ea,comm = cls.by_index(idx)
-            logging.warn("{:s}.new({:#x}, ...) : Replacing mark {:d} at {:#x} : {!r} -> {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, comm, description))
+            ea, res = cls.by_index(idx)
+            logging.warn("{:s}.new({:#x}, ...) : Replacing mark {:d} at {:#x} : {!r} -> {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, res, description))
         except KeyError:
-            idx = cls.free_slotindex()
+            res, idx = None, cls.free_slotindex()
             logging.info("{:s}.new({:#x}, ...) : Creating mark {:d} at {:#x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, description))
-        return cls.set_description(idx, ea, description, **extra)
+        cls.set_description(idx, ea, description, **extra)
+        return res
 
     @utils.multicase()
     @classmethod
@@ -2810,13 +2814,13 @@ class marks(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, ea):
-        '''Remove the mark at the specified address ``ea``.'''
+        '''Remove the mark at the specified address ``ea`` returning the previous description.'''
         ea = interface.address.inside(ea)
         idx = cls.get_slotindex(ea)
         descr = cls.get_description(idx)
-        res = cls.set_description(idx, idaapi.BADADDR, '')
+        cls.set_description(idx, ea, '')
         logging.warn("{:s}.remove({:#x}) : Removed mark {:d} at {:#x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, descr))
-        return idx
+        return descr
 
     @classmethod
     def iterate(cls):
@@ -2836,7 +2840,7 @@ class marks(object):
 
     @classmethod
     def by_index(cls, index):
-        '''Return the mark at the specified ``index`` in the mark list.'''
+        '''Return the (address, description) of the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.get_slotaddress(index), cls.get_description(index))
         raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__,cls.__name__)), index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
@@ -2850,7 +2854,7 @@ class marks(object):
     @utils.multicase()
     @classmethod
     def by_address(cls, ea):
-        '''Return the mark at the given address ``ea``.'''
+        '''Return the (address, description) of the mark at the given address ``ea``.'''
         return cls.by_index(cls.get_slotindex(ea))
     byAddress = utils.alias(by_address, 'marks')
 
@@ -2863,11 +2867,7 @@ class marks(object):
     @classmethod
     def get_slotindex(cls, ea):
         '''Get the index of the mark at address ``ea``.'''
-        res = cls.table.get(ea, None)
-        if res is None:
-            # FIXME: figure out good way to fail if this address isn't found
-            return cls.find_slotaddress(ea)
-        return res
+        return cls.find_slotaddress(ea)
 
     @utils.multicase()
     @classmethod
@@ -2887,8 +2887,7 @@ class marks(object):
             res = cls.location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
             title, descr = description, description
             res.mark(index, title, descr)
-            if cls.get_slotaddress(index) != ea:
-                raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems())) if extra else '')))
+            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems())) if extra else '')))
             return index
 
         @classmethod
@@ -2923,16 +2922,13 @@ class marks(object):
             res = loc.markedpos(intp)
             if res == idaapi.BADADDR:
                 raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
-            ea = address.head(res)
-            cls.table[ea] = slotidx
-            return ea
+            return address.head(res)
 
     else:   # idaapi.__version__ >= 7.0
         @classmethod
         def set_description(cls, index, ea, description, **extra):
             idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, description)
-            if cls.get_slotaddress(index) != ea:
-                raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems())) if extra else '')))
+            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems()))) if extra else ''))
             return index
 
         @classmethod
@@ -2966,9 +2962,7 @@ class marks(object):
             res = idaapi.get_marked_pos(slotidx)
             if res == idaapi.BADADDR:
                 raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
-            ea = address.head(res)
-            cls.table[ea] = slotidx
-            return ea
+            return address.head(res)
 
     getSlotIndex = utils.alias(get_slotindex, 'marks')
     findSlotAddress = utils.alias(find_slotaddress, 'marks')
@@ -2976,7 +2970,8 @@ class marks(object):
 @utils.multicase()
 def mark():
     '''Return the mark at the current address.'''
-    return marks.by_address(ui.current.address())
+    _, res = marks.by_address(ui.current.address())
+    return res
 @utils.multicase(none=types.NoneType)
 def mark(none):
     '''Remove the mark at the current address.'''
@@ -2984,10 +2979,11 @@ def mark(none):
 @utils.multicase(ea=six.integer_types)
 def mark(ea):
     '''Return the mark at the specified address ``ea``.'''
-    return marks.by_address(ea)
+    _, res = marks.by_address(ea)
+    return res
 @utils.multicase(description=basestring)
 def mark(description):
-    '''Create a mark at the current address with the specified ``description``.'''
+    '''Set the mark at the current address to the specified ``description``.'''
     return mark(ui.current.address(), description)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def mark(ea, none):
@@ -2998,7 +2994,9 @@ def mark(ea, none):
     return marks.remove(ea)
 @utils.multicase(ea=six.integer_types, description=basestring)
 def mark(ea, description):
-    '''Create a mark at address ``ea`` with the given ``description``.'''
+    """Sets the mark at address ``ea`` to the specified ``description``.
+    Returns the previous description of the mark.
+    """
     return marks.new(ea, description)
 
 class extra(object):
