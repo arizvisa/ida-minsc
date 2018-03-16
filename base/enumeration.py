@@ -154,7 +154,7 @@ def size(enum, width):
     '''Set the number of bits for the enumeration identified by ``enum`` to ``width``.'''
     eid = by(enum)
     res = math.trunc(math.ceil(width / 8.0))
-    return idaapi.set_enum_width(eid, int(res)+1)
+    return idaapi.set_enum_width(eid, int(res))
 
 def mask(enum):
     '''Return the bitmask for the enumeration identified by ``enum``.'''
