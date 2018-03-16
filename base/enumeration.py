@@ -267,7 +267,7 @@ class member(object):
         If the int, ``bitmask``, is specified then used it as the bitmask for the enumeration.
         """
         eid = by(enum)
-        bmask = bitmask.get('bitmask', -1&mask(eid))
+        bmask = bitmask.get('bitmask', idaapi.BADADDR & mask(eid))
 
         res = interface.tuplename(name) if isinstance(name, tuple) else name
         ok = idaapi.add_enum_member(eid, res, value, bmask)
@@ -284,7 +284,7 @@ class member(object):
         '''Remove the enumeration member with the given ``mid``.'''
         value = cls.value(mid)
         # XXX: is a serial of 0 valid?
-        res = idaapi.del_enum_member(cls.parent(mid), value, 0, -1&cls.mask(mid))
+        res = idaapi.del_enum_member(cls.parent(mid), value, 0, idaapi.BADADDR & cls.mask(mid))
         if not res:
             raise LookupError("{:s}.member._remove({:x}) : Unable to remove member from enumeration.".format(__name__, mid))
         return res
@@ -317,7 +317,7 @@ class member(object):
     def by_value(cls, enum, value):
         '''Return the member id for the member of the enumeration ``enum`` with the specified ``value``.'''
         eid = by(enum)
-        bmask = -1&mask(eid)
+        bmask = idaapi.BADADDR & mask(eid)
         res,_ = idaapi.get_first_serial_enum_member(eid, value, bmask)
         if res == idaapi.BADADDR:
             raise LookupError("{:s}.by_value({:x}, {:d}) : Unable to locate member by value.".format('.'.join((__name__,cls.__name__)), eid, value))
@@ -428,8 +428,8 @@ class member(object):
         """
         eid = by(enum)
         mid = cls.by(enum, member)
-        #bmask = bitmask.get('bitmask', -1 & mask(eid))
-        bmask = bitmask.get('bitmask', -1 & cls.mask(mid))
+        #bmask = bitmask.get('bitmask', idaapi.BADADDR & mask(eid))
+        bmask = bitmask.get('bitmask', idaapi.BADADDR & cls.mask(mid))
         return idaapi.set_enum_member_value(mid, value, bmask)
 
     @utils.multicase(mid=six.integer_types)
@@ -463,7 +463,7 @@ class member(object):
 
     @classmethod
     def __iterate__(cls, eid):
-        bmask = -1&mask(eid)
+        bmask = idaapi.BADADDR & mask(eid)
         res = idaapi.get_first_enum_member(eid, bmask)
         if res == idaapi.BADADDR: return
         yield res
@@ -476,7 +476,7 @@ class member(object):
     def iterate(cls, enum):
         '''Iterate through all the member ids associated with the enumeration ``enum``.'''
         eid = by(enum)
-        bmask = -1&mask(eid)
+        bmask = idaapi.BADADDR & mask(eid)
         for v in cls.__iterate__(eid):
             res,_ = idaapi.get_first_serial_enum_member(eid, v, bmask)
             # XXX: what does get_next_serial_enum_member and the rest do?
