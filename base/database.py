@@ -396,7 +396,8 @@ def instruction(ea):
     '''Return the instruction at the specified address ``ea``.'''
     insn = idaapi.generate_disasm_line(interface.address.inside(ea))
     unformatted = idaapi.tag_remove(insn)
-    nocomment = unformatted[:unformatted.rfind(idaapi.cvar.ash.cmnt)]
+    comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
+    nocomment = unformatted[:comment] if comment != -1 else unformatted
     return reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
 
 @utils.multicase()
@@ -410,12 +411,14 @@ def disassemble(ea, **options):
     If the bool ``comments`` is True, then return the comments for each instruction as well.
     """
     ea = interface.address.inside(ea)
+    commentQ = __builtin__.next((options[k] for k in ('comment', 'comments') if k in options), False)
 
     res,count = [], options.get('count',1)
     while count > 0:
         insn = idaapi.generate_disasm_line(ea)
         unformatted = idaapi.tag_remove(insn)
-        nocomment = unformatted[:unformatted.rfind(idaapi.cvar.ash.cmnt)] if idaapi.cvar.ash.cmnt in unformatted and not options.get('comments', options.get('comment', False)) else unformatted
+        comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
+        nocomment = unformatted[:comment] if comment != -1 and not commentQ else unformatted
         res.append("{:x}: {:s}".format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
         ea = address.next(ea)
         count -= 1

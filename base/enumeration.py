@@ -478,7 +478,7 @@ class member(object):
         eid = by(enum)
         bmask = idaapi.BADADDR & mask(eid)
         for v in cls.__iterate__(eid):
-            res,_ = idaapi.get_first_serial_enum_member(eid, v, bmask)
+            res, _ = idaapi.get_first_serial_enum_member(eid, v, bmask)
             # XXX: what does get_next_serial_enum_member and the rest do?
             yield res
         return
