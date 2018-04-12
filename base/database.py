@@ -3751,12 +3751,12 @@ class get(object):
 
         lnumerics = {
             idaapi.FF_QWRD : 8,
-            idaapi.FF_OWORD : 16,
         }
 
-        # FF_YWORD and FF_ZWORD might not exist in older versions of IDA
-        # so try to add them to lnumerics "softly".
+        # FF_OWORD, FF_YWORD and FF_ZWORD might not exist in older versions
+        # of IDA, so try to add them to lnumerics "softly".
         try:
+            lnumerics[idaapi.FF_OWORD] = 16,
             lnumerics[idaapi.FF_YWORD] = 32
             lnumerics[idaapi.FF_ZWORD] = 64
         except AttributeError:
