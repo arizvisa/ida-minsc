@@ -1572,7 +1572,7 @@ def register(func, reg, *regs, **modifiers):
     uses_register = interface.regmatch.use( (reg,)+regs )
 
     for ea in iterate(func):
-        for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
+        for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
             yield ea, opnum, _instruction.op_state(ea, opnum)
         continue
     return

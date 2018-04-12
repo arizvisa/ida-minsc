@@ -297,34 +297,31 @@ class address(object):
         return l <= ea < r
 
     @classmethod
-    def __head1__(cls, ea):
+    def __head1__(cls, ea, **silent):
         # Ensures that ``ea`` is pointing to a valid address
         entryframe = cls.pframe()
 
         res = idaapi.get_item_head(ea)
-        if res != ea:
+        if not silent.get('silent', False):
             logging.warn("{:s} : Address {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, ea, res))
-            ea = res
-        return ea
+        return res
     @classmethod
-    def __head2__(cls, start, end):
+    def __head2__(cls, start, end, **silent):
         # Ensures that both ``start`` and ``end`` are pointing to valid addresses
         entryframe = cls.pframe()
 
         res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
         # FIXME: off-by-one here, as end can be the size of the db.
-        if res_start != start:
+        if res_start != start and not silent.get('silent', False):
             logging.warn("{:s} : Starting address of {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
-            start = res_start
-        if res_end != end:
+        if res_end != end and not silent.get('silent', False):
             logging.warn("{:s} : Ending address of {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
-            end = res_end
-        return start, end
+        return res_start, res_end
     @classmethod
-    def head(cls, *args):
+    def head(cls, *args, **silent):
         if len(args) > 1:
-            return cls.__head2__(*args)
-        return cls.__head1__(*args)
+            return cls.__head2__(*args, **silent)
+        return cls.__head1__(*args, **silent)
 
     @classmethod
     def __inside1__(cls, ea):
@@ -618,29 +615,34 @@ class AddressOpnumReftype(namedtypedtuple):
     _types = (long, (types.NoneType, int), ref_t)
 OREF = AddressOpnumReftype
 
-# FIXME: document this and consolidate it somehow with database.type.switch
+# XXX: is .startea always guaranteed to point to an instruction that modifies
+#      the switch's register? if so, then we can use this to calculate the
+#      .range/.cases more accurately instead of them being based on .elbase.
 class switch_t(object):
+    """
+    This is a wrapper around the idaapi.switch_info_ex_t class.
+    """
     def __init__(self, switch_info_ex):
         self.object = switch_info_ex
     @property
     def ea(self):
-        # address of beginning of switch code
+        '''Return the address of the beginning of the switch.'''
         return self.object.startea
     @property
     def branch_ea(self):
-        # address of branch table
+        '''Return the address of the branch table.'''
         return self.object.jumps
     @property
     def table_ea(self):
-        # address of case table
+        '''Return the address of the case/index table.'''
         return self.object.lowcase
     @property
     def default(self):
-        # address of default case
+        '''Return the code that handles the default case.'''
         return self.object.defjump
     @property
     def branch(self):
-        # return the branch table as an array
+        '''Return the contents of the branch table.'''
         import database
         if self.indirectQ():
             ea, count = self.object.jumps, self.object.jcases
@@ -649,7 +651,7 @@ class switch_t(object):
         return database.type.array(ea, length=count)
     @property
     def index(self):
-        # return the index table as an array
+        '''Return the contents of the case/index table.'''
         import database
         if self.indirectQ():
             ea, count = self.object.lowcase, self.object.ncases
@@ -657,20 +659,26 @@ class switch_t(object):
         return database.type.array(self.object.jumps, length=0)
     @property
     def register(self):
+        '''Return the register that the switch is based on.'''
         import instruction
         ri, rt = self.object.regnum, self.object.regdtyp
         return instruction.architecture.by_indextype(ri, rt)
     @property
     def base(self):
+        '''Return the base value (lowest index of cases) of the switch.'''
         return self.object.elbase
     @property
     def count(self):
+        '''Return the number of cases in the switch.'''
         return self.object.ncases
     def indirectQ(self):
+        '''Return whether the switch is using an indirection table or not.'''
         return self.object.is_indirect()
     def subtractQ(self):
+        '''Return whether the switch performs a transformation (subtract) on the index.'''
         return self.object.is_subtract()
     def case(self, case):
+        '''Return the handler for a particular case.'''
         # return the ea of the specified case number
         # FIXME: check that this works with a different .elbase
         if case < self.base or case >= self.count + self.base:
@@ -680,6 +688,15 @@ class switch_t(object):
         if self.indirectQ():
             idx = self.index[idx]
         return self.branch[idx]
+    @property
+    def cases(self):
+        '''Return all of the non-default cases in the switch.'''
+        default = self.default
+        return tuple(idx for idx in xrange(self.base, self.base+self.count) if self.case(idx) != default)
+    @property
+    def range(self):
+        '''Return all the possible cases for the switch.'''
+        return tuple(xrange(self.base, self.base+self.count))
     def __repr__(self):
         cls = self.__class__
         if self.indirectQ():

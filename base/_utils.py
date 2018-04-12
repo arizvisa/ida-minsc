@@ -6,7 +6,7 @@ import six,types,heapq,collections
 import multiprocessing,Queue
 import idaapi
 
-__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter']
+__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -74,25 +74,26 @@ itake = lambda count: compose(iter, fap(*(next,)*count), tuple)
 iget = lambda count: compose(iter, fap(*(next,)*(count)), tuple, operator.itemgetter(-1))
 # copy from itertools
 imap, ifilter = itertools.imap, itertools.ifilter
+# count number of elements of a container
+count = compose(iter, list, len)
 
 # cheap pattern-like matching
 class Pattern(object):
     def __eq__(self, other):
-        return False
+        return self.__cmp__(other) == 0
+    __call__ = __eq__
     def __repr__(self):
         return 'Pattern()'
 class PatternAny(Pattern):
-    def __eq__(self, other):
-        return True
-    __call__ = __eq__
+    def __cmp__(self, other):
+        return 0
     def __repr__(self):
         return "{:s}({:s})".format('Pattern', '*')
 class PatternAnyType(Pattern):
     def __init__(self, other):
         self.type = other
-    def __eq__(self, other):
-        return isinstance(other, self.type)
-    __call__ = __eq__
+    def __cmp__(self, other):
+        return 0 if isinstance(other, self.type) else -1
     def __repr__(self):
         return "{:s}({:s})".format('Pattern', '|'.join(n.__name__ for n in self.type) if hasattr(self.type, '__iter__') else self.type.__name__)
 

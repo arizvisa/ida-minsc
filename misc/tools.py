@@ -120,7 +120,7 @@ def collect(ea, sentinel):
     def _collect(addr, result):
         process = set()
         for blk in __builtin__.map(function.block, function.block.after(addr)):
-            if any(blk in coll for coll in (result,sentinel)):
+            if any(blk in coll for coll in (result, sentinel)):
                 continue
             process.add(blk)
         for addr, _ in process:
@@ -128,6 +128,28 @@ def collect(ea, sentinel):
         return result
     addr, _ = blk = function.block(ea)
     return _collect(addr, set([blk]))
+
+def collectcall(ea, sentinel=set()):
+    '''Collect all the children functions starting at function ``ea`` and terminating when a function in the set ``sentinel`` is reached.'''
+    if isinstance(sentinel, list):
+        sentinel = set(sentinel)
+    if not isinstance(sentinel, set):
+        raise AssertionError("{:s}.collectcall({:x}, {!r}) : Sentinel is not a set.".format(__name__, ea, sentinel))
+    def _collectcall(addr, result):
+        process = set()
+        for f in function.down(addr):
+            if any(f in coll for coll in (result, sentinel)):
+                continue
+            if not function.within(f):
+                logging.warn("{:s}.collectcall({:x}, {!r}) : Adding non-function address {:#x} ({:s}).".format(__name__, ea, sentinel, f, database.name(f)))
+                result.add(f)
+                continue
+            process.add(f)
+        for addr in process:
+            result |= _collectcall(addr, result | process)
+        return result
+    addr = function.top(ea)
+    return _collectcall(addr, set([addr]))
 
 def above(ea, includeSegment=False):
     '''Display all the callers of the function at /ea/'''

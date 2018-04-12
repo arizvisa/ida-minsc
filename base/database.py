@@ -712,52 +712,54 @@ def get_name(ea):
     return aname or None
 
 @utils.multicase(none=types.NoneType)
-def set_name(none, **listed):
+def set_name(none, **flags):
     '''Remove the name at the current address.'''
-    return set_name(ui.current.address(), '', **listed)
+    return set_name(ui.current.address(), '', **flags)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
-def set_name(ea, none, **listed):
+def set_name(ea, none, **flags):
     '''Remove the name defined at the address ``ea``.'''
-    return set_name(ea, '', **listed)
+    return set_name(ea, '', **flags)
 @utils.multicase(string=basestring)
-def set_name(string, **listed):
+def set_name(string, **flags):
     '''Rename the current address to ``string``.'''
-    return set_name(ui.current.address(), string, **listed)
+    return set_name(ui.current.address(), string, **flags)
 @utils.multicase(ea=six.integer_types, string=basestring)
-def set_name(ea, string, **listed):
+def set_name(ea, string, **flags):
     """Rename the address specified by ``ea`` to ``string``.
     If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
+    If ``flags`` is specified, then use the specified value as the flags.
     If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
     """
 
     ea = interface.address.inside(ea)
-    SN_NOCHECK = idaapi.SN_NOCHECK
-    SN_CHECK = idaapi.SN_CHECK
-    SN_NOLIST = idaapi.SN_NOLIST
-    SN_LOCAL = idaapi.SN_LOCAL
-    SN_NON_PUBLIC = idaapi.SN_NON_PUBLIC
 
     # FIXME: what's this for?
     if idaapi.has_any_name(type.flags(ea)):
         pass
 
-    flags = idaapi.SN_NON_AUTO
-    flags |= idaapi.SN_NOCHECK
-    flags |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
-    flags |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
-    flags |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
-    flags &= ~idaapi.SN_LOCAL
+    # some default options
+    fl = idaapi.SN_NON_AUTO
+    fl |= idaapi.SN_NOCHECK
 
-    try:
-        function.top(ea)
-    except Exception:
-        if 'listed' not in listed:
-            flags &= ~idaapi.SN_NOLIST
+    # preserve any flags that were previously applied
+    fl |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
+    fl |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
+    fl |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
 
-    # If the bool ``listed`` is True, then ensure that this name is added to the name list.
-    if 'listed' in listed:
-        flags = (flags & ~idaapi.SN_NOLIST) if listed.get('listed', False) else (flags | idaapi.SN_NOLIST)
+    # set its local flag based on whether we're in a function or not
+    fl = (fl | idaapi.SN_LOCAL) if function.within(ea) else (fl & ~idaapi.SN_LOCAL)
 
+    # if we're within a function and 'listed' wasn't explicitly specified
+    # then ensure it's not listed as it's likely to be a local label
+    if not function.within(ea) and 'listed' not in flags:
+        fl &= ~idaapi.SN_NOLIST
+
+    # if the bool ``listed`` is True, then ensure that it's added to the name list.
+    if 'listed' in flags:
+        fl = (fl & ~idaapi.SN_NOLIST) if flags.get('listed', False) else (fl | idaapi.SN_NOLIST)
+
+    # check to see if we're a label being applied to a switch
+    # that way we can make it a local label
     try:
         # check if we're a label of some kind
         f = type.flags(ea)
@@ -769,18 +771,20 @@ def set_name(ea, string, **listed):
                 si = next(idaapi.get_switch_info_ex(r) for r in xref.data_up(r))
                 if si is not None:
                     # because its name has its local flag cleared
-                    flags |= idaapi.SN_LOCAL
+                    fl |= idaapi.SN_LOCAL
     except: pass
 
+    # validate the name
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
-        logging.warn("{:s}.set_name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in listed.iteritems())) if listed else '', res))
+        logging.warn("{:s}.set_name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in flags.iteritems())) if flags else '', res))
         string = res
 
-    res,ok = get_name(ea),idaapi.set_name(ea, string or "", flags)
+    # set the name and use the value of 'flags' if it was explicit
+    res, ok = get_name(ea), idaapi.set_name(ea, string or "", flags.get('flags', fl))
 
     if not ok:
-        raise ValueError("{:s}.set_name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in listed.iteritems())) if listed else '', ea, string, flags))
+        raise ValueError("{:s}.set_name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in flags.iteritems())) if flags else '', ea, string, flags))
     return res
 
 @utils.multicase()
@@ -792,18 +796,18 @@ def name(ea):
     '''Returns the name at the address ``ea``.'''
     return get_name(ea) or None
 @utils.multicase(string=basestring)
-def name(string, *suffix, **listed):
+def name(string, *suffix, **flags):
     '''Renames the current address to ``string``.'''
-    return name(ui.current.address(), string, *suffix, **listed)
+    return name(ui.current.address(), string, *suffix, **flags)
 @utils.multicase(none=types.NoneType)
 def name(none):
     '''Removes the name at the current address.'''
     return set_name(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types, string=basestring)
-def name(ea, string, *suffix, **listed):
+def name(ea, string, *suffix, **flags):
     '''Renames the address ``ea`` to ``string``.'''
     res = (string,) + suffix
-    return set_name(ea, interface.tuplename(*res), **listed)
+    return set_name(ea, interface.tuplename(*res), **flags)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none):
     '''Removes the name at address ``ea``.'''
@@ -1979,6 +1983,37 @@ class address(object):
 
     @utils.multicase()
     @classmethod
+    def prevlabel(cls):
+        '''Return the address of the previous label.'''
+        return cls.prevlabel(ui.current.address(), 1)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def prevlabel(cls, ea):
+        '''Return the address of the previous label from the address ``ea``.'''
+        return cls.prevlabel(ea, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def prevlabel(cls, ea, count):
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: not type.has_label(n))
+        return cls.prevlabel(res, count-1) if count > 1 else res
+
+    @utils.multicase()
+    @classmethod
+    def nextlabel(cls):
+        '''Return the address of the next label.'''
+        return cls.nextlabel(ui.current.address(), 1)
+    @utils.multicase(ea=six.integer_types)
+    def nextlabel(cls, ea):
+        '''Return the address of the next label from the address ``ea``.'''
+        return cls.nextlabel(ea, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def nextlabel(cls, ea, count):
+        res = cls.walk(ea, cls.next, lambda n: not type.has_label(n))
+        return cls.nextlabel(cls.next(res), count-1) if count > 1 else res
+
+    @utils.multicase()
+    @classmethod
     def prevtag(cls, **tagname):
         '''Return the previous address that contains a tag.'''
         return cls.prevtag(ui.current.address(), 1, **tagname)
@@ -2255,15 +2290,15 @@ class type(object):
 
     @utils.multicase()
     @staticmethod
-    def has_name():
-        '''Return True if the current address has a name.'''
-        return type.has_name(ui.current.address())
+    def has_label():
+        '''Return True if the current address has a label.'''
+        return type.has_label(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
-    def has_name(ea):
-        '''Return True if the address at ``ea`` has a name.'''
+    def has_label(ea):
+        '''Return True if the address at ``ea`` has a label.'''
         return idaapi.has_any_name(type.flags(ea))
-    nameQ = utils.alias(has_name, 'type')
+    labelQ = nameQ = has_name = utils.alias(has_label, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -2469,32 +2504,27 @@ class type(object):
     class switch(object):
         @classmethod
         def __getlabel(cls, ea):
-            try:
-                f = type.flags(ea)
-                if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
-                    r, = xref.data_up(ea)
-                    return cls.__getarray(r)
-            except (ValueError, TypeError): pass
+            f = type.flags(ea)
+            if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
+                drefs = (ea for ea in xref.data_up(ea))
+                refs = (ea for ea in itertools.chain(*itertools.imap(xref.up, drefs)) if idaapi.get_switch_info_ex(ea) is not None)
+                try:
+                    ea = __builtin__.next(refs)
+                    res = idaapi.get_switch_info_ex(ea)
+                    return interface.switch_t(res)
+                except StopIteration:
+                    pass
             raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
         def __getarray(cls, ea):
+            refs = (ea for ea in xref.up(ea) if idaapi.get_switch_info_ex(ea) is not None)
             try:
-                c, = xref.data_up(ea)
-                sidata,each = type.array(ea),__builtin__.set(xref.code_down(c))
-
-                # check to see if first element is the correct dataref
-                lastea, = xref.data_down(c)
-                if ea != lastea: raise TypeError
-                # then copy the first element since its been decoded already
-                each.add(sidata[0])
-
-                # ensure that each element matches
-                if config.bits() == sidata.itemsize*8 and all(x in each for x in sidata):
-                    r, = xref.data_up(ea)
-                    return cls.__getinsn(r)
-
-            except (IndexError,TypeError,KeyError,ValueError): pass
+                ea = __builtin__.next(refs)
+                res = idaapi.get_switch_info_ex(ea)
+                return interface.switch_t(res)
+            except StopIteration:
+                pass
             raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
@@ -2519,6 +2549,37 @@ class type(object):
             try: return cls.__getlabel(ea)
             except TypeError: pass
             raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+
+    @utils.multicase()
+    @staticmethod
+    def is_importref():
+        '''Returns True if the instruction at the current address references an import.'''
+        return type.is_importref(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @staticmethod
+    def is_importref(ea):
+        '''Returns True if the instruction at ``ea`` references an import.'''
+        ea = interface.address.inside(ea)
+
+        # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
+        return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
+    isImportRef = importrefQ = utils.alias(is_importref, 'type')
+
+    @utils.multicase()
+    @staticmethod
+    def is_globalref():
+        '''Returns True if the instruction at the current address references a global.'''
+        return is_globalref(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @staticmethod
+    def is_globalref(ea):
+        '''Return True if the instruction at ``ea`` references a global.'''
+        ea = interface.address.inside(ea)
+
+        # FIXME: this doesn't seem like the right way to determine this...
+        return len(database.dxdown(ea)) > len(database.cxdown(ea))
+    isGlobalRef = globalrefQ = utils.alias(is_globalref, 'type')
+
 t = type    # XXX: ns alias
 
 ## information about a given address
