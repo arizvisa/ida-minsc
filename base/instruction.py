@@ -765,7 +765,7 @@ def is_branch(): return is_branch(ui.current.address())
 def is_branch(ea):
     '''Returns True if the instruction at ``ea`` is a branch instruction.'''
     ea = interface.address.inside(ea)
-    return database.is_code(ea) and isJmp(ea) or isJxx(ea) or isJmpi(ea)
+    return database.is_code(ea) and is_jmp(ea) or is_jxx(ea) or is_jmpi(ea)
 isBranch = branchQ = utils.alias(is_branch)
 
 @utils.multicase()
@@ -775,16 +775,8 @@ def is_jmp(ea):
     '''Returns True if the instruction at ``ea`` is a jmp (both immediate and indirect) instruction.'''
     ea = interface.address.inside(ea)
 
-    MASK_TYPE = 0x0300
-    T_BRANCH = 0x0100
-
-    MASK_BRTYPE = 0b111
-    CF_JMPIMM = 0b001
-    CF_JMPCOND = 0b000
-    CF_CALL = 0b010
-
-    F = feature(ea)
-    return database.is_code(ea) and not isJmpi(ea) and (F & MASK_TYPE == T_BRANCH) and (F & MASK_BRTYPE == CF_JMPIMM) and bool(database.xref.down(ea))
+    F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
+    return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_STOP == idaapi.CF_STOP) and len(list(X)) == 1 and not is_return(ea)
 isJmp = JmpQ = jmpQ = utils.alias(is_jmp)
 
 @utils.multicase()
@@ -794,16 +786,8 @@ def is_jxx(ea):
     '''Returns True if the instruction at ``ea`` is a conditional branch.'''
     ea = interface.address.inside(ea)
 
-    MASK_TYPE = 0x0300
-    T_BRANCH = 0x0100
-
-    MASK_BRTYPE = 0b111
-    CF_JMPIMM = 0b001
-    CF_JMPCOND = 0b000
-    CF_CALL = 0b010
-
-    F = feature(ea)
-    return database.is_code(ea) and (F & MASK_TYPE == T_BRANCH) and (F & MASK_BRTYPE == CF_JMPCOND) and bool(database.xref.down(ea))
+    F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
+    return database.is_code(ea) and all((F&x != x) for x in (idaapi.CF_CALL, idaapi.CF_STOP)) and len(list(X)) > 1
 isJxx = JxxQ = jxxQ = utils.alias(is_jxx)
 
 @utils.multicase()
@@ -812,7 +796,8 @@ def is_jmpi(): return is_jmpi(ui.current.address())
 def is_jmpi(ea):
     '''Returns True if the instruction at ``ea`` is an indirect branch.'''
     ea = interface.address.inside(ea)
-    return database.is_code(ea) and feature(ea) & idaapi.CF_JUMP == idaapi.CF_JUMP
+    F = feature(ea)
+    return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_JUMP == idaapi.CF_JUMP)
 isJmpi = JmpiQ = jmpiQ = utils.alias(is_jmpi)
 
 @utils.multicase()
@@ -825,17 +810,18 @@ def is_call(ea):
         idaapi.decode_insn(ea)
         return idaapi.is_call_insn(ea)
 
-    MASK_TYPE = 0x0300
-    T_BRANCH = 0x0100
-
-    MASK_BRTYPE = 0b111
-    CF_JMPIMM = 0b001
-    CF_JMPCOND = 0b000
-    CF_CALL = 0b010
-
     F = feature(ea)
-    return database.is_code(ea) and (feature(ea) & MASK_TYPE == T_BRANCH) and (feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL)
+    return database.is_code(ea) and (feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL)
 isCall = callQ = utils.alias(is_call)
+
+@utils.multicase()
+def is_calli(): return is_calli(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def is_calli(ea):
+    '''Returns True if the instruction at ``ea`` is an indirect call instruction.'''
+    ea = interface.address.inside(ea)
+    F = feature(ea)
+    return is_call(ea) and all(F&x == x for x in (idaapi.CF_CALL, idaapi.CF_JUMP))
 
 ## op_t.flags
 #OF_NO_BASE_DISP = 0x80 #  o_displ: base displacement doesn't exist meaningful only for o_displ type if set, base displacement (x.addr) doesn't exist.
