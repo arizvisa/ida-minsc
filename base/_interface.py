@@ -302,7 +302,7 @@ class address(object):
         entryframe = cls.pframe()
 
         res = idaapi.get_item_head(ea)
-        if not silent.get('silent', False):
+        if ea != res and not silent.get('silent', False):
             logging.warn("{:s} : Address {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, ea, res))
         return res
     @classmethod
