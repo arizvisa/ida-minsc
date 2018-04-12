@@ -733,29 +733,6 @@ def op_refs(ea, n):
     return res
 op_ref = utils.alias(op_refs)
 
-## instruction type references
-@utils.multicase()
-def is_globalref(): return is_globalref(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_globalref(ea):
-    '''Return True if the instruction at ``ea`` references global data.'''
-    ea = interface.address.inside(ea)
-
-    # FIXME: this doesn't seem like the right way to determine this...
-    return len(database.dxdown(ea)) > len(database.cxdown(ea))
-isGlobalRef = globalrefQ = is_globalref
-
-@utils.multicase()
-def is_importref(): return is_importref(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_importref(ea):
-    '''Returns True if the instruction at ``ea`` references an import.'''
-    ea = interface.address.inside(ea)
-
-    # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
-    return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
-isImportRef = importrefQ = utils.alias(is_importref)
-
 ## types of instructions
 @utils.multicase()
 def is_return(): return is_return(ui.current.address())
