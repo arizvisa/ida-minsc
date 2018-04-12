@@ -2604,17 +2604,6 @@ class xref(object):
     Functions for interacting with all of the cross-references inside the database.
     """
 
-    @staticmethod
-    def iterate(ea, start, next):
-        ea = interface.address.inside(ea)
-        ea = ea if type.flags(ea, idaapi.FF_DATA) else idaapi.prev_head(ea,0)
-
-        addr = start(ea)
-        while addr != idaapi.BADADDR:
-            yield addr
-            addr = next(ea, addr)
-        return
-
     @utils.multicase()
     @staticmethod
     def code():
@@ -2634,11 +2623,12 @@ class xref(object):
         If the bool ``descend`` is defined, then return only code refs that are referred by the specified address.
         """
         if descend:
-            start,next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
+            start, next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
         else:
-            start,next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
+            start, next = idaapi.get_first_cref_to, idaapi.get_next_cref_to
 
-        for addr in xref.iterate(ea, start, next):
+        ea = interface.address.inside(ea)
+        for addr in interface.xiterate(ea, start, next):
             yield addr
         return
     c = utils.alias(code, 'xref')
@@ -2664,11 +2654,12 @@ class xref(object):
         If the bool ``descend`` is defined, then return only the data refs that are referred by the specified address.
         """
         if descend:
-            start,next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
+            start, next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
         else:
-            start,next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
+            start, next = idaapi.get_first_dref_to, idaapi.get_next_dref_to
 
-        for addr in xref.iterate(ea, start, next):
+        ea = interface.address.inside(ea)
+        for addr in interface.xiterate(ea, start, next):
             yield addr
         return
     d = utils.alias(data, 'xref')

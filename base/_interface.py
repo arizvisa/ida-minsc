@@ -691,8 +691,9 @@ class switch_t(object):
     @property
     def cases(self):
         '''Return all of the non-default cases in the switch.'''
-        default = self.default
-        return tuple(idx for idx in xrange(self.base, self.base+self.count) if self.case(idx) != default)
+        import instruction
+        f = lambda ea, dflt=self.default: (ea == dflt) or (instruction.is_jmp(ea) and instruction.op_value(ea, 0) == dflt)
+        return tuple(idx for idx in xrange(self.base, self.base+self.count) if not f(self.case(idx)))
     @property
     def range(self):
         '''Return all the possible cases for the switch.'''
@@ -703,3 +704,13 @@ class switch_t(object):
             return "<type '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
         return "<type '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
 
+def xiterate(ea, start, next):
+    '''Simple utility function for iterating through idaapi's xrefs.'''
+    getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
+    ea = ea if getflags(ea) & idaapi.FF_DATA else idaapi.prev_head(ea, 0)
+
+    addr = start(ea)
+    while addr != idaapi.BADADDR:
+        yield addr
+        addr = next(ea, addr)
+    return
