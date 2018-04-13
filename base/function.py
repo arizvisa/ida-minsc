@@ -4,14 +4,13 @@ Functions
 generic tools for working in the context of a function.
 """
 
-import __builtin__
-import logging,re
-import functools,operator,itertools
-import six,types
+import six, __builtin__ as builtin
+import functools, operator, itertools, types
+import logging, re
 
-import database,structure,ui,internal
-import instruction as _instruction
-from internal import utils,interface
+import database, instruction, structure
+import ui, internal
+from internal import utils, interface
 
 import idaapi
 
@@ -947,14 +946,14 @@ class block(object):
         l, r = bb.startEA, bb.endEA
         return database.iterate(l, database.address.prev(r))
 
-    @utils.multicase(reg=(basestring,_instruction.register_t))
+    @utils.multicase(reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         """Yield each `(address, operand-number, operand-state)` within the current basic-block that touches one of the registers identified by ``regs``.
         If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
         """
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
-    @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
+    @utils.multicase(ea=six.integer_types, reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
         """Yield each `(address, operand-number, operand-state)` within the basic-block containing ``ea`` that touches one of the registers identified by ``regs``.
@@ -962,7 +961,7 @@ class block(object):
         """
         blk = blocks.get(ea)
         return cls.register(blk, reg, *regs, **modifiers)
-    @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring,_instruction.register_t))
+    @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
         """Yield each `(address, operand-number, operand-state)` within the basic-block ``bb`` that touches one of the registers identified by ``regs``.
@@ -973,7 +972,7 @@ class block(object):
 
         for ea in cls.iterate(bb):
             for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
-                yield ea, opnum, _instruction.op_state(ea, opnum)
+                yield ea, opnum, instruction.op_state(ea, opnum)
             continue
         return
 
@@ -1216,12 +1215,12 @@ class search(object):
             continue
         return
 
-    @utils.multicase(match=(types.FunctionType,types.MethodType))
+    @utils.multicase(match=(types.FunctionType, types.MethodType))
     @classmethod
     def instruction(cls, match):
         '''Search through the current function for any instruction that matches with the callable ``match``.'''
         return search_instruction(ui.current.address(), match)
-    @utils.multicase(match=(types.FunctionType,types.MethodType))
+    @utils.multicase(match=(types.FunctionType, types.MethodType))
     @classmethod
     def instruction(cls, func, match):
         """Search through the function ``func`` for any instruction that matches with the callable ``match``.
@@ -1402,23 +1401,24 @@ def select(**boolean):
 @utils.multicase(tag=basestring)
 def select(tag, *tags, **boolean):
     tags = (tag,) + tags
-    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 def select(func, tag, *tags, **boolean):
     tags = (tag,) + tags
-    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
     return select(func, **boolean)
-@utils.multicase(tag=(__builtin__.set,__builtin__.list))
+@utils.multicase(tag=(builtin.set, builtin.list))
 def select(func, tag, *tags, **boolean):
-    tags = set(__builtin__.list(tag) + __builtin__.list(tags))
-    boolean['And'] = tuple(set(boolean.get('And',set())).union(tags))
+    tags = set(builtin.list(tag) + builtin.list(tags))
+    boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
     return select(func, **boolean)
 @utils.multicase()
 def select(func, **boolean):
     '''Fetch a list of addresses within the function that contain the specified tags.'''
     fn = by(func)
-    boolean = dict((k,set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
+    containers = (builtin.tuple, builtin.set, builtin.list)
+    boolean = {k : set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
     if not boolean:
         for ea in internal.comment.contents.address(fn.startEA):
@@ -1427,17 +1427,17 @@ def select(func, **boolean):
         return
 
     for ea in internal.comment.contents.address(fn.startEA):
-        res,d = {},database.tag(ea)
+        res, d = {}, database.tag(ea)
 
         Or = boolean.get('Or', set())
-        res.update((k,v) for k,v in d.iteritems() if k in Or)
+        res.update({k : v for k, v in d.iteritems() if k in Or})
 
         And = boolean.get('And', set())
         if And:
             if And.intersection(d.viewkeys()) == And:
-                res.update((k,v) for k,v in d.iteritems() if k in And)
+                res.update({k : v for k, v in d.iteritems() if k in And})
             else: continue
-        if res: yield ea,res
+        if res: yield ea, res
     return
 
 ## referencing
@@ -1449,18 +1449,18 @@ def down():
 def down(func):
     '''Return all the functions that are called by the function ``func``.'''
     def codeRefs(fn):
-        resultData,resultCode = [],[]
+        resultData, resultCode = [], []
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
-                if database.type.is_code(ea) and _instruction.is_call(ea):
+                if database.type.is_code(ea) and instruction.is_call(ea):
                     logging.warn("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. : {:s}".format(__name__, fn.startEA, database.disasm(ea)))
                     #resultCode.append((ea, 0))
                 continue
-            resultData.extend( (ea,x) for x in database.dxdown(ea) )
-            resultCode.extend( (ea,x) for x in database.cxdown(ea) if fn.startEA == x or not contains(fn,x) )
-        return resultData,resultCode
+            resultData.extend( (ea, x) for x in database.dxdown(ea) )
+            resultCode.extend( (ea, x) for x in database.cxdown(ea) if fn.startEA == x or not contains(fn, x) )
+        return resultData, resultCode
     fn = by(func)
-    return sorted(set(d for x,d in codeRefs(fn)[1]))
+    return sorted(set(d for x, d in codeRefs(fn)[1]))
 
 @utils.multicase()
 def up():
@@ -1557,13 +1557,13 @@ class type(object):
         return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
     thunkQ = utils.alias(is_thunk, 'type')
 
-@utils.multicase(reg=(basestring,_instruction.register_t))
+@utils.multicase(reg=(basestring, instruction.register_t))
 def register(reg, *regs, **modifiers):
     """Yield each `(address, operand-number, operand-state)` within the current function that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     return register(ui.current.function(), reg, *regs, **modifiers)
-@utils.multicase(reg=(basestring,_instruction.register_t))
+@utils.multicase(reg=(basestring, instruction.register_t))
 def register(func, reg, *regs, **modifiers):
     """Yield each `(address, operand-number, operand-state)` within the function ``func`` that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
@@ -1573,7 +1573,7 @@ def register(func, reg, *regs, **modifiers):
 
     for ea in iterate(func):
         for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
-            yield ea, opnum, _instruction.op_state(ea, opnum)
+            yield ea, opnum, instruction.op_state(ea, opnum)
         continue
     return
 
@@ -1589,18 +1589,18 @@ def stackdelta(ea, delta, **direction):
     """
     dir = direction.get('direction', direction.get('dir', -1))
     if dir == 0:
-        raise ValueError("{:s}.stackdelta({:#x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in direction.iteritems())) if direction else ''))
+        raise ValueError("{:s}.stackdelta({:#x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in direction.iteritems())) if direction else ''))
     next = database.next if dir > 0 else database.prev
 
     sp, ea = get_spdelta(ea), interface.address.inside(ea)
-    start = (ea,sp)
+    start = (ea, sp)
     while abs(sp - start[1]) < delta:
         sp = get_spdelta(ea)
         ea = next(ea)
 
     if ea < start[0]:
-        return ea+idaapi.decode_insn(ea),start[0]+idaapi.decode_insn(start[0])
-    return (start[0],ea)
+        return ea+idaapi.decode_insn(ea), start[0]+idaapi.decode_insn(start[0])
+    return (start[0], ea)
 stackwindow = stack_window = utils.alias(stackdelta)
 
 # FIXME: document this
@@ -1622,4 +1622,4 @@ stackwindow = stack_window = utils.alias(stackdelta)
 #        20 : 'Code_User',
 #        21 : 'Ordinary_Flow'
 #    }
-#    return [(x.ea,x.opnum) for x in xl]
+#    return [(x.ea, x.opnum) for x in xl]

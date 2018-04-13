@@ -4,15 +4,15 @@ Database
 generic tools for working in the context of the database.
 """
 
-import __builtin__,logging,os,sys
-import functools,itertools,operator
-import math,types,array
-import six,fnmatch,re,ctypes
+import six, __builtin__ as builtin
+import functools, operator, itertools, types
+import sys, os, logging
+import math, array, fnmatch, re, ctypes
 
-import function,segment,ui,internal
-import structure as _structure
-import instruction as _instruction
-from internal import utils,interface
+import function, segment
+import structure as _structure, instruction as _instruction
+import ui, internal
+from internal import utils, interface
 
 import idaapi
 
@@ -225,7 +225,7 @@ class functions(object):
             return
         res = cls()
         for k,v in type.iteritems():
-            res = __builtin__.list(cls.__matcher__.match(k, v, res))
+            res = builtin.list(cls.__matcher__.match(k, v, res))
         for n in res: yield n
 
     @utils.multicase(string=basestring)
@@ -246,7 +246,7 @@ class functions(object):
         greater, less = greater-or-equal against bounds, less-or-equal against bounds
         pred = function predicate
         """
-        res = __builtin__.list(cls.iterate(**type))
+        res = builtin.list(cls.iterate(**type))
 
         flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
         fminaddr = utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)
@@ -254,19 +254,19 @@ class functions(object):
 
         maxindex = len(res)
         maxentry = max(res or [1])
-        maxaddr = max(__builtin__.map(fmaxaddr, res) or [1])
-        minaddr = max(__builtin__.map(fminaddr, res) or [1])
-        maxname = max(__builtin__.map(utils.compose(function.name, len), res) or [1])
-        chunks = max(__builtin__.map(utils.compose(function.chunks, __builtin__.list, len), res) or [1])
-        marks = max(__builtin__.map(utils.compose(function.marks, __builtin__.list, len), res) or [1])
-        blocks = max(__builtin__.map(utils.compose(function.blocks, __builtin__.list, len), res) or [1])
-        exits = max(__builtin__.map(utils.compose(function.bottom, __builtin__.list, len), res) or [1])
-        lvars = max(__builtin__.map(utils.compose(lambda ea: flvars(ea) if function.by(ea).frsize else [], __builtin__.list, len), res) or [1])
+        maxaddr = max(builtin.map(fmaxaddr, res) or [1])
+        minaddr = max(builtin.map(fminaddr, res) or [1])
+        maxname = max(builtin.map(utils.compose(function.name, len), res) or [1])
+        chunks = max(builtin.map(utils.compose(function.chunks, builtin.list, len), res) or [1])
+        marks = max(builtin.map(utils.compose(function.marks, builtin.list, len), res) or [1])
+        blocks = max(builtin.map(utils.compose(function.blocks, builtin.list, len), res) or [1])
+        exits = max(builtin.map(utils.compose(function.bottom, builtin.list, len), res) or [1])
+        lvars = max(builtin.map(utils.compose(lambda ea: flvars(ea) if function.by(ea).frsize else [], builtin.list, len), res) or [1])
 
         # FIXME: fix function.arguments so that it works on non-stackbased functions
         fargs = function.arguments
         try:
-            args = max(__builtin__.map(utils.compose(lambda ea: fargs(ea) if function.by(ea).frsize else [], __builtin__.list, len), res) or [1])
+            args = max(builtin.map(utils.compose(lambda ea: fargs(ea) if function.by(ea).frsize else [], builtin.list, len), res) or [1])
         except RuntimeError:
             args, fargs = 1, lambda ea: []
 
@@ -310,13 +310,13 @@ class functions(object):
         """
         query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
-        res = __builtin__.list(cls.iterate(**type))
+        res = builtin.list(cls.iterate(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i,ea in enumerate(res)))
+            builtin.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i,ea in enumerate(res)))
             f = utils.compose(function.by,function.name)
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
-        res = __builtin__.next(iter(res), None)
+        res = builtin.next(iter(res), None)
         if res is None:
             raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res
@@ -389,11 +389,11 @@ def decode(ea):
 
 @utils.multicase()
 def instruction():
-    '''Return the instruction at the current address.'''
+    '''Return the instruction at the current address as a string.'''
     return instruction(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def instruction(ea):
-    '''Return the instruction at the specified address ``ea``.'''
+    '''Return the instruction at the address ``ea`` as a string.'''
     insn = idaapi.generate_disasm_line(interface.address.inside(ea))
     unformatted = idaapi.tag_remove(insn)
     comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
@@ -411,7 +411,7 @@ def disassemble(ea, **options):
     If the bool ``comments`` is `True`, then return the comments for each instruction as well.
     """
     ea = interface.address.inside(ea)
-    commentQ = __builtin__.next((options[k] for k in ('comment', 'comments') if k in options), False)
+    commentQ = builtin.next((options[k] for k in ('comment', 'comments') if k in options), False)
 
     res,count = [], options.get('count',1)
     while count > 0:
@@ -464,7 +464,7 @@ def write(ea, data, **original):
 def iterate(start, end, step=None):
     '''Iterate through all of the instruction and data boundaries from address ``start`` to ``end``.'''
     step = step or (address.prev if start > end else address.next)
-    start, end = __builtin__.map(interface.address.head, (start, end))
+    start, end = builtin.map(interface.address.head, (start, end))
     op = operator.gt if start > end else operator.lt
     while start != idaapi.BADADDR and op(start,end):
         yield start
@@ -500,9 +500,9 @@ class names(object):
     @classmethod
     def __iterate__(cls, **type):
         if not type: type = {'predicate':lambda n: True}
-        res = __builtin__.range(idaapi.get_nlist_size())
+        res = builtin.range(idaapi.get_nlist_size())
         for k,v in type.iteritems():
-            res = __builtin__.list(cls.__matcher__.match(k, v, res))
+            res = builtin.list(cls.__matcher__.match(k, v, res))
         for n in res: yield n
 
     @utils.multicase(string=basestring)
@@ -536,10 +536,10 @@ class names(object):
         index = name at index
         pred = function predicate
         """
-        res = __builtin__.list(cls.__iterate__(**type))
+        res = builtin.list(cls.__iterate__(**type))
 
         maxindex = max(res or [1])
-        maxaddr = max(__builtin__.map(idaapi.get_nlist_ea, res) or [idaapi.BADADDR])
+        maxaddr = max(builtin.map(idaapi.get_nlist_ea, res) or [idaapi.BADADDR])
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
 
@@ -560,13 +560,13 @@ class names(object):
         """
         query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
-        res = __builtin__.list(cls.__iterate__(**type))
+        res = builtin.list(cls.__iterate__(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, (("[{:d}] {:x} {:s}".format(idx, idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx))) for idx in res))
+            builtin.map(logging.info, (("[{:d}] {:x} {:s}".format(idx, idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx))) for idx in res))
             f1, f2 = idaapi.get_nlist_ea, idaapi.get_nlist_name
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x} {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
 
-        res = __builtin__.next(iter(res), None)
+        res = builtin.next(iter(res), None)
         if res is None:
             raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return idaapi.get_nlist_ea(res)
@@ -977,9 +977,9 @@ class entry(object):
     @classmethod
     def __iterate__(cls, **type):
         if not type: type = {'predicate':lambda n: True}
-        res = __builtin__.range(idaapi.get_entry_qty())
+        res = builtin.range(idaapi.get_entry_qty())
         for k,v in type.iteritems():
-            res = __builtin__.list(cls.__matcher__.match(k, v, res))
+            res = builtin.list(cls.__matcher__.match(k, v, res))
         for n in res: yield n
 
     @utils.multicase(string=basestring)
@@ -998,10 +998,10 @@ class entry(object):
     def __index__(cls, ea):
         '''Returns the index of the entry-point at the specified ``address``.'''
         f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
-        iterable = itertools.imap(utils.compose(utils.fap(f, lambda n:n), __builtin__.tuple), __builtin__.range(idaapi.get_entry_qty()))
+        iterable = itertools.imap(utils.compose(utils.fap(f, lambda n:n), builtin.tuple), builtin.range(idaapi.get_entry_qty()))
         filterable = itertools.ifilter(utils.compose(utils.first, functools.partial(operator.eq, ea)), iterable)
         result = itertools.imap(utils.second, filterable)
-        return __builtin__.next(result, None)
+        return builtin.next(result, None)
     @utils.multicase(index=six.integer_types)
     @classmethod
     def __address__(cls, index):
@@ -1062,14 +1062,14 @@ class entry(object):
         greater, less = greater-or-equal against address, less-or-equal against address
         pred = function predicate
         """
-        res = __builtin__.list(cls.__iterate__(**type))
+        res = builtin.list(cls.__iterate__(**type))
 
         to_address = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
         to_numlen = utils.compose("{:x}".format, len)
 
         maxindex = max(res+[1])
-        maxaddr = max(__builtin__.map(to_address, res) or [idaapi.BADADDR])
-        maxordinal = max(__builtin__.map(idaapi.get_entry_ordinal, res) or [1])
+        maxaddr = max(builtin.map(to_address, res) or [idaapi.BADADDR])
+        maxordinal = max(builtin.map(idaapi.get_entry_ordinal, res) or [1])
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
         cordinal = math.floor(math.log(maxordinal or 1)/math.log(16))
@@ -1091,13 +1091,13 @@ class entry(object):
         """
         query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
-        res = __builtin__.list(cls.__iterate__(**type))
+        res = builtin.list(cls.__iterate__(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, (("[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
+            builtin.map(logging.info, (("[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
             f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}".format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
 
-        res = __builtin__.next(iter(res), None)
+        res = builtin.next(iter(res), None)
         if res is None:
             raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__,cls.__name__)), query_s))
         return cls.__address__(res)
@@ -1176,7 +1176,7 @@ def tag_read(ea):
     if d1.viewkeys() & d2.viewkeys():
         logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
     res = {}
-    __builtin__.map(res.update, (d1,d2))
+    builtin.map(res.update, (d1,d2))
 
     # modify the decoded dictionary with implicit tags
     aname = get_name(ea)
@@ -1317,12 +1317,13 @@ def tag(ea, key, none):
 @utils.multicase(tag=basestring)
 def select(tag, *tags, **boolean):
     tags = (tag,) + tags
-    boolean['And'] = tuple(__builtin__.set(boolean.get('And',__builtin__.set())).union(tags))
+    boolean['And'] = tuple(builtin.set(boolean.get('And', builtin.set())).union(tags))
     return select(**boolean)
 @utils.multicase()
 def select(**boolean):
     '''Fetch all of the functions containing the specified tags within its declaration'''
-    boolean = dict((k,__builtin__.set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
+    containers = (builtin.tuple, builtin.set, builtin.list)
+    boolean = {k : builtin.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
     if not boolean:
         for ea in internal.comment.globals.address():
@@ -1331,15 +1332,15 @@ def select(**boolean):
         return
 
     for ea in internal.comment.globals.address():
-        res,d = {},function.tag(ea) if function.within(ea) else tag(ea)
+        res, d = {}, function.tag(ea) if function.within(ea) else tag(ea)
 
-        Or = boolean.get('Or', __builtin__.set())
-        res.update((k,v) for k,v in d.iteritems() if k in Or)
+        Or = boolean.get('Or', builtin.set())
+        res.update({k : v for k, v in d.iteritems() if k in Or})
 
-        And = boolean.get('And', __builtin__.set())
+        And = boolean.get('And', builtin.set())
         if And:
             if And.intersection(d.viewkeys()) == And:
-                res.update((k,v) for k,v in d.iteritems() if k in And)
+                res.update({k : v  for k, v in d.iteritems() if k in And})
             else: continue
         if res: yield ea,res
     return
@@ -1349,33 +1350,34 @@ def select(**boolean):
 @utils.multicase(tag=basestring)
 def selectcontents(tag, *tags, **boolean):
     tags = (tag,) + tags
-    boolean['Or'] = tuple(__builtin__.set(boolean.get('Or',__builtin__.set())).union(tags))
+    boolean['Or'] = tuple(builtin.set(boolean.get('Or', builtin.set())).union(tags))
     return selectcontents(**boolean)
 @utils.multicase()
 def selectcontents(**boolean):
     '''Fetch all of the functions containing the specified tags within its contents.'''
-    boolean = dict((k,__builtin__.set(v if isinstance(v, (__builtin__.tuple,__builtin__.set,__builtin__.list)) else (v,))) for k,v in boolean.viewitems())
+    containers = (builtin.tuple, builtin.set, builtin.list)
+    boolean = {k : builtin.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
     if not boolean:
-        for ea,_ in internal.comment.contents.iterate():
+        for ea, _ in internal.comment.contents.iterate():
             res = internal.comment.contents.name(ea)
             if res: yield ea, res
         return
 
     for ea, res in internal.comment.contents.iterate():
         # check to see that the dict's keys match
-        res,d = __builtin__.set(res),internal.comment.contents._read(None, ea) or {}
-        if __builtin__.set(d.viewkeys()) != res:
+        res, d = builtin.set(res), internal.comment.contents._read(None, ea) or {}
+        if builtin.set(d.viewkeys()) != res:
             # FIXME: include query in warning
             logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:#x}".format(__name__, ea))
 
         # now start aggregating the keys that the user is looking for
-        res, d = __builtin__.set(), internal.comment.contents.name(ea)
+        res, d = builtin.set(), internal.comment.contents.name(ea)
 
-        Or = boolean.get('Or', __builtin__.set())
+        Or = boolean.get('Or', builtin.set())
         res.update(Or.intersection(d))
 
-        And = boolean.get('And', __builtin__.set())
+        And = boolean.get('And', builtin.set())
         if And:
             if And.intersection(d) == And:
                 res.update(And)
@@ -1433,9 +1435,9 @@ class imports(object):
     def iterate(cls, **type):
         '''Iterate through all of the imports in the database that match ``type``.'''
         if not type: type = {'predicate':lambda n: True}
-        res = __builtin__.list(cls.__iterate__())
+        res = builtin.list(cls.__iterate__())
         for k,v in type.iteritems():
-            res = __builtin__.list(cls.__matcher__.match(k, v, res))
+            res = builtin.list(cls.__matcher__.match(k, v, res))
         for n in res: yield n
 
     # searching
@@ -1451,7 +1453,7 @@ class imports(object):
         ea = interface.address.inside(ea)
         res = itertools.ifilter(utils.compose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
         try:
-            return utils.second(__builtin__.next(res))
+            return utils.second(builtin.next(res))
         except StopIteration:
             pass
         raise LookupError("{:s}.get({:#x}) : Unable to determine import at specified address.".format('.'.join((__name__, cls.__name__)), ea))
@@ -1534,12 +1536,12 @@ class imports(object):
         index = import name at index
         pred = function predicate
         """
-        res = __builtin__.list(cls.iterate(**type))
+        res = builtin.list(cls.iterate(**type))
 
-        maxaddr = max(__builtin__.map(utils.first, res) or [idaapi.BADADDR])
-        maxmodule = max(__builtin__.map(utils.compose(utils.second, utils.first, len), res) or [''])
+        maxaddr = max(builtin.map(utils.first, res) or [idaapi.BADADDR])
+        maxmodule = max(builtin.map(utils.compose(utils.second, utils.first, len), res) or [''])
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
-        cordinal = max(__builtin__.map(utils.compose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
+        cordinal = max(builtin.map(utils.compose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
 
         for ea,(module,name,ordinal) in res:
             print "{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name)
@@ -1558,13 +1560,13 @@ class imports(object):
         """
         query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
-        res = __builtin__.list(cls.iterate(**type))
+        res = builtin.list(cls.iterate(**type))
         if len(res) > 1:
-            __builtin__.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea,(module,name,ordinal) in res))
+            builtin.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea,(module,name,ordinal) in res))
             f = utils.compose(utils.second, cls.__formatl__)
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
 
-        res = __builtin__.next(iter(res), None)
+        res = builtin.next(iter(res), None)
         if res is None:
             raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__,cls.__name__)), query_s))
         return res[0]
@@ -1788,12 +1790,12 @@ class address(object):
         res = cls.walk(ea, cls.next, lambda n: len(xref.up(n)) == 0)
         return cls.nextref(cls.next(res), count-1) if count > 1 else res
 
-    @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
+    @utils.multicase(ea=six.integer_types, reg=(basestring, _instruction.register_t))
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = ', '.join(["{:x}".format(ea)] + __builtin__.map("\"{:s}\"".format, regs) + __builtin__.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + builtin.map("\"{:s}\"".format, regs) + builtin.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -1830,18 +1832,18 @@ class address(object):
         # recurse if the user specified it
         modifiers['count'] = count - 1
         return cls.prevreg( cls.prev(res), *regs, **modifiers) if count > 1 else res
-    @utils.multicase(reg=(basestring,_instruction.register_t))
+    @utils.multicase(reg=(basestring, _instruction.register_t))
     @classmethod
     def prevreg(cls, reg, *regs, **modifiers):
         '''Return the previous address containing an instruction that uses one of the specified registers ``regs``.'''
         return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
 
-    @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
+    @utils.multicase(ea=six.integer_types, reg=(basestring, _instruction.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
         regs = (reg,) + regs
         count = modifiers.get('count',1)
-        args = ', '.join(["{:x}".format(ea)] + __builtin__.map("\"{:s}\"".format, regs) + __builtin__.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + builtin.map("\"{:s}\"".format, regs) + builtin.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -1878,7 +1880,7 @@ class address(object):
         # recurse if the user specified it
         modifiers['count'] = count - 1
         return cls.nextreg(cls.next(res), *regs, **modifiers) if count > 1 else res
-    @utils.multicase(reg=(basestring,_instruction.register_t))
+    @utils.multicase(reg=(basestring, _instruction.register_t))
     @classmethod
     def nextreg(cls, reg, *regs, **modifiers):
         '''Return the next address containing an instruction that uses one of the specified registers ``regs``.'''
@@ -2069,7 +2071,7 @@ class flow(address):
     def walk(ea, next, match):
         '''Used internally. Please see .iterate() instead.'''
         ea = interface.address.inside(ea)
-        res = __builtin__.set()
+        res = builtin.set()
         while ea not in (None,idaapi.BADADDR) and is_code(ea) and ea not in res and match(ea):
             res.add(ea)
             ea = next(ea)
@@ -2093,7 +2095,7 @@ class flow(address):
         invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
         refs = filter(type.is_code, xref.up(ea))
         if len(refs) > 1 and invalidQ(address.prev(ea)):
-            logging.fatal("{:s}.prev({:#x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map("{:#x}".format,refs))))
+            logging.fatal("{:s}.prev({:#x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtin.map("{:#x}".format,refs))))
             return None
         try:
             if invalidQ(address.prev(ea)):
@@ -2123,7 +2125,7 @@ class flow(address):
         invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
         refs = filter(type.is_code, xref.down(ea))
         if len(refs) > 1:
-            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(__builtin__.map("{:#x}".format,refs))))
+            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtin.map("{:#x}".format,refs))))
             return None
         if invalidQ(ea) and not _instruction.is_jmp(ea):
 #            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to move to next address. Flow has stopped.".format('.'.join((__name__, cls.__name__)), ea, count))
@@ -2509,7 +2511,7 @@ class type(object):
                 drefs = (ea for ea in xref.data_up(ea))
                 refs = (ea for ea in itertools.chain(*itertools.imap(xref.up, drefs)) if idaapi.get_switch_info_ex(ea) is not None)
                 try:
-                    ea = __builtin__.next(refs)
+                    ea = builtin.next(refs)
                     res = idaapi.get_switch_info_ex(ea)
                     return interface.switch_t(res)
                 except StopIteration:
@@ -2520,7 +2522,7 @@ class type(object):
         def __getarray(cls, ea):
             refs = (ea for ea in xref.up(ea) if idaapi.get_switch_info_ex(ea) is not None)
             try:
-                ea = __builtin__.next(refs)
+                ea = builtin.next(refs)
                 res = idaapi.get_switch_info_ex(ea)
                 return interface.switch_t(res)
             except StopIteration:
@@ -2697,7 +2699,7 @@ class xref(object):
     @staticmethod
     def code_down(ea):
         '''Return all of the code xrefs that are referenced by the address ``ea``.'''
-        result = __builtin__.set(xref.code(ea, True))
+        result = builtin.set(xref.code(ea, True))
         result.discard(address.next(ea))
         return sorted(result)
     cd = utils.alias(code_down, 'xref')
@@ -2711,7 +2713,7 @@ class xref(object):
     @staticmethod
     def code_up(ea):
         '''Return all of the code xrefs that refer to the address ``ea``.'''
-        result = __builtin__.set(xref.code(ea, False))
+        result = builtin.set(xref.code(ea, False))
         result.discard(address.prev(ea))
         return sorted(result)
     cu = utils.alias(code_up, 'xref')
@@ -2725,7 +2727,7 @@ class xref(object):
     @staticmethod
     def up(ea):
         '''Return all of the references that refer to the address ``ea``.'''
-        return sorted(__builtin__.set(xref.data_up(ea) + xref.code_up(ea)))
+        return sorted(builtin.set(xref.data_up(ea) + xref.code_up(ea)))
     u = utils.alias(up, 'xref')
 
     # All locations that are referenced by the specified address
@@ -2738,7 +2740,7 @@ class xref(object):
     @staticmethod
     def down(ea):
         '''Return all of the references that are referred by the address ``ea``.'''
-        return sorted(__builtin__.set(xref.data_down(ea) + xref.code_down(ea)))
+        return sorted(builtin.set(xref.data_down(ea) + xref.code_down(ea)))
     d = utils.alias(down, 'xref')
 
     @utils.multicase(target=six.integer_types)
@@ -2754,7 +2756,7 @@ class xref(object):
         """
         ea, target = interface.address.inside(ea, target)
 
-        isCall = __builtin__.next((reftype[k] for k in ('call', 'is_call', 'isCall', 'iscall', 'callQ') if k in reftype), None)
+        isCall = builtin.next((reftype[k] for k in ('call', 'is_call', 'isCall', 'iscall', 'callQ') if k in reftype), None)
         if abs(target-ea) > 2**(config.bits()/2):
             flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
         else:
@@ -2834,7 +2836,7 @@ class marks(object):
 
     def __new__(cls):
         '''Yields each of the marked positions within the database.'''
-        res = __builtin__.list(cls.iterate()) # make a copy in-case someone is actively modifying it
+        res = builtin.list(cls.iterate()) # make a copy in-case someone is actively modifying it
         for ea,comment in cls.iterate():
             yield ea, comment
         return
@@ -2891,7 +2893,7 @@ class marks(object):
     @classmethod
     def length(cls):
         '''Return the number of marks in the database.'''
-        return len(__builtin__.list(cls.iterate()))
+        return len(builtin.list(cls.iterate()))
 
     @classmethod
     def by_index(cls, index):
@@ -2934,7 +2936,7 @@ class marks(object):
         def location(cls, **attrs):
             '''Return a location_t object with the specified attributes.'''
             res = idaapi.curloc()
-            __builtin__.list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
+            builtin.list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
             return res
 
         @classmethod
@@ -2956,11 +2958,11 @@ class marks(object):
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
             res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
             try:
-                count = len(__builtin__.list(itertools.takewhile(lambda n: n != ea, res)))
+                count = len(builtin.list(itertools.takewhile(lambda n: n != ea, res)))
             except IndexError:
                 raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
-            __builtin__.list(itertools.islice(iterable, count))
-            if __builtin__.next(iterable) != ea:
+            builtin.list(itertools.islice(iterable, count))
+            if builtin.next(iterable) != ea:
                 raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
             return count
 
@@ -2996,17 +2998,17 @@ class marks(object):
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
             res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
             try:
-                count = len(__builtin__.list(itertools.takewhile(lambda n: n != ea, res)))
+                count = len(builtin.list(itertools.takewhile(lambda n: n != ea, res)))
             except IndexError:
                 raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
-            __builtin__.list(itertools.islice(iterable, count))
-            if __builtin__.next(iterable) != ea:
+            builtin.list(itertools.islice(iterable, count))
+            if builtin.next(iterable) != ea:
                 raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
             return count
 
         @classmethod
         def free_slotindex(cls):
-            res = __builtin__.next((i for i in xrange(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
+            res = builtin.next((i for i in xrange(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
             if res is None:
                 raise ValueError("{:s}.free_slotindex : No free slots available for mark.".format('.'.join((__name__, 'bookmarks', cls.__name__))))
             return res
@@ -3765,7 +3767,7 @@ class get(object):
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ cls.struc(ea + i*cb, id=t) for i in __builtin__.range(count) ]
+            return [ cls.struc(ea + i*cb, id=t) for i in builtin.range(count) ]
         elif T in numerics:
             ch = numerics[T]
             # FIXME: return signed version of number
@@ -3775,7 +3777,7 @@ class get(object):
             # FIXME: return signed version of number
             t = get.signed if F & idaapi.FF_SIGN == idaapi.FF_SIGN else get.unsigned
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ t(ea + i*cb, cb) for i in __builtin__.range(count) ]
+            return [ t(ea + i*cb, cb) for i in builtin.range(count) ]
         else:
             res = itertools.imap(utils.unbox('{:s}={!r}'.format), length.iteritems())
             raise TypeError("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. : {:#x} & idaapi.DT_TYPE = {:#x}".format('.'.join((__name__,cls.__name__)), ea, (', '+', '.join(res)) if res else '', ea, F, T))
@@ -3799,7 +3801,7 @@ class get(object):
         """
         ea = interface.address.within(ea)
 
-        key = __builtin__.next((k for k in ('structure', 'struct', 'struc', 'sid', 'id') if k in structure), None)
+        key = builtin.next((k for k in ('structure', 'struct', 'struc', 'sid', 'id') if k in structure), None)
         if key is None:
             sid = type.structure.id(ea)
         else:
@@ -3821,8 +3823,8 @@ class get(object):
             try:
                 ct = typelookup[t]
             except KeyError:
-                ty, sz = t if isinstance(t, __builtin__.tuple) else (m.type, 0)
-                if isinstance(t, __builtin__.list):
+                ty, sz = t if isinstance(t, builtin.tuple) else (m.type, 0)
+                if isinstance(t, builtin.list):
                     t = typelookup[tuple(ty)]
                     ct = t*sz
                 elif ty in (chr,str):

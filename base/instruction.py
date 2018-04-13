@@ -1,10 +1,16 @@
-import logging, __builtin__
-import itertools, functools, operator
-import six, types, collections
+"""
+Instructions
 
-import database, function, ui
+generic tools for working in the context of an instruction.
+"""
+
+import six, __builtin__ as builtin
+import functools, operator, itertools, types
+import logging, collections
+
+import database, function
 import structure, enumeration
-import internal
+import ui, internal
 from internal import utils, interface
 
 import idaapi
@@ -401,13 +407,13 @@ def ops_constant(ea):
     return tuple(i for i,v in enumerate(ops_value(ea)) if isinstance(v, six.integer_types))
 ops_const = utils.alias(ops_constant)
 
-@utils.multicase(reg=(basestring,register_t))
+@utils.multicase(reg=(basestring, register_t))
 def ops_register(reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at the current address which touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
-@utils.multicase(reg=(basestring,register_t))
+@utils.multicase(reg=(basestring, register_t))
 def ops_register(ea, reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at address ``ea`` that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
@@ -1368,7 +1374,7 @@ class ir_op:
                     try: return cmp(classname, other_name) == 0 and self.size == int(other_size)
                     except ValueError: return False
                 return cmp(classname, other) == 0
-            return isinstance(self, other) if isinstance(other, __builtin__.type) else super(object, self) == other
+            return isinstance(self, other) if isinstance(other, builtin.type) else super(object, self) == other
     class store(__base__): pass
     class load(__base__): pass
     class loadstore(__base__): pass

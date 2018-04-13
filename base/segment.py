@@ -4,15 +4,16 @@ Segments
 generic tools for working with segments.
 """
 
-import logging,os
-import math,types
-import itertools,operator,functools
-import six,re,fnmatch
+import six, __builtin__ as builtin
+import functools, operator, itertools, types
+import os, logging
+import math, re, fnmatch
 
-import database,ui
-from internal import utils,interface
+import database
+import ui, internal
+from internal import utils, interface
 
-import __builtin__,idaapi
+import idaapi
 
 ## enumerating
 __matcher__ = utils.matcher()
