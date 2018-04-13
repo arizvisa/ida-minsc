@@ -7,7 +7,7 @@ import multiprocessing, Queue
 
 import idaapi
 
-__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','count']
+__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -74,7 +74,7 @@ itake = lambda count: compose(iter, fap(*(next,)*count), tuple)
 # get the ``nth`` element from an iterator
 iget = lambda count: compose(iter, fap(*(next,)*(count)), tuple, operator.itemgetter(-1))
 # copy from itertools
-imap, ifilter, ichain = itertools.imap, itertools.ifilter, itertools.chain
+imap, ifilter, ichain, izip = itertools.imap, itertools.ifilter, itertools.chain, itertools.izip
 # count number of elements of a container
 count = compose(iter, list, len)
 
