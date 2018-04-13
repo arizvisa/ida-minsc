@@ -1,4 +1,4 @@
-'''
+"""
 Abstraction around IDA's comments to allow one to store arbitrary python objects within them. These encoded python objects follow a constraint in that they also must be human-readable.
 
 Each comment stores a dictionary that has the following format:
@@ -21,7 +21,7 @@ Some value types are encoded in order to retain any specific information about t
 Lists and Dictionary types are stored as-is. Integral types are always portrayed in hexadecimal form as IDA uses hexadecimal everywhere. Despite one being allowed to specify a comment that's a decimal or an octal number, when encoding a tag it will always be in a hexadecimal format. This way if a user has tagged an address in a comment, they may double-click on it to convince IDA to follow it.
 
 String types have the ability to escape certain characters.  The characters that have special meaning are '\n', '\r', and '\t'. Similarly if a backslash is escaped, it will result in a single '\'. If any other character is prefixed with a backslash, it will decode into a character prefixed with a backslash. This is different from what one would expect in that all characters might be escaped but is done so that one would not need to recursively escape and unescape strings that are stored.
-'''
+"""
 
 import itertools,functools,operator
 import collections,heapq,string

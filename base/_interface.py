@@ -7,7 +7,7 @@ import internal, ui
 import idaapi
 
 class typemap:
-    """Convert bidirectionally from a pythonic type into an IDA type"""
+    """Convert bidirectionally from a pythonic type into an idaapi type"""
 
     FF_MASKSIZE = 0xf0000000    # Mask that select's the flag's size
     FF_MASK = 0xfff00000        # Mask that select's the flag's repr
@@ -620,7 +620,7 @@ OREF = AddressOpnumReftype
 #      .range/.cases more accurately instead of them being based on .elbase.
 class switch_t(object):
     """
-    This is a wrapper around the idaapi.switch_info_ex_t class.
+    This is a wrapper around the `idaapi.switch_info_ex_t` class.
     """
     def __init__(self, switch_info_ex):
         self.object = switch_info_ex

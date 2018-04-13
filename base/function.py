@@ -1,8 +1,8 @@
-'''
-function-context
+"""
+Functions
 
 generic tools for working in the context of a function.
-'''
+"""
 
 import __builtin__
 import logging,re
@@ -31,7 +31,7 @@ def by_address(ea):
 byAddress = by_address
 
 def by_name(name):
-    '''Return the function with the name ``name``.'''
+    '''Return the function with the specified ``name``.'''
     ea = idaapi.get_name_ea(idaapi.BADADDR, name)
     if ea == idaapi.BADADDR:
         raise LookupError("{:s}.by_name({!r}) : Unable to locate function".format(__name__, name))
@@ -49,9 +49,9 @@ def by(name): return by_name(name)
 
 # FIXME: implement a matcher class for func_t
 
-# FIXME: document this despite it only being used internally
+# FIXME: Move this into the internal.interface module.
 def __addressOfRtOrSt(func):
-    '''Returns (F,address) if a statically linked address, or (T,address) if a runtime-linked address'''
+    '''Returns `(F, address)` if a statically linked address, or `(T, address)` if a runtime-linked address'''
     try:
         fn = by(func)
 
@@ -483,11 +483,11 @@ add_chunk, remove_chunk, assign_chunk = utils.alias(chunk.add, 'chunk'), utils.a
 
 @utils.multicase()
 def within():
-    '''Return True if the current address is within a function.'''
+    '''Return `True` if the current address is within a function.'''
     return within(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def within(ea):
-    '''Return True if the address ``ea`` is within a function.'''
+    '''Return `True` if the address ``ea`` is within a function.'''
     ea = interface.address.within(ea)
     return idaapi.get_func(ea) is not None
 
@@ -537,12 +537,12 @@ class blocks(object):
     @utils.multicase()
     @classmethod
     def iterate(cls):
-        '''Return each idaapi.BasicBlock for the current function.'''
+        '''Return each `idaapi.BasicBlock` for the current function.'''
         return cls.iterate(ui.current.function())
     @utils.multicase()
     @classmethod
     def iterate(cls, func):
-        '''Returns each idaapi.BasicBlock for the function ``func``.'''
+        '''Returns each `idaapi.BasicBlock` for the function ``func``.'''
         fn = by(func)
         fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
         for bb in fc:
@@ -552,18 +552,18 @@ class blocks(object):
     @utils.multicase()
     @classmethod
     def get(cls):
-        '''Return the idaapi.BasicBlock at the current address.'''
+        '''Return the `idaapi.BasicBlock` at the current address.'''
         return cls.get(ui.current.function(), ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def get(cls, ea):
-        '''Return the idaapi.BasicBlock in at the address ``ea``.'''
+        '''Return the `idaapi.BasicBlock` in at the address ``ea``.'''
         fn = by_address(ea)
         return cls.get(fn, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def get(cls, func, ea):
-        '''Return the idaapi.BasicBlock in function ``func`` at address ``ea``.'''
+        '''Return the `idaapi.BasicBlock` in function ``func`` at address ``ea``.'''
         fn = by(func)
         res = (bb for bb in blocks.iterate(fn) if bb.startEA <= ea < bb.endEA)
         return next(res)
@@ -571,12 +571,12 @@ class blocks(object):
     @utils.multicase()
     @classmethod
     def flow(cls):
-        '''Return an IDAPython FlowChart object for the current function.'''
+        '''Return an `idaapi.FlowChart` object for the current function.'''
         return cls.flow(ui.current.function())
     @utils.multicase()
     @classmethod
     def flow(cls, func):
-        '''Return an IDAPython FlowChart object for the function ``func``.'''
+        '''Return an `idaapi.FlowChart` object for the function ``func``.'''
         fn = by(func)
         fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
         return fc
@@ -584,15 +584,15 @@ class blocks(object):
     @utils.multicase()
     @classmethod
     def nx(cls):
-        """Return a networkx.DiGraph of the function at the current address.
-        Requires the networkx module in order to build the graph.
+        """Return a `networkx.DiGraph` of the function at the current address.
+        Requires the `networkx` module in order to build the graph.
         """
         return cls.nx(ui.current.function())
     @utils.multicase()
     @classmethod
     def nx(cls, func):
-        """Return a networkx.DiGraph of the function at the address ``ea``.
-        Requires the networkx module in order to build the graph.
+        """Return a `networkx.DiGraph` of the function at the address ``ea``.
+        Requires the `networkx` module in order to build the graph.
         """
         fn = by(func)
 
@@ -950,23 +950,23 @@ class block(object):
     @utils.multicase(reg=(basestring,_instruction.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
-        """Yield each (address, operand-number, operand-state) within the current basic-block that touches one of the registers identified by ``regs``.
-        If the keyword ``write`` is True, then only return the result if it's writing to the register.
+        """Yield each `(address, operand-number, operand-state)` within the current basic-block that touches one of the registers identified by ``regs``.
+        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
         """
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring,_instruction.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
-        """Yield each (address, operand-number, operand-state) within the basic-block containing ``ea`` that touches one of the registers identified by ``regs``.
-        If the keyword ``write`` is True, then only return the result if it's writing to the register.
+        """Yield each `(address, operand-number, operand-state)` within the basic-block containing ``ea`` that touches one of the registers identified by ``regs``.
+        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
         """
         blk = blocks.get(ea)
         return cls.register(blk, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring,_instruction.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
-        """Yield each (address, operand-number, operand-state) within the basic-block ``bb`` that touches one of the registers identified by ``regs``.
-        If the keyword ``write`` is True, then only return the result if it's writing to the register.
+        """Yield each `(address, operand-number, operand-state)` within the basic-block ``bb`` that touches one of the registers identified by ``regs``.
+        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
         """
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use( (reg,)+regs )
@@ -1495,12 +1495,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_noframe(cls):
-        '''Return True if the current function has no frame.'''
+        '''Return `True` if the current function has no frame.'''
         return cls.has_noframe(ui.current.function())
     @utils.multicase()
     @classmethod
     def has_noframe(cls, func):
-        '''Return True if the function ``func`` has no frame.'''
+        '''Return `True` if the function ``func`` has no frame.'''
         fn = by(func)
         return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_FRAME == 0)
     noframeQ = utils.alias(has_noframe, 'type')
@@ -1508,12 +1508,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_name(cls):
-        '''Return True if the current function has a user-defined name.'''
+        '''Return `True` if the current function has a user-defined name.'''
         return cls.has_name(ui.current.function())
     @utils.multicase()
     @classmethod
     def has_name(cls, func):
-        '''Return True if the function ``func`` has a user-defined name.'''
+        '''Return `True` if the function ``func`` has a user-defined name.'''
         ea = address(func)
         return database.type.has_customname(ea)
     nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
@@ -1521,12 +1521,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_noreturn(cls):
-        '''Return True if the current function does not return.'''
+        '''Return `True` if the current function does not return.'''
         return cls.has_noreturn(ui.current.function())
     @utils.multicase()
     @classmethod
     def has_noreturn(cls, func):
-        '''Return True if the function ``func`` does not return.'''
+        '''Return `True` if the function ``func`` does not return.'''
         fn = by(func)
         return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
     noreturnQ = utils.alias(has_noreturn, 'type')
@@ -1534,12 +1534,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_library(cls):
-        '''Return True if the current function is considered a library function.'''
+        '''Return `True` if the current function is considered a library function.'''
         return cls.is_library(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_library(cls, func):
-        '''Return True if the function ``func`` is considered a library function.'''
+        '''Return `True` if the function ``func`` is considered a library function.'''
         fn = by(func)
         return fn.flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
     libraryQ = utils.alias(is_library, 'type')
@@ -1547,25 +1547,25 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_thunk(cls):
-        '''Return True if the current function is considered a code thunk.'''
+        '''Return `True` if the current function is considered a code thunk.'''
         return cls.is_thunk(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_thunk(cls, func):
-        '''Return True if the function ``func`` is considered a code thunk.'''
+        '''Return `True` if the function ``func`` is considered a code thunk.'''
         fn = by(func)
         return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
     thunkQ = utils.alias(is_thunk, 'type')
 
 @utils.multicase(reg=(basestring,_instruction.register_t))
 def register(reg, *regs, **modifiers):
-    """Yield each (address, operand-number, operand-state) within the current function that touches one of the registers identified by ``regs``.
+    """Yield each `(address, operand-number, operand-state)` within the current function that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     return register(ui.current.function(), reg, *regs, **modifiers)
 @utils.multicase(reg=(basestring,_instruction.register_t))
 def register(func, reg, *regs, **modifiers):
-    """Yield each (address, operand-number, operand-state) within the function ``func`` that touches one of the registers identified by ``regs``.
+    """Yield each `(address, operand-number, operand-state)` within the function ``func`` that touches one of the registers identified by ``regs``.
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     iterops = interface.regmatch.modifier(**modifiers)

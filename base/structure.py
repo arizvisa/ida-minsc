@@ -1,3 +1,9 @@
+"""
+Structures
+
+generic tools for working in the context of a structure.
+"""
+
 import sys, logging
 import functools, itertools, operator
 import math, types
@@ -7,18 +13,13 @@ import database, instruction, ui, internal
 from internal import utils, interface
 
 import __builtin__, idaapi
-'''
-structure-context
-
-generic tools for working in the context of a structure.
-'''
 
 ## FIXME: need to add support for a union_t. add_struc takes another parameter
 ##        that defines whether a structure is a union or not.
 
 ### structure_t abstraction
 class structure_t(object):
-    """An abstraction around an IDA structure"""
+    """An abstraction around an IDA structure."""
     __slots__ = ('__id', '__members')
 
     def __init__(self, id, offset=0):
@@ -66,9 +67,9 @@ class structure_t(object):
         return map(utils.compose(operator.itemgetter(0), instance), refs)
 
     def refs(self):
-        """Return the (address, opnum, type) of all the references (code & data) to this structure within the database.
-        If `opnum` is None, then the `address` has the structure applied to it.
-        If `opnum` is defined, then the instruction at `address` references a field that is the specified structure.
+        """Return the `(address, opnum, type)` of all the references (code & data) to this structure within the database.
+        If `opnum` is `None`, then the returned `address` has the structure applied to it.
+        If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
         """
         x, sid = idaapi.xrefblk_t(), self.id
 
@@ -122,15 +123,15 @@ class structure_t(object):
 
     @property
     def id(self):
-        '''Return the identifier for the structure'''
+        '''Return the identifier of the structure.'''
         return self.__id
     @property
     def ptr(self):
-        '''Return the structure's idaapi pointer.'''
+        '''Return the pointer of the `idaapi.struc_t`.'''
         return idaapi.get_struc(self.id)
     @property
     def members(self):
-        '''Return the members for the structure.'''
+        '''Return the members belonging to the structure.'''
         return self.__members
 
     def __getstate__(self):
@@ -151,11 +152,11 @@ class structure_t(object):
 
     @property
     def name(self):
-        '''Return the name for the structure.'''
+        '''Return the name of the structure.'''
         return idaapi.get_struc_name(self.id)
     @name.setter
     def name(self, string):
-        '''Set the name for the structure to ``string``.'''
+        '''Set the name of the structure to ``string``.'''
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
@@ -245,32 +246,32 @@ def name(structure, string, *suffix): return name(structure.id, string, *suffix)
 
 @utils.multicase(id=six.integer_types)
 def comment(id, **repeatable):
-    """Return the comment for the structure identified by ``id``.
+    """Return the comment of the structure identified by ``id``.
     If the bool ``repeatable`` is specified, return the repeatable comment.
     """
     return idaapi.get_struc_cmt(id, repeatable.get('repeatable', True))
 @utils.multicase(structure=structure_t)
 def comment(structure, **repeatable):
-    '''Return the comment for the provided ``structure``.'''
+    '''Return the comment for the specified ``structure``.'''
     return comment(structure.id, **repeatable)
 @utils.multicase(cmt=basestring)
 def comment(id=six.integer_types, cmt=basestring, **repeatable):
-    """Set the comment for the structure identified by ``id`` to ``cmt``.
+    """Set the comment of the structure identified by ``id`` to ``cmt``.
     If the bool ``repeatable`` is specified, set the repeatable comment.
     """
     return idaapi.set_struc_cmt(id, cmt, repeatable.get('repeatable', True))
 @utils.multicase(structure=structure_t, cmt=basestring)
 def comment(structure, cmt, **repeatable):
-    '''Set the comment to ``cmt`` for the provided ``structure``.'''
+    '''Set the comment to ``cmt`` for the specified ``structure``.'''
     return comment(structure.id, cmt, **repeatable)
 
 @utils.multicase(id=six.integer_types)
 def index(id):
-    '''Return the index for the structure identified by ``id``.'''
+    '''Return the index of the structure identified by ``id``.'''
     return idaapi.get_struc_idx(id)
 @utils.multicase(structure=structure_t)
 def index(structure):
-    '''Return the index for the provided ``structure``.'''
+    '''Return the index of the specified ``structure``.'''
     return index(structure.id)
 @utils.multicase(id=six.integer_types, index=six.integer_types)
 def index(id, index):
@@ -278,7 +279,7 @@ def index(id, index):
     return idaapi.set_struc_idx(id, index)
 @utils.multicase(structure=structure_t, index=six.integer_types)
 def index(structure, index):
-    '''Move the provided ``structure`` to the specified ``index`` in the structure list.'''
+    '''Move the specified ``structure`` to the specified ``index`` in the structure list.'''
     return index(structure.id, index)
 
 __matcher__ = utils.matcher()
@@ -338,7 +339,7 @@ def list(**type):
 
 @utils.multicase(structure=structure_t)
 def size(structure):
-    '''Return the size of the provided ``structure``.'''
+    '''Return the size of the specified ``structure``.'''
     return size(structure.id)
 @utils.multicase(id=six.integer_types)
 def size(id):
@@ -347,12 +348,12 @@ def size(id):
 
 @utils.multicase(structure=structure_t)
 def members(structure):
-    '''Yield each member of the provided ``structure``.'''
+    '''Yield each member of the specified ``structure``.'''
     return members(structure.id)
 @utils.multicase(id=six.integer_types)
 def members(id):
     """Yield each member of the structure identified by ``id``.
-    Each iteration yields the ((offset, size), (name, comment, repeatable-comment)) of each member.
+    Each iteration yields the `((offset, size), (name, comment, repeatable-comment))` of each member.
     """
 
     st = idaapi.get_struc(id)
@@ -379,12 +380,12 @@ def members(id):
 
 @utils.multicase(structure=structure_t, offset=six.integer_types, size=six.integer_types)
 def fragment(structure, offset, size):
-    '''Yield each member of the provided ``structure`` from the specified ``offset`` up to the ``size``.'''
+    '''Yield each member of the specified ``structure`` from the ``offset`` up to the ``size``.'''
     return fragment(structure.id, offset, size)
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
 def fragment(id, offset, size):
     """Yield each member of the structure identified by ``id`` from the ``offset`` up to the ``size``.
-    Each iteration yields ((offset, size), (name, comment, repeatable comment)) for each member within the specified bounds.
+    Each iteration yields `((offset, size), (name, comment, repeatable comment))` for each member within the specified bounds.
     """
     member = members(id)
 
@@ -409,7 +410,7 @@ def fragment(id, offset, size):
 # XXX: deprecate this as it's already in database
 @utils.multicase(ea=six.integer_types, structure=structure_t)
 def apply(ea, structure):
-    '''Apply the provided ``structure`` to the address at ``ea``.'''
+    '''Apply the specified ``structure`` to the address at ``ea``.'''
     ea = interface.address.inside(ea)
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
     res = idaapi.get_opinfo(ea, 0, fl, ti)
@@ -421,7 +422,7 @@ def apply(id):
     return apply(ui.current.address(), instance(id))
 @utils.multicase(structure=structure_t)
 def apply(structure):
-    '''Apply the provided ``structure`` to the current address.'''
+    '''Apply the specified ``structure`` to the current address.'''
     return apply(ui.current.address(), structure)
 @utils.multicase(ea=six.integer_types, id=six.integer_types)
 def apply(ea, id):
@@ -445,13 +446,13 @@ def apply_op(id, ea, opnum, **delta):
     return True if ok else False
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=structure_t)
 def apply_op(structure, ea, opnum, **delta):
-    """Apply the provided ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
+    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
     return apply_op(structure.id, ea, opnum, **delta)
 @utils.multicase(opnum=six.integer_types, structure=structure_t)
 def apply_op(structure, opnum, **delta):
-    """Apply the provided ``structure`` to the instruction operand ``opnum`` at the current address.
+    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
     return apply_op(structure.id, ui.current.address(), opnum, **delta)
@@ -494,7 +495,7 @@ def remove(structure):
     return True
 @utils.multicase(name=basestring)
 def remove(name):
-    '''Remove the structure with the provided ``name``.'''
+    '''Remove the structure with the specified ``name``.'''
     res = by_name(name)
     return remove(res)
 @utils.multicase(id=six.integer_types)
@@ -581,18 +582,18 @@ by_identifier = by_id = byIdentifier = byId = utils.alias(instance)
 class members_t(object):
     """An abstraction around the members of a particular IDA structure
 
-    This allows one to treat each member as a dict.
+    This allows one to treat each member as a `dict`.
     """
     __slots__ = ('__owner', 'baseoffset')
 
     # members state
     @property
     def owner(self):
-        '''Return the structure_t that owns this members_t.'''
+        '''Return the `structure_t` that owns this `members_t`.'''
         return self.__owner
     @property
     def ptr(self):
-        '''Return the members' idaapi pointer.'''
+        '''Return the pointer to the `idaapi.member_t` that contains all the members.'''
         return self.__owner.ptr.members
     def __init__(self, owner, baseoffset=0):
         self.__owner = owner
@@ -636,7 +637,7 @@ class members_t(object):
         return res
 
     def index(self, member_t):
-        '''Return the index of the member ``member_t``.'''
+        '''Return the index of the member specified by ``member_t``.'''
         for i in range(0, self.owner.ptr.memqty):
             if member_t.id == self[i].id:
                 return i
@@ -914,7 +915,7 @@ class member_t(object):
     # read-only properties
     @property
     def ptr(self):
-        '''Return the member's idaapi pointer.'''
+        '''Return the pointer of the `idaapi.member_t`.'''
         return self.__owner.ptr.get_member(self.__index)
     @property
     def id(self):
@@ -926,20 +927,20 @@ class member_t(object):
         return idaapi.get_member_size(self.ptr)
     @property
     def offset(self):
-        '''Return the member's offset.'''
+        '''Return the offset of the member.'''
         return self.ptr.get_soff() + self.__owner.members.baseoffset
     @property
     def flag(self):
-        '''Return the member's `.flag` attribute.'''
+        '''Return the `.flag` attribute of the member.'''
         m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
         return 0 if m is None else m.flag
     @property
     def fullname(self):
-        '''Return the member's fullname.'''
+        '''Return the fullname of the member.'''
         return idaapi.get_member_fullname(self.id)
     @property
     def typeid(self):
-        '''Return the `.tid` of the member's type.'''
+        '''Return the `.tid` attribute of the type of the member.'''
         opinfo = idaapi.opinfo_t()
         if idaapi.__version__ < 7.0:
             res = idaapi.retrieve_member_info(self.ptr, opinfo)
@@ -963,11 +964,11 @@ class member_t(object):
     # read/write properties
     @property
     def name(self):
-        '''Return the member's name.'''
+        '''Return the name of the member.'''
         return idaapi.get_member_name(self.id) or ''
     @name.setter
     def name(self, string):
-        '''Set the member's name to ``string``.'''
+        '''Set the name of the member to ``string``.'''
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
@@ -979,15 +980,15 @@ class member_t(object):
         return idaapi.set_member_name(self.__owner.ptr, self.offset - self.__owner.members.baseoffset, string)
     @property
     def comment(self):
-        '''Return the member's repeable comment.'''
+        '''Return the repeatable comment of the member.'''
         return idaapi.get_member_cmt(self.id, True) or idaapi.get_member_cmt(self.id, False)
     @comment.setter
     def comment(self, value):
-        '''Set the member's repeatable comment.'''
+        '''Set the repeatable comment of the member.'''
         return idaapi.set_member_cmt(self.ptr, value, True)
     @property
     def dt_type(self):
-        '''Return the member's `.dt_type` attribute.'''
+        '''Return the `.dt_type` attribute of the member.'''
         m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
         if m is None:
             return 0
@@ -998,7 +999,7 @@ class member_t(object):
         return (max+flag) if flag < 0 else (flag-max) if flag > max else flag
     @property
     def type(self):
-        '''Return the member's type in its pythonic form.'''
+        '''Return the type of the member in its pythonic form.'''
         res = interface.typemap.dissolve(self.flag, self.typeid, self.size)
         if isinstance(res, structure_t):
             res = instance(res.id, offset=self.offset)
@@ -1012,7 +1013,7 @@ class member_t(object):
         return res
     @type.setter
     def type(self, type):
-        '''Set the member's type.'''
+        '''Set the type of the member.'''
         flag, typeid, nbytes = interface.typemap.resolve(type)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
@@ -1028,12 +1029,12 @@ class member_t(object):
         return res
 
     def __repr__(self):
-        '''Display the specified member in a readable format.'''
+        '''Display the member in a readable format.'''
         id, name, typ, comment = self.id, self.name, self.type, self.comment
         return "{:s}\n[{:d}] {:-#x}:{:+#x} \'{:s}\' {:s}{:s}".format(self.__class__, self.index, self.offset, self.size, name, typ, " // {:s}".format(comment) if comment else '')
 
     def refs(self):
-        '''Return the (address, opnum, type) of all the references to this member within the database.'''
+        '''Return the `(address, opnum, type)` of all the references to this member within the database.'''
         mid = self.id
 
         # calculate the high-byte which is used to determine an address from a structure

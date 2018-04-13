@@ -1,6 +1,7 @@
-'''
-enum-context
-generic tools for working with enumerations
+"""
+Enumerations
+
+generic tools for working with enumerations.
 
 Examples:
 e = enum.create("example_enum")
@@ -14,7 +15,7 @@ for e in enum.iterate():
     print enum.repr(e)
 
 enum.delete("example_enum")
-'''
+"""
 
 import __builtin__
 import sys,six,math
@@ -39,7 +40,7 @@ def flags(enum, mask):
     return idaapi.get_enum_flag(enum) & mask
 
 def by_name(name):
-    '''Return an enum id with the specified ``name``.'''
+    '''Return the identifier for the enumeration with the given ``name``.'''
     res = idaapi.get_enum(name)
     if res == idaapi.BADADDR:
         raise LookupError("{:s}.by_name({!r}) : Unable to locate enumeration.".format(__name__, name))
@@ -47,7 +48,7 @@ def by_name(name):
 byName = utils.alias(by_name)
 
 def by_index(index):
-    '''Return an enum id at the specified ``index``.'''
+    '''Return the identifier for the enumeration at the specified ``index``.'''
     res = idaapi.getn_enum(index)
     if res == idaapi.BADADDR:
         raise LookupError("{:s}.by_index({:x}) : Unable to locate enumeration.".format(__name__, index))
@@ -188,13 +189,13 @@ __matcher__.predicate('pred')
 __matcher__.predicate('predicate')
 
 def __iterate__():
-    '''Iterate through all enumeration ids defined in the database.'''
+    '''Yield the identifier of each enumeration within the database.'''
     for n in __builtin__.range(idaapi.get_enum_qty()):
         yield idaapi.getn_enum(n)
     return
 
 def iterate(**type):
-    '''Yield the id of each enumeration within the database.'''
+    '''Iterate through the identifiers of all the enumerations defined in the database.'''
     if not type: type = {'predicate':lambda n: True}
     res = __builtin__.list(__iterate__())
     for k,v in type.iteritems():
@@ -257,7 +258,7 @@ class member(object):
 
     @classmethod
     def parent(cls, mid):
-        '''Return the enumeration id that owns the member ``mid``.'''
+        '''Return the enumeration identifier that owns the member ``mid``.'''
         return idaapi.get_enum_member_enum(mid)
 
     ## lifetime
@@ -300,7 +301,7 @@ class member(object):
     ## searching
     @classmethod
     def by_index(cls, enum, index):
-        '''Return the member id for the member of the enumeration ``enum`` at the specified ``index``.'''
+        '''Return the member identifier for the member of the enumeration ``enum`` at the specified ``index``.'''
         eid = by(enum)
         try: return next(m for i,m in enumerate(cls.iterate(eid)) if i == index)
         except StopIteration: pass
@@ -315,7 +316,7 @@ class member(object):
 
     @classmethod
     def by_value(cls, enum, value):
-        '''Return the member id for the member of the enumeration ``enum`` with the specified ``value``.'''
+        '''Return the member identifier for the member of the enumeration ``enum`` with the specified ``value``.'''
         eid = by(enum)
         bmask = idaapi.BADADDR & mask(eid)
         res,_ = idaapi.get_first_serial_enum_member(eid, value, bmask)
@@ -326,7 +327,7 @@ class member(object):
 
     @classmethod
     def by_name(cls, enum, name):
-        '''Return the member id for the member of the enumeration ``enum`` with the specified ``name``.'''
+        '''Return the member identifier for the member of the enumeration ``enum`` with the specified ``name``.'''
         eid = by(enum)
         for mid in cls.iterate(eid):
             if name == cls.name(mid):
@@ -382,7 +383,7 @@ class member(object):
     @utils.multicase(mid=six.integer_types)
     @classmethod
     def comment(cls, mid, **repeatable):
-        """Return the comment for the enumeration member id ``mid``.
+        """Return the comment for the enumeration member ``mid``.
         If the bool ``repeatable`` is specified, then return the repeatable comment.
         """
         return idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True))
@@ -458,7 +459,7 @@ class member(object):
         mid = cls.by(eid, member)
         return cls.mask(mid)
 
-    # FIXME
+    # FIXME: Implement a matcher class for enumeration members that can be used with .iterate and .list below.
     __member_matcher = utils.matcher()
 
     @classmethod

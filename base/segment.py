@@ -1,8 +1,9 @@
-'''
-segment-context
+"""
+Segments
 
-generic tools for working with segments
-'''
+generic tools for working with segments.
+"""
+
 import logging,os
 import math,types
 import itertools,operator,functools
@@ -91,7 +92,7 @@ def by_address(ea):
 byAddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
 def by(segment):
-    '''Return a segment by its segment_t.'''
+    '''Return a segment by its `idaapi.segment_t`.'''
     return segment
 @utils.multicase(name=basestring)
 def by(name):
@@ -152,7 +153,7 @@ def range():
     return seg.startEA, seg.endEA
 @utils.multicase()
 def range(segment):
-    '''Return the range of the segment specified by ``seg``.'''
+    '''Return the range of the segment specified by ``segment``.'''
     seg = by(segment)
     return seg.startEA, seg.endEA
 
@@ -168,10 +169,10 @@ def iterate(segment):
     '''Iterate through all of the addresses within the segment identified by ``segment``.'''
     seg = by(segment)
     return iterate(seg)
-@utils.multicase(seg=idaapi.segment_t)
-def iterate(seg):
-    '''Iterate through all of the addresses within the segment ``seg``.'''
-    for ea in database.iterate(seg.startEA, seg.endEA):
+@utils.multicase(segment=idaapi.segment_t)
+def iterate(segment):
+    '''Iterate through all of the addresses within the segment ``segment``.'''
+    for ea in database.iterate(segment.startEA, segment.endEA):
         yield ea
     return
 
@@ -203,14 +204,15 @@ def offset(segment, ea):
     return ea - segment.startEA
 
 @utils.multicase(offset=six.integer_types)
-def goof(offset):
+def go_offset(offset):
     '''Go to the ``offset`` of the current segment.'''
-    return goof(ui.current.segment(), offset)
+    return go_offset(ui.current.segment(), offset)
 @utils.multicase(offset=six.integer_types)
-def goof(segment, offset):
+def go_offset(segment, offset):
     '''Go to the ``offset`` of the specified ``segment``.'''
     seg = by(segment)
     return database.go(seg.startEA + offset)
+goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
 
 @utils.multicase()
 def read():
@@ -228,15 +230,14 @@ string = utils.alias(read)
 
 @utils.multicase()
 def repr():
-    '''Return a repr() of the current segment.'''
+    '''Return the current segment in a printable form.'''
     segment = ui.current.segment()
     if segment is None:
         raise LookupError("{:s}.repr() : Not currently positioned within a segment".format(__name__))
     return "{:s} {:s} {:x}-{:x} (+{:x})".format(object.__repr__(segment),idaapi.get_true_segm_name(segment),segment.startEA,segment.endEA,segment.endEA-segment.startEA)
 @utils.multicase()
 def repr(segment):
-    '''Return a repr() of the segment identified by ``segment``.'''
-    '''Given a segment_t/address, return a printable representation of it'''
+    '''Return the specified ``segment`` in a printable form.'''
     seg = by(segment)
     return "{:s} {:s} {:x}-{:x} (+{:x})".format(object.__repr__(seg),idaapi.get_true_segm_name(seg),seg.startEA,seg.endEA,seg.endEA-seg.startEA)
 
@@ -339,30 +340,30 @@ def color(segment, rgb):
 
 @utils.multicase()
 def within():
-    '''Returns True if the current address is within any segment.'''
+    '''Returns `True` if the current address is within any segment.'''
     return within(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def within(ea):
-    '''Returns True if the address ``ea`` is within any segment.'''
+    '''Returns `True` if the address ``ea`` is within any segment.'''
     return any(segment.startEA <= ea < segment.endEA for segment in __iterate__())
 
 @utils.multicase(ea=six.integer_types)
 def contains(ea):
-    '''Returns True if the address ``ea`` is contained within the current segment.'''
+    '''Returns `True` if the address ``ea`` is contained within the current segment.'''
     return contains(ui.current.segment(), ea)
 @utils.multicase(segaddr=six.integer_types, ea=six.integer_types)
 def contains(segaddr, ea):
-    '''Returns True if the address ``ea`` is contained within the segment owning the specified ``segaddr``.'''
+    '''Returns `True` if the address ``ea`` is contained within the segment owning the specified ``segaddr``.'''
     seg = by_address(segaddr)
     return contains(seg, ea)
 @utils.multicase(name=basestring, ea=six.integer_types)
 def contains(segname, ea):
-    '''Returns True if the address ``ea`` is contained within the segment named ``segname``.'''
+    '''Returns `True` if the address ``ea`` is contained within the segment named ``segname``.'''
     seg = by_name(segname)
     return contains(seg, ea)
 @utils.multicase(segment=idaapi.segment_t, ea=six.integer_types)
 def contains(segment, ea):
-    '''Returns True if the address ``ea`` is contained within the specified ``segment``.'''
+    '''Returns `True` if the address ``ea`` is contained within the specified ``segment``.'''
     return segment.startEA <= ea < segment.endEA
 
 ## functions
