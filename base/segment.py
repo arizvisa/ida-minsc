@@ -36,9 +36,9 @@ def __iterate__(**type):
         res = idaapi.getnseg(index)
         res.index = index
         return res
-    res = __builtin__.map(newsegment, xrange(idaapi.get_segm_qty()))
+    res = builtins.map(newsegment, xrange(idaapi.get_segm_qty()))
     for k,v in type.iteritems():
-        res = __builtin__.list(__matcher__.match(k, v, res))
+        res = builtins.list(__matcher__.match(k, v, res))
     for n in res: yield n
 
 @utils.multicase(string=basestring)
@@ -56,19 +56,19 @@ def list(**type):
     name = specific segment name
     predicate = function predicate
     """
-    res = __builtin__.list(__iterate__(**type))
+    res = builtins.list(__iterate__(**type))
 
-    maxindex = max(__builtin__.map(operator.attrgetter('index'), res) or [1])
-    maxaddr = max(__builtin__.map(operator.attrgetter('endEA'), res) or [1])
-    maxsize = max(__builtin__.map(operator.methodcaller('size'), res) or [1])
-    maxname = max(__builtin__.map(utils.compose(idaapi.get_true_segm_name,len), res) or [1])
+    maxindex = max(builtins.map(operator.attrgetter('index'), res) or [1])
+    maxaddr = max(builtins.map(operator.attrgetter('endEA'), res) or [1])
+    maxsize = max(builtins.map(operator.methodcaller('size'), res) or [1])
+    maxname = max(builtins.map(utils.compose(idaapi.get_true_segm_name,len), res) or [1])
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
     caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
     csize = math.ceil(math.log(maxsize or 1)/math.log(16))
 
     for seg in res:
         comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
-        print("[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, int(caddr), seg.endEA, int(caddr), seg.size(), int(csize), idaapi.get_true_segm_name(seg), maxname, seg.sel, seg.flags, "// {:s}".format(comment) if comment else ''))
+        print("[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), idaapi.get_true_segm_name(seg), maxname, seg.sel, seg.flags, "// {:s}".format(comment) if comment else ''))
     return
 
 ## searching
@@ -123,11 +123,11 @@ def by(**type):
     """
     searchstring = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
-    res = __builtin__.list(__iterate__(**type))
+    res = builtins.list(__iterate__(**type))
     if len(res) > 1:
-        maxaddr = max(__builtin__.map(operator.attrgetter('endEA'), res) or [1])
+        maxaddr = max(builtins.map(operator.attrgetter('endEA'), res) or [1])
         caddr = math.ceil(math.log(maxaddr)/math.log(16))
-        __builtin__.map(logging.info, (("[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), seg.size(), seg.sel, seg.flags)) for seg in res))
+        builtins.map(logging.info, (("[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), idaapi.get_true_segm_name(seg), seg.size(), seg.sel, seg.flags)) for seg in res))
         logging.warn("{:s}.by({:s}) : Found {:d} matching results, returning the first one. : [{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x}".format(__name__, searchstring, len(res), res[0].index, res[0].startEA, int(caddr), res[0].endEA, int(caddr), idaapi.get_true_segm_name(res[0]), res[0].size()))
 
     res = next(iter(res), None)

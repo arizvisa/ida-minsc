@@ -34,7 +34,7 @@ if idaapi.__version__ >= 6.95:
 
 ### customize the root namespace
 import functools, operator, itertools, types
-import __builtin__ as builtin
+from six.moves import builtins
 
 ## context modules from idascripts
 import segment, database, function, instruction
