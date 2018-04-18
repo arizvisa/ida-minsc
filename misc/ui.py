@@ -67,6 +67,9 @@ try:
     from PyQt5.Qt import QObject
 
     class root(object):
+        """
+        Get information about the root Qt objects in IDA.
+        """
         @classmethod
         def application(cls):
             return PyQt5.Qt.qApp
@@ -83,6 +86,9 @@ try:
             return idaapi.refresh_idaview_anyway()
 
     class progress(object):
+        """
+        Helper class for showing a progress-bar.
+        """
         def __init__(self, blocking=True):
             self.object = res = PyQt5.Qt.QProgressDialog()
             res.setVisible(False)
@@ -453,3 +459,50 @@ class hook(object):
             # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
             res.remove()
         return
+
+class navigation(object):
+    """
+    Exposes the ability to update the state of the colored navigation band.
+    """
+    if all(not hasattr(idaapi, name) for name in ('show_addr','showAddr')):
+        __set__ = lambda ea: None
+    else:
+        __set__ = idaapi.showAddr if idaapi.__version__ < 7.0 else idaapi.show_addr
+
+    if all(not hasattr(idaapi, name) for name in ('show_auto','showAuto')):
+        __auto__ = lambda ea, t: None
+    else:
+        __auto__ = idaapi.showAuto if idaapi.__version__ < 7.0 else idaapi.show_auto
+
+    @classmethod
+    def set(cls, ea):
+        '''Set the auto-analysis address on the navigation bar to ``ea``.'''
+        return cls.__set__(ea)
+
+    @classmethod
+    def auto(cls, ea, **type):
+        """Set the auto-analysis address and type on the navigation bar to ``ea``.
+        If ``type`` is specified, then update using the specified auto-analysis type.
+        """
+        return cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
+
+    @classmethod
+    def unknown(cls, ea): return cls.auto(ea, type=idaapi.AU_UNK)
+    @classmethod
+    def code(cls, ea): return cls.auto(ea, type=idaapi.AU_CODE)
+    @classmethod
+    def weak(cls, ea): return cls.auto(ea, type=idaapi.AU_WEAK)
+    @classmethod
+    def procedure(cls, ea): return cls.auto(ea, type=idaapi.AU_PROC)
+    @classmethod
+    def tail(cls, ea): return cls.auto(ea, type=idaapi.AU_TAIL)
+    @classmethod
+    def stackpointer(cls, ea): return cls.auto(ea, type=idaapi.AU_TRSP)
+    @classmethod
+    def analyze(cls, ea): return cls.auto(ea, type=idaapi.AU_USED)
+    @classmethod
+    def type(cls, ea): return cls.auto(ea, type=idaapi.AU_TYPE)
+    @classmethod
+    def signature(cls, ea): return cls.auto(ea, type=idaapi.AU_LIBF)
+    @classmethod
+    def final(cls, ea): return cls.auto(ea, type=idaapi.AU_FINAL)
