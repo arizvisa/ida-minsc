@@ -1,6 +1,7 @@
-import __builtin__
-import sys,logging
-import database,function,instruction as ins
+import six, sys, logging
+from six.moves import builtins
+
+import database, function, instruction as ins
 import internal
 
 class remote(object):
@@ -50,7 +51,7 @@ def recovermarks():
         m = set( (l['marks']) if hasattr(l['marks'],'__iter__') else [int(x,16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
         res = [(ea,d['mark']) for ea,d in function.select(fn,'mark')]
         if m != set(a for a,_ in res):
-            logging.warning("{:x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, __builtin__.map(hex,m), __builtin__.map(hex,set(a for a,_ in res))))
+            logging.warning("{:x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, builtins.map(hex,m), builtins.map(hex,set(a for a,_ in res))))
         result.extend(res)
     result.sort(cmp=lambda x,y: cmp(x[1],y[1]))
 
@@ -119,7 +120,7 @@ def collect(ea, sentinel):
         raise AssertionError("{:s}.collect({:x}, {!r}) : Sentinel is empty or not a set.".format(__name__, ea, sentinel))
     def _collect(addr, result):
         process = set()
-        for blk in __builtin__.map(function.block, function.block.after(addr)):
+        for blk in builtins.map(function.block, function.block.after(addr)):
             if any(blk in coll for coll in (result, sentinel)):
                 continue
             process.add(blk)
@@ -235,12 +236,12 @@ def sourcechain(fn, *args, **kwds):
                 result.setdefault(ea,set()).add(i)
                 r = ins.op_value(ea,i)
                 for a,b in sourcechain(fn, ea, r):
-                    __builtin__.map(result.setdefault(a,set()).add, b)
+                    builtins.map(result.setdefault(a,set()).add, b)
             elif t in ('phrase',):
                 result.setdefault(ea,set()).add(i)
                 _,(r1,r2,_) = ins.op_value(ea,i)
                 for a,b in sourcechain(fn, ea, *tuple(r for r in (r1,r2) if r is not None)):
-                    __builtin__.map(result.setdefault(a,set()).add, b)
+                    builtins.map(result.setdefault(a,set()).add, b)
             elif t in ('imm','addr',):
                 result.setdefault(ea,set()).add(i)
             else:

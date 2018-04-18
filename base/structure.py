@@ -4,7 +4,9 @@ Structures
 generic tools for working in the context of a structure.
 """
 
-import six, __builtin__ as builtin
+import six
+from six.moves import builtins
+
 import functools, operator, itertools, types
 import sys, logging
 import math, re, fnmatch
@@ -308,9 +310,9 @@ def iterate(string):
 @utils.multicase()
 def iterate(**type):
     if not type: type = {'predicate':lambda n: True}
-    res = builtin.list(__iterate__())
+    res = builtins.list(__iterate__())
     for k, v in type.iteritems():
-        res = builtin.list(__matcher__.match(k, v, res))
+        res = builtins.list(__matcher__.match(k, v, res))
     for n in res: yield n
 
 @utils.multicase(string=basestring)
@@ -328,11 +330,11 @@ def list(**type):
     identifier = particular id number
     pred = function predicate
     """
-    res = builtin.list(iterate(**type))
+    res = builtins.list(iterate(**type))
 
-    maxindex = max(builtin.map(utils.compose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
-    maxname = max(builtin.map(utils.compose(operator.attrgetter('name'), len), res) or [1])
-    maxsize = max(builtin.map(utils.compose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
+    maxindex = max(builtins.map(utils.compose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
+    maxname = max(builtins.map(utils.compose(operator.attrgetter('name'), len), res) or [1])
+    maxsize = max(builtins.map(utils.compose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
 
     for st in res:
         print("[{:{:d}d}] {:>{:d}s} {:<+{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {:s}".format(st.comment) if st.comment else ''))
@@ -536,7 +538,7 @@ def by(**type):
 
     searchstring = ', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())
 
-    res = builtin.list(iterate(**type))
+    res = builtins.list(iterate(**type))
     if len(res) > 1:
         map(logging.info, (("[{:d}] {:s}".format(idaapi.get_struc_idx(st.id), st.name)) for i, st in enumerate(res)))
         logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format(__name__, searchstring, len(res), res[0]))
@@ -663,9 +665,9 @@ class members_t(object):
     @utils.multicase()
     def iterate(self, **type):
         if not type: type = {'predicate':lambda n: True}
-        res = builtin.list(iter(self))
+        res = builtins.list(iter(self))
         for k, v in type.iteritems():
-            res = builtin.list(self.__member_matcher.match(k, v, res))
+            res = builtins.list(self.__member_matcher.match(k, v, res))
         for n in res: yield n
 
     @utils.multicase(string=basestring)
@@ -683,14 +685,14 @@ class members_t(object):
         identifier = particular id number
         predicate = function predicate
         """
-        res = builtin.list(self.iterate(**type))
+        res = builtins.list(self.iterate(**type))
 
         escape = repr
-        maxindex = max(builtin.map(utils.compose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
-        maxoffset = max(builtin.map(utils.compose(operator.attrgetter('offset'), "{:x}".format, len), res) or [1])
-        maxsize = max(builtin.map(utils.compose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
-        maxname = max(builtin.map(utils.compose(operator.attrgetter('name'), escape, len), res) or [1])
-        maxtype = max(builtin.map(utils.compose(operator.attrgetter('type'), repr, len), res) or [1])
+        maxindex = max(builtins.map(utils.compose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
+        maxoffset = max(builtins.map(utils.compose(operator.attrgetter('offset'), "{:x}".format, len), res) or [1])
+        maxsize = max(builtins.map(utils.compose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
+        maxname = max(builtins.map(utils.compose(operator.attrgetter('name'), escape, len), res) or [1])
+        maxtype = max(builtins.map(utils.compose(operator.attrgetter('type'), repr, len), res) or [1])
 
         for m in res:
             print "[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {:s}".format(m.comment) if m.comment else '')
@@ -701,7 +703,7 @@ class members_t(object):
         '''Return the member with the specified ``name``.'''
         searchstring = ', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())
 
-        res = builtin.list(self.iterate(**type))
+        res = builtins.list(self.iterate(**type))
         if len(res) > 1:
             map(logging.info, (("[{:d}] {:x}:+{:x} '{:s}' {!r}".format(m.index, m.offset, m.size, m.name, m.type)) for m in res))
             logging.warn("{:s}.instance({:s}).members.by({:s}) : Found {:d} matching results, returning the first one. : [{:d}] {:x}:+{:x} '{:s}' {!r}".format(__name__, self.owner.name, searchstring, len(res), res[0].index, res[0].offset, res[0].size, res[0].fullname, res[0].type))

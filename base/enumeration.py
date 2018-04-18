@@ -17,7 +17,9 @@ for e in enum.iterate():
 enum.delete("example_enum")
 """
 
-import six, __builtin__ as builtin
+import six
+from six.moves import builtins
+
 import functools, operator, itertools
 import logging, sys, math
 import fnmatch, re
@@ -78,9 +80,9 @@ def by(**type):
     """
     searchstring = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
 
-    res = builtin.list(iterate(**type))
+    res = builtins.list(iterate(**type))
     if len(res) > 1:
-        map(logging.info, ("[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtin.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
+        map(logging.info, ("[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
         logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one.".format(__name__, searchstring, len(res)))
 
     res = next(iter(res), None)
@@ -192,16 +194,16 @@ __matcher__.predicate('predicate')
 
 def __iterate__():
     '''Yield the identifier of each enumeration within the database.'''
-    for n in builtin.range(idaapi.get_enum_qty()):
+    for n in builtins.range(idaapi.get_enum_qty()):
         yield idaapi.getn_enum(n)
     return
 
 def iterate(**type):
     '''Iterate through the identifiers of all the enumerations defined in the database.'''
     if not type: type = {'predicate':lambda n: True}
-    res = builtin.list(__iterate__())
+    res = builtins.list(__iterate__())
     for k,v in type.iteritems():
-        res = builtin.list(__matcher__.match(k, v, res))
+        res = builtins.list(__matcher__.match(k, v, res))
     for n in res: yield n
 
 @utils.multicase(string=basestring)
@@ -219,16 +221,16 @@ def list(**type):
     identifier = particular id number
     pred = function predicate
     """
-    res = builtin.list(iterate(**type))
+    res = builtins.list(iterate(**type))
 
-    maxindex = max(builtin.map(idaapi.get_enum_idx, res))
-    maxname = max(builtin.map(utils.compose(idaapi.get_enum_name, len), res))
-    maxsize = max(builtin.map(size, res))
+    maxindex = max(builtins.map(idaapi.get_enum_idx, res))
+    maxname = max(builtins.map(utils.compose(idaapi.get_enum_name, len), res))
+    maxsize = max(builtins.map(size, res))
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    cmask = max(builtin.map(utils.compose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
+    cmask = max(builtins.map(utils.compose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
 
     for n in res:
-        print("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(builtin.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
+        print("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
     return
 
 ## members
@@ -490,9 +492,9 @@ class member(object):
     def list(cls, enum):
         # FIXME: make this consistent with every other .list
         eid = by(enum)
-        res = builtin.list(cls.iterate(eid))
-        maxindex = max(builtin.map(utils.first, enumerate(res)) or [1])
-        maxvalue = max(builtin.map(utils.compose(cls.value, "{:x}".format, len), res) or [1])
+        res = builtins.list(cls.iterate(eid))
+        maxindex = max(builtins.map(utils.first, enumerate(res)) or [1])
+        maxvalue = max(builtins.map(utils.compose(cls.value, "{:x}".format, len), res) or [1])
         for i, mid in enumerate(res):
              print("[{:d}] {:>0{:d}x} {:s}".format(i, cls.value(mid), maxvalue, cls.name(mid)))
         return

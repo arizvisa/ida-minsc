@@ -4,7 +4,9 @@ Instructions
 generic tools for working in the context of an instruction.
 """
 
-import six, __builtin__ as builtin
+import six
+from six.moves import builtins
+
 import functools, operator, itertools, types
 import logging, collections
 
@@ -1374,7 +1376,7 @@ class ir_op:
                     try: return cmp(classname, other_name) == 0 and self.size == int(other_size)
                     except ValueError: return False
                 return cmp(classname, other) == 0
-            return isinstance(self, other) if isinstance(other, builtin.type) else super(object, self) == other
+            return isinstance(self, other) if isinstance(other, builtins.type) else super(object, self) == other
     class store(__base__): pass
     class load(__base__): pass
     class loadstore(__base__): pass

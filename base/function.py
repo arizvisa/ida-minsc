@@ -4,7 +4,9 @@ Functions
 generic tools for working in the context of a function.
 """
 
-import six, __builtin__ as builtin
+import six
+from six.moves import builtins
+
 import functools, operator, itertools, types
 import logging, re
 
@@ -1408,16 +1410,16 @@ def select(func, tag, *tags, **boolean):
     tags = (tag,) + tags
     boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
     return select(func, **boolean)
-@utils.multicase(tag=(builtin.set, builtin.list))
+@utils.multicase(tag=(builtins.set, builtins.list))
 def select(func, tag, *tags, **boolean):
-    tags = set(builtin.list(tag) + builtin.list(tags))
+    tags = set(builtins.list(tag) + builtins.list(tags))
     boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
     return select(func, **boolean)
 @utils.multicase()
 def select(func, **boolean):
     '''Fetch a list of addresses within the function that contain the specified tags.'''
     fn = by(func)
-    containers = (builtin.tuple, builtin.set, builtin.list)
+    containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
     if not boolean:

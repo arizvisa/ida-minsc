@@ -4,7 +4,9 @@ Segments
 generic tools for working with segments.
 """
 
-import six, __builtin__ as builtin
+import six
+from six.moves import builtins
+
 import functools, operator, itertools, types
 import os, logging
 import math, re, fnmatch
