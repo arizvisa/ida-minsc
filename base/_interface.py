@@ -303,7 +303,7 @@ class address(object):
 
         res = idaapi.get_item_head(ea)
         if ea != res and not silent.get('silent', False):
-            logging.warn("{:s} : Address {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, ea, res))
+            logging.warn("{:s} : Specified address {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, ea, res))
         return res
     @classmethod
     def __head2__(cls, start, end, **silent):
@@ -313,9 +313,9 @@ class address(object):
         res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
         # FIXME: off-by-one here, as end can be the size of the db.
         if res_start != start and not silent.get('silent', False):
-            logging.warn("{:s} : Starting address of {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
+            logging.warn("{:s} : Starting address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
         if res_end != end and not silent.get('silent', False):
-            logging.warn("{:s} : Ending address of {:#x} not aligned to the beginning of an item. Fixing it to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
+            logging.warn("{:s} : Ending address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
         return res_start, res_end
     @classmethod
     def head(cls, *args, **silent):
@@ -357,7 +357,7 @@ class address(object):
 
         if not cls.__within__(ea):
             l, r = cls.__bounds__()
-            raise StandardError("{:s} : Address {:#x} not within bounds of database ({:#x}<>{:#x}.)".format(entryframe.f_code.co_name, ea, l, r))
+            raise StandardError("{:s} : Specified address {:#x} not within bounds of database ({:#x}<>{:#x}.)".format(entryframe.f_code.co_name, ea, l, r))
         return ea
     @classmethod
     def __within2__(cls, start, end):
