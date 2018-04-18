@@ -311,10 +311,12 @@ def __process_functions():
 
         text = functools.partial("{:x} : Processing function {:d} of {:d} : ({:d} chunk{:s})".format, fn, i, len(funcs))
         p.update(current=i)
+        ui.navigation.procedure(fn)
 
         contents = set(internal.comment.contents.address(fn))
         for ci, (l, r) in enumerate(chunks):
             p.update(text=text(len(chunks), 's' if len(chunks) != 1 else ''), tooltip="Chunk #{:d} : {:x} - {:x}".format(ci, l, r))
+            ui.navigation.analyze(l)
             for ea in database.iterate(l, r):
                 # FIXME: no need to iterate really since we should have
                 #        all of the addresses
@@ -343,14 +345,15 @@ def rebase(info):
         for i, fn in __rebase_function(info[si]._from, info[si].to, info[si].size, res):
             text = "Function {:d} of {:d} : {:x}".format(i + fcount, len(functions), fn)
             p.update(value=sum((fcount,gcount,i)), text=text)
+            ui.navigation.procedure(fn)
         fcount += len(res)
 
         # for each global
         res = [(ea,count) for ea,count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
         for i, ea in __rebase_globals(info[si]._from, info[si].to, info[si].size, res):
-            time.sleep(0.001)
             text = "Global {:d} of {:d} : {:x}".format(i + gcount, len(globals), ea)
             p.update(value=sum((fcount,gcount,i)), text=text)
+            ui.navigation.analyze(ea)
         gcount += len(res)
     p.close()
 
