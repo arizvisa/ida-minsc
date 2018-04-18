@@ -465,14 +465,14 @@ class navigation(object):
     Exposes the ability to update the state of the colored navigation band.
     """
     if all(not hasattr(idaapi, name) for name in ('show_addr','showAddr')):
-        __set__ = lambda ea: None
+        __set__ = staticmethod(lambda ea: None)
     else:
-        __set__ = idaapi.showAddr if idaapi.__version__ < 7.0 else idaapi.show_addr
+        __set__ = staticmethod(idaapi.showAddr if idaapi.__version__ < 7.0 else idaapi.show_addr)
 
     if all(not hasattr(idaapi, name) for name in ('show_auto','showAuto')):
-        __auto__ = lambda ea, t: None
+        __auto__ = staticmethod(lambda ea, t: None)
     else:
-        __auto__ = idaapi.showAuto if idaapi.__version__ < 7.0 else idaapi.show_auto
+        __auto__ = staticmethod(idaapi.showAuto if idaapi.__version__ < 7.0 else idaapi.show_auto)
 
     @classmethod
     def set(cls, ea):
