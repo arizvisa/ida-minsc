@@ -1,7 +1,8 @@
 import six, sys, logging
 from six.moves import builtins
 
-import database, function, instruction as ins
+import database, function, instruction
+import ui
 import internal
 
 class remote(object):
@@ -12,8 +13,8 @@ class remote(object):
         self.lbase = localbaseaddress
         self.rbase = remotebaseaddress
 
-    def get(self, addr):
-        offset = addr - self.rbase
+    def get(self, ea):
+        offset = ea - self.rbase
         return offset + self.lbase
 
     def put(self, ea):
@@ -21,7 +22,8 @@ class remote(object):
         return offset + self.rbase
 
     def go(self, ea):
-        database.go( self.get(ea) )
+        res = self.get(ea)
+        database.go(res)
 
 ## XXX: would be useful to have a quick wrapper class for interacting with Ida's mark list
 ##          in the future, this would be abstracted into a arbitrarily sized tree.
@@ -202,8 +204,8 @@ def makecall(ea=None, target=None):
         raise LookupError("{:s}.makecall({!r},{!r}) : Unable to get arguments for target function".format(__name__, ea, target))
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
-#    result = ["{:s}={:s}".format(name,ins.op_repr(ea, 0)) for name,ea in result]
-    result = ["({:x}){:s}={:s}".format(ea, name, ':'.join(ins.op_repr(database.address.prevreg(ea, ins.op_value(ea,0), write=1), n) for n in ins.ops_read(database.address.prevreg(ea, ins.op_value(ea,0), write=1))) if ins.op_type(ea,0) == 'reg' else ins.op_repr(ea, 0)) for name,ea in result]
+#    result = ["{:s}={:s}".format(name,instruction.op_repr(ea, 0)) for name,ea in result]
+    result = ["({:x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea,0), write=1), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea,0), write=1))) if instruction.op_type(ea,0) == 'reg' else instruction.op_repr(ea, 0)) for name,ea in result]
 
     try:
         return "{:s}({:s})".format(internal.declaration.demangle(function.name(function.by_address(fn))), ','.join(result))
@@ -216,7 +218,7 @@ def source(ea, *regs):
     res = []
     for r in regs:
         pea = database.address.prevreg(ea, r, write=1)
-        res.append( (pea,tuple(ins.ops_read(pea))) )
+        res.append( (pea,tuple(instruction.ops_read(pea))) )
     return res
 
 def sourcechain(fn, *args, **kwds):
@@ -228,18 +230,18 @@ def sourcechain(fn, *args, **kwds):
     result = {}
     for ea,opi in source(*args):
         if not function.contains(fn, ea): continue
-        opt = tuple(ins.op_type(ea,i) for i in opi)
+        opt = tuple(instruction.op_type(ea,i) for i in opi)
         for i,t in zip(opi,opt):
             if t in sentinel:
                 result.setdefault(ea,set()).add(i)
             elif t in ('reg',):
                 result.setdefault(ea,set()).add(i)
-                r = ins.op_value(ea,i)
+                r = instruction.op_value(ea,i)
                 for a,b in sourcechain(fn, ea, r):
                     builtins.map(result.setdefault(a,set()).add, b)
             elif t in ('phrase',):
                 result.setdefault(ea,set()).add(i)
-                _,(r1,r2,_) = ins.op_value(ea,i)
+                _,(r1,r2,_) = instruction.op_value(ea,i)
                 for a,b in sourcechain(fn, ea, *tuple(r for r in (r1,r2) if r is not None)):
                     builtins.map(result.setdefault(a,set()).add, b)
             elif t in ('imm','addr',):
@@ -250,22 +252,21 @@ def sourcechain(fn, *args, **kwds):
         continue
     return [(ea,result[ea]) for ea in sorted(result.keys())]
 
-def map(l, *args, **kwds):
-    """Execute provided callback on all functions in database. Synonymous to map(l,db.functions()).
-    ``l`` is defined as a function(address, *args, **kwds).
-    Any other arguments are passed to ``l`` unmodified.
+def map(F, *args, **kwds):
+    """Execute provided callback on all functions in database. Synonymous to map(F, database.functions()).
+    ``F`` is defined as a function(address, *args, **kwds).
+    Any extra arguments are passed to ``F`` unmodified.
     """
-    i, x = 0, database.here()
-    current = x
-    all = database.functions()
-    result = []
-    try:
-        for i,x in enumerate(all):
-            database.go(x)
-            print("{:x}: processing # {:d} of {:d} : {:s}".format(x, i+1, len(all), function.name(x)))
-            result.append( l(x, *args, **kwds) )
-    except KeyboardInterrupt:
-        print("{:x}: terminated at # {:d} of {:d} : {:s}".format(x, i+1, len(all), function.name(x)))
-    database.go(current)
+    result, all = [], database.functions()
+    total = len(all)
+    if len(all):
+        ea = next(iter(all))
+        try:
+            for i, ea in enumerate(all):
+                ui.navigation.set(ea)
+                print("{:x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
+                result.append( F(ea, *args, **kwds) )
+        except KeyboardInterrupt:
+            print("{:x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
     return result
 
