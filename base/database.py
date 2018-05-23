@@ -2067,85 +2067,8 @@ class address(object):
 a = addr = address  # XXX: ns alias
 
 prev, next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'address')
-prevdata, nextdata = utils.alias(address.prevdata, 'address'), utils.alias(address.nextdata, 'address')
-prevcode, nextcode = utils.alias(address.prevcode, 'address'), utils.alias(address.nextcode, 'address')
 prevref, nextref = utils.alias(address.prevref, 'address'), utils.alias(address.nextref, 'address')
 prevreg, nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.nextreg, 'address')
-head, tail = utils.alias(address.head, 'address'), utils.alias(address.tail, 'address')
-
-class flow(address):
-    """
-    Functions for navigating through the addresses in the database while honoring data flow.
-    """
-
-    # FIXME: use the flow-chart instead of blindly following references
-    # FIXME: deprecate this until that's done.
-    @staticmethod
-    def walk(ea, next, match):
-        '''Used internally. Please see .iterate() instead.'''
-        ea = interface.address.inside(ea)
-        res = builtins.set()
-        while ea not in {None, idaapi.BADADDR} and type.is_code(ea) and ea not in res and match(ea):
-            res.add(ea)
-            ea = next(ea)
-        return ea
-
-    @utils.multicase()
-    @classmethod
-    def prev(cls):
-        '''Return the previous address that would have to be executed to get to the current address.'''
-        return cls.prev(ui.current.address(), 1)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def prev(cls, ea):
-        '''Return the previous address that would have to be executed to get to the address ``ea``.'''
-        return cls.prev(ea, 1)
-    @utils.multicase(ea=six.integer_types, count=six.integer_types)
-    @classmethod
-    def prev(cls, ea, count):
-        ea = interface.address.within(ea)
-        isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-        invalidQ = utils.compose(utils.fmap(utils.compose(type.is_code, operator.not_), isStop), any)
-        refs = filter(type.is_code, xref.up(ea))
-        if len(refs) > 1 and invalidQ(address.prev(ea)):
-            logging.fatal("{:s}.prev({:#x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtins.map("{:#x}".format, refs))))
-            return None
-        try:
-            if invalidQ(address.prev(ea)):
-                res = refs[0]
-                count += 1
-            else:
-                res = address.prev(ea)
-        except:
-            res = ea
-        return cls.prev(res, count-1) if count > 1 else res
-
-    @utils.multicase()
-    @classmethod
-    def next(cls):
-        '''Emulate the current instruction and return the next address that would be executed.'''
-        return cls.next(ui.current.address(), 1)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def next(cls, ea):
-        '''Emulate the instruction at ``ea`` and return the next address that would be executed.'''
-        return cls.next(ea, 1)
-    @utils.multicase(ea=six.integer_types, count=six.integer_types)
-    @classmethod
-    def next(cls, ea, count):
-        ea = interface.address.within(ea)
-        isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-        invalidQ = utils.compose(utils.fmap(utils.compose(type.is_code, operator.not_), isStop), any)
-        refs = filter(type.is_code, xref.down(ea))
-        if len(refs) > 1:
-            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtins.map("{:#x}".format, refs))))
-            return None
-        if invalidQ(ea) and not _instruction.is_jmp(ea):
-#            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to move to next address. Flow has stopped.".format('.'.join((__name__, cls.__name__)), ea, count))
-            return None
-        res = refs[0] if _instruction.is_jmp(ea) else address.next(ea)
-        return cls.next(res, count-1) if count > 1 else res
-f = flow    # XXX: ns alias
 
 class type(object):
     """
