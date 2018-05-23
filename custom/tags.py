@@ -1,3 +1,4 @@
+import six
 import database as db, function as fn, structure as st
 import sys, itertools, operator, logging
 
@@ -92,7 +93,7 @@ def apply_frame(ea, frame, **tagmap):
         for k in d.viewkeys() & state.viewkeys():
             if state[k] == d[k]: continue
             print >>output, "{:x} : {:+x} : Overwriting frame member tag with new value. : {!r} : {!r}".format(ea, offset, state[k], d[k])
-        mapstate = { tagmap.get(k, k) : v for k, v in d.iteritems() }
+        mapstate = { tagmap.get(k, k) : v for k, v in six.iteritems(d) }
         state.update(mapstate)
         member.comment = internal.comment.encode(state)
 
@@ -115,7 +116,7 @@ def load((g, f, h), **tagmap):
             print >>output, "{:x} : {!r} : Overwriting global tag with new value. : {!r} : {!r}".format(ea, k, state[k], d[k])
 
         try:
-            [ m.tag(ea, tagmap.get(k, k), v) for k, v in d.iteritems() ]
+            [ m.tag(ea, tagmap.get(k, k), v) for k, v in six.iteritems(d) ]
         except:
             logging.warn("{:s}.load : {:x} : Unable to apply tags to global. : {!r}".format(__name__, ea, d), exc_info=True)
         continue
@@ -128,7 +129,7 @@ def load((g, f, h), **tagmap):
             print >>output, "{:x} : {!r} : Overwriting contents tag with new value. : {!r} : {!r}".format(ea, k, state[k], d[k])
 
         try:
-            [ db.tag(ea, tagmap.get(k, k), v) for k, v in d.iteritems() ]
+            [ db.tag(ea, tagmap.get(k, k), v) for k, v in six.iteritems(d) ]
         except:
             logging.warn("{:s}.load : {:x} : Unable to apply tags to contents. : {!r}".format(__name__, ea, d), exc_info=True)
         continue

@@ -311,9 +311,9 @@ def iterate(string):
 def iterate(**type):
     if not type: type = {'predicate':lambda n: True}
     res = builtins.list(__iterate__())
-    for k, v in type.iteritems():
-        res = builtins.list(__matcher__.match(k, v, res))
-    for n in res: yield n
+    for key, value in six.iteritems(type):
+        res = builtins.list(__matcher__.match(key, value, res))
+    for item in res: yield item
 
 @utils.multicase(string=basestring)
 def list(string):
@@ -337,7 +337,7 @@ def list(**type):
     maxsize = max(builtins.map(utils.compose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
 
     for st in res:
-        print("[{:{:d}d}] {:>{:d}s} {:<+{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {:s}".format(st.comment) if st.comment else ''))
+        six.print_("[{:{:d}d}] {:>{:d}s} {:<+{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {:s}".format(st.comment) if st.comment else ''))
     return
 
 @utils.multicase(structure=structure_t)
@@ -367,7 +367,7 @@ def members(id):
     size = idaapi.get_struc_size(st)
 
     offset = 0
-    for i in range(st.memqty):
+    for i in six.moves.range(st.memqty):
         m = st.get_member(i)
         ms = idaapi.get_member_size(m)
 
@@ -536,7 +536,7 @@ def by(**type):
     identifier or id = internal id number
     """
 
-    searchstring = ', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())
+    searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(iterate(**type))
     if len(res) > 1:
@@ -603,7 +603,7 @@ class members_t(object):
         self.baseoffset = baseoffset
 
     def __getstate__(self):
-        return (self.owner.name, self.baseoffset, map(self.__getitem__, range(len(self))))
+        return (self.owner.name, self.baseoffset, map(self.__getitem__, six.moves.range(len(self))))
     def __setstate__(self, state):
         ownername, baseoffset, _ = state
         identifier = idaapi.get_struc_id(ownername)
@@ -620,7 +620,7 @@ class members_t(object):
         '''Return the number of members within the structure.'''
         return 0 if self.owner.ptr is None else self.owner.ptr.memqty
     def __iter__(self):
-        for idx in xrange(len(self)):
+        for idx in six.moves.range(len(self)):
             yield member_t(self.owner, idx)
         return
     def __getitem__(self, index):
@@ -628,10 +628,10 @@ class members_t(object):
         if isinstance(index, six.integer_types):
             index = self.owner.ptr.memqty + index if index < 0 else index
             res = member_t(self.owner, index) if index >= 0 and index < self.owner.ptr.memqty else None
-        elif isinstance(index, str):
+        elif isinstance(index, six.string_types):
             res = self.byname(index)
         elif isinstance(index, slice):
-            res = [self.__getitem__(i) for i in range(self.owner.ptr.memqty)].__getitem__(index)
+            res = [self.__getitem__(i) for i in six.moves.range(self.owner.ptr.memqty)].__getitem__(index)
         else:
             raise TypeError, index
 
@@ -641,7 +641,7 @@ class members_t(object):
 
     def index(self, member_t):
         '''Return the index of the member specified by ``member_t``.'''
-        for i in range(0, self.owner.ptr.memqty):
+        for i in six.moves.range(self.owner.ptr.memqty):
             if member_t.id == self[i].id:
                 return i
             continue
@@ -666,9 +666,9 @@ class members_t(object):
     def iterate(self, **type):
         if not type: type = {'predicate':lambda n: True}
         res = builtins.list(iter(self))
-        for k, v in type.iteritems():
-            res = builtins.list(self.__member_matcher.match(k, v, res))
-        for n in res: yield n
+        for key, value in six.iteritems(type):
+            res = builtins.list(self.__member_matcher.match(key, value, res))
+        for item in res: yield item
 
     @utils.multicase(string=basestring)
     def list(self, string):
@@ -695,13 +695,13 @@ class members_t(object):
         maxtype = max(builtins.map(utils.compose(operator.attrgetter('type'), repr, len), res) or [1])
 
         for m in res:
-            print "[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {:s}".format(m.comment) if m.comment else '')
+            six.print_("[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {:s}".format(m.comment) if m.comment else ''))
         return
 
     @utils.multicase()
     def by(self, **type):
         '''Return the member with the specified ``name``.'''
-        searchstring = ', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())
+        searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(self.iterate(**type))
         if len(res) > 1:
@@ -723,7 +723,7 @@ class members_t(object):
 
     def by_name(self, name):
         '''Return the member with the specified ``name``.'''
-        mem = idaapi.get_member_by_name(self.owner.ptr, str(name))
+        mem = idaapi.get_member_by_name(self.owner.ptr, name)
         if mem is None:
             raise KeyError("{:s}.instance({:s}).members.by_name : Unable to find member with requested name : {!r}".format(__name__, self.owner.name, name))
         index = self.index(mem)
@@ -731,7 +731,7 @@ class members_t(object):
     byname = byName = utils.alias(by_name, 'members_t')
     def by_fullname(self, fullname):
         '''Return the member with the specified ``fullname``.'''
-        mem = idaapi.get_member_by_fullname(self.owner.ptr, str(fullname))
+        mem = idaapi.get_member_by_fullname(self.owner.ptr, fullname)
         if mem is None:
             raise KeyError("{:s}.instance({:s}).members.by_fullname : Unable to find member with full name : {!r}".format(__name__, self.owner.name, fullname))
         index = self.index(mem)
@@ -844,13 +844,13 @@ class members_t(object):
         '''Display all the fields within the specified structure.'''
         result = []
         mn, ms = 0, 0
-        for i in xrange(len(self)):
+        for i in six.moves.range(len(self)):
             m = self[i]
             name, t, ofs, size, comment = m.name, m.type, m.offset, m.size, m.comment
             result.append((i, name, t, ofs, size, comment))
             mn = max((mn, len(name)))
             ms = max((ms, len("{:x}".format(size))))
-        mi = len(str(len(self)))
+        mi = len("{:d}".format(len(self)))
         mo = max(map(len, map("{:x}".format, (self.baseoffset, self.baseoffset+self.owner.size))))
         return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, "'{:s}'".format(n), mn+2, t, " // {:s}".format(c) if c else '') for i, n, t, o, s, c in result))
 
@@ -1080,7 +1080,7 @@ class member_t(object):
         # now figure out which operand has the structure member applied to it
         res = []
         for ea, _, t in refs:
-            ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
+            ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
             ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in ops)
             ops = (idx for idx, ids in ops if self.__owner.id in ids)    # sanity
             res.extend( interface.OREF(ea, int(op), interface.ref_t.of(t)) for op in ops)

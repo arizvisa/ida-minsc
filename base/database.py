@@ -45,10 +45,6 @@ def baseaddress():
     return idaapi.get_imagebase()
 base = utils.alias(baseaddress)
 
-def range():
-    '''Return the total address range of the database.'''
-    return config.bounds()
-
 @utils.multicase()
 def within():
     '''Should always return `True`.'''
@@ -159,6 +155,8 @@ class config(object):
     def bounds(cls):
         return cls.info.minEA,cls.info.maxEA
 
+range = bounds = utils.alias(config.bounds)
+
 class functions(object):
     """
     Enumerate all of the functions inside the database.
@@ -181,7 +179,7 @@ class functions(object):
 
     def __new__(cls):
         '''Returns a list of all of the functions in the current database (ripped from idautils).'''
-        left,right = range()
+        left, right = config.bounds()
 
         # find first function chunk
         ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
@@ -198,7 +196,7 @@ class functions(object):
     @classmethod
     def __iterate__(cls):
         '''Iterates through all of the functions in the current database (ripped from idautils).'''
-        left,right = range()
+        left, right = config.bounds()
 
         # find first function chunk
         ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
@@ -226,9 +224,9 @@ class functions(object):
                 yield n
             return
         res = cls()
-        for k,v in type.iteritems():
-            res = builtins.list(cls.__matcher__.match(k, v, res))
-        for n in res: yield n
+        for key, value in six.iteritems(type):
+            res = builtins.list(cls.__matcher__.match(key, value, res))
+        for item in res: yield item
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -255,7 +253,7 @@ class functions(object):
         fmaxaddr = utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)
 
         maxindex = len(res)
-        maxentry = max(res or [1])
+        maxentry = max(res or [config.bounds()[0]])
         maxaddr = max(builtins.map(fmaxaddr, res) or [1])
         minaddr = max(builtins.map(fminaddr, res) or [1])
         maxname = max(builtins.map(utils.compose(function.name, len), res) or [1])
@@ -284,8 +282,8 @@ class functions(object):
         cexits = math.floor(math.log(exits or 1)/math.log(10)) if exits else 1
         clvars = math.floor(math.log(lvars or 1)/math.log(10)) if lvars else 1
 
-        for index,ea in enumerate(res):
-            print "[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
+        for index, ea in enumerate(res):
+            six.print_("[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
                 offset(ea), int(cmaxoffset),
                 fminaddr(ea), int(cminaddr), fmaxaddr(ea), int(cmaxaddr),
@@ -296,7 +294,7 @@ class functions(object):
                 len(list(function.blocks(ea))), int(cblocks),
                 len(list(function.bottom(ea))), int(cexits),
                 len(list(function.marks(ea))), int(cmarks)
-            )
+            ))
         return
 
     @utils.multicase(string=basestring)
@@ -310,11 +308,11 @@ class functions(object):
         """Search through all of the functions within the database and return the first result.
         Please review the help for functions.list for the definition of ``type``.
         """
-        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
-            builtins.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i,ea in enumerate(res)))
+            builtins.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(res)))
             f = utils.compose(function.by,function.name)
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
@@ -415,13 +413,13 @@ def disassemble(ea, **options):
     ea = interface.address.inside(ea)
     commentQ = builtins.next((options[k] for k in ('comment', 'comments') if k in options), False)
 
-    res,count = [], options.get('count',1)
+    res, count = [], options.get('count',1)
     while count > 0:
-        insn = idaapi.generate_disasm_line(ea)
+        insn = idaapi.generate_disasm_line(ea) or ''
         unformatted = idaapi.tag_remove(insn)
         comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
         nocomment = unformatted[:comment] if comment != -1 and not commentQ else unformatted
-        res.append("{:x}: {:s}".format(ea, reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
+        res.append("{:x}: {:s}".format(ea, reduce(lambda t, x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
         ea = address.next(ea)
         count -= 1
     return '\n'.join(res)
@@ -489,9 +487,9 @@ class names(object):
     __matcher__.attribute('index')
 
     def __new__(cls):
-        for index in xrange(idaapi.get_nlist_size()):
-            res = zip((idaapi.get_nlist_ea,idaapi.get_nlist_name), (index,)*2)
-            yield tuple(f(n) for f,n in res)
+        for index in six.moves.range(idaapi.get_nlist_size()):
+            res = zip((idaapi.get_nlist_ea, idaapi.get_nlist_name), (index,)*2)
+            yield tuple(f(x) for f, x in res)
         return
 
     @utils.multicase(string=basestring)
@@ -502,10 +500,10 @@ class names(object):
     @classmethod
     def __iterate__(cls, **type):
         if not type: type = {'predicate':lambda n: True}
-        res = builtins.range(idaapi.get_nlist_size())
-        for k,v in type.iteritems():
-            res = builtins.list(cls.__matcher__.match(k, v, res))
-        for n in res: yield n
+        res = six.moves.range(idaapi.get_nlist_size())
+        for key, value in six.iteritems(type):
+            res = builtins.list(cls.__matcher__.match(key, value, res))
+        for item in res: yield item
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -546,7 +544,7 @@ class names(object):
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
 
         for index in res:
-            print "[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index))
+            six.print_("[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index)))
         return
 
     @utils.multicase(string=basestring)
@@ -560,7 +558,7 @@ class names(object):
         """Search through all of the names within the database and return the first result.
         Please review the help for `names.list` for the definition of ``type``.
         """
-        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
@@ -604,7 +602,7 @@ class search(object):
         If ``reverse`` is specified as a bool, then search backwards from the given address.
         """
         flags = idaapi.SEARCH_UP if direction.get('reverse', False) else idaapi.SEARCH_DOWN
-        return idaapi.find_binary(ea, idaapi.BADADDR, ' '.join(str(ord(c)) for c in string), 10, idaapi.SEARCH_CASE | flags)
+        return idaapi.find_binary(ea, idaapi.BADADDR, ' '.join("{:d}".format(six.byte2int(ch)) for ch in string), 10, idaapi.SEARCH_CASE | flags)
     byBytes = by_bytes
 
     @utils.multicase(string=basestring)
@@ -779,14 +777,14 @@ def set_name(ea, string, **flags):
     # validate the name
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
-        logging.warn("{:s}.set_name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in flags.iteritems())) if flags else '', res))
+        logging.warn("{:s}.set_name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
         string = res
 
     # set the name and use the value of 'flags' if it was explicit
     res, ok = get_name(ea), idaapi.set_name(ea, string or "", flags.get('flags', fl))
 
     if not ok:
-        raise ValueError("{:s}.set_name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k,v in flags.iteritems())) if flags else '', ea, string, flags))
+        raise ValueError("{:s}.set_name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags))
     return res
 
 @utils.multicase()
@@ -807,7 +805,11 @@ def name(none):
     return set_name(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types, string=basestring)
 def name(ea, string, *suffix, **flags):
-    '''Renames the address ``ea`` to ``string``.'''
+    """Renames the address  ``ea`` to ``string``.
+    If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
+    If ``flags`` is specified, then use the specified value as the flags.
+    If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
+    """
     res = (string,) + suffix
     return set_name(ea, interface.tuplename(*res), **flags)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
@@ -979,10 +981,10 @@ class entry(object):
     @classmethod
     def __iterate__(cls, **type):
         if not type: type = {'predicate':lambda n: True}
-        res = builtins.range(idaapi.get_entry_qty())
-        for k,v in type.iteritems():
-            res = builtins.list(cls.__matcher__.match(k, v, res))
-        for n in res: yield n
+        res = six.moves.range(idaapi.get_entry_qty())
+        for key, value in six.iteritems(type):
+            res = builtins.list(cls.__matcher__.match(key, value, res))
+        for item in res: yield item
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1000,7 +1002,7 @@ class entry(object):
     def __index__(cls, ea):
         '''Returns the index of the entry-point at the specified ``address``.'''
         f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
-        iterable = itertools.imap(utils.compose(utils.fap(f, lambda n:n), builtins.tuple), builtins.range(idaapi.get_entry_qty()))
+        iterable = itertools.imap(utils.compose(utils.fmap(f, lambda n:n), builtins.tuple), six.moves.range(idaapi.get_entry_qty()))
         filterable = itertools.ifilter(utils.compose(utils.first, functools.partial(operator.eq, ea)), iterable)
         result = itertools.imap(utils.second, filterable)
         return builtins.next(result, None)
@@ -1077,7 +1079,7 @@ class entry(object):
         cordinal = math.floor(math.log(maxordinal or 1)/math.log(16))
 
         for index in res:
-            print "[{:{:d}d}] {:>#{:d}x} : ({:#{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index))
+            six.print_("[{:{:d}d}] {:>#{:d}x} : ({:#{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index)))
         return
 
     @utils.multicase(string=basestring)
@@ -1091,17 +1093,17 @@ class entry(object):
         """Search through all of the entry-points within the database and return the first result.
         Please review the help for entry.list for the definition of ``type``.
         """
-        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
             builtins.map(logging.info, (("[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
             f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}".format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
-            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__,cls.__name__)), query_s))
+            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return cls.__address__(res)
 
     @utils.multicase()
@@ -1110,7 +1112,7 @@ class entry(object):
         '''Makes an entry-point at the current address.'''
         ea,entryname,ordinal = ui.current.address(), name(ui.current.address()) or function.name(ui.current.address()), idaapi.get_entry_qty()
         if entryname is None:
-            raise ValueError("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__,cls.__name__)), ea))
+            raise ValueError("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -1118,7 +1120,7 @@ class entry(object):
         '''Makes an entry-point at the specified address ``ea``.'''
         entryname, ordinal = name(ea) or function.name(ea), idaapi.get_entry_qty()
         if entryname is None:
-            raise ValueError("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__,cls.__name__)), ea))
+            raise ValueError("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(name=basestring)
     @classmethod
@@ -1337,14 +1339,14 @@ def select(**boolean):
         res, d = {}, function.tag(ea) if function.within(ea) else tag(ea)
 
         Or = boolean.get('Or', builtins.set())
-        res.update({k : v for k, v in d.iteritems() if k in Or})
+        res.update({key : value for key, value in six.iteritems(d) if key in Or})
 
         And = boolean.get('And', builtins.set())
         if And:
             if And.intersection(d.viewkeys()) == And:
-                res.update({k : v  for k, v in d.iteritems() if k in And})
+                res.update({key : value  for key, value in six.iteritems(d) if key in And})
             else: continue
-        if res: yield ea,res
+        if res: yield ea, res
     return
 
 # FIXME: consolidate the boolean querying logic into the utils module
@@ -1398,7 +1400,7 @@ class imports(object):
 
     # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
     __formats__ = staticmethod(lambda (module, name, ordinal): name or "Ordinal{:d}".format(ordinal))
-    __formatl__ = staticmethod(lambda (module, name, ordinal): "{:s}!{:s}".format(module, imports.__formats__((module,name,ordinal))))
+    __formatl__ = staticmethod(lambda (module, name, ordinal): "{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal))))
     __format__ = __formatl__
 
     __matcher__ = utils.matcher()
@@ -1418,12 +1420,12 @@ class imports(object):
         """Iterate through all of the imports in the database.
         Yields `(ea, (module, name, ordinal))` for each iteration.
         """
-        for idx in xrange(idaapi.get_import_module_qty()):
+        for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
             result = []
             idaapi.enum_import_names(idx, utils.compose(utils.box,result.append,utils.fdiscard(lambda:True)))
-            for ea,name,ordinal in result:
-                yield (ea,(module,name,ordinal))
+            for ea, name, ordinal in result:
+                yield ea, (module, name, ordinal)
             continue
         return
 
@@ -1438,9 +1440,9 @@ class imports(object):
         '''Iterate through all of the imports in the database that match ``type``.'''
         if not type: type = {'predicate':lambda n: True}
         res = builtins.list(cls.__iterate__())
-        for k,v in type.iteritems():
-            res = builtins.list(cls.__matcher__.match(k, v, res))
-        for n in res: yield n
+        for key, value in six.iteritems(type):
+            res = builtins.list(cls.__matcher__.match(key, value, res))
+        for item in res: yield item
 
     # searching
     @utils.multicase()
@@ -1470,7 +1472,7 @@ class imports(object):
     def module(cls, ea):
         '''Return the import module at the specified address ``ea``.'''
         ea = interface.address.inside(ea)
-        for addr,(module,_,_) in cls.__iterate__():
+        for addr, (module, _, _) in cls.__iterate__():
             if addr == ea:
                 return module
             continue
@@ -1515,7 +1517,7 @@ class imports(object):
     @classmethod
     def modules(cls):
         '''Return all of the import modules defined in the database.'''
-        return [idaapi.get_import_module_name(i) for i in xrange(idaapi.get_import_module_qty())]
+        return [idaapi.get_import_module_name(i) for i in six.moves.range(idaapi.get_import_module_qty())]
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1545,8 +1547,8 @@ class imports(object):
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
         cordinal = max(builtins.map(utils.compose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
 
-        for ea,(module,name,ordinal) in res:
-            print "{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name)
+        for ea, (module, name, ordinal) in res:
+            six.print_("{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name))
         return
 
     @utils.multicase(string=basestring)
@@ -1560,17 +1562,17 @@ class imports(object):
         """Search through all of the imports within the database and return the first result.
         Please review the help for imports.list for the definition of ``type``.
         """
-        query_s = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
+        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
-            builtins.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea,(module,name,ordinal) in res))
+            builtins.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in res))
             f = utils.compose(utils.second, cls.__formatl__)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__,cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
-            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__,cls.__name__)), query_s))
+            raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res[0]
 
 getImportModules = utils.alias(imports.modules, 'imports')
@@ -1587,7 +1589,7 @@ class register(object):
     def segments(cls):
         '''Return all of the segment registers in the database.'''
         names = cls.names()
-        return [names[i] for i in xrange(idaapi.ph_get_regFirstSreg(),idaapi.ph_get_regLastSreg()+1)]
+        return [names[i] for i in six.moves.range(idaapi.ph_get_regFirstSreg(), idaapi.ph_get_regLastSreg()+1)]
     @classmethod
     def codesegment(cls):
         '''Return all of the code segment registers in the database.'''
@@ -1609,10 +1611,10 @@ class address(object):
     @staticmethod
     def walk(ea, next, match):
         '''Return the first address from ``ea`` that doesn't ``match``. ``next`` is used to determine the next address.'''
-        ea = interface.address.inside(ea)
-        while ea not in (None,idaapi.BADADDR) and match(ea):
-            ea = next(ea)
-        return ea
+        res = interface.address.inside(ea)
+        while res not in {None, idaapi.BADADDR} and match(res):
+            res = next(res)
+        return res
 
     @utils.multicase()
     def iterate(cls):
@@ -1627,7 +1629,7 @@ class address(object):
     def iterate(cls, ea, next):
         '''Return an iterator that walks through the database starting at the address ``ea``. Use ``next`` to determine the next address.'''
         ea = interface.address.inside(ea)
-        while ea not in (None,idaapi.BADADDR):
+        while ea not in {None, idaapi.BADADDR}:
             yield ea
             ea = next(ea)
         return
@@ -1652,111 +1654,47 @@ class address(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def tail(cls, ea):
-        '''Return the address of the last byte at the end of the address ``ea``.'''
+        '''Return the address of the last byte at the end of the address at ``ea``.'''
         ea = interface.address.within(ea)
         return idaapi.get_item_end(ea)-1
 
     @utils.multicase()
     @classmethod
     def prev(cls):
-        '''Return the previously defined address from the current one.'''
+        '''Return the previous address from the current one.'''
         return cls.prev(ui.current.address(), 1)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prev(cls, ea):
-        '''Return the previously defined address from the address ``ea``.'''
+        '''Return the previous address from the address ``ea``.'''
         return cls.prev(ea, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prev(cls, ea, count):
-        '''Return the previously defined address from the address ``ea``. Skip ``count`` addresses before returning.'''
-        res = idaapi.prev_head(interface.address.within(ea),0)
+        """Return the previous address from the address ``ea``.
+        Skip ``count`` addresses before returning.
+        """
+        res = idaapi.prev_not_tail(interface.address.within(ea))
         return cls.prev(res, count-1) if count > 1 else res
 
     @utils.multicase()
     @classmethod
     def next(cls):
-        '''Return the next defined address from the current one.'''
+        '''Return the next address from the current one.'''
         return cls.next(ui.current.address(), 1)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def next(cls, ea):
-        '''Return the next defined address from the address ``ea``.'''
+        '''Return the next address from the address ``ea``.'''
         return cls.next(ea, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def next(cls, ea, count):
-        '''Return the next defined address from the address ``ea``. Skip ``count`` addresses before returning.'''
-        res = idaapi.next_head(interface.address.within(ea), idaapi.BADADDR)
+        """Return the next address from the address ``ea``.
+        Skip ``count`` addresses before returning.
+        """
+        res = idaapi.next_not_tail(interface.address.within(ea))
         return cls.next(res, count-1) if count > 1 else res
-
-    @utils.multicase()
-    @classmethod
-    def prevdata(cls):
-        '''Returns the previous address that has data referencing it.'''
-        return cls.prevdata(ui.current.address(), 1)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def prevdata(cls, ea):
-        '''Returns the previous address from ``ea`` that has data referencing it.'''
-        return cls.prevdata(ea, 1)
-    @utils.multicase(ea=six.integer_types, count=six.integer_types)
-    @classmethod
-    def prevdata(cls, ea, count):
-        '''Returns the previous address from ``ea`` that has data referencing it. Skip ``count`` results before returning.'''
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.data_up(n)) == 0)
-        return cls.prevdata(res, count-1) if count > 1 else res
-
-    @utils.multicase()
-    @classmethod
-    def nextdata(cls):
-        '''Returns the next address that has data referencing it.'''
-        return cls.nextdata(ui.current.address(), 1)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def nextdata(cls, ea):
-        '''Returns the next address from ``ea`` that has data referencing it.'''
-        return cls.nextdata(ea, 1)
-    @utils.multicase(ea=six.integer_types, count=six.integer_types)
-    @classmethod
-    def nextdata(cls, ea, count):
-        '''Returns the next address from ``ea`` that has data referencing it. Skip ``count`` results before returning.'''
-        res = cls.walk(ea, cls.next, lambda n: len(xref.data_up(n)) == 0)
-        return cls.nextdata(cls.next(res), count-1) if count > 1 else res
-
-    @utils.multicase()
-    @classmethod
-    def prevcode(cls):
-        '''Returns the previous address that has code referencing it.'''
-        return cls.prevcode(ui.current.address(), 1)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def prevcode(cls, ea):
-        '''Returns the previous address from ``ea`` that has code referencing it.'''
-        return cls.prevcode(ea, 1)
-    @utils.multicase(ea=six.integer_types, count=six.integer_types)
-    @classmethod
-    def prevcode(cls, ea, count):
-        '''Returns the previous address from ``ea`` that has code referencing it. Skip ``count`` results before returning.'''
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.code_up(n)) == 0)
-        return cls.prevcode(res, count-1) if count > 1 else res
-
-    @utils.multicase()
-    @classmethod
-    def nextcode(cls):
-        '''Returns the next address that has code referencing it.'''
-        return cls.nextcode(ui.current.address(), 1)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def nextcode(cls, ea):
-        '''Returns the next address from ``ea`` that has code referencing it.'''
-        return cls.nextcode(ea, 1)
-    @utils.multicase(ea=six.integer_types, count=six.integer_types)
-    @classmethod
-    def nextcode(cls, ea, count):
-        '''Returns the next address from ``ea`` that has code referencing it. Skip ``count`` results before returning.'''
-        res = cls.walk(ea, cls.next, lambda n: len(xref.code_up(n)) == 0)
-        return cls.nextcode(cls.next(res), count-1) if count > 1 else res
 
     @utils.multicase()
     @classmethod
@@ -1789,8 +1727,80 @@ class address(object):
     @classmethod
     def nextref(cls, ea, count):
         '''Returns the next address from ``ea`` that has anything referencing it. Skip ``count`` references before returning.'''
-        res = cls.walk(ea, cls.next, lambda n: len(xref.up(n)) == 0)
-        return cls.nextref(cls.next(res), count-1) if count > 1 else res
+        res = cls.walk(cls.next(ea), cls.next, lambda n: len(xref.up(n)) == 0)
+        return cls.nextref(res, count-1) if count > 1 else res
+
+    @utils.multicase()
+    @classmethod
+    def prevdref(cls):
+        '''Returns the previous address that has data referencing it.'''
+        return cls.prevdref(ui.current.address(), 1)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def prevdref(cls, ea):
+        '''Returns the previous address from ``ea`` that has data referencing it.'''
+        return cls.prevdref(ea, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def prevdref(cls, ea, count):
+        '''Returns the previous address from ``ea`` that has data referencing it. Skip ``count`` results before returning.'''
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.data_up(n)) == 0)
+        return cls.prevdref(res, count-1) if count > 1 else res
+
+    @utils.multicase()
+    @classmethod
+    def nextdref(cls):
+        '''Returns the next address that has data referencing it.'''
+        return cls.nextdref(ui.current.address(), 1)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def nextdref(cls, ea):
+        '''Returns the next address from ``ea`` that has data referencing it.'''
+        return cls.nextdref(ea, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def nextdref(cls, ea, count):
+        '''Returns the next address from ``ea`` that has data referencing it. Skip ``count`` results before returning.'''
+        res = cls.walk(cls.next(ea), cls.next, lambda n: len(xref.data_up(n)) == 0)
+        return cls.nextdref(res, count-1) if count > 1 else res
+    prevdata, nextdata = utils.alias(prevdref, 'address'), utils.alias(nextdref, 'address')
+
+    @utils.multicase()
+    @classmethod
+    def prevcref(cls):
+        '''Returns the previous address that has code referencing it.'''
+        return cls.prevcref(ui.current.address(), 1)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def prevcref(cls, ea):
+        '''Returns the previous address from ``ea`` that has code referencing it.'''
+        return cls.prevcref(ea, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def prevcref(cls, ea, count):
+        '''Returns the previous address from ``ea`` that has code referencing it. Skip ``count`` results before returning.'''
+        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.code_up(n)) == 0)
+        return cls.prevcref(res, count-1) if count > 1 else res
+
+    @utils.multicase()
+    @classmethod
+    def nextcref(cls):
+        '''Returns the next address that has code referencing it.'''
+        return cls.nextcref(ui.current.address(), 1)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def nextcref(cls, ea):
+        '''Returns the next address from ``ea`` that has code referencing it.'''
+        return cls.nextcref(ea, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def nextcref(cls, ea, count):
+        """Returns the next address from ``ea`` that has code referencing it.
+        Skip ``count`` results before returning.
+        """
+        res = cls.walk(cls.next(ea), cls.next, lambda n: len(xref.code_up(n)) == 0)
+        return cls.nextcref(res, count-1) if count > 1 else res
+    prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
 
     @utils.multicase(ea=six.integer_types, reg=(basestring, _instruction.register_t))
     @classmethod
@@ -1810,7 +1820,7 @@ class address(object):
 
         # otherwise ensure that we're not in the function and we're a code type.
         else:
-            fwithin = utils.compose(utils.fap(utils.compose(function.within, operator.not_), type.is_code), all)
+            fwithin = utils.compose(utils.fmap(utils.compose(function.within, operator.not_), type.is_code), all)
 
             start = cls.walk(ea, cls.prev, fwithin)
             start = top() if start == idaapi.BADADDR else start
@@ -1818,7 +1828,7 @@ class address(object):
         # define a function for cls.walk to continue looping while
         F = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
 
-        # skip the current address
+        ## skip the current address
         prevea = cls.prev(ea)
         if prevea is None:
             # FIXME: include registers in message
@@ -1827,13 +1837,13 @@ class address(object):
 
         # now walk while none of our registers match
         res = cls.walk(prevea, cls.prev, F)
-        if res == idaapi.BADADDR or (cls == address and res < start):
+        if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
-            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x} - {:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], start, ea, res))
+            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x} - {:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
-        return cls.prevreg( cls.prev(res), *regs, **modifiers) if count > 1 else res
+        return cls.prevreg(res, *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=(basestring, _instruction.register_t))
     @classmethod
     def prevreg(cls, reg, *regs, **modifiers):
@@ -1858,7 +1868,7 @@ class address(object):
 
         # otherwise ensure that we're not in a function and we're a code type.
         else:
-            fwithin = utils.compose(utils.fap(utils.compose(function.within, operator.not_), type.is_code), all)
+            fwithin = utils.compose(utils.fmap(utils.compose(function.within, operator.not_), type.is_code), all)
 
             end = cls.walk(ea, cls.next, fwithin)
             end = bottom() if end == idaapi.BADADDR else end
@@ -1875,13 +1885,13 @@ class address(object):
 
         # now walk while none of our registers match
         res = cls.walk(nextea, cls.next, F)
-        if res == idaapi.BADADDR or (cls == address and res >= end):
+        if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
-            raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:#x}:{:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, ('s','')[len(regs)>1], end, ea, res))
+            raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:#x}:{:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', end, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
-        return cls.nextreg(cls.next(res), *regs, **modifiers) if count > 1 else res
+        return cls.nextreg(res, *regs, **modifiers) if count > 1 else res
     @utils.multicase(reg=(basestring, _instruction.register_t))
     @classmethod
     def nextreg(cls, reg, *regs, **modifiers):
@@ -1897,8 +1907,8 @@ class address(object):
     @classmethod
     def prevstack(cls, ea, delta):
         '''Return the previous instruction from ``ea`` that is past the sp delta ``delta``.'''
-        fn,sp = function.top(ea), function.get_spdelta(ea)
-        start,_ = function.chunk(ea)
+        fn, sp = function.top(ea), function.get_spdelta(ea)
+        start, _ = function.chunk(ea)
         res = cls.walk(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res < start:
             raise ValueError("{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} < {:#x} ".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, start))
@@ -1913,13 +1923,12 @@ class address(object):
     @classmethod
     def nextstack(cls, ea, delta):
         '''Return the next instruction from ``ea`` that is past the sp delta ``delta``.'''
-        fn,sp = function.top(ea), function.get_spdelta(ea)
-        _,end = function.chunk(ea)
+        fn, sp = function.top(ea), function.get_spdelta(ea)
+        _, end = function.chunk(ea)
         res = cls.walk(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res >= end:
-            raise ValueError("{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} >= {:#x}".format('.'.join((__name__,cls.__name__)), ea, delta, fn, res, end))
+            raise ValueError("{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} >= {:#x}".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, end))
         return res
-
     prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
 
     @utils.multicase()
@@ -1951,8 +1960,8 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextcall(cls, ea, count):
-        res = cls.walk(ea, cls.next, lambda n: not _instruction.is_call(n))
-        return cls.nextcall(cls.next(res), count-1) if count > 1 else res
+        res = cls.walk(cls.next(ea), cls.next, lambda n: not _instruction.is_call(n))
+        return cls.nextcall(res, count-1) if count > 1 else res
 
     @utils.multicase()
     @classmethod
@@ -1982,8 +1991,8 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextbranch(cls, ea, count):
-        res = cls.walk(ea, cls.next, lambda n: _instruction.is_call(n) or not _instruction.is_branch(n))
-        return cls.nextbranch(cls.next(res), count-1) if count > 1 else res
+        res = cls.walk(cls.next(ea), cls.next, lambda n: _instruction.is_call(n) or not _instruction.is_branch(n))
+        return cls.nextbranch(res, count-1) if count > 1 else res
 
     @utils.multicase()
     @classmethod
@@ -2007,14 +2016,15 @@ class address(object):
         '''Return the address of the next label.'''
         return cls.nextlabel(ui.current.address(), 1)
     @utils.multicase(ea=six.integer_types)
+    @classmethod
     def nextlabel(cls, ea):
         '''Return the address of the next label from the address ``ea``.'''
         return cls.nextlabel(ea, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextlabel(cls, ea, count):
-        res = cls.walk(ea, cls.next, lambda n: not type.has_label(n))
-        return cls.nextlabel(cls.next(res), count-1) if count > 1 else res
+        res = cls.walk(cls.next(ea), cls.next, lambda n: not type.has_label(n))
+        return cls.nextlabel(res, count-1) if count > 1 else res
 
     @utils.multicase()
     @classmethod
@@ -2025,7 +2035,7 @@ class address(object):
     @classmethod
     def prevtag(cls, ea, **tagname):
         """Returns the previous address from ``ea`` that contains a tag.
-        If the str ``tag`` is specified, then only return the address if the specified tag is defined.
+        If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
         """
         return cls.prevtag(ea, 1, **tagname)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
@@ -2033,7 +2043,7 @@ class address(object):
     def prevtag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
         res = cls.walk(cls.prev(ea), cls.prev, lambda n: not (type.has_comment(n) if tagname is None else tagname in tag(n)))
-        return cls.prevbranch(res, count-1) if count > 1 else res
+        return cls.prevtag(res, count-1) if count > 1 else res
 
     @utils.multicase()
     @classmethod
@@ -2043,15 +2053,16 @@ class address(object):
     @utils.multicase(ea=six.integer_types)
     def nexttag(cls, ea, **tagname):
         """Returns the next address from ``ea`` that contains a tag.
-        If the str ``tag`` is specified, then only return the address if the specified tag is defined.
+        If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
         """
         return cls.nexttag(ea, 1, **tagname)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nexttag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
-        res = cls.walk(ea, cls.next, lambda n: not (type.has_comment(n) if tagname is None else tagname in tag(n)))
-        return cls.nextbranch(cls.next(res), count-1) if count > 1 else res
+        res = cls.walk(cls.next(ea), cls.next, lambda n: not (type.has_comment(n) if tagname is None else tagname in tag(n)))
+        return cls.nexttag(res, count-1) if count > 1 else res
+    prevcomment, nextcomment = utils.alias(prevtag, 'address'), utils.alias(nexttag, 'address')
 
 a = addr = address  # XXX: ns alias
 
@@ -2074,7 +2085,7 @@ class flow(address):
         '''Used internally. Please see .iterate() instead.'''
         ea = interface.address.inside(ea)
         res = builtins.set()
-        while ea not in (None,idaapi.BADADDR) and is_code(ea) and ea not in res and match(ea):
+        while ea not in {None, idaapi.BADADDR} and type.is_code(ea) and ea not in res and match(ea):
             res.add(ea)
             ea = next(ea)
         return ea
@@ -2094,10 +2105,10 @@ class flow(address):
     def prev(cls, ea, count):
         ea = interface.address.within(ea)
         isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-        invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
+        invalidQ = utils.compose(utils.fmap(utils.compose(type.is_code, operator.not_), isStop), any)
         refs = filter(type.is_code, xref.up(ea))
         if len(refs) > 1 and invalidQ(address.prev(ea)):
-            logging.fatal("{:s}.prev({:#x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtins.map("{:#x}".format,refs))))
+            logging.fatal("{:s}.prev({:#x}, count={:d}) : Unable to determine previous address due to multiple previous references being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtins.map("{:#x}".format, refs))))
             return None
         try:
             if invalidQ(address.prev(ea)):
@@ -2124,10 +2135,10 @@ class flow(address):
     def next(cls, ea, count):
         ea = interface.address.within(ea)
         isStop = lambda ea: _instruction.feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-        invalidQ = utils.compose(utils.fap(utils.compose(type.is_code, operator.not_), isStop), any)
+        invalidQ = utils.compose(utils.fmap(utils.compose(type.is_code, operator.not_), isStop), any)
         refs = filter(type.is_code, xref.down(ea))
         if len(refs) > 1:
-            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtins.map("{:#x}".format,refs))))
+            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to determine next address due to multiple xrefs being available : {:s}".format('.'.join((__name__, cls.__name__)), ea, count, ', '.join(builtins.map("{:#x}".format, refs))))
             return None
         if invalidQ(ea) and not _instruction.is_jmp(ea):
 #            logging.fatal("{:s}.next({:#x}, count={:d}) : Unable to move to next address. Flow has stopped.".format('.'.join((__name__, cls.__name__)), ea, count))
@@ -2145,15 +2156,11 @@ class type(object):
     def __new__(cls):
         '''Return the type at the address specified at the current address.'''
         ea = ui.current.address()
-        module,F = idaapi,cls.flags(ea, idaapi.DT_TYPE)
-        res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
-        return res
+        return cls(ea)
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
         '''Return the type at the address specified by ``ea``.'''
-        module,F = idaapi,cls.flags(ea, idaapi.DT_TYPE)
-        res, = itertools.islice((v for n,v in itertools.imap(lambda n:(n,getattr(module,n)),dir(module)) if n.startswith('FF_') and (F == v&0xffffffff)), 1)
-        return res
+        return cls.flags(ea, idaapi.DT_TYPE)
 
     @utils.multicase()
     @classmethod
@@ -2818,7 +2825,7 @@ class xref(object):
     @staticmethod
     def clear(ea):
         ea = interface.address.inside(ea)
-        return all((res is True) for res in (xref.del_code(ea),xref.del_data(ea)))
+        return all(ok for ok in (xref.del_code(ea), xref.del_data(ea)))
 x = xref    # XXX: ns alias
 
 drefs, crefs = utils.alias(xref.data, 'xref'), utils.alias(xref.code, 'xref')
@@ -2839,7 +2846,7 @@ class marks(object):
     def __new__(cls):
         '''Yields each of the marked positions within the database.'''
         res = builtins.list(cls.iterate()) # make a copy in-case someone is actively modifying it
-        for ea,comment in cls.iterate():
+        for ea, comment in cls.iterate():
             yield ea, comment
         return
 
@@ -2858,10 +2865,10 @@ class marks(object):
         try:
             idx = cls.get_slotindex(ea)
             ea, res = cls.by_index(idx)
-            logging.warn("{:s}.new({:#x}, ...) : Replacing mark {:d} at {:#x} : {!r} -> {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, res, description))
+            logging.warn("{:s}.new({:#x}, ...) : Replacing mark {:d} at {:#x} : {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, res, description))
         except KeyError:
             res, idx = None, cls.free_slotindex()
-            logging.info("{:s}.new({:#x}, ...) : Creating mark {:d} at {:#x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, description))
+            logging.info("{:s}.new({:#x}, ...) : Creating mark {:d} at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, description))
         cls.set_description(idx, ea, description, **extra)
         return res
 
@@ -2878,7 +2885,7 @@ class marks(object):
         idx = cls.get_slotindex(ea)
         descr = cls.get_description(idx)
         cls.set_description(idx, ea, '')
-        logging.warn("{:s}.remove({:#x}) : Removed mark {:d} at {:#x} : {!r}".format('.'.join((__name__,cls.__name__)), ea, idx, ea, descr))
+        logging.warn("{:s}.remove({:#x}) : Removed mark {:d} at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, descr))
         return descr
 
     @classmethod
@@ -2886,7 +2893,7 @@ class marks(object):
         '''Iterate through all of the marks in the database.'''
         count = 0
         try:
-            for count, idx in enumerate(xrange(cls.MAX_SLOT_COUNT)):
+            for idx in six.moves.range(cls.MAX_SLOT_COUNT):
                 yield cls.by_index(idx)
         except KeyError:
             pass
@@ -2902,7 +2909,7 @@ class marks(object):
         '''Return the (address, description) of the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.get_slotaddress(index), cls.get_description(index))
-        raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__,cls.__name__)), index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
+        raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__, cls.__name__)), index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
     byIndex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
@@ -2946,7 +2953,7 @@ class marks(object):
             res = cls.location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
             title, descr = description, description
             res.mark(index, title, descr)
-            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems())) if extra else '')))
+            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
             return index
 
         @classmethod
@@ -2962,10 +2969,10 @@ class marks(object):
             try:
                 count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
             except IndexError:
-                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             builtins.list(itertools.islice(iterable, count))
             if builtins.next(iterable) != ea:
-                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             return count
 
         @classmethod
@@ -2980,14 +2987,14 @@ class marks(object):
             intp.assign(slotidx)
             res = loc.markedpos(intp)
             if res == idaapi.BADADDR:
-                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
+                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), slotidx))
             return address.head(res)
 
     else:   # idaapi.__version__ >= 7.0
         @classmethod
         def set_description(cls, index, ea, description, **extra):
             idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, description)
-            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), extra.iteritems()))) if extra else ''))
+            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
             return index
 
         @classmethod
@@ -3002,15 +3009,15 @@ class marks(object):
             try:
                 count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
             except IndexError:
-                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             builtins.list(itertools.islice(iterable, count))
             if builtins.next(iterable) != ea:
-                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__,cls.__name__)), ea))
+                raise KeyError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             return count
 
         @classmethod
         def free_slotindex(cls):
-            res = builtins.next((i for i in xrange(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
+            res = builtins.next((i for i in six.moves.range(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
             if res is None:
                 raise ValueError("{:s}.free_slotindex : No free slots available for mark.".format('.'.join((__name__, 'bookmarks', cls.__name__))))
             return res
@@ -3020,7 +3027,7 @@ class marks(object):
             '''Get the address of the mark at index ``slotidx``.'''
             res = idaapi.get_marked_pos(slotidx)
             if res == idaapi.BADADDR:
-                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__,cls.__name__)), slotidx))
+                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), slotidx))
             return address.head(res)
 
     getSlotIndex = utils.alias(get_slotindex, 'marks')
@@ -3096,7 +3103,7 @@ class extra(object):
     @classmethod
     def __count(cls, ea, base):
         sup = internal.netnode.sup
-        for i in xrange(cls.MAX_ITEM_LINES):
+        for i in six.moves.range(cls.MAX_ITEM_LINES):
             row = sup.get(ea, base+i)
             if row is None: break
         return i or None
@@ -3121,13 +3128,13 @@ class extra(object):
             sup = internal.netnode.sup
             count = cls.__count(ea, base)
             if count is None: return None
-            res = (sup.get(ea, base+i) for i in xrange(count))
+            res = (sup.get(ea, base+i) for i in six.moves.range(count))
             return '\n'.join(row[:-1] if row.endswith('\x00') else row for row in res)
         @classmethod
         def __set(cls, ea, string, base):
             cls.__hide(ea)
             sup = internal.netnode.sup
-            [ sup.set(ea, base+i, row+'\x00') for i,row in enumerate(string.split('\n')) ]
+            [ sup.set(ea, base+i, row+'\x00') for i, row in enumerate(string.split('\n')) ]
             cls.__show(ea)
             return True
         @classmethod
@@ -3136,7 +3143,7 @@ class extra(object):
             count = cls.__count(ea, base)
             if count is None: return False
             cls.__hide(ea)
-            [ sup.remove(ea, base+i) for i in xrange(count) ]
+            [ sup.remove(ea, base+i) for i in six.moves.range(count) ]
             cls.__show(ea)
             return True
     else:
@@ -3144,7 +3151,7 @@ class extra(object):
         def __get(cls, ea, base):
             count = cls.__count(ea, base)
             if count is None: return None
-            res = (idaapi.get_extra_cmt(ea, base+i) or '' for i in xrange(count))
+            res = (idaapi.get_extra_cmt(ea, base+i) or '' for i in six.moves.range(count))
             return '\n'.join(res)
         @classmethod
         def __set(cls, ea, string, base):
@@ -3154,7 +3161,7 @@ class extra(object):
         def __del(cls, ea, base):
             res = cls.__count(ea, base)
             if res is None: return 0
-            [idaapi.del_extra_cmt(ea, base+i) for i in xrange(res)]
+            [idaapi.del_extra_cmt(ea, base+i) for i in six.moves.range(res)]
             return res
 
     @utils.multicase(ea=six.integer_types)
@@ -3369,13 +3376,15 @@ class set(object):
     def unknown(cls, ea):
         '''Set the data at address ``ea`` to undefined.'''
         cb = idaapi.get_item_size(ea)
-        idaapi.do_unknown_range(ea, cb, idaapi.DOUNK_SIMPLE)
+        ok = idaapi.do_unknown_range(ea, cb, idaapi.DOUNK_SIMPLE)
         return cb
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unknown(cls, ea, size):
         '''Set the data at address ``ea`` to undefined.'''
-        idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
+        cb = idaapi.get_item_size(ea)
+        ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
+        # FIXME: check the result, and return the calculated size
         return size
     undefine = undefined = utils.alias(unknown, 'set')
 
@@ -3431,7 +3440,7 @@ class set(object):
     def align(cls, ea, **alignment):
         '''Set the data at address ``ea`` as aligned with the specified ``alignment``.'''
         if not type.is_unknown(ea):
-            raise TypeError("{:s}.set.align({:#x}, ...) : Data at specified address has already been defined.".format('.'.join((__name__,cls.__name__)), ea))
+            raise TypeError("{:s}.set.align({:#x}, ...) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea))
         res = alignment.get('alignment', alignment.get('size', address.next(ea) - ea))
         # FIXME: figure out how to properly calculate the alignment
         #        and allow the users to choose it. the alignment arg
@@ -3529,13 +3538,16 @@ class set(object):
         return cls.data(ea, type.size, type=type)
     struc = struct = utils.alias(structure, 'set')
 
+    # FIXME: implement these with either pythonic types, or array.array
     @utils.multicase(length=six.integer_types)
     @classmethod
     def array(cls, type, length):
+        '''Unimplemented.'''
         raise NotImplementedError
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
+        '''Unimplemented.'''
         raise NotImplementedError
 
 class get(object):
@@ -3567,7 +3579,7 @@ class get(object):
         endian = byteorder.get('order', None) or byteorder.get('byteorder', sys.byteorder)
         if endian.lower().startswith('little'):
             data = data[::-1]
-        return reduce(lambda x,y: x << 8 | ord(y), data, 0)
+        return reduce(lambda x,y: x << 8 | six.byte2int(y), data, 0)
 
     @utils.multicase()
     @classmethod
@@ -3769,7 +3781,7 @@ class get(object):
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ cls.struc(ea + i*cb, id=t) for i in builtins.range(count) ]
+            return [ cls.struc(ea + i*cb, id=t) for i in six.moves.range(count) ]
         elif T in numerics:
             ch = numerics[T]
             # FIXME: return signed version of number
@@ -3779,10 +3791,10 @@ class get(object):
             # FIXME: return signed version of number
             t = get.signed if F & idaapi.FF_SIGN == idaapi.FF_SIGN else get.unsigned
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ t(ea + i*cb, cb) for i in builtins.range(count) ]
+            return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
         else:
-            res = itertools.imap(utils.unbox('{:s}={!r}'.format), length.iteritems())
-            raise TypeError("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. : {:#x} & idaapi.DT_TYPE = {:#x}".format('.'.join((__name__,cls.__name__)), ea, (', '+', '.join(res)) if res else '', ea, F, T))
+            query_l = itertools.imap(utils.unbox('{:s}={!r}'.format), six.iteritems(length))
+            raise TypeError("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. : {:#x} & idaapi.DT_TYPE = {:#x}".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if query_l else '', ea, F, T))
 
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
@@ -3829,11 +3841,11 @@ class get(object):
                 if isinstance(t, builtins.list):
                     t = typelookup[tuple(ty)]
                     ct = t*sz
-                elif ty in (chr,str):
+                elif ty in {chr, str}:
                     ct = ctypes.c_char*sz
                 else:
                     ct = None
             finally:
-                res[m.name] = val if any(_ is None for _ in (ct,val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)),ctypes.POINTER(ct)).contents
+                res[m.name] = val if any(_ is None for _ in (ct, val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
         return res
     struc = struct = utils.alias(structure, 'get')

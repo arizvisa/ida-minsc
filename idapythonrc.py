@@ -214,7 +214,7 @@ except IOError:
     __import__('logging').warn('No idapythonrc.py file found in home directory')
 
 except Exception, e:
-    print("warning: Unexpected exception {!r} raised".format(e))
+    print("Unexpected exception raised while trying to execute `~/.idapythonrc.py`.")
     __import__('traceback').print_exc()
 
 ## stupid fucking idapython hax

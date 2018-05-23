@@ -50,26 +50,6 @@ def by(name): return by_name(name)
 
 # FIXME: implement a matcher class for func_t
 
-# FIXME: Move this into the internal.interface module.
-def __addressOfRtOrSt(func):
-    '''Returns `(F, address)` if a statically linked address, or `(T, address)` if a runtime-linked address'''
-    try:
-        fn = by(func)
-
-    # otherwise, maybe it's an rtld symbol
-    except LookupError, e:
-        if not database.is_data(func): raise
-
-        # ensure that we're an import, otherwise throw original exception
-        try: database.imports.get(func)
-        except LookupError: raise e
-
-        # yep, we're an import
-        return True, func
-    if fn is None:
-        raise LookupError("{:s}.by({!r}) : Unable to locate function with the specified identifier.".format(__name__, func))
-    return False, fn.startEA
-
 @utils.multicase()
 def address():
     '''Return the address of the current function.'''
@@ -160,7 +140,7 @@ def get_name(func):
     '''Return the name of the function ``func``.'''
     get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
 
-    rt,ea = __addressOfRtOrSt(func)
+    rt, ea = interface.addressOfRuntimeOrStatic(func)
     if rt:
         res = get_name(ea)
         return internal.declaration.demangle(res) if internal.declaration.mangled(res) else res
@@ -190,7 +170,7 @@ def set_name(func, none):
 @utils.multicase(string=basestring)
 def set_name(func, string):
     '''Set the name of the function ``func`` to ``string``.'''
-    rt,ea = __addressOfRtOrSt(func)
+    rt, ea = interface.addressOfRuntimeOrStatic(func)
 
     res = idaapi.validate_name2(buffer(string)[:])
     if string and string != res:
@@ -233,13 +213,33 @@ def name(func, string, *suffix):
     return set_name(func, interface.tuplename(*res))
 
 @utils.multicase()
+def convention():
+    '''Return the calling convention of the current function.'''
+    return convention(ui.current.function())
+@utils.multicase()
+def convention(func):
+    """Return the calling convention of the function ``func``.
+    The integer returned corresponds to one of the idaapi.CM_CC_* constants.
+    """
+    rt, ea = interface.addressOfRuntimeOrStatic(func)
+    sup = internal.netnode.sup.get(ea, 0x3000)
+    if sup is None:
+        raise ValueError("{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
+    try:
+        _, _, cc = interface.node.sup_functype(sup)
+    except TypeError:
+        raise NotImplementedError("{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
+    return cc
+cc = utils.alias(convention)
+
+@utils.multicase()
 def prototype():
     '''Return the prototype of the current function if it has one.'''
     return prototype(ui.current.function())
 @utils.multicase()
 def prototype(func):
     '''Return the prototype of the function ``func`` if it has one.'''
-    rt,ea = __addressOfRtOrSt(func)
+    rt, ea = interface.addressOfRuntimeOrStatic(func)
     funcname = database.name(ea) or get_name(ea)
     try:
         res = internal.declaration.function(ea)
@@ -252,19 +252,18 @@ def prototype(func):
         result = internal.declaration.demangle(funcname)
     return result
 
-# FIXME: fix the naming
 @utils.multicase()
-def range():
+def bounds():
     '''Return a tuple containing the bounds of the first chunk of the current function.'''
     return range(ui.current.function())
 @utils.multicase()
-def range(func):
+def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function ``func``.'''
     fn = by(func)
     if fn is None:
-        raise ValueError("{:s}.range({!r}) : Specified location is not contained within a function.".format(__name__, func, ea))
+        raise ValueError("{:s}.bounds({!r}) : Specified location is not contained within a function.".format(__name__, func, ea))
     return fn.startEA, fn.endEA
-bounds = utils.alias(range)
+range = utils.alias(bounds)
 
 @utils.multicase(none=types.NoneType)
 def set_color(none):
@@ -1086,7 +1085,7 @@ class frame(object):
         fn, ea = by(func), interface.address.inside(ea)
         return idaapi.get_spd(fn, ea)
 
-    class args(object):
+    class arguments(object):
         """
         Information about the function frame's arguments.
         """
@@ -1100,10 +1099,8 @@ class frame(object):
             """Yield each argument for the function ``func`` in order.
             Each result is of the format (offset into stack, name, size).
             """
-            try:
-                fn = by(func)
-
-            except LookupError:
+            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            if rt:
                 target = func
                 database.imports.get(target)
 
@@ -1115,14 +1112,21 @@ class frame(object):
                     o += sz
                 return
 
+            # grab the function
+            fn = by(ea)
+
+            # now the calling convention
+            try: cc = convention(ea)
+            except ValueError: cc = idaapi.CM_CC_UNKNOWN
+
             # grab from structure
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
                 raise LookupError("{:s}.arguments({:#x}) : Unable to determine function frame.".format(__name__, fn.startEA))
 
-            # FIXME: figure out calling convention and grab correct arguments
-            if database.config.bits() != 32:
-                logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to {:d}-bit calling convention.".format(__name__, fn.startEA, database.config.bits()))
+            # FIXME: The calling conventions should be defined within the instruction.architecture_t
+            if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
+                logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. : {:#x}".format(__name__, fn.startEA, cc))
 
             base = get_vars_size(fn)+get_regs_size(fn)
             for (off,size),(name,_,_) in structure.fragment(fr.id, base, get_args_size(fn)):
@@ -1142,6 +1146,7 @@ class frame(object):
             max = structure.size(get_frameid(fn))
             total = get_vars_size(fn) + get_regs_size(fn)
             return max - total
+    args = arguments
 
     class lvars(object):
         """
@@ -1183,7 +1188,7 @@ get_args_size = utils.alias(frame.args.size, 'frame.args')
 get_vars_size = utils.alias(frame.lvars.size, 'frame.lvars')
 get_regs_size = utils.alias(frame.regs.size, 'frame.regs')
 get_spdelta = get_sp = spdelta = delta = utils.alias(frame.delta, 'frame')
-arguments = args = frame.args
+arguments = args = frame.arguments
 
 ## instruction iteration/searching
 @utils.multicase()
@@ -1248,7 +1253,7 @@ def tag_read(key):
 def tag_read(func):
     '''Returns all the tags defined for the function ``func``.'''
     try:
-        rt,ea = __addressOfRtOrSt(func)
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
     except LookupError:
         logging.warn("{:s}.tag_read({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func)))
         return database.tag_read(func)
@@ -1295,7 +1300,7 @@ def tag_write(func, key, value):
 
     # Check to see if function tag is being applied to an import
     try:
-        rt,ea = __addressOfRtOrSt(func)
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
     except LookupError:
         # If we're not even in a function, then use a database tag.
         logging.warn("{:s}.tag_write({!r}, {!r}, ...) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, func, key))
@@ -1327,7 +1332,7 @@ def tag_write(func, key, none):
     #fn = by(func)
     # Check to see if function tag is being applied to an import
     try:
-        rt,ea = __addressOfRtOrSt(func)
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
     except LookupError:
         # If we're not even in a function, then use a database tag.
         logging.warn("{:s}.tag_write({:s}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key))
@@ -1432,12 +1437,12 @@ def select(func, **boolean):
         res, d = {}, database.tag(ea)
 
         Or = boolean.get('Or', set())
-        res.update({k : v for k, v in d.iteritems() if k in Or})
+        res.update({key : value for key, value in six.iteritems(d) if key in Or})
 
         And = boolean.get('And', set())
         if And:
             if And.intersection(d.viewkeys()) == And:
-                res.update({k : v for k, v in d.iteritems() if k in And})
+                res.update({key : value for key, value in six.iteritems(d) if key in And})
             else: continue
         if res: yield ea, res
     return
@@ -1471,7 +1476,7 @@ def up():
 @utils.multicase()
 def up(func):
     '''Return all the functions that call the function ``func``.'''
-    rt, ea = __addressOfRtOrSt(func)
+    rt, ea = interface.addressOfRuntimeOrStatic(func)
     # runtime
     if rt:
         return database.up(ea)
@@ -1591,7 +1596,7 @@ def stackdelta(ea, delta, **direction):
     """
     dir = direction.get('direction', direction.get('dir', -1))
     if dir == 0:
-        raise ValueError("{:s}.stackdelta({:#x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in direction.iteritems())) if direction else ''))
+        raise ValueError("{:s}.stackdelta({:#x}, {:+x}{:s}) : Invalid value specified for `direction` argument.".format(__name__, ea, delta, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(direction))) if direction else ''))
     next = database.next if dir > 0 else database.prev
 
     sp, ea = get_spdelta(ea), interface.address.inside(ea)

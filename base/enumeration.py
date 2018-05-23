@@ -78,7 +78,7 @@ def by(**type):
     index = particular index
     identifier or id = internal id number
     """
-    searchstring = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
+    searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(iterate(**type))
     if len(res) > 1:
@@ -194,7 +194,7 @@ __matcher__.predicate('predicate')
 
 def __iterate__():
     '''Yield the identifier of each enumeration within the database.'''
-    for n in builtins.range(idaapi.get_enum_qty()):
+    for n in six.moves.range(idaapi.get_enum_qty()):
         yield idaapi.getn_enum(n)
     return
 
@@ -202,9 +202,9 @@ def iterate(**type):
     '''Iterate through the identifiers of all the enumerations defined in the database.'''
     if not type: type = {'predicate':lambda n: True}
     res = builtins.list(__iterate__())
-    for k,v in type.iteritems():
-        res = builtins.list(__matcher__.match(k, v, res))
-    for n in res: yield n
+    for key, value in six.iteritems(type):
+        res = builtins.list(__matcher__.match(key, value, res))
+    for item in res: yield item
 
 @utils.multicase(string=basestring)
 def list(string):
@@ -230,7 +230,7 @@ def list(**type):
     cmask = max(builtins.map(utils.compose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
 
     for n in res:
-        print("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
+        six.print_("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
     return
 
 ## members
@@ -496,5 +496,5 @@ class member(object):
         maxindex = max(builtins.map(utils.first, enumerate(res)) or [1])
         maxvalue = max(builtins.map(utils.compose(cls.value, "{:x}".format, len), res) or [1])
         for i, mid in enumerate(res):
-             print("[{:d}] {:>0{:d}x} {:s}".format(i, cls.value(mid), maxvalue, cls.name(mid)))
+             six.print_("[{:d}] {:>0{:d}x} {:s}".format(i, cls.value(mid), maxvalue, cls.name(mid)))
         return

@@ -250,13 +250,17 @@ def sourcechain(fn, *args, **kwds):
                 raise ValueError, (t, ea, i)
             continue
         continue
-    return [(ea,result[ea]) for ea in sorted(result.keys())]
+    return [(ea, result[ea]) for ea in sorted(six.viewkeys(result))]
 
-def map(F, *args, **kwds):
+def map(F, **kwargs):
     """Execute provided callback on all functions in database. Synonymous to map(F, database.functions()).
-    ``F`` is defined as a function(address, *args, **kwds).
+    ``F`` is defined as a function(address, **kwargs) or function(index, address, **kwargs).
     Any extra arguments are passed to ``F`` unmodified.
     """
+    f1 = lambda (idx,ea), **kwargs: F(ea, **kwargs)
+    f2 = lambda (idx,ea), **kwargs: F(idx, ea, **kwargs)
+    f = f1 if F.func_code.co_argcount == 1 else f2
+
     result, all = [], database.functions()
     total = len(all)
     if len(all):
@@ -265,7 +269,7 @@ def map(F, *args, **kwds):
             for i, ea in enumerate(all):
                 ui.navigation.set(ea)
                 print("{:x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
-                result.append( F(ea, *args, **kwds) )
+                result.append( f((i, ea), **kwargs) )
         except KeyboardInterrupt:
             print("{:x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
     return result

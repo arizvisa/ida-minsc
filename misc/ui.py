@@ -1,3 +1,4 @@
+import six
 import sys,os
 import logging
 
@@ -37,7 +38,7 @@ class current(object):
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
-            raise StandardError("{:s}.function : Not currently inside a function.".format('.'.join((__name__,cls.__name__))))
+            raise StandardError("{:s}.function : Not currently inside a function.".format('.'.join((__name__, cls.__name__))))
         return res
     @classmethod
     def segment(cls):
@@ -58,7 +59,7 @@ class current(object):
         left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
         ok = idaapi.read_selection(view, left, right)
         if not ok:
-            raise StandardError("{:s}.selection : Unable to read selection.".format('.'.join((__name__,cls.__name__))))
+            raise StandardError("{:s}.selection : Unable to read selection.".format('.'.join((__name__, cls.__name__))))
         pl_l, pl_r = left.place(view), right.place(view)
         return database.address.head(pl_l.ea), database.address.tail(pl_r.ea)
 
@@ -121,7 +122,7 @@ try:
 
         def update(self, **options):
             minimum, maximum = options.get('min', None), options.get('max', None)
-            text,title,tooltip = (options.get(n, None) for n in ('text','title','tooltip'))
+            text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
 
             if minimum is not None:
                 self.object.setMinimum(minimum)
@@ -180,7 +181,7 @@ except ImportError:
 
         def update(self, **options):
             minimum, maximum = options.get('min', None), options.get('max', None)
-            text,title,tooltip = (options.get(n, None) for n in ('text','title','tooltip'))
+            text,title,tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
 
             if minimum is not None:
                 self.__min__ = minimum
@@ -232,7 +233,7 @@ class Names(object):
 
     @classmethod
     def iterate(cls):
-        for idx in xrange(cls.size()):
+        for idx in six.moves.range(cls.size()):
             yield cls.at(idx)
         return
 
@@ -276,7 +277,7 @@ class Strings(object):
         return si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
     @classmethod
     def iterate(cls):
-        for index in xrange(cls.size()):
+        for index in six.moves.range(cls.size()):
             si = cls.at(index)
             yield si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
         return
@@ -360,9 +361,9 @@ try:
             @classmethod
             def reset(cls):
                 """remove all timers"""
-                for i,x in cls.clock.iteritems():
-                    idaapi.unregister_timer(x)
-                    del( cls.clock[i] )
+                for id, clk in six.iteritems(cls.clock):
+                    idaapi.unregister_timer(clk)
+                    del(cls.clock[id])
                 return
 
         # FIXME: add some support for actually manipulating menus
@@ -380,7 +381,7 @@ try:
                 del cls.state[path,name]
             @classmethod
             def reset(cls):
-                for path,name in state.keys():
+                for path, name in six.iterkeys(state):
                     cls.rm(path,name)
                 return
 
@@ -399,7 +400,7 @@ class queue(object):
     @classmethod
     def __start_ida__(cls):
         if hasattr(cls, 'execute') and not cls.execute.dead:
-            logging.warn("{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format('.'.join((__name__,cls.__name__)), cls.execute))
+            logging.warn("{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format('.'.join((__name__, cls.__name__)), cls.execute))
             return
         cls.execute = internal.utils.execution()
         return
@@ -407,7 +408,7 @@ class queue(object):
     @classmethod
     def __stop_ida__(cls):
         if not hasattr(cls, 'execute'):
-            logging.warn("{:s}.stop : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__,cls.__name__))))
+            logging.warn("{:s}.stop : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
             return
         return cls.execute.release()
 
@@ -422,7 +423,7 @@ class queue(object):
     @classmethod
     def add(cls, func, *args, **kwds):
         if not cls.execute.running:
-            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__,cls.__name__)), func))
+            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), func))
         return cls.execute.push(func, *args, **kwds)
 
     @classmethod
@@ -449,7 +450,7 @@ class hook(object):
 
     @classmethod
     def __stop_ida__(cls):
-        for api in ('idp','idb','ui'):
+        for api in ['idp', 'idb', 'ui']:
             res = getattr(cls, api)
 
             # disable every single hook
@@ -464,12 +465,12 @@ class navigation(object):
     """
     Exposes the ability to update the state of the colored navigation band.
     """
-    if all(not hasattr(idaapi, name) for name in ('show_addr','showAddr')):
+    if all(not hasattr(idaapi, name) for name in ['show_addr', 'showAddr']):
         __set__ = staticmethod(lambda ea: None)
     else:
         __set__ = staticmethod(idaapi.showAddr if idaapi.__version__ < 7.0 else idaapi.show_addr)
 
-    if all(not hasattr(idaapi, name) for name in ('show_auto','showAuto')):
+    if all(not hasattr(idaapi, name) for name in ['show_auto', 'showAuto']):
         __auto__ = staticmethod(lambda ea, t: None)
     else:
         __auto__ = staticmethod(idaapi.showAuto if idaapi.__version__ < 7.0 else idaapi.show_auto)

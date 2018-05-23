@@ -1,3 +1,4 @@
+import six
 import database as db,function as fn
 import internal
 import itertools,functools,operator
@@ -9,7 +10,7 @@ def fetch_function(f):
     for ea in fn.iterate(f):
         res = db.tag(ea)
         #res.pop('name', None)
-        for k, v in res.iteritems():
+        for k, v in six.iteritems(res):
             addr[ea] = addr.get(ea,0) + 1
             tags[k] = tags.get(k,0) + 1
         continue
@@ -54,7 +55,7 @@ def do_functions():
         print "{:x} : fetching function {:d} of {:d}".format(ea, i, t)
         res = fn.tag(ea)
         #res.pop('name', None)
-        for k, v in res.iteritems():
+        for k, v in six.iteritems(res):
             addr[ea] = addr.get(ea, 0) + 1
             tags[k] = tags.get(k, 0) + 1
         continue
@@ -69,7 +70,7 @@ def do_data():
         if f is not None: continue
         res = db.tag(ea)
         #res.pop('name', None)
-        for k, v in res.iteritems():
+        for k, v in six.iteritems(res):
             addr[ea] = addr.get(ea, 0) + 1
             tags[k] = tags.get(k, 0) + 1
         continue
@@ -81,9 +82,9 @@ def do_globally():
 
     print 'aggregating results'
     addr,tags = dict(faddr), dict(ftags)
-    for k, v in daddr.iteritems():
+    for k, v in six.iteritems(daddr):
         addr[k] = addr.get(k, 0) + v
-    for k, v in dtags.iteritems():
+    for k, v in six.iteritems(dtags):
         tags[k] = tags.get(k, 0) + v
 
     print "found {:d} addrs".format(len(addr))
@@ -111,10 +112,10 @@ def function(ea):
                     tags.pop(k)
         continue
 
-    for k, v in tags.iteritems():
+    for k, v in six.iteritems(tags):
         internal.comment.contents.set_name(f, k, v)
 
-    for k, v in addr.iteritems():
+    for k, v in six.iteritems(addr):
         if not fn.within(k):
             continue
         internal.comment.contents.set_address(k, v)
@@ -126,11 +127,11 @@ def globals():
     addr, tags = do_globally()
 
     print 'updating global name refs'
-    for k, v in tags.iteritems():
+    for k, v in six.iteritems(tags):
         internal.comment.globals.set_name(k, v)
 
     print 'updating global address refs'
-    for k, v in addr.iteritems():
+    for k, v in six.iteritems(addr):
         internal.comment.globals.set_address(k, v)
 
     return addr, tags
@@ -166,10 +167,10 @@ def extracomments():
         ctx = internal.comment.contents if fn else internal.comment.globals
 
         count = db.extra.count(ea, idaapi.E_PREV)
-        if count: [ ctx.inc(ea, '__extra_prefix__') for i in xrange(count) ]
+        if count: [ ctx.inc(ea, '__extra_prefix__') for i in six.moves.range(count) ]
 
         count = db.extra.count(ea, idaapi.E_NEXT)
-        if count: [ ctx.inc(ea, '__extra_suffix__') for i in xrange(count) ]
+        if count: [ ctx.inc(ea, '__extra_suffix__') for i in six.moves.range(count) ]
     return
 
 def everything():

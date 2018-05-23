@@ -36,10 +36,10 @@ def __iterate__(**type):
         res = idaapi.getnseg(index)
         res.index = index
         return res
-    res = builtins.map(newsegment, xrange(idaapi.get_segm_qty()))
-    for k,v in type.iteritems():
-        res = builtins.list(__matcher__.match(k, v, res))
-    for n in res: yield n
+    res = builtins.map(newsegment, six.moves.range(idaapi.get_segm_qty()))
+    for key, value in six.iteritems(type):
+        res = builtins.list(__matcher__.match(key, value, res))
+    for item in res: yield item
 
 @utils.multicase(string=basestring)
 def list(string):
@@ -68,7 +68,7 @@ def list(**type):
 
     for seg in res:
         comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
-        print("[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), idaapi.get_true_segm_name(seg), maxname, seg.sel, seg.flags, "// {:s}".format(comment) if comment else ''))
+        six.print_("[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), idaapi.get_true_segm_name(seg), maxname, seg.sel, seg.flags, "// {:s}".format(comment) if comment else ''))
     return
 
 ## searching
@@ -121,7 +121,7 @@ def by(**type):
     name = specific segment name
     predicate = function predicate
     """
-    searchstring = ', '.join("{:s}={!r}".format(k,v) for k,v in type.iteritems())
+    searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(__iterate__(**type))
     if len(res) > 1:
@@ -148,17 +148,18 @@ def search(**type):
 
 ## properties
 @utils.multicase()
-def range():
-    '''Return the range of the current segment.'''
+def bounds():
+    '''Return the bounds of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise LookupError("{:s}.range() : Not currently positioned within a segment".format(__name__))
+        raise LookupError("{:s}.bounds() : Not currently positioned within a segment".format(__name__))
     return seg.startEA, seg.endEA
 @utils.multicase()
-def range(segment):
-    '''Return the range of the segment specified by ``segment``.'''
+def bounds(segment):
+    '''Return the bounds of the segment specified by ``segment``.'''
     seg = by(segment)
     return seg.startEA, seg.endEA
+range = utils.alias(bounds)
 
 @utils.multicase()
 def iterate():

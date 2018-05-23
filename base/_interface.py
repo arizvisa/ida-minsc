@@ -1,7 +1,7 @@
+import six
 import sys, logging
-import operator, functools, itertools
-import collections, heapq, types
-import six, traceback, ctypes
+import functools, operator, itertools, types
+import collections, heapq, traceback, ctypes
 
 import internal, ui
 import idaapi
@@ -38,7 +38,7 @@ class typemap:
         unicode:(idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
     }
 
-    ptrmap = { sz : (idaapi.offflag()|flg, tid) for sz, (flg, tid) in integermap.iteritems() }
+    ptrmap = { sz : (idaapi.offflag()|flg, tid) for sz, (flg, tid) in six.iteritems(integermap) }
     nonemap = { None :(idaapi.alignflag(), -1) }
 
     typemap = {
@@ -379,9 +379,66 @@ class address(object):
         return cls.__within1__(*args)
 
 class node(object):
-    """Various methods that extract information from the undocumented structures
+    """
+    Various methods that extract information from the undocumented structures
     that IDA stores within a Netnode for a given address.
     """
+    @staticmethod
+    def sup_functype(sup):
+        """Given a supval, return the pointer size, model, and calling convention for a function.
+        This string is typically found in a supval[0x3000] of a function.
+        """
+        res, iterable = [], iter(sup)
+        onext = internal.utils.compose(next, six.byte2int)
+
+        # pointer and model
+        by = onext(iterable)
+        if by&0xf0:
+            # FIXME: If this doesn't match, then this is a type that forwards to the real function type.
+            raise TypeError(by)
+        res.append( (by&idaapi.CM_MASK) )
+        res.append( (by&idaapi.CM_M_MASK) )
+
+        # calling convention
+        by = onext(iterable)
+        cc, count = by&idaapi.CM_CC_MASK, by&0x0f
+        if cc == idaapi.CM_CC_SPOILED:
+            if count != 15:
+                raise NotImplementedError((idaapi.CM_CC_SPOILED, count, repr(sup)))
+            funcattr = onext(iterable)
+            by = onext(iterable)
+            res.append( (by&idaapi.CM_CC_MASK) )
+        else:
+            res.append(cc)
+
+        return tuple(res)
+
+        # XXX: implement a parser for type_t in order to figure out idaapi.BT_COMPLEX types
+        # return type_t
+        data = next(iterable)
+        base, flags, mods = six.byte2int(data)&idaapi.TYPE_BASE_MASK, six.byte2int(data)&idaapi.TYPE_FLAGS_MASK, six.byte2int(data)&idaapi.TYPE_MODIF_MASK
+        if base == idaapi.BT_PTR:
+            data+= next(iterable)
+        elif base == idaapi.BT_COMPLEX and flags == 0x30:
+            by = next(iterable)
+            skip, data = six.byte2int(by), data + by
+            while skip > 1:
+                data+= next(iterable)
+                skip -= 1
+        elif base in (idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD):
+            raise NotImplementedError(base, flags, mods)
+        res.append(data)
+
+        # number of arguments
+        by = onext(iterable)
+        res.append(by)
+
+        # Everything else in iterable is an array of type_t as found in "Type flags" in the SDK docs.
+        ''.join(iterable)
+
+        # now we can return it
+        return tuple(res)
+
     @staticmethod
     def sup_opstruct(sup, bit64Q):
         """Given a supval, return the list of the encoded structure/field ids.
@@ -389,7 +446,7 @@ class node(object):
         This string is typically found in a supval[0xF+opnum] of the instruction.
         """
         le = internal.utils.compose(
-            functools.partial(map, ord),
+            functools.partial(map, six.byte2int),
             functools.partial(reduce, lambda t, c: (t*0x100)|c)
         )
         ror = lambda n, shift, bits: (n>>shift) | ((n&2**shift-1) << (bits-shift))
@@ -484,7 +541,7 @@ class namedtypedtuple(tuple):
     def _replace(self, **kwds):
         result = self._make(map(kwds.pop, self._fields, self))
         if kwds:
-            raise ValueError("Got unexpected field names: {!r}".format(kwds.keys()))
+            raise ValueError("Got unexpected field names: {!r}".format(six.viewkeys(kwds)))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
@@ -504,7 +561,7 @@ class regmatch(object):
     def __new__(cls, *regs, **modifiers):
         if not regs:
             args = ', '.join(map("{:s}".format, regs))
-            mods = ', '.join(map(internal.utils.unbox("{:s}={!r}".format), modifiers.iteritems()))
+            mods = ', '.join(map(internal.utils.unbox("{:s}={!r}".format), six.iteritems(modifiers)))
             raise AssertionError("{:s}({:s}{:s}) : Specified registers are empty.".format('.'.join((__name__, cls.__name__)), args, (', '+mods) if mods else ''))
         use, iterops = cls.use(regs), cls.modifier(**modifiers)
         def match(ea):
@@ -535,7 +592,7 @@ class regmatch(object):
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # by default, grab all operand indexes
-        iterops = internal.utils.compose(_instruction.ops_count, xrange, sorted)
+        iterops = internal.utils.compose(_instruction.ops_count, six.moves.range, sorted)
 
         # if ``read`` is specified, then only grab operand indexes that are read from
         if modifiers.get('read', False):
@@ -603,7 +660,7 @@ class ref_t(set):
         if state == '*':
             return cls(31, '*')     # code 31 used internally by idascripts
         res = set(state)
-        for F, t in cls.__mapper__.iteritems():
+        for F, t in six.iteritems(cls.__mapper__):
             if set(t) == res:
                 return cls(F, str().join(sorted(res)))
             continue
@@ -693,11 +750,11 @@ class switch_t(object):
         '''Return all of the non-default cases in the switch.'''
         import instruction
         f = lambda ea, dflt=self.default: (ea == dflt) or (instruction.is_jmp(ea) and instruction.op_value(ea, 0) == dflt)
-        return tuple(idx for idx in xrange(self.base, self.base+self.count) if not f(self.case(idx)))
+        return tuple(idx for idx in six.moves.range(self.base, self.base+self.count) if not f(self.case(idx)))
     @property
     def range(self):
         '''Return all the possible cases for the switch.'''
-        return tuple(xrange(self.base, self.base+self.count))
+        return tuple(six.moves.range(self.base, self.base+self.count))
     def __repr__(self):
         cls = self.__class__
         if self.indirectQ():
@@ -714,3 +771,30 @@ def xiterate(ea, start, next):
         yield addr
         addr = next(ea, addr)
     return
+
+def addressOfRuntimeOrStatic(func):
+    '''Returns `(F, address)` if a statically linked address, or `(T, address)` if a runtime-linked address'''
+    import function
+    try:
+        fn = function.by(func)
+
+    # otherwise, maybe it's an rtld symbol
+    except LookupError, e:
+        import database
+        exc_info = sys.exc_info()
+
+        # if func is not an address, then there ain't shit we can do
+        if not isinstance(func, six.integer_types): six.reraise(*exc_info)
+
+        # make sure that we're actually data
+        if not database.is_data(func): six.reraise(*exc_info)
+
+        # ensure that we're an import, otherwise throw original exception
+        try: database.imports.get(func)
+        except LookupError: six.reraise(*exc_info)
+
+        # yep, we're an import
+        return True, func
+
+    # nope, we're just a function
+    return False, fn.startEA

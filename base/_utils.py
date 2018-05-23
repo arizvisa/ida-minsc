@@ -9,7 +9,7 @@ import multiprocessing, Queue
 
 import idaapi
 
-__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmaplist','fmap','fap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -18,7 +18,7 @@ fbox = fboxed = box = boxed = lambda *a: a
 # return a closure that executes ``f`` with the arguments unboxed.
 funbox = unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **builtins.dict(k.items() + kp.items()))
 # return a closure that will check that ``object`` is an instance of ``type``.
-finstance = lambda type: frpartial(isinstance, type)
+finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item ``key``.
 fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), iter, next, fpartial(operator.eq, None))
 # return a closure that will check if its argument has an ``attribute``.
@@ -33,11 +33,11 @@ first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), ope
 fcompose = compose = lambda *f: builtins.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), builtins.reversed(f))
 # return a closure that executes function ``f`` whilst discarding any extra arguments
 fdiscard = lambda f: lambda *a, **k: f()
-# return a closure that executes function ``crit`` and then executes ``f`` or ``t`` based on whether or not it's successful.
+# return a closure that executes function ``crit`` and then returns/executes ``f`` or ``t`` based on whether or not it's successful.
 fcondition = fcond = lambda crit: lambda t, f: \
-    lambda *a, **k: t(*a, **k) if crit(*a, **k) else f(*a, **k)
+    lambda *a, **k: (t(*a, **k) if builtins.callable(t) else t) if crit(*a, **k) else (f(*a, **k) if builtins.callable(f) else f)
 # return a closure that takes a list of functions to execute with the provided arguments
-fmaplist = fmap = fap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
+fmap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
 #lazy = lambda f, state={}: lambda *a, **k: state[(f, a, builtins.tuple(builtins.sorted(k.items())))] if (f, a, builtins.tuple(builtins.sorted(k.items()))) in state else state.setdefault((f, a, builtins.tuple(builtins.sorted(k.items()))), f(*a, **k))
 #lazy = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **dict(k.items() + kp.items()))
 # return a memoized closure that's lazy and only executes when evaluated
@@ -68,17 +68,17 @@ fexc = fexception = fcatch
 # boolean inversion of the result of a function
 fcomplement = fnot = complement = frpartial(fcompose, operator.not_)
 # converts a list to an iterator, or an iterator to a list
-ilist, liter = compose(list, iter), compose(iter, list)
+ilist, liter = compose(builtins.list, builtins.iter), compose(builtins.iter, builtins.list)
 # converts a tuple to an iterator, or an iterator to a tuple
-ituple, titer = compose(tuple, iter), compose(iter, tuple)
+ituple, titer = compose(builtins.tuple, builtins.iter), compose(builtins.iter, builtins.tuple)
 # take ``count`` number of elements from an iterator
-itake = lambda count: compose(iter, fmaplist(*(next,)*count), tuple)
+itake = lambda count: compose(builtins.iter, fmap(*(builtins.next,)*count), builtins.tuple)
 # get the ``nth`` element from an iterator
-iget = lambda count: compose(iter, fmaplist(*(next,)*(count)), tuple, operator.itemgetter(-1))
+iget = lambda count: compose(builtins.iter, fmap(*(builtins.next,)*(count)), builtins.tuple, operator.itemgetter(-1))
 # copy from itertools
 imap, ifilter, ichain, izip = itertools.imap, itertools.ifilter, itertools.chain, itertools.izip
 # count number of elements of a container
-count = compose(iter, list, len)
+count = compose(builtins.iter, builtins.list, builtins.len)
 
 # cheap pattern-like matching
 class Pattern(object):
@@ -240,14 +240,14 @@ class multicase(object):
     @classmethod
     def new_wrapper(cls, func, cache):
         # define the wrapper...
-        def callable(*arguments, **keywords):
+        def F(*arguments, **keywords):
             heap = [res for _,res in heapq.nsmallest(len(cache), cache)]
             f, (a, w, k) = cls.match((arguments[:],keywords), heap)
             return f(*arguments, **keywords)
             #return f(*(arguments + tuple(w)), **keywords)
 
         # swap out the original code object with our wrapper's
-        f,c = callable, callable.func_code
+        f, c = F, F.func_code
         cargs = c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags, \
                 c.co_code, c.co_consts, c.co_names, c.co_varnames, \
                 c.co_filename, '.'.join((func.__module__, func.func_name)), \
@@ -799,13 +799,13 @@ class execution(object):
         self.queue.release()
         return res
 
-    def push(self, callable, *args, **kwds):
-        '''Push ``callable`` with the provided ``args`` and ``kwds`` onto the execution queue.'''
+    def push(self, F, *args, **kwds):
+        '''Push ``F`` with the provided ``args`` and ``kwds`` onto the execution queue.'''
         # package it all into a single function
-        res = functools.partial(callable, *args, **kwds)
+        res = functools.partial(F, *args, **kwds)
 
         cls = self.__class__
-        logging.debug("{:s}.push : Adding callable {!r} to execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), callable, self))
+        logging.debug("{:s}.push : Adding callable {!r} to execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), F, self))
         # shove it down a multiprocessing.Queue
         self.queue.acquire()
         self.state.append(res)
@@ -843,10 +843,10 @@ class execution(object):
     def __dispatch(cls, lock):
         res, error = None, (None, None, None)
         while True:
-            callable = (yield res, error)
+            F = (yield res, error)
             lock.acquire()
             try:
-                res = callable()
+                res = F()
             except:
                 res, error = None, sys.exc_info()
             else:
