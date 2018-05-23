@@ -1247,7 +1247,7 @@ def tag_write(ea, key, value):
             internal.comment.globals.inc(ea, key)
 
     # now we can actually update the tag
-    res,state[key] = state.get(key,None),value
+    res, state[key] = state.get(key, None), value
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
     return res
 @utils.multicase(ea=six.integer_types, key=basestring, none=types.NoneType)
@@ -3369,42 +3369,45 @@ class set(object):
 
     @utils.multicase()
     @classmethod
-    def align(cls, **alignment):
+    def alignment(cls, **alignment):
         '''Set the data at the current address as aligned with the specified ``alignment``.'''
         return cls.align(ui.current.address(), **alignment)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def align(cls, ea, **alignment):
-        '''Set the data at address ``ea`` as aligned with the specified ``alignment``.'''
+    def alignment(cls, ea, **alignment):
+        """Set the data at address ``ea`` as aligned.
+        If ``alignment`` is specified, then use it as the default alignment.
+        If ``size`` is specified, then align that number of bytes.
+        """
         if not type.is_unknown(ea):
             raise TypeError("{:s}.set.align({:#x}, ...) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea))
 
-        # grab the size
+        # grab the size out of the kwarg
         if 'size' in alignment:
             size = alignment['size']
 
-        # otherwise, figure it out by counting zeroes if address is initialized
+        # otherwise, figure it out by counting repetitions
+        # if the address is actually initialized
         elif type.is_initialized(ea):
-            size = 0
-            while read(ea + size, 1) == '\x00':
+            size, by = 0, read(ea, 1)
+            while read(ea + size, 1) == by:
                 size += 1
             pass
 
-        # if it's uninitialized, then use the nextlabel as a boundary
+        # if it's uninitialized, then use the nextlabel as the
+        # boundary to determine the size
         else:
             size = address.nextlabel(ea) - ea
 
         # if idaapi.create_align doesn't exist, then just hand this
-        # off to idaapi.create_data with the specified size.
+        # off to idaapi.create_data with the determined size.
         if not hasattr(idaapi, 'create_align'):
             return cls.data(ea, size, type=idaapi.FF_ALIGN)
 
-        # grab some defaults
-        alignment = alignment.get('alignment', None), alignment.get('size', None)
-
-        # grab the aligment
-        if 'alignment' in alignment:
-            e = math.trunc(math.log(alignment) / math.log(2))
+        # grab the aligment out of the kwarg
+        if any(k in alignment for k in ('align', 'alignment')):
+            align = builtins.next((alignment[k] for k in ('align', 'alignment') if k in alignment))
+            e = math.trunc(math.log(align) / math.log(2))
 
         # or we again...just figure it out via brute force
         else:
@@ -3419,7 +3422,7 @@ class set(object):
 
         # return the new size, or a failure
         return idaapi.get_item_size(ea) if ok else 0
-    aligned = utils.alias(align, 'set')
+    align = aligned = utils.alias(alignment, 'set')
 
     @utils.multicase()
     @classmethod
@@ -3550,7 +3553,7 @@ class get(object):
         ``byteorder`` defaults to the format used by the database architecture.
         """
         data = read(ea, size)
-        endian = byteorder.get('order', None) or byteorder.get('byteorder', sys.byteorder)
+        endian = byteorder.get('order', None) or byteorder.get('byteorder', config.byteorder())
         if endian.lower().startswith('little'):
             data = data[::-1]
         return reduce(lambda x,y: x << 8 | six.byte2int(y), data, 0)
