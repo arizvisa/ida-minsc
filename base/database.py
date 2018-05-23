@@ -461,18 +461,6 @@ def write(ea, data, **original):
     ea, _ = interface.address.within(ea, ea + len(data))
     return idaapi.patch_many_bytes(ea, data) if original.get('original', False) else idaapi.put_many_bytes(ea, data)
 
-def iterate(start, end, step=None):
-    '''Iterate through all of the instruction and data boundaries from address ``start`` to ``end``.'''
-    step = step or (address.prev if start > end else address.next)
-    start, end = builtins.map(interface.address.head, (start, end))
-    op = operator.gt if start > end else operator.lt
-    while start != idaapi.BADADDR and op(start,end):
-        yield start
-        start = step(start)
-
-    _, right = config.bounds()
-    if end < right: yield end
-
 class names(object):
     """
     Enumerate all of the entries inside the database's names list.
@@ -816,6 +804,20 @@ def name(ea, string, *suffix, **flags):
 def name(ea, none):
     '''Removes the name at address ``ea``.'''
     return set_name(ea, None)
+
+def iterate(start, end, step=None):
+    '''Iterate through all of the instruction and data boundaries from address ``start`` to ``end``.'''
+    start, end = builtins.map(interface.address.head, (start, end))
+    left, right = config.bounds()
+
+    step = step or (address.prev if start > end else address.next)
+    op = operator.ge if start >= end else operator.lt
+
+    res = start
+    while res not in {idaapi.BADADDR, None} and left <= res < right and op(res, end):
+        yield res
+        res = step(res)
+    return
 
 def blocks(start, end):
     '''Returns each block between the addresses ``start`` and ``end``.'''
@@ -2106,13 +2108,13 @@ class type(object):
     @classmethod
     def flags(cls, ea):
         '''Returns the flags of the item at the address ``ea``.'''
-        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
+        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
         return getflags(interface.address.within(ea))
     @utils.multicase(ea=six.integer_types, mask=six.integer_types)
     @classmethod
     def flags(cls, ea, mask):
         '''Returns the flags at the address ``ea`` masked with ``mask``.'''
-        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
+        getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
         return getflags(interface.address.within(ea)) & mask
     @utils.multicase(ea=six.integer_types, mask=six.integer_types, value=six.integer_types)
     @classmethod
@@ -2124,6 +2126,18 @@ class type(object):
             idaapi.setFlags(ea, (res&~mask) | value)
             return res & mask
         raise DeprecationWarning("{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated idaapi.setFlags(...).".format('.'.join((__name__, cls.__name__)), ea, mask, value))
+
+    @utils.multicase()
+    @staticmethod
+    def is_initialized():
+        '''Return `True` if the current address is initialized.'''
+        return type.is_initialized(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @staticmethod
+    def is_initialized(ea):
+        '''Return `True` if the address specified by ``ea`` is initialized.'''
+        return type.flags(interface.address.within(ea), idaapi.FF_IVL) == idaapi.FF_IVL
+    initializedQ = utils.alias(is_initialized, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -3364,11 +3378,47 @@ class set(object):
         '''Set the data at address ``ea`` as aligned with the specified ``alignment``.'''
         if not type.is_unknown(ea):
             raise TypeError("{:s}.set.align({:#x}, ...) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea))
-        res = alignment.get('alignment', alignment.get('size', address.next(ea) - ea))
-        # FIXME: figure out how to properly calculate the alignment
-        #        and allow the users to choose it. the alignment arg
-        #        for idaapi.create_align is a power of 2.
-        return cls.data(ea, res, type=idaapi.FF_ALIGN)
+
+        # grab the size
+        if 'size' in alignment:
+            size = alignment['size']
+
+        # otherwise, figure it out by counting zeroes if address is initialized
+        elif type.is_initialized(ea):
+            size = 0
+            while read(ea + size, 1) == '\x00':
+                size += 1
+            pass
+
+        # if it's uninitialized, then use the nextlabel as a boundary
+        else:
+            size = address.nextlabel(ea) - ea
+
+        # if idaapi.create_align doesn't exist, then just hand this
+        # off to idaapi.create_data with the specified size.
+        if not hasattr(idaapi, 'create_align'):
+            return cls.data(ea, size, type=idaapi.FF_ALIGN)
+
+        # grab some defaults
+        alignment = alignment.get('alignment', None), alignment.get('size', None)
+
+        # grab the aligment
+        if 'alignment' in alignment:
+            e = math.trunc(math.log(alignment) / math.log(2))
+
+        # or we again...just figure it out via brute force
+        else:
+            e, target = 13, ea + size
+            while e > 0:
+                if target & (2**e-1) == 0:
+                    break
+                e -= 1
+
+        # we should be good to go
+        ok = idaapi.create_align(ea, size, e)
+
+        # return the new size, or a failure
+        return idaapi.get_item_size(ea) if ok else 0
     aligned = utils.alias(align, 'set')
 
     @utils.multicase()
@@ -3448,6 +3498,7 @@ class set(object):
         def oword(cls, ea):
             '''Set the data at address ``ea`` to an octal-word.'''
             return set.data(ea, 16, type=idaapi.FF_OWRD)
+    i = integer # XXX: ns alias
 
     @utils.multicase(type=_structure.structure_t)
     @classmethod
