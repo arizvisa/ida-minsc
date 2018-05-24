@@ -1331,23 +1331,31 @@ def select(**boolean):
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
+    # nothing specific was queried, so just yield all the tags
     if not boolean:
         for ea in internal.comment.globals.address():
+            ui.navigation.set(ea)
             res = function.tag(ea) if function.within(ea) else tag(ea)
             if res: yield ea, res
         return
 
+    # walk through all tags so we can cross-check them with the query
     for ea in internal.comment.globals.address():
+        ui.navigation.set(ea)
         res, d = {}, function.tag(ea) if function.within(ea) else tag(ea)
 
+        # Or(|) includes any tags that were queried
         Or = boolean.get('Or', builtins.set())
         res.update({key : value for key, value in six.iteritems(d) if key in Or})
 
+        # And(&) includes any tags that match all of the queried tagnames
         And = boolean.get('And', builtins.set())
         if And:
             if And.intersection(d.viewkeys()) == And:
                 res.update({key : value  for key, value in six.iteritems(d) if key in And})
             else: continue
+
+        # if anything matched, then yield the address and the queried tags
         if res: yield ea, res
     return
 
@@ -1364,15 +1372,20 @@ def selectcontents(**boolean):
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
+    # nothing specific was queried, so just yield all tagnames
     if not boolean:
         for ea, _ in internal.comment.contents.iterate():
+            ui.navigation.procedure(ea)
             res = internal.comment.contents.name(ea)
             if res: yield ea, res
         return
 
+    # walk through all tagnames so we can cross-check them against the query
     for ea, res in internal.comment.contents.iterate():
-        # check to see that the dict's keys match
+        ui.navigation.procedure(ea)
         res, d = builtins.set(res), internal.comment.contents._read(None, ea) or {}
+
+        # check to see that the dict's keys match
         if builtins.set(d.viewkeys()) != res:
             # FIXME: include query in warning
             logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:#x}".format(__name__, ea))
@@ -1380,15 +1393,19 @@ def selectcontents(**boolean):
         # now start aggregating the keys that the user is looking for
         res, d = builtins.set(), internal.comment.contents.name(ea)
 
+        # Or(|) includes any of the tagnames being queried
         Or = boolean.get('Or', builtins.set())
         res.update(Or.intersection(d))
 
+        # And(&) includes tags only if they include all of the specified tagnames
         And = boolean.get('And', builtins.set())
         if And:
             if And.intersection(d) == And:
                 res.update(And)
             else: continue
-        if res: yield ea,res
+
+        # if any tags matched, then yield the address and the results
+        if res: yield ea, res
     return
 selectcontent = utils.alias(selectcontents)
 

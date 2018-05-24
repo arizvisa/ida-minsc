@@ -1427,23 +1427,31 @@ def select(func, **boolean):
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
+    # nothing specific was queried, so just yield each tag
     if not boolean:
         for ea in internal.comment.contents.address(fn.startEA):
+            ui.navigation.analyze(ea)
             res = database.tag(ea)
             if res: yield ea, res
         return
 
+    # walk through every tagged address and cross-check it against query
     for ea in internal.comment.contents.address(fn.startEA):
+        ui.navigation.analyze(ea)
         res, d = {}, database.tag(ea)
 
+        # Or(|) includes any of the tags being queried
         Or = boolean.get('Or', set())
         res.update({key : value for key, value in six.iteritems(d) if key in Or})
 
+        # And(&) includes any tags only if they include all the specified tagnames
         And = boolean.get('And', set())
         if And:
             if And.intersection(d.viewkeys()) == And:
                 res.update({key : value for key, value in six.iteritems(d) if key in And})
             else: continue
+
+        # if anything matched, then yield the address and the queried tags.
         if res: yield ea, res
     return
 

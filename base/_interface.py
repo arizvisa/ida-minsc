@@ -300,22 +300,24 @@ class address(object):
     def __head1__(cls, ea, **silent):
         # Ensures that ``ea`` is pointing to a valid address
         entryframe = cls.pframe()
+        logF = logging.warn if not silent.get('silent', False) else logging.debug
 
         res = idaapi.get_item_head(ea)
-        if ea != res and not silent.get('silent', False):
-            logging.warn("{:s} : Specified address {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, ea, res))
+        if ea != res:
+            logF("{:s} : Specified address {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, ea, res))
         return res
     @classmethod
     def __head2__(cls, start, end, **silent):
         # Ensures that both ``start`` and ``end`` are pointing to valid addresses
         entryframe = cls.pframe()
+        logF = logging.warn if not silent.get('silent', False) else logging.debug
 
         res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
         # FIXME: off-by-one here, as end can be the size of the db.
-        if res_start != start and not silent.get('silent', False):
-            logging.warn("{:s} : Starting address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
-        if res_end != end and not silent.get('silent', False):
-            logging.warn("{:s} : Ending address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
+        if res_start != start:
+            logF("{:s} : Starting address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
+        if res_end != end:
+            logF("{:s} : Ending address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
         return res_start, res_end
     @classmethod
     def head(cls, *args, **silent):
@@ -331,7 +333,7 @@ class address(object):
         if not isinstance(ea, six.integer_types):
             raise TypeError("{:s} : Specified address is not of the correct type. : {!r} -> {!r}".format(entryframe.f_code.co_name, ea, ea.__class__))
         res = cls.within(ea)
-        return cls.head(res)
+        return cls.head(res, silent=True)
     @classmethod
     def __inside2__(cls, start, end):
         # Ensures that both ``start`` and ``end`` are within the database and pointing at a valid address
@@ -340,7 +342,7 @@ class address(object):
         start, end = cls.within(start, end)
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
             raise TypeError("{:s} : Specified addresses are not of the correct type. : ({!r}, {!r}) -> ({!r}, {!r})".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
-        return cls.head(start, end)
+        return cls.head(start, end, silent=True)
     @classmethod
     def inside(cls, *args):
         if len(args) > 1:
