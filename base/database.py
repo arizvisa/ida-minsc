@@ -693,10 +693,13 @@ def get_name(ea):
     if fn and fn.startEA == ea:
         return None
 
-    # now return the name at the specified address
-    aname = idaapi.get_true_name(ea) or idaapi.get_true_name(ea, ea)
+    # figure out which name function to call
+    if idaapi.__version__ < 6.8:
+        aname = idaapi.get_true_name(ea) or idaapi.get_true_name(ea, ea)
+    else:
+        aname = idaapi.get_ea_name(ea, idaapi.GN_LOCAL)
 
-    # ..or not
+    # return the name at the specified address or not
     return aname or None
 
 @utils.multicase(none=types.NoneType)
@@ -2421,17 +2424,17 @@ class type(object):
         @utils.multicase()
         def __new__(cls):
             '''Return the structure at the current address.'''
-            return get.struc(ui.current.address())
+            return get.structure(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the structure at address ``ea``.'''
-            return get.struc(ea)
+            return get.structure(ea)
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea, **sid):
             """Return the structure at address ``ea``.
             If the structure ``sid`` is specified, then use that specific structure type.
             """
-            return get.struc(ea, **sid)
+            return get.structure(ea, **sid)
 
         @utils.multicase()
         @staticmethod
@@ -3775,7 +3778,7 @@ class get(object):
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ cls.struc(ea + i*cb, id=t) for i in six.moves.range(count) ]
+            return [ cls.structure(ea + i*cb, id=t) for i in six.moves.range(count) ]
         elif T in numerics:
             ch = numerics[T]
             # FIXME: return signed version of number
@@ -3800,7 +3803,7 @@ class get(object):
     @utils.multicase()
     @classmethod
     def structure(cls):
-        return cls.struc(ui.current.address())
+        return cls.structure(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def structure(cls, ea, **structure):
@@ -3816,6 +3819,8 @@ class get(object):
             res = structure.get(key, None)
             sid = res.id if isinstance(res, _structure.structure_t) else res
 
+        # FIXME: add support for string types
+        # FIXME: consolidate this conversion into interface or something
         st = _structure.instance(sid, offset=ea)
         typelookup = {
             (int,-1) : ctypes.c_int8, (int,1) : ctypes.c_uint8,

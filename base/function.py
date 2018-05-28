@@ -147,7 +147,7 @@ def get_name(func):
         #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     res = idaapi.get_func_name(ea)
     if not res: res = get_name(ea)
-    if not res: res = idaapi.get_true_name(ea, ea)
+    if not res: res = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea)
     return res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
