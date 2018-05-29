@@ -101,13 +101,16 @@ class config(object):
     @classmethod
     def type(cls, typestr):
         lookup = {
-            'char':'size_b',
+            'bool':'size_b',
             'short':'size_s',
-            'int':'size_i',
+            'int':'size_i', 'float':'size_l', 'single':'size_l',
             'long':'size_l',
-            'longlong':'size_ll',
+            'longlong':'size_ll', 'double':'size_ll',
+            'enum':'size_e',
+            'longdouble':'size_ldbl',
+            'align':'defalign', 'alignment':'defalign',
         }
-        return getattr(cls.compiler(), lookup.get(typestr.lower(),typestr) )
+        return getattr(cls.compiler(), lookup.get(typestr.translate(None, ' ').lower(), typestr) )
 
     @classmethod
     def bits(cls):
@@ -131,13 +134,6 @@ class config(object):
         return cls.info.procName
 
     @classmethod
-    def graphview(cls):
-        '''Returns `True` if the user is currently using graph view.'''
-        if idaapi.__version__ < 7.0:
-            return cls.info.graph_view != 0
-        return cls.info.is_graph_view()
-
-    @classmethod
     def main(cls):
         return cls.info.main
 
@@ -153,7 +149,7 @@ class config(object):
 
     @classmethod
     def bounds(cls):
-        return cls.info.minEA,cls.info.maxEA
+        return cls.info.minEA, cls.info.maxEA
 
 range = bounds = utils.alias(config.bounds)
 
@@ -378,16 +374,6 @@ class segments(object):
         return segment.search(**type)
 
 @utils.multicase()
-def decode():
-    '''Decode the instruction at the current address.'''
-    res = ui.current.address()
-    return read(res, _instruction.size(res))
-@utils.multicase(ea=six.integer_types)
-def decode(ea):
-    '''Decode the instruction at the address ``ea``.'''
-    return read(ea, _instruction.size(ea))
-
-@utils.multicase()
 def instruction():
     '''Return the instruction at the current address as a string.'''
     return instruction(ui.current.address())
@@ -398,7 +384,7 @@ def instruction(ea):
     unformatted = idaapi.tag_remove(insn)
     comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
     nocomment = unformatted[:comment] if comment != -1 else unformatted
-    return reduce(lambda t,x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
+    return reduce(lambda t, x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
 
 @utils.multicase()
 def disassemble(**options):
@@ -430,8 +416,7 @@ def block(start, end):
     if start > end:
         start, end = end, start
     start, end = interface.address.within(start, end)
-    length = end-start
-    return read(start, length)
+    return read(start, end - start)
 getBlock = getblock = get_block = read_block = utils.alias(block)
 
 @utils.multicase()
@@ -724,9 +709,12 @@ def set_name(ea, string, **flags):
 
     ea = interface.address.inside(ea)
 
-    # FIXME: what's this for?
+    # XXX: what's this for?
     if idaapi.has_any_name(type.flags(ea)):
         pass
+
+    # XXX: isolate this default flags logic into a separate closure
+    #      since this logic can be short-circuited by the 'flags' parameter.
 
     # some default options
     fl = idaapi.SN_NON_AUTO

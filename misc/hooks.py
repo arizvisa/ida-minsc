@@ -301,7 +301,7 @@ def auto_queue_empty(type):
         on_ready()
 
 def __process_functions():
-    p = ui.progress()
+    p = ui.Progress()
     globals = internal.comment.globals.address()
 
     funcs = list(database.functions())
@@ -332,7 +332,7 @@ def __process_functions():
 def rebase(info):
     functions, globals = map(utils.compose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
 
-    p = ui.progress()
+    p = ui.Progress()
     p.update(current=0, title="Rebasing tagcache...", min=0, max=len(functions)+len(globals))
     fcount = gcount = 0
 

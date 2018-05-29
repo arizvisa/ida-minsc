@@ -16,25 +16,20 @@ class current(object):
     """
     Fetching things from current visual state.
 
-    Pretty much used for doing friendly user-interface type stuff.
+    Used to fetch information about what the user has currently selected.
     """
     @classmethod
     def address(cls):
-        """Current address"""
+        '''Current address'''
         return idaapi.get_screen_ea()
     @classmethod
-    def widget(cls):
-        """Current widget"""
-        x,y = Input.mouse.position()
-        return Input.at((x,y))
-    @classmethod
     def color(cls):
-        """Current color"""
+        '''Current color'''
         ea = cls.address()
         return idaapi.get_item_color(ea)
     @classmethod
     def function(cls):
-        """Current function"""
+        '''Current function'''
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
@@ -42,19 +37,20 @@ class current(object):
         return res
     @classmethod
     def segment(cls):
-        """Current segment"""
+        '''Current segment'''
         ea = cls.address()
         return idaapi.getseg(ea)
     @classmethod
     def status(cls):
-        """IDA Status"""
+        '''IDA Status'''
         raise NotImplementedError
     @classmethod
     def symbol(cls):
-        """Return the symbol name directly under the cursor"""
+        '''Return the symbol name directly under the cursor'''
         return idaapi.get_highlighted_identifier()
     @classmethod
     def selection(cls):
+        '''Return the current address range of whatever is selected'''
         view = idaapi.get_current_viewer()
         left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
         ok = idaapi.read_selection(view, left, right)
@@ -62,155 +58,79 @@ class current(object):
             raise StandardError("{:s}.selection : Unable to read selection.".format('.'.join((__name__, cls.__name__))))
         pl_l, pl_r = left.place(view), right.place(view)
         return database.address.head(pl_l.ea), database.address.tail(pl_r.ea)
+    @classmethod
+    def opnum(cls):
+        return idaapi.get_opnum()
+    @classmethod
+    def widget(cls):
+        '''Current widget'''
+        # XXX: there's probably a better way to do this rather than looking
+        #      at the mouse cursor position
+        x, y = mouse.position()
+        return widget.at((x,y))
+    @classmethod
+    def window(cls):
+        '''Return the current window that is being used.'''
+        global window
+        # FIXME: cast this to a QWindow somehow?
+        return window.main()
 
-try:
-    import PyQt5.Qt
-    from PyQt5.Qt import QObject
-
-    class root(object):
-        """
-        Get information about the root Qt objects in IDA.
-        """
-        @classmethod
-        def application(cls):
-            return PyQt5.Qt.qApp
-        @classmethod
-        def window(cls):
-            return max(cls.windows(), key=lambda w: w.width() * w.height())
-        @classmethod
-        def windows(cls):
-            q = cls.application()
-            return q.topLevelWindows()
-        @classmethod
-        def refresh(cls):
-            idaapi.refresh_lists()
-            return idaapi.refresh_idaview_anyway()
-
-    class progress(object):
-        """
-        Helper class for showing a progress-bar.
-        """
-        def __init__(self, blocking=True):
-            self.object = res = PyQt5.Qt.QProgressDialog()
-            res.setVisible(False)
-            res.setWindowModality(blocking)
-            res.setAutoClose(True)
-            path = "{:s}/{:s}".format(database.path(), database.filename())
-            self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
-
-        # properties
-        canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s,v: s.object.canceled.connect(v))
-        maximum = property(fget=lambda s: s.object.maximum())
-        minimum = property(fget=lambda s: s.object.minimum())
-        current = property(fget=lambda s: s.object.value())
-
-        # methods
-        def open(self, width=0.8, height=0.1):
-            global root
-            window = root.window()
-            w, h = window.width() * width, window.height() * height
-            self.object.setFixedWidth(w), self.object.setFixedHeight(h)
-
-            center = window.geometry().center()
-            x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
-            self.object.move(x, y)
-
-            self.object.show()
-
-        def close(self):
-            self.object.close()
-
-        def update(self, **options):
-            minimum, maximum = options.get('min', None), options.get('max', None)
-            text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
-
-            if minimum is not None:
-                self.object.setMinimum(minimum)
-            if maximum is not None:
-                self.object.setMaximum(maximum)
-            if title is not None:
-                self.object.setWindowTitle(title)
-            if tooltip is not None:
-                self.object.setToolTip(tooltip)
-            if text is not None:
-                self.object.setLabelText(text)
-
-            res = self.object.value()
-            if 'current' in options:
-                self.object.setValue(options['current'])
-            elif 'value' in options:
-                self.object.setValue(options['value'])
-            return res
-
-except ImportError:
-    logging.warn("{:s}:Unable to import PyQt5.Qt. Using console-only variation of ui module.".format(__name__))
-
-    class root(object):
-        @classmethod
-        def application(cls):
-            return PyQt5.Qt.qApp
-        @classmethod
-        def window(cls):
-            return max(cls.windows(), key=lambda w: w.width() * w.height())
-        @classmethod
-        def windows(cls):
-            q = cls.application()
-            return q.topLevelWindows()
-        @classmethod
-        def refresh(cls):
-            idaapi.refresh_lists()
-            return idaapi.refresh_idaview_anyway()
-
-    class progress(object):
-        def __init__(self, blocking=True):
-            self.__path__ = "{:s}/{:s}".format(database.path(), database.filename())
-            self.__value__ = 0
-            self.__min__, self.__max__ = 0, 0
-            return
-
-        canceled = property(fget=lambda s: False, fset=lambda s,v: None)
-        maximum = property(fget=lambda s: self.__max__)
-        minimum = property(fget=lambda s: self.__min__)
-        current = property(fget=lambda s: self.__value__)
-
-        def open(self, width=0.8, height=0.1):
-            return
-
-        def close(self):
-            return
-
-        def update(self, **options):
-            minimum, maximum = options.get('min', None), options.get('max', None)
-            text,title,tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
-
-            if minimum is not None:
-                self.__min__ = minimum
-            if maximum is not None:
-                self.__max__ = maximum
-
-            if 'current' in options:
-                self.__value__ = options['current']
-            if 'value' in options:
-                self.__value__ = options['value']
-
-            logging.info(text)
-            return self.__value__
-
-class InputBox(idaapi.PluginForm):
-    """Creating an InputBox to interact with the user"""
-    def OnCreate(self, form):
-        self.parent = self.FormToPyQtWidget(form)
-
-    def OnClose(self, form):
-        pass
-
-    def Show(self, caption, options=0):
-        return super(InputBox,self).Show(caption, options)
-
-class Names(object):
+class state(object):
     """
-    Getting information about the Names window.
+    Class for returning information about the state of IDA's interface.
     """
+    @classmethod
+    def graphview(cls):
+        """Returns `True` if the current function is being viewed in graph view mode."""
+        res = idaapi.get_inf_structure()
+        if idaapi.__version__ < 7.0:
+            return res.graph_view != 0
+        return res.is_graph_view()
+
+def refresh():
+    '''Refresh all of IDA's windows.'''
+    global disassembly
+    idaapi.refresh_lists()
+    disassembly.refresh()
+
+class disassembly(object):
+    """
+    Interacting with the Disassembly window.
+    """
+    @classmethod
+    def refresh(cls):
+        '''Refresh the main IDA disassembly view.'''
+        return idaapi.refresh_idaview_anyway()
+
+class exports(object):
+    """
+    Interacting with the Exports window.
+    """
+    @classmethod
+    def open(cls, ea):
+        global widget
+        return widget.form(idaapi.open_exports_window(ea))
+
+class imports(object):
+    """
+    Interacting with the Imports window.
+    """
+    @classmethod
+    def open(cls, ea):
+        global widget
+        return widget.form(idaapi.open_imports_window(ea))
+
+class names(object):
+    """
+    Interacting with the Names window.
+    """
+    @classmethod
+    def open(cls, ea):
+        global widget
+        return widget.form(idaapi.open_names_window(ea))
+    @classmethod
+    def refresh(cls):
+        return idaapi.refresh_lists()
     @classmethod
     def size(cls):
         return idaapi.get_nlist_size()
@@ -237,13 +157,22 @@ class Names(object):
             yield cls.at(idx)
         return
 
-class Strings(object):
+class functions(object):
     """
-    Grabbing contents from the Strings window
+    Interacting with the Functions window.
+    """
+    @classmethod
+    def open(cls, ea):
+        global widget
+        return widget.form(idaapi.open_functions_window(ea))
+
+class strings(object):
+    """
+    Interacting with the Strings window.
     """
 
     @classmethod
-    def on_openidb(cls, code, is_old_database):
+    def __on_openidb__(cls, code, is_old_database):
         if code != idaapi.NW_OPENIDB or is_old_database:
             raise RuntimeError
         config = idaapi.strwinsetup_t()
@@ -259,8 +188,15 @@ class Strings(object):
         #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:x}:{:x}".format(config.ea1, config.ea2)
 
     # FIXME: I don't think that these callbacks are stackable
-    idaapi.notify_when(idaapi.NW_OPENIDB, on_openidb)
+    idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)
 
+    @classmethod
+    def open(cls, ea):
+        global widget
+        return widget.form(idaapi.open_strings_window(ea))
+    @classmethod
+    def refresh(cls):
+        return idaapi.refresh_lists()
     @classmethod
     def size(cls):
         return idaapi.get_strlist_qty()
@@ -282,185 +218,49 @@ class Strings(object):
             yield si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
         return
 
-try:
-    # FIXME: switch over to PyQt5
-    import PyQt5.Qt
-
-    class UI(object):
-        '''static class for interacting with IDA's Qt user-interface'''
-        @classmethod
-        def application(cls):
-            return PyQt5.Qt.qApp
-            #return PyQt5.Qt.QApplication.instance()
-
-        @classmethod
-        def clipboard(cls):
-            clp = cls.application().clipboard()
-            clp = utils.multicase()
-
-        @classmethod
-        def main(cls):
-            """Return the current active window"""
-            return cls.application().activeWindow()
-
-        @classmethod
-        def at(cls, (x,y)):
-            """Return the QWidget under the specific coordinate"""
-            return cls.application().widgetAt(x,y)
-
-        class mouse(object):
-            """mouse interface"""
-            @classmethod
-            def position(cls):
-                res = PySide.QtGui.QCursor.pos()
-                return res.x(),res.y()
-            @classmethod
-            def buttons(cls):
-                return Input.application().mouseButtons()
-
-        class keyboard(object):
-            """keyboard interface"""
-            @classmethod
-            def modifiers(cls):
-                return Input.application().keyboardModifiers()
-            @classmethod
-            def input(cls):
-                return Input.application().inputContext()
-
-            hotkey = {}
-            @classmethod
-            def add(cls, key, fn):
-                """map a key to a python function"""
-                if key in cls.hotkey:
-                    idaapi.del_hotkey(cls.hotkey[key])
-                cls.hotkey[key] = res = idaapi.add_hotkey(key, fn)
-                return res
-            @classmethod
-            def rm(cls, key):
-                """unmap a key"""
-                idaapi.del_hotkey(cls.hotkey[key])
-                del(cls.hotkey[key])
-
-        # FIXME: idaapi timer's are racy and can crash ida
-        class timer(object):
-            clock = {}
-            @classmethod
-            def register(cls, id, interval, fn):
-                """register a python function as a timer"""
-                if id in cls.clock:
-                    idaapi.unregister_timer(cls.clock[id])
-
-                # XXX: need to create a closure that can terminate when signalled
-                cls.clock[id] = res = idaapi.register_timer(interval, fn)
-                return res
-            @classmethod
-            def unregister(cls, id):
-                raise NotImplementedError('need a lock or signal here')
-                idaapi.unregister_timer(cls.clock[id])
-                del(cls.clock[id])
-            @classmethod
-            def reset(cls):
-                """remove all timers"""
-                for id, clk in six.iteritems(cls.clock):
-                    idaapi.unregister_timer(clk)
-                    del(cls.clock[id])
-                return
-
-        # FIXME: add some support for actually manipulating menus
-        class menu(object):
-            state = {}
-            @classmethod
-            def add(cls, path, name, fn, hotkey='', flags=0, args=()):
-                if (path,name) in cls.state:
-                    cls.rm(path, name)
-                ctx = idaapi.add_menu_item(path, name, hotkey, flags, fn, args)
-                cls.state[path,name] = ctx
-            @classmethod
-            def rm(cls, path, name):
-                idaapi.del_menu_item( cls.state[path,name] )
-                del cls.state[path,name]
-            @classmethod
-            def reset(cls):
-                for path, name in six.iterkeys(state):
-                    cls.rm(path,name)
-                return
-
-except ImportError:
-    logging.warn("__module__ : {:s} : Unable to load PyQt5.Qt module. Certain UI.* methods might not work.".format(__name__))
-
-# for exposing the ability queueing functions asynchronously..
-# which is probably pretty unsafe in IDA, but let's hope.
-class queue(object):
+class segments(object):
     """
-    Exposes the ability to queue the execution of functions so they
-    run asynchronously.
-
-    This is probably pretty unsafe in IDA, but let's hope.
+    Interacting with the Segments window.
     """
     @classmethod
-    def __start_ida__(cls):
-        if hasattr(cls, 'execute') and not cls.execute.dead:
-            logging.warn("{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format('.'.join((__name__, cls.__name__)), cls.execute))
-            return
-        cls.execute = internal.utils.execution()
+    def open(cls, ea):
+        global widget
+        return widget.form(idaapi.open_segments_window(ea))
+
+class notepad(object):
+    """
+    Interacting with the Notepad window.
+    """
+    @classmethod
+    def open(cls, ea):
+        global widget
+        return widget.form(idaapi.open_notepad_window())
+
+class timer(object):
+    clock = {}
+    @classmethod
+    def register(cls, id, interval, fn):
+        """register a python function as a timer"""
+        if id in cls.clock:
+            idaapi.unregister_timer(cls.clock[id])
+
+        # XXX: need to create a closure that can terminate when signalled
+        cls.clock[id] = res = idaapi.register_timer(interval, fn)
+        return res
+    @classmethod
+    def unregister(cls, id):
+        raise NotImplementedError('need a lock or signal here')
+        idaapi.unregister_timer(cls.clock[id])
+        del(cls.clock[id])
+    @classmethod
+    def reset(cls):
+        """remove all timers"""
+        for id, clk in six.iteritems(cls.clock):
+            idaapi.unregister_timer(clk)
+            del(cls.clock[id])
         return
 
-    @classmethod
-    def __stop_ida__(cls):
-        if not hasattr(cls, 'execute'):
-            logging.warn("{:s}.stop : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
-            return
-        return cls.execute.release()
-
-    @classmethod
-    def __open_database__(cls, idp_modname):
-        return cls.execute.start()
-
-    @classmethod
-    def __close_database__(cls):
-        return cls.execute.stop()
-
-    @classmethod
-    def add(cls, func, *args, **kwds):
-        if not cls.execute.running:
-            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), func))
-        return cls.execute.push(func, *args, **kwds)
-
-    @classmethod
-    def pop(cls):
-        return next(cls.execute)
-
-class hook(object):
-    """
-    Exposes the ability of hooking different parts of IDA.
-    """
-    @classmethod
-    def __start_ida__(cls):
-        api = [
-            ('idp', idaapi.IDP_Hooks),
-            ('idb', idaapi.IDB_Hooks),
-            ('ui', idaapi.UI_Hooks),
-        ]
-        priorityhook = internal.interface.priorityhook
-        for attr, hookcls in api:
-            if not hasattr(cls, attr):
-                setattr(cls, attr, priorityhook(hookcls))
-            continue
-        return
-
-    @classmethod
-    def __stop_ida__(cls):
-        for api in ['idp', 'idb', 'ui']:
-            res = getattr(cls, api)
-
-            # disable every single hook
-            for name in res:
-                res.disable(name)
-
-            # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
-            res.remove()
-        return
-
+### updating the state of the colored navigation band
 class navigation(object):
     """
     Exposes the ability to update the state of the colored navigation band.
@@ -507,3 +307,373 @@ class navigation(object):
     def signature(cls, ea): return cls.auto(ea, type=idaapi.AU_LIBF)
     @classmethod
     def final(cls, ea): return cls.auto(ea, type=idaapi.AU_FINAL)
+
+### interfacing with IDA's menu system
+# FIXME: add some support for actually manipulating menus
+class menu(object):
+    state = {}
+    @classmethod
+    def add(cls, path, name, fn, hotkey='', flags=0, args=()):
+        if (path,name) in cls.state:
+            cls.rm(path, name)
+        ctx = idaapi.add_menu_item(path, name, hotkey, flags, fn, args)
+        cls.state[path,name] = ctx
+    @classmethod
+    def rm(cls, path, name):
+        idaapi.del_menu_item( cls.state[path,name] )
+        del cls.state[path,name]
+    @classmethod
+    def reset(cls):
+        for path, name in six.iterkeys(state):
+            cls.rm(path,name)
+        return
+
+### Qt wrappers and namespaces
+def application():
+    raise NotImplementedError
+
+class window(object):
+    """
+    selecting a specific or particular window.
+    """
+    @classmethod
+    def viewer(cls):
+        return idaapi.get_current_viewer()
+    @classmethod
+    def main(cls):
+        """Return the active main window"""
+        global application
+        q = application()
+        return q.activeWindow()
+
+class windows(object):
+    """
+    enumerating and filtering all the window types that are available.
+    """
+    def __new__(cls):
+        global application
+        q = application()
+        return q.topLevelWindows()
+
+class widget(object):
+    """
+    selecting a specific or particular widget.
+    """
+    def __new__(self, (x, y)):
+        res = (x, y)
+        return cls.at(res)
+    @classmethod
+    def at(cls, (x, y)):
+        global application
+        q = application()
+        return q.widgetAt(x, y)
+    @classmethod
+    def form(cls, twidget):
+        raise NotImplementedError
+
+class clipboard(object):
+    """
+    interacting with the clipboard state.
+    """
+    def __new__(cls):
+        global application
+        clp = application()
+        return clp.clipboard()
+
+class mouse(object):
+    '''mouse interface'''
+    @classmethod
+    def buttons(cls):
+        global application
+        q = application()
+        return q.mouseButtons()
+
+class keyboard(object):
+    '''keyboard interface'''
+    @classmethod
+    def modifiers(cls):
+        global application
+        q = application()
+        return q.keyboardModifiers()
+
+    hotkey = {}
+    @classmethod
+    def map(cls, key, fn):
+        '''map a key to a python function'''
+        if key in cls.hotkey:
+            idaapi.del_hotkey(cls.hotkey[key])
+        cls.hotkey[key] = res = idaapi.add_hotkey(key, fn)
+        return res
+    @classmethod
+    def unmap(cls, key):
+        '''unmap a key'''
+        idaapi.del_hotkey(cls.hotkey[key])
+        del(cls.hotkey[key])
+    add, rm = internal.utils.alias(map, 'keyboard'), internal.utils.alias(unmap, 'keyboard')
+
+### PyQt5-specific functions and namespaces
+## these can overwrite any of the classes defined above
+try:
+    import PyQt5.Qt
+    from PyQt5.Qt import QObject
+
+    def application():
+        q = PyQt5.Qt.qApp
+        return q.instance()
+
+    class mouse(mouse):
+        '''mouse interface'''
+        @classmethod
+        def position(cls):
+            qt = PyQt5.QtGui.QCursor
+            res = qt.pos()
+            return res.x(), res.y()
+
+    class keyboard(keyboard):
+        '''PyQt5 keyboard interface'''
+        @classmethod
+        def input(cls):
+            raise NotImplementedError
+
+    class UIProgress(object):
+        """
+        Helper class used to construct and show a progress-bar in PyQt5.
+        """
+        def __init__(self, blocking=True):
+            self.object = res = PyQt5.Qt.QProgressDialog()
+            res.setVisible(False)
+            res.setWindowModality(blocking)
+            res.setAutoClose(True)
+            path = "{:s}/{:s}".format(database.path(), database.filename())
+            self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
+
+        # properties
+        canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s,v: s.object.canceled.connect(v))
+        maximum = property(fget=lambda s: s.object.maximum())
+        minimum = property(fget=lambda s: s.object.minimum())
+        current = property(fget=lambda s: s.object.value())
+
+        # methods
+        def open(self, width=0.8, height=0.1):
+            global current
+            window = current.window()
+            w, h = window.width() * width, window.height() * height
+            self.object.setFixedWidth(w), self.object.setFixedHeight(h)
+
+            center = window.geometry().center()
+            x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
+            self.object.move(x, y)
+
+            self.object.show()
+
+        def close(self):
+            self.object.close()
+
+        def update(self, **options):
+            minimum, maximum = options.get('min', None), options.get('max', None)
+            text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
+
+            if minimum is not None:
+                self.object.setMinimum(minimum)
+            if maximum is not None:
+                self.object.setMaximum(maximum)
+            if title is not None:
+                self.object.setWindowTitle(title)
+            if tooltip is not None:
+                self.object.setToolTip(tooltip)
+            if text is not None:
+                self.object.setLabelText(text)
+
+            res = self.object.value()
+            if 'current' in options:
+                self.object.setValue(options['current'])
+            elif 'value' in options:
+                self.object.setValue(options['value'])
+            return res
+
+    class widget(widget):
+        @classmethod
+        def form(cls, twidget):
+            ns = idaapi.PluginForm
+            return ns.FormToPyQtWidget(twidget)
+
+except ImportError:
+    logging.warn("{:s}:Unable to locate PyQt5.Qt module.".format(__name__))
+
+### PySide-specific functions and namespaces
+try:
+    import PySide
+    import PySide.QtCore, PySide.QtGui
+
+    def application():
+        res = PySide.QtCore.QCoreApplication
+        return res.instance()
+
+    class mouse(mouse):
+        """mouse interface"""
+        @classmethod
+        def position(cls):
+            qt = PySide.QtGui.QCursor
+            res = qt.pos()
+            return res.x(), res.y()
+
+    class keyboard(keyboard):
+        """PySide keyboard interface"""
+        @classmethod
+        def input(cls):
+            return q.inputContext()
+
+    class widget(widget):
+        @classmethod
+        def form(cls, twidget):
+            ns = idaapi.PluginForm
+            return ns.FormToPySideWidget(twidget)
+
+except ImportError:
+    logging.warn("{:s}:Unable to locate PySide module.".format(__name__))
+
+### wrapper that uses a priorityhook around IDA's hooking capabilities.
+class hook(object):
+    """
+    Exposes the ability of hooking different parts of IDA.
+    """
+    @classmethod
+    def __start_ida__(cls):
+        api = [
+            ('idp', idaapi.IDP_Hooks),
+            ('idb', idaapi.IDB_Hooks),
+            ('ui', idaapi.UI_Hooks),
+        ]
+        priorityhook = internal.interface.priorityhook
+        for attr, hookcls in api:
+            if not hasattr(cls, attr):
+                setattr(cls, attr, priorityhook(hookcls))
+            continue
+        return
+
+    @classmethod
+    def __stop_ida__(cls):
+        for api in ['idp', 'idb', 'ui']:
+            res = getattr(cls, api)
+
+            # disable every single hook
+            for name in res:
+                res.disable(name)
+
+            # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
+            res.remove()
+        return
+
+### for queueing the execution of a function asynchronously.
+## (which is probably pretty unsafe in IDA, but let's hope).
+class queue(object):
+    """
+    Exposes the ability to queue the execution of functions so they
+    run asynchronously.
+
+    This is probably pretty unsafe in IDA, but let's hope.
+    """
+    @classmethod
+    def __start_ida__(cls):
+        if hasattr(cls, 'execute') and not cls.execute.dead:
+            logging.warn("{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format('.'.join((__name__, cls.__name__)), cls.execute))
+            return
+        cls.execute = internal.utils.execution()
+        return
+
+    @classmethod
+    def __stop_ida__(cls):
+        if not hasattr(cls, 'execute'):
+            logging.warn("{:s}.stop : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
+            return
+        return cls.execute.release()
+
+    @classmethod
+    def __open_database__(cls, idp_modname):
+        return cls.execute.start()
+
+    @classmethod
+    def __close_database__(cls):
+        return cls.execute.stop()
+
+    @classmethod
+    def add(cls, func, *args, **kwds):
+        if not cls.execute.running:
+            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), func))
+        return cls.execute.push(func, *args, **kwds)
+
+    @classmethod
+    def pop(cls):
+        return next(cls.execute)
+
+### Helper classes to use or inherit from
+# XXX: why was this base class implemented again??
+class InputBox(idaapi.PluginForm):
+    """Creating an InputBox to interact with the user"""
+    def OnCreate(self, form):
+        self.parent = self.FormToPyQtWidget(form)
+
+    def OnClose(self, form):
+        pass
+
+    def Show(self, caption, options=0):
+        return super(InputBox,self).Show(caption, options)
+
+### figure out which progress-bar to define as `Progress`.
+# if a UIProgress one was successfully defined, then use that one.
+if 'UIProgress' in locals():
+    class Progress(UIProgress): pass
+
+# otherwise we just fall-back to the console-only one.
+else:
+    logging.warn("{:s}:Using console-only implementation of the ui.progress class.".format(__name__))
+    class ConsoleProgress(object):
+        """
+        Helper class used to construct and show a progress-bar using the console.
+        """
+        def __init__(self, blocking=True):
+            self.__path__ = "{:s}/{:s}".format(database.path(), database.filename())
+            self.__value__ = 0
+            self.__min__, self.__max__ = 0, 0
+            return
+
+        canceled = property(fget=lambda s: False, fset=lambda s,v: None)
+        maximum = property(fget=lambda s: self.__max__)
+        minimum = property(fget=lambda s: self.__min__)
+        current = property(fget=lambda s: self.__value__)
+
+        def open(self, width=0.8, height=0.1):
+            return
+
+        def close(self):
+            return
+
+        def update(self, **options):
+            minimum, maximum = options.get('min', None), options.get('max', None)
+            text,title,tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
+
+            if minimum is not None:
+                self.__min__ = minimum
+            if maximum is not None:
+                self.__max__ = maximum
+
+            if 'current' in options:
+                self.__value__ = options['current']
+            if 'value' in options:
+                self.__value__ = options['value']
+
+            logging.info(text)
+            return self.__value__
+    class Progress(ConsoleProgress): pass
+
+def ask(string, **default):
+    state = {'no': 0, 'yes': 1, 'cancel': -1}
+    results = {0: False, 1: True}
+    if default:
+        keys = {n for n in default.viewkeys()}
+        keys = {n.lower() for n in keys if default.get(n, False)}
+        dflt = next((k for k in keys), 'cancel')
+    else:
+        dflt = 'cancel'
+    res = idaapi.ask_yn(state[dflt], string)
+    return results.get(res, None)

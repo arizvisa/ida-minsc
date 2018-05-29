@@ -1,9 +1,11 @@
 import six, sys, logging
 from six.moves import builtins
 
+import functools, operator, itertools, types
+import logging
+
 import database, function, instruction
-import ui
-import internal
+import ui, internal
 
 class remote(object):
     '''For poor folk without a dbgeng'''
@@ -274,3 +276,59 @@ def map(F, **kwargs):
             print("{:x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
     return result
 
+# XXX: This namespace should be deprecated
+class function(object):
+    """
+    Tools for iterating through a function looking for a match of some kind.
+    """
+
+    @internal.utils.multicase(regex=six.string_types)
+    @classmethod
+    def regex(cls, regex):
+        '''Return each instruction in the current function that matches the string ``regex``.'''
+        return cls.regex(ui.current.function(), regex)
+    @internal.utils.multicase(regex=six.string_types)
+    @classmethod
+    def regex(cls, func, regex):
+        '''Return each instruction in the function ``func`` that matches the string ``regex``.'''
+        pattern = re.compile(regex, re.I)
+        for ea in function.iterate(func):
+            insn = re.sub(' +', ' ', database.instruction(ea))
+            if pattern.search(insn) is not None:
+                yield ea
+            continue
+        return
+
+    @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
+    @classmethod
+    def instruction(cls, F):
+        '''Search through the current function for any instruction that matches with the callable ``F``.'''
+        return cls.instruction(ui.current.address(), F)
+    @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
+    @classmethod
+    def instruction(cls, func, F):
+        """Search through the function ``func`` for any instruction that matches with the callable ``F``.
+        ``F`` is a callable that takes one argument which is the result of database.instruction(ea).
+        """
+        for ea in function.iterate(func):
+            res = database.instruction(ea)
+            if F(res):
+                yield ea
+            continue
+        return
+
+    @classmethod
+    def address(cls, F):
+        '''Search through the current function for any address that matches with the callable ``F``.'''
+        return cls.instruction(ui.current.address(), F)
+    @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
+    @classmethod
+    def address(cls, func, F):
+        """Search through the function ``func`` for any address that matches with the callable ``F``.
+        ``F`` is a callable that takes one argument which is passed the address to match.
+        """
+        for ea in function.iterate(func):
+            if F(ea):
+                yield ea
+            continue
+        return
