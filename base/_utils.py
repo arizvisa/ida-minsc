@@ -201,7 +201,7 @@ class multicase(object):
     @classmethod
     def match(cls, (args, kwds), heap):
         # FIXME: yep, done in O(n) time.
-        for f, types, (sa, af, defaults, (argname, kwdname)) in heap:
+        for f, ts, (sa, af, defaults, (argname, kwdname)) in heap:
             # populate our arguments
             ac, kc = (n for n in args), dict(kwds)
 
@@ -226,8 +226,11 @@ class multicase(object):
             if len(a) != len(af[sa:]):
                 continue
 
+            # figure out how to match the types by checking if it's a regular type or it's a callable
+            predicateF = lambda t: callable if t == callable else (lambda v: isinstance(v, t))
+
             # now we can finally start checking that the types match
-            if any(not isinstance(v, types[k]) for k, v in zip(af[sa:], a) if k in types):
+            if any(not predicateF(ts[t])(v) for t, v in zip(af[sa:], a) if t in ts):
                 continue
 
             # we should have a match
