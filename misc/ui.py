@@ -456,14 +456,22 @@ try:
         # methods
         def open(self, width=0.8, height=0.1):
             global window
-            main = window.main()
+
+            # XXX: spin until main is defined because IDA seems to be racy..
+            main = None
+            while main is None:
+                main = window.main()
+
+            # now we can calculate the dimensions of the progress bar
             w, h = main.width() * width, main.height() * height
             self.object.setFixedWidth(w), self.object.setFixedHeight(h)
 
+            # ...and center it.
             center = main.geometry().center()
             x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
             self.object.move(x, y)
 
+            # now everything should look good.
             self.object.show()
 
         def close(self):
