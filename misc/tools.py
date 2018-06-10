@@ -55,7 +55,7 @@ def recovermarks():
         m = set( (l['marks']) if hasattr(l['marks'],'__iter__') else [int(x,16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
         res = [(ea,d['mark']) for ea,d in function.select(fn,'mark')]
         if m != set(a for a,_ in res):
-            logging.warning("{:x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, builtins.map(hex,m), builtins.map(hex,set(a for a,_ in res))))
+            logging.warning("{:#x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, builtins.map(hex,m), builtins.map(hex,set(a for a,_ in res))))
         result.extend(res)
     result.sort(cmp=lambda x,y: cmp(x[1],y[1]))
 
@@ -66,21 +66,21 @@ def recovermarks():
     # create tags
     for x,y in result.items():
         if x in current:
-            logging.warning("{:x}: skipping already existing mark : {!r}".format(x, current[x]))
+            logging.warning("{:#x}: skipping already existing mark : {!r}".format(x, current[x]))
             continue
 
         # x not in current
         if x not in current:
-            logging.info("{:x}: adding missing mark due to tag : {!r}".format(x, result[x]))
+            logging.info("{:#x}: adding missing mark due to tag : {!r}".format(x, result[x]))
         elif current[x] != result[x]:
-            logging.info("{:x}: database tag is different than mark description : {!r}".format(x, result[x]))
+            logging.info("{:#x}: database tag is different than mark description : {!r}".format(x, result[x]))
         else:
             assert current[x] == result[x]
         database.mark(x, y)
 
     # marks that aren't reachable in the database
     for ea in set(current.viewkeys()).difference(result.viewkeys()):
-        logging.warning("{:x}: unreachable mark (global) : {!r}".format(ea, current[ea]))
+        logging.warning("{:#x}: unreachable mark (global) : {!r}".format(ea, current[ea]))
 
     # color them
     colormarks()
@@ -112,8 +112,8 @@ def checkmarks():
         return
 
     for k,v in functions:
-        print >>sys.stdout, "{:x} : in function {:s}".format(k,function.name(function.byAddress(k)))
-        print >>sys.stdout, '\n'.join( ("- {:x} : {:s}".format(a,m) for a,m in sorted(v)) )
+        print >>sys.stdout, "{:#x} : in function {:s}".format(k,function.name(function.byAddress(k)))
+        print >>sys.stdout, '\n'.join( ("- {:#x} : {:s}".format(a,m) for a,m in sorted(v)) )
     return
 
 def collect(ea, sentinel):
@@ -121,7 +121,7 @@ def collect(ea, sentinel):
     if isinstance(sentinel, list):
         sentinel = set(sentinel)
     if not all((sentinel, isinstance(sentinel, set))):
-        raise AssertionError("{:s}.collect({:x}, {!r}) : Sentinel is empty or not a set.".format(__name__, ea, sentinel))
+        raise AssertionError("{:s}.collect({:#x}, {!r}) : Sentinel is empty or not a set.".format(__name__, ea, sentinel))
     def _collect(addr, result):
         process = set()
         for blk in builtins.map(function.block, function.block.after(addr)):
@@ -139,14 +139,14 @@ def collectcall(ea, sentinel=set()):
     if isinstance(sentinel, list):
         sentinel = set(sentinel)
     if not isinstance(sentinel, set):
-        raise AssertionError("{:s}.collectcall({:x}, {!r}) : Sentinel is not a set.".format(__name__, ea, sentinel))
+        raise AssertionError("{:s}.collectcall({:#x}, {!r}) : Sentinel is not a set.".format(__name__, ea, sentinel))
     def _collectcall(addr, result):
         process = set()
         for f in function.down(addr):
             if any(f in coll for coll in (result, sentinel)):
                 continue
             if not function.within(f):
-                logging.warn("{:s}.collectcall({:x}, {!r}) : Adding non-function address {:#x} ({:s}).".format(__name__, ea, sentinel, f, database.name(f)))
+                logging.warn("{:s}.collectcall({:#x}, {!r}) : Adding non-function address {:#x} ({:s}).".format(__name__, ea, sentinel, f, database.name(f)))
                 result.add(f)
                 continue
             process.add(f)
@@ -158,12 +158,12 @@ def collectcall(ea, sentinel=set()):
 
 def above(ea, includeSegment=False):
     '''Display all the callers of the function at /ea/'''
-    tryhard = lambda ea: "{:s}+{:x}".format(function.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "+{:x}".format(ea) if function.name(ea) is None else function.name(ea)
+    tryhard = lambda ea: "{:s}{:+x}".format(function.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "{:+x}".format(ea) if function.name(ea) is None else function.name(ea)
     return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in function.up(ea))
 
 def below(ea, includeSegment=False):
     '''Display all the functions that the function at /ea/ can call'''
-    tryhard = lambda ea: "{:s}+{:x}".format(function.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "+{:x}".format(ea) if function.name(ea) is None else function.name(ea)
+    tryhard = lambda ea: "{:s}{:+x}".format(function.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "{:+x}".format(ea) if function.name(ea) is None else function.name(ea)
     return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in function.down(ea))
 
 # FIXME: this only works on x86 where args are pushed via stack
@@ -191,7 +191,7 @@ def makecall(ea=None, target=None):
             if len(result) == 0: raise TypeError("{:s}.makecall({!r},{!r}) : Unable to determine number of arguments".format(__name__, ea, target))
 
         if len(result) != 1:
-            raise ValueError("{:s}.makecall({!r},{!r}) : Too many targets for call at {:x} : {!r}".format(__name__, ea, result))
+            raise ValueError("{:s}.makecall({!r},{!r}) : Too many targets for call at {:#x} : {!r}".format(__name__, ea, result))
         fn, = result
     else:
         fn = target
@@ -207,7 +207,7 @@ def makecall(ea=None, target=None):
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
 #    result = ["{:s}={:s}".format(name,instruction.op_repr(ea, 0)) for name,ea in result]
-    result = ["({:x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea,0), write=1), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea,0), write=1))) if instruction.op_type(ea,0) == 'reg' else instruction.op_repr(ea, 0)) for name,ea in result]
+    result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea,0), write=1), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea,0), write=1))) if instruction.op_type(ea,0) == 'reg' else instruction.op_repr(ea, 0)) for name,ea in result]
 
     try:
         return "{:s}({:s})".format(internal.declaration.demangle(function.name(function.by_address(fn))), ','.join(result))
@@ -270,10 +270,10 @@ def map(F, **kwargs):
         try:
             for i, ea in enumerate(all):
                 ui.navigation.set(ea)
-                print("{:x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
+                print("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
                 result.append( f((i, ea), **kwargs) )
         except KeyboardInterrupt:
-            print("{:x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
+            print("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
     return result
 
 # XXX: This namespace should be deprecated

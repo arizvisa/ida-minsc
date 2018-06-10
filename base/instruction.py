@@ -265,7 +265,7 @@ def at(ea):
     '''Returns the `idaapi.insn_t` instance at the address ``ea``.'''
     ea = interface.address.inside(ea)
     if not database.is_code(ea):
-        raise TypeError("{:s}.at({:x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
+        raise TypeError("{:s}.at({:#x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
     length = idaapi.decode_insn(ea)
     if idaapi.__version__ < 7.0:
         return idaapi.cmd.copy()
@@ -562,7 +562,7 @@ def op_segment(ea, n):
     if segment:
         global architecture
         return architecture.by_index(segment)
-    #raise NotImplementedError("{:s}.op_segment({:x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
+    #raise NotImplementedError("{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
     return None
 
 ## flags
@@ -626,7 +626,7 @@ def op_refs(ea, n):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the ``n``th operand of the instruction at ``ea``.'''
     fn = idaapi.get_func(ea)
     if fn is None:
-        raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to locate function for address. : {:x}".format(__name__, ea, n, ea))
+        raise LookupError("{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address. : {:#x}".format(__name__, ea, n, ea))
     inst = at(ea)
 
     # sanity: returns whether the operand has a local or global xref
@@ -651,7 +651,7 @@ def op_refs(ea, n):
             member, stkofs = idaapi.get_stkvar(inst, op, res)
 
         if stkofs != stkofs_:
-            logging.warn("{:s}.op_refs({:x}, {:d}) : Stack offsets for instruction operand do not match. : {:x} != {:x}".format(__name__, inst.ea, n, stkofs, stkofs_))
+            logging.warn("{:s}.op_refs({:#x}, {:d}) : Stack offsets for instruction operand do not match. : {:#x} != {:#x}".format(__name__, inst.ea, n, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
@@ -673,7 +673,7 @@ def op_refs(ea, n):
         else:
             ok = idaapi.get_stroff_path(pathvar.cast(), delta.cast(), inst.ea, n)
         if not ok:
-            raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to get structure id for operand.".format(__name__, inst.ea, n))
+            raise LookupError("{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand.".format(__name__, inst.ea, n))
 
         # get the structure offset and then figure its member
         addr = operator.attrgetter('value' if idaapi.__version__ < 7.0 else 'addr')     # FIXME: this will be incorrect for an offsetted struct
@@ -681,17 +681,17 @@ def op_refs(ea, n):
 
         st = idaapi.get_struc(pathvar[0])
         if st is None:
-            raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to get structure for id. : {:x}".format(__name__, inst.ea, n, pathvar[0]))
+            raise LookupError("{:s}.op_refs({:#x}, {:d}) : Unable to get structure for id. : {:#x}".format(__name__, inst.ea, n, pathvar[0]))
 
         mem = idaapi.get_member(st, memofs)
         if mem is None:
-            raise LookupError("{:s}.op_refs({:x}, {:d}) : Unable to find member for offset in structure {:x}. : {:x}".format(__name__, inst.ea, n, st.id, memofs))
+            raise LookupError("{:s}.op_refs({:#x}, {:d}) : Unable to find member for offset in structure {:#x}. : {:#x}".format(__name__, inst.ea, n, st.id, memofs))
 
         # extract the references
         x = idaapi.xrefblk_t()
 
         if not x.first_to(mem.id, 0):
-            logging.warn("{:s}.op_refs({:x}, {:d}) : No references found to struct member {:s}.".format(__name__, inst.ea, n, mem.fullname))
+            logging.warn("{:s}.op_refs({:#x}, {:d}) : No references found to struct member {:s}.".format(__name__, inst.ea, n, mem.fullname))
 
         refs = [ (x.frm,x.iscode,x.type) ]
         while x.next_to():
@@ -938,7 +938,7 @@ class operand_types:
 
             else:
                 optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-                raise TypeError("{:s}.phrase(...) : {:s},{:s},{:s} : Unable to determine the operand format for op.type {:d} : {:x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
+                raise TypeError("{:s}.phrase(...) : {:s},{:s},{:s} : Unable to determine the operand format for op.type {:d} : {:#x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
@@ -967,7 +967,7 @@ class operand_types:
 
             else:
                 optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-                raise TypeError("{:s}.phrase(...) : {:s} : Unable to determine the operand format for op.type {:d} : {:x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
+                raise TypeError("{:s}.phrase(...) : {:s} : Unable to determine the operand format for op.type {:d} : {:#x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
             offset = op.addr
 
         else:

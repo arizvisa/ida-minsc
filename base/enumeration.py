@@ -55,7 +55,7 @@ def by_index(index):
     '''Return the identifier for the enumeration at the specified ``index``.'''
     res = idaapi.getn_enum(index)
     if res == idaapi.BADADDR:
-        raise LookupError("{:s}.by_index({:x}) : Unable to locate enumeration.".format(__name__, index))
+        raise LookupError("{:s}.by_index({:#x}) : Unable to locate enumeration.".format(__name__, index))
     return res
 byIndex = utils.alias(by_index)
 
@@ -279,7 +279,7 @@ class member(object):
 
         err = {getattr(idaapi, n) : n for n in ('ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV')}
         if ok in err.viewkeys():
-            raise ValueError("{:s}.add({:x}, {!r}, {:x}, bitmask={!r}) : Unable to add member to enumeration. : {:s}({:d})".format('.'.join((__name__,cls.__name__)), eid, name, value, bitmask, err[ok], ok))
+            raise ValueError("{:s}.add({:#x}, {!r}, {:#x}, bitmask={!r}) : Unable to add member to enumeration. : {:s}({:d})".format('.'.join((__name__,cls.__name__)), eid, name, value, bitmask, err[ok], ok))
         return cls.by_value(eid, value)
     new = create = utils.alias(add, 'member')
 
@@ -291,7 +291,7 @@ class member(object):
         # XXX: is a serial of 0 valid?
         res = idaapi.del_enum_member(cls.parent(mid), value, 0, idaapi.BADADDR & cls.mask(mid))
         if not res:
-            raise LookupError("{:s}.member._remove({:x}) : Unable to remove member from enumeration.".format(__name__, mid))
+            raise LookupError("{:s}.member._remove({:#x}) : Unable to remove member from enumeration.".format(__name__, mid))
         return res
     @utils.multicase()
     @classmethod
@@ -309,13 +309,13 @@ class member(object):
         eid = by(enum)
         try: return next(m for i,m in enumerate(cls.iterate(eid)) if i == index)
         except StopIteration: pass
-        raise LookupError("{:s}.by_index({:x}, {:d}) : Unable to locate member by index.".format('.'.join((__name__,cls.__name__)), eid, index))
+        raise LookupError("{:s}.by_index({:#x}, {:d}) : Unable to locate member by index.".format('.'.join((__name__,cls.__name__)), eid, index))
 
     @classmethod
     def by_identifier(cls, enum, mid):
         eid = by(enum)
         if cls.parent(mid) != eid:
-            raise LookupError("{:s}.by_identifier({:x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__,cls.__name__)), eid, index))
+            raise LookupError("{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__,cls.__name__)), eid, index))
         return mid
 
     @classmethod
@@ -325,7 +325,7 @@ class member(object):
         bmask = idaapi.BADADDR & mask(eid)
         res,_ = idaapi.get_first_serial_enum_member(eid, value, bmask)
         if res == idaapi.BADADDR:
-            raise LookupError("{:s}.by_value({:x}, {:d}) : Unable to locate member by value.".format('.'.join((__name__,cls.__name__)), eid, value))
+            raise LookupError("{:s}.by_value({:#x}, {:d}) : Unable to locate member by value.".format('.'.join((__name__,cls.__name__)), eid, value))
         return res
     byValue = utils.alias(by_value, 'member')
 

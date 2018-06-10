@@ -334,10 +334,10 @@ def list(**type):
 
     maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
     maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), len), res) or [1])
-    maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
+    maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), res) or [1])
 
     for st in res:
-        six.print_("[{:{:d}d}] {:>{:d}s} {:<+{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {:s}".format(st.comment) if st.comment else ''))
+        six.print_("[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {:s}".format(st.comment) if st.comment else ''))
     return
 
 @utils.multicase(structure=structure_t)
@@ -440,7 +440,7 @@ def apply_op(id, ea, opnum, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise TypeError("{:s}.apply_op({:x}, {:x}, {:d}, delta={:d}) : Item type at requested address is not code.".format(__name__, id, ea, opnum, delta.get('delta', 0)))
+        raise TypeError("{:s}.apply_op({:#x}, {:#x}, {:d}, delta={:d}) : Item type at requested address is not code.".format(__name__, id, ea, opnum, delta.get('delta', 0)))
     # FIXME: allow one to specify more than one field for tid_array
     length = 2
     tid = idaapi.tid_array(length)
@@ -690,12 +690,12 @@ class members_t(object):
         escape = repr
         maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
         maxoffset = max(builtins.map(utils.fcompose(operator.attrgetter('offset'), "{:x}".format, len), res) or [1])
-        maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
+        maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), res) or [1])
         maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), escape, len), res) or [1])
         maxtype = max(builtins.map(utils.fcompose(operator.attrgetter('type'), repr, len), res) or [1])
 
         for m in res:
-            six.print_("[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {:s}".format(m.comment) if m.comment else ''))
+            six.print_("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {:s}".format(m.comment) if m.comment else ''))
         return
 
     @utils.multicase()
@@ -705,8 +705,8 @@ class members_t(object):
 
         res = builtins.list(self.iterate(**type))
         if len(res) > 1:
-            map(logging.info, (("[{:d}] {:x}:+{:x} '{:s}' {!r}".format(m.index, m.offset, m.size, m.name, m.type)) for m in res))
-            logging.warn("{:s}.instance({:s}).members.by({:s}) : Found {:d} matching results, returning the first one. : [{:d}] {:x}:+{:x} '{:s}' {!r}".format(__name__, self.owner.name, searchstring, len(res), res[0].index, res[0].offset, res[0].size, res[0].fullname, res[0].type))
+            map(logging.info, (("[{:d}] {:x}:{:+#x} '{:s}' {!r}".format(m.index, m.offset, m.size, m.name, m.type)) for m in res))
+            logging.warn("{:s}.instance({:s}).members.by({:s}) : Found {:d} matching results, returning the first one. : [{:d}] {:x}:{:+#x} '{:s}' {!r}".format(__name__, self.owner.name, searchstring, len(res), res[0].index, res[0].offset, res[0].size, res[0].fullname, res[0].type))
 
         res = next(iter(res), None)
         if res is None:
@@ -849,10 +849,10 @@ class members_t(object):
             name, t, ofs, size, comment = m.name, m.type, m.offset, m.size, m.comment
             result.append((i, name, t, ofs, size, comment))
             mn = max((mn, len(name)))
-            ms = max((ms, len("{:x}".format(size))))
+            ms = max((ms, len("{:+#x}".format(size))))
         mi = len("{:d}".format(len(self)))
         mo = max(map(len, map("{:x}".format, (self.baseoffset, self.baseoffset+self.owner.size))))
-        return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, "'{:s}'".format(n), mn+2, t, " // {:s}".format(c) if c else '') for i, n, t, o, s, c in result))
+        return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, "'{:s}'".format(n), mn+2, t, " // {:s}".format(c) if c else '') for i, n, t, o, s, c in result))
 
 class member_t(object):
     '''Contains information about a particular member within a given structure'''

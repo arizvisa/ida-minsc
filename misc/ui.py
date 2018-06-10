@@ -185,7 +185,7 @@ class strings(object):
         res = [idaapi.ASCSTR_TERMCHR,idaapi.ASCSTR_PASCAL,idaapi.ASCSTR_LEN2,idaapi.ASCSTR_UNICODE,idaapi.ASCSTR_LEN4,idaapi.ASCSTR_ULEN2,idaapi.ASCSTR_ULEN4]
         config.strtypes = reduce(lambda t,c: t | (2**c), res, 0)
         assert idaapi.set_strlist_options(config)
-        #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:x}:{:x}".format(config.ea1, config.ea2)
+        #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
     # FIXME: I don't think that these callbacks are stackable
     idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)

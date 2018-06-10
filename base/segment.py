@@ -238,12 +238,12 @@ def repr():
     segment = ui.current.segment()
     if segment is None:
         raise LookupError("{:s}.repr() : Not currently positioned within a segment".format(__name__))
-    return "{:s} {:s} {:x}-{:x} (+{:x})".format(object.__repr__(segment),idaapi.get_true_segm_name(segment),segment.startEA,segment.endEA,segment.endEA-segment.startEA)
+    return repr(segment)
 @utils.multicase()
 def repr(segment):
     '''Return the specified ``segment`` in a printable form.'''
     seg = by(segment)
-    return "{:s} {:s} {:x}-{:x} (+{:x})".format(object.__repr__(seg),idaapi.get_true_segm_name(seg),seg.startEA,seg.endEA,seg.endEA-seg.startEA)
+    return "{:s} {:s} {:#x}-{:#x} ({:+#x})".format(object.__repr__(seg),idaapi.get_true_segm_name(seg),seg.startEA,seg.endEA,seg.endEA-seg.startEA)
 
 @utils.multicase()
 def top():
@@ -427,7 +427,7 @@ def new(offset, size, name, **kwds):
     """
     s = idaapi.get_segm_by_name(name)
     if s is not None:
-        logging.fatal("{:s}.new({:x}, {:x}, {!r}, {!r}) : a segment with the specified name already exists : {:s}".format(__name__, offset, size, name, kwds, name))
+        logging.fatal("{:s}.new({:#x}, {:+#x}, {!r}, {!r}) : a segment with the specified name already exists : {:s}".format(__name__, offset, size, name, kwds, name))
         return None
 
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits()) # FIXME: use disassembler default bit length instead of 32
@@ -436,7 +436,7 @@ def new(offset, size, name, **kwds):
     if bits == 16:
         org = kwds.get('org',0)
         if org&0xf > 0:
-            logging.fatal("{:s}.new({:x}, {:x}, {!r}, {!r}) : origin (.org) is not aligned to the size of a paragraph (0x10) : {:x}".format(__name__, offset, size, name, kwds, org))
+            logging.fatal("{:s}.new({:#x}, {:+#x}, {!r}, {!r}) : origin (.org) is not aligned to the size of a paragraph (0x10) : {:#x}".format(__name__, offset, size, name, kwds, org))
             return None
 
         para = offset/16
@@ -472,7 +472,7 @@ def new(offset, size, name, **kwds):
 
     res = idaapi.add_segm_ex(s, name, "", idaapi.ADDSEG_NOSREG|idaapi.ADDSEG_SPARSE)
     if res == 0:
-        logging.warn("{:s}.new({:x}, {:x}, {!r}, {!r}) : unable to add a new segment".format(__name__, offset, size, name, kwds))
+        logging.warn("{:s}.new({:#x}, {:+#x}, {!r}, {!r}) : unable to add a new segment".format(__name__, offset, size, name, kwds))
         res = idaapi.del_selector(sel)
         #assert res != 0
         return None
@@ -487,7 +487,7 @@ def remove(segment, remove=False):
         raise TypeError("{:s}.remove({!r}) : segment is not of an idaapi.segment_t. : {!r}".format(__name__, segment, type(segment)))
     res = idaapi.del_selector(segment.sel)
     if res == 0:
-        logging.warn("{:s}.remove({!r}):Unable to delete selector {:x}".format(__name__, segment, segment.sel))
+        logging.warn("{:s}.remove({!r}):Unable to delete selector {:#x}".format(__name__, segment, segment.sel))
     res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL if remove else idaapi.SEGMOD_KEEP)
     if res == 0:
         logging.warn("{:s}.remove({!r}):Unable to delete segment {:s} : {:s}".format(__name__, segment, segment.name, segment.sel))

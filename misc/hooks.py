@@ -86,7 +86,7 @@ class address(comment):
                 ncmt,repeatable = idaapi.get_cmt(ea, rpt), cls._is_repeatable(ea)
 
                 if (ncmt or '') != new:
-                    logging.warn("internal.{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}".format('.'.join((__name__, cls.__name__)), ea, new, ncmt))
+                    logging.warn("internal.{:s}.event : Comment from event is different from database : {:#x} : {!r} != {!r}".format('.'.join((__name__, cls.__name__)), ea, new, ncmt))
 
                 # delete it if it's the wrong type
 #                if nrpt != repeatable:
@@ -111,7 +111,7 @@ class address(comment):
             # delete the old comment
             cls._delete_refs(ea, o)
             idaapi.set_cmt(ea, '', rpt)
-            logging.warn("{:s}.event : Previous comment at {:x} : {!r}".format('.'.join((__name__, cls.__name__)), o))
+            logging.warn("{:s}.event : Previous comment at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), o))
 
             # new comment
             new = idaapi.get_cmt(newea, nrpt)
@@ -180,7 +180,7 @@ class globals(comment):
                 ncmt = idaapi.get_func_cmt(fn, rpt)
 
                 if (ncmt or '') != new:
-                    logging.warn("{:s}.event : Comment from event is different from database : {:x} : {!r} != {!r}".format('.'.join((__name__, cls.__name__)), ea, new, ncmt))
+                    logging.warn("{:s}.event : Comment from event is different from database : {:#x} : {!r} != {!r}".format('.'.join((__name__, cls.__name__)), ea, new, ncmt))
 
                 # if it's non-repeatable, then fix it.
 #                if not nrpt:
@@ -205,7 +205,7 @@ class globals(comment):
             # delete the old comment
             cls._delete_refs(fn, o)
             idaapi.set_func_cmt(fn, '', rpt)
-            logging.warn("{:s}.event : Previous comment at {:x} : {!r}".format('.'.join((__name__, cls.__name__)), o))
+            logging.warn("{:s}.event : Previous comment at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), o))
 
             # new comment
             newfn = idaapi.get_func(newea)
@@ -310,13 +310,13 @@ def __process_functions():
     for i, fn in enumerate(funcs):
         chunks = list(function.chunks(fn))
 
-        text = functools.partial("{:x} : Processing function {:d} of {:d} : ({:d} chunk{:s})".format, fn, i, len(funcs))
+        text = functools.partial("{:#x} : Processing function {:d} of {:d} : ({:d} chunk{:s})".format, fn, i, len(funcs))
         p.update(current=i)
         ui.navigation.procedure(fn)
 
         contents = set(internal.comment.contents.address(fn))
         for ci, (l, r) in enumerate(chunks):
-            p.update(text=text(len(chunks), 's' if len(chunks) != 1 else ''), tooltip="Chunk #{:d} : {:x} - {:x}".format(ci, l, r))
+            p.update(text=text(len(chunks), 's' if len(chunks) != 1 else ''), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
             ui.navigation.analyze(l)
             for ea in database.iterate(l, r):
                 # FIXME: no need to iterate really since we should have
@@ -339,12 +339,12 @@ def rebase(info):
     # for each segment
     p.open()
     for si in six.moves.range(info.size()):
-        p.update(title="Rebasing segment {:d} of {:d} (+{:x}) : {:x} -> {:x}".format(si, info.size(), info[si].size, info[si]._from, info[si].to))
+        p.update(title="Rebasing segment {:d} of {:d} : {:#x} ({:+#x}) -> {:#x}".format(si, info.size(), info[si]._from, info[si].size, info[si].to))
 
         # for each function (using target address because ida moved the netnodes for us)
         res = [n for n in functions if info[si].to <= n < info[si].to + info[si].size]
         for i, fn in __rebase_function(info[si]._from, info[si].to, info[si].size, res):
-            text = "Function {:d} of {:d} : {:x}".format(i + fcount, len(functions), fn)
+            text = "Function {:d} of {:d} : {:#x}".format(i + fcount, len(functions), fn)
             p.update(value=sum((fcount,gcount,i)), text=text)
             ui.navigation.procedure(fn)
         fcount += len(res)
@@ -352,7 +352,7 @@ def rebase(info):
         # for each global
         res = [(ea, count) for ea, count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
         for i, ea in __rebase_globals(info[si]._from, info[si].to, info[si].size, res):
-            text = "Global {:d} of {:d} : {:x}".format(i + gcount, len(globals), ea)
+            text = "Global {:d} of {:d} : {:#x}".format(i + gcount, len(globals), ea)
             p.update(value=sum((fcount,gcount,i)), text=text)
             ui.navigation.analyze(ea)
         gcount += len(res)
@@ -367,7 +367,7 @@ def __rebase_function(old, new, size, iterable):
         try:
             state = internal.comment.contents._read(None, fn)
         except LookupError:
-            logging.fatal("{:s}.rebase : Address {:x} -> {:x} is not a function : {:x} -> {:x}".format(__name__, fn - new + old, fn, old, new))
+            logging.fatal("{:s}.rebase : Address {:#x} -> {:#x} is not a function : {:#x} -> {:#x}".format(__name__, fn - new + old, fn, old, new))
             state = None
         if state is None: continue
 
@@ -381,7 +381,7 @@ def __rebase_function(old, new, size, iterable):
         # and put the new addresses back
         ok = internal.comment.contents._write(None, fn, state)
         if not ok:
-            logging.fatal("{:s}.rebase : Failure trying to write refcount for {:x} : {!r} : {!r}".format(__name__, fn, res, state[key]))
+            logging.fatal("{:s}.rebase : Failure trying to write refcount for {:#x} : {!r} : {!r}".format(__name__, fn, res, state[key]))
             failure.append((fn, res, state[key]))
 
         yield i, fn
@@ -394,13 +394,13 @@ def __rebase_globals(old, new, size, iterable):
         # remove the old address
         ok = internal.netnode.alt.remove(node, ea)
         if not ok:
-            logging.fatal("{:s}.rebase : Failure trying to remove refcount for {:x} : {!r}".format(__name__, ea, count))
+            logging.fatal("{:s}.rebase : Failure trying to remove refcount for {:#x} : {!r}".format(__name__, ea, count))
 
         # now add the new address
         res = ea - old + new
         ok = internal.netnode.alt.set(node, res, count)
         if not ok:
-            logging.fatal("{:s}.rebase : Failure trying to store refcount from {:x} to {:x} : {!r}".format(__name__, ea, res, count))
+            logging.fatal("{:s}.rebase : Failure trying to store refcount from {:#x} to {:#x} : {!r}".format(__name__, ea, res, count))
 
             failure.append((ea, res, count))
         yield i, ea
