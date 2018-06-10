@@ -1934,10 +1934,25 @@ class address(object):
         return cls.nextF(ea, Fcref, count)
     prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
 
+    @utils.multicase(reg=(basestring, _instruction.register_t))
+    @classmethod
+    def prevreg(cls, reg, *regs, **modifiers):
+        '''Return the previous address containing an instruction that uses one of the specified registers ``regs``.'''
+        return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
+    @utils.multicase(predicate=builtins.callable, reg=(basestring, _instruction.register_t))
+    @classmethod
+    def prevreg(cls, predicate, reg, *regs, **modifiers):
+        '''Return the previous address containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
+        return cls.prevreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, _instruction.register_t))
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
         '''Return the previous address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.'''
+        return cls.prevreg(ea, utils.fconst(True), reg, *regs, **modifiers)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, _instruction.register_t))
+    @classmethod
+    def prevreg(cls, ea, predicate, reg, *regs, **modifiers):
+        '''Return the previous address from ``ea`` containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
         args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
@@ -1958,8 +1973,10 @@ class address(object):
             start = cls.walk(ea, cls.prev, fwithin)
             start = top() if start == idaapi.BADADDR else start
 
-        # define a function for cls.walk to continue looping while
+        # define a predicate for cls.walk to continue looping when true
         Freg = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+        Fnot = utils.fcompose(predicate, operator.not_)
+        F = utils.fcompose(utils.fmap(Freg, Fnot), builtins.any)
 
         ## skip the current address
         prevea = cls.prev(ea)
@@ -1969,24 +1986,34 @@ class address(object):
             return ea
 
         # now walk while none of our registers match
-        res = cls.walk(prevea, cls.prev, Freg)
+        res = cls.walk(prevea, cls.prev, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
             raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x} - {:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
-        return cls.prevreg(res, *regs, **modifiers) if count > 1 else res
+        return cls.prevreg(res, predicate, *regs, **modifiers) if count > 1 else res
+
     @utils.multicase(reg=(basestring, _instruction.register_t))
     @classmethod
-    def prevreg(cls, reg, *regs, **modifiers):
-        '''Return the previous address containing an instruction that uses one of the specified registers ``regs``.'''
-        return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
-
+    def nextreg(cls, reg, *regs, **modifiers):
+        '''Return the next address containing an instruction that uses one of the specified registers ``regs``.'''
+        return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
+    @utils.multicase(predicate=builtins.callable, reg=(basestring, _instruction.register_t))
+    @classmethod
+    def nextreg(cls, predicate, reg, *regs, **modifiers):
+        '''Return the next address containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
+        return cls.nextreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, _instruction.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
         '''Return the next address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.'''
+        return cls.nextreg(ea, utils.fconst(True), reg, *regs, **modifiers)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, _instruction.register_t))
+    @classmethod
+    def nextreg(cls, ea, predicate, reg, *regs, **modifiers):
+        '''Return the next address from ``ea`` containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
         regs = (reg,) + regs
         count = modifiers.get('count',1)
         args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
@@ -2002,13 +2029,15 @@ class address(object):
 
         # otherwise ensure that we're not in a function and we're a code type.
         else:
-            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), all)
+            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), builtins.all)
 
             end = cls.walk(ea, cls.next, fwithin)
             end = bottom() if end == idaapi.BADADDR else end
 
-        # define a function for cls.walk to continue looping while
+        # define a predicate for cls.walk to continue looping when true
         Freg = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+        Fnot = utils.fcompose(predicate, operator.not_)
+        F = utils.fcompose(utils.fmap(Freg, Fnot), builtins.any)
 
         # skip the current address
         nextea = cls.next(ea)
@@ -2018,20 +2047,16 @@ class address(object):
             return ea
 
         # now walk while none of our registers match
-        res = cls.walk(nextea, cls.next, Freg)
+        res = cls.walk(nextea, cls.next, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
             raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:#x}:{:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', end, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
-        return cls.nextreg(res, *regs, **modifiers) if count > 1 else res
-    @utils.multicase(reg=(basestring, _instruction.register_t))
-    @classmethod
-    def nextreg(cls, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that uses one of the specified registers ``regs``.'''
-        return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
+        return cls.nextreg(res, predicate, *regs, **modifiers) if count > 1 else res
 
+    # FIXME: modify this to just locate _any_ amount of change in the sp delta
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def prevstack(cls, delta):
@@ -2041,6 +2066,7 @@ class address(object):
     @classmethod
     def prevstack(cls, ea, delta):
         '''Return the previous instruction from ``ea`` that is past the specified sp ``delta``.'''
+        logging.warn("{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change!".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
         res = cls.walk(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
@@ -2048,6 +2074,7 @@ class address(object):
             raise ValueError("{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} < {:#x} ".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, start))
         return res
 
+    # FIXME: modify this to just locate _any_ amount of change in the sp delta
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def nextstack(cls, delta):
@@ -2057,6 +2084,7 @@ class address(object):
     @classmethod
     def nextstack(cls, ea, delta):
         '''Return the next instruction from ``ea`` that is past the sp delta ``delta``.'''
+        logging.warn("{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change!".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
         res = cls.walk(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
