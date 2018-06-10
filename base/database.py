@@ -1706,73 +1706,169 @@ class address(object):
         res = idaapi.next_not_tail(interface.address.within(ea))
         return cls.next(res, count-1) if count > 1 else res
 
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevF(cls, predicate):
+        '''Return the previous address from the current one that matches ``predicate``.'''
+        return cls.prevF(ui.current.address(), predicate, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevF(cls, ea, predicate):
+        '''Return the previous address from the address ``ea``. that matches ``predicate``.'''
+        return cls.prevF(ea, predicate, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
+    @classmethod
+    def prevF(cls, ea, predicate, count):
+        """Return the previous address from the address ``ea`` that matches ``predicate``..
+        Skip ``count`` addresses before returning.
+        """
+        Finverse = utils.fcompose(predicate, operator.not_)
+        res = cls.walk(cls.prev(ea), cls.prev, Finverse)
+        return cls.prevF(res, predicate, count-1) if count > 1 else res
+
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextF(cls, predicate):
+        '''Return the next address from the current one that matches ``predicate``.'''
+        return cls.nextF(ui.current.address(), predicate, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextF(cls, ea, predicate):
+        '''Return the next address from the address ``ea``. that matches ``predicate``.'''
+        return cls.nextF(ea, predicate, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
+    @classmethod
+    def nextF(cls, ea, predicate, count):
+        """Return the next address from the address ``ea`` that matches ``predicate``..
+        Skip ``count`` addresses before returning.
+        """
+        Finverse = utils.fcompose(predicate, operator.not_)
+        res = cls.walk(cls.next(ea), cls.next, Finverse)
+        return cls.nextF(res, predicate, count-1) if count > 1 else res
+
     @utils.multicase()
     @classmethod
     def prevref(cls):
         '''Returns the previous address that has anything referencing it.'''
         return cls.prevref(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevref(cls, predicate):
+        '''Returns the previous address that has anything referencing it and matches ``predicate``.'''
+        return cls.prevref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevref(cls, ea):
         '''Returns the previous address from ``ea`` that has anything referencing it.'''
         return cls.prevref(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevref(cls, ea, predicate):
+        '''Returns the previous address from ``ea`` that has anything referencing it and matches ``predicate``.'''
+        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
+        F = utils.fcompose(utils.fmap(Fxref, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevref(cls, ea, count):
-        '''Returns the previous address from ``ea`` that has anything referencing it. Skip ``count`` references before returning.'''
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.up(n)) == 0)
-        return cls.prevref(res, count-1) if count > 1 else res
+        """Returns the previous address from ``ea`` that has anything referencing it.
+        Skip ``count`` references before returning.
+        """
+        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
+        return cls.prevF(ea, Fxref, count)
 
     @utils.multicase()
     @classmethod
     def nextref(cls):
         '''Returns the next address that has anything referencing it.'''
         return cls.nextref(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextref(cls, predicate):
+        '''Returns the next address that has anything referencing it and matches ``predicate``.'''
+        return cls.nextref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextref(cls, ea):
         '''Returns the next address from ``ea`` that has anything referencing it.'''
         return cls.nextref(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextref(cls, ea, predicate):
+        '''Returns the next address from ``ea`` that has anything referencing it and matches ``predicate``.'''
+        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
+        F = utils.fcompose(utils.fmap(Fxref, predicate), builtins.all)
+        return cls.nextF(ea, Fxref, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextref(cls, ea, count):
-        '''Returns the next address from ``ea`` that has anything referencing it. Skip ``count`` references before returning.'''
-        res = cls.walk(cls.next(ea), cls.next, lambda n: len(xref.up(n)) == 0)
-        return cls.nextref(res, count-1) if count > 1 else res
+        """Returns the next address from ``ea`` that has anything referencing it.
+        Skip ``count`` references before returning.
+        """
+        Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
+        return cls.nextF(ea, Fxref, count)
 
     @utils.multicase()
     @classmethod
     def prevdref(cls):
         '''Returns the previous address that has data referencing it.'''
         return cls.prevdref(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevdref(cls, predicate):
+        '''Returns the previous address that has data referencing it and matches ``predicate``.'''
+        return cls.prevdref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevdref(cls, ea):
         '''Returns the previous address from ``ea`` that has data referencing it.'''
         return cls.prevdref(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevdref(cls, ea, predicate):
+        '''Returns the previous address from ``ea`` that has data referencing it and matches ``predicate``.'''
+        Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
+        F = utils.fcompose(utils.fmap(Fdref, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevdref(cls, ea, count):
-        '''Returns the previous address from ``ea`` that has data referencing it. Skip ``count`` results before returning.'''
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.data_up(n)) == 0)
-        return cls.prevdref(res, count-1) if count > 1 else res
+        """Returns the previous address from ``ea`` that has data referencing it.
+        Skip ``count`` results before returning.
+        """
+        Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
+        return cls.prevF(ea, Fdref, count)
 
     @utils.multicase()
     @classmethod
     def nextdref(cls):
         '''Returns the next address that has data referencing it.'''
         return cls.nextdref(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextdref(cls, predicate):
+        '''Returns the next address that has data referencing it and matches ``predicate``.'''
+        return cls.nextdref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextdref(cls, ea):
         '''Returns the next address from ``ea`` that has data referencing it.'''
         return cls.nextdref(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextdref(cls, ea, predicate):
+        '''Returns the next address from ``ea`` that has data referencing it and matches ``predicate``.'''
+        Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
+        F = utils.fcompose(utils.fmap(Fdref, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextdref(cls, ea, count):
-        '''Returns the next address from ``ea`` that has data referencing it. Skip ``count`` results before returning.'''
-        res = cls.walk(cls.next(ea), cls.next, lambda n: len(xref.data_up(n)) == 0)
-        return cls.nextdref(res, count-1) if count > 1 else res
+        """Returns the next address from ``ea`` that has data referencing it.
+        Skip ``count`` results before returning.
+        """
+        Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
+        return cls.nextF(ea, Fdref, count)
     prevdata, nextdata = utils.alias(prevdref, 'address'), utils.alias(nextdref, 'address')
 
     @utils.multicase()
@@ -1780,41 +1876,68 @@ class address(object):
     def prevcref(cls):
         '''Returns the previous address that has code referencing it.'''
         return cls.prevcref(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevcref(cls, predicate):
+        '''Returns the previous address that has code referencing it and matches ``predicate``.'''
+        return cls.prevcref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevcref(cls, ea):
         '''Returns the previous address from ``ea`` that has code referencing it.'''
         return cls.prevcref(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevcref(cls, ea, predicate):
+        '''Returns the previous address from ``ea`` that has code referencing it and matches ``predicate``.'''
+        Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
+        F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
+        return cls.prevF(ea, Fcref, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevcref(cls, ea, count):
-        '''Returns the previous address from ``ea`` that has code referencing it. Skip ``count`` results before returning.'''
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: len(xref.code_up(n)) == 0)
-        return cls.prevcref(res, count-1) if count > 1 else res
+        """Returns the previous address from ``ea`` that has code referencing it.
+        Skip ``count`` results before returning.
+        """
+        Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
+        return cls.prevF(ea, Fcref, count)
 
     @utils.multicase()
     @classmethod
     def nextcref(cls):
         '''Returns the next address that has code referencing it.'''
         return cls.nextcref(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextcref(cls, predicate):
+        '''Returns the next address that has code referencing it and matches ``predicate``.'''
+        return cls.nextcref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextcref(cls, ea):
         '''Returns the next address from ``ea`` that has code referencing it.'''
         return cls.nextcref(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextcref(cls, ea, predicate):
+        '''Returns the next address from ``ea`` that has code referencing it and matches ``predicate``.'''
+        Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
+        F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
+        return cls.nextF(ea, Fcref, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextcref(cls, ea, count):
         """Returns the next address from ``ea`` that has code referencing it.
         Skip ``count`` results before returning.
         """
-        res = cls.walk(cls.next(ea), cls.next, lambda n: len(xref.code_up(n)) == 0)
-        return cls.nextcref(res, count-1) if count > 1 else res
+        Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
+        return cls.nextF(ea, Fcref, count)
     prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
 
     @utils.multicase(ea=six.integer_types, reg=(basestring, _instruction.register_t))
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
+        '''Return the previous address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
         args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
@@ -1823,7 +1946,7 @@ class address(object):
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use(regs)
 
-        # if within a function, then sure we're within the chunk's bounds.
+        # if within a function, then make sure we're within the chunk's bounds.
         if function.within(ea):
             (start, _) = function.chunk(ea)
             fwithin = functools.partial(operator.le, start)
@@ -1836,7 +1959,7 @@ class address(object):
             start = top() if start == idaapi.BADADDR else start
 
         # define a function for cls.walk to continue looping while
-        F = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+        Freg = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
 
         ## skip the current address
         prevea = cls.prev(ea)
@@ -1846,7 +1969,7 @@ class address(object):
             return ea
 
         # now walk while none of our registers match
-        res = cls.walk(prevea, cls.prev, F)
+        res = cls.walk(prevea, cls.prev, Freg)
         if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
             raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x} - {:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
@@ -1863,6 +1986,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, reg=(basestring, _instruction.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
+        '''Return the next address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.'''
         regs = (reg,) + regs
         count = modifiers.get('count',1)
         args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
@@ -1871,7 +1995,7 @@ class address(object):
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use(regs)
 
-        # if within a function, then sure we're within the chunk's bounds.
+        # if within a function, then make sure we're within the chunk's bounds.
         if function.within(ea):
             (_,end) = function.chunk(ea)
             fwithin = functools.partial(operator.gt, end)
@@ -1884,7 +2008,7 @@ class address(object):
             end = bottom() if end == idaapi.BADADDR else end
 
         # define a function for cls.walk to continue looping while
-        F = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+        Freg = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
 
         # skip the current address
         nextea = cls.next(ea)
@@ -1894,7 +2018,7 @@ class address(object):
             return ea
 
         # now walk while none of our registers match
-        res = cls.walk(nextea, cls.next, F)
+        res = cls.walk(nextea, cls.next, Freg)
         if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
             raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:#x}:{:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', end, ea, res))
@@ -1911,12 +2035,12 @@ class address(object):
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def prevstack(cls, delta):
-        '''Return the previous instruction that is past the sp delta ``delta``.'''
+        '''Return the previous instruction that is past the specified sp ``delta``.'''
         return cls.prevstack(ui.current.address(), delta)
     @utils.multicase(ea=six.integer_types, delta=six.integer_types)
     @classmethod
     def prevstack(cls, ea, delta):
-        '''Return the previous instruction from ``ea`` that is past the sp delta ``delta``.'''
+        '''Return the previous instruction from ``ea`` that is past the specified sp ``delta``.'''
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
         res = cls.walk(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
@@ -1946,101 +2070,179 @@ class address(object):
     def prevcall(cls):
         '''Return the previous call instruction.'''
         return cls.prevcall(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevcall(cls, predicate):
+        '''Return the previous call instruction that matches ``predicate``.'''
+        return cls.prevcall(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevcall(cls, ea):
         '''Return the previous call instruction from the address ``ea``.'''
         return cls.prevcall(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevcall(cls, ea, predicate):
+        '''Return the previous call instruction from the address ``ea`` that matches ``predicate``.'''
+        F = utils.fcompose(utils.fmap(_instruction.is_call, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevcall(cls, ea, count):
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: not _instruction.is_call(n))
-        return cls.prevcall(res, count-1) if count > 1 else res
+        return cls.prevF(ea, _instruction.is_call, count)
 
     @utils.multicase()
     @classmethod
     def nextcall(cls):
         '''Return the next call instruction.'''
         return cls.nextcall(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextcall(cls, predicate):
+        '''Return the next call instruction that matches ``predicate``.'''
+        return cls.nextcall(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextcall(cls, ea):
         '''Return the next call instruction from the address ``ea``.'''
         return cls.nextcall(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextcall(cls, ea, predicate):
+        '''Return the next call instruction from the address ``ea`` that matches ``predicate``.'''
+        F = utils.fcompose(utils.fmap(_instruction.is_call, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextcall(cls, ea, count):
-        res = cls.walk(cls.next(ea), cls.next, lambda n: not _instruction.is_call(n))
-        return cls.nextcall(res, count-1) if count > 1 else res
+        return cls.nextF(ea, _instruction.is_call, count)
 
     @utils.multicase()
     @classmethod
     def prevbranch(cls):
         '''Return the previous branch instruction.'''
         return cls.prevbranch(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevbranch(cls, predicate):
+        '''Return the previous branch instruction that matches ``predicate``.'''
+        return cls.prevbranch(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevbranch(cls, ea):
         '''Return the previous branch instruction from the address ``ea``.'''
         return cls.prevbranch(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevbranch(cls, ea, predicate):
+        '''Return the previous branch instruction from the address ``ea`` that matches ``predicate``.'''
+        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
+        Fbranch = _instruction.is_branch
+        Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
+        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevbranch(cls, ea, count):
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: _instruction.is_call(n) or not _instruction.is_branch(n))
-        return cls.prevbranch(res, count-1) if count > 1 else res
+        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
+        Fbranch = _instruction.is_branch
+        F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
+        return cls.prevF(ea, F, count)
 
     @utils.multicase()
     @classmethod
     def nextbranch(cls):
         '''Return the next branch instruction.'''
         return cls.nextbranch(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextbranch(cls, predicate):
+        '''Return the next branch instruction that matches ``predicate``.'''
+        return cls.nextbranch(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     def nextbranch(cls, ea):
         '''Return the next branch instruction from the address ``ea``.'''
         return cls.nextbranch(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    def nextbranch(cls, ea, predicate):
+        '''Return the next branch instruction from the address ``ea`` that matches ``predicate``.'''
+        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
+        Fbranch = _instruction.is_branch
+        Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
+        F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextbranch(cls, ea, count):
-        res = cls.walk(cls.next(ea), cls.next, lambda n: _instruction.is_call(n) or not _instruction.is_branch(n))
-        return cls.nextbranch(res, count-1) if count > 1 else res
+        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
+        Fbranch = _instruction.is_branch
+        F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
+        return cls.nextF(ea, F, count)
 
     @utils.multicase()
     @classmethod
     def prevlabel(cls):
         '''Return the address of the previous label.'''
         return cls.prevlabel(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevlabel(cls, predicate):
+        '''Return the address of the previous label that matches ``predicate``.'''
+        return cls.prevlabel(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevlabel(cls, ea):
         '''Return the address of the previous label from the address ``ea``.'''
         return cls.prevlabel(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevlabel(cls, ea, predicate):
+        '''Return the address of the previous label from the address ``ea`` that matches ``predicate``.'''
+        Flabel = type.has_label
+        F = utils.fcompose(utils.fmap(Flabel, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevlabel(cls, ea, count):
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: not type.has_label(n))
-        return cls.prevlabel(res, count-1) if count > 1 else res
+        return cls.prevF(ea, type.has_label, count)
 
     @utils.multicase()
     @classmethod
     def nextlabel(cls):
         '''Return the address of the next label.'''
         return cls.nextlabel(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextlabel(cls, predicate):
+        '''Return the address of the next label that matches ``predicate``.'''
+        return cls.nextlabel(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextlabel(cls, ea):
         '''Return the address of the next label from the address ``ea``.'''
         return cls.nextlabel(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextlabel(cls, ea, predicate):
+        '''Return the address of the next label from the address ``ea`` that matches ``predicate``.'''
+        Flabel = type.has_label
+        F = utils.fcompose(utils.fmap(Flabel, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextlabel(cls, ea, count):
-        res = cls.walk(cls.next(ea), cls.next, lambda n: not type.has_label(n))
-        return cls.nextlabel(res, count-1) if count > 1 else res
+        return cls.nextF(ea, type.has_label, count)
 
     @utils.multicase()
     @classmethod
     def prevtag(cls, **tagname):
         '''Return the previous address that contains a tag.'''
         return cls.prevtag(ui.current.address(), 1, **tagname)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevtag(cls, predicate, **tagname):
+        '''Return the previous address that contains a tag and matches ``predicate``.'''
+        return cls.prevtag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevtag(cls, ea, **tagname):
@@ -2048,30 +2250,52 @@ class address(object):
         If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
         """
         return cls.prevtag(ea, 1, **tagname)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevtag(cls, ea, predicate, **tagname):
+        '''Returns the previous address from ``ea`` that contains a tag and matches ``predicate.'''
+        tagname = tagname.get('tagname', None)
+        Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
+        F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
+        return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevtag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
-        res = cls.walk(cls.prev(ea), cls.prev, lambda n: not (type.has_comment(n) if tagname is None else tagname in tag(n)))
-        return cls.prevtag(res, count-1) if count > 1 else res
+        Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
+        return cls.prevF(ea, Ftag, count)
 
     @utils.multicase()
     @classmethod
     def nexttag(cls, **tagname):
         '''Return the next address that contains a tag.'''
         return cls.nexttag(ui.current.address(), 1, **tagname)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nexttag(cls, predicate, **tagname):
+        '''Return the next address that contains a tag and matches ``predicate``.'''
+        return cls.nexttag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
+    @classmethod
     def nexttag(cls, ea, **tagname):
         """Returns the next address from ``ea`` that contains a tag.
         If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
         """
         return cls.nexttag(ea, 1, **tagname)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nexttag(cls, ea, predicate, **tagname):
+        '''Returns the next address from ``ea`` that contains a tag and matches ``predicate``.'''
+        tagname = tagname.get('tagname', None)
+        Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
+        F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
+        return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nexttag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
-        res = cls.walk(cls.next(ea), cls.next, lambda n: not (type.has_comment(n) if tagname is None else tagname in tag(n)))
-        return cls.nexttag(res, count-1) if count > 1 else res
+        Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
+        return cls.nextF(ea, Ftag, count)
     prevcomment, nextcomment = utils.alias(prevtag, 'address'), utils.alias(nexttag, 'address')
 
 a = addr = address  # XXX: ns alias
