@@ -47,7 +47,7 @@ class structure_t(object):
         refs = [ interface.OREF(xrfrom, xriscode, interface.ref_t.of(xrtype)) for xrfrom, xriscode, xrtype in res ]
 
         # return as a tuple
-        return map(utils.compose(operator.itemgetter(0), instance), refs)
+        return map(utils.fcompose(operator.itemgetter(0), instance), refs)
 
     def down(self):
         '''Return all the structures that are referenced by this specific structure.'''
@@ -67,7 +67,7 @@ class structure_t(object):
         refs = [ interface.OREF(xrto, xriscode, interface.ref_t.of(xrtype)) for xrto, xriscode, xrtype in res ]
 
         # return it as a tuple
-        return map(utils.compose(operator.itemgetter(0), instance), refs)
+        return map(utils.fcompose(operator.itemgetter(0), instance), refs)
 
     def refs(self):
         """Return the `(address, opnum, type)` of all the references (code & data) to this structure within the database.
@@ -332,9 +332,9 @@ def list(**type):
     """
     res = builtins.list(iterate(**type))
 
-    maxindex = max(builtins.map(utils.compose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
-    maxname = max(builtins.map(utils.compose(operator.attrgetter('name'), len), res) or [1])
-    maxsize = max(builtins.map(utils.compose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
+    maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
+    maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), len), res) or [1])
+    maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
 
     for st in res:
         six.print_("[{:{:d}d}] {:>{:d}s} {:<+{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {:s}".format(st.comment) if st.comment else ''))
@@ -688,11 +688,11 @@ class members_t(object):
         res = builtins.list(self.iterate(**type))
 
         escape = repr
-        maxindex = max(builtins.map(utils.compose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
-        maxoffset = max(builtins.map(utils.compose(operator.attrgetter('offset'), "{:x}".format, len), res) or [1])
-        maxsize = max(builtins.map(utils.compose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
-        maxname = max(builtins.map(utils.compose(operator.attrgetter('name'), escape, len), res) or [1])
-        maxtype = max(builtins.map(utils.compose(operator.attrgetter('type'), repr, len), res) or [1])
+        maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
+        maxoffset = max(builtins.map(utils.fcompose(operator.attrgetter('offset'), "{:x}".format, len), res) or [1])
+        maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:x}".format, len), res) or [1])
+        maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), escape, len), res) or [1])
+        maxtype = max(builtins.map(utils.fcompose(operator.attrgetter('type'), repr, len), res) or [1])
 
         for m in res:
             six.print_("[{:{:d}d}] {:>{:d}x}:+{:<{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {:s}".format(m.comment) if m.comment else ''))

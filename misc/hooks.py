@@ -330,7 +330,7 @@ def __process_functions():
     p.close()
 
 def rebase(info):
-    functions, globals = map(utils.compose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
+    functions, globals = map(utils.fcompose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
 
     p = ui.Progress()
     p.update(current=0, title="Rebasing tagcache...", min=0, max=len(functions)+len(globals))

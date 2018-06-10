@@ -224,10 +224,10 @@ def list(**type):
     res = builtins.list(iterate(**type))
 
     maxindex = max(builtins.map(idaapi.get_enum_idx, res))
-    maxname = max(builtins.map(utils.compose(idaapi.get_enum_name, len), res))
+    maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res))
     maxsize = max(builtins.map(size, res))
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    cmask = max(builtins.map(utils.compose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
+    cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
 
     for n in res:
         six.print_("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
@@ -494,7 +494,7 @@ class member(object):
         eid = by(enum)
         res = builtins.list(cls.iterate(eid))
         maxindex = max(builtins.map(utils.first, enumerate(res)) or [1])
-        maxvalue = max(builtins.map(utils.compose(cls.value, "{:x}".format, len), res) or [1])
+        maxvalue = max(builtins.map(utils.fcompose(cls.value, "{:x}".format, len), res) or [1])
         for i, mid in enumerate(res):
              six.print_("[{:d}] {:>0{:d}x} {:s}".format(i, cls.value(mid), maxvalue, cls.name(mid)))
         return

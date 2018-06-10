@@ -61,7 +61,7 @@ def list(**type):
     maxindex = max(builtins.map(operator.attrgetter('index'), res) or [1])
     maxaddr = max(builtins.map(operator.attrgetter('endEA'), res) or [1])
     maxsize = max(builtins.map(operator.methodcaller('size'), res) or [1])
-    maxname = max(builtins.map(utils.compose(idaapi.get_true_segm_name,len), res) or [1])
+    maxname = max(builtins.map(utils.fcompose(idaapi.get_true_segm_name,len), res) or [1])
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
     caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
     csize = math.ceil(math.log(maxsize or 1)/math.log(16))

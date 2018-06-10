@@ -391,7 +391,7 @@ class node(object):
         This string is typically found in a supval[0x3000] of a function.
         """
         res, iterable = [], iter(sup)
-        onext = internal.utils.compose(next, six.byte2int)
+        onext = internal.utils.fcompose(next, six.byte2int)
 
         # pointer and model
         by = onext(iterable)
@@ -447,7 +447,7 @@ class node(object):
 
         This string is typically found in a supval[0xF+opnum] of the instruction.
         """
-        le = internal.utils.compose(
+        le = internal.utils.fcompose(
             functools.partial(map, six.byte2int),
             functools.partial(reduce, lambda t, c: (t*0x100)|c)
         )
@@ -594,7 +594,7 @@ class regmatch(object):
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # by default, grab all operand indexes
-        iterops = internal.utils.compose(_instruction.ops_count, six.moves.range, sorted)
+        iterops = internal.utils.fcompose(_instruction.ops_count, six.moves.range, sorted)
 
         # if ``read`` is specified, then only grab operand indexes that are read from
         if modifiers.get('read', False):

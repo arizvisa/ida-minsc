@@ -137,7 +137,7 @@ class architecture_t(object):
 
         # older
         if idaapi.__version__ < 7.0:
-            dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, six.byte2int)
+            dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
         # newer
         else:
             dtype_by_size = idaapi.get_dtyp_by_size
@@ -158,7 +158,7 @@ class architecture_t(object):
 
         # older
         if idaapi.__version__ < 7.0:
-            dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, six.byte2int)
+            dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
         # newer
         else:
             dtype_by_size = idaapi.get_dtyp_by_size
@@ -200,13 +200,13 @@ class architecture_t(object):
     byName = utils.alias(by_name, 'architecture')
     def by_indexsize(self, index, size):
         '''Lookup a register according to its ``index`` and ``size``.'''
-        dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         dtyp = dtype_by_size(size)
         return self.by_indextype(index, dtyp)
     def promote(self, register, size=None):
         '''Promote the specified ``register`` to its next larger ``size``.'''
         cls = self.__class__
-        parent = utils.compose(operator.attrgetter('parent'), utils.box, functools.partial(filter, None), iter, next)
+        parent = utils.fcompose(operator.attrgetter('parent'), utils.box, functools.partial(filter, None), iter, next)
         try:
             if size is None:
                 return parent(register)
@@ -216,8 +216,8 @@ class architecture_t(object):
     def demote(self, register, size=None):
         '''Demote the specified ``register`` to its next smaller ``size``.'''
         cls = self.__class__
-        childitems = utils.compose(operator.attrgetter('children'), operator.methodcaller('iteritems'))
-        firstchild = utils.compose(childitems, functools.partial(sorted, key=operator.itemgetter(0)), iter, next, operator.itemgetter(1))
+        childitems = utils.fcompose(operator.attrgetter('children'), operator.methodcaller('iteritems'))
+        firstchild = utils.fcompose(childitems, functools.partial(sorted, key=operator.itemgetter(0)), iter, next, operator.itemgetter(1))
         try:
             if size is None:
                 return firstchild(register)
@@ -349,7 +349,7 @@ def ops_size():
 def ops_size(ea):
     '''Returns a tuple with all the sizes of each operand for the instruction at the address ``ea``.'''
     ea = interface.address.inside(ea)
-    f = utils.compose(functools.partial(operand, ea), operator.attrgetter('dtyp'), idaapi.get_dtyp_size, int)
+    f = utils.fcompose(functools.partial(operand, ea), operator.attrgetter('dtyp'), idaapi.get_dtyp_size, int)
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
 @utils.multicase()
@@ -445,7 +445,7 @@ def operand(n):
 def operand(ea, none):
     '''Returns all of the operands of the instruction at the address ``ea`` as a tuple of `idaapi.op_t` instances.'''
     insn = at(ea)
-    res = itertools.takewhile(utils.compose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), insn.Operands)
+    res = itertools.takewhile(utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), insn.Operands)
     if idaapi.__version__ < 7.0:
         return tuple(op.copy() for op in res)
     res = ((idaapi.op_t(), op) for op in res)
@@ -470,7 +470,7 @@ def op_repr(ea, n):
     '''Returns the ``n``th operand of the instruction at the address ``ea`` in a printable form.'''
     insn = at(ea)
     oppr = idaapi.ua_outop2 if idaapi.__version__ < 7.0 else idaapi.print_operand
-    outop = utils.compose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.compose(idaapi.print_operand, idaapi.tag_remove)
+    outop = utils.fcompose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.fcompose(idaapi.print_operand, idaapi.tag_remove)
     try:
         res = outop(insn.ea, n) or "{:s}".format(op_value(insn.ea, n))
     except ValueError, e:
@@ -866,7 +866,7 @@ class operand_types:
     def register(op):
         '''Return the operand as a `register_t`.'''
         global architecture
-        dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         if op.type in (idaapi.o_reg,):
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
             return architecture.by_indextype(res, op.dtyp)
@@ -991,7 +991,7 @@ class operand_types:
 
         seg,sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
-        dtype_by_size = utils.compose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
 
         global architecture
         dt = dtype_by_size(database.config.bits()//8)

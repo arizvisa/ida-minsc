@@ -158,16 +158,16 @@ class functions(object):
     Enumerate all of the functions inside the database.
     """
     __matcher__ = utils.matcher()
-    __matcher__.boolean('name', operator.eq, utils.compose(function.by,function.name))
-    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.compose(function.by,function.name))
-    __matcher__.boolean('regex', re.search, utils.compose(function.by,function.name))
+    __matcher__.boolean('name', operator.eq, utils.fcompose(function.by,function.name))
+    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(function.by,function.name))
+    __matcher__.boolean('regex', re.search, utils.fcompose(function.by,function.name))
     __matcher__.predicate('predicate', function.by)
     __matcher__.predicate('pred', function.by)
     __matcher__.boolean('address', function.contains), __matcher__.boolean('ea', function.contains)
 
     # chunk matching
-    #__matcher__.boolean('greater', operator.le, utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max))
-    #__matcher__.boolean('less', operator.ge, utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)), __matcher__.boolean('lt', operator.gt, utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min))
+    #__matcher__.boolean('greater', operator.le, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max))
+    #__matcher__.boolean('less', operator.ge, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)), __matcher__.boolean('lt', operator.gt, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min))
 
     # entry-point matching
     __matcher__.boolean('greater', operator.le, function.top), __matcher__.boolean('gt', operator.lt, function.top)
@@ -245,24 +245,24 @@ class functions(object):
         res = builtins.list(cls.iterate(**type))
 
         flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
-        fminaddr = utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)
-        fmaxaddr = utils.compose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)
+        fminaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)
+        fmaxaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)
 
         maxindex = len(res)
         maxentry = max(res or [config.bounds()[0]])
         maxaddr = max(builtins.map(fmaxaddr, res) or [1])
         minaddr = max(builtins.map(fminaddr, res) or [1])
-        maxname = max(builtins.map(utils.compose(function.name, len), res) or [1])
-        chunks = max(builtins.map(utils.compose(function.chunks, builtins.list, len), res) or [1])
-        marks = max(builtins.map(utils.compose(function.marks, builtins.list, len), res) or [1])
-        blocks = max(builtins.map(utils.compose(function.blocks, builtins.list, len), res) or [1])
-        exits = max(builtins.map(utils.compose(function.bottom, builtins.list, len), res) or [1])
-        lvars = max(builtins.map(utils.compose(lambda ea: flvars(ea) if function.by(ea).frsize else [], builtins.list, len), res) or [1])
+        maxname = max(builtins.map(utils.fcompose(function.name, len), res) or [1])
+        chunks = max(builtins.map(utils.fcompose(function.chunks, builtins.list, len), res) or [1])
+        marks = max(builtins.map(utils.fcompose(function.marks, builtins.list, len), res) or [1])
+        blocks = max(builtins.map(utils.fcompose(function.blocks, builtins.list, len), res) or [1])
+        exits = max(builtins.map(utils.fcompose(function.bottom, builtins.list, len), res) or [1])
+        lvars = max(builtins.map(utils.fcompose(lambda ea: flvars(ea) if function.by(ea).frsize else [], builtins.list, len), res) or [1])
 
         # FIXME: fix function.arguments so that it works on non-stackbased functions
         fargs = function.arguments
         try:
-            args = max(builtins.map(utils.compose(lambda ea: fargs(ea) if function.by(ea).frsize else [], builtins.list, len), res) or [1])
+            args = max(builtins.map(utils.fcompose(lambda ea: fargs(ea) if function.by(ea).frsize else [], builtins.list, len), res) or [1])
         except RuntimeError:
             args, fargs = 1, lambda ea: []
 
@@ -309,7 +309,7 @@ class functions(object):
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
             builtins.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(res)))
-            f = utils.compose(function.by,function.name)
+            f = utils.fcompose(function.by,function.name)
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
@@ -955,13 +955,13 @@ class entry(object):
     """
 
     __matcher__ = utils.matcher()
-    __matcher__.mapping('address', utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.mapping('ea', utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.boolean('greater', operator.le, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('gt', operator.lt, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.boolean('less', operator.ge, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('lt', operator.gt, utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.boolean('name', operator.eq, utils.compose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
-    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.compose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
-    __matcher__.boolean('regex', re.search, utils.compose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
+    __matcher__.mapping('address', utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.mapping('ea', utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('greater', operator.le, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('gt', operator.lt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('less', operator.ge, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('lt', operator.gt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
+    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
+    __matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_entry_ordinal,idaapi.get_entry_name))
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal)
     __matcher__.predicate('pred', idaapi.get_entry_ordinal)
     __matcher__.boolean('index', operator.eq)
@@ -994,9 +994,9 @@ class entry(object):
     @classmethod
     def __index__(cls, ea):
         '''Returns the index of the entry-point at the specified ``address``.'''
-        f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
-        iterable = itertools.imap(utils.compose(utils.fmap(f, lambda n:n), builtins.tuple), six.moves.range(idaapi.get_entry_qty()))
-        filterable = itertools.ifilter(utils.compose(utils.first, functools.partial(operator.eq, ea)), iterable)
+        f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
+        iterable = itertools.imap(utils.fcompose(utils.fmap(f, lambda n:n), builtins.tuple), six.moves.range(idaapi.get_entry_qty()))
+        filterable = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), iterable)
         result = itertools.imap(utils.second, filterable)
         return builtins.next(result, None)
     @utils.multicase(index=six.integer_types)
@@ -1008,7 +1008,7 @@ class entry(object):
         return None if res == idaapi.BADADDR else res
 
     # Returns the name of the entry-point at the specified ``index``.
-    __entryname__ = staticmethod(utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
+    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
     # Returns the ordinal of the entry-point at the specified ``index``.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
@@ -1061,8 +1061,8 @@ class entry(object):
         """
         res = builtins.list(cls.__iterate__(**type))
 
-        to_address = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
-        to_numlen = utils.compose("{:x}".format, len)
+        to_address = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
+        to_numlen = utils.fcompose("{:x}".format, len)
 
         maxindex = max(res+[1])
         maxaddr = max(builtins.map(to_address, res) or [idaapi.BADADDR])
@@ -1091,7 +1091,7 @@ class entry(object):
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
             builtins.map(logging.info, (("[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
-            f = utils.compose(idaapi.get_entry_ordinal, idaapi.get_entry)
+            f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
@@ -1415,12 +1415,12 @@ class imports(object):
 
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', utils.first), __matcher__.mapping('ea', utils.first)
-    __matcher__.boolean('name', operator.eq, utils.compose(utils.second, __formats__.__func__))
-    __matcher__.boolean('fullname', lambda v, n: fnmatch.fnmatch(n, v), utils.compose(utils.second, __formatl__.__func__))
-    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.compose(utils.second, __formats__.__func__))
-    __matcher__.boolean('module', lambda v, n: fnmatch.fnmatch(n, v), utils.compose(utils.second, utils.first))
-    __matcher__.mapping('ordinal', utils.compose(utils.second, lambda(m,n,o): o))
-    __matcher__.boolean('regex', re.search, utils.compose(utils.second, __format__))
+    __matcher__.boolean('name', operator.eq, utils.fcompose(utils.second, __formats__.__func__))
+    __matcher__.boolean('fullname', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, __formatl__.__func__))
+    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, __formats__.__func__))
+    __matcher__.boolean('module', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, utils.first))
+    __matcher__.mapping('ordinal', utils.fcompose(utils.second, lambda(m,n,o): o))
+    __matcher__.boolean('regex', re.search, utils.fcompose(utils.second, __format__))
     __matcher__.predicate('predicate', lambda n:n)
     __matcher__.predicate('pred', lambda n:n)
     __matcher__.mapping('index', utils.first)
@@ -1433,7 +1433,7 @@ class imports(object):
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
             result = []
-            idaapi.enum_import_names(idx, utils.compose(utils.box,result.append,utils.fdiscard(lambda:True)))
+            idaapi.enum_import_names(idx, utils.fcompose(utils.box,result.append,utils.fdiscard(lambda:True)))
             for ea, name, ordinal in result:
                 yield ea, (module, name, ordinal)
             continue
@@ -1465,7 +1465,7 @@ class imports(object):
     def get(cls, ea):
         '''Return the import at the address ``ea``.'''
         ea = interface.address.inside(ea)
-        res = itertools.ifilter(utils.compose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
+        res = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
         try:
             return utils.second(builtins.next(res))
         except StopIteration:
@@ -1553,9 +1553,9 @@ class imports(object):
         res = builtins.list(cls.iterate(**type))
 
         maxaddr = max(builtins.map(utils.first, res) or [idaapi.BADADDR])
-        maxmodule = max(builtins.map(utils.compose(utils.second, utils.first, len), res) or [''])
+        maxmodule = max(builtins.map(utils.fcompose(utils.second, utils.first, len), res) or [''])
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
-        cordinal = max(builtins.map(utils.compose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
+        cordinal = max(builtins.map(utils.fcompose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
 
         for ea, (module, name, ordinal) in res:
             six.print_("{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name))
@@ -1577,7 +1577,7 @@ class imports(object):
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
             builtins.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in res))
-            f = utils.compose(utils.second, cls.__formatl__)
+            f = utils.fcompose(utils.second, cls.__formatl__)
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
@@ -1830,7 +1830,7 @@ class address(object):
 
         # otherwise ensure that we're not in the function and we're a code type.
         else:
-            fwithin = utils.compose(utils.fmap(utils.compose(function.within, operator.not_), type.is_code), all)
+            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), all)
 
             start = cls.walk(ea, cls.prev, fwithin)
             start = top() if start == idaapi.BADADDR else start
@@ -1878,7 +1878,7 @@ class address(object):
 
         # otherwise ensure that we're not in a function and we're a code type.
         else:
-            fwithin = utils.compose(utils.fmap(utils.compose(function.within, operator.not_), type.is_code), all)
+            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), all)
 
             end = cls.walk(ea, cls.next, fwithin)
             end = bottom() if end == idaapi.BADADDR else end
