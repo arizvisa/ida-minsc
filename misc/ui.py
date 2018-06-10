@@ -455,12 +455,12 @@ try:
 
         # methods
         def open(self, width=0.8, height=0.1):
-            global current
-            window = current.window()
-            w, h = window.width() * width, window.height() * height
+            global window
+            main = window.main()
+            w, h = main.width() * width, main.height() * height
             self.object.setFixedWidth(w), self.object.setFixedHeight(h)
 
-            center = window.geometry().center()
+            center = main.geometry().center()
             x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
             self.object.move(x, y)
 
