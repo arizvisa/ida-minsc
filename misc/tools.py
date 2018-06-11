@@ -4,7 +4,7 @@ from six.moves import builtins
 import functools, operator, itertools, types
 import logging
 
-import database, function, instruction
+import database, function as func, instruction
 import ui, internal
 
 class remote(object):
@@ -38,13 +38,13 @@ def colormarks(color=0x7f007f):
         database.tag(ea, 'mark', m)
         if database.color(ea) is None:
             database.color(ea, color)
-        try: f.add(function.top(ea))
+        try: f.add(func.top(ea))
         except (LookupError,ValueError): pass
 
     # tag the functions too
     for ea in list(f):
-        m = function.marks(ea)
-        function.tag(ea, 'marks', [ea for ea,_ in m])
+        m = func.marks(ea)
+        func.tag(ea, 'marks', [ea for ea,_ in m])
     return
 
 def recovermarks():
@@ -53,7 +53,7 @@ def recovermarks():
     result = []
     for fn,l in database.select('marks'):
         m = set( (l['marks']) if hasattr(l['marks'],'__iter__') else [int(x,16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
-        res = [(ea,d['mark']) for ea,d in function.select(fn,'mark')]
+        res = [(ea,d['mark']) for ea,d in func.select(fn,'mark')]
         if m != set(a for a,_ in res):
             logging.warning("{:#x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, builtins.map(hex,m), builtins.map(hex,set(a for a,_ in res))))
         result.extend(res)
@@ -90,7 +90,7 @@ def checkmarks():
     res = []
     for a,m in database.marks():
         try:
-            res.append((function.top(a), a, m))
+            res.append((func.top(a), a, m))
         except ValueError:
             pass
         continue
@@ -112,7 +112,7 @@ def checkmarks():
         return
 
     for k,v in functions:
-        print >>sys.stdout, "{:#x} : in function {:s}".format(k,function.name(function.byAddress(k)))
+        print >>sys.stdout, "{:#x} : in function {:s}".format(k, func.name(func.byAddress(k)))
         print >>sys.stdout, '\n'.join( ("- {:#x} : {:s}".format(a,m) for a,m in sorted(v)) )
     return
 
@@ -124,14 +124,14 @@ def collect(ea, sentinel):
         raise AssertionError("{:s}.collect({:#x}, {!r}) : Sentinel is empty or not a set.".format(__name__, ea, sentinel))
     def _collect(addr, result):
         process = set()
-        for blk in builtins.map(function.block, function.block.after(addr)):
+        for blk in builtins.map(func.block, func.block.after(addr)):
             if any(blk in coll for coll in (result, sentinel)):
                 continue
             process.add(blk)
         for addr, _ in process:
             result |= _collect(addr, result | process)
         return result
-    addr, _ = blk = function.block(ea)
+    addr, _ = blk = func.block(ea)
     return _collect(addr, set([blk]))
 
 def collectcall(ea, sentinel=set()):
@@ -142,10 +142,10 @@ def collectcall(ea, sentinel=set()):
         raise AssertionError("{:s}.collectcall({:#x}, {!r}) : Sentinel is not a set.".format(__name__, ea, sentinel))
     def _collectcall(addr, result):
         process = set()
-        for f in function.down(addr):
+        for f in func.down(addr):
             if any(f in coll for coll in (result, sentinel)):
                 continue
-            if not function.within(f):
+            if not func.within(f):
                 logging.warn("{:s}.collectcall({:#x}, {!r}) : Adding non-function address {:#x} ({:s}).".format(__name__, ea, sentinel, f, database.name(f)))
                 result.add(f)
                 continue
@@ -153,18 +153,18 @@ def collectcall(ea, sentinel=set()):
         for addr in process:
             result |= _collectcall(addr, result | process)
         return result
-    addr = function.top(ea)
+    addr = func.top(ea)
     return _collectcall(addr, set([addr]))
 
 def above(ea, includeSegment=False):
     '''Display all the callers of the function at /ea/'''
-    tryhard = lambda ea: "{:s}{:+x}".format(function.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "{:+x}".format(ea) if function.name(ea) is None else function.name(ea)
-    return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in function.up(ea))
+    tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)),ea-func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
+    return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.up(ea))
 
 def below(ea, includeSegment=False):
     '''Display all the functions that the function at /ea/ can call'''
-    tryhard = lambda ea: "{:s}{:+x}".format(function.name(function.top(ea)),ea-function.top(ea)) if function.within(ea) else "{:+x}".format(ea) if function.name(ea) is None else function.name(ea)
-    return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in function.down(ea))
+    tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)),ea-func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
+    return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.down(ea))
 
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea=None, target=None):
@@ -172,7 +172,7 @@ def makecall(ea=None, target=None):
     If ``target`` is specified, then assume that the instruction is calling ``target``.
     """
     ea = current.address() if ea is None else ea
-    if not function.contains(ea, ea):
+    if not func.contains(ea, ea):
         return None
 
     if database.config.bits() != 32:
@@ -180,7 +180,7 @@ def makecall(ea=None, target=None):
 
     if target is None:
         # scan down until we find a call that references something
-        chunk, = ((l,r) for l,r in function.chunks(ea) if l <= ea <= r)
+        chunk, = ((l,r) for l,r in func.chunks(ea) if l <= ea <= r)
         result = []
         while (len(result) < 1) and ea < chunk[1]:
             # FIXME: it's probably not good to just scan for a call
@@ -198,7 +198,7 @@ def makecall(ea=None, target=None):
 
     try:
         result = []
-        for offset,name,size in function.arguments(fn):
+        for offset,name,size in func.arguments(fn):
             left = database.address.prevstack(ea, offset+database.config.bits()/8)
             # FIXME: if left is not an assignment or a push, find last assignment
             result.append((name,left))
@@ -210,7 +210,7 @@ def makecall(ea=None, target=None):
     result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea,0), write=1), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea,0), write=1))) if instruction.op_type(ea,0) == 'reg' else instruction.op_repr(ea, 0)) for name,ea in result]
 
     try:
-        return "{:s}({:s})".format(internal.declaration.demangle(function.name(function.by_address(fn))), ','.join(result))
+        return "{:s}({:s})".format(internal.declaration.demangle(func.name(func.by_address(fn))), ','.join(result))
     except:
         pass
     return "{:s}({:s})".format(internal.declaration.demangle(database.name(fn)), ','.join(result))
@@ -231,7 +231,7 @@ def sourcechain(fn, *args, **kwds):
     #      to the top of a function?
     result = {}
     for ea,opi in source(*args):
-        if not function.contains(fn, ea): continue
+        if not func.contains(fn, ea): continue
         opt = tuple(instruction.op_type(ea,i) for i in opi)
         for i,t in zip(opi,opt):
             if t in sentinel:
@@ -270,10 +270,10 @@ def map(F, **kwargs):
         try:
             for i, ea in enumerate(all):
                 ui.navigation.set(ea)
-                print("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
+                print("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
                 result.append( f((i, ea), **kwargs) )
         except KeyboardInterrupt:
-            print("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, function.name(ea)))
+            print("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
     return result
 
 # XXX: This namespace should be deprecated
@@ -289,10 +289,10 @@ class function(object):
         return cls.regex(ui.current.function(), regex)
     @internal.utils.multicase(regex=six.string_types)
     @classmethod
-    def regex(cls, func, regex):
-        '''Return each instruction in the function ``func`` that matches the string ``regex``.'''
+    def regex(cls, function, regex):
+        '''Return each instruction in the ``function`` that matches the string ``regex``.'''
         pattern = re.compile(regex, re.I)
-        for ea in function.iterate(func):
+        for ea in func.iterate(function):
             insn = re.sub(' +', ' ', database.instruction(ea))
             if pattern.search(insn) is not None:
                 yield ea
@@ -301,34 +301,34 @@ class function(object):
 
     @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
     @classmethod
-    def instruction(cls, F):
-        '''Search through the current function for any instruction that matches with the callable ``F``.'''
-        return cls.instruction(ui.current.address(), F)
+    def instruction(cls, predicate):
+        '''Search through the current function for any instruction that matches with the callable ``predicate``.'''
+        return cls.instruction(ui.current.address(), predicate)
     @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
     @classmethod
-    def instruction(cls, func, F):
-        """Search through the function ``func`` for any instruction that matches with the callable ``F``.
-        ``F`` is a callable that takes one argument which is the result of database.instruction(ea).
+    def instruction(cls, function, predicate):
+        """Search through the function ``function`` for any instruction that matches with the callable ``predicate``.
+        ``predicate`` is a callable that takes one argument which is the result of database.instruction(ea).
         """
-        for ea in function.iterate(func):
+        for ea in func.iterate(function):
             res = database.instruction(ea)
-            if F(res):
+            if predicate(res):
                 yield ea
             continue
         return
 
     @classmethod
-    def address(cls, F):
-        '''Search through the current function for any address that matches with the callable ``F``.'''
-        return cls.instruction(ui.current.address(), F)
+    def address(cls, predicate):
+        '''Search through the current function for any address that matches with the callable ``predicate``.'''
+        return cls.instruction(ui.current.address(), predicate)
     @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
     @classmethod
-    def address(cls, func, F):
-        """Search through the function ``func`` for any address that matches with the callable ``F``.
-        ``F`` is a callable that takes one argument which is passed the address to match.
+    def address(cls, function, predicate):
+        """Search through the ``function`` for any address that matches with the callable ``predicate``.
+        ``predicate`` is a callable that takes one argument which is passed the address to match.
         """
-        for ea in function.iterate(func):
-            if F(ea):
+        for ea in func.iterate(function):
+            if predicate(ea):
                 yield ea
             continue
         return
