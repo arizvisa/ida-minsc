@@ -664,25 +664,28 @@ def go_offset(offset):
 goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
 
 @utils.multicase()
-def get_name():
+def get_name(**flags):
     '''Return the name defined at the current address.'''
-    return get_name(ui.current.address())
+    return get_name(ui.current.address(), **flags)
 @utils.multicase(ea=six.integer_types)
-def get_name(ea):
-    '''Return the name defined at the address ``ea``.'''
+def get_name(ea, **flags):
+    """Return the name defined at the address ``ea``.
+    If ``flags`` is specified, then use the specified value as the flags.
+    """
     ea = interface.address.inside(ea)
 
-    # if get_true_name is going to return the function's name instead of a real one
-    # then consider the address itself as being unnamed.
+    # figure out what default flags to use
     fn = idaapi.get_func(ea)
-    if fn and fn.startEA == ea:
-        return None
 
     # figure out which name function to call
     if idaapi.__version__ < 6.8:
+        # if get_true_name is going to return the function's name instead of a real one, then leave it as unnamed.
+        if fn and fn.startEA == ea and not flags:
+            return None
+
         aname = idaapi.get_true_name(ea) or idaapi.get_true_name(ea, ea)
     else:
-        aname = idaapi.get_ea_name(ea, idaapi.GN_LOCAL)
+        aname = idaapi.get_ea_name(ea, flags.get('flags', idaapi.GN_LOCAL))
 
     # return the name at the specified address or not
     return aname or None
@@ -754,7 +757,7 @@ def set_name(ea, string, **flags):
     except: pass
 
     # validate the name
-    res = idaapi.validate_name2(buffer(string)[:])
+    res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
         logging.warn("{:s}.set_name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
         string = res

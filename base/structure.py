@@ -163,7 +163,7 @@ class structure_t(object):
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
-        res = idaapi.validate_name2(buffer(string)[:])
+        res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
         if string and string != res:
             cls = self.__class__
             logging.warn("{:s}.name : Stripping invalid chars from structure name {!r}. : {!r}".format( '.'.join((__name__, cls.__name__)), string, res))
@@ -239,7 +239,7 @@ def name(id, string, *suffix):
     res = (string,) + suffix
     string = interface.tuplename(*res)
 
-    res = idaapi.validate_name2(buffer(string)[:])
+    res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
         logging.warn("{:s}.name : Stripping invalid chars from structure name \"{:s}\". : {!r}".format(__name__, string, res))
         string = res
@@ -975,7 +975,7 @@ class member_t(object):
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
-        res = idaapi.validate_name2(buffer(string)[:])
+        res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
         if string and string != res:
             cls = self.__class__
             logging.warn("{:s}.name : Stripping invalid chars from structure \"{:s}\" member {:d} name {!r}. : {!r}".format( '.'.join((__name__, cls.__name__)), self.__owner.name, self.__index, string, res))

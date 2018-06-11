@@ -110,7 +110,9 @@ def get_name():
     return get_name(ui.current.function())
 @utils.multicase()
 def get_name(func):
-    '''Return the name of the function ``func``.'''
+    """Return the name of the function ``func``.
+    If ``flags`` is specified, then use the specified value as the flags.
+    """
     get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
 
     rt, ea = interface.addressOfRuntimeOrStatic(func)
@@ -120,7 +122,7 @@ def get_name(func):
         #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     res = idaapi.get_func_name(ea)
     if not res: res = get_name(ea)
-    if not res: res = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea)
+    if not res: res = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
     return res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
@@ -145,18 +147,16 @@ def set_name(func, string):
     '''Set the name of the function ``func`` to ``string``.'''
     rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-    res = idaapi.validate_name2(buffer(string)[:])
+    res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
         logging.warn("{:s}.set_name({:#x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
         string = res
 
     if rt:
         # FIXME: shuffle the new name into the prototype and then re-mangle it
-        res, ok = get_name(ea), database.set_name(ea, string)
+        res = database.set_name(ea, string)
     else:
-        res, ok = get_name(ea), database.set_name(ea, string, flags=idaapi.SN_PUBLIC)
-    if not ok:
-        raise ValueError("{:s}.set_name({:#x}, {!r}) : Unable to apply function name.".format(__name__, ea, string))
+        res = database.set_name(ea, string, flags=idaapi.SN_PUBLIC)
     return res
 
 @utils.multicase()
