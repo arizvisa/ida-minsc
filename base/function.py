@@ -349,20 +349,20 @@ def marks(func):
 
 ## functions
 @utils.multicase()
-def add():
+def new():
     '''Make a function at the current address.'''
-    return add(ui.current.address())
+    return new(ui.current.address())
 @utils.multicase(start=six.integer_types)
-def add(start, **end):
+def new(start, **end):
     """Make a function at the address ``start`` and return its entrypoint.
     If the address ``end`` is specified, then stop processing the function at its address.
     """
     start = interface.address.inside(start)
     end = end.get('end', idaapi.BADADDR)
     ok = idaapi.add_func(start, end)
-    idaapi.autoWait()
+    ui.state.wait()
     return address(start) if ok else None
-make = utils.alias(add)
+make = add = utils.alias(new)
 
 @utils.multicase()
 def remove():
@@ -1349,19 +1349,19 @@ def tags(func):
 def select(**boolean):
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
-def select(tag, *tags, **boolean):
-    tags = (tag,) + tags
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
+def select(tag, *And, **boolean):
+    res = (tag,) + And
+    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
-def select(func, tag, *tags, **boolean):
-    tags = (tag,) + tags
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
+def select(func, tag, *And, **boolean):
+    res = (tag,) + And
+    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
-def select(func, tag, *tags, **boolean):
-    tags = set(builtins.list(tag) + builtins.list(tags))
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(tags))
+def select(func, tag, *And, **boolean):
+    res = set(builtins.list(tag) + builtins.list(And))
+    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(func, **boolean)
 @utils.multicase()
 def select(func, **boolean):

@@ -61,11 +61,6 @@ def top():
 def bottom():
     return config.bounds()[1]
 
-# FIXME: move this to some place that makes sense
-#        ...and then drop an alias.
-def wait():
-    return idaapi.autoWait()
-
 class config(object):
     """
     Database configuration.
@@ -799,8 +794,12 @@ def name(ea, none):
     '''Removes the name at address ``ea``.'''
     return set_name(ea, None)
 
+# FIXME: This can be moved into database.address.iterate as it's not used anywhere.
+# FIXME: Add a predicate for only selecting types that match something
 def iterate(start, end, step=None):
     '''Iterate through all of the instruction and data boundaries from address ``start`` to ``end``.'''
+    if step:
+        logging.warn("{:s}.iterate({:#x}, {:#x}, {!r}) : The `step` argument for this function will soon be deprecated!".format(__name__, start, end, step))
     start, end = builtins.map(interface.address.head, (start, end))
     left, right = config.bounds()
 
@@ -1139,7 +1138,7 @@ class entry(object):
     def new(cls, ea, name, ordinal):
         '''Adds an entry-point at ``ea`` with the specified ``name`` and ``ordinal``.'''
         res = idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
-        idaapi.autoWait()
+        ui.state.wait()
         return res
 
     add = utils.alias(new, 'entry')
@@ -1315,9 +1314,9 @@ def tag(ea, key, none):
 # FIXME: document this properly
 # FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=basestring)
-def select(tag, *tags, **boolean):
-    tags = (tag,) + tags
-    boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())).union(tags))
+def select(tag, *And, **boolean):
+    res = (tag,) + And
+    boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())).union(res))
     return select(**boolean)
 @utils.multicase()
 def select(**boolean):
@@ -1356,9 +1355,9 @@ def select(**boolean):
 # FIXME: consolidate the boolean querying logic into the utils module
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
-def selectcontents(tag, *tags, **boolean):
-    tags = (tag,) + tags
-    boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())).union(tags))
+def selectcontents(tag, *Or, **boolean):
+    res = (tag,) + Or
+    boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())).union(res))
     return selectcontents(**boolean)
 @utils.multicase()
 def selectcontents(**boolean):
@@ -1629,6 +1628,7 @@ class address(object):
             res = next(res)
         return res
 
+    # FIXME: Deprecate this as it's not used for anything
     @utils.multicase()
     def iterate(cls):
         '''Return an iterator that walks forward through the database from the current address.'''
@@ -1641,6 +1641,7 @@ class address(object):
     @classmethod
     def iterate(cls, ea, next):
         '''Return an iterator that walks through the database starting at the address ``ea``. Use ``next`` to determine the next address.'''
+        logging.warn("{:s}.iterate({:#x}, {!r}) : This function will soon be deprecated!".format('.'.join((__name__, cls.__name__)), start, end, step))
         ea = interface.address.inside(ea)
         while ea not in {None, idaapi.BADADDR}:
             yield ea
@@ -1674,40 +1675,72 @@ class address(object):
     @utils.multicase()
     @classmethod
     def prev(cls):
-        '''Return the previous address from the current one.'''
+        '''Return the previous address from the current address.'''
         return cls.prev(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prev(cls, predicate):
+        '''Return the previous address from the current address that matches ``predicate``.'''
+        return cls.prev(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prev(cls, ea):
         '''Return the previous address from the address ``ea``.'''
         return cls.prev(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prev(cls, ea, predicate):
+        '''Return the previous address from the address ``ea`` that matches ``predicate``.'''
+        return cls.prevF(ea, predicate, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prev(cls, ea, count):
         """Return the previous address from the address ``ea``.
         Skip ``count`` addresses before returning.
         """
-        res = idaapi.prev_not_tail(interface.address.within(ea))
-        return cls.prev(res, count-1) if count > 1 else res
+        return cls.prevF(ea, utils.fidentity, count)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
+    @classmethod
+    def prev(cls, ea, predicate, count):
+        """Return the previous address from the address ``ea`` that matches ``predicate``.
+        Skip ``count`` addresses before returning.
+        """
+        return cls.prevF(ea, predicate, count)
 
     @utils.multicase()
     @classmethod
     def next(cls):
-        '''Return the next address from the current one.'''
+        '''Return the next address from the current address.'''
         return cls.next(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def next(cls, predicate):
+        '''Return the next address from the current address that matches ``predicate``.'''
+        return cls.next(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def next(cls, ea):
         '''Return the next address from the address ``ea``.'''
         return cls.next(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def next(cls, ea, predicate):
+        '''Return the next address from the address ``ea`` that matches ``predicate``.'''
+        return cls.nextF(ea, predicate, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def next(cls, ea, count):
         """Return the next address from the address ``ea``.
         Skip ``count`` addresses before returning.
         """
-        res = idaapi.next_not_tail(interface.address.within(ea))
-        return cls.next(res, count-1) if count > 1 else res
+        return cls.nextF(ea, utils.fidentity, count)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
+    @classmethod
+    def next(cls, ea, predicate, count):
+        """Return the next address from the address ``ea`` that matches ``predicate``.
+        Skip ``count`` addresses before returning.
+        """
+        return cls.nextF(ea, predicate, count)
 
     @utils.multicase(predicate=builtins.callable)
     @classmethod
@@ -1725,8 +1758,8 @@ class address(object):
         """Return the previous address from the address ``ea`` that matches ``predicate``..
         Skip ``count`` addresses before returning.
         """
-        Finverse = utils.fcompose(predicate, operator.not_)
-        res = cls.walk(cls.prev(ea), cls.prev, Finverse)
+        Fprev, Finverse = utils.fcompose(interface.address.within, idaapi.prev_not_tail), utils.fcompose(predicate, operator.not_)
+        res = cls.walk(Fprev(ea), Fprev, Finverse)
         return cls.prevF(res, predicate, count-1) if count > 1 else res
 
     @utils.multicase(predicate=builtins.callable)
@@ -1745,8 +1778,8 @@ class address(object):
         """Return the next address from the address ``ea`` that matches ``predicate``..
         Skip ``count`` addresses before returning.
         """
-        Finverse = utils.fcompose(predicate, operator.not_)
-        res = cls.walk(cls.next(ea), cls.next, Finverse)
+        Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
+        res = cls.walk(Fnext(ea), Fnext, Finverse)
         return cls.nextF(res, predicate, count-1) if count > 1 else res
 
     @utils.multicase()
@@ -1992,7 +2025,7 @@ class address(object):
         res = cls.walk(prevea, cls.prev, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
-            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x} - {:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
+            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x}{:+#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2053,13 +2086,13 @@ class address(object):
         res = cls.walk(nextea, cls.next, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
-            raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:#x}:{:#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', end, ea, res))
+            raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x}{:+#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', ea, end, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
         return cls.nextreg(res, predicate, *regs, **modifiers) if count > 1 else res
 
-    # FIXME: modify this to just locate _any_ amount of change in the sp delta
+    # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def prevstack(cls, delta):
@@ -2077,7 +2110,7 @@ class address(object):
             raise ValueError("{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} < {:#x} ".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, start))
         return res
 
-    # FIXME: modify this to just locate _any_ amount of change in the sp delta
+    # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def nextstack(cls, delta):
@@ -2328,6 +2361,56 @@ class address(object):
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         return cls.nextF(ea, Ftag, count)
     prevcomment, nextcomment = utils.alias(prevtag, 'address'), utils.alias(nexttag, 'address')
+
+    @utils.multicase()
+    @classmethod
+    def prevunknown(cls):
+        '''Return the previous address that is undefined.'''
+        return cls.prevunknown(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def prevunknown(cls, predicate):
+        '''Return the previous address that is undefined and matches ``predicate``.'''
+        return cls.prevunknown(ui.current.address(), predicate)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def prevunknown(cls, ea):
+        '''Return the previous address from ``ea`` that is undefined.'''
+        return cls.prevunknown(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def prevunknown(cls, ea, predicate):
+        '''Return the previous address from ``ea`` that is undefined and matches ``predicate``.'''
+        return cls.prevF(ea, type.is_unknown, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def prevunknown(cls, ea, count):
+        return cls.prevF(ea, type.is_unknown, count)
+
+    @utils.multicase()
+    @classmethod
+    def nextunknown(cls):
+        '''Return the next address that is undefined.'''
+        return cls.nextunknown(ui.current.address(), 1)
+    @utils.multicase(predicate=builtins.callable)
+    @classmethod
+    def nextunknown(cls, predicate):
+        '''Return the next address that is undefined and matches ``predicate``.'''
+        return cls.nextunknown(ui.current.address(), predicate)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def nextunknown(cls, ea):
+        '''Return the next address from ``ea`` that is undefined.'''
+        return cls.nextunknown(ea, 1)
+    @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
+    def nextunknown(cls, ea, predicate):
+        '''Return the next address from ``ea`` that is undefined and matches ``predicate``.'''
+        return cls.nextF(ea, type.is_unknown, 1)
+    @utils.multicase(ea=six.integer_types, count=six.integer_types)
+    @classmethod
+    def nextunknown(cls, ea, count):
+        return cls.nextF(ea, type.is_unknown, count)
 
 a = addr = address  # XXX: ns alias
 

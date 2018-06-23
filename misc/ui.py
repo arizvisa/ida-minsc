@@ -2,8 +2,8 @@ import six
 import sys,os
 import logging
 
-import idaapi
-import internal,database,segment,function,instruction as ins,structure
+import idaapi, internal
+import database as _database
 
 ## TODO:
 # locate window under current cursor position
@@ -57,7 +57,7 @@ class current(object):
         if not ok:
             raise StandardError("{:s}.selection : Unable to read selection.".format('.'.join((__name__, cls.__name__))))
         pl_l, pl_r = left.place(view), right.place(view)
-        return database.address.head(pl_l.ea), database.address.tail(pl_r.ea)
+        return _database.address.head(pl_l.ea), _database.address.tail(pl_r.ea)
     @classmethod
     def opnum(cls):
         return idaapi.get_opnum()
@@ -77,7 +77,7 @@ class current(object):
 
 class state(object):
     """
-    Class for returning information about the state of IDA's interface.
+    Class for interacting with the state of IDA's interface.
     """
     @classmethod
     def graphview(cls):
@@ -87,47 +87,65 @@ class state(object):
             return res.graph_view != 0
         return res.is_graph_view()
 
+    @classmethod
+    def wait(cls):
+        '''Wait until IDA's autoanalysis queues are empty.'''
+        return idaapi.autoWait() if idaapi.__version__ < 7.0 else idaapi.auto_wait()
+
+def beep():
+    return idaapi.beep()
+
 def refresh():
     '''Refresh all of IDA's windows.'''
     global disassembly
     idaapi.refresh_lists()
     disassembly.refresh()
 
-class disassembly(object):
+class appwindow(object):
+    @classmethod
+    def open(cls, *args):
+        global widget
+        res = cls.__open__(*args) if args else cls.__open__(*getattr(cls, '__open_defaults__', ()))
+        return widget.form(res)
+
+    @classmethod
+    def close(cls):
+        res = cls.open()
+        return res.deleteLater()
+
+class disassembly(appwindow):
     """
     Interacting with the Disassembly window.
     """
+    __open__ = staticmethod(idaapi.open_disasm_window)
+    __open_defaults__ = ('Disassembly', )
+
     @classmethod
     def refresh(cls):
         '''Refresh the main IDA disassembly view.'''
         return idaapi.refresh_idaview_anyway()
 
-class exports(object):
+class exports(appwindow):
     """
     Interacting with the Exports window.
     """
-    @classmethod
-    def open(cls, ea):
-        global widget
-        return widget.form(idaapi.open_exports_window(ea))
+    __open__ = staticmethod(idaapi.open_exports_window)
+    __open_defaults__ = (idaapi.BADADDR, )
 
-class imports(object):
+class imports(appwindow):
     """
     Interacting with the Imports window.
     """
-    @classmethod
-    def open(cls, ea):
-        global widget
-        return widget.form(idaapi.open_imports_window(ea))
+    __open__ = staticmethod(idaapi.open_imports_window)
+    __open_defaults__ = (idaapi.BADADDR, )
 
-class names(object):
+class names(appwindow):
     """
     Interacting with the Names window.
     """
-    @classmethod
-    def open(cls, ea):
-        global widget
-        return widget.form(idaapi.open_names_window(ea))
+    __open__ = staticmethod(idaapi.open_names_window)
+    __open_defaults__ = (idaapi.BADADDR, )
+
     @classmethod
     def refresh(cls):
         return idaapi.refresh_lists()
@@ -157,19 +175,26 @@ class names(object):
             yield cls.at(idx)
         return
 
-class functions(object):
+class functions(appwindow):
     """
     Interacting with the Functions window.
     """
-    @classmethod
-    def open(cls, ea):
-        global widget
-        return widget.form(idaapi.open_functions_window(ea))
+    __open__ = staticmethod(idaapi.open_funcs_window)
+    __open_defaults__ = (idaapi.BADADDR, )
 
-class strings(object):
+class structures(appwindow):
+    """
+    Interacting with the Structures window.
+    """
+    __open__ = staticmethod(idaapi.open_structs_window)
+    __open_defaults__ = (idaapi.BADADDR, 0)
+
+class strings(appwindow):
     """
     Interacting with the Strings window.
     """
+    __open__ = staticmethod(idaapi.open_strings_window)
+    __open_defaults__ = (idaapi.BADADDR, idaapi.BADADDR, idaapi.BADADDR)
 
     @classmethod
     def __on_openidb__(cls, code, is_old_database):
@@ -190,10 +215,6 @@ class strings(object):
     # FIXME: I don't think that these callbacks are stackable
     idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)
 
-    @classmethod
-    def open(cls, ea):
-        global widget
-        return widget.form(idaapi.open_strings_window(ea))
     @classmethod
     def refresh(cls):
         return idaapi.refresh_lists()
@@ -218,23 +239,19 @@ class strings(object):
             yield si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
         return
 
-class segments(object):
+class segments(appwindow):
     """
     Interacting with the Segments window.
     """
-    @classmethod
-    def open(cls, ea):
-        global widget
-        return widget.form(idaapi.open_segments_window(ea))
+    __open__ = staticmethod(idaapi.open_segments_window)
+    __open_defaults__ = (idaapi.BADADDR, )
 
-class notepad(object):
+class notepad(appwindow):
     """
     Interacting with the Notepad window.
     """
-    @classmethod
-    def open(cls, ea):
-        global widget
-        return widget.form(idaapi.open_notepad_window())
+    __open__ = staticmethod(idaapi.open_notepad_window)
+    __open_defaults__ = ()
 
 class timer(object):
     clock = {}
@@ -444,7 +461,7 @@ try:
             res.setVisible(False)
             res.setWindowModality(blocking)
             res.setAutoClose(True)
-            path = "{:s}/{:s}".format(database.path(), database.filename())
+            path = "{:s}/{:s}".format(_database.path(), _database.filename())
             self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
 
         # properties
@@ -640,7 +657,7 @@ else:
         Helper class used to construct and show a progress-bar using the console.
         """
         def __init__(self, blocking=True):
-            self.__path__ = "{:s}/{:s}".format(database.path(), database.filename())
+            self.__path__ = "{:s}/{:s}".format(_database.path(), _database.filename())
             self.__value__ = 0
             self.__min__, self.__max__ = 0, 0
             return
