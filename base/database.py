@@ -761,7 +761,7 @@ def set_name(ea, string, **flags):
     res, ok = get_name(ea), idaapi.set_name(ea, string or "", flags.get('flags', fl))
 
     if not ok:
-        raise ValueError("{:s}.set_name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags))
+        raise ValueError("{:s}.set_name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
     return res
 
 @utils.multicase()
@@ -3669,7 +3669,7 @@ class set(object):
         ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         # FIXME: check the result, and return the calculated size
         return size
-    undefine = undefined = utils.alias(unknown, 'set')
+    undef = undefine = undefined = utils.alias(unknown, 'set')
 
     @utils.multicase()
     @classmethod
