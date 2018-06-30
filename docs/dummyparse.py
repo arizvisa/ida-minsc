@@ -8,7 +8,41 @@ import argparse
 import ast
 import contextlib
 
-### 
+### Namespace of types that should get evaluated to a string
+class evaluate(object):
+    def __new__(cls, path):
+        res = cls
+        for name in path.split('.'):
+            res = getattr(res, name)
+        return res
+
+    import six
+    from six.moves import builtins
+    class instruction:
+        register_t = 'register_t'
+    _instruction = instruction
+    class structure:
+        structure_t = 'structure_t'
+    _structure = structure
+
+class stringify(object):
+    def __new__(cls, object):
+        if isinstance(object, basestring):
+            return object
+        lookup = {
+            int: 'int',
+            long: 'long',
+            str: 'str',
+            basestring: 'basestring',
+            unicode: 'unicode',
+            chr: 'chr',
+            callable: 'callable',
+        }
+        if not isinstance(object, tuple):
+            return lookup[object]
+        return tuple(cls(res) for res in object)
+
+### Types used for parsed tree
 class Reference(object):
     def __init__(self, **attrs):
         self.__children__ = []
@@ -28,7 +62,7 @@ class Reference(object):
             continue
         [setattr(self, "_{:s}".format(key), value) for key, value in attrs.iteritems()]
     def has(self, name):
-        if not isinstance(object, basestring):
+        if not isinstance(name, basestring):
             raise TypeError(name)
         return hasattr(self, "_{:s}".format(name))
     name = property(fget=operator.attrgetter('_name'))
@@ -50,20 +84,20 @@ class Module(Commentable): pass
 class Namespace(Commentable):
     namespace = property(fget=operator.attrgetter('_namespace'))
 class Function(Commentable):
-    namespace = property(fget=operator.attrgetter('_namespace'))
+    ns = namespace = property(fget=operator.attrgetter('_namespace'))
     args = property(fget=operator.attrgetter('_arguments'))
-    mc = property(fget=operator.attrgetter('_multicase'))
+    argtypes = mc = property(fget=operator.attrgetter('_multicase'))
+    argdefaults = defaults = property(fget=operator.attrgetter('_defaults'))
     def __repr__(self):
         return "{:s}({:s})".format(super(Function, self).__repr__(), ', '.join(map("{!r}".format, self._arguments)))
 class StaticFunction(Function): pass
 class ClassFunction(Function): pass
 class Param(Reference):
     owner = property(fget=operator.attrgetter('_owner'))
-class ParamVariableList(Param):
-    owner = property(fget=operator.attrgetter('_owner'))
-class ParamVariableKeyword(Param):
-    owner = property(fget=operator.attrgetter('_owner'))
+class ParamVariableList(Param): pass
+class ParamVariableKeyword(Param): pass
 
+### reduce parts of the ast into a tuple of strings
 class grammar(object):
     def reduce_call(call):
         res = ()
@@ -108,88 +142,6 @@ class grammar(object):
     }
 
 ### parsing code using ast visitor
-def _is_sub_node(node):
-    return isinstance(node, ast.AST) and not isinstance(node, ast.expr_context)
-
-def _is_leaf(node):
-    for field in node._fields:
-        attr = getattr(node, field)
-        if _is_sub_node(attr):
-            return False
-        elif isinstance(attr, (list, tuple)):
-            for val in attr:
-                if _is_sub_node(val):
-                    return False
-                continue
-            pass
-        continue
-    else:
-        return True
-
-def pformat(node, indent='    ', _indent=0):
-    if node is None:  # pragma: no cover (py35+ unpacking in literals)
-        return repr(node)
-    elif _is_leaf(node):
-        if hasattr(node, 'lineno'):
-            ret = ast.dump(node)
-            # For nodes like Pass() which have information but no data
-            if ret.endswith('()'):
-                info = '(lineno={:d}, col_offset={:d}'.format(node.lineno, node.col_offset)
-            else:
-                info = '(lineno={:d}, col_offset={:d}, '.format(node.lineno, node.col_offset)
-            return ret.replace('(', info, 1)
-        else:
-            return ast.dump(node)
-    else:
-        class state:
-            indent = _indent
-
-        @contextlib.contextmanager
-        def indented():
-            state.indent += 1
-            yield
-            state.indent -= 1
-
-        def indentstr():
-            return state.indent * indent
-
-        def _pformat(el, _indent=0):
-            return pformat(el, indent=indent, _indent=_indent)
-
-        out = type(node).__name__ + '(\n'
-        with indented():
-            fields = (('lineno', 'col_offset') + node._fields) if hasattr(node, 'lineno') else node._fields
-
-            for field in fields:
-                attr = getattr(node, field)
-                if attr == []:
-                    representation = '[]'
-                elif isinstance(attr, list) and len(attr) == 1 and isinstance(attr[0], ast.AST) and _is_leaf(attr[0]):
-                    representation = '[{:s}]'.format(_pformat(attr[0]))
-                elif isinstance(attr, list):
-                    representation = '[\n'
-                    with indented():
-                        for el in attr:
-                            representation += '{:s}{:s},\n'.format(indentstr(), _pformat(el, state.indent))
-                    representation += indentstr() + ']'
-                elif isinstance(attr, ast.AST):
-                    representation = _pformat(attr, state.indent)
-                else:
-                    representation = repr(attr)
-                out += '{:s}{:s}={:s},\n'.format(indentstr(), field, representation)
-        out += indentstr() + ')'
-        return out
-
-def pprint(*args, **kwargs):
-    print(pformat(*args, **kwargs))
-
-def is_multicased(fdef):
-    res = (d for d in getattr(fdef, 'decorator_list', []))
-    res = (d for d in res if isinstance(d, ast.Call))
-    res = (d.func for d in res)
-    res = (getattr(f, 'attr', None) for f in res)
-    return any(a == 'multicase' for a in res)
-
 class NSVisitor(ast.NodeVisitor):
     def __init__(self, ref):
         if not isinstance(ref, Reference):
@@ -199,7 +151,7 @@ class NSVisitor(ast.NodeVisitor):
     def visit_ClassDef(self, node):
         if node.name.startswith('_'): return
 
-        name = '.'.join((self._ref.name, node.name))
+        name = node.name
         try:
             docstring = ast.get_docstring(node)
         except TypeError:
@@ -224,6 +176,9 @@ class NSVisitor(ast.NodeVisitor):
             docstring = ''
         arguments, defaults = node.args, node.args.defaults
 
+        # FIXME: figure out the defaults
+        defs = defaults
+
         # figure out the attributes
         decorator_attributes = [d for d in node.decorator_list if isinstance(d, ast.Name)]
         methodtypes = {name for name, in map(grammar.reduce, decorator_attributes)}
@@ -241,7 +196,7 @@ class NSVisitor(ast.NodeVisitor):
             F, args = Function, arguments.args[:]
 
         # capture the method
-        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring, arguments=[])
+        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring, arguments=[], defaults=defs)
         self._ref.add(res)
 
         # add its arguments
@@ -268,7 +223,7 @@ class RootVisitor(ast.NodeVisitor):
             docstring = ''
 
         # construct the namespace
-        res = Namespace(node=node, name=name, namespace=None, docstring=docstring)
+        res = Namespace(node=node, name=name, namespace=self._ref, docstring=docstring)
         self._ref.add(res)
 
         # continue parsing its children
@@ -285,6 +240,9 @@ class RootVisitor(ast.NodeVisitor):
         except TypeError:
             docstring = ''
         arguments, defaults = node.args, node.args.defaults
+
+        # FIXME: figure out the defaults
+        defs = defaults
 
         # figure out the attributes
         decorator_attributes = [d for d in node.decorator_list if isinstance(d, ast.Name)]
@@ -303,7 +261,7 @@ class RootVisitor(ast.NodeVisitor):
             F, args = Function, arguments.args[:]
 
         # capture the function
-        res = F(name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring, arguments=[])
+        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring, arguments=[], defaults=defs)
         self._ref.add(res)
 
         # add its arguments
@@ -313,6 +271,49 @@ class RootVisitor(ast.NodeVisitor):
         if arguments.kwarg:
             res.args.append(ParamVariableKeyword(name=arguments.kwarg, owner=res))
         return
+
+class restructure(object):
+    @classmethod
+    def walk(cls, ref, field):
+        while ref.has(field):
+            yield ref
+            ref = ref.get(field)
+        yield ref
+    @classmethod
+    def comment(cls, cmt):
+        res = cmt.replace('``', '**')
+        res = cmt.replace('`', '*')
+        return res.strip()
+    @classmethod
+    def Module(cls, ref):
+        return ".. py:module:: {:s}".format(ref.name)
+    @classmethod
+    def Function(cls, ref):
+        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        name = '.'.join(reversed(ns))
+        adefs, atypes = ref.defaults or {}, ref.mc
+        gargs = dict(itertools.groupby(ref.args, type))
+        args = []
+        if Param in gargs:
+            args.extend( (a.name, a.name, adefs.get(a.name, None), atypes.get(a.name, None)) for a in gargs[Param])
+        if ParamVariableList in gargs:
+            args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
+        if ParamVariableKeyword in gargs:
+            args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
+
+        res = []
+        res.append("py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, df) if df else fn for _, fn, df, _ in args)))
+        res.append('')
+        if ref.comment: res.extend([cls.comment(ref.comment), ''])
+        for n, _, _, ty in args:
+            t = ()
+            if isinstance(ty, basestring):
+                try: t = evaluate(ty.name)
+                except AttributeError: t = ty
+            t = stringify(t)
+            fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
+            res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=n))
+        return '\n'.join(res)
 
 if __name__ == '__main__':
     import sys, os.path
