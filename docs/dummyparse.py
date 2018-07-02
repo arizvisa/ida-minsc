@@ -30,6 +30,7 @@ class stringify(object):
         if isinstance(object, basestring):
             return object
         lookup = {
+            None: 'None',
             int: 'int',
             long: 'long',
             str: 'str',
@@ -125,6 +126,17 @@ class grammar(object):
     def reduce_tuple(T):
         return tuple(map(grammar.reduce, T.elts)),
 
+
+    @staticmethod
+    def resolve(value):
+        global evaluate
+        if isinstance(value, basestring):
+            try:
+                res = evaluate(value)
+            except AttributeError:
+                res = value
+            return res
+        return value
     @staticmethod
     def reduce(type):
         for t, f in grammar.reduction.iteritems():
@@ -153,7 +165,7 @@ class NSVisitor(ast.NodeVisitor):
 
         name = node.name
         try:
-            docstring = ast.get_docstring(node)
+            docstring = ast.get_docstring(node) or ''
         except TypeError:
             docstring = ''
 
@@ -171,21 +183,21 @@ class NSVisitor(ast.NodeVisitor):
         # capture fields
         name = '.'.join((self._ref.name, node.name))
         try:
-            docstring = ast.get_docstring(node)
+            docstring = ast.get_docstring(node) or ''
         except TypeError:
             docstring = ''
         arguments, defaults = node.args, node.args.defaults
 
-        # FIXME: figure out the defaults
-        defs = defaults
+        # figure out the defaults
+        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(defaults, reversed(arguments.args)) }
 
         # figure out the attributes
         decorator_attributes = [d for d in node.decorator_list if isinstance(d, ast.Name)]
-        methodtypes = {name for name, in map(grammar.reduce, decorator_attributes)}
+        methodtypes = {n for n, in map(grammar.reduce, decorator_attributes)}
 
         # figure out the decorators
         decorator_functions = [d for d in node.decorator_list if isinstance(d, ast.Call)]
-        multicase = (dict(args) for name, args in map(grammar.reduce, decorator_functions) if name == u'utils.multicase')
+        multicase = (dict(args) for n, args in map(grammar.reduce, decorator_functions) if n == u'utils.multicase')
 
         # figure out which type
         if 'classmethod' in methodtypes:
@@ -213,6 +225,11 @@ class RootVisitor(ast.NodeVisitor):
             raise TypeError(ref)
         self._ref = ref
 
+    def visit_Expr(self, node):
+        if isinstance(node.value, ast.Str):
+            self._ref.set(docstring=node.value.s)
+        return
+
     def visit_ClassDef(self, node):
         if node.name.startswith('_'): return
 
@@ -223,13 +240,13 @@ class RootVisitor(ast.NodeVisitor):
             docstring = ''
 
         # construct the namespace
-        res = Namespace(node=node, name=name, namespace=self._ref, docstring=docstring)
+        res = Namespace(node=node, name=name, namespace=self._ref, docstring=docstring or '')
         self._ref.add(res)
 
         # continue parsing its children
         nv = NSVisitor(res)
         map(nv.visit, ast.iter_child_nodes(node))
-    
+
     def visit_FunctionDef(self, node):
         if node.name.startswith('_'): return
 
@@ -241,8 +258,8 @@ class RootVisitor(ast.NodeVisitor):
             docstring = ''
         arguments, defaults = node.args, node.args.defaults
 
-        # FIXME: figure out the defaults
-        defs = defaults
+        # figure out the defaults
+        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(defaults, reversed(arguments.args)) }
 
         # figure out the attributes
         decorator_attributes = [d for d in node.decorator_list if isinstance(d, ast.Name)]
@@ -261,7 +278,7 @@ class RootVisitor(ast.NodeVisitor):
             F, args = Function, arguments.args[:]
 
         # capture the function
-        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring, arguments=[], defaults=defs)
+        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring or '', arguments=[], defaults=defs)
         self._ref.add(res)
 
         # add its arguments
@@ -274,25 +291,88 @@ class RootVisitor(ast.NodeVisitor):
 
 class restructure(object):
     @classmethod
+    def escape(cls, string):
+        def escape_chars(iterable, characters=u'*\\'):
+            characters = set(characters)
+            for ch in iterable:
+                if ch in characters:
+                    yield '\\'
+                yield ch
+            return
+        return str().join(escape_chars(string))
+    @classmethod
+    def escapelist(cls, strings):
+        return map(cls.escape, strings)
+    @classmethod
+    def indent(cls, string, prefix):
+        res = string.split('\n') if isinstance(string, basestring) else string
+        return '\n'.join(cls.indentlist(res, prefix))
+    @classmethod
+    def indentlist(cls, strings, prefix):
+        return [prefix + line for line in strings]
+    @classmethod
     def walk(cls, ref, field):
         while ref.has(field):
             yield ref
             ref = ref.get(field)
         yield ref
     @classmethod
-    def comment(cls, cmt):
+    def docstringToList(cls, cmt):
+        res = cls.escape(cmt)
         res = cmt.replace('``', '**')
         res = cmt.replace('`', '*')
-        return res.strip()
+        return res.strip().split('\n')
     @classmethod
     def Module(cls, ref):
-        return ".. py:module:: {:s}".format(ref.name)
+        definition = ".. py:module:: {name:s}".format(name=ref.name)
+        res = []
+        res.append('')
+        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+
+        for child in ref.children:
+            if isinstance(child, Function):
+                res.extend(cls.Function(child).split('\n'))
+            elif isinstance(child, Namespace):
+                res.extend(cls.Namespace(child).split('\n'))
+            else:
+                raise TypeError(child)
+            continue
+        res = cls.indentlist(res, '   ')
+        res[0:0] = (definition,)
+        return '\n'.join(res)
+
+    @classmethod
+    def Namespace(cls, ref):
+        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        name = '.'.join(reversed(ns))
+
+        definition = ".. namespace {name:s}".format(name=name)
+
+        res = []
+        res.append('')
+        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+        for child in ref.children:
+            if isinstance(child, Function):
+                res.extend(cls.Function(child).split('\n'))
+            elif isinstance(child, Namespace):
+                res.extend(cls.Namespace(child).split('\n'))
+            else:
+                raise TypeError(child)
+            continue
+        res = cls.indentlist(res, '   ')
+        res[0:0] = (definition,)
+        return '\n'.join(res)
     @classmethod
     def Function(cls, ref):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         name = '.'.join(reversed(ns))
         adefs, atypes = ref.defaults or {}, ref.mc
-        gargs = dict(itertools.groupby(ref.args, type))
+
+        #gargs = dict(itertools.groupby(ref.args, type))
+        gargs = {}
+        for a in ref.args:
+            gargs.setdefault(type(a), []).append(a)
+
         args = []
         if Param in gargs:
             args.extend( (a.name, a.name, adefs.get(a.name, None), atypes.get(a.name, None)) for a in gargs[Param])
@@ -300,19 +380,30 @@ class restructure(object):
             args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
         if ParamVariableKeyword in gargs:
             args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
+        args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args]
+
+        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, df) if df is not None else fn for _, fn, df, _ in args))
 
         res = []
-        res.append("py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, df) if df else fn for _, fn, df, _ in args)))
         res.append('')
-        if ref.comment: res.extend([cls.comment(ref.comment), ''])
-        for n, _, _, ty in args:
+        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+        for n, fn, _, ty in args:
             t = ()
             if isinstance(ty, basestring):
-                try: t = evaluate(ty.name)
+                try: t = evaluate(ty)
                 except AttributeError: t = ty
             t = stringify(t)
             fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
-            res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=n))
+            #if any('``{name:s}``'.format(name=n) in line for line in ref.comment.split('\n')):
+            #    iterable = (line for line in ref.comment.split('\n') if '``{name:s}``'.format(name=n) in line)
+            #    cmt = next(iterable, '')
+            #    fmt += ' '+cmt if cmt else ''
+            res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
+
+        if args: res.append('')
+
+        res = cls.indentlist(res, '   ')
+        res[0:0] = (definition,)
         return '\n'.join(res)
 
 if __name__ == '__main__':
@@ -324,7 +415,7 @@ if __name__ == '__main__':
     name, _ = os.path.splitext(filename)
 
     # create our root module object
-    M = Module(name=name)
+    M = Module(name=name, docstring='')
 
     # parse everything into our module object
     with file(path, 'rt') as f:
@@ -334,3 +425,4 @@ if __name__ == '__main__':
     V.visit(data)
 
     # now we should have some structures
+    print(restructure.Module(M))
