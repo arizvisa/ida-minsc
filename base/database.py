@@ -28,7 +28,7 @@ import math, array as _array, fnmatch, re, ctypes
 import function, segment
 import structure as _structure, instruction as _instruction
 import ui, internal
-from internal import utils, interface, exceptions as E
+from internal import utils, interface, exceptions as E, document
 
 import idaapi
 
@@ -42,6 +42,8 @@ h = utils.alias(here)
 def within():
     '''Should always return true.'''
     return within(ui.current.address())
+@document.parameters(ea='An address within the database')
+@document.aliases('contains')
 @utils.multicase(ea=six.integer_types)
 def within(ea):
     '''Returns true if address `ea` is within the bounds of the database.'''
@@ -56,6 +58,7 @@ def bottom():
     '''Return the very highest address within the database.'''
     return config.bounds()[1]
 
+@document.namespace
 class config(object):
     """
     This namespace contains various read-only properties about the
@@ -105,6 +108,7 @@ class config(object):
             return cls.info.readonly_idb()
         raise E.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
 
+    @document.aliases('sharedQ', 'is_sharedobject')
     @classmethod
     def sharedobject(cls):
         '''Returns whether the database is a shared-object or not.'''
@@ -137,6 +141,7 @@ class config(object):
         return cls.info.version
 
     @classmethod
+    @document.parameters(typestr='This is a c-like type specification.')
     def type(cls, typestr):
         '''Evaluates a type string and returns its size according to the compiler used by the database.'''
         lookup = {
@@ -230,6 +235,16 @@ filename, idb, module, path = utils.alias(config.filename, 'config'), utils.alia
 path = utils.alias(config.path, 'config')
 baseaddress = base = utils.alias(config.baseaddress, 'config')
 
+@document.namespace
+@document.details("""Example details for the database.functions namespace.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam eget
+feugiat ante. Quisque vehicula, mi nec viverra tristique, metus elit
+aliquam leo, vel lobortis massa ante id sapien. Aenean eu augue rutrum,
+egestas metus eget, gravida eros. Sed euismod, justo pharetra
+pellentesque congue, metus justo tempus metus, ac blandit velit diam
+iaculis nulla. Nam luctus rutrum justo, quis faucibus ex pharetra vitae.
+""")
 class functions(object):
     r"""
     This namespace is used for listing all the functions inside the
@@ -304,12 +319,14 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='The glob-string to match the name with.')
     def iterate(cls, string):
         '''Iterate through all of the functions in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
+    @document.parameters(type='Any keyword that can be used to match a function with.')
     def iterate(cls, **type):
         '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
         if not type:
@@ -325,12 +342,14 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='The glob-string to match the name with.')
     def list(cls, string):
         '''List all of the functions in the database with a glob that matches `string`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
+    @document.parameters(type='Any keyword that can be used to match a function with.')
     def list(cls, **type):
         '''List all of the functions in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
@@ -388,12 +407,14 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='The glob-string to match the name with.')
     def search(cls, string):
         '''Search through all of the functions matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
+    @document.parameters(type='Any keyword that can be used to match a function with.')
     def search(cls, **type):
         '''Search through all of the functions within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -409,6 +430,7 @@ class functions(object):
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res
 
+@document.namespace
 class segments(object):
     r"""
     This namespace is used for listing all the segments inside the
@@ -574,6 +596,7 @@ def write(ea, data, **persist):
     originalQ = builtins.next((persist[k] for k in ('original', 'persist', 'store', 'save') if k in persist), False)
     return idaapi.patch_many_bytes(ea, data) if originalQ else idaapi.put_many_bytes(ea, data)
 
+@document.namespace
 class names(object):
     """
     This namespace is used for listing all the names (or symbols)
@@ -704,6 +727,7 @@ class names(object):
         ea, name = idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
         return ea, utils.string.of(name)
 
+@document.namespace
 class search(object):
     """
     This namespace used for searching the database using IDA's find
@@ -1103,6 +1127,7 @@ def comment(ea, string, **repeatable):
         raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_cmt({:#x}, \"{:s}\", {!s})`.".format(__name__, ea, string, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.escape(string, '"'), repeatable.get('repeatable', False)))
     return res
 
+@document.namespace
 class entries(object):
     """
     This namespace can be used to enumerate all of the entry points and
@@ -1583,6 +1608,7 @@ def selectcontents(**boolean):
 selectcontent = utils.alias(selectcontents)
 
 ## imports
+@document.namespace
 class imports(object):
     """
     This namespace is used for listing all of the imports within the
@@ -1795,6 +1821,7 @@ getImportModules = utils.alias(imports.modules, 'imports')
 getImports = utils.alias(imports.list, 'imports')
 
 ###
+@document.namespace
 class address(object):
     """
     This namespace is used for translating an address in the database
@@ -2700,6 +2727,7 @@ prev, next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'ad
 prevref, nextref = utils.alias(address.prevref, 'address'), utils.alias(address.nextref, 'address')
 prevreg, nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.nextreg, 'address')
 
+@document.namespace
 class type(object):
     """
     This namespace is for fetching type information from the different
@@ -3182,6 +3210,7 @@ getArrayLength = get_arraylength = utils.alias(type.array.length, 'type.array')
 # structures
 getStructureId = get_strucid = get_structureid = utils.alias(type.structure.id, 'type.structure')
 
+@document.namespace
 class xref(object):
     """
     This namespace is for navigating the cross-references (xrefs)
@@ -3473,6 +3502,7 @@ cxdown, cxup = utils.alias(xref.code_down, 'xref'), utils.alias(xref.code_up, 'x
 up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
 
 # create/erase a mark at the specified address in the .idb
+@document.namespace
 class marks(object):
     """
     This namespace is for interacting with the marks table within the
@@ -3714,6 +3744,7 @@ def mark(ea, description):
     '''Sets the mark at address `ea` to the specified `description`.'''
     return marks.new(ea, description)
 
+@document.namespace
 class extra(object):
     r"""
     This namespace is for interacting with IDA's "extra" comments that
@@ -4074,6 +4105,7 @@ class extra(object):
     insert, append = utils.alias(preinsert, 'extra'), utils.alias(preappend, 'extra')
 ex = extra  # XXX: ns alias
 
+@document.namespace
 class set(object):
     """
     This namespace for setting the type of an address within the
@@ -4403,6 +4435,7 @@ class set(object):
             raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join((__name__, cls.__name__)), ea, type, length))
         return get.array(ea, length=reallength)
 
+@document.namespace
 class get(object):
     """
     This namespace used to fetch and decode the data from the database
