@@ -8,7 +8,7 @@ import argparse
 import ast
 import contextlib
 
-### Namespace of types that should get evaluated to a string
+### Namespace of idascripts-specific types that get evaluated to an internal type or a string
 class evaluate(object):
     def __new__(cls, path):
         res = cls
@@ -16,6 +16,7 @@ class evaluate(object):
             res = getattr(res, name)
         return res
 
+    ## Miscellaneous intgernal types
     import six
     from six.moves import builtins
     class instruction:
@@ -25,25 +26,26 @@ class evaluate(object):
         structure_t = 'structure_t'
     _structure = structure
 
+### Namespace of internal python types and how to convert them into a string
 class stringify(object):
+    definitions = {
+        None: 'None',
+        int: 'int',
+        long: 'long',
+        str: 'str',
+        basestring: 'basestring',
+        unicode: 'unicode',
+        chr: 'chr',
+        callable: 'callable',
+    }
     def __new__(cls, object):
         if isinstance(object, basestring):
             return object
-        lookup = {
-            None: 'None',
-            int: 'int',
-            long: 'long',
-            str: 'str',
-            basestring: 'basestring',
-            unicode: 'unicode',
-            chr: 'chr',
-            callable: 'callable',
-        }
         if not isinstance(object, tuple):
-            return lookup[object]
+            return cls.definitions[object]
         return tuple(cls(res) for res in object)
 
-### Types used for parsed tree
+### Reference types which represent the parsed tree
 class Reference(object):
     def __init__(self, **attrs):
         self.__children__ = []
@@ -98,12 +100,15 @@ class Param(Reference):
 class ParamVariableList(Param): pass
 class ParamVariableKeyword(Param): pass
 
-### reduce parts of the ast into a tuple of strings
+### reduce parts of the ast as a tuple of strings
 class grammar(object):
     def reduce_call(call):
         res = ()
         res += grammar.reduce(call.func)
+        res += [arg for arg, in map(grammar.reduce, call.args)],
         res += map(grammar.reduce, call.keywords),
+        res += grammar.reduce(call.starargs) if call.starargs else None,
+        res += grammar.reduce(call.kwargs) if call.kwargs else None,
         return res
 
     def reduce_keyword(keyword):
@@ -118,14 +123,16 @@ class grammar(object):
         if hasattr(attr, 'value'):
             res += grammar.reduce(attr.value)
         res += (attr.attr,)
-        return ('.'.join(res),)
+        return '.'.join(res),
 
     def reduce_name(name):
-        return (name.id,)
+        return name.id,
 
     def reduce_tuple(T):
         return tuple(map(grammar.reduce, T.elts)),
 
+    def reduce_string(str):
+        return str.s,
 
     @staticmethod
     def resolve(value):
@@ -151,145 +158,12 @@ class grammar(object):
         ast.keyword : reduce_keyword,
         ast.Call : reduce_call,
         ast.Tuple : reduce_tuple,
+        ast.Str : reduce_string,
     }
 
-### parsing code using ast visitor
-class NSVisitor(ast.NodeVisitor):
-    def __init__(self, ref):
-        if not isinstance(ref, Reference):
-            raise TypeError(ref)
-        self._ref = ref
-
-    def visit_ClassDef(self, node):
-        if node.name.startswith('_'): return
-
-        name = node.name
-        try:
-            docstring = ast.get_docstring(node) or ''
-        except TypeError:
-            docstring = ''
-
-        # construct the namespace
-        res = Namespace(node=node, name=name, namespace=self._ref, docstring=docstring)
-        self._ref.add(res)
-
-        # continue parsing its children
-        nv = NSVisitor(res)
-        map(nv.visit, ast.iter_child_nodes(node))
-
-    def visit_FunctionDef(self, node):
-        if node.name.startswith('_'): return
-
-        # capture fields
-        name = '.'.join((self._ref.name, node.name))
-        try:
-            docstring = ast.get_docstring(node) or ''
-        except TypeError:
-            docstring = ''
-        arguments, defaults = node.args, node.args.defaults
-
-        # figure out the defaults
-        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(defaults, reversed(arguments.args)) }
-
-        # figure out the attributes
-        decorator_attributes = [d for d in node.decorator_list if isinstance(d, ast.Name)]
-        methodtypes = {n for n, in map(grammar.reduce, decorator_attributes)}
-
-        # figure out the decorators
-        decorator_functions = [d for d in node.decorator_list if isinstance(d, ast.Call)]
-        multicase = (dict(args) for n, args in map(grammar.reduce, decorator_functions) if n == u'utils.multicase')
-
-        # figure out which type
-        if 'classmethod' in methodtypes:
-            F, args = ClassFunction, arguments.args[1:]
-        elif 'staticmethod' in methodtypes:
-            F, args = StaticFunction, arguments.args[:]
-        else:
-            F, args = Function, arguments.args[:]
-
-        # capture the method
-        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring, arguments=[], defaults=defs)
-        self._ref.add(res)
-
-        # add its arguments
-        res.args.extend((Param(name=a.id, owner=res) for a in args))
-        if arguments.vararg:
-            res.args.append(ParamVariableList(name=arguments.vararg, owner=res))
-        if arguments.kwarg:
-            res.args.append(ParamVariableKeyword(name=arguments.kwarg, owner=res))
-        return
-
-class RootVisitor(ast.NodeVisitor):
-    def __init__(self, ref):
-        if not isinstance(ref, Reference):
-            raise TypeError(ref)
-        self._ref = ref
-
-    def visit_Expr(self, node):
-        if isinstance(node.value, ast.Str):
-            self._ref.set(docstring=node.value.s)
-        return
-
-    def visit_ClassDef(self, node):
-        if node.name.startswith('_'): return
-
-        name = node.name
-        try:
-            docstring = ast.get_docstring(node)
-        except TypeError:
-            docstring = ''
-
-        # construct the namespace
-        res = Namespace(node=node, name=name, namespace=self._ref, docstring=docstring or '')
-        self._ref.add(res)
-
-        # continue parsing its children
-        nv = NSVisitor(res)
-        map(nv.visit, ast.iter_child_nodes(node))
-
-    def visit_FunctionDef(self, node):
-        if node.name.startswith('_'): return
-
-        # capture fields
-        name = node.name
-        try:
-            docstring = ast.get_docstring(node)
-        except TypeError:
-            docstring = ''
-        arguments, defaults = node.args, node.args.defaults
-
-        # figure out the defaults
-        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(defaults, reversed(arguments.args)) }
-
-        # figure out the attributes
-        decorator_attributes = [d for d in node.decorator_list if isinstance(d, ast.Name)]
-        methodtypes = {name for name, in map(grammar.reduce, decorator_attributes)}
-
-        # figure out the decorators
-        decorator_functions = [d for d in node.decorator_list if isinstance(d, ast.Call)]
-        multicase = (dict(args) for name, args in map(grammar.reduce, decorator_functions) if name == u'utils.multicase')
-
-        # figure out which type
-        if 'classmethod' in methodtypes:
-            F, args = ClassFunction, arguments.args[1:]
-        elif 'staticmethod' in methodtypes:
-            F, args = StaticFunction, arguments.args[:]
-        else:
-            F, args = Function, arguments.args[:]
-
-        # capture the function
-        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring or '', arguments=[], defaults=defs)
-        self._ref.add(res)
-
-        # add its arguments
-        res.args.extend((Param(name=a.id, owner=res) for a in args))
-        if arguments.vararg:
-            res.args.append(ParamVariableList(name=arguments.vararg, owner=res))
-        if arguments.kwarg:
-            res.args.append(ParamVariableKeyword(name=arguments.kwarg, owner=res))
-        return
-
+### Converting Reference types into reStructuredText
 class restructure(object):
+    ## small utility functions
     @classmethod
     def escape(cls, string):
         def escape_chars(iterable, characters=u'*\\'):
@@ -320,8 +194,9 @@ class restructure(object):
     def docstringToList(cls, cmt):
         res = cls.escape(cmt)
         res = cmt.replace('``', '**')
-        res = cmt.replace('`', '*')
         return res.strip().split('\n')
+
+    ## Reference type converters
     @classmethod
     def Module(cls, ref):
         definition = ".. py:module:: {name:s}".format(name=ref.name)
@@ -351,6 +226,7 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+        if ref.has('details'): res.extend(['details:'] + cls.escape(ref.get('details')).split('\n') + [''])
         for child in ref.children:
             if isinstance(child, Function):
                 res.extend(cls.Function(child).split('\n'))
@@ -362,11 +238,15 @@ class restructure(object):
         res = cls.indentlist(res, '   ')
         res[0:0] = (definition,)
         return '\n'.join(res)
+
     @classmethod
     def Function(cls, ref):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
+        ns = ns[1:] if ref.name == '__new__' else ns[:]
         name = '.'.join(reversed(ns))
-        adefs, atypes = ref.defaults or {}, ref.mc
+
+        aliases = ref.get('aliases') or {}
+        adefs, atypes, aparams = ref.get('defaults') or {}, ref.mc, ref.get('parameters')
 
         #gargs = dict(itertools.groupby(ref.args, type))
         gargs = {}
@@ -387,17 +267,12 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+        if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
         for n, fn, _, ty in args:
-            t = ()
-            if isinstance(ty, basestring):
-                try: t = evaluate(ty)
-                except AttributeError: t = ty
+            t = grammar.resolve(ty) if isinstance(ty, basestring) else ()
             t = stringify(t)
             fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
-            #if any('``{name:s}``'.format(name=n) in line for line in ref.comment.split('\n')):
-            #    iterable = (line for line in ref.comment.split('\n') if '``{name:s}``'.format(name=n) in line)
-            #    cmt = next(iterable, '')
-            #    fmt += ' '+cmt if cmt else ''
+            fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
             res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
 
         if args: res.append('')
@@ -406,7 +281,108 @@ class restructure(object):
         res[0:0] = (definition,)
         return '\n'.join(res)
 
+### Visitor Node decorator_list extraction
+class decorators(object):
+    @classmethod
+    def attributes(cls, node):
+        global grammar
+        res = (d for d in node.decorator_list if isinstance(d, (ast.Attribute,ast.Name)))
+        return [n for n, in map(grammar.reduce, res)]
+    @classmethod
+    def functions(cls, node):
+        global grammar
+        res = (d for d in node.decorator_list if isinstance(d, ast.Call))
+        return [(n, a, k, sa, sk) for n, a, k, sa, sk in map(grammar.reduce, res)]
+
+### Visitor parser mix-ins
+class FunctionVisitor(ast.NodeVisitor):
+    def visit_FunctionDef(self, node):
+        if node.name != '__new__' and node.name.startswith('_'): return
+
+        # capture fields
+        name = node.name
+        try:
+            docstring = ast.get_docstring(node)
+        except TypeError:
+            docstring = ''
+        arguments, defaults = node.args, node.args.defaults
+
+        # figure out the defaults
+        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(defaults, reversed(arguments.args)) }
+
+        # figure things out about which decorators were applied
+        methodtypes = {m for m in decorators.attributes(node)}
+        multicase = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == u'utils.multicase')
+        aliases = (a for n, a, _, _, _ in decorators.functions(node) if n == 'document.aliases')
+        params = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == 'document.parameters')            
+
+        # figure out which type
+        if node.name == '__new__' or 'classmethod' in methodtypes:
+            F, args = ClassFunction, arguments.args[1:]
+        elif 'staticmethod' in methodtypes:
+            F, args = StaticFunction, arguments.args[:]
+        else:
+            F, args = Function, arguments.args[:]
+
+        # capture the function
+        res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring or '', arguments=[], defaults=defs, parameters=next(params, {}), aliases=set(next(aliases, {})))
+        self._ref.add(res)
+
+        # add its arguments
+        res.args.extend((Param(name=a.id, owner=res) for a in args))
+        if arguments.vararg:
+            res.args.append(ParamVariableList(name=arguments.vararg, owner=res))
+        if arguments.kwarg:
+            res.args.append(ParamVariableKeyword(name=arguments.kwarg, owner=res))
+        return
+
+class NamespaceVisitor(ast.NodeVisitor):
+    def visit_ClassDef(self, node):
+        '''Anything that's a class is considered a namespace'''
+        if node.name.startswith('_'): return
+
+        name = node.name
+        try:
+            docstring = ast.get_docstring(node) or ''
+        except TypeError:
+            docstring = ''
+
+        # extract the decorators
+        attributes = decorators.attributes(node)
+        details = [details for n, (details,), _, _, _ in decorators.functions(node) if n == 'document.details']
+
+        # construct the namespace
+        res = Namespace(node=node, name=name, namespace=self._ref, docstring=docstring)
+        if attributes: res.set(attributes=attributes)
+        if details: res.set(details=details)
+        self._ref.add(res)
+
+        # continue parsing its children
+        nv = NSVisitor(res)
+        map(nv.visit, ast.iter_child_nodes(node))
+
+### Visitor entrypoints
+class NSVisitor(FunctionVisitor, NamespaceVisitor):
+    def __init__(self, ref):
+        if not isinstance(ref, Reference):
+            raise TypeError(ref)
+        self._ref = ref
+
+class RootVisitor(FunctionVisitor, NamespaceVisitor):
+    def __init__(self, ref):
+        if not isinstance(ref, Reference):
+            raise TypeError(ref)
+        self._ref = ref
+
+    def visit_Expr(self, node):
+        '''Grab the first module docstring.'''
+        if isinstance(node.value, ast.Str) and not self._ref.has('docstring'):
+            docstring, = grammar.reduce(node.value)
+            self._ref.set(docstring=docstring)
+        return
+
 if __name__ == '__main__':
+    ### Output a module into reStructuredText
     import sys, os.path
 
     # extract the module name
@@ -415,14 +391,14 @@ if __name__ == '__main__':
     name, _ = os.path.splitext(filename)
 
     # create our root module object
-    M = Module(name=name, docstring='')
+    M = Module(name=name)
 
-    # parse everything into our module object
+    # read the file and parse everything into our root module object
     with file(path, 'rt') as f:
         data = ast.parse(f.read(), filename)
 
     V = RootVisitor(M)
     V.visit(data)
 
-    # now we should have some structures
+    # now we should have some data to format as rst
     print(restructure.Module(M))
