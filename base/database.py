@@ -158,7 +158,7 @@ class config(object):
 
     @classmethod
     def bits(cls):
-        '''Return number of bits of the processor used by the database.'''
+        '''Return number of bits used by the database.'''
         if cls.info.is_64bit():
             return 64
         elif cls.info.is_32bit():
