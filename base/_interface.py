@@ -332,6 +332,10 @@ class address(object):
 
         if not isinstance(ea, six.integer_types):
             raise TypeError("{:s} : Specified address is not of the correct type. : {!r} -> {!r}".format(entryframe.f_code.co_name, ea, ea.__class__))
+
+        if ea == idaapi.BADADDR:
+            raise StandardError("{:s} : An invalid address ({:#x}) was specified.".format(entryframe.f_code.co_name, ea))
+
         res = cls.within(ea)
         return cls.head(res, silent=True)
     @classmethod
@@ -357,9 +361,12 @@ class address(object):
         if not isinstance(ea, six.integer_types):
             raise TypeError("{:s} : Specified address is not of the correct type. : {!r} -> {!r}".format(entryframe.f_code.co_name, ea, ea.__class__))
 
+        if ea == idaapi.BADADDR:
+            raise StandardError("{:s} : An invalid address {:#x} was specified.".format(entryframe.f_code.co_name, ea))
+
         if not cls.__within__(ea):
             l, r = cls.__bounds__()
-            raise StandardError("{:s} : Specified address {:#x} not within bounds of database ({:#x}<>{:#x}.)".format(entryframe.f_code.co_name, ea, l, r))
+            raise StandardError("{:s} : Specified address {:#x} not within bounds of database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, l, r))
         return ea
     @classmethod
     def __within2__(cls, start, end):
