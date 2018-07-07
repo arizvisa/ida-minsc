@@ -1772,6 +1772,15 @@ class address(object):
         Skip ``count`` addresses before returning.
         """
         Fprev, Finverse = utils.fcompose(interface.address.within, idaapi.prev_not_tail), utils.fcompose(predicate, operator.not_)
+
+        # if we're at the very bottom address of the database
+        # then skip the `interface.address.within` check.
+        if ea == config.bounds()[1]:
+            Fprev = idaapi.prev_not_tail
+
+        if Fprev(ea) == idaapi.BADADDR:
+            raise StandardError("{:s}.prevF: Refusing to seek past the top of the database: ({:#x} <= {:#x})".format('.'.join((__name__, cls.__name__)), ea, config.bounds()[0]))
+
         res = cls.walk(Fprev(ea), Fprev, Finverse)
         return cls.prevF(res, predicate, count-1) if count > 1 else res
 
@@ -1792,6 +1801,8 @@ class address(object):
         Skip ``count`` addresses before returning.
         """
         Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
+        if Fnext(ea) == idaapi.BADADDR:
+            raise StandardError("{:s}.nextF: Refusing to seek past the bottom of the database: ({:#x} >= {:#x})".format('.'.join((__name__, cls.__name__)), idaapi.get_item_end(ea), config.bounds()[1]))
         res = cls.walk(Fnext(ea), Fnext, Finverse)
         return cls.nextF(res, predicate, count-1) if count > 1 else res
 
