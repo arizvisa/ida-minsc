@@ -1,23 +1,24 @@
-import six
-import database as db, function as fn, structure as st
-import sys, itertools, operator, logging
+import six, sys, logging
+import functools,operator,itertools,types
 
-import internal, idaapi
+import database as db, function as func, structure as struc, ui
+import internal
 
 output = sys.stderr
 
 def function(ea):
     '''Yield each tag defined within a function.'''
-    for ea in fn.iterate(ea):
+    for ea in func.iterate(ea):
+        ui.navigation.set(ea)
         t = db.tag(ea)
         if t: yield ea, t
     return
 
 def frame(ea):
-    for member in fn.frame(ea).members:
+    for member in func.frame(ea).members:
         if any(member.name.startswith(n) for n in ('arg_', 'var_', ' ')) and not member.comment:
             continue
-        if isinstance(member.type, st.structure_t) or any(isinstance(n, st.structure_t) for n in member.type):
+        if isinstance(member.type, struc.structure_t) or any(isinstance(n, struc.structure_t) for n in member.type):
             logging.warn("{:s}.frame({:#x}) : Skipping structure-based type for field {:+#x} : {!r}".format(__name__, ea, member.offset, member.type))
             yield member.offset, (member.name, None, member.comment)
             continue
@@ -26,22 +27,24 @@ def frame(ea):
 
 def globals():
     '''Yields all the global tags.'''
-    ea, sentinel = db.range()
+    ea, sentinel = db.config.bounds()
     while ea < sentinel:
-        f = idaapi.get_func(ea)
-        if f:
-            t = fn.tag(ea)
+        ui.navigation.auto(ea)
+        if func.within(ea):
+            t = func.tag(ea)
             if t: yield ea, t
-            ea = f.endEA
+            _, ea = func.chunk(ea)
             continue
         t = db.tag(ea)
         if t: yield ea, t
-        ea = db.a.next(ea)
+        try: ea = db.a.next(ea)
+        except StandardError: ea = sentinel
     return
 
 def frames():
     '''Yields all the frames for each function within the database.'''
     for ea in db.functions():
+        ui.navigation.procedure(ea)
         res = dict(frame(ea))
         if res: yield ea, res
     return
@@ -70,13 +73,13 @@ def cached():
     g = {ea : t for ea, t in db.select()}
 
     print >>output, '--> Grabbing contents from all functions (cached)...'
-    res = itertools.starmap(fn.select, db.selectcontents())
+    res = itertools.starmap(func.select, db.selectcontents())
     f = {ea : t for ea, t in itertools.chain(*res)}
 
     return (g, f)
 
 def apply_frame(ea, frame, **tagmap):
-    F = fn.frame(ea)
+    F = func.frame(ea)
     for offset, (name, type, comment) in frame.viewitems():
         try:
             member = F.by_offset(offset)
@@ -108,7 +111,7 @@ def load((g, f, h), **tagmap):
 
     print >>output, "--> Writing globals... ({:d} entr{:s})".format(len(g), 'y' if len(g) == 1 else 'ies')
     for ea, d in sorted(g.items(), key=first):
-        m = fn if fn.within(ea) else db
+        m = fn if func.within(ea) else db
 
         state = m.tag(ea)
         for k in state.viewkeys() & d.viewkeys():
@@ -152,7 +155,7 @@ def export(*tags, **boolean):
 
     def contents(*tags, **boolean):
         for res in db.selectcontents(*tags, **boolean):
-            for ea, res in fn.select(*res):
+            for ea, res in func.select(*res):
                 yield ea, res
             continue
         return
