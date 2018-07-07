@@ -916,13 +916,13 @@ class block(object):
     def iterate(cls, ea):
         '''Yield all the addresses in the basic-block at address ``ea``.'''
         left, right = cls(ea)
-        return database.iterate(left, database.address.prev(right))
+        return database.iterate(left, right)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def iterate(cls, bb):
         '''Yield all the addresses in the basic-block ``bb``.'''
         left, right = bb.startEA, bb.endEA
-        return database.iterate(left, database.address.prev(right))
+        return database.iterate(left, right)
 
     @utils.multicase(reg=(basestring, instruction.register_t))
     @classmethod
@@ -1177,7 +1177,6 @@ def iterate():
 def iterate(func):
     '''Iterate through all the instructions for each chunk in the function ``func``.'''
     for start,end in chunks(func):
-        end = database.address.prev(end) if end < database.bottom() else end
         for ea in itertools.ifilter(database.type.is_code, database.iterate(start, end)):
             yield ea
         continue

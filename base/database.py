@@ -57,8 +57,10 @@ def within(ea):
 contains = utils.alias(within)
 
 def top():
+    '''Return the very lowest address within the database.'''
     return config.bounds()[0]
 def bottom():
+    '''Return the very highest address within the database.'''
     return config.bounds()[1]
 
 class config(object):
@@ -71,30 +73,37 @@ class config(object):
     if idaapi.__version__ >= 7.0:
         @classmethod
         def readonly(cls):
+            '''Returns whether the database is read-only or not.'''
             return cls.info.readonly_idb()
 
         @classmethod
         def sharedobject(cls):
+            '''Returns whether the database is a shared-object or not.'''
             return cls.info.is_dll()
         is_sharedobject = sharedQ = sharedobject
 
         @classmethod
         def changes(cls):
+            '''Returns the number of changes within the database.'''
             return cls.info.database_change_count
 
         @classmethod
         def processor(cls):
+            '''Returns the name of the processor configured by the database.'''
             return cls.info.get_procName()
 
     @classmethod
     def compiler(cls):
+        '''Returns the configured compiler for the database.'''
         return cls.info.cc
     @classmethod
     def version(cls):
+        '''Returns the database version.'''
         return cls.info.version
 
     @classmethod
     def type(cls, typestr):
+        '''Evaluates a type string and returns its size according to the compiler used by the database.'''
         lookup = {
             'bool':'size_b',
             'short':'size_s',
@@ -109,7 +118,7 @@ class config(object):
 
     @classmethod
     def bits(cls):
-        '''Return number of bits of the database.'''
+        '''Return number of bits of the processor used by the database.'''
         if cls.info.is_64bit():
             return 64
         elif cls.info.is_32bit():
@@ -118,6 +127,7 @@ class config(object):
 
     @classmethod
     def byteorder(cls):
+        '''Returns a string representing the byte-order used by integers in the database.'''
         if idaapi.__version__ < 7.0:
             res = idaapi.cvar.inf.mf
             return 'big' if res else 'little'
@@ -802,6 +812,9 @@ def iterate(start, end, step=None):
         logging.warn("{:s}.iterate({:#x}, {:#x}, {!r}) : The `step` argument for this function will soon be deprecated!".format(__name__, start, end, step))
     start, end = builtins.map(interface.address.head, (start, end))
     left, right = config.bounds()
+    right = idaapi.prev_not_tail(right)
+
+    if start == end: return
 
     step = step or (address.prev if start > end else address.next)
     op = operator.ge if start >= end else operator.lt
@@ -3357,7 +3370,7 @@ class extra(object):
     MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
 
     @classmethod
-    def __has_extra(cls, ea, base):
+    def __has_extra__(cls, ea, base):
         sup = internal.netnode.sup
         return sup.get(ea, base) is not None
 
@@ -3365,26 +3378,26 @@ class extra(object):
     @classmethod
     def has_prefix(cls):
         '''Returns `True` if the item at the current address has extra prefix lines.'''
-        return cls.__has_extra(ui.current.address(), idaapi.E_PREV)
+        return cls.__has_extra__(ui.current.address(), idaapi.E_PREV)
     @utils.multicase()
     @classmethod
     def has_suffix(cls, ea):
         '''Returns `True` if the item at the current address has extra suffix lines.'''
-        return cls.__has_extra(ui.current.address(), idaapi.E_NEXT)
+        return cls.__has_extra__(ui.current.address(), idaapi.E_NEXT)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def has_prefix(cls, ea):
         '''Returns `True` if the item at the address ``ea`` has extra prefix lines.'''
-        return cls.__has_extra(ea, idaapi.E_PREV)
+        return cls.__has_extra__(ea, idaapi.E_PREV)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def has_suffix(cls, ea):
         '''Returns `True` if the item at the address ``ea`` has extra suffix lines.'''
-        return cls.__has_extra(ea, idaapi.E_NEXT)
+        return cls.__has_extra__(ea, idaapi.E_NEXT)
     prefixQ, suffixQ = utils.alias(has_prefix, 'extra'), utils.alias(has_suffix, 'extra')
 
     @classmethod
-    def __count(cls, ea, base):
+    def __count__(cls, ea, base):
         sup = internal.netnode.sup
         for i in six.moves.range(cls.MAX_ITEM_LINES):
             row = sup.get(ea, base+i)
@@ -3393,56 +3406,56 @@ class extra(object):
 
     if idaapi.__version__ < 7.0:
         @classmethod
-        def __hide(cls, ea):
+        def __hide__(cls, ea):
             if type.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
                 type.flags(ea, idaapi.FF_LINE, 0)
                 return True
             return False
 
         @classmethod
-        def __show(cls, ea):
+        def __show__(cls, ea):
             if type.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
                 type.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE)  # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
                 return True
             return False
 
         @classmethod
-        def __get(cls, ea, base):
+        def __get__(cls, ea, base):
             sup = internal.netnode.sup
-            count = cls.__count(ea, base)
+            count = cls.__count__(ea, base)
             if count is None: return None
             res = (sup.get(ea, base+i) for i in six.moves.range(count))
             return '\n'.join(row[:-1] if row.endswith('\x00') else row for row in res)
         @classmethod
-        def __set(cls, ea, string, base):
-            cls.__hide(ea)
+        def __set__(cls, ea, string, base):
+            cls.__hide__(ea)
             sup = internal.netnode.sup
             [ sup.set(ea, base+i, row+'\x00') for i, row in enumerate(string.split('\n')) ]
-            cls.__show(ea)
+            cls.__show__(ea)
             return True
         @classmethod
-        def __del(cls, ea, base):
+        def __del__(cls, ea, base):
             sup = internal.netnode.sup
-            count = cls.__count(ea, base)
+            count = cls.__count__(ea, base)
             if count is None: return False
-            cls.__hide(ea)
+            cls.__hide__(ea)
             [ sup.remove(ea, base+i) for i in six.moves.range(count) ]
-            cls.__show(ea)
+            cls.__show__(ea)
             return True
     else:
         @classmethod
-        def __get(cls, ea, base):
-            count = cls.__count(ea, base)
+        def __get__(cls, ea, base):
+            count = cls.__count__(ea, base)
             if count is None: return None
             res = (idaapi.get_extra_cmt(ea, base+i) or '' for i in six.moves.range(count))
             return '\n'.join(res)
         @classmethod
-        def __set(cls, ea, string, base):
+        def __set__(cls, ea, string, base):
             [ idaapi.update_extra_cmt(ea, base+i, row) for i, row in enumerate(string.split('\n')) ]
             return string.count('\n')
         @classmethod
-        def __del(cls, ea, base):
-            res = cls.__count(ea, base)
+        def __del__(cls, ea, base):
+            res = cls.__count__(ea, base)
             if res is None: return 0
             [idaapi.del_extra_cmt(ea, base+i) for i in six.moves.range(res)]
             return res
@@ -3451,41 +3464,41 @@ class extra(object):
     @classmethod
     def get_prefix(cls, ea):
         '''Return the prefixed comment at address ``ea``.'''
-        return cls.__get(ea, idaapi.E_PREV)
+        return cls.__get__(ea, idaapi.E_PREV)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def get_suffix(cls, ea):
         '''Return the suffixed comment at address ``ea``.'''
-        return cls.__get(ea, idaapi.E_NEXT)
+        return cls.__get__(ea, idaapi.E_NEXT)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def del_prefix(cls, ea):
         '''Delete the prefixed comment at address ``ea``.'''
-        res = cls.__get(ea, idaapi.E_PREV)
-        cls.__del(ea, idaapi.E_PREV)
+        res = cls.__get__(ea, idaapi.E_PREV)
+        cls.__del__(ea, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def del_suffix(cls, ea):
         '''Delete the suffixed comment at address ``ea``.'''
-        res = cls.__get(ea, idaapi.E_NEXT)
-        cls.__del(ea, idaapi.E_NEXT)
+        res = cls.__get__(ea, idaapi.E_NEXT)
+        cls.__del__(ea, idaapi.E_NEXT)
         return res
 
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def set_prefix(cls, ea, string):
         '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
-        res, ok = cls.del_prefix(ea), cls.__set(ea, string, idaapi.E_PREV)
-        ok = cls.__set(ea, string, idaapi.E_PREV)
+        res, ok = cls.del_prefix(ea), cls.__set__(ea, string, idaapi.E_PREV)
+        ok = cls.__set__(ea, string, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def set_suffix(cls, ea, string):
         '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
-        res, ok = cls.del_suffix(ea), cls.__set(ea, string, idaapi.E_NEXT)
+        res, ok = cls.del_suffix(ea), cls.__set__(ea, string, idaapi.E_NEXT)
         return res
 
     @utils.multicase()
