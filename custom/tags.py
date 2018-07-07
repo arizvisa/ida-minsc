@@ -19,8 +19,8 @@ def frame(ea):
         if any(member.name.startswith(n) for n in ('arg_', 'var_', ' ')) and not member.comment:
             continue
         if isinstance(member.type, struc.structure_t) or any(isinstance(n, struc.structure_t) for n in member.type):
-            logging.warn("{:s}.frame({:#x}) : Skipping structure-based type for field {:+#x} : {!r}".format(__name__, ea, member.offset, member.type))
-            yield member.offset, (member.name, None, member.comment)
+            logging.info("{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} : {!r}".format(__name__, ea, member.offset, member.type))
+            yield member.offset, (member.name, member.type.name, member.comment)
             continue
         yield member.offset, (member.name, member.type, member.comment)
     return
@@ -100,7 +100,12 @@ def apply_frame(ea, frame, **tagmap):
         state.update(mapstate)
         member.comment = internal.comment.encode(state)
 
-        if type is not None:
+        if isinstance(type, basestring):
+            try:
+                member.type = struc.by(type)
+            except LookupError:
+                logging.warn("{:s}.apply_frame({:x}, ...): Unable to find structure {!r} for member at {:+#x}. Skipping. it.".format(__name__, ea, type, offset))
+        else:
             member.type = type
         continue
     return
