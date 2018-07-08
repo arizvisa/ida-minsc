@@ -242,8 +242,9 @@ def erase():
         print >>output, "erasing contents for function {:#x} : {:d} of {:d}".format(ea, idx, total)
 
     res = idx + 1
-    for idx, ea in iter2:
-        print >>output, "erasing global {:#x} : {:d} of {:d}".format(ea, res+idx, total)
+    for idx, addressOrName in iter2:
+        fmt = "{:#x}" if isinstance(addressOrName, six.integer_types) else "tagname {!r}"
+        print >>output, "erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), res+idx, total)
     return
 
 __all__ = ['everything','globals','contents']
