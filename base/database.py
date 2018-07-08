@@ -2716,15 +2716,13 @@ class type(object):
         46
         """
         @utils.multicase()
-        def __new__(cls, **length):
-            '''Return the array at the current address.'''
-            return get.array(ui.current.address(), **length)
+        def __new__(cls):
+            '''Return the array's (element, length) at the current address.'''
+            return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
-        def __new__(cls, ea, **length):
-            """Return the array at the address specified by ``ea``.
-            If the int ``length`` is defined, then return an array of the specified length instead of auto-detecting it.
-            """
-            return get.array(ea, **length)
+        def __new__(cls, ea):
+            '''Return the array's (element, length) at the address specified by ``ea``.'''
+            return cls.element(ea), cls.length(ea)
 
         @utils.multicase()
         @classmethod
@@ -2735,8 +2733,8 @@ class type(object):
         @classmethod
         def element(cls, ea):
             '''Return the size of an element in the array at address ``ea``.'''
-            ea, F = interface.address.within(ea), type.flags(ea)
-            return idaapi.get_full_data_elsize(ea, F)
+            ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
+            return _structure.size(type.structure.id(ea)) if T == idaapi.FF_STRU else idaapi.get_full_data_elsize(ea, F)
 
         @utils.multicase()
         @classmethod
@@ -2773,18 +2771,13 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the structure at the current address.'''
-            return get.structure(ui.current.address())
+            '''Return the structure type at the current address.'''
+            return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the structure at address ``ea``.'''
-            return get.structure(ea)
-        @utils.multicase(ea=six.integer_types)
-        def __new__(cls, ea, **sid):
-            """Return the structure at address ``ea``.
-            If the structure ``sid`` is specified, then use that specific structure type.
-            """
-            return get.structure(ea, **sid)
+            '''Return the structure type at address ``ea``.'''
+            res = cls.id(ea)
+            return _structure.by(res)
 
         @utils.multicase()
         @staticmethod
@@ -2797,9 +2790,9 @@ class type(object):
             '''Return the identifier of the structure at address ``ea``.'''
             ea = interface.address.within(ea)
 
-            res = type(ea)
+            res = type.flags(ea, idaapi.DT_TYPE)
             if res != idaapi.FF_STRU:
-                raise TypeError("{:s}.id({:#x}) : Specified IDA Type is not an FF_STRU({:#x}) : {:#x}".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
+                raise TypeError("{:s}.id({:#x}) : type at specified locatiopn is not an FF_STRU({:#x}) : {:#x}".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
 
             ti, F = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, F, ti)
@@ -4127,6 +4120,7 @@ class get(object):
         elif T == idaapi.FF_STRU:
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
+            # FIXME: this math doesn't work (of course) with dynamically sized structures
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
             return [ cls.structure(ea + i*cb, id=t) for i in six.moves.range(count) ]
         elif T in numerics:
