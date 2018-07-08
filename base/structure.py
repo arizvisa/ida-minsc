@@ -871,7 +871,7 @@ class member_t(object):
         return (self.__owner.name, self.__index, self.name, (cmtt, cmtf), ofs, t)
     def __setstate__(self, state):
         ownername, index, name, (cmtt, cmtf), ofs, t = state
-        fullname = '.'.join((owername, name))
+        fullname = '.'.join((ownername, name))
 
         identifier = idaapi.get_struc_id(ownername)
         if identifier == idaapi.BADADDR:

@@ -84,7 +84,7 @@ def apply_frame(ea, frame, **tagmap):
         try:
             member = F.by_offset(offset)
         except LookupError:
-            logging.warn("{:s}.apply_frame({:x}, ...) : Unable to find frame member at {:+#x}. Skipping application of data to it. : {!r}".format(__name__, ea, offset, (name, type, comment)), exc_info=True)
+            logging.warn("{:s}.apply_frame({:x}, ...) : Unable to find frame member at {:+#x}. Skipping application of data to it. : {!r}".format(__name__, ea, offset, (name, type, comment)))
             continue
 
         if member.name != name:
@@ -126,7 +126,7 @@ def load((g, f, h), **tagmap):
         try:
             [ m.tag(ea, tagmap.get(k, k), v) for k, v in six.iteritems(d) ]
         except:
-            logging.warn("{:s}.load : {:x} : Unable to apply tags to global. : {!r}".format(__name__, ea, d), exc_info=True)
+            logging.warn("{:s}.load : {:x} : Unable to apply tags to global. : {!r}".format(__name__, ea, d))
         continue
 
     print >>output, "--> Writing function contents... ({:d} entr{:s})".format(len(f), 'y' if len(f) == 1 else 'ies')
@@ -139,7 +139,7 @@ def load((g, f, h), **tagmap):
         try:
             [ db.tag(ea, tagmap.get(k, k), v) for k, v in six.iteritems(d) ]
         except:
-            logging.warn("{:s}.load : {:x} : Unable to apply tags to contents. : {!r}".format(__name__, ea, d), exc_info=True)
+            logging.warn("{:s}.load : {:x} : Unable to apply tags to contents. : {!r}".format(__name__, ea, d))
         continue
 
     print >>output, "--> Applying frames to each function... ({:d} entr{:s})".format(len(h), 'y' if len(h) == 1 else 'ies')
