@@ -712,17 +712,17 @@ class switch_t(object):
         import database
         if self.indirectQ():
             ea, count = self.object.jumps, self.object.jcases
-            return database.type.array(ea, length=count)
+            return database.get.array(ea, length=count)
         ea, count = self.object.jumps, self.object.ncases
-        return database.type.array(ea, length=count)
+        return database.get.array(ea, length=count)
     @property
     def index(self):
         '''Return the contents of the case/index table.'''
         import database
         if self.indirectQ():
             ea, count = self.object.lowcase, self.object.ncases
-            return database.type.array(ea, length=count)
-        return database.type.array(self.object.jumps, length=0)
+            return database.get.array(ea, length=count)
+        return database.get.array(self.object.jumps, length=0)
     @property
     def register(self):
         '''Return the register that the switch is based on.'''

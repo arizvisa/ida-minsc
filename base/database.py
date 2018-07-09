@@ -2812,54 +2812,16 @@ class type(object):
             return type.size(ea)
     struc = struct = structure  # ns alias
 
-    class switch(object):
-        @classmethod
-        def __getlabel(cls, ea):
-            f = type.flags(ea)
-            if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
-                drefs = (ea for ea in xref.data_up(ea))
-                refs = (ea for ea in itertools.chain(*itertools.imap(xref.up, drefs)) if idaapi.get_switch_info_ex(ea) is not None)
-                try:
-                    ea = builtins.next(refs)
-                    res = idaapi.get_switch_info_ex(ea)
-                    return interface.switch_t(res)
-                except StopIteration:
-                    pass
-            raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
-
-        @classmethod
-        def __getarray(cls, ea):
-            refs = (ea for ea in xref.up(ea) if idaapi.get_switch_info_ex(ea) is not None)
-            try:
-                ea = builtins.next(refs)
-                res = idaapi.get_switch_info_ex(ea)
-                return interface.switch_t(res)
-            except StopIteration:
-                pass
-            raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
-
-        @classmethod
-        def __getinsn(cls, ea):
-            res = idaapi.get_switch_info_ex(ea)
-            if res is None:
-                raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
-            return interface.switch_t(res)
-
-        @utils.multicase()
-        def __new__(cls):
-            '''Return the switch at the current address.'''
-            return cls(ui.current.address())
-        @utils.multicase(ea=six.integer_types)
-        def __new__(cls, ea):
-            '''Return the switch at the address ``ea``.'''
-            ea = interface.address.within(ea)
-            try: return cls.__getinsn(ea)
-            except TypeError: pass
-            try: return cls.__getarray(ea)
-            except TypeError: pass
-            try: return cls.__getlabel(ea)
-            except TypeError: pass
-            raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+    @utils.multicase()
+    @staticmethod
+    def switch():
+        '''Return the switch_t at the current address.'''
+        return get.switch(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @staticmethod
+    def switch(ea):
+        '''Return the switch_t at the address ``ea``.'''
+        return get.switch(ea)
 
     @utils.multicase()
     @staticmethod
@@ -4192,3 +4154,53 @@ class get(object):
                 res[m.name] = val if any(_ is None for _ in (ct, val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
         return res
     struc = struct = utils.alias(structure, 'get')
+
+    class switch(object):
+        @classmethod
+        def __getlabel(cls, ea):
+            f = type.flags(ea)
+            if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
+                drefs = (ea for ea in xref.data_up(ea))
+                refs = (ea for ea in itertools.chain(*itertools.imap(xref.up, drefs)) if idaapi.get_switch_info_ex(ea) is not None)
+                try:
+                    ea = builtins.next(refs)
+                    res = idaapi.get_switch_info_ex(ea)
+                    return interface.switch_t(res)
+                except StopIteration:
+                    pass
+            raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+
+        @classmethod
+        def __getarray(cls, ea):
+            refs = (ea for ea in xref.up(ea) if idaapi.get_switch_info_ex(ea) is not None)
+            try:
+                ea = builtins.next(refs)
+                res = idaapi.get_switch_info_ex(ea)
+                return interface.switch_t(res)
+            except StopIteration:
+                pass
+            raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+
+        @classmethod
+        def __getinsn(cls, ea):
+            res = idaapi.get_switch_info_ex(ea)
+            if res is None:
+                raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+            return interface.switch_t(res)
+
+        @utils.multicase()
+        def __new__(cls):
+            '''Return the switch at the current address.'''
+            return cls(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        def __new__(cls, ea):
+            '''Return the switch at the address ``ea``.'''
+            ea = interface.address.within(ea)
+            try: return cls.__getinsn(ea)
+            except TypeError: pass
+            try: return cls.__getarray(ea)
+            except TypeError: pass
+            try: return cls.__getlabel(ea)
+            except TypeError: pass
+            raise TypeError("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+
