@@ -629,25 +629,57 @@ class block(object):
     """
     @utils.multicase()
     @classmethod
+    def get(cls):
+        '''Return the idaapi.BasicBlock of the current address in the current function.'''
+        return cls.get(ui.current.function(), ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def get(cls, ea):
+        '''Return the idaapi.BasicBlock of address ``ea`` in the current function.'''
+        fn = by_address(ea)
+        return cls.get(fn, ea)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def get(cls, func, ea):
+        '''Return the idaapi.BasicBlock of address ``ea`` in the function ``func``.'''
+        return blocks.get(func, ea)
+    @utils.multicase(bb=idaapi.BasicBlock)
+    @classmethod
+    def get(cls, bb):
+        '''Return the idaapi.BasicBlock of the basic-block ``bb``.'''
+        return bb
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def get(cls, tuple):
+        '''Return the idaapi.BasicBlock identified by ``tuple``.'''
+        left, _ = tuple
+        return cls.get(left)
+
+    @utils.multicase()
+    @classmethod
     def id(cls):
         '''Return the block id of the current address in the current function.'''
-        return cls.id(ui.current.function(), ui.current.address())
+        return cls.get(ui.current.function(), ui.current.address()).id
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def id(cls, ea):
         '''Return the block id of address ``ea`` in the current function.'''
-        fn = by_address(ea)
-        return cls.id(fn, ea)
+        return cls.get(ea).id
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def id(cls, func, ea):
         '''Return the block id of address ``ea`` in the function ``func``.'''
-        return blocks.get(func, ea).id
+        return cls.get(func, ea).id
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def id(cls, bb):
         '''Return the block id of the basic-block ``bb``.'''
         return bb.id
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def id(cls, tuple):
+        '''Return the block id of the basic-block identified by ``tuple``.'''
+        return cls.get(tuple).id
 
     @utils.multicase()
     def __new__(cls):
@@ -666,6 +698,11 @@ class block(object):
     def __new__(cls, bb):
         '''Returns the boundaries of the basic-block ``bb``.'''
         return bb.startEA, bb.endEA
+    @utils.multicase(tuple=types.TupleType)
+    def __new__(cls, tuple):
+        '''Return the boundaries of the basic-block identified by ``tuple``.'''
+        left, _ = tuple
+        return cls(left)
 
     @utils.multicase()
     @classmethod
@@ -683,6 +720,12 @@ class block(object):
     @classmethod
     def top(cls, bb):
         '''Return the top address of the basic-block ``bb``.'''
+        left, _ = cls(bb)
+        return left
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def top(cls, tuple):
+        '''Return the top address of the basic-block identified by ``tuple``.'''
         left, _ = cls(bb)
         return left
 
@@ -704,6 +747,12 @@ class block(object):
         '''Return the bottom address of the basic-block ``bb``.'''
         _, right = cls(bb)
         return right
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def bottom(cls, tuple):
+        '''Return the bottom address of the basic-block identified by ``tuple``.'''
+        _, right = cls(tuple)
+        return right
 
     @utils.multicase(none=types.NoneType)
     @classmethod
@@ -715,6 +764,20 @@ class block(object):
     def set_color(cls, rgb):
         '''Sets the color of the current-basic block to ``rgb``.'''
         return cls.set_color(ui.current.address(), rgb)
+    @utils.multicase(tuple=types.TupleType, none=types.NoneType)
+    @classmethod
+    def set_color(cls, tuple, none):
+        '''Removes the color of the basic-block identified by ``tuple``.'''
+        bb = cls.get(tuple)
+        return cls.set_color(bb, None)
+    @utils.multicase(tuple=types.TupleType, rgb=six.integer_types)
+    @classmethod
+    def set_color(cls, tuple, rgb, **frame):
+        """Sets the color of the basic-block identified by ``tuple`` to ``rgb``.
+        If the color ``frame`` is specified, set the frame to the specified color.
+        """
+        bb = cls.get(tuple)
+        return cls.set_color(bb, rgb, **frame)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
     def set_color(cls, ea, none):
@@ -806,13 +869,14 @@ class block(object):
     @classmethod
     def get_color(cls, ea):
         '''Returns the color of the basic-block at address ``ea``.'''
-        fn, bb, n = by_address(ea), cls.id(ea), idaapi.node_info_t()
-        ok = idaapi.get_node_info2(n, fn.startEA, bb)
-        if ok and n.valid_bg_color():
-            res = n.bg_color
-            b, r = (res&0xff0000)>>16, res&0x0000ff
-            return (r<<16) | (res&0x00ff00) | b
-        return None
+        bb = cls.get(ea)
+        return cls.get_color(bb)
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def get_color(cls, tuple):
+        '''Returns the color of the basic-block ``bb``.'''
+        bb = cls.get(tuple)
+        return cls.get_color(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def get_color(cls, bb):
@@ -845,11 +909,21 @@ class block(object):
     def color(cls, bb):
         '''Returns the color of the basic-block ``bb``.'''
         return cls.get_color(bb)
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def color(cls, tuple):
+        '''Returns the color of the basic-block identified by ``tuple``.'''
+        return cls.get_color(tuple)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
     def color(cls, ea, none):
         '''Removes the color of the basic-block at the address ``ea``.'''
         return cls.set_color(ea, None)
+    @utils.multicase(tuple=types.TupleType, none=types.NoneType)
+    @classmethod
+    def color(cls, tuple, none):
+        '''Removes the color of the basic-block identified by ``tuple``.'''
+        return cls.set_color(tuple, None)
     @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
     @classmethod
     def color(cls, bb, none):
@@ -869,6 +943,13 @@ class block(object):
         If the color ``frame`` is specified, set the frame to the specified color.
         """
         return cls.set_color(bb, rgb, **frame)
+    @utils.multicase(tuple=types.TupleType, rgb=six.integer_types)
+    @classmethod
+    def color(cls, tuple, rgb, **frame):
+        """Sets the color of the basic-block identifed by ``tuple`` to ``rgb``.
+        If the color ``frame`` is specified, set the frame to the specified color.
+        """
+        return cls.set_color(tuple, rgb, **frame)
 
     @utils.multicase()
     @classmethod
@@ -881,6 +962,12 @@ class block(object):
         '''Return the addresses of all the instructions that branch to the basic-block at address ``ea``.'''
         res = blocks.get(ea)
         return cls.before(res)
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def before(cls, tuple):
+        '''Return the addresses of all the instructions that branch to the basic-block identified by ``tuple``.'''
+        bb = cls.get(tuple)
+        return cls.before(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def before(cls, bb):
@@ -897,8 +984,14 @@ class block(object):
     @classmethod
     def after(cls, ea):
         '''Return the addresses of all the instructions that the basic-block at address ``ea`` leaves to.'''
-        res = blocks.get(ea)
-        return cls.after(res)
+        bb = cls.get(ea)
+        return cls.after(bb)
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def after(cls, tuple):
+        '''Return the addresses of all the instructions that branch to the basic-block identified by ``tuple``.'''
+        bb = cls.get(tuple)
+        return cls.after(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def after(cls, bb):
@@ -917,6 +1010,12 @@ class block(object):
         '''Yield all the addresses in the basic-block at address ``ea``.'''
         left, right = cls(ea)
         return database.iterate(left, right)
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def iterate(cls, tuple):
+        '''Yield all the addresses in the basic-block identified by ``tuple``.'''
+        bb = cls.get(tuple)
+        return cls.iterate(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def iterate(cls, bb):
@@ -939,6 +1038,14 @@ class block(object):
         """
         blk = blocks.get(ea)
         return cls.register(blk, reg, *regs, **modifiers)
+    @utils.multicase(tuple=types.TupleType, reg=(basestring, instruction.register_t))
+    @classmethod
+    def register(cls, tuple, reg, *regs, **modifiers):
+        """Yield each `(address, operand-number, operand-state)` within the basic-block identified by ``tuple`` that touches one of the registers identified by ``regs``.
+        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
+        """
+        bb = cls.get(tuple)
+        return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
@@ -949,7 +1056,7 @@ class block(object):
         uses_register = interface.regmatch.use( (reg,) + regs )
 
         for ea in cls.iterate(bb):
-            for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
+            for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
                 yield ea, opnum, instruction.op_state(ea, opnum)
             continue
         return
@@ -965,6 +1072,12 @@ class block(object):
         '''Return all the bytes contained in the basic-block at address ``ea``.'''
         l, r = cls(ea)
         return database.read(l, r - l)
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def read(cls, tuple):
+        '''Return all the bytes contained in the basic-block identified by ``tuple``.'''
+        bb = cls.get(tuple)
+        return cls.read(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def read(cls, bb):
@@ -982,13 +1095,19 @@ class block(object):
     def disassemble(cls, ea, **options):
         '''Returns the disassembly of the basic-block at the address ``ea``.'''
         F = functools.partial(database.disassemble, **options)
-        return '\n'.join(map(F, cls.iterate(ea)))
+        return '\n'.join(itertools.imap(F, cls.iterate(ea)))
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def disassemble(cls, tuple, **options):
+        '''Returns the disassembly of the basic-block identified by ``tuple``.'''
+        bb = cls.get(tuple)
+        return cls.disassemble(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def disassemble(cls, bb, **options):
         '''Returns the disassembly of the basic-block ``bb``.'''
         F = functools.partial(database.disassemble, **options)
-        return '\n'.join(map(F, cls.iterate(bb)))
+        return '\n'.join(itertools.imap(F, cls.iterate(bb)))
     disasm = utils.alias(disassemble, 'block')
 
     # FIXME: implement .decompile for an idaapi.BasicBlock type too
@@ -1003,7 +1122,7 @@ class block(object):
         '''(UNSTABLE) Returns the decompiled code of the basic-block at the address ``ea``.'''
         source = idaapi.decompile(ea)
 
-        res = map(functools.partial(operator.__getitem__, source.eamap), cls.iterate(ea))
+        res = itertools.imap(functools.partial(operator.__getitem__, source.eamap), cls.iterate(ea))
         res = itertools.chain(*res)
         formatted = reduce(lambda t,c: t if t[-1].ea == c.ea else t+[c], res, [next(res)])
 
@@ -1013,7 +1132,7 @@ class block(object):
             for fmt in formatted:
                 res.append( fmt.print1(source.__deref__()) )
         except TypeError: pass
-        return '\n'.join(map(idaapi.tag_remove,res))
+        return '\n'.join(itertools.imap(idaapi.tag_remove,res))
 
 class frame(object):
     """
