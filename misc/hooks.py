@@ -1,5 +1,5 @@
 import six
-import sys,logging
+import sys, logging
 import functools, operator, itertools, types
 
 import database,function,ui
@@ -12,7 +12,7 @@ import idaapi
 def noapi(*args):
     fr = sys._getframe().f_back
     if fr is None:
-        logging.fatal("{:s}.noapi : Unexpected empty frame from caller. Continuing.. : {!r} : {!r}".format('.'.join(("internal", __name__)), sys._getframe(), sys._getframe().f_code))
+        logging.fatal("{:s}.noapi : Unexpected empty frame from caller. Continuing.. : {!r} : {!r}".format(__name__, sys._getframe(), sys._getframe().f_code))
         return hook.CONTINUE
 
     return internal.interface.priorityhook.CONTINUE if fr.f_back is None else internal.interface.priorityhook.STOP
@@ -43,9 +43,11 @@ class address(comment):
         f = idaapi.get_func(ea)
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
+                logging.debug("{:s}.update_refs({:#x}) : Decreasing refcount for {!r} at {:s} : {!r} : {!r}".format('.'.join((__name__, cls.__name__)), ea,  key, 'address', old.viewkeys(), new.viewkeys()))
                 if f: internal.comment.contents.dec(ea, key)
                 else: internal.comment.globals.dec(ea, key)
             if key not in old:
+                logging.debug("{:s}.update_refs({:#x}) : Increasing refcount for {!r} at {:s} : {!r} : {!r}".format('.'.join((__name__, cls.__name__)), ea, key, 'address', old.viewkeys(), new.viewkeys()))
                 if f: internal.comment.contents.inc(ea, key)
                 else: internal.comment.globals.inc(ea, key)
             continue
@@ -55,6 +57,7 @@ class address(comment):
     def _create_refs(cls, ea, res):
         f = idaapi.get_func(ea)
         for key in res.viewkeys():
+            logging.debug("{:s}.create_refs({:#x}) : Increasing refcount for {!r} at {:s} : {!r}".format('.'.join((__name__, cls.__name__)), ea, key, 'address', res.viewkeys()))
             if f: internal.comment.contents.inc(ea, key)
             else: internal.comment.globals.inc(ea, key)
         return
@@ -63,6 +66,7 @@ class address(comment):
     def _delete_refs(cls, ea, res):
         f = idaapi.get_func(ea)
         for key in res.viewkeys():
+            logging.debug("{:s}.delete_refs({:#x}) : Decreasing refcount for {!r} at {:s} : {!r}".format('.'.join((__name__, cls.__name__)), ea,  key, 'address', res.viewkeys()))
             if f: internal.comment.contents.dec(ea, key)
             else: internal.comment.globals.dec(ea, key)
         return
@@ -142,8 +146,10 @@ class globals(comment):
     def _update_refs(cls, fn, old, new):
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
+                logging.debug("{:s}.update_refs({:#x}) : Decreasing refcount for {!r} at {:s} : {!r} : {!r}".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, key, 'function' if fn else 'global', old.viewkeys(), new.viewkeys()))
                 internal.comment.globals.dec(fn.startEA, key)
             if key not in old:
+                logging.debug("{:s}.update_refs({:#x}) : Increasing refcount for {!r} at {:s} : {!r} : {!r}".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, key, 'function' if fn else 'global', old.viewkeys(), new.viewkeys()))
                 internal.comment.globals.inc(fn.startEA, key)
             continue
         return
@@ -152,12 +158,14 @@ class globals(comment):
     def _create_refs(cls, fn, res):
         for key in res.viewkeys():
             internal.comment.globals.inc(fn.startEA, key)
+            logging.debug("{:s}.create_refs({:#x}) : Increasing refcount for {!r} at {:s} : {!r}".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, key, 'function' if fn else 'global', res.viewkeys()))
         return
 
     @classmethod
     def _delete_refs(cls, fn, res):
         for key in res.viewkeys():
             internal.comment.globals.dec(fn.startEA, key)
+            logging.debug("{:s}.delete_refs({:#x}) : Decreasing refcount for {!r} at {:s} : {!r}".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, key, 'function' if fn else 'global', res.viewkeys()))
         return
 
     @classmethod
@@ -293,6 +301,10 @@ def on_ready():
 
         # update tagcache using function state
         __process_functions()
+
+    elif State == state.ready:
+        logging.debug("{:s}.on_ready : Database is already ready. : {!r}".format(__name__, State))
+
     else:
         logging.debug("{:s}.on_ready : Received unexpected state transition. : {!r}".format(__name__, State))
 
@@ -421,18 +433,22 @@ def rename(ea, newname):
         # if it's a custom name
         if (not labelQ and customQ):
             ctx.dec(ea, '__name__')
+            logging.debug("{:s}.rename({:#x}, {!r}): Decreasing refcount for {!r} at address due to an empty name.".format(__name__, ea, newname, '__name__'))
         return
 
     # if it's currently a label or is unnamed
     if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
         ctx.inc(ea, '__name__')
+        logging.debug("{:s}.rename({:#x}, {!r}): Increasing refcount for {!r} at address due to a new name.".format(__name__, ea, newname, '__name__'))
     return
 
 def extra_cmt_changed(ea, line_idx, cmt):
     # FIXME: persist state for extra_cmts in order to determine
     #        what the original value was before modification
+    # XXX: IDA doesn't seem to have an extra_cmt_changing event and instead calls this hook twice for every insertion
 
     oldcmt = internal.netnode.sup.get(ea, line_idx)
+    if oldcmt is not None: oldcmt = oldcmt.rstrip('\x00')
     ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
     MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
@@ -441,8 +457,9 @@ def extra_cmt_changed(ea, line_idx, cmt):
 
     for l, r, key in (prefix, suffix):
         if l <= line_idx < r:
-            if oldcmt is None and cmt: ctx.inc(ea, key)
-            elif oldcmt and cmt is None: ctx.dec(ea, key)
+            if oldcmt is None and cmt is not None: ctx.inc(ea, key)
+            elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
+            logging.debug("{:s}.extra_cmt_changed({:#x}, {:d}, {!r}, oldcmt={!r}) : {:s} refcount at address for tag {!r}.".format(__name__, ea, line_idx, cmt, oldcmt, 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', key))
         continue
     return
 
@@ -458,6 +475,7 @@ def func_tail_appended(pfn, tail):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=pfn.startEA)
+            logging.debug("{:s}.func_tail_appended({:#x}, {:#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, tail.startEA, k, k))
         continue
     return
 
@@ -469,6 +487,7 @@ def removing_func_tail(pfn, tail):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=pfn.startEA)
             internal.comment.globals.inc(ea, k)
+            logging.debug("{:s}.removing_func_tail({:#x}, {:#x}): Decreasing refcount for contents tag {!r} and increasing refcount for global tag {!r}".format(__name__, pfn.startEA, tail.startEA, k, k))
         continue
     return
 
@@ -481,6 +500,7 @@ def add_func(pfn):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
+                logging.debug("{:s}.add_func({:#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, k, k))
             continue
         continue
     return
@@ -494,12 +514,14 @@ def del_func(pfn):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
+                logging.debug("{:s}.del_func({:#x}): Decreasing refcount for contents tag {!r} and increasing refcount for globals tag {!r}".format(__name__, pfn.startEA, k, k))
             continue
         continue
 
     # remove all function tags
     for k in function.tag(pfn.startEA):
         internal.comment.globals.dec(pfn.startEA, k)
+        logging.debug("{:s}.del_func({:#x}): Removing function (global) tag {!r}".format(__name__, pfn.startEA, k))
     return
 
 def set_func_start(pfn, new_start):
@@ -512,6 +534,7 @@ def set_func_start(pfn, new_start):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
+                logging.debug("{:s}.set_func_start({:#x}, {#x}): Decreasing refcount for contents tag {!r} and increasing refcount for globals tag {!r}".format(__name__, pfn.startEA, new_start, k, k))
             continue
         return
 
@@ -522,6 +545,7 @@ def set_func_start(pfn, new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
+                logging.debug("{:s}.set_func_start({:#x}, {#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, new_start, k, k))
             continue
         return
     return
@@ -536,6 +560,7 @@ def set_func_end(pfn, new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
+                logging.debug("{:s}.set_func_end({:#x}, {#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, new_end, k, k))
             continue
         return
 
@@ -546,6 +571,7 @@ def set_func_end(pfn, new_end):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
+                logging.debug("{:s}.set_func_end({:#x}, {#x}): Decreasing refcount for contents tag {!r} and increasing refcount for globals tag {!r}".format(__name__, pfn.startEA, new_end, k, k))
             continue
         return
     return
