@@ -194,7 +194,7 @@ class multicase(object):
     @classmethod
     def prototype(cls, func, types={}):
         args, defaults, (star, starstar) = cls.ex_args(func)
-        argsiter = (("{:s}={:s}".format(n, "{:s}".format('|'.join(t.__name__ for t in types[n])) if hasattr(types[n], '__iter__') else types[n].__name__) if types.has_key(n) else n) for n in args)
+        argsiter = (("{:s}={:s}".format(n, "{:s}".format('|'.join(t.__name__ for t in types[n])) if not isinstance(types[n], type) and hasattr(types[n], '__iter__') else types[n].__name__) if types.has_key(n) else n) for n in args)
         res = (argsiter, ("*{:s}".format(star),) if star else (), ("**{:s}".format(starstar),) if starstar else ())
         return "{:s}({:s})".format(func.func_name, ', '.join(itertools.chain(*res)))
 
