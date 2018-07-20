@@ -501,6 +501,12 @@ class node(object):
 
         return id64(sup) if bit64Q else id32(sup)
 
+    @staticmethod
+    def alt_opinverted(ea, opnum):
+        '''Return whether the operand ``opnum`` at the address ``ea`` has its sign inverted or not.'''
+        OP_REPR, INVERT_BIT = 8, 0x100000
+        return internal.netnode.alt.get(ea, OP_REPR) & (INVERT_BIT << opnum) != 0
+
 def tuplename(*names):
     res = ("{:x}".format(abs(n)) if isinstance(n, six.integer_types) else n for n in names)
     return '_'.join(res)

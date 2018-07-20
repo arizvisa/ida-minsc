@@ -242,9 +242,9 @@ class __optype__(object):
         except KeyError: return cls.cache[0, type]
 
     @classmethod
-    def decode(cls, op, processor=None):
+    def decode(cls, ea, op, processor=None):
         res = cls.lookup(op.type, processor=processor)
-        return res(op)
+        return res(ea, op)
 
     @classmethod
     def type(cls, op, processor=None):
@@ -544,7 +544,7 @@ def op_value(ea, n):
     phrase -> (offset, base-register name, index-register name, scale)
     """
     res = operand(ea, n)
-    return __optype__.decode(res)
+    return __optype__.decode(ea, res)
 op = op_decode = utils.alias(op_value)
 
 ### tag:intel
@@ -856,14 +856,14 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_void)
-    def void(op):
+    def void(ea, op):
         '''An `idaapi.o_void` operand...which is nothing.'''
         return ()
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_reg)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_reg)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg)
-    def register(op):
+    def register(ea, op):
         '''Return the operand as a `register_t`.'''
         global architecture
         dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
@@ -876,11 +876,16 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
-    def immediate(op):
+    def immediate(ea, op):
         '''Return the operand as an integer.'''
         if op.type in (idaapi.o_imm,idaapi.o_phrase):
             bits = idaapi.get_dtyp_size(op.dtyp) * 8
-            return op.value & (2**bits-1)
+
+            # figure out the sign flag
+            sf, res = 2 ** (bits - 1), op.value
+
+            # if op.value has its sign inverted, then signify it otherwise just use it
+            return -2 ** bits + res if interface.node.alt_opinverted(ea, op.n) else res & (2 ** bits - 1)
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
         raise TypeError("{:s}.immediate(...) : {:s} : Invalid operand type. : {:d}".format('.'.join((__name__, 'operand_types')), optype, op.type))
 
@@ -888,57 +893,58 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_near)
-    def memory(op):
+    def memory(ea, op):
         '''Return the `operand.addr` field from an operand.'''
         if op.type in (idaapi.o_mem,idaapi.o_far,idaapi.o_near,idaapi.o_displ):
-            seg,sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+            seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
             return op.addr
         optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
         raise TypeError("{:s}.address(...) : {:s},{:s} : Invalid operand type. : {:d}".format('.'.join((__name__, 'operand_types')), optype[0], optype[1], op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
-    def trregister(op):
+    def trregister(ea, op):
         '''trreg'''
         raise NotImplementedError
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
-    def dbregister(op):
+    def dbregister(ea, op):
         '''dbreg'''
         raise NotImplementedError
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
-    def crregister(op):
+    def crregister(ea, op):
         '''crreg'''
         raise NotImplementedError
         return getattr(reg, "cr{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
-    def fpregister(op):
+    def fpregister(ea, op):
         '''fpreg'''
         return getattr(reg, "st{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
-    def mmxregister(op):
+    def mmxregister(ea, op):
         '''mmxreg'''
         return getattr(reg, "mmx{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
-    def xmmregister(op):
+    def xmmregister(ea, op):
         '''xmmreg'''
         return getattr(reg, "xmm{:d}".format(op.reg)).id
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
-    def phrase(op):
+    def phrase(ea, op):
         """Returns an operand as a `(offset, basereg, indexreg, scale)` tuple."""
+        F1, F2 = op.specflag1, op.specflag2
         if op.type in (idaapi.o_displ, idaapi.o_phrase):
-            if op.specflag1 == 0:
+            if F1 == 0:
                 base = op.reg
                 index = None
 
-            elif op.specflag1 == 1:
-                base = (op.specflag2&0x07) >> 0
-                index = (op.specflag2&0x38) >> 3
+            elif F1 == 1:
+                base = (F2 & 0x07) >> 0
+                index = (F2 & 0x38) >> 3
 
             else:
                 optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-                raise TypeError("{:s}.phrase(...) : {:s},{:s},{:s} : Unable to determine the operand format for op.type {:d} : {:#x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
+                raise TypeError("{:s}.phrase(...) : {:s},{:s},{:s} : Unable to determine the operand format for op.type {:d} : {:#x}".format(__name__, optype[0], optype[1], optype[2], op.type, F1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
@@ -957,17 +963,17 @@ class operand_types:
             # OF_OUTER_DISP = 1 then .value exists
 
         elif op.type == idaapi.o_mem:
-            if op.specflag1 == 0:
+            if F1 == 0:
                 base = None
                 index = None
 
-            elif op.specflag1 == 1:
+            elif F1 == 1:
                 base = None
-                index = (op.specflag2&0x38) >> 3
+                index = (F2 & 0x38) >> 3
 
             else:
                 optype = map(utils.unbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-                raise TypeError("{:s}.phrase(...) : {:s} : Unable to determine the operand format for op.type {:d} : {:#x}".format(__name__, optype[0], optype[1], optype[2], op.type, op.specflag1))
+                raise TypeError("{:s}.phrase(...) : {:s} : Unable to determine the operand format for op.type {:d} : {:#x}".format(__name__, optype[0], optype[1], optype[2], op.type, F1))
             offset = op.addr
 
         else:
@@ -976,43 +982,41 @@ class operand_types:
 
         # if arch == x64, then index += 8
 
-        res = op.specflag2 & 0xc0
-        if res == 0x00:     # 00
-            scale = 1
-        elif res == 0x40:   # 01
-            scale = 2
-        elif res == 0x80:   # 10
-            scale = 4
-        elif res == 0xc0:   # 11
-            scale = 8
+        scale_lookup = {
+            0x00 : 1,   # 00
+            0x40 : 2,   # 01
+            0x80 : 4,   # 10
+            0xc0 : 8,   # 11
+        }
+        scale = scale_lookup[F2 & 0xc0]
 
-        signbit = 2**(database.config.bits()-1)
-        maxint = 2**database.config.bits()
-
-        seg,sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
-
+        bits = database.config.bits()
         dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
 
+        seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
+
         global architecture
-        dt = dtype_by_size(database.config.bits()//8)
-        res = long((offset-maxint) if offset&signbit else offset), None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
+        sf, dt = 2 ** (bits - 1), dtype_by_size(database.config.bits() // 8)
+
+        inverted, regular = offset & (2 ** bits - 1) if offset & sf else -2 ** bits + offset, -2 ** bits + offset if offset & sf else offset & (sf - 1)
+        res = long(inverted) if interface.node.alt_opinverted(ea, op.n) else long(regular), None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
         return intelop.OffsetBaseIndexScale(*res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
-    def phrase(op):
+    def phrase(ea, op):
         global architecture
         Rn, Rm = architecture.by_index(op.reg), architecture.by_index(op.specflag1)
         return armop.phrase(Rn, Rm)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
-    def disp(op):
+    def disp(ea, op):
         '''Convert an arm operand into an `armop.disp` tuple `(register, offset)`.'''
         global architecture
         Rn = architecture.by_index(op.reg)
         return armop.disp(Rn, long(op.addr))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
-    def memory(op):
+    def memory(ea, op):
         '''Convert an arm operand into an `armop.mem` tuple `(address, dereferenced-value)`.'''
         # get the address and the operand size
         addr, size = op.addr, idaapi.get_dtyp_size(op.dtyp)
@@ -1027,7 +1031,7 @@ class operand_types:
         return armop.mem(long(addr), long(res-maxval) if sf else long(res))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
-    def flex(op):
+    def flex(ea, op):
         '''Convert an arm operand into an `arm.flexop` tuple `(register, type, immediate)`.'''
         # tag:arm, this is a register with a shift-op applied
         global architecture
@@ -1036,7 +1040,7 @@ class operand_types:
         return armop.flex(Rn, int(shift), int(op.value))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
-    def list(op):
+    def list(ea, op):
         '''Convert a bitmask of a registers into an `armop.list`.'''
         # op.specval -- a bitmask specifying which registers are included
         global architecture
@@ -1048,13 +1052,13 @@ class operand_types:
         return armop.list(set(res))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
-    def phrase(op):
+    def phrase(ea, op):
         global architecture
         rt, imm = architecture.by_index(op.reg), op.addr
         return mipsop.phrase(rt, imm)
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
-    def coprocessor(op):
+    def coprocessor(ea, op):
         return mipsop.coproc(op.reg)
 del(operand_types)
 
