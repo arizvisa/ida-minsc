@@ -170,7 +170,6 @@ class structure_t(object):
             string = res
         return idaapi.set_struc_name(self.id, string)
     @property
-    #def comment(self, repeatable=True):
     def comment(self):
         '''Return the repeatable comment for the structure.'''
         return idaapi.get_struc_cmt(self.id, True) or idaapi.get_struc_cmt(self.id, False)
@@ -225,6 +224,11 @@ class structure_t(object):
 
     def __getattr__(self, name):
         return getattr(self.members, name)
+
+    def contains(self, offset):
+        '''Return whether the specified offset is contained by the structure.'''
+        res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
+        return res <= offset < res + cb
 
 
 @utils.multicase()
@@ -409,62 +413,6 @@ def fragment(id, offset, size):
         yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
         size -= m_size
     return
-
-# XXX: deprecate this as it's already in database
-@utils.multicase(ea=six.integer_types, structure=structure_t)
-def apply(ea, structure):
-    '''Apply the specified ``structure`` to the address at ``ea``.'''
-    ea = interface.address.inside(ea)
-    ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
-    res = idaapi.get_opinfo(ea, 0, fl, ti)
-    ti.tid = structure.id
-    return idaapi.set_opinfo(ea, 0, fl | idaapi.struflag(), ti)
-@utils.multicase(id=six.integer_types)
-def apply(id):
-    '''Apply the structure identified by ``id`` to the current address.'''
-    return apply(ui.current.address(), instance(id))
-@utils.multicase(structure=structure_t)
-def apply(structure):
-    '''Apply the specified ``structure`` to the current address.'''
-    return apply(ui.current.address(), structure)
-@utils.multicase(ea=six.integer_types, id=six.integer_types)
-def apply(ea, id):
-    '''Apply the structure identified by ``id`` to the address at ``ea``.'''
-    return apply(ea, instance(id))
-
-# XXX: move this to the instruction module
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
-def apply_op(id, ea, opnum, **delta):
-    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
-    ea = interface.address.inside(ea)
-    if not database.type.is_code(ea):
-        raise TypeError("{:s}.apply_op({:#x}, {:#x}, {:d}, delta={:d}) : Item type at requested address is not code.".format(__name__, id, ea, opnum, delta.get('delta', 0)))
-    # FIXME: allow one to specify more than one field for tid_array
-    length = 2
-    tid = idaapi.tid_array(length)
-    tid[0] = id
-    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
-    return True if ok else False
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=structure_t)
-def apply_op(structure, ea, opnum, **delta):
-    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
-    return apply_op(structure.id, ea, opnum, **delta)
-@utils.multicase(opnum=six.integer_types, structure=structure_t)
-def apply_op(structure, opnum, **delta):
-    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
-    return apply_op(structure.id, ui.current.address(), opnum, **delta)
-@utils.multicase(opnum=six.integer_types)
-def apply_op(id, opnum, **delta):
-    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
-    return apply_op(id, ui.current.address(), opnum, **delta)
 
 # XXX: deprecate this as it's the same as by_name
 def get(name):
@@ -963,6 +911,10 @@ class member_t(object):
     def right(self):
         '''Return the ending offset of the member.'''
         return self.ptr.eoff
+    @property
+    def owner(self):
+        '''Return the structure_t that owns the member.'''
+        return self.__owner
 
     # read/write properties
     @property

@@ -565,30 +565,188 @@ def op_segment(ea, n):
     #raise NotImplementedError("{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
     return None
 
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_structure(ea, opnum):
+    '''Return the structures that operand ``opnum`` at instruction ``ea`` points to.'''
+    ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
+    if fl & idaapi.FF_STRUCT != idaapi.FF_STRUCT:
+        raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
+
+    # pathvar = idaapi.tid_array(length)
+    # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
+    res = idaapi.get_opinfo(ea, opnum, fl, ti)
+    if not res:
+        raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Unable to get the operand info for operand {:d}.".format(__name__, ea, opnum, opnum))
+
+    path = [res.path.ids[idx] for idx in six.moves.range(res.path.len)]
+    if len(path) == 1:
+        return (structure.by(path[0]), res.path.delta) if res.path.delta > 0 else structure.by(path[0])
+
+    return tuple(map(structure.by, path) + [res.path.delta]) if res.path.delta > 0 else tuple(map(structure.by, path))
+@utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
+def op_structure(opnum, structure, **delta):
+    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    return op_structure(ui.current.address(), opnum, structure.id, **delta)
+@utils.multicase(opnum=six.integer_types)
+def op_structure(opnum, id, **delta):
+    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    return op_structure(ui.current.address(), opnum, id, **delta)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
+def op_structure(ea, opnum, structure, **delta):
+    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    return op_structure(ea, opnum, structure.id, **delta)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
+def op_structure(ea, opnum, id, **delta):
+    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    ea = interface.address.inside(ea)
+    if not database.type.is_code(ea):
+        raise TypeError("{:s}.op_structure({:#x}, {:#x}, {:#x}, delta={:d}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+    # FIXME: allow one to specify more than one field for tid_array
+
+    sptr, name = idaapi.get_struc(id), idaapi.get_member_fullname(id)
+    if sptr is not None:
+        sid, mid = sptr.id, 0
+    elif name is not None:
+        fn = idaapi.get_member_fullname(id)
+        sptr = idaapi.get_member_struc(name)
+        sid, mid = sptr.id, id
+    else:
+        raise LookupError("{:s}.op_structure({:#x}, {:#x}, {:#x}, delta={:d}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+
+    length = 2
+    tid = idaapi.tid_array(length)
+    tid[0] = sid
+    tid[1] = mid
+    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
+
+    return True if ok else False
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, list=(types.TupleType, types.ListType))
+def op_structure(ea, opnum, list, **delta):
+    """Apply the structure members in ``list`` to the instruction operand ``opnum`` at the address ``ea``.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    ea = interface.address.inside(ea)
+    if not database.type.is_code(ea):
+        raise TypeError("{:s}.op_structure({:#x}, {:#x}, {:#x}, delta={:d}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+
+    if len(list) == 0:
+        raise UserError("{:s}.op_structure({:#x}, {:#x}, ..., delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+
+    if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring)) for m in list):
+        raise UserError("{:s}.op_structure({:#x}, {:#x}, ..., delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+
+    # figure out the structure that this all starts with
+    if isinstance(list[0], structure.structure_t):
+        sptr = list.pop(0).ptr
+    else:
+        sptr = list[0].owner.ptr
+
+    # collect each member resolving them to an id
+    res, tids = sptr, []
+    for item in list:
+        if isinstance(item, basestring):
+            m = idaapi.get_member_by_name(sptr, item)
+        elif isinstance(item, structure.member_t):
+            m = item.ptr
+        else:
+            raise NotImplementedError
+        tids.append(m.id)
+
+        # if member is not a structure, then terminate the loop
+        mptr = idaapi.get_sptr(m)
+        if not m:
+            break
+
+        # continue to the next iteration
+        res = mptr
+
+    # check what was different
+    if len(list) != len(tids):
+        logging.warn("{:s}.op_structure({:#x}, {:#x}, ..., delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+
+    # build the list of member ids
+    length = len(tids) + 1
+    tid = idaapi.tid_array(length)
+    tid[0] = sptr.id
+    for i, id in enumerate(tids):
+        tid[i + 1] = id
+
+    # now we can finally apply the path to the specified operand
+    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
+    #okres = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, delta)
+
+    return ok
+
+@utils.multicase(opnum=six.integer_types)
+def op_enumeration(opnum):
+    return op_enumeration(ui.current.address(), opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_enumeration(ea, opnum):
+    '''Return the id of the enumeration used by operand ``opnum`` of the instruction at ``ea``.'''
+    ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
+    if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
+        raise TypeError("{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
+
+    res = idaapi.get_opinfo(ea, opnum, fl, ti)
+    if res is None:
+        raise TypeError("{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d}.".format(__name__, ea, opnum, opnum))
+
+    return enumeration.by(res.ec.tid), res.ec.serial if res.ec.serial > 0 else enumeration.by(res.ec.tid)
+@utils.multicase(opnum=six.integer_types, name=basestring)
+def op_enumeration(opnum, name):
+    '''Apply the enumeration ``name`` to operand ``opnum`` of the current instruction.'''
+    return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=basestring)
+def op_enumeration(ea, opnum, name):
+    '''Apply the enumeration ``name`` to operand ``opnum`` of the instruction at ``ea``.'''
+    return op_enumeration(ea, opnum, enumeration.by(name))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types+(types.TupleType,))
+def op_enumeration(ea, opnum, id):
+    '''Apply the enumeration ``id`` to operand ``opnum`` of the instruction at ``ea``.'''
+    return idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
+
+@utils.multicase(opnum=six.integer_types)
+def op_string(opnum):
+    return op_string(ui.current.address(), opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_string(ea, opnum):
+    '''Return the string type (STRTYPE_) of the string used by operand ``opnum`` of the instruction at ``ea``.'''
+    ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
+    if fl & idaapi.STRLIT == 0:
+        raise TypeError("{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
+
+    res = idaapi.get_opinfo(ea, opnum, fl, ti)
+    if res is None:
+        raise TypeError("{:s}.op_string({:#x}, {:#x}) : Unable to get operand info for operand {:d}.".format(__name__, ea, opnum, opnum))
+
+    return res.strtype
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
+def op_string(ea, opnum, strtype):
+    '''Set the string type used by operand ``opnum`` of the instruction at ``ea`` to ``strtype``.'''
+    res, fl = idaapi.opinfo_t(), database.type.flags(ea)
+
+    fl |= idaapi.FF_STRLIT
+    res.strtype = strtype
+
+    ok = idaapi.set_opinfo(ea, opnum, fl, res)
+
+    # FIXME: verify that set_opinfo was actually applied by checking via get_opinfo
+    return ok
+
 ## flags
-# idaapi.stroffflag()
-# idaapi.stkvarflag()
-# idaapi.offflag()
-# idaapi.struflag()
-
-# idaapi.set_opinfo(ea, opnum, flags, ti)
-# idaapi.get_opinfo(ea, opnum, &flags, &buf)
-
 # idaapi.set_typeinfo(ea, opnum, flags, ti)
 # idaapi.get_typeinfo(ea, opnum, &flags, &buf)
 
 # idaapi.set_op_type(ea, type, opnum)
 # idaapi.typeflag(ea, &oldflag, type, opnum)
-
-# idaapi.op_stkvar(ea, opnum)
-
-# tid = idaapi.tid_array(1)
-# tid[0] = structure_id
-# idaapi.op_stroff(ea, opnum, tid, len(tid), delta)
-# idaapi.get_stroff_path(ea, opnum, &tid, delta)
-
-# idaapi.op_enum(ea, opnum, enumid, enumserial)
-# idaapi.get_enum_id(ea, opnum)
 
 ## lvars
 # def op_type(ea, n)
@@ -598,24 +756,6 @@ def op_segment(ea, n):
 #    py_t = idc.ParseType("type string", flags)[1]
 #    py_name = "stack variable name"
 #    idaapi.apply_type_to_stkarg(py_op, py_v, py_t, py_name)
-
-## structure operands
-#def op_stroff(ea, n):
-#    '''Convert the specified operand repr to a structure field'''
-#    path = idaapi.tid_array(1)
-#    path[0] = structureId
-#    lengthOfPath = 1
-#    return idaapi.op_stroff(ea, n, path.cast(), lengthOfPath, delta)
-
-## set_stroff_path
-# length = 1
-# pathvar = idaapi.tid_array(length)
-# delta = 0
-# res = idaapi.set_stroff_path(ea, n, pathvar, length, delta)
-
-## get_stroff_path
-# pathvar = idaapi.tid_array(length)
-# res = idapi.get_stroff_path(ea, n, pathvar.cast(), delta)
 
 @utils.multicase(n=six.integer_types)
 def op_refs(n):
