@@ -759,7 +759,7 @@ class execution(object):
     def __start(self):
         cls = self.__class__
         logging.debug("{:s}.start : Starting execution queue thread. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
-        self.ev_terminating.clear(), self.ev_unpaused.clear()
+        self.ev_terminating.clear(), self.ev_unpaused.set()
         self.thread.daemon = True
         return self.thread.start()
 
