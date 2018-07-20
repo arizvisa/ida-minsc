@@ -117,11 +117,14 @@ class cache(object):
 
     @classmethod
     def by(cls, instance):
-        t = instance.__class__
-        if t not in cls.state:
-            t = next((k for k in cls.state if issubclass(t, k)), None)
-            if not t: return None
-        return next((k for k in cls.state[t] if k.type(instance)), None)
+        type = instance.__class__
+        try:
+            if type not in cls.state:
+                type = next(t for t in cls.state if issubclass(type, t))
+            res = next(enc for enc in cls.state[type] if enc.type(instance))
+        except StopIteration:
+            raise LookupError("{:s}.by({!s}) : Unable to find an encoder for the serialization of the specified type.".format( '.'.join(('internal', __name__, cls.__name__)), type))
+        return res
 
     @classmethod
     def match(cls, string):
