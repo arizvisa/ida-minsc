@@ -3832,7 +3832,7 @@ class set(object):
     @classmethod
     def structure(cls, type):
         '''Set the data at the current address to the structure_t specified by ``type``.'''
-        return cls.struct(ui.current.address(), type)
+        return cls.structure(ui.current.address(), type)
     @utils.multicase(ea=six.integer_types, type=_structure.structure_t)
     @classmethod
     def structure(cls, ea, type):
