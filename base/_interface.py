@@ -568,7 +568,7 @@ class symbol_t(object):
     """
 
     @property
-    def __symbols__(self):
+    def symbols(self):
         '''Must be implemented by each sub-class: Return a generator that returns each symbol described by ``self``.'''
         raise NotImplementedError
 
@@ -597,7 +597,7 @@ class regmatch(object):
         def uses_register(ea, opnum):
             val = _instruction.op_value(ea, opnum)
             if isinstance(val, symbol_t):
-                return any(map(match, val.__symbols__))
+                return any(map(match, val.symbols))
             return False
 
         return uses_register
