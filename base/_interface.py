@@ -434,7 +434,7 @@ class node(object):
             while skip > 1:
                 data+= next(iterable)
                 skip -= 1
-        elif base in (idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD):
+        elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             raise NotImplementedError(base, flags, mods)
         res.append(data)
 

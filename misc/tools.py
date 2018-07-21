@@ -236,17 +236,17 @@ def sourcechain(fn, *args, **kwds):
         for i,t in zip(opi,opt):
             if t in sentinel:
                 result.setdefault(ea,set()).add(i)
-            elif t in ('reg',):
+            elif t in {'reg'}:
                 result.setdefault(ea,set()).add(i)
                 r = instruction.op_value(ea,i)
                 for a,b in sourcechain(fn, ea, r):
                     builtins.map(result.setdefault(a,set()).add, b)
-            elif t in ('phrase',):
+            elif t in {'phrase'}:
                 result.setdefault(ea,set()).add(i)
                 _,(r1,r2,_) = instruction.op_value(ea,i)
-                for a,b in sourcechain(fn, ea, *tuple(r for r in (r1,r2) if r is not None)):
+                for a,b in sourcechain(fn, ea, *tuple(r for r in (r1, r2) if r is not None)):
                     builtins.map(result.setdefault(a,set()).add, b)
-            elif t in ('imm','addr',):
+            elif t in {'imm', 'addr'}:
                 result.setdefault(ea,set()).add(i)
             else:
                 raise ValueError, (t, ea, i)

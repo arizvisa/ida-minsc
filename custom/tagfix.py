@@ -113,7 +113,7 @@ def contents(ea):
 
     # clean out any hidden tag values
     for k in six.viewkeys(tags):
-        if k in ('__tags__','__address__'):
+        if k in {'__tags__', '__address__'}:
             if f in addr:
                 addr[f] -= 1
                 if addr[f] == 0:

@@ -135,7 +135,7 @@ class utils(object):
     @classmethod
     def valfiter(cls, node, first, last, next, val):
         start, end = first(node), last(node)
-        if start in (None,idaapi.BADADDR): return
+        if start in {None, idaapi.BADADDR}: return
         yield start, val(node, start)
         while start != end:
             start = next(node, start)
@@ -145,7 +145,7 @@ class utils(object):
     @classmethod
     def valriter(cls, node, first, last, prev, val):
         start, end = first(node), last(node)
-        if end in (None,idaapi.BADADDR): return
+        if end in {None, idaapi.BADADDR}: return
         yield end, val(node, end)
         while end != start:
             end = prev(node, end)
