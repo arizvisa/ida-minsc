@@ -501,6 +501,14 @@ def op_size(ea, n):
     '''Returns the size for the ``n``th operand of the instruction at the address ``ea``.'''
     res = operand(ea, n)
     return idaapi.get_dtyp_size(res.dtyp)
+@utils.multicase(n=six.integer_types)
+def op_bits(n):
+    '''Returns the size (in bits) for the ``n``th operand of the current instruction.'''
+    return 8 * op_size(ui.current.address(), n)
+@utils.multicase(ea=six.integer_types, n=six.integer_types)
+def op_bits(ea, n):
+    '''Returns the size (in bits) for the ``n``th operand of the instruction at the address ``ea``.'''
+    return 8 * op_size(ea, n)
 
 @utils.multicase(n=six.integer_types)
 def op_type(n):
