@@ -1324,14 +1324,16 @@ def tag_read(func):
         return database.tag_read(ea)
 
     fn, repeatable = by_address(ea), True
-    res = comment(fn, repeatable=repeatable)
+    res = comment(fn, repeatable=False)
     d1 = internal.comment.decode(res)
-    res = comment(fn, repeatable=not repeatable)
+    res = comment(fn, repeatable=True)
     d2 = internal.comment.decode(res)
+
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+        logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2, ', '.join(d1.viewkeys() & d2.viewkeys())))
+
     res = {}
-    map(res.update, (d1, d2))
+    map(res.update, (d1, d2) if repeatable else (d2, d1))
 
     # add the function's name to the result
     fname = get_name(fn)

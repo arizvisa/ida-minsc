@@ -23,11 +23,11 @@ import idaapi
 ### structure_t abstraction
 class structure_t(object):
     """An abstraction around an IDA structure."""
-    __slots__ = ('__id', '__members')
+    __slots__ = ('__id__', '__members__')
 
     def __init__(self, id, offset=0):
-        self.__id = id
-        self.__members = members_t(self, baseoffset=offset)
+        self.__id__ = id
+        self.__members__ = members_t(self, baseoffset=offset)
 
     def up(self):
         '''Return all the structures that reference this specific structure.'''
@@ -127,7 +127,7 @@ class structure_t(object):
     @property
     def id(self):
         '''Return the identifier of the structure.'''
-        return self.__id
+        return self.__id__
     @property
     def ptr(self):
         '''Return the pointer of the `idaapi.struc_t`.'''
@@ -135,7 +135,7 @@ class structure_t(object):
     @property
     def members(self):
         '''Return the members belonging to the structure.'''
-        return self.__members
+        return self.__members__
 
     def __getstate__(self):
         cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), (True, False))
@@ -145,12 +145,12 @@ class structure_t(object):
         name, (cmtt, cmtf), members = state
         identifier = idaapi.get_struc_id(name)
         if identifier == idaapi.BADADDR:
-            logging.warn("{:s}.structure_t.__setstate__ : Creating structure {:s} [{:d} fields]{:s}".format(__name__, name, len(members), " // {:s}".format(cmtf or cmtt) if cmtf or cmtt else ''))
+            logging.warn("{:s}.structure_t.__setstate__ : Creating structure {:s} [{:d} fields]{:s}".format(__name__, name, len(members), " // {!s}".format(cmtf or cmtt) if cmtf or cmtt else ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, name)
         idaapi.set_struc_cmt(identifier, cmtt, True)
         idaapi.set_struc_cmt(identifier, cmtf, False)
-        self.__id = identifier
-        self.__members = members
+        self.__id__ = identifier
+        self.__members__ = members
         return
 
     @property
@@ -169,14 +169,56 @@ class structure_t(object):
             logging.warn("{:s}.name : Stripping invalid chars from structure name {!r}. : {!r}".format( '.'.join((__name__, cls.__name__)), string, res))
             string = res
         return idaapi.set_struc_name(self.id, string)
+
     @property
-    def comment(self):
+    def comment(self, repeatable=True):
         '''Return the repeatable comment for the structure.'''
         return idaapi.get_struc_cmt(self.id, True) or idaapi.get_struc_cmt(self.id, False)
     @comment.setter
-    def comment(self, comment, repeatable=True):
-        '''Set the repeatable comment for the structure to ``comment``.'''
-        return idaapi.set_struc_cmt(self.id, comment, repeatable)
+    def comment(self, value, repeatable=True):
+        '''Set the repeatable comment for the structure to ``value``.'''
+        return idaapi.set_struc_cmt(self.id, value, repeatable)
+
+    @utils.multicase()
+    def tag(self):
+        '''Return the tags associated with the structure.'''
+        repeatable = True
+
+        # grab the repeatable and non-repeatable comment for the structure
+        res = idaapi.get_struc_cmt(self.id, False)
+        d1 = internal.comment.decode(res)
+        res = idaapi.get_struc_cmt(self.id, True)
+        d2 = internal.comment.decode(res)
+
+        # check for duplicate keys
+        if d1.viewkeys() & d2.viewkeys():
+            cls = self.__class__
+            logging.warn("{:s}.comment({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format('.'.join((__name__,cls.__name__)), self.id, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
+
+        # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
+        res = {}
+        builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
+        return res
+    @utils.multicase(key=basestring)
+    def tag(self, key):
+        '''Return the tag identified by ``key`` belonging to the structure.'''
+        res = self.tag()
+        return res[key]
+    @utils.multicase(key=basestring)
+    def tag(self, key, value):
+        '''Set the tag identified by ``key`` to ``value`` for the structure.'''
+        state = self.tag()
+        repeatable, res, state[key] = True, state.get(key, None), value
+        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
+        return res
+    @utils.multicase(key=basestring, none=types.NoneType)
+    def tag(self, key, none):
+        '''Removes the tag specified by ``key`` from the structure.'''
+        state = self.tag()
+        repeatable, res = True, state.pop(key)
+        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
+        return res
+
     @property
     def size(self):
         '''Return the size of the structure.'''
@@ -212,7 +254,8 @@ class structure_t(object):
         return idaapi.del_struc(self.ptr)
 
     def __repr__(self):
-        return "<type 'structure' name={!r}{:s} size=+{:#x}>{:s}".format(self.name, (" offset={:#x}".format(self.offset) if self.offset > 0 else ''), self.size, " // {:s}".format(self.comment) if self.comment else '')
+        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment, self.tag()
+        return "<type 'structure' name={!r}{:s} size=+{:#x}>{:s}".format(name, (" offset={:#x}".format(offset) if offset > 0 else ''), size, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
 
     def field(self, ofs):
         '''Return the member at the specified offset.'''
@@ -341,7 +384,7 @@ def list(**type):
     maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), res) or [1])
 
     for st in res:
-        six.print_("[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {:s}".format(st.comment) if st.comment else ''))
+        six.print_("[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
     return
 
 @utils.multicase(structure=structure_t)
@@ -643,7 +686,7 @@ class members_t(object):
         maxtype = max(builtins.map(utils.fcompose(operator.attrgetter('type'), repr, len), res) or [1])
 
         for m in res:
-            six.print_("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {:s}".format(m.comment) if m.comment else ''))
+            six.print_("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
         return
 
     @utils.multicase()
@@ -794,13 +837,13 @@ class members_t(object):
         mn, ms = 0, 0
         for i in six.moves.range(len(self)):
             m = self[i]
-            name, t, ofs, size, comment = m.name, m.type, m.offset, m.size, m.comment
-            result.append((i, name, t, ofs, size, comment))
+            name, t, ofs, size, comment, tag = m.name, m.type, m.offset, m.size, m.comment, m.tag()
+            result.append((i, name, t, ofs, size, comment, tag))
             mn = max((mn, len(name)))
             ms = max((ms, len("{:+#x}".format(size))))
         mi = len("{:d}".format(len(self)))
         mo = max(map(len, map("{:x}".format, (self.baseoffset, self.baseoffset+self.owner.size))))
-        return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, "'{:s}'".format(n), mn+2, t, " // {:s}".format(c) if c else '') for i, n, t, o, s, c in result))
+        return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, "'{:s}'".format(n), mn+2, t, " // {!s}".format(T if '\n' in c else c) if c else '') for i, n, t, o, s, c, T in result))
 
 class member_t(object):
     '''Contains information about a particular member within a given structure'''
@@ -823,7 +866,7 @@ class member_t(object):
 
         identifier = idaapi.get_struc_id(ownername)
         if identifier == idaapi.BADADDR:
-            logging.warn("{:s}.instance({:s}).member_t : Creating structure {:s} -- [{:#x}] {:s}{:s}".format(__name__, ownername, ownername, ofs, name, " // {:s}".format(cmtt or cmtf) if cmtt or cmtf else ''))
+            logging.warn("{:s}.instance({:s}).member_t : Creating structure {:s} -- [{:#x}] {:s}{:s}".format(__name__, ownername, ownername, ofs, name, " // {!s}".format(cmtt or cmtf) if cmtt or cmtf else ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
         self.__owner = owner = instance(identifier, offset=0)
 
@@ -933,14 +976,56 @@ class member_t(object):
             logging.warn("{:s}.name : Stripping invalid chars from structure \"{:s}\" member {:d} name {!r}. : {!r}".format( '.'.join((__name__, cls.__name__)), self.__owner.name, self.__index, string, res))
             string = res
         return idaapi.set_member_name(self.__owner.ptr, self.offset - self.__owner.members.baseoffset, string)
+
     @property
-    def comment(self):
+    def comment(self, repeatable=True):
         '''Return the repeatable comment of the member.'''
         return idaapi.get_member_cmt(self.id, True) or idaapi.get_member_cmt(self.id, False)
     @comment.setter
-    def comment(self, value):
-        '''Set the repeatable comment of the member.'''
-        return idaapi.set_member_cmt(self.ptr, value, True)
+    def comment(self, value, repeatable=True):
+        '''Set the repeatable comment of the member to ``value``.'''
+        return idaapi.set_member_cmt(self.ptr, value, repeatable)
+
+    @utils.multicase()
+    def tag(self):
+        '''Return the tags associated with the member.'''
+        repeatable = True
+
+        # grab the repeatable and non-repeatable comment
+        res = idaapi.get_member_cmt(self.id, False)
+        d1 = internal.comment.decode(res)
+        res = idaapi.get_member_cmt(self.id, True)
+        d2 = internal.comment.decode(res)
+
+        # check for duplicate keys
+        if d1.viewkeys() & d2.viewkeys():
+            cls = self.__class__
+            logging.warn("{:s}.comment({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format('.'.join((__name__,cls.__name__)), self.id, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
+
+        # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
+        res = {}
+        builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
+        return res
+    @utils.multicase(key=basestring)
+    def tag(self, key):
+        '''Return the tag identified by ``key`` belonging to the member.'''
+        res = self.tag()
+        return res[key]
+    @utils.multicase(key=basestring)
+    def tag(self, key, value):
+        '''Set the tag identified by ``key`` to ``value`` for the member.'''
+        state = self.tag()
+        repeatable, res, state[key] = True, state.get(key, None), value
+        ok = idaapi.set_member_cmt(self.ptr, internal.comment.encode(state), repeatable)
+        return res
+    @utils.multicase(key=basestring, none=types.NoneType)
+    def tag(self, key, none):
+        '''Removes the tag specified by ``key`` from the member.'''
+        state = self.tag()
+        repeatable, res, = True, state.pop(key)
+        ok = idaapi.set_member_cmt(self.ptr, internal.comment.encode(state), repeatable)
+        return res
+
     @property
     def dt_type(self):
         '''Return the `.dt_type` attribute of the member.'''
@@ -985,8 +1070,8 @@ class member_t(object):
 
     def __repr__(self):
         '''Display the member in a readable format.'''
-        id, name, typ, comment = self.id, self.name, self.type, self.comment
-        return "{:s}\n[{:d}] {:-#x}:{:+#x} \'{:s}\' {:s}{:s}".format(self.__class__, self.index, self.offset, self.size, name, typ, " // {:s}".format(comment) if comment else '')
+        id, name, typ, comment, tag = self.id, self.name, self.type, self.comment, self.tag()
+        return "{:s}\n[{:d}] {:-#x}:{:+#x} \'{:s}\' {:s}{:s}".format(self.__class__, self.index, self.offset, self.size, name, typ, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
 
     def refs(self):
         '''Return the `(address, opnum, type)` of all the references to this member within the database.'''

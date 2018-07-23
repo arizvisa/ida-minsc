@@ -1181,14 +1181,16 @@ def tag_read(ea):
     repeatable = False if func else True
 
     # fetch the tags at the given address
-    res = comment(ea, repeatable=repeatable)
+    res = comment(ea, repeatable=False)
     d1 = internal.comment.decode(res)
-    res = comment(ea, repeatable=not repeatable)
+    res = comment(ea, repeatable=True)
     d2 = internal.comment.decode(res)
+
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority.".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2))
+        logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
+
     res = {}
-    builtins.map(res.update, (d1,d2))
+    builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
 
     # modify the decoded dictionary with implicit tags
     aname = get_name(ea)
