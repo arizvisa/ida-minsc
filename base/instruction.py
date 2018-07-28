@@ -695,6 +695,7 @@ def op_structure(ea, opnum, list, **delta):
     #okres = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, delta)
 
     return ok
+op_struc = op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_enumeration(opnum):
@@ -723,6 +724,7 @@ def op_enumeration(ea, opnum, name):
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration ``id`` to operand ``opnum`` of the instruction at ``ea``.'''
     return idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
+op_enum = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_string(opnum):
