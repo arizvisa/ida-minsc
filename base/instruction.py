@@ -500,7 +500,7 @@ def op_size(n):
 def op_size(ea, n):
     '''Returns the size for the ``n``th operand of the instruction at the address ``ea``.'''
     res = operand(ea, n)
-    return idaapi.get_dtyp_size(res.dtyp)
+    return 0 if res.type == idaapi.o_void else idaapi.get_dtyp_size(res.dtyp)
 @utils.multicase(n=six.integer_types)
 def op_bits(n):
     '''Returns the size (in bits) for the ``n``th operand of the current instruction.'''
@@ -523,22 +523,14 @@ def op_type(ea, n):
     return __optype__.type(res)
 opt = utils.alias(op_type)
 
-#@utils.multicase(n=six.integer_types)
-#def op_decode(n):
-#    '''Returns the value of the ``n``th operand for the current instruction in byte form.'''
-#    return op_decode(ui.current.address(), n)
-#@utils.multicase(ea=six.integer_types, n=six.integer_types)
-#def op_decode(ea, n):
-#    """Returns the value of the ``n``th operand for the instruction at address ``ea`` in byte form.
-#
-#    The formats are based on the operand type as emitted by the ins.op_type function:
-#    imm -> integer
-#    reg -> register index
-#    addr -> address
-#    phrase -> (offset, base-register index, index-register index, scale)
-#    """
-#    res = operand(ea, n)
-#    return __optype__.decode(res)
+@utils.multicase(n=six.integer_types)
+def op_decode(n):
+    '''Returns the value of the ``n``th operand for the current instruction in byte form if possible.'''
+    raise NotImplementedError
+@utils.multicase(ea=six.integer_types, n=six.integer_types)
+def op_decode(ea, n):
+    '''Returns the value of the ``n``th operand for the instruction at address ``ea`` in byte form if possible.'''
+    raise NotImplementedError
 
 @utils.multicase(n=six.integer_types)
 def op_value(n):
@@ -576,9 +568,14 @@ def op_segment(ea, n):
     #raise NotImplementedError("{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
     return None
 
+@utils.multicase(opnum=six.integer_types)
+def op_structure(opnum):
+    '''Return the structures that operand ``opnum`` at the current instruction points to.'''
+    return op_structure(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
     '''Return the structures that operand ``opnum`` at instruction ``ea`` points to.'''
+    # FIXME: Check to see if a structure offset was applied to the operand, and return the member associated with it
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
     if fl & idaapi.FF_STRUCT != idaapi.FF_STRUCT:
         raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
@@ -599,19 +596,25 @@ def op_structure(opnum, structure, **delta):
     """Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
-    return op_structure(ui.current.address(), opnum, structure.id, **delta)
-@utils.multicase(opnum=six.integer_types)
+    return op_structure(ui.current.address(), opnum, [structure], **delta)
+@utils.multicase(opnum=six.integer_types, id=six.integer_types)
 def op_structure(opnum, id, **delta):
     """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
     return op_structure(ui.current.address(), opnum, id, **delta)
+@utils.multicase(opnum=six.integer_types, path=(types.TupleType, types.ListType))
+def op_structure(opnum, path, **delta):
+    """Apply the structure members in ``path`` to the instruction operand ``opnum`` at the current address.
+    If the offset ``delta`` is specified, shift the structure by that amount.
+    """
+    return op_structure(ui.current.address(), opnum, path, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(ea, opnum, structure, **delta):
     """Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
-    return op_structure(ea, opnum, structure.id, **delta)
+    return op_structure(ea, opnum, [structure], **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
 def op_structure(ea, opnum, id, **delta):
     """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
@@ -639,30 +642,34 @@ def op_structure(ea, opnum, id, **delta):
     ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
 
     return True if ok else False
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, list=(types.TupleType, types.ListType))
-def op_structure(ea, opnum, list, **delta):
-    """Apply the structure members in ``list`` to the instruction operand ``opnum`` at the address ``ea``.
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(types.TupleType, types.ListType))
+def op_structure(ea, opnum, path, **delta):
+    """Apply the structure members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
         raise TypeError("{:s}.op_structure({:#x}, {:#x}, {:#x}, delta={:d}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
 
-    if len(list) == 0:
+    if len(path) == 0:
         raise UserError("{:s}.op_structure({:#x}, {:#x}, ..., delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
 
-    if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring)) for m in list):
+    if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring)) for m in path):
         raise UserError("{:s}.op_structure({:#x}, {:#x}, ..., delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
 
     # figure out the structure that this all starts with
-    if isinstance(list[0], structure.structure_t):
-        sptr = list.pop(0).ptr
+    if isinstance(path[0], structure.structure_t):
+        sptr = path.pop(0).ptr
     else:
-        sptr = list[0].owner.ptr
+        sptr = path[0].owner.ptr
+
+    ofs = delta.get('delta', 0)
+
+    # FIXME: if there's only one element in path, then figure out how to apply it instead of a full path
 
     # collect each member resolving them to an id
     res, tids = sptr, []
-    for item in list:
+    for item in path:
         if isinstance(item, basestring):
             m = idaapi.get_member_by_name(sptr, item)
         elif isinstance(item, structure.member_t):
@@ -670,6 +677,7 @@ def op_structure(ea, opnum, list, **delta):
         else:
             raise NotImplementedError
         tids.append(m.id)
+        ofs += m.soff
 
         # if member is not a structure, then terminate the loop
         mptr = idaapi.get_sptr(m)
@@ -680,7 +688,7 @@ def op_structure(ea, opnum, list, **delta):
         res = mptr
 
     # check what was different
-    if len(list) != len(tids):
+    if len(path) != len(tids):
         logging.warn("{:s}.op_structure({:#x}, {:#x}, ..., delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, id, delta.get('delta', 0)))
 
     # build the list of member ids
@@ -691,11 +699,11 @@ def op_structure(ea, opnum, list, **delta):
         tid[i + 1] = id
 
     # now we can finally apply the path to the specified operand
-    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
-    #okres = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, delta)
+    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, ofs)
+    #ok = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, ofs)
 
     return ok
-op_struc = op_struct = utils.alias(op_structure)
+op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_enumeration(opnum):
