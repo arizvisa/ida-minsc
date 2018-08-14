@@ -260,7 +260,7 @@ class _tuple(default):
     @classmethod
     def encode(cls, instance):
         f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
-        return '(' + ', '.join(map(f,instance)) + ')'
+        return '(' + ', '.join(map(f,instance)) + (',' if len(instance) == 1 else '') + ')'
 
 @cache.register(set, trie.star(' \t'), *'set([')
 class _set(default):
