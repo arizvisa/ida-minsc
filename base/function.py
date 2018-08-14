@@ -304,7 +304,7 @@ def address(func):
     '''Return the entry-point of the function identified by ``func``.'''
     fn = by(func)
     return fn.startEA
-top = utils.alias(address)
+top = addr = utils.alias(address)
 
 ## internal enumerations that idapython missed
 class fc_block_type_t:
@@ -326,7 +326,7 @@ def bottom(func):
     '''Return the exit-points of the function ``func``.'''
     fn = by(func)
     fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
-    exit_types = (fc_block_type_t.fcb_ret,fc_block_type_t.fcb_cndret,fc_block_type_t.fcb_noret,fc_block_type_t.fcb_enoret,fc_block_type_t.fcb_error)
+    exit_types = (fc_block_type_t.fcb_ret, fc_block_type_t.fcb_cndret, fc_block_type_t.fcb_noret, fc_block_type_t.fcb_enoret, fc_block_type_t.fcb_error)
     return tuple(database.address.prev(n.endEA) for n in fc if n.type in exit_types)
 
 @utils.multicase()
@@ -505,7 +505,7 @@ class blocks(object):
     def __new__(cls, left, right):
         '''Returns each basic-block contained within the addresses ``left`` and ``right``.'''
         fn = by_address(left)
-        (left,_), (_,right) = block(left), block(database.address.prev(right))
+        (left, _), (_, right) = block(left), block(database.address.prev(right))
         for bb in cls.iterate(fn):
             if (bb.startEA >= left and bb.endEA <= right):
                 yield bb.startEA, bb.endEA
@@ -595,7 +595,7 @@ class blocks(object):
             attrs = database.tag(b)
             operator.setitem(attrs, '__name__', database.name(b))
             operator.setitem(attrs, '__address__', b)
-            operator.setitem(attrs, '__bounds__', (b,e))
+            operator.setitem(attrs, '__bounds__', (b, e))
             block.color(b) and operator.setitem(attrs, '__color__', block.color(b))
             res.add_node(b, attrs)
 
@@ -1124,7 +1124,7 @@ class block(object):
 
         res = itertools.imap(functools.partial(operator.__getitem__, source.eamap), cls.iterate(ea))
         res = itertools.chain(*res)
-        formatted = reduce(lambda t,c: t if t[-1].ea == c.ea else t+[c], res, [next(res)])
+        formatted = reduce(lambda t, c: t if t[-1].ea == c.ea else t+[c], res, [next(res)])
 
         res = []
         # FIXME: This has been pretty damn unstable in my tests.
@@ -1132,7 +1132,7 @@ class block(object):
             for fmt in formatted:
                 res.append( fmt.print1(source.__deref__()) )
         except TypeError: pass
-        return '\n'.join(itertools.imap(idaapi.tag_remove,res))
+        return '\n'.join(itertools.imap(idaapi.tag_remove, res))
 
 class frame(object):
     """
@@ -1227,8 +1227,8 @@ class frame(object):
                 logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. : {:#x}".format(__name__, fn.startEA, cc))
 
             base = get_vars_size(fn)+get_regs_size(fn)
-            for (off,size),(name,_,_) in structure.fragment(fr.id, base, get_args_size(fn)):
-                yield off-base,name,size
+            for (off, size), (name, _, _) in structure.fragment(fr.id, base, get_args_size(fn)):
+                yield off - base, name, size
             return
 
         @utils.multicase()
@@ -1295,7 +1295,7 @@ def iterate():
 @utils.multicase()
 def iterate(func):
     '''Iterate through all the instructions for each chunk in the function ``func``.'''
-    for start,end in chunks(func):
+    for start, end in chunks(func):
         for ea in itertools.ifilter(database.type.is_code, database.iterate(start, end)):
             yield ea
         continue
@@ -1345,7 +1345,9 @@ def tag_read(func):
 def tag_read(func, key):
     '''Returns the value for the tag ``key`` for the function ``func``.'''
     res = tag_read(func)
-    return res[key]
+    if key in res:
+        return res[key]
+    raise KeyError("{:s}.tag_read({!r}, {!r}) : Unable to read tag {!r} from function {:#x}.".format(__name__, func, key, key, address(func)))
 
 @utils.multicase(key=basestring)
 def tag_write(key, value):
@@ -1382,7 +1384,7 @@ def tag_write(func, key, value):
         return set_name(fn, value)
 
     state = internal.comment.decode(comment(fn, repeatable=1))
-    res,state[key] = state.get(key,None),value
+    res, state[key] = state.get(key, None), value
     comment(fn, internal.comment.encode(state), repeatable=1)
 
     if res is None:
@@ -1488,7 +1490,7 @@ def select(func, **boolean):
     '''Fetch a list of addresses within the function that contain the specified tags.'''
     fn = by(func)
     containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {k : set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
+    boolean = {k : set(v if isinstance(v, containers) else {v}) for k, v in boolean.viewitems()}
 
     # nothing specific was queried, so just yield each tag
     if not boolean:
@@ -1647,7 +1649,7 @@ def register(func, reg, *regs, **modifiers):
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     iterops = interface.regmatch.modifier(**modifiers)
-    uses_register = interface.regmatch.use( (reg,)+regs )
+    uses_register = interface.regmatch.use( (reg,) + regs )
 
     for ea in iterate(func):
         for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
