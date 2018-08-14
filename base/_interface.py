@@ -738,7 +738,7 @@ class switch_t(object):
     @property
     def base(self):
         '''Return the base value (lowest index of cases) of the switch.'''
-        return self.object.elbase
+        return self.object.ind_lowcase if self.object.is_indirect() else 0
     @property
     def count(self):
         '''Return the number of cases in the switch.'''
@@ -752,7 +752,7 @@ class switch_t(object):
     def case(self, case):
         '''Return the handler for a particular case.'''
         # return the ea of the specified case number
-        # FIXME: check that this works with a different .elbase
+        # FIXME: check that this works with a different .ind_lowcase
         if case < self.base or case >= self.count + self.base:
             cls = self.__class__
             raise ValueError("{:s}.case({:#x}) : Specified case was out of bounds. : ({:#x}<>{:#x})".format(cls.__name__, case, self.base, self.base+self.count - 1))
@@ -760,6 +760,9 @@ class switch_t(object):
         if self.indirectQ():
             idx = self.index[idx]
         return self.branch[idx]
+    def handler(self, ea):
+        '''Return the cases that are handled by the address ``ea`` as a `tuple`.'''
+        return tuple(case for case in self.range if self.case(case) == ea)
     @property
     def cases(self):
         '''Return all of the non-default cases in the switch.'''
