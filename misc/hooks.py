@@ -127,6 +127,7 @@ class address(comment):
 
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
+        logging.debug("{:s}.changing : Received comment.changing at {:x} repeatable={:d} : {!r}".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, newcmt))
         oldcmt = idaapi.get_cmt(ea, repeatable_cmt)
         try: cls.event.send((ea, bool(repeatable_cmt), newcmt))
         except StopIteration, e:
@@ -135,6 +136,7 @@ class address(comment):
 
     @classmethod
     def changed(cls, ea, repeatable_cmt):
+        logging.debug("{:s}.changing : Received comment.changed at {:x} repeatable={:d}".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt))
         newcmt = idaapi.get_cmt(ea, repeatable_cmt)
         try: cls.event.send((ea, bool(repeatable_cmt), None))
         except StopIteration, e:
@@ -226,6 +228,7 @@ class globals(comment):
 
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
+        logging.debug("{:s}.changing : Received comment.changing at {:x} cb={!r} repeatable={:d} : {!r}".format('.'.join((__name__, cls.__name__)), a.startEA, cb, repeatable, cmt))
         fn = idaapi.get_func(a.startEA)
         if fn is None and not cmt: return
         oldcmt = idaapi.get_func_cmt(fn, repeatable)
@@ -236,6 +239,7 @@ class globals(comment):
 
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
+        logging.debug("{:s}.changing : Received comment.changed at {:x} cb={!r} repeatable={:d} : {!r}".format('.'.join((__name__, cls.__name__)), a.startEA, cb, repeatable, cmt))
         fn = idaapi.get_func(a.startEA)
         if fn is None and not cmt: return
         newcmt = idaapi.get_func_cmt(fn, repeatable)
