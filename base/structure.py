@@ -43,7 +43,7 @@ import math, re, fnmatch
 
 import database, instruction
 import ui, internal
-from internal import utils, interface, exceptions as E
+from internal import utils, interface, exceptions as E, document
 
 import idaapi
 
@@ -214,6 +214,7 @@ by_id = byIdentifier = byId = utils.alias(by_identifier)
 ##        that defines whether a structure is a union or not.
 
 ### structure_t abstraction
+@document.classdef
 class structure_t(object):
     """
     This object is an abstraction around an IDA structure type. This
@@ -413,6 +414,7 @@ class structure_t(object):
         return utils.string.of(res)
     @name.setter
     @utils.string.decorate_arguments('string')
+    @document.parameters(string='a `str` representing the name of the structure')
     def name(self, string):
         '''Set the name of the structure to `string`.'''
         if isinstance(string, tuple):
@@ -732,6 +734,7 @@ def remove(**type):
     return remove(res)
 delete = utils.alias(remove)
 
+@document.classdef
 class members_t(object):
     """
     This object is an abstraction around all the members belonging to
@@ -1072,6 +1075,7 @@ class members_t(object):
         mo = max(map(len, map("{:x}".format, (self.baseoffset, self.baseoffset+self[-1].size))))
         return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, utils.string.repr(n), mn+2, t, " // {!s}".format(utils.string.repr(T) if '\n' in c else c.encode('utf8')) if c else '') for i, n, t, o, s, c, T in res))
 
+@document.classdef
 class member_t(object):
     """
     This object is an abstraction around a single member belonging to

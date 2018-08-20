@@ -3,10 +3,8 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import functools, operator, itertools, types
-
-import argparse
-import ast
-import contextlib
+import argparse, logging
+import ast, contextlib
 
 ### Namespace of idascripts-specific types that get evaluated to an internal type or a string
 class evaluate(object):
@@ -54,10 +52,10 @@ class Reference(object):
         if not isinstance(object, Reference):
             raise TypeError(object)
         self.__children__.append(object)
-    def get(self, name):
+    def get(self, name, *default):
         if not isinstance(name, basestring):
             raise TypeError(name)
-        return getattr(self, "_{:s}".format(name))
+        return getattr(self, "_{:s}".format(name), *default) if default else getattr(self, "_{:s}".format(name))
     def set(self, **attrs):
         for name, _ in attrs.iteritems():
             if not isinstance(name, basestring):
@@ -86,6 +84,8 @@ class Commentable(Reference):
 class Module(Commentable): pass
 class Namespace(Commentable):
     namespace = property(fget=operator.attrgetter('_namespace'))
+class Class(Commentable):
+    ns = namespace = property(fget=operator.attrgetter('_namespace'))
 class Function(Commentable):
     ns = namespace = property(fget=operator.attrgetter('_namespace'))
     args = property(fget=operator.attrgetter('_arguments'))
@@ -93,6 +93,9 @@ class Function(Commentable):
     argdefaults = defaults = property(fget=operator.attrgetter('_defaults'))
     def __repr__(self):
         return "{:s}({:s})".format(super(Function, self).__repr__(), ', '.join(map("{!r}".format, self._arguments)))
+class PropertyFunction(Function):
+    ns = namespace = property(fget=operator.attrgetter('_namespace'))
+    owner = property(fget=operator.attrgetter('_owner'))
 class StaticFunction(Function): pass
 class ClassFunction(Function): pass
 class Param(Reference):
@@ -128,6 +131,9 @@ class grammar(object):
     def reduce_name(name):
         return name.id,
 
+    def reduce_number(num):
+        return "{!s}".format(num.n),
+
     def reduce_tuple(T):
         return tuple(map(grammar.reduce, T.elts)),
 
@@ -159,6 +165,7 @@ class grammar(object):
         ast.Call : reduce_call,
         ast.Tuple : reduce_tuple,
         ast.Str : reduce_string,
+        ast.Num : reduce_number,
     }
 
 ### Converting Reference types into reStructuredText
@@ -204,13 +211,15 @@ class restructure(object):
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
 
-        for child in ref.children:
-            if isinstance(child, Function):
-                res.extend(cls.Function(child).split('\n'))
-            elif isinstance(child, Namespace):
-                res.extend(cls.Namespace(child).split('\n'))
+        for ch in ref.children:
+            if isinstance(ch, Function):
+                res.extend(cls.Function(ch).split('\n'))
+            elif isinstance(ch, Namespace):
+                res.extend(cls.Namespace(ch).split('\n'))
+            elif isinstance(ch, Class):
+                res.extend(cls.Class(ch).split('\n'))
             else:
-                raise TypeError(child)
+                raise TypeError(ch)
             continue
         res = cls.indentlist(res, '   ')
         res[0:0] = (definition,)
@@ -227,14 +236,158 @@ class restructure(object):
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
         if ref.has('details'): res.extend(['details:'] + cls.escape(ref.get('details')).split('\n') + [''])
-        for child in ref.children:
-            if isinstance(child, Function):
-                res.extend(cls.Function(child).split('\n'))
-            elif isinstance(child, Namespace):
-                res.extend(cls.Namespace(child).split('\n'))
+        for ch in ref.children:
+            if isinstance(ch, Function):
+                res.extend(cls.Function(ch).split('\n'))
+            elif isinstance(ch, Namespace):
+                res.extend(cls.Namespace(ch).split('\n'))
             else:
-                raise TypeError(child)
+                raise TypeError(ch)
             continue
+        res = cls.indentlist(res, '   ')
+        res[0:0] = (definition,)
+        return '\n'.join(res)
+
+    @classmethod
+    def Class(cls, ref):
+        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        name = '.'.join(reversed(ns))
+
+        res, definition = [], ".. py:class:: {name:s}".format(name=name)
+
+        # class documentation
+        res.append('')
+        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+        if ref.has('details'): res.extend(['details:'] + cls.escape(ref.get('details')).split('\n') + [''])
+
+        # split up the properties from the methods
+        global types
+        props, children = [], []
+        for t, iterable in itertools.groupby(ref.children, lambda ch: isinstance(ch, PropertyFunction)):
+            if t: props.extend(iterable)
+            else: children.extend(iterable)
+
+        # group related properties together
+        grouped = []
+        for ch in props:
+            if ch.owner == ch:
+                grouped.append(ch)
+            elif ch.get('property') == 'getter':
+                ch.owner.set(getter=ch)
+            elif ch.get('property') == 'setter':
+                ch.owner.set(setter=ch)
+            continue
+
+        # process properties
+        for ch in grouped:
+            if not isinstance(ch, PropertyFunction):
+                raise TypeError(ch)
+            res.append(cls.Property(ch))
+
+        # process functions
+        for ch in children:
+            if isinstance(ch, Function):
+                res.extend(cls.Method(ch).split('\n'))
+            elif isinstance(ch, Namespace):
+                res.extend(cls.Namespace(ch).split('\n'))
+            else:
+                raise TypeError(ch)
+            continue
+        res = cls.indentlist(res, '   ')
+        res[0:0] = (definition,)
+        return '\n'.join(res)
+
+    @classmethod
+    def Property(cls, ref):
+        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        ns = ns[1:] if ref.name == '__new__' else ns[:]
+        name = '.'.join(reversed(ns)) if ref.name == '__new__' else ref.name
+
+        definition = ".. py:attribute:: {name:s}".format(name=name)
+
+        res = []
+        res.append('')
+
+        attrs = []
+        if ref.has('getter'): attrs.append(('getter', ref.get('getter')))
+        else: attrs.append(('getter', ref))
+        if ref.has('setter'): attrs.append(('setter', ref.get('setter')))
+
+        params = []
+        for n, r in attrs:
+            adefs, atypes, aparams = r.get('defaults') or {}, r.mc, r.get('parameters')
+
+            fmt = ": param {name:s} {comment:s}"
+            params.append(fmt.format(name=n, comment=' '.join(cls.docstringToList(r.comment))))
+
+            #gargs = dict(itertools.groupby(ref.args, type))
+            gargs = {}
+            for a in r.args:
+                gargs.setdefault(type(a), []).append(a)
+
+            args = []
+            if Param in gargs:
+                args.extend( (a.name, a.name, adefs.get(a.name, None), atypes.get(a.name, None)) for a in gargs[Param])
+            if ParamVariableList in gargs:
+                args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
+            if ParamVariableKeyword in gargs:
+                args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
+            args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args][1:]
+
+            for n, fn, _, ty in args:
+                t = grammar.resolve(ty) if isinstance(ty, basestring) else ()
+                t = stringify(t)
+                fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
+                fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
+                params.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
+            continue
+        res.extend(cls.indentlist(params, '   '))
+
+        if attrs: res.append('')
+
+        res = cls.indentlist(res, '   ')
+        res[0:0] = (definition,)
+        return '\n'.join(res)
+
+    @classmethod
+    def Method(cls, ref):
+        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        ns = ns[1:] if ref.name == '__new__' else ns[:]
+        name = '.'.join(reversed(ns)) if ref.name == '__new__' else ref.name
+
+        aliases = ref.get('aliases') or {}
+        adefs, atypes, aparams = ref.get('defaults') or {}, ref.mc, ref.get('parameters')
+
+        #gargs = dict(itertools.groupby(ref.args, type))
+        gargs = {}
+        for a in ref.args:
+            gargs.setdefault(type(a), []).append(a)
+
+        args = []
+        if Param in gargs:
+            args.extend( (a.name, a.name, adefs.get(a.name, None), atypes.get(a.name, None)) for a in gargs[Param])
+        if ParamVariableList in gargs:
+            args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
+        if ParamVariableKeyword in gargs:
+            args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
+        args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args][1:]
+
+        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, df) if df is not None else fn for _, fn, df, _ in args))
+
+        res = []
+        res.append('')
+        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+        if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
+
+        for n, fn, _, ty in args:
+            t = grammar.resolve(ty) if isinstance(ty, basestring) else ()
+            t = stringify(t)
+            fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
+            fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
+            res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
+
+        if args: res.append('')
+
         res = cls.indentlist(res, '   ')
         res[0:0] = (definition,)
         return '\n'.join(res)
@@ -321,12 +474,33 @@ class FunctionVisitor(ast.NodeVisitor):
             F, args = ClassFunction, arguments.args[1:]
         elif 'staticmethod' in methodtypes:
             F, args = StaticFunction, arguments.args[:]
+        elif 'property' in methodtypes or any(mt.endswith(t) for mt in methodtypes for t in {'.getter','.setter'}):
+            F, args = PropertyFunction, arguments.args[:]
         else:
             F, args = Function, arguments.args[:]
 
         # capture the function
         res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring or '', arguments=[], defaults=defs, parameters=next(params, {}), aliases=set(next(aliases, {})))
         self._ref.add(res)
+
+        # determine what type of attribute it is
+        if F is PropertyFunction:
+            owner = None
+            if 'property' in methodtypes:
+                owner = res
+                res.set(property='define')
+            elif any(mt.endswith('.getter') for mt in methodtypes):
+                name = next(mt for mt in methodtypes if mt.endswith('.getter'))
+                name, _ = name.rsplit('.', 1)
+                owner = next(n for n in self._ref.children if isinstance(n, PropertyFunction) and n.name == name and n.owner == n)
+                res.set(property='getter')
+            elif any(mt.endswith('.setter') for mt in methodtypes):
+                name = next(mt for mt in methodtypes if mt.endswith('.setter'))
+                name, _ = name.rsplit('.', 1)
+                owner = next(n for n in self._ref.children if isinstance(n, PropertyFunction) and n.name == name and n.owner == n)
+                res.set(property='setter')
+            if owner is not None:
+                res.set(owner=owner)
 
         # add its arguments
         res.args.extend((Param(name=a.id, owner=res) for a in args))
@@ -341,18 +515,46 @@ class NamespaceVisitor(ast.NodeVisitor):
         '''Anything that's a class is considered a namespace'''
         if node.name.startswith('_'): return
 
-        name = node.name
+        # figure out which type it is according to the decorators
+        attributes = decorators.attributes(node)
+        if 'document.classdef' in attributes:
+            return self.append_classdef(node)
+        elif 'document.namespace' in attributes:
+            return self.append_namespace(node)
+
+        # no decorator was found, so assume it's a namespace
+        return self.append_namespace(node)
+
+    def append_classdef(self, node):
+        attributes = decorators.attributes(node)
+        details = [details for n, (details,), _, _, _ in decorators.functions(node) if n == 'document.details']
+
         try:
             docstring = ast.get_docstring(node) or ''
         except TypeError:
             docstring = ''
 
-        # extract the decorators
+        # construct the namespace
+        res = Class(node=node, name=node.name, namespace=self._ref, docstring=docstring)
+        if attributes: res.set(attributes=attributes)
+        if details: res.set(details=details)
+        self._ref.add(res)
+
+        # continue parsing its children
+        nv = NSVisitor(res)
+        map(nv.visit, ast.iter_child_nodes(node))
+
+    def append_namespace(self, node):
         attributes = decorators.attributes(node)
         details = [details for n, (details,), _, _, _ in decorators.functions(node) if n == 'document.details']
 
+        try:
+            docstring = ast.get_docstring(node) or ''
+        except TypeError:
+            docstring = ''
+
         # construct the namespace
-        res = Namespace(node=node, name=name, namespace=self._ref, docstring=docstring)
+        res = Namespace(node=node, name=node.name, namespace=self._ref, docstring=docstring)
         if attributes: res.set(attributes=attributes)
         if details: res.set(details=details)
         self._ref.add(res)

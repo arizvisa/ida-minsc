@@ -21,3 +21,6 @@ def details(docstring):
 
 def namespace(F):
     return F
+
+def classdef(F):
+    return F
