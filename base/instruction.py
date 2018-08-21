@@ -585,6 +585,9 @@ def op_structure(ea, opnum):
     if not res:
         raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
+    # get the member offset of the operand
+    moff = operand(ea, opnum).value if opt(ea, opnum) == 'immediate' else operand(ea, opnum).addr
+
     # FIXME: Check to see if a structure offset was applied to the operand, and return the member associated with it
     # FIXME: res.path.delta doesn't actually represent anything
     #        read the offset from the operand and use that to figure out
@@ -593,14 +596,21 @@ def op_structure(ea, opnum):
     delta = res.path.delta
     if len(path) == 1:
         st = structure.by(path[0])
-        moff = operand(ea, opnum).value if opt(ea, opnum) == 'immediate' else operand(ea, opnum).addr
         m = st.by(moff)
         off = moff - m.offset
         res = (st, m)
         return res + (delta + off,) if delta + off > 0 else res
 
+    # collect all the path members
+    st, = res = [structure.by(path.pop(0))]
+    for item in path:
+        m = st.by_identifier(item)
+        res.append(m)
+        st = m.type
+
     # FIXME: Check to ensure that this structure path actually works
-    return tuple(map(structure.by, path) + [delta]) if delta > 0 else tuple(map(structure.by, path))
+    off = (moff - delta) if delta > 0 else (moff - m.offset)
+    return tuple(res + [off]) if off > 0 else tuple(res)
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
     """Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
