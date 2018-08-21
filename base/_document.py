@@ -24,3 +24,6 @@ def namespace(F):
 
 def classdef(F):
     return F
+
+def hidden(F):
+    return F

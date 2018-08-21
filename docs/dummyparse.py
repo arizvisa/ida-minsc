@@ -100,6 +100,9 @@ class StaticFunction(Function): pass
 class ClassFunction(Function): pass
 class Param(Reference):
     owner = property(fget=operator.attrgetter('_owner'))
+class ParamTuple(Reference):
+    owner = property(fget=operator.attrgetter('_owner'))
+    params = property(fget=operator.attrgetter('_params'))
 class ParamVariableList(Param): pass
 class ParamVariableKeyword(Param): pass
 
@@ -132,13 +135,31 @@ class grammar(object):
         return name.id,
 
     def reduce_number(num):
-        return "{!s}".format(num.n),
+        return num.n,
 
     def reduce_tuple(T):
         return tuple(map(grammar.reduce, T.elts)),
 
     def reduce_string(str):
-        return str.s,
+        def escape(string, chars):
+            for ch in string:
+                if ch in chars:
+                    yield '\\'
+                yield ch
+            return
+        res = ''.join(escape(str.s, r'\"'))
+        return "\"{:s}\"".format(res),
+
+    def reduce_binop(op):
+        l, op, r = op.left, op.op, op.right
+        l, r = (n[0] for n in map(grammar.reduce, (l, r)))
+        return grammar.operation[type(op)](l, r),
+
+    def reduce_dictionary(dict):
+        keys = map(grammar.reduce, dict.keys)
+        values = map(grammar.reduce, dict.values)
+        res = ["{:s}={:s}".format(k[0], v[0]) for k, v in zip(keys, values)]
+        return "{{{:s}}}".format(', '.join(res)),
 
     @staticmethod
     def resolve(value):
@@ -166,6 +187,36 @@ class grammar(object):
         ast.Tuple : reduce_tuple,
         ast.Str : reduce_string,
         ast.Num : reduce_number,
+        ast.Dict : reduce_dictionary,
+        ast.BinOp : reduce_binop,
+    }
+
+    operation = {
+        ast.Add : operator.add,
+        ast.And : lambda a, b: a and b,
+        ast.BitAnd : operator.and_,
+        ast.BitOr : operator.or_,
+        ast.Compare : cmp,
+        ast.Div : operator.div,
+        ast.Eq : operator.eq,
+        ast.Gt : operator.gt,
+        ast.GtE : operator.ge,
+        ast.In : lambda a, b: a in b,
+        ast.Is : operator.is_,
+        ast.IsNot : operator.is_not,
+        ast.LShift : operator.lshift,
+        ast.Lt : operator.lt,
+        ast.LtE : operator.le,
+        ast.Mod : operator.mod,
+        ast.Mult : operator.mul,
+        ast.NotEq : operator.ne,
+        ast.NotIn : lambda a, b: a not in b,
+        ast.Or : lambda a, b: a or b,
+        ast.Pow : operator.pow,
+        ast.RShift : operator.rshift,
+        ast.Sub : operator.sub,
+        ast.UAdd : operator.iadd,
+        ast.USub : operator.isub,
     }
 
 ### Converting Reference types into reStructuredText
@@ -415,7 +466,7 @@ class restructure(object):
             args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
         args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args]
 
-        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, df) if df is not None else fn for _, fn, df, _ in args))
+        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={!s}'.format(fn, df) if df is not None else fn for _, fn, df, _ in args))
 
         res = []
         res.append('')
@@ -467,7 +518,10 @@ class FunctionVisitor(ast.NodeVisitor):
         methodtypes = {m for m in decorators.attributes(node)}
         multicase = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == u'utils.multicase')
         aliases = (a for n, a, _, _, _ in decorators.functions(node) if n == 'document.aliases')
-        params = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == 'document.parameters')            
+        params = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == 'document.parameters')
+
+        # if it's hidden, then don't bother adding it
+        if 'document.hidden' in methodtypes: return
 
         # figure out which type
         if node.name == '__new__' or 'classmethod' in methodtypes:
@@ -479,7 +533,7 @@ class FunctionVisitor(ast.NodeVisitor):
         else:
             F, args = Function, arguments.args[:]
 
-        # capture the function
+        # construct the function
         res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring or '', arguments=[], defaults=defs, parameters=next(params, {}), aliases=set(next(aliases, {})))
         self._ref.add(res)
 
@@ -503,7 +557,7 @@ class FunctionVisitor(ast.NodeVisitor):
                 res.set(owner=owner)
 
         # add its arguments
-        res.args.extend((Param(name=a.id, owner=res) for a in args))
+        res.args.extend((ParamTuple(owner=res, params=a) if isinstance(a, ast.Tuple) else Param(name=a.id, owner=res) for a in args))
         if arguments.vararg:
             res.args.append(ParamVariableList(name=arguments.vararg, owner=res))
         if arguments.kwarg:
@@ -575,6 +629,7 @@ class RootVisitor(FunctionVisitor, NamespaceVisitor):
         if not isinstance(ref, Reference):
             raise TypeError(ref)
         self._ref = ref
+        self._ref.set(docstring='')
 
     def visit_Expr(self, node):
         '''Grab the first module docstring.'''
