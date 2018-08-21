@@ -744,6 +744,13 @@ class members_t(object):
         index = self.index(mem)
         return self[index]
     byoffset = byOffset = utils.alias(by_offset, 'members_t')
+    def by_identifier(self, id):
+        mem, fn, st = idaapi.get_member_by_id(id)
+        if mem is None:
+            raise KeyError("{:s}.instance({:s}).members.by_id : Unable to find member with id : {:#x}".format(__name__, self.owner.name, id))
+        index = self.index(mem)
+        return self[index]
+    by_id = byId = byIdentifier = utils.alias(by_identifier, 'members_t')
 
     def near_offset(self, offset):
         '''Return the member near to the specified ``offset``.'''
