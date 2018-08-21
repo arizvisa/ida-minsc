@@ -575,22 +575,32 @@ def op_structure(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
     '''Return the structures that operand ``opnum`` at instruction ``ea`` points to.'''
-    # FIXME: Check to see if a structure offset was applied to the operand, and return the member associated with it
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
-    if fl & idaapi.FF_STRUCT != idaapi.FF_STRUCT:
+    if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # pathvar = idaapi.tid_array(length)
     # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
     if not res:
-        raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Unable to get the operand info for operand {:d}.".format(__name__, ea, opnum, opnum))
+        raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
+    # FIXME: Check to see if a structure offset was applied to the operand, and return the member associated with it
+    # FIXME: res.path.delta doesn't actually represent anything
+    #        read the offset from the operand and use that to figure out
+    #        the structure member to return. (.value or .addr)
     path = [res.path.ids[idx] for idx in six.moves.range(res.path.len)]
+    delta = res.path.delta
     if len(path) == 1:
-        return (structure.by(path[0]), res.path.delta) if res.path.delta > 0 else structure.by(path[0])
+        st = structure.by(path[0])
+        moff = operand(ea, opnum).value if opt(ea, opnum) == 'immediate' else operand(ea, opnum).addr
+        m = st.by(moff)
+        off = moff - m.offset
+        res = (st, m)
+        return res + (delta + off,) if delta + off > 0 else res
 
-    return tuple(map(structure.by, path) + [res.path.delta]) if res.path.delta > 0 else tuple(map(structure.by, path))
+    # FIXME: Check to ensure that this structure path actually works
+    return tuple(map(structure.by, path) + [delta]) if delta > 0 else tuple(map(structure.by, path))
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
     """Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
@@ -658,6 +668,7 @@ def op_structure(ea, opnum, path, **delta):
         raise UserError("{:s}.op_structure({:#x}, {:#x}, ..., delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
 
     # figure out the structure that this all starts with
+    path = map(None, path)
     if isinstance(path[0], structure.structure_t):
         sptr = path.pop(0).ptr
     else:
@@ -1580,7 +1591,7 @@ class ir:
         operation = cls.table[t.__name__][state]
 
         # if mnemonic is lea, then demote it from a memory operation
-        # FIXME: i don't like this hack.
+        # FIXME: i _really_ don't like this hack.
         if mnem(ea).upper() == 'LEA':
             if operation == ir_op.load:
                 operation = ir_op.value
