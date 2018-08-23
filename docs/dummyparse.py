@@ -14,14 +14,16 @@ class evaluate(object):
             res = getattr(res, name)
         return res
 
-    ## Miscellaneous intgernal types
-    import six
+    ## Miscellaneous internal types
+    import six, types
     from six.moves import builtins
     class instruction:
         register_t = 'register_t'
+
     _instruction = instruction
     class structure:
-        structure_t = 'structure_t'
+        structure_t = 'structure.structure_t'
+        member_t = 'structure.member_t'
     _structure = structure
 
 ### Namespace of internal python types and how to convert them into a string
@@ -30,15 +32,25 @@ class stringify(object):
         None: 'None',
         int: 'int',
         long: 'long',
+        list: 'list',
         str: 'str',
         basestring: 'basestring',
         unicode: 'unicode',
         chr: 'chr',
         callable: 'callable',
+        types.NoneType: 'None',
+    }
+    stringmap = {
+        'types.NoneType' : 'None',
+        'types.TupleType' : 'tuple',
     }
     def __new__(cls, object):
         if isinstance(object, basestring):
-            return object
+            try:
+                res = cls.stringmap[object] if object in cls.stringmap else evaluate(object)
+            except AttributeError:
+                res = object
+            return cls(res) if isinstance(res, type) else res
         if not isinstance(object, tuple):
             return cls.definitions[object]
         return tuple(cls(res) for res in object)
@@ -152,14 +164,23 @@ class grammar(object):
 
     def reduce_binop(op):
         l, op, r = op.left, op.op, op.right
+        operation = grammar.operation[type(op)]
+        global evaluate
         l, r = (n[0] for n in map(grammar.reduce, (l, r)))
-        return grammar.operation[type(op)](l, r),
+        if isinstance(l, tuple): l = reduce(operation, l)
+        if isinstance(r, tuple): r = reduce(operation, r)
+        if isinstance(l, basestring): l = evaluate(l)
+        if isinstance(r, basestring): r = evaluate(r)
+        return operation(l, r),
 
     def reduce_dictionary(dict):
         keys = map(grammar.reduce, dict.keys)
         values = map(grammar.reduce, dict.values)
         res = ["{:s}={:s}".format(k[0], v[0]) for k, v in zip(keys, values)]
         return "{{{:s}}}".format(', '.join(res)),
+
+    def return_empty(yy):
+        return '',
 
     @staticmethod
     def resolve(value):
@@ -173,10 +194,14 @@ class grammar(object):
         return value
     @staticmethod
     def reduce(type):
+        # check if it's a reduction that requires a transform
         for t, f in grammar.reduction.iteritems():
             if isinstance(type, t):
                 return f(type)
             continue
+        # its not, so try and map it directly to the operation
+        if type.__class__ in grammar.operation:
+            return grammar.operation[type.__class__]
         raise TypeError(type)
 
     reduction = {
@@ -189,6 +214,7 @@ class grammar(object):
         ast.Num : reduce_number,
         ast.Dict : reduce_dictionary,
         ast.BinOp : reduce_binop,
+        ast.Load : return_empty,
     }
 
     operation = {
@@ -386,8 +412,14 @@ class restructure(object):
             args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args][1:]
 
             for n, fn, _, ty in args:
-                t = grammar.resolve(ty) if isinstance(ty, basestring) else ()
+                if isinstance(ty, basestring): t = grammar.resolve(ty)
+                elif ty is None: t = ()
+                elif isinstance(ty, types.TupleType):
+                    t = tuple(ty)
+                    if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
+                else: raise TypeError(name, n, ty)
                 t = stringify(t)
+
                 fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
                 fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
                 params.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
@@ -431,8 +463,14 @@ class restructure(object):
         if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
 
         for n, fn, _, ty in args:
-            t = grammar.resolve(ty) if isinstance(ty, basestring) else ()
+            if isinstance(ty, basestring): t = grammar.resolve(ty)
+            elif ty is None: t = ()
+            elif isinstance(ty, types.TupleType):
+                t = tuple(ty)
+                if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
+            else: raise TypeError(name, n, ty)
             t = stringify(t)
+
             fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
             fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
             res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
@@ -472,9 +510,16 @@ class restructure(object):
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
         if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
+
         for n, fn, _, ty in args:
-            t = grammar.resolve(ty) if isinstance(ty, basestring) else ()
+            if isinstance(ty, basestring): t = grammar.resolve(ty)
+            elif ty is None: t = ()
+            elif isinstance(ty, types.TupleType):
+                t = tuple(ty)
+                if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
+            else: raise TypeError(name, n, ty)
             t = stringify(t)
+
             fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
             fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
             res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
@@ -499,6 +544,28 @@ class decorators(object):
         return [(n, a, k, sa, sk) for n, a, k, sa, sk in map(grammar.reduce, res)]
 
 ### Visitor parser mix-ins
+class ConditionalVisitor(ast.NodeVisitor):
+    def visit_If(self, node):
+        ok = None
+        if isinstance(node.test, ast.Attribute):
+            idaapiversion, = grammar.reduce(node.test.left)
+            ops = [grammar.reduce(o)[0] for o in node.test.ops]
+            versions = [grammar.reduce(v)[0] for v in node.test.comparators]
+            if idaapiversion != 'idaapi.__version__':
+                raise NotImplementedError(idaapiversion, ops, versions)
+            ok = True
+        elif isinstance(node.test, ast.Name):
+            expr = grammar.reduce(node.test)[0]
+            ok = eval(expr)
+
+        if ok is None: return
+
+        if ok:
+            map(self.visit, node.body)
+        else:
+            map(self.visit, node.orelse)
+        return
+
 class FunctionVisitor(ast.NodeVisitor):
     def visit_FunctionDef(self, node):
         if node.name != '__new__' and node.name.startswith('_'): return
@@ -618,13 +685,13 @@ class NamespaceVisitor(ast.NodeVisitor):
         map(nv.visit, ast.iter_child_nodes(node))
 
 ### Visitor entrypoints
-class NSVisitor(FunctionVisitor, NamespaceVisitor):
+class NSVisitor(FunctionVisitor, NamespaceVisitor, ConditionalVisitor):
     def __init__(self, ref):
         if not isinstance(ref, Reference):
             raise TypeError(ref)
         self._ref = ref
 
-class RootVisitor(FunctionVisitor, NamespaceVisitor):
+class RootVisitor(FunctionVisitor, NamespaceVisitor, ConditionalVisitor):
     def __init__(self, ref):
         if not isinstance(ref, Reference):
             raise TypeError(ref)
