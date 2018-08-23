@@ -236,14 +236,13 @@ path = utils.alias(config.path, 'config')
 baseaddress = base = utils.alias(config.baseaddress, 'config')
 
 @document.namespace
-@document.details("""Example details for the database.functions namespace.
+@document.details("""When enumerating all the functions inside the database, the following keywords are available:
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam eget
-feugiat ante. Quisque vehicula, mi nec viverra tristique, metus elit
-aliquam leo, vel lobortis massa ante id sapien. Aenean eu augue rutrum,
-egestas metus eget, gravida eros. Sed euismod, justo pharetra
-pellentesque congue, metus justo tempus metus, ac blandit velit diam
-iaculis nulla. Nam luctus rutrum justo, quis faucibus ex pharetra vitae.
+name=basestring - Match the specified function name exactly
+like=basestring - Match the the function name using the specified glob
+regex=basestring - Match the function name using the specified regular expression
+address=integral - Match the function name by the given address
+predicate=F - Return any functions where the given function ``F`` is true. The function ``F`` is given a single argument `idaapi.func_t`.
 """)
 class functions(object):
     r"""
