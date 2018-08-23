@@ -160,7 +160,7 @@ class grammar(object):
                 yield ch
             return
         res = ''.join(escape(str.s, r'\"'))
-        return "\"{:s}\"".format(res),
+        return res,
 
     def reduce_binop(op):
         l, op, r = op.left, op.op, op.right
@@ -312,7 +312,7 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if ref.has('details'): res.extend(['details:'] + cls.escape(ref.get('details')).split('\n') + [''])
+        if ref.has('details'): res.extend(cls.escape(ref.get('details')).strip().split('\n') + [''])
         for ch in ref.children:
             if isinstance(ch, Function):
                 res.extend(cls.Function(ch).split('\n'))
@@ -394,6 +394,9 @@ class restructure(object):
         for n, r in attrs:
             adefs, atypes, aparams = r.get('defaults') or {}, r.mc, r.get('parameters')
 
+            # ensure that all default arguments are stringified ahead of time so they're always there
+            adefs = {a : stringify(v) if not v and v not in {0, None} else v for a, v in adefs.iteritems()}
+
             fmt = ": param {name:s} {comment:s}"
             params.append(fmt.format(name=n, comment=' '.join(cls.docstringToList(r.comment))))
 
@@ -441,6 +444,9 @@ class restructure(object):
         aliases = ref.get('aliases') or {}
         adefs, atypes, aparams = ref.get('defaults') or {}, ref.mc, ref.get('parameters')
 
+        # ensure that all default arguments are stringified ahead of time so they're always there
+        adefs = {a : stringify(v) if not v and v not in {0, None} else v for a, v in adefs.iteritems()}
+
         #gargs = dict(itertools.groupby(ref.args, type))
         gargs = {}
         for a in ref.args:
@@ -455,7 +461,7 @@ class restructure(object):
             args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
         args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args][1:]
 
-        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, df) if df is not None else fn for _, fn, df, _ in args))
+        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, "''" if df == '' else df) if df is not None else fn for _, fn, df, _ in args))
 
         res = []
         res.append('')
@@ -490,6 +496,9 @@ class restructure(object):
         aliases = ref.get('aliases') or {}
         adefs, atypes, aparams = ref.get('defaults') or {}, ref.mc, ref.get('parameters')
 
+        # ensure that all default arguments are stringified ahead of time so they're always there
+        adefs = {a : stringify(v) if not v and v not in {0, None} else v for a, v in adefs.iteritems()}
+
         #gargs = dict(itertools.groupby(ref.args, type))
         gargs = {}
         for a in ref.args:
@@ -504,7 +513,7 @@ class restructure(object):
             args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
         args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args]
 
-        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={!s}'.format(fn, df) if df is not None else fn for _, fn, df, _ in args))
+        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={!s}'.format(fn, "''" if df == '' else df) if df is not None else fn for _, fn, df, _ in args))
 
         res = []
         res.append('')
@@ -579,7 +588,7 @@ class FunctionVisitor(ast.NodeVisitor):
         arguments, defaults = node.args, node.args.defaults
 
         # figure out the defaults
-        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(defaults, reversed(arguments.args)) }
+        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(reversed(defaults), reversed(arguments.args)) }
 
         # figure things out about which decorators were applied
         methodtypes = {m for m in decorators.attributes(node)}
