@@ -37,6 +37,10 @@ class evaluate(object):
         member_t = 'structure.member_t'
     _structure = structure
 
+    class interface:
+        symbol_t = 'symbol_t'
+        namedtypedtuple = 'namedtypedtuple'
+
 ### Namespace of internal python types and how to convert them into a string
 class stringify(object):
     definitions = {
@@ -54,6 +58,7 @@ class stringify(object):
     stringmap = {
         'types.NoneType' : 'None',
         'types.TupleType' : 'tuple',
+        'basestring': 'str',
     }
     def __new__(cls, object):
         if isinstance(object, basestring):
@@ -63,7 +68,7 @@ class stringify(object):
                 res = object
             return cls(res) if isinstance(res, type) else res
         if not isinstance(object, tuple):
-            return cls.definitions[object]
+            return cls(cls.definitions[object])
         return tuple(cls(res) for res in object)
 
 ### Reference types which represent the parsed tree
@@ -109,6 +114,7 @@ class Namespace(Commentable):
     namespace = property(fget=operator.attrgetter('_namespace'))
 class Class(Commentable):
     ns = namespace = property(fget=operator.attrgetter('_namespace'))
+    bases = property(fget=operator.attrgetter('_bases'))
 class Function(Commentable):
     ns = namespace = property(fget=operator.attrgetter('_namespace'))
     args = property(fget=operator.attrgetter('_arguments'))
@@ -322,7 +328,7 @@ class restructure(object):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         name = '.'.join(reversed(ns))
 
-        definition = ".. namespace {name:s}".format(name=name)
+        definition = ".. py:namespace {name:s}".format(name=name)
 
         res = []
         res.append('')
@@ -334,6 +340,9 @@ class restructure(object):
             elif isinstance(ch, Namespace):
                 rows = cls.Namespace(ch).split('\n')
                 if filter(None, rows): res.extend(rows)
+            elif isinstance(ch, Class):
+                rows = cls.Class(ch).split('\n')
+                if filter(None, rows): res.extend(cls.Class(ch).split('\n'))
             else:
                 raise TypeError(ch)
             continue
@@ -349,6 +358,8 @@ class restructure(object):
         name = '.'.join(reversed(ns))
 
         res, definition = [], ".. py:class:: {name:s}".format(name=name)
+
+        if ref.has('bases'): res.append("Bases: {:s}".format(', '.join(map(stringify, ref.bases))))
 
         # class documentation
         res.append('')
@@ -477,9 +488,9 @@ class restructure(object):
             args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
         if ParamVariableKeyword in gargs:
             args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
-        args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args][1:]
+        args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args]
 
-        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, "''" if df == '' else df) if df is not None else fn for _, fn, df, _ in args))
+        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, "''" if df == '' else '|'.join(map(stringify, df)) if isinstance(df, tuple) else stringify(df)) if df is not None else fn for _, fn, df, _ in args))
 
         res = []
         res.append('')
@@ -531,7 +542,7 @@ class restructure(object):
             args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
         args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args]
 
-        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={!s}'.format(fn, "''" if df == '' else df) if df is not None else fn for _, fn, df, _ in args))
+        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={!s}'.format(fn, "''" if df == '' else '|'.join(map(stringify, df)) if isinstance(df, tuple) else stringify(df)) if df is not None else fn for _, fn, df, _ in args))
 
         res = []
         res.append('')
@@ -688,6 +699,10 @@ class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
         res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring or '', arguments=[], defaults=defs, parameters=next(params, {}), aliases=set(next(aliases, {})))
         self._ref.add(res)
 
+        # check to see if there's a new name for it
+        newnames = [a[0] for n, a, _, _, _ in decorators.functions(node) if n == 'document.rename']
+        if newnames: res.set(name=newnames[0])
+
         # determine what type of attribute it is
         if F is PropertyFunction:
             owner = None
@@ -751,12 +766,18 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
             res = self.append_classdef(node)
         elif 'document.namespace' in attributes:
             res = self.append_namespace(node)
-        elif 'document.hidden' in attributes:
-            logging.info("{:s}.visit_ClassDef: Skipping parsing of namespace/class due to explicit hidden decorator {!s}".format(cls.__name__, self.fullname(self._ref, node)))
-            visible = False
         else:
             logging.warn("{:s}.visit_ClassDef: Skipping parsing of undecorated node {!s}".format(cls.__name__, self.fullname(self._ref, node)))
             return
+
+        # check to see if the definition is explicitly hidden
+        if 'document.hidden' in attributes:
+            logging.info("{:s}.visit_ClassDef: Skipping emitting of namespace/class due to explicit hidden decorator {!s}".format(cls.__name__, self.fullname(self._ref, node)))
+            visible = False
+
+        # check to see if there's a new name for it
+        newnames = [a[0] for n, a, _, _, _ in decorators.functions(node) if n == 'document.rename']
+        if newnames: res.set(name=newnames[0])
 
         # if this namespace can be hidden, then set a flag for the emitter
         res.set(skippable=not visible)
@@ -771,6 +792,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
     def append_classdef(self, node):
         attributes = decorators.attributes(node)
         details = [details for n, (details,), _, _, _ in decorators.functions(node) if n == 'document.details']
+        bases = [b[0] for b in map(grammar.reduce, node.bases) if b[0] != 'object']
 
         try:
             docstring = ast.get_docstring(node) or ''
@@ -779,6 +801,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
 
         # construct the namespace
         res = Class(node=node, name=node.name, namespace=self._ref, docstring=docstring)
+        if bases: res.set(bases=bases)
         if attributes: res.set(attributes=attributes)
         if details: res.set(details=details)
         return res

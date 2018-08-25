@@ -27,3 +27,8 @@ def classdef(F):
 
 def hidden(F):
     return F
+
+def rename(name):
+    def rename(F):
+        return F
+    return rename
