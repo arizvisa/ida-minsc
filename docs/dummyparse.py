@@ -1,3 +1,7 @@
+"""
+Output a module into reStructuredText
+"""
+
 from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
@@ -5,6 +9,13 @@ from __future__ import unicode_literals
 import functools, operator, itertools, types
 import argparse, logging
 import ast, contextlib
+
+# global list of filters
+class FILTER:
+    class NAMESPACE:
+        WHITELIST, BLACKLIST = set(), set()
+    class FUNCTION:
+        WHITELIST, BLACKLIST = set(), set()
 
 ### Namespace of idascripts-specific types that get evaluated to an internal type or a string
 class evaluate(object):
@@ -292,9 +303,11 @@ class restructure(object):
             if isinstance(ch, Function):
                 res.extend(cls.Function(ch).split('\n'))
             elif isinstance(ch, Namespace):
-                res.extend(cls.Namespace(ch).split('\n'))
+                rows = cls.Namespace(ch).split('\n')
+                if filter(None, rows): res.extend(rows)
             elif isinstance(ch, Class):
-                res.extend(cls.Class(ch).split('\n'))
+                rows = cls.Class(ch).split('\n')
+                if filter(None, rows): res.extend(cls.Class(ch).split('\n'))
             else:
                 raise TypeError(ch)
             continue
@@ -304,6 +317,8 @@ class restructure(object):
 
     @classmethod
     def Namespace(cls, ref):
+        if ref.get('skippable') and not len([ch for ch in ref.children if not isinstance(ch, Namespace)]): return ''
+
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         name = '.'.join(reversed(ns))
 
@@ -317,7 +332,8 @@ class restructure(object):
             if isinstance(ch, Function):
                 res.extend(cls.Function(ch).split('\n'))
             elif isinstance(ch, Namespace):
-                res.extend(cls.Namespace(ch).split('\n'))
+                rows = cls.Namespace(ch).split('\n')
+                if filter(None, rows): res.extend(rows)
             else:
                 raise TypeError(ch)
             continue
@@ -327,6 +343,8 @@ class restructure(object):
 
     @classmethod
     def Class(cls, ref):
+        if ref.get('skippable') and not ref.children: return ''
+
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         name = '.'.join(reversed(ns))
 
@@ -553,6 +571,16 @@ class decorators(object):
         return [(n, a, k, sa, sk) for n, a, k, sa, sk in map(grammar.reduce, res)]
 
 ### Visitor parser mix-ins
+class FullNameMixin(object):
+    def fullname(self, ref, node):
+        def namespace(ref, field='namespace'):
+            while ref.has(field):
+                yield ref.name
+                ref = ref.get(field)
+            yield ref.name
+        res = reversed(list(namespace(ref)))
+        return '.'.join(list(res) + ([node.name] if node else []))
+
 class ConditionalVisitor(ast.NodeVisitor):
     def visit_If(self, node):
         ok = None
@@ -575,9 +603,53 @@ class ConditionalVisitor(ast.NodeVisitor):
             map(self.visit, node.orelse)
         return
 
-class FunctionVisitor(ast.NodeVisitor):
+class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
+    def match_FunctionDef(self, node):
+        cls, ns, name = self.__class__, self.fullname(self._ref, None), self.fullname(self._ref, node)
+
+        # start filtering
+        global FILTER
+        ok = True
+
+        # first check that the namespace is valid
+        allns = {n[0] for n in map(functools.partial(ns.rsplit, '.'), xrange(ns.count('.')+1))}
+        if FILTER.NAMESPACE.WHITELIST and any(n in FILTER.NAMESPACE.WHITELIST for n in allns):
+            ok = True
+        if FILTER.NAMESPACE.BLACKLIST and any(n in FILTER.NAMESPACE.BLACKLIST for n in allns):
+            ok = False
+
+        # now we can check if the function is valid
+        if FILTER.FUNCTION.WHITELIST:
+            if name in FILTER.FUNCTION.WHITELIST:
+                logging.info("{:s}.visit_FunctionDef: Documenting whitelisted function {!s}".format(cls.__name__, name))
+                return True
+            elif all(n not in FILTER.NAMESPACE.WHITELIST for n in allns):
+                logging.info("{:s}.visit_FunctionDef: Skipping function not in whitelisted namespace/class {!s}".format(cls.__name__, name))
+                return False
+
+        if ok and FILTER.FUNCTION.BLACKLIST and name in FILTER.FUNCTION.BLACKLIST:
+            logging.info("{:s}.visit_FunctionDef: Skipping blacklisted function {!s}".format(cls.__name__, name))
+            return False
+
+        # the namespace wasn't valid, so we're done here
+        if not ok:
+            logging.info("{:s}.visit_FunctionDef: Skipping function in blacklisted namespace/class {!s}".format(cls.__name__, name))
+            return False
+
+        # now we can check the default matches
+        if node.name == '__new__':
+            logging.debug("{:s}.visit_FunctionDef: Documenting default function in namespace/class {!s}".format(cls.__name__, name))
+            return True
+
+        if node.name.startswith('_'):
+            logging.debug("{:s}.visit_FunctionDef: Skipping hidden function in namespace/class {!s}".format(cls.__name__, name))
+            return False
+
+        logging.debug("{:s}.visit_FunctionDef: Documenting matched function {:s}.{:s}".format(cls.__name__, ns, node.name))
+        return True
+
     def visit_FunctionDef(self, node):
-        if node.name != '__new__' and node.name.startswith('_'): return
+        if not self.match_FunctionDef(node): return
 
         # capture fields
         name = node.name
@@ -640,20 +712,55 @@ class FunctionVisitor(ast.NodeVisitor):
             res.args.append(ParamVariableKeyword(name=arguments.kwarg, owner=res))
         return
 
-class NamespaceVisitor(ast.NodeVisitor):
+class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
+    def match_ClassDef(self, node):
+        cls, ns, name = self.__class__, self.fullname(self._ref, None), self.fullname(self._ref, node)
+        allns = {n[0] for n in map(functools.partial(ns.rsplit, '.'), xrange(ns.count('.')+1))}
+
+        global FILTER
+        if FILTER.NAMESPACE.WHITELIST:
+            if name in FILTER.NAMESPACE.WHITELIST:
+                logging.info("{:s}.visit_ClassDef: Documenting whitelisted namespace/class {!s}".format(cls.__name__, name))
+                return True
+            elif all(n not in FILTER.NAMESPACE.WHITELIST for n in allns):
+                logging.info("{:s}.visit_ClassDef: Skipping non-whitelisted namespace/class {!s}".format(cls.__name__, name))
+                return False
+
+        if FILTER.NAMESPACE.BLACKLIST and (name in FILTER.NAMESPACE.BLACKLIST or any(n in FILTER.NAMESPACE.BLACKLIST for n in allns)):
+            logging.info("{:s}.visit_ClassDef: Skipping blacklisted namespace/class {!s}".format(cls.__name__, name))
+            return False
+
+        # now for the default namespace matches
+        if node.name.startswith('_'):
+            logging.debug("{:s}.visit_ClassDef: Skipping hidden namespace/class {!s}".format(cls.__name__, name))
+            return False
+
+        logging.debug("{:s}.visit_ClassDef: Adding documentation for namespace/class {!s}".format(cls.__name__, name))
+        return True
+
     def visit_ClassDef(self, node):
         '''Anything that's a class is considered a namespace'''
-        if node.name.startswith('_'): return
 
         # figure out which type it is according to the decorators
         attributes = decorators.attributes(node)
         if 'document.classdef' in attributes:
-            return self.append_classdef(node)
+            res = self.append_classdef(node)
         elif 'document.namespace' in attributes:
-            return self.append_namespace(node)
+            res = self.append_namespace(node)
+        else:
+            cls = self.__class__
+            logging.warn("{:s}.visit_ClassDef: Skipping undecorated node {:s}".format(cls.__name__, self.fullname(self._ref, node)))
+            return
 
-        # no decorator was found, so assume it's a namespace
-        return self.append_namespace(node)
+        # if this namespace can be hidden, then set a flag for the emitter
+        res.set(skippable=not self.match_ClassDef(node))
+
+        # add the namespace to the parent
+        self._ref.add(res)
+
+        # continue parsing any children
+        nv = NSVisitor(res)
+        map(nv.visit, ast.iter_child_nodes(node))
 
     def append_classdef(self, node):
         attributes = decorators.attributes(node)
@@ -668,11 +775,7 @@ class NamespaceVisitor(ast.NodeVisitor):
         res = Class(node=node, name=node.name, namespace=self._ref, docstring=docstring)
         if attributes: res.set(attributes=attributes)
         if details: res.set(details=details)
-        self._ref.add(res)
-
-        # continue parsing its children
-        nv = NSVisitor(res)
-        map(nv.visit, ast.iter_child_nodes(node))
+        return res
 
     def append_namespace(self, node):
         attributes = decorators.attributes(node)
@@ -687,11 +790,7 @@ class NamespaceVisitor(ast.NodeVisitor):
         res = Namespace(node=node, name=node.name, namespace=self._ref, docstring=docstring)
         if attributes: res.set(attributes=attributes)
         if details: res.set(details=details)
-        self._ref.add(res)
-
-        # continue parsing its children
-        nv = NSVisitor(res)
-        map(nv.visit, ast.iter_child_nodes(node))
+        return res
 
 ### Visitor entrypoints
 class NSVisitor(FunctionVisitor, NamespaceVisitor, ConditionalVisitor):
@@ -714,21 +813,75 @@ class RootVisitor(FunctionVisitor, NamespaceVisitor, ConditionalVisitor):
             self._ref.set(docstring=docstring)
         return
 
+def parse_args(args=None):
+    def loglevel(value):
+        try:
+            res = getattr(logging, value.upper())
+        except AttributeError:
+            res = int(value)
+        return res
+
+    prolog='parse the specified python file and emit ReStructuredText from it.'
+
+    epilog = """
+    When specifying a filter, each provided argument represents the full
+    namespace/class to whitelist. To exclude a namespace/class, prefix the
+    argument with a '^' character. To whitelist or blacklist a function name,
+    prefix the argument with a '+' or '-'.
+    """
+
+    res = argparse.ArgumentParser(description=prolog, epilog=epilog)
+    res.add_argument('--name', type=str, nargs='?', help='the name of the generated module (defaults to the filename)')
+    res.add_argument('--loglevel', type=loglevel, default=logging.ERROR, help='the level of logging (0-100)')
+    res.add_argument('path', metavar='filename', type=str, help='path to the specified python file')
+    res.add_argument('filter', type=str, nargs='*', help='a list of filters applied to the names within the module')
+    return res.parse_args(args)
+
 if __name__ == '__main__':
-    ### Output a module into reStructuredText
     import sys, os.path
 
-    # extract the module name
-    _, path = sys.argv[:]
-    filename = os.path.basename(path)
-    name, _ = os.path.splitext(filename)
+    # parse the arguments
+    res = parse_args() if len(sys.argv) < 1 else parse_args(sys.argv[1:])
+
+    # apply the options that were specified at the commandline
+    if res.name is None:
+        # default module name if one wasn't specified
+        _, filename = os.path.split(res.path)
+        res.name, _ = os.path.splitext(filename)
+
+    # set the specified logging level
+    logging.root.setLevel(res.loglevel)
+
+    # update both the blacklist and whitelist
+    for m in res.filter:
+        if m.startswith('+'):
+            n, ns = m[1:], m[1:].rsplit('.', 1)[0]
+            logging.debug("{:s}: Adding function {!s} to whitelist.".format(__name__, n))
+            FILTER.FUNCTION.WHITELIST.add(n)
+        elif m.startswith('-'):
+            n, ns = m[1:], m[1:].rsplit('.', 1)[0]
+            logging.debug("{:s}: Adding function {!s} to blacklist.".format(__name__, n))
+            FILTER.FUNCTION.BLACKLIST.add(n)
+        elif m.startswith('^'):
+            logging.debug("{:s}: Adding namespace {!s} to blacklist.".format(__name__, m[1:]))
+            FILTER.NAMESPACE.BLACKLIST.add(m[1:])
+        else:
+            logging.debug("{:s}: Adding namespace {!s} to whitelist.".format(__name__, m[:]))
+            FILTER.NAMESPACE.WHITELIST.add(m[:])
+        continue
+
+    # emit the current state of the filters
+    if FILTER.NAMESPACE.WHITELIST: logging.info("{:s}: Namespace whitelist: {!r}".format(__name__, FILTER.NAMESPACE.WHITELIST))
+    if FILTER.NAMESPACE.BLACKLIST: logging.info("{:s}: Namespace blacklist: {!r}".format(__name__, FILTER.NAMESPACE.BLACKLIST))
+    if FILTER.FUNCTION.WHITELIST: logging.info("{:s}: Function whitelist: {!r}".format(__name__, FILTER.FUNCTION.WHITELIST))
+    if FILTER.FUNCTION.BLACKLIST: logging.info("{:s}: Function blacklist: {!r}".format(__name__, FILTER.FUNCTION.BLACKLIST))
 
     # create our root module object
-    M = Module(name=name)
+    M = Module(name=res.name)
 
     # read the file and parse everything into our root module object
-    with file(path, 'rt') as f:
-        data = ast.parse(f.read(), filename)
+    with file(res.path, 'rt') as f:
+        data = ast.parse(f.read(), os.path.split(res.path)[-1])
 
     V = RootVisitor(M)
     V.visit(data)
