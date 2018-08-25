@@ -621,34 +621,35 @@ class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
         # now we can check if the function is valid
         if FILTER.FUNCTION.WHITELIST:
             if name in FILTER.FUNCTION.WHITELIST:
-                logging.info("{:s}.visit_FunctionDef: Documenting whitelisted function {!s}".format(cls.__name__, name))
+                logging.info("{:s}.match_FunctionDef: Documenting whitelisted function {!s}".format(cls.__name__, name))
                 return True
             elif all(n not in FILTER.NAMESPACE.WHITELIST for n in allns):
-                logging.info("{:s}.visit_FunctionDef: Skipping function not in whitelisted namespace/class {!s}".format(cls.__name__, name))
+                logging.info("{:s}.match_FunctionDef: Skipping function not in whitelisted namespace/class {!s}".format(cls.__name__, name))
                 return False
 
         if ok and FILTER.FUNCTION.BLACKLIST and name in FILTER.FUNCTION.BLACKLIST:
-            logging.info("{:s}.visit_FunctionDef: Skipping blacklisted function {!s}".format(cls.__name__, name))
+            logging.info("{:s}.match_FunctionDef: Skipping blacklisted function {!s}".format(cls.__name__, name))
             return False
 
         # the namespace wasn't valid, so we're done here
         if not ok:
-            logging.info("{:s}.visit_FunctionDef: Skipping function in blacklisted namespace/class {!s}".format(cls.__name__, name))
+            logging.info("{:s}.match_FunctionDef: Skipping function in blacklisted namespace/class {!s}".format(cls.__name__, name))
             return False
 
         # now we can check the default matches
         if node.name == '__new__':
-            logging.debug("{:s}.visit_FunctionDef: Documenting default function in namespace/class {!s}".format(cls.__name__, name))
+            logging.debug("{:s}.match_FunctionDef: Documenting default function in namespace/class {!s}".format(cls.__name__, name))
             return True
 
         if node.name.startswith('_'):
-            logging.debug("{:s}.visit_FunctionDef: Skipping hidden function in namespace/class {!s}".format(cls.__name__, name))
+            logging.debug("{:s}.match_FunctionDef: Skipping hidden function in namespace/class {!s}".format(cls.__name__, name))
             return False
 
-        logging.debug("{:s}.visit_FunctionDef: Documenting matched function {:s}.{:s}".format(cls.__name__, ns, node.name))
+        logging.debug("{:s}.match_FunctionDef: Documenting matched function {!s}".format(cls.__name__, name))
         return True
 
     def visit_FunctionDef(self, node):
+        cls = self.__class__
         if not self.match_FunctionDef(node): return
 
         # capture fields
@@ -669,7 +670,9 @@ class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
         params = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == 'document.parameters')
 
         # if it's hidden, then don't bother adding it
-        if 'document.hidden' in methodtypes: return
+        if 'document.hidden' in methodtypes:
+            logging.info("{:s}.visit_FunctionDef: Skipping parsing of function due to explicit hidden decorator {!s}".format(cls.__name__, self.fullname(self._ref, node)))
+            return
 
         # figure out which type
         if node.name == '__new__' or 'classmethod' in methodtypes:
@@ -720,26 +723,27 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
         global FILTER
         if FILTER.NAMESPACE.WHITELIST:
             if name in FILTER.NAMESPACE.WHITELIST:
-                logging.info("{:s}.visit_ClassDef: Documenting whitelisted namespace/class {!s}".format(cls.__name__, name))
+                logging.info("{:s}.match_ClassDef: Documenting whitelisted namespace/class {!s}".format(cls.__name__, name))
                 return True
             elif all(n not in FILTER.NAMESPACE.WHITELIST for n in allns):
-                logging.info("{:s}.visit_ClassDef: Skipping non-whitelisted namespace/class {!s}".format(cls.__name__, name))
+                logging.info("{:s}.match_ClassDef: Skipping non-whitelisted namespace/class {!s}".format(cls.__name__, name))
                 return False
 
         if FILTER.NAMESPACE.BLACKLIST and (name in FILTER.NAMESPACE.BLACKLIST or any(n in FILTER.NAMESPACE.BLACKLIST for n in allns)):
-            logging.info("{:s}.visit_ClassDef: Skipping blacklisted namespace/class {!s}".format(cls.__name__, name))
+            logging.info("{:s}.match_ClassDef: Skipping blacklisted namespace/class {!s}".format(cls.__name__, name))
             return False
 
         # now for the default namespace matches
         if node.name.startswith('_'):
-            logging.debug("{:s}.visit_ClassDef: Skipping hidden namespace/class {!s}".format(cls.__name__, name))
+            logging.debug("{:s}.match_ClassDef: Skipping hidden namespace/class {!s}".format(cls.__name__, name))
             return False
 
-        logging.debug("{:s}.visit_ClassDef: Adding documentation for namespace/class {!s}".format(cls.__name__, name))
+        logging.debug("{:s}.match_ClassDef: Adding documentation for namespace/class {!s}".format(cls.__name__, name))
         return True
 
     def visit_ClassDef(self, node):
         '''Anything that's a class is considered a namespace'''
+        cls, visible = self.__class__, self.match_ClassDef(node)
 
         # figure out which type it is according to the decorators
         attributes = decorators.attributes(node)
@@ -747,13 +751,15 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
             res = self.append_classdef(node)
         elif 'document.namespace' in attributes:
             res = self.append_namespace(node)
+        elif 'document.hidden' in attributes:
+            logging.info("{:s}.visit_ClassDef: Skipping parsing of namespace/class due to explicit hidden decorator {!s}".format(cls.__name__, self.fullname(self._ref, node)))
+            visible = False
         else:
-            cls = self.__class__
-            logging.warn("{:s}.visit_ClassDef: Skipping undecorated node {:s}".format(cls.__name__, self.fullname(self._ref, node)))
+            logging.warn("{:s}.visit_ClassDef: Skipping parsing of undecorated node {!s}".format(cls.__name__, self.fullname(self._ref, node)))
             return
 
         # if this namespace can be hidden, then set a flag for the emitter
-        res.set(skippable=not self.match_ClassDef(node))
+        res.set(skippable=not visible)
 
         # add the namespace to the parent
         self._ref.add(res)
@@ -821,7 +827,7 @@ def parse_args(args=None):
             res = int(value)
         return res
 
-    prolog='parse the specified python file and emit ReStructuredText from it.'
+    prolog='parse the specified python file and emit reStructuredText from it.'
 
     epilog = """
     When specifying a filter, each provided argument represents the full
@@ -831,9 +837,10 @@ def parse_args(args=None):
     """
 
     res = argparse.ArgumentParser(description=prolog, epilog=epilog)
-    res.add_argument('--name', type=str, nargs='?', help='the name of the generated module (defaults to the filename)')
+    res.add_argument('--name', '-N', type=str, nargs='?', help='the name of the generated module (defaults to the input filename)')
     res.add_argument('--loglevel', type=loglevel, default=logging.ERROR, help='the level of logging (0-100)')
-    res.add_argument('path', metavar='filename', type=str, help='path to the specified python file')
+    res.add_argument('--outfile', '-o', type=argparse.FileType('wt'), default=sys.stdout, help='where to output the generated reStructuredText')
+    res.add_argument('infile', type=str, help='path to the specified python file')
     res.add_argument('filter', type=str, nargs='*', help='a list of filters applied to the names within the module')
     return res.parse_args(args)
 
@@ -846,7 +853,7 @@ if __name__ == '__main__':
     # apply the options that were specified at the commandline
     if res.name is None:
         # default module name if one wasn't specified
-        _, filename = os.path.split(res.path)
+        _, filename = os.path.split(res.infile)
         res.name, _ = os.path.splitext(filename)
 
     # set the specified logging level
@@ -880,11 +887,11 @@ if __name__ == '__main__':
     M = Module(name=res.name)
 
     # read the file and parse everything into our root module object
-    with file(res.path, 'rt') as f:
-        data = ast.parse(f.read(), os.path.split(res.path)[-1])
+    with file(res.infile, 'rt') as f:
+        data = ast.parse(f.read(), res.name)
 
     V = RootVisitor(M)
     V.visit(data)
 
     # now we should have some data to format as rst
-    print(restructure.Module(M))
+    print(restructure.Module(M), file=res.outfile)
