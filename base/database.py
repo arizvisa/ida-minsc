@@ -70,27 +70,34 @@ class config(object):
 
     info = idaapi.get_inf_structure()
 
-    if idaapi.__version__ >= 7.0:
-        @classmethod
-        def readonly(cls):
-            '''Returns whether the database is read-only or not.'''
+    @classmethod
+    def readonly(cls):
+        '''Returns whether the database is read-only or not.'''
+        if idaapi.__version__ >= 7.0:
             return cls.info.readonly_idb()
+        raise NotImplementedError("{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
 
-        @classmethod
-        def sharedobject(cls):
-            '''Returns whether the database is a shared-object or not.'''
+    @classmethod
+    def sharedobject(cls):
+        '''Returns whether the database is a shared-object or not.'''
+        if idaapi.__version__ >= 7.0:
             return cls.info.is_dll()
-        is_sharedobject = sharedQ = sharedobject
+        raise NotImplementedError("{:s}.sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
+    is_sharedobject = sharedQ = sharedobject
 
-        @classmethod
-        def changes(cls):
-            '''Returns the number of changes within the database.'''
+    @classmethod
+    def changes(cls):
+        '''Returns the number of changes within the database.'''
+        if idaapi.__version__ >= 7.0:
             return cls.info.database_change_count
+        raise NotImplementedError("{:s}.changes() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
 
-        @classmethod
-        def processor(cls):
-            '''Returns the name of the processor configured by the database.'''
+    @classmethod
+    def processor(cls):
+        '''Returns the name of the processor configured by the database.'''
+        if idaapi.__version__ >= 7.0:
             return cls.info.get_procName()
+        raise NotImplementedError("{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
 
     @classmethod
     def compiler(cls):
