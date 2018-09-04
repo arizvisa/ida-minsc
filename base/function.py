@@ -365,6 +365,7 @@ def remove(func):
     return idaapi.del_func(fn.startEA)
 
 ## chunks
+@document.namespace
 class chunks(object):
     """
     This namespace is for interacting with the different chunks
@@ -456,6 +457,7 @@ class chunks(object):
 iterate = utils.alias(chunks.iterate, 'chunks')
 register = utils.alias(chunks.register, 'chunks')
 
+@document.namespace
 class chunk(object):
     """
     This namespace is for interacting with a specific chunk belonging
@@ -609,6 +611,7 @@ def contains(func, ea):
     ea = interface.address.within(ea)
     return any(start <= ea < end for start, end in chunks(fn))
 
+@document.namespace
 class blocks(object):
     """
     This namespace is for interacting with all of the basic blocks within
@@ -765,6 +768,7 @@ class blocks(object):
 flowchart = utils.alias(blocks.flowchart, 'blocks')
 digraph = graph = utils.alias(blocks.digraph, 'blocks')
 
+@document.namespace
 class block(object):
     """
     This namespace is for interacting with a single basic block
@@ -1217,6 +1221,7 @@ class block(object):
         res = itertools.imap(idaapi.tag_remove, res)
         return '\n'.join(map(utils.string.of, res))
 
+@document.namespace
 class frame(object):
     """
     This namespace is for getting information about the selected
@@ -1700,6 +1705,7 @@ def switches(func):
         if res: yield interface.switch_t(res)
     return
 
+@document.namespace
 class type(object):
     """
     This namespace allows one to query type information about a

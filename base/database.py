@@ -3004,6 +3004,7 @@ class type(object):
         return type.has_dummyname(ea) or type.has_customname(ea)
     labelQ = utils.alias(is_label, 'type')
 
+    @document.namespace
     class array(object):
         """
         This namespace is for returning type information about an array
@@ -3093,6 +3094,7 @@ class type(object):
             '''Return the total size of the array at the address specified by `ea`.'''
             return type.size(ea)
 
+    @document.namespace
     class structure(object):
         """
         This namespace for returning type information about a structure
@@ -4272,6 +4274,7 @@ class set(object):
             raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
 
+    @document.namespace
     class integer(object):
         """
         This namespace used for applying various sized integer types to
@@ -4508,6 +4511,7 @@ class get(object):
         res = cls.unsigned(ea, size, **byteorder)
         return (res - (2**bits)) if res&sf else res
 
+    @document.namespace
     class integer(object):
         """
         This namespace contains the different ISO standard integer types that
@@ -4859,6 +4863,7 @@ class get(object):
         return res
     struc = struct = utils.alias(structure, 'get')
 
+    @document.namespace
     class switch(object):
         """
         Function for fetching an instance of a ``switch_t`` from a given address.

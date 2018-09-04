@@ -28,8 +28,9 @@ To apply previously read tags with different names to the database::
 import six, sys, logging, builtins
 import functools, operator, itertools, types, string
 
-import database as db, function as func, structure as struc, ui
-import internal
+import database as db, function as func, structure as struc
+import ui, internal
+from internal import document
 
 output = sys.stderr
 
@@ -82,6 +83,7 @@ class dummy(object):
 dummy = dummy()
 
 ### read without using the tag cache
+@document.namespace
 class read(object):
     """
     This namespace contains tools that can be used to manually read
@@ -235,6 +237,7 @@ class read(object):
         return
 
 ### Applying tags to the database
+@document.namespace
 class apply(object):
     """
     This namespace contains tools that can be used to apply tags that
@@ -513,6 +516,7 @@ class apply(object):
         return count
 
 ### Exporting tags from the database using the tag cache
+@document.namespace
 class export(object):
     """
     This namespace contains tools that can be used to quickly

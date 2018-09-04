@@ -14,6 +14,8 @@ import collections, heapq, traceback, ctypes
 import unicodedata as _unicodedata, string as _string
 
 import ui, internal
+from internal import document
+
 import idaapi
 
 class typemap:
@@ -632,6 +634,7 @@ class node(object):
         OP_REPR, INVERT_BIT = 8, 0x100000
         return internal.netnode.alt.get(ea, OP_REPR) & (INVERT_BIT << opnum) != 0
 
+@document.hidden
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
     res = ("{:x}".format(abs(n)) if isinstance(n, six.integer_types) else n for n in names)
@@ -941,6 +944,7 @@ class ref_t(set):
             continue
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to find the cross-reference type that matches requested state.".format('.'.join(('internal', __name__, cls.__name__)), str().join(sorted(res))))
 
+@document.classdef
 class AddressOpnumReftype(namedtypedtuple):
     """
     This tuple is used to represent references that include an operand number
@@ -954,6 +958,7 @@ OREF = AddressOpnumReftype
 # XXX: is .startea always guaranteed to point to an instruction that modifies
 #      the switch's register? if so, then we can use this to calculate the
 #      .range/.cases more accurately instead of them being based on .elbase.
+@document.classdef
 class switch_t(object):
     """
     This object is a wrapper around the ``idaapi.switch_info_ex_t`` class and
@@ -1050,6 +1055,7 @@ class switch_t(object):
             return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
         return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
 
+@document.hidden
 def xiterate(ea, start, next):
     '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
     getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
@@ -1061,6 +1067,7 @@ def xiterate(ea, start, next):
         addr = next(ea, addr)
     return
 
+@document.hidden
 def addressOfRuntimeOrStatic(func):
     """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
