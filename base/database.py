@@ -899,91 +899,49 @@ def erase(ea):
     color(ea, None)
 
 @utils.multicase()
-def get_color():
+def color():
     '''Return the rgb color at the current address.'''
-    return get_color(ui.current.address())
+    return color(ui.current.address())
+@utils.multicase(none=types.NoneType)
+def color(none):
+    '''Remove the color from the current address.'''
+    return color(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types)
-def get_color(ea):
+def color(ea):
     '''Return the rgb color at the address ``ea``.'''
     res = idaapi.get_item_color(interface.address.inside(ea))
     b,r = (res&0xff0000)>>16, res&0x0000ff
     return None if res == 0xffffffff else (r<<16)|(res&0x00ff00)|b
-@utils.multicase(none=types.NoneType)
-def set_color(none):
-    '''Remove the color at the current address.'''
-    return set_color(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
-def set_color(ea, none):
-    '''Remove the color at address ``ea``.'''
+def color(ea, none):
+    '''Remove the color at the address ``ea``.'''
     return idaapi.set_item_color(interface.address.inside(ea), 0xffffffff)
 @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
-def set_color(ea, rgb):
+def color(ea, rgb):
     '''Set the color at address ``ea`` to ``rgb``.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
     return idaapi.set_item_color(interface.address.inside(ea), (b<<16)|(rgb&0x00ff00)|r)
 
 @utils.multicase()
-def color():
-    '''Return the rgb color at the current address.'''
-    return get_color(ui.current.address())
-@utils.multicase(none=types.NoneType)
-def color(none):
-    '''Remove the color from the current address.'''
-    return set_color(ui.current.address(), None)
-@utils.multicase(ea=six.integer_types)
-def color(ea):
-    '''Return the color at the address ``ea``.'''
-    return get_color(ea)
-@utils.multicase(ea=six.integer_types, none=types.NoneType)
-def color(ea, none):
-    '''Remove the color at the address ``ea``.'''
-    return set_color(ea, None)
-@utils.multicase(ea=six.integer_types, rgb=six.integer_types)
-def color(ea, rgb):
-    '''Set the color at address ``ea`` to ``rgb``.'''
-    return set_color(ea, rgb)
-
-@utils.multicase()
-def get_comment(**repeatable):
-    '''Return the comment at the current address.'''
-    return get_comment(ui.current.address(), **repeatable)
-@utils.multicase(ea=six.integer_types)
-def get_comment(ea, **repeatable):
-    """Return the comment at the address ``ea``.
-    If the bool ``repeatable`` is specified, then return the repeatable comment.
-    """
-    return idaapi.get_cmt(interface.address.inside(ea), repeatable.get('repeatable', False))
-@utils.multicase(comment=basestring)
-def set_comment(comment, **repeatable):
-    '''Set the comment at the current address to the string ``comment``.'''
-    return set_comment(ui.current.address(), comment, **repeatable)
-@utils.multicase(ea=six.integer_types, comment=basestring)
-def set_comment(ea, comment, **repeatable):
-    """Set the comment at address ``ea`` to ``comment``.
-    If the bool ``repeatable`` is specified, then modify the repeatable comment.
-    """
-    return idaapi.set_cmt(interface.address.inside(ea), comment, repeatable.get('repeatable', False))
-
-@utils.multicase()
 def comment(**repeatable):
     '''Return the comment at the current address.'''
-    return get_comment(ui.current.address(), **repeatable)
+    return comment(ui.current.address(), **repeatable)
 @utils.multicase(ea=six.integer_types)
 def comment(ea, **repeatable):
     """Return the comment at the address ``ea``.
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
-    return get_comment(ea, **repeatable)
-@utils.multicase(comment=basestring)
-def comment(comment, **repeatable):
-    '''Set the comment at the current address to ``comment``.'''
-    return set_comment(ui.current.address(), comment, **repeatable)
-@utils.multicase(ea=six.integer_types, comment=basestring)
-def comment(ea, comment, **repeatable):
-    """Set the comment at address ``ea`` to ``comment``.
+    return idaapi.get_cmt(interface.address.inside(ea), repeatable.get('repeatable', False))
+@utils.multicase(string=basestring)
+def comment(string, **repeatable):
+    '''Set the comment at the current address to ``string``.'''
+    return comment(ui.current.address(), string, **repeatable)
+@utils.multicase(ea=six.integer_types, string=basestring)
+def comment(ea, string, **repeatable):
+    """Set the comment at address ``ea`` to ``string``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
-    return set_comment(ea, comment, **repeatable)
+    return idaapi.set_cmt(interface.address.inside(ea), string, repeatable.get('repeatable', False))
 
 class entry(object):
     """

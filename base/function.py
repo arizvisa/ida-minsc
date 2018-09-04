@@ -766,7 +766,7 @@ class block(object):
 
         # clear the color of each item too.
         for ea in block.iterate(ea):
-            database.set_color(ea, None)
+            database.color(ea, None)
             # internal.netnode.alt.remove(ea, 0x14)
         return res
     @utils.multicase(tuple=types.TupleType, none=types.NoneType)
@@ -785,7 +785,7 @@ class block(object):
 
         # clear the color of each item too.
         for ea in block.iterate(bb):
-            database.set_color(ea, None)
+            database.color(ea, None)
             #internal.netnode.alt.remove(ea, 0x14)
         return res
     @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
@@ -813,7 +813,7 @@ class block(object):
 
         # update the color of each item too
         for ea in block.iterate(ea):
-            database.set_color(ea, rgb)
+            database.color(ea, rgb)
             #internal.netnode.alt.set(ea, 0x14, n.bg_color)
         return res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
@@ -840,7 +840,7 @@ class block(object):
 
         # update the colors of each item too.
         for ea in block.iterate(bb):
-            database.set_color(ea, rgb)
+            database.color(ea, rgb)
             #internal.netnode.alt.set(ea, 0x14, n.bg_color)
         return res
     @utils.multicase(tuple=types.TupleType, rgb=six.integer_types)
