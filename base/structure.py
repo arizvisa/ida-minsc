@@ -273,7 +273,6 @@ class structure_t(object):
         res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
         return res <= offset < res + cb
 
-
 @utils.multicase()
 def name(id):
     '''Return the name of the structure identified by ``id``.'''
