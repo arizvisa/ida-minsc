@@ -1,7 +1,12 @@
 """
-Segments
+Segment module
 
-generic tools for working with segments.
+This module provides a number of tools that can be used to enumerate
+or work with segments within a database.
+
+The base argument type for some of the utilities within this module
+is the `segment_t`. This type is interchangeable with the address
+or the segment name and so either can be used to identify a segment.
 """
 
 import six

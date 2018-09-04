@@ -1,3 +1,22 @@
+"""
+User Interface module
+
+This module exposes a number of tools and class definitions for
+interacting with IDA's user interface. This includes things such
+as getting the current state of user input, information about
+windows that are in use as well as utilities for simplifying the
+customization of the interface.
+
+There are a few namespaces that are provided in order to get the
+current state. The `ui.current` namespace allows for one to get
+the current address, function, segment, window, as well as a number
+of other things.
+
+A number of namespaces defined within this module also allows a
+user to interact with the different windows that are currently
+in use. This can allow for one to automatically show or hide a
+window that they wish to expose to the user.
+"""
 import six
 import sys,os
 import logging

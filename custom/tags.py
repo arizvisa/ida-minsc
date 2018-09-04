@@ -1,3 +1,12 @@
+"""
+Tags module
+
+This module exposes tools for exporting the currently defined tags
+within the database. Once exported, these tags can then be pickled
+or then re-applied to the same or another database. Some options
+are allowed which will let a user apply transformations to the tags
+before applying them to a target database.
+"""
 import six, sys, logging
 import functools,operator,itertools,types,string
 

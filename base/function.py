@@ -1,7 +1,21 @@
 """
-Functions
+Function module
 
-generic tools for working in the context of a function.
+This module exposes a number of tools that can be used on or in
+a particular function. There are a couple of namespaces that can allow
+one to interact with the different components that are available for
+a function.
+
+The base argument type for a number of the utilities within this module
+is the `func_t`. This type is interchangeable with an address or a name
+and either can be used to identify a function. Some of the tools exposed
+in this module allow for one to modify comments, rename, re-type, or
+determine the relationships between functions.
+
+Some namespaces are provided for interacting with the different components
+that IDA associates with each function. This can be used to navigate
+to the different parts of a function. Some of the available namespaces
+are `type`, `block`, `chunk`, `blocks`, `chunks`, and `frame`.
 """
 
 import six

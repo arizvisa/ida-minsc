@@ -1,7 +1,40 @@
 """
-Instructions
+Instruction module
 
-generic tools for working in the context of an instruction.
+This module exposes a number of tools for interacting with an
+instruction defined within the database. There are three types
+of tools within this module and each can be distinguished by their
+prefixes which can be used to decode the operands for an instruction.
+At the present time, only the Intel, AArch32, and Mips architectures
+are supported.
+
+Although IDA internally uses the `insn_t` and `op_t` to represent
+an instruction and its operands, this module's base argument type
+is typically an address or an operand index. When dealing with an
+instruction's operands, the `ops_` prefix represents all of the
+instructions operands and typically will take only an address.
+Likewise when dealing with a single operand, the `op_` prefix
+is used and will take an address and the operand index.
+
+To request the actual IDA types (`insn_t` and `op_t`) there are
+two tools that are provided. The `instruction.at($$)` tool will
+take an address and return an `insn_t`. To get an `op_t`, the
+`instruction.operand($$, $)` tool is provided. This will take
+an address an in index at which point an `op_t` will be returned.
+
+Some globals are also defined for the given architecture which
+can be used to query or access the registers that are currently
+available. Once IDA has determined the architecture for the database
+the `instruction.register` object is created. This object allows
+one to reference a register that is defined for the architecture.
+
+Another object that is created is the `instruction.architecture`
+object. This object allows one to search, promote, or demote a
+register. Searching for a register can be done by index or by name.
+The `instruction.architecture` object can also be used to promote
+or demote a register between its various bits. This allows one to
+navigate between the 8-bit, 16-bit, 32-bit, or 64-bit versions of
+a register available in the architecture.
 """
 
 import six

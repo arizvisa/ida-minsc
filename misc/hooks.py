@@ -1,3 +1,11 @@
+"""
+Internal module (hooks)
+
+This is an internal module that contains implementations of all the hooks
+that are used. Some of the things that are hooked are things such as
+comment creation, function and segment scoping, etc. This is not intended
+to be used by the average user.
+"""
 import six
 import sys, logging
 import functools, operator, itertools, types

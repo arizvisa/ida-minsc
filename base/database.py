@@ -1,7 +1,21 @@
 """
-Database
+Database module
 
-generic tools for working in the context of the database.
+This module exposes a number of tools that can be used on a database
+and on addresses within the database. There are a number of namespaces
+that allow one to query information about the database as a whole, or to
+read/write to an address within the database.
+
+The base argument type for many of the utilites within this module is
+the address. This can allow one to modify the colors or comments for an
+address, or to read/write from the different types of data that might
+exist at an address.
+
+Some namespaces are also provided for querying the available symbolic
+information that IDA has discovered about a binary. This can be used
+to search and navigate the database. Some of the available namespaces
+that can be used for querying are `functions`, `segments`, `names`,
+`imports`, `exports`, and `marks`.
 """
 
 import six

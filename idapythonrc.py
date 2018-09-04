@@ -1,3 +1,14 @@
+"""
+Internal initialization script
+
+This is an internal script that is executed when IDA starts. Things
+such as meta_path hooks, replacing the namespace with the contents
+of the __root__ module, and implementing a work-around for the hack
+that IDAPython does with saving the contents of sys.modules. After
+initializing everything, this script will then hand off execution
+to the user's idapythonrc.py in their home directory.
+"""
+
 # output the IDAPython banner when IDA starts
 print_banner()
 
@@ -207,11 +218,11 @@ try:
         elif __import__('os').getenv('USERPROFILE'):
             execfile(__import__('os').path.join(__import__('os').getenv('USERPROFILE'), '.idapythonrc.py'))
         else:
-            raise OSError('Unable to figure out home directory')
+            raise OSError('Unable to determine the user home directory.')
         pass
 
 except IOError:
-    __import__('logging').warn('No idapythonrc.py file found in home directory')
+    __import__('logging').warn('No .idapythonrc.py file found in the user home directory.')
 
 except Exception, e:
     print("Unexpected exception raised while trying to execute `~/.idapythonrc.py`.")

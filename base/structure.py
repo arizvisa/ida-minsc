@@ -1,7 +1,22 @@
 """
-Structures
+Structure module
 
-generic tools for working in the context of a structure.
+This module exposes a number of tools and defines some classes that
+can be used to interacting with the structures defined in the database.
+The classes defined by this module wrap IDA's structure API and expose
+a simpler interface that can be used to perform various operations
+against a structure such as renaming or enumerating the structure's
+members.
+
+The base argument type for getting a `structure_t` can be either a name,
+an identifier, or an index. Typically one will call `structure.by($$)`
+with either identifier which will then return an instance of their
+`structure_t`.
+
+To list the different structures available in the database, one can use
+`structure.list(...)` with their method of filtering. This will list all
+of the available structures at which point the user can then request it
+by passing an identifer to `structure.by($$)`.
 """
 
 import six
@@ -16,262 +31,6 @@ import ui, internal
 from internal import utils, interface
 
 import idaapi
-
-## FIXME: need to add support for a union_t. add_struc takes another parameter
-##        that defines whether a structure is a union or not.
-
-### structure_t abstraction
-class structure_t(object):
-    """An abstraction around an IDA structure."""
-    __slots__ = ('__id__', '__members__')
-
-    def __init__(self, id, offset=0):
-        self.__id__ = id
-        self.__members__ = members_t(self, baseoffset=offset)
-
-    def up(self):
-        '''Return all the structures that reference this specific structure.'''
-        x, sid = idaapi.xrefblk_t(), self.id
-
-        # grab first structure that references this one
-        ok = x.first_to(sid, 0)
-        if not ok:
-            return ()
-
-        # continue collecting all structures that references this one
-        res = [(x.frm, x.iscode, x.type)]
-        while x.next_to():
-            res.append((x.frm, x.iscode, x.type))
-
-        # convert refs into a list of OREFs
-        refs = [ interface.OREF(xrfrom, xriscode, interface.ref_t.of(xrtype)) for xrfrom, xriscode, xrtype in res ]
-
-        # return as a tuple
-        return map(utils.fcompose(operator.itemgetter(0), instance), refs)
-
-    def down(self):
-        '''Return all the structures that are referenced by this specific structure.'''
-        x, sid = idaapi.xrefblk_t(), self.id
-
-        # grab structures that this one references
-        ok = x.first_from(sid, 0)
-        if not ok:
-            return []
-
-        # continue collecting all structures that this one references
-        res = [(x.to, x.iscode, x.type)]
-        while x.next_from():
-            res.append((x.to, x.iscode, x.type))
-
-        # convert refs into a list of OREFs
-        refs = [ interface.OREF(xrto, xriscode, interface.ref_t.of(xrtype)) for xrto, xriscode, xrtype in res ]
-
-        # return it as a tuple
-        return map(utils.fcompose(operator.itemgetter(0), instance), refs)
-
-    def refs(self):
-        """Return the `(address, opnum, type)` of all the references (code & data) to this structure within the database.
-        If `opnum` is `None`, then the returned `address` has the structure applied to it.
-        If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
-        """
-        x, sid = idaapi.xrefblk_t(), self.id
-
-        # grab first reference to structure
-        ok = x.first_to(sid, 0)
-        if not ok:
-            return []
-
-        # collect the rest of its references
-        refs = [(x.frm, x.iscode, x.type)]
-        while x.next_to():
-            refs.append((x.frm, x.iscode, x.type))
-
-        # calculate the high-byte which is used to differentiate an address from a structure
-        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR) / math.log(2.0)))
-        highbyte = 0xff << (bits-8)
-
-        # iterate through figuring out if sid is applied to an address or another structure
-        res = []
-        for ref, _, _ in refs:
-            # structure (probably a frame member)
-            if ref & highbyte == highbyte:
-                # get sptr, mptr
-                name = idaapi.get_member_fullname(ref)
-                mptr, _ = idaapi.get_member_by_fullname(name)
-                if not isinstance(mptr, idaapi.member_t):
-                    cls = self.__class__
-                    raise TypeError("{:s} : Unexpected type {!r} for netnode '{:s}'".format('.'.join((__name__, cls.__name__)), mptr.__class__, name))
-                sptr = idaapi.get_sptr(mptr)
-
-                # get frame, func_t
-                frname, _ = name.split('.', 2)
-                frid = internal.netnode.get(frname)
-                ea = idaapi.get_func_by_frame(frid)
-                f = idaapi.get_func(ea)
-
-                # now find all xrefs to member within function
-                xl = idaapi.xreflist_t()
-                idaapi.build_stkvar_xrefs(xl, f, mptr)
-
-                # now we can add it
-                for xr in xl:
-                    ea, opnum, state = xr.ea, int(xr.opnum), instruction.op_state(ea, opnum)
-                    res.append( interface.OREF(ea, opnum, interface.ref_t.of_state(state)) )
-                continue
-
-            # address
-            res.append( interface.OREF(ref, None, interface.ref_t.of_state('*')) )   # using '*' to describe being applied to the an address
-
-        return res
-
-    @property
-    def id(self):
-        '''Return the identifier of the structure.'''
-        return self.__id__
-    @property
-    def ptr(self):
-        '''Return the pointer of the `idaapi.struc_t`.'''
-        return idaapi.get_struc(self.id)
-    @property
-    def members(self):
-        '''Return the members belonging to the structure.'''
-        return self.__members__
-
-    def __getstate__(self):
-        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), (True, False))
-        # FIXME: perhaps we should preserve the get_struc_idx result too
-        return (self.name, (cmtt, cmtf), self.members)
-    def __setstate__(self, state):
-        name, (cmtt, cmtf), members = state
-        identifier = idaapi.get_struc_id(name)
-        if identifier == idaapi.BADADDR:
-            logging.warn("{:s}.structure_t.__setstate__ : Creating structure {:s} [{:d} fields]{:s}".format(__name__, name, len(members), " // {!s}".format(cmtf or cmtt) if cmtf or cmtt else ''))
-            identifier = idaapi.add_struc(idaapi.BADADDR, name)
-        idaapi.set_struc_cmt(identifier, cmtt, True)
-        idaapi.set_struc_cmt(identifier, cmtf, False)
-        self.__id__ = identifier
-        self.__members__ = members
-        return
-
-    @property
-    def name(self):
-        '''Return the name of the structure.'''
-        return idaapi.get_struc_name(self.id)
-    @name.setter
-    def name(self, string):
-        '''Set the name of the structure to ``string``.'''
-        if isinstance(string, tuple):
-            string = interface.tuplename(*string)
-
-        res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
-        if string and string != res:
-            cls = self.__class__
-            logging.warn("{:s}.name : Stripping invalid chars from structure name {!r}. : {!r}".format( '.'.join((__name__, cls.__name__)), string, res))
-            string = res
-        return idaapi.set_struc_name(self.id, string)
-
-    @property
-    def comment(self, repeatable=True):
-        '''Return the repeatable comment for the structure.'''
-        return idaapi.get_struc_cmt(self.id, True) or idaapi.get_struc_cmt(self.id, False)
-    @comment.setter
-    def comment(self, value, repeatable=True):
-        '''Set the repeatable comment for the structure to ``value``.'''
-        return idaapi.set_struc_cmt(self.id, value, repeatable)
-
-    @utils.multicase()
-    def tag(self):
-        '''Return the tags associated with the structure.'''
-        repeatable = True
-
-        # grab the repeatable and non-repeatable comment for the structure
-        res = idaapi.get_struc_cmt(self.id, False)
-        d1 = internal.comment.decode(res)
-        res = idaapi.get_struc_cmt(self.id, True)
-        d2 = internal.comment.decode(res)
-
-        # check for duplicate keys
-        if d1.viewkeys() & d2.viewkeys():
-            cls = self.__class__
-            logging.warn("{:s}.comment({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format('.'.join((__name__,cls.__name__)), self.id, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
-
-        # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
-        res = {}
-        builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
-        return res
-    @utils.multicase(key=basestring)
-    def tag(self, key):
-        '''Return the tag identified by ``key`` belonging to the structure.'''
-        res = self.tag()
-        return res[key]
-    @utils.multicase(key=basestring)
-    def tag(self, key, value):
-        '''Set the tag identified by ``key`` to ``value`` for the structure.'''
-        state = self.tag()
-        repeatable, res, state[key] = True, state.get(key, None), value
-        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
-        return res
-    @utils.multicase(key=basestring, none=types.NoneType)
-    def tag(self, key, none):
-        '''Removes the tag specified by ``key`` from the structure.'''
-        state = self.tag()
-        repeatable, res = True, state.pop(key)
-        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
-        return res
-
-    @property
-    def size(self):
-        '''Return the size of the structure.'''
-        return idaapi.get_struc_size(self.ptr)
-    @size.setter
-    def size(self, new):
-        res = idaapi.get_struc_size(self.ptr)
-        ok = idaapi.expand_struc(self.ptr, 0, new - res, True)
-        if not ok:
-            logging.fatal("{:s}.instance({:s}).resize : Unable to resize structure {:s} from {:#x} bytes to {:#x} bytes.".format(__name__, self.name, self.name, res, new))
-        return res
-
-    @property
-    def offset(self):
-        '''Return the base-offset of the structure.'''
-        return self.members.baseoffset
-    @offset.setter
-    def offset(self, offset):
-        '''Set the base-offset of the structure to ``offset``.'''
-        res, self.members.baseoffset = self.members.baseoffset, offset
-        return res
-    @property
-    def index(self):
-        '''Return the index of the structure.'''
-        return idaapi.get_struc_idx(self.id)
-    @index.setter
-    def index(self, idx):
-        '''Set the index of the structure to ``idx``.'''
-        return idaapi.set_struc_idx(self.ptr, idx)
-
-    def destroy(self):
-        '''Remove the structure from the database.'''
-        return idaapi.del_struc(self.ptr)
-
-    def __repr__(self):
-        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment, self.tag()
-        return "<type 'structure' name={!r}{:s} size=+{:#x}>{:s}".format(name, (" offset={:#x}".format(offset) if offset > 0 else ''), size, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
-
-    def field(self, ofs):
-        '''Return the member at the specified offset.'''
-        return self.members.by_offset(ofs + self.members.baseoffset)
-
-    def copy(self, name):
-        '''Copy members into the structure ``name``.'''
-        raise NotImplementedError
-
-    def __getattr__(self, name):
-        return getattr(self.members, name)
-
-    def contains(self, offset):
-        '''Return whether the specified offset is contained by the structure.'''
-        res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
-        return res <= offset < res + cb
 
 @utils.multicase()
 def name(id):
@@ -571,6 +330,262 @@ def instance(identifier, **options):
     return res
 
 by_identifier = by_id = byIdentifier = byId = utils.alias(instance)
+
+## FIXME: need to add support for a union_t. add_struc takes another parameter
+##        that defines whether a structure is a union or not.
+
+### structure_t abstraction
+class structure_t(object):
+    """An abstraction around an IDA structure."""
+    __slots__ = ('__id__', '__members__')
+
+    def __init__(self, id, offset=0):
+        self.__id__ = id
+        self.__members__ = members_t(self, baseoffset=offset)
+
+    def up(self):
+        '''Return all the structures that reference this specific structure.'''
+        x, sid = idaapi.xrefblk_t(), self.id
+
+        # grab first structure that references this one
+        ok = x.first_to(sid, 0)
+        if not ok:
+            return ()
+
+        # continue collecting all structures that references this one
+        res = [(x.frm, x.iscode, x.type)]
+        while x.next_to():
+            res.append((x.frm, x.iscode, x.type))
+
+        # convert refs into a list of OREFs
+        refs = [ interface.OREF(xrfrom, xriscode, interface.ref_t.of(xrtype)) for xrfrom, xriscode, xrtype in res ]
+
+        # return as a tuple
+        return map(utils.fcompose(operator.itemgetter(0), instance), refs)
+
+    def down(self):
+        '''Return all the structures that are referenced by this specific structure.'''
+        x, sid = idaapi.xrefblk_t(), self.id
+
+        # grab structures that this one references
+        ok = x.first_from(sid, 0)
+        if not ok:
+            return []
+
+        # continue collecting all structures that this one references
+        res = [(x.to, x.iscode, x.type)]
+        while x.next_from():
+            res.append((x.to, x.iscode, x.type))
+
+        # convert refs into a list of OREFs
+        refs = [ interface.OREF(xrto, xriscode, interface.ref_t.of(xrtype)) for xrto, xriscode, xrtype in res ]
+
+        # return it as a tuple
+        return map(utils.fcompose(operator.itemgetter(0), instance), refs)
+
+    def refs(self):
+        """Return the `(address, opnum, type)` of all the references (code & data) to this structure within the database.
+        If `opnum` is `None`, then the returned `address` has the structure applied to it.
+        If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
+        """
+        x, sid = idaapi.xrefblk_t(), self.id
+
+        # grab first reference to structure
+        ok = x.first_to(sid, 0)
+        if not ok:
+            return []
+
+        # collect the rest of its references
+        refs = [(x.frm, x.iscode, x.type)]
+        while x.next_to():
+            refs.append((x.frm, x.iscode, x.type))
+
+        # calculate the high-byte which is used to differentiate an address from a structure
+        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR) / math.log(2.0)))
+        highbyte = 0xff << (bits-8)
+
+        # iterate through figuring out if sid is applied to an address or another structure
+        res = []
+        for ref, _, _ in refs:
+            # structure (probably a frame member)
+            if ref & highbyte == highbyte:
+                # get sptr, mptr
+                name = idaapi.get_member_fullname(ref)
+                mptr, _ = idaapi.get_member_by_fullname(name)
+                if not isinstance(mptr, idaapi.member_t):
+                    cls = self.__class__
+                    raise TypeError("{:s} : Unexpected type {!r} for netnode '{:s}'".format('.'.join((__name__, cls.__name__)), mptr.__class__, name))
+                sptr = idaapi.get_sptr(mptr)
+
+                # get frame, func_t
+                frname, _ = name.split('.', 2)
+                frid = internal.netnode.get(frname)
+                ea = idaapi.get_func_by_frame(frid)
+                f = idaapi.get_func(ea)
+
+                # now find all xrefs to member within function
+                xl = idaapi.xreflist_t()
+                idaapi.build_stkvar_xrefs(xl, f, mptr)
+
+                # now we can add it
+                for xr in xl:
+                    ea, opnum, state = xr.ea, int(xr.opnum), instruction.op_state(ea, opnum)
+                    res.append( interface.OREF(ea, opnum, interface.ref_t.of_state(state)) )
+                continue
+
+            # address
+            res.append( interface.OREF(ref, None, interface.ref_t.of_state('*')) )   # using '*' to describe being applied to the an address
+
+        return res
+
+    @property
+    def id(self):
+        '''Return the identifier of the structure.'''
+        return self.__id__
+    @property
+    def ptr(self):
+        '''Return the pointer of the `idaapi.struc_t`.'''
+        return idaapi.get_struc(self.id)
+    @property
+    def members(self):
+        '''Return the members belonging to the structure.'''
+        return self.__members__
+
+    def __getstate__(self):
+        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), (True, False))
+        # FIXME: perhaps we should preserve the get_struc_idx result too
+        return (self.name, (cmtt, cmtf), self.members)
+    def __setstate__(self, state):
+        name, (cmtt, cmtf), members = state
+        identifier = idaapi.get_struc_id(name)
+        if identifier == idaapi.BADADDR:
+            logging.warn("{:s}.structure_t.__setstate__ : Creating structure {:s} [{:d} fields]{:s}".format(__name__, name, len(members), " // {!s}".format(cmtf or cmtt) if cmtf or cmtt else ''))
+            identifier = idaapi.add_struc(idaapi.BADADDR, name)
+        idaapi.set_struc_cmt(identifier, cmtt, True)
+        idaapi.set_struc_cmt(identifier, cmtf, False)
+        self.__id__ = identifier
+        self.__members__ = members
+        return
+
+    @property
+    def name(self):
+        '''Return the name of the structure.'''
+        return idaapi.get_struc_name(self.id)
+    @name.setter
+    def name(self, string):
+        '''Set the name of the structure to ``string``.'''
+        if isinstance(string, tuple):
+            string = interface.tuplename(*string)
+
+        res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
+        if string and string != res:
+            cls = self.__class__
+            logging.warn("{:s}.name : Stripping invalid chars from structure name {!r}. : {!r}".format( '.'.join((__name__, cls.__name__)), string, res))
+            string = res
+        return idaapi.set_struc_name(self.id, string)
+
+    @property
+    def comment(self, repeatable=True):
+        '''Return the repeatable comment for the structure.'''
+        return idaapi.get_struc_cmt(self.id, True) or idaapi.get_struc_cmt(self.id, False)
+    @comment.setter
+    def comment(self, value, repeatable=True):
+        '''Set the repeatable comment for the structure to ``value``.'''
+        return idaapi.set_struc_cmt(self.id, value, repeatable)
+
+    @utils.multicase()
+    def tag(self):
+        '''Return the tags associated with the structure.'''
+        repeatable = True
+
+        # grab the repeatable and non-repeatable comment for the structure
+        res = idaapi.get_struc_cmt(self.id, False)
+        d1 = internal.comment.decode(res)
+        res = idaapi.get_struc_cmt(self.id, True)
+        d2 = internal.comment.decode(res)
+
+        # check for duplicate keys
+        if d1.viewkeys() & d2.viewkeys():
+            cls = self.__class__
+            logging.warn("{:s}.comment({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format('.'.join((__name__,cls.__name__)), self.id, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
+
+        # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
+        res = {}
+        builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
+        return res
+    @utils.multicase(key=basestring)
+    def tag(self, key):
+        '''Return the tag identified by ``key`` belonging to the structure.'''
+        res = self.tag()
+        return res[key]
+    @utils.multicase(key=basestring)
+    def tag(self, key, value):
+        '''Set the tag identified by ``key`` to ``value`` for the structure.'''
+        state = self.tag()
+        repeatable, res, state[key] = True, state.get(key, None), value
+        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
+        return res
+    @utils.multicase(key=basestring, none=types.NoneType)
+    def tag(self, key, none):
+        '''Removes the tag specified by ``key`` from the structure.'''
+        state = self.tag()
+        repeatable, res = True, state.pop(key)
+        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
+        return res
+
+    @property
+    def size(self):
+        '''Return the size of the structure.'''
+        return idaapi.get_struc_size(self.ptr)
+    @size.setter
+    def size(self, new):
+        res = idaapi.get_struc_size(self.ptr)
+        ok = idaapi.expand_struc(self.ptr, 0, new - res, True)
+        if not ok:
+            logging.fatal("{:s}.instance({:s}).resize : Unable to resize structure {:s} from {:#x} bytes to {:#x} bytes.".format(__name__, self.name, self.name, res, new))
+        return res
+
+    @property
+    def offset(self):
+        '''Return the base-offset of the structure.'''
+        return self.members.baseoffset
+    @offset.setter
+    def offset(self, offset):
+        '''Set the base-offset of the structure to ``offset``.'''
+        res, self.members.baseoffset = self.members.baseoffset, offset
+        return res
+    @property
+    def index(self):
+        '''Return the index of the structure.'''
+        return idaapi.get_struc_idx(self.id)
+    @index.setter
+    def index(self, idx):
+        '''Set the index of the structure to ``idx``.'''
+        return idaapi.set_struc_idx(self.ptr, idx)
+
+    def destroy(self):
+        '''Remove the structure from the database.'''
+        return idaapi.del_struc(self.ptr)
+
+    def __repr__(self):
+        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment, self.tag()
+        return "<type 'structure' name={!r}{:s} size=+{:#x}>{:s}".format(name, (" offset={:#x}".format(offset) if offset > 0 else ''), size, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
+
+    def field(self, ofs):
+        '''Return the member at the specified offset.'''
+        return self.members.by_offset(ofs + self.members.baseoffset)
+
+    def copy(self, name):
+        '''Copy members into the structure ``name``.'''
+        raise NotImplementedError
+
+    def __getattr__(self, name):
+        return getattr(self.members, name)
+
+    def contains(self, offset):
+        '''Return whether the specified offset is contained by the structure.'''
+        res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
+        return res <= offset < res + cb
 
 class members_t(object):
     """An abstraction around the members of a particular IDA structure

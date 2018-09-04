@@ -1,3 +1,15 @@
+"""
+Root module
+
+This module contains the root namespace that IDA starts up with. Any
+thing defined within this module is used to replace the globals that
+IDA starts up with.
+
+This module also is responsible for assigning the default hooks in
+order to trap what the user is doing to perform any extra maintenance
+that needs to occur.
+"""
+
 ### ida-python specific modules
 import idaapi, ida
 

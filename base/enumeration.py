@@ -1,20 +1,24 @@
 """
-Enumerations
+Enumeration module
 
-generic tools for working with enumerations.
+This module exposes a number of tools that can be used to interact
+with the enumerations or their members defined within the database.
 
-Examples:
-e = enum.create("example_enum")
-e = enum.byName("example_enum")
+The base argument type for interacting with an enumeration is the
+enumeration identifier. This is an opaque integer id that will need
+to be passed to the different tools in order to reference the
+enumeration that the user is referring to.
 
-print enum.name(e), enum.comment(e)
-print enum.size(e), enum.mask(e)
+There are a number of tools within the `member` namespace that can
+be used to enumerate or locate the members of an enumeration. As
+typically an enumeration is simply a constant, each result that is
+returned will either be a value or a name.
 
-for e in enum.iterate():
-    print enum.keys(e),enum.values(e)
-    print enum.repr(e)
-
-enum.delete("example_enum")
+To list the different enumerations available in the database, one
+can use `enumeration.list(...)` specifying their preferred method
+of filtering. This will list all of the available enumerations at
+which point the user can then request it by passing an identifier
+to `enumeration.by($$)`.
 """
 
 import six
