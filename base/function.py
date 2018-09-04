@@ -320,17 +320,6 @@ def address(func):
     return fn.startEA
 top = addr = utils.alias(address)
 
-## internal enumerations that idapython missed
-class fc_block_type_t:
-    fcb_normal = 0  # normal block
-    fcb_indjump = 1 # block ends with indirect jump
-    fcb_ret = 2     # return block
-    fcb_cndret = 3  # conditional return block
-    fcb_noret = 4   # noreturn block
-    fcb_enoret = 5  # external noreturn block (does not belong to the function)
-    fcb_extern = 6  # external normal block
-    fcb_error = 7   # block passes execution past the function end
-
 @utils.multicase()
 def bottom():
     '''Return the exit-points of the current function.'''
@@ -340,7 +329,13 @@ def bottom(func):
     '''Return the exit-points of the function ``func``.'''
     fn = by(func)
     fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
-    exit_types = (fc_block_type_t.fcb_ret, fc_block_type_t.fcb_cndret, fc_block_type_t.fcb_noret, fc_block_type_t.fcb_enoret, fc_block_type_t.fcb_error)
+    exit_types = (
+        interface.fc_block_type_t.fcb_ret,
+        interface.fc_block_type_t.fcb_cndret,
+        interface.fc_block_type_t.fcb_noret,
+        interface.fc_block_type_t.fcb_enoret,
+        interface.fc_block_type_t.fcb_error
+    )
     return tuple(database.address.prev(n.endEA) for n in fc if n.type in exit_types)
 
 @utils.multicase()

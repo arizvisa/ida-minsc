@@ -816,3 +816,14 @@ def addressOfRuntimeOrStatic(func):
 
     # nope, we're just a function
     return False, fn.startEA
+
+## internal enumerations that idapython missed
+class fc_block_type_t:
+    fcb_normal = 0  # normal block
+    fcb_indjump = 1 # block ends with indirect jump
+    fcb_ret = 2     # return block
+    fcb_cndret = 3  # conditional return block
+    fcb_noret = 4   # noreturn block
+    fcb_enoret = 5  # external noreturn block (does not belong to the function)
+    fcb_extern = 6  # external normal block
+    fcb_error = 7   # block passes execution past the function end
