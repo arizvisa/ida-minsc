@@ -256,13 +256,13 @@ class notepad(appwindow):
 class timer(object):
     clock = {}
     @classmethod
-    def register(cls, id, interval, fn):
+    def register(cls, id, interval, callable):
         """register a python function as a timer"""
         if id in cls.clock:
             idaapi.unregister_timer(cls.clock[id])
 
         # XXX: need to create a closure that can terminate when signalled
-        cls.clock[id] = res = idaapi.register_timer(interval, fn)
+        cls.clock[id] = res = idaapi.register_timer(interval, callable)
         return res
     @classmethod
     def unregister(cls, id):
@@ -330,10 +330,10 @@ class navigation(object):
 class menu(object):
     state = {}
     @classmethod
-    def add(cls, path, name, fn, hotkey='', flags=0, args=()):
+    def add(cls, path, name, callable, hotkey='', flags=0, args=()):
         if (path,name) in cls.state:
             cls.rm(path, name)
-        ctx = idaapi.add_menu_item(path, name, hotkey, flags, fn, args)
+        ctx = idaapi.add_menu_item(path, name, hotkey, flags, callable, args)
         cls.state[path,name] = ctx
     @classmethod
     def rm(cls, path, name):
@@ -415,11 +415,11 @@ class keyboard(object):
 
     hotkey = {}
     @classmethod
-    def map(cls, key, fn):
+    def map(cls, key, callable):
         '''map a key to a python function'''
         if key in cls.hotkey:
             idaapi.del_hotkey(cls.hotkey[key])
-        cls.hotkey[key] = res = idaapi.add_hotkey(key, fn)
+        cls.hotkey[key] = res = idaapi.add_hotkey(key, callable)
         return res
     @classmethod
     def unmap(cls, key):
@@ -622,10 +622,10 @@ class queue(object):
         return cls.execute.stop()
 
     @classmethod
-    def add(cls, func, *args, **kwds):
+    def add(cls, callable, *args, **kwds):
         if not cls.execute.running:
-            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), func))
-        return cls.execute.push(func, *args, **kwds)
+            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
+        return cls.execute.push(callable, *args, **kwds)
 
     @classmethod
     def pop(cls):
