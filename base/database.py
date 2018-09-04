@@ -1178,7 +1178,7 @@ def tag_read(ea):
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
     esuffix = extra.get_suffix(ea)
     if esuffix is not None: res.setdefault('__extra_suffix__', esuffix)
-    col = get_color(ea)
+    col = color(ea)
     if col is not None: res.setdefault('__color__', col)
 
     # now return what the user cares about
@@ -1212,7 +1212,7 @@ def tag_write(ea, key, value):
     if key == '__extra_suffix__':
         return extra.set_suffix(ea, value)
     if key == '__color__':
-        return set_color(ea, value)
+        return color(ea, value)
 
     # if not within a function, then use a repeatable comment
     # otherwise, use a non-repeatable one

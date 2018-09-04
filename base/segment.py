@@ -294,7 +294,7 @@ def color():
     '''Return the color of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise LookupError("{:s}.get_color() : Not currently positioned within a segment".format(__name__))
+        raise LookupError("{:s}.color() : Not currently positioned within a segment".format(__name__))
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
 @utils.multicase()

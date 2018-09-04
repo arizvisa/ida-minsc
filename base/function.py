@@ -153,7 +153,7 @@ def name(func, string, *suffix):
     # filter out invalid characters
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
-        logging.warn("{:s}.set_name({:#x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
+        logging.warn("{:s}.name({:#x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
         string = res
 
     # now we can assign the name
@@ -192,7 +192,7 @@ def prototype():
 def prototype(func):
     '''Return the prototype of the function ``func`` if it has one.'''
     rt, ea = interface.addressOfRuntimeOrStatic(func)
-    funcname = database.name(ea) or get_name(ea)
+    funcname = database.name(ea) or name(ea)
     try:
         res = internal.declaration.function(ea)
         idx = res.find('(')
@@ -1237,7 +1237,7 @@ def tag_read(func):
     map(res.update, (d1, d2) if repeatable else (d2, d1))
 
     # add the function's name to the result
-    fname = get_name(fn)
+    fname = name(fn)
     if fname and database.type.flags(fn.startEA, idaapi.FF_NAME): res.setdefault('__name__', fname)
 
     # ..and now hand it off.
@@ -1282,7 +1282,7 @@ def tag_write(func, key, value):
 
     # if the user wants to change the '__name__' tag then update the function's name.
     if key == '__name__':
-        return set_name(fn, value)
+        return name(fn, value)
 
     state = internal.comment.decode(comment(fn, repeatable=1))
     res, state[key] = state.get(key, None), value
@@ -1314,7 +1314,7 @@ def tag_write(func, key, none):
 
     # if the user wants to remove the '__name__' tag then remove the name from the function.
     if key == '__name__':
-        return set_name(fn, None)
+        return name(fn, None)
 
     state = internal.comment.decode(comment(fn, repeatable=1))
     res = state.pop(key)

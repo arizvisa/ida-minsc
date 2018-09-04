@@ -32,7 +32,7 @@ def fetch_contents(f):
 
 def check_contents(ea):
     node, key = internal.netnode.get(internal.comment.tagging.node()), internal.comment.contents._key(ea)
-    tag = internal.comment.decode(db.get_comment(key))
+    tag = internal.comment.decode(db.comment(key))
 
     encdata = internal.netnode.sup.get(node, key)
     if encdata is None and tag: return False
@@ -45,11 +45,11 @@ def check_contents(ea):
 def check_global(ea):
     if func.within(ea): return False
 
-    cache = internal.comment.decode(db.get_comment(db.top()))
-    cache.update( internal.comment.decode(db.get_comment(db.bottom())) )
+    cache = internal.comment.decode(db.comment(db.top()))
+    cache.update( internal.comment.decode(db.comment(db.bottom())) )
 
     node = internal.netnode.get(internal.comment.tagging.node())
-    tag = internal.comment.decode(db.get_comment(ea))
+    tag = internal.comment.decode(db.comment(ea))
 
     if cache and '__address__' not in cache: return False
     if not cache and tag: return False
