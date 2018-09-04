@@ -624,12 +624,12 @@ class search(object):
         return search.iterate(start, string, search.by_bytes)
     @utils.multicase(start=six.integer_types, string=basestring)
     @staticmethod
-    def iterate(start, string, type):
-        '''Iterate through all searches matched by the function ``type`` and ``string`` starting at address ``start``.'''
-        ea = type(start, string)
+    def iterate(start, string, predicate):
+        '''Iterate through all searches matched by the function ``predicate`` and ``string`` starting at address ``start``.'''
+        ea = predicate(start, string)
         while ea != idaapi.BADADDR:
             yield ea
-            ea = type(ea+1, string)
+            ea = predicate(ea+1, string)
         return
 
     def __new__(cls, string):
