@@ -77,56 +77,37 @@ def offset(func):
 
 ## properties
 @utils.multicase()
-def get_comment(**repeatable):
+def comment(**repeatable):
     '''Return the comment for the current function.'''
-    return get_comment(ui.current.function(), **repeatable)
+    fn = ui.current.function()
+    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', 1))
 @utils.multicase()
-def get_comment(func, **repeatable):
+def comment(func, **repeatable):
     """Return the comment for the function ``func``.
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
     fn = by(func)
     return idaapi.get_func_cmt(fn, repeatable.get('repeatable', 1))
-@utils.multicase(comment=basestring)
-def set_comment(comment, **repeatable):
-    '''Set the comment for the current function to ``comment``.'''
-    return set_comment(ui.current.function(), comment, **repeatable)
-@utils.multicase(comment=basestring)
-def set_comment(func, comment, **repeatable):
-    """Set the comment for the function ``func`` to ``comment``.
+@utils.multicase(string=basestring)
+def comment(string, **repeatable):
+    '''Set the comment for the current function to ``string``.'''
+    fn = ui.current.function()
+    return idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', 1))
+@utils.multicase(string=basestring)
+def comment(func, string, **repeatable):
+    """Set the comment for the function ``func`` to ``string``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
     fn = by(func)
-    return idaapi.set_func_cmt(fn, comment, repeatable.get('repeatable', 1))
+    return idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', 1))
 
 @utils.multicase()
-def comment(**repeatable):
-    '''Return the comment for the current function.'''
-    return get_comment(ui.current.function(), **repeatable)
-@utils.multicase()
-def comment(func, **repeatable):
-    '''Return the comment for the function ``func``.'''
-    return get_comment(func, **repeatable)
-@utils.multicase(comment=basestring)
-def comment(comment, **repeatable):
-    '''Set the comment for the current function to ``comment``.'''
-    return set_comment(ui.current.function(), comment, **repeatable)
-@utils.multicase(comment=basestring)
-def comment(func, comment, **repeatable):
-    """Set the comment for the function ``func`` to ``comment``.
-    If the bool ``repeatable`` is specified, then modify the repeatable comment.
-    """
-    return set_comment(func, comment, **repeatable)
-
-@utils.multicase()
-def get_name():
+def name():
     '''Return the name of the current function.'''
-    return get_name(ui.current.function())
+    return name(ui.current.address())
 @utils.multicase()
-def get_name(func):
-    """Return the name of the function ``func``.
-    If ``flags`` is specified, then use the specified value as the flags.
-    """
+def name(func):
+    '''Return the name of the function ``func``.'''
     get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
 
     rt, ea = interface.addressOfRuntimeOrStatic(func)
@@ -140,64 +121,48 @@ def get_name(func):
     return res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
-
 @utils.multicase(none=types.NoneType)
-def set_name(none):
+def name(none):
     '''Remove the custom-name from the current function.'''
-    return set_name(ui.current.function(), none or '')
-@utils.multicase(name=basestring)
-def set_name(name):
-    '''Set the name of the current function to ``name``.'''
     # we use ui.current.address() instead of ui.current.function()
     # in case the user might be hovering over an import table
     # function and wanting to rename that instead.
-    return set_name(ui.current.address(), name)
-@utils.multicase(none=types.NoneType)
-def set_name(func, none):
-    '''Remove the custom-name from the function ``func``.'''
-    return set_name(func, none or '')
+    return name(ui.current.address(), none or '')
 @utils.multicase(string=basestring)
-def set_name(func, string):
+def name(string, *suffix):
+    '''Set the name of the current function to ``string``.'''
+    # we use ui.current.address() instead of ui.current.function()
+    # in case the user might be hovering over an import table
+    # function and wanting to rename that instead.
+    return name(ui.current.address(), string, *suffix)
+@utils.multicase(none=types.NoneType)
+def name(func, none):
+    '''Remove the custom-name from the function ``func``.'''
+    return name(func, none or '')
+@utils.multicase(string=basestring)
+def name(func, string, *suffix):
     '''Set the name of the function ``func`` to ``string``.'''
+
+    # combine name with its suffix
+    res = (string,) + suffix
+    string = interface.tuplename(*res)
+
+    # figure out if address is a runtime or static function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
 
+    # filter out invalid characters
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
         logging.warn("{:s}.set_name({:#x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
         string = res
 
+    # now we can assign the name
     if rt:
         # FIXME: shuffle the new name into the prototype and then re-mangle it
         res = database.set_name(ea, string)
     else:
         res = database.set_name(ea, string, flags=idaapi.SN_PUBLIC)
     return res
-
-@utils.multicase()
-def name():
-    '''Return the name of the current function.'''
-    return get_name(ui.current.function())
-@utils.multicase()
-def name(func):
-    '''Return the name of the function ``func``.'''
-    return get_name(func)
-@utils.multicase(none=types.NoneType)
-def name(none):
-    '''Remove the custom-name from the current function.'''
-    return set_name(ui.current.function(), none or '')
-@utils.multicase(string=basestring)
-def name(string, *suffix):
-    '''Set the name of the current function to ``string``.'''
-    return name(ui.current.function(), string, *suffix)
-@utils.multicase(none=types.NoneType)
-def name(func, none):
-    '''Remove the custom-name from the function ``func``.'''
-    return set_name(func, none or '')
-@utils.multicase(string=basestring)
-def name(func, string, *suffix):
-    '''Set the name of the function ``func`` to ``string``.'''
-    res = (string,) + suffix
-    return set_name(func, interface.tuplename(*res))
 
 @utils.multicase()
 def convention():
@@ -252,59 +217,33 @@ def bounds(func):
     return fn.startEA, fn.endEA
 range = utils.alias(bounds)
 
+@utils.multicase()
+def color():
+    '''Return the color of the current function.'''
+    return color(ui.current.function())
+@utils.multicase()
+def color(func):
+    '''Return the color of the function ``func``.'''
+    fn = by(func)
+    b, r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
+    return None if fn.color == 0xffffffff else (r<<16) | (fn.color&0x00ff00) | b
 @utils.multicase(none=types.NoneType)
-def set_color(none):
-    '''Remove the color from the current function.'''
-    return set_color(ui.current.function(), None)
-@utils.multicase(rgb=six.integer_types)
-def set_color(rgb):
-    '''Set the color of the current function to ``rgb``.'''
-    return set_color(ui.current.function(), rgb)
-@utils.multicase(none=types.NoneType)
-def set_color(func, none):
-    '''Remove the color from the function ``func``.'''
+def color(func, none):
+    '''Remove the color for the function ``func``.'''
     fn = by(func)
     fn.color = 0xffffffff
     return bool(idaapi.update_func(fn))
 @utils.multicase(rgb=six.integer_types)
-def set_color(func, rgb):
+def color(func, rgb):
     '''Set the color of the function ``func`` to ``rgb``.'''
     r, b = (rgb&0xff0000)>>16, rgb&0x0000ff
     fn = by(func)
     fn.color = (b<<16) | (rgb&0x00ff00) | r
     return bool(idaapi.update_func(fn))
-
-@utils.multicase()
-def get_color():
-    '''Return the color of the current function.'''
-    return get_color(ui.current.function())
-@utils.multicase()
-def get_color(func):
-    '''Return the color of the function ``func``.'''
-    fn = by(func)
-    b, r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
-    return None if fn.color == 0xffffffff else (r<<16) | (fn.color&0x00ff00) | b
-
-@utils.multicase()
-def color():
-    '''Return the color of the current function.'''
-    return get_color(ui.current.function())
-@utils.multicase()
-def color(func):
-    '''Return the color of the function ``func``.'''
-    return get_color(func)
-@utils.multicase(none=types.NoneType)
-def color(func, none):
-    '''Remove the color for the function ``func``.'''
-    return set_color(func, None)
-@utils.multicase(rgb=six.integer_types)
-def color(func, rgb):
-    '''Set the color of the function ``func`` to ``rgb``.'''
-    return set_color(func, rgb)
 @utils.multicase(none=types.NoneType)
 def color(none):
     '''Remove the color for the current function.'''
-    return set_color(ui.current.function(), None)
+    return color(ui.current.function(), None)
 
 @utils.multicase()
 def address():
@@ -784,35 +723,44 @@ class block(object):
         _, right = cls(tuple)
         return right
 
+    @utils.multicase()
+    @classmethod
+    def color(cls):
+        '''Returns the color of the basic-block at the current address.'''
+        return cls.color(ui.current.address())
     @utils.multicase(none=types.NoneType)
     @classmethod
-    def set_color(cls, none):
-        '''Removes the color of the current-basic block.'''
-        return cls.set_color(ui.current.address(), None)
-    @utils.multicase(rgb=six.integer_types)
+    def color(cls, none):
+        '''Removes the color of the basic-block at the current address.'''
+        return cls.color(ui.current.address(), None)
+    @utils.multicase(ea=six.integer_types)
     @classmethod
-    def set_color(cls, rgb):
-        '''Sets the color of the current-basic block to ``rgb``.'''
-        return cls.set_color(ui.current.address(), rgb)
-    @utils.multicase(tuple=types.TupleType, none=types.NoneType)
+    def color(cls, ea):
+        '''Returns the color of the basic-block at the address ``ea``.'''
+        bb = cls.get(ea)
+        return cls.color(bb)
+    @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
-    def set_color(cls, tuple, none):
-        '''Removes the color of the basic-block identified by ``tuple``.'''
+    def color(cls, bb):
+        '''Returns the color of the basic-block ``bb``.'''
+        fn, n = by_address(bb.startEA), idaapi.node_info_t()
+        ok = idaapi.get_node_info2(n, fn.startEA, bb.id)
+        if ok and n.valid_bg_color():
+            res = n.bg_color
+            b, r = (res&0xff0000)>>16, res&0x0000ff
+            return (r<<16) | (res&0x00ff00) | b
+        return None
+    @utils.multicase(tuple=types.TupleType)
+    @classmethod
+    def color(cls, tuple):
+        '''Returns the color of the basic-block identified by ``tuple``.'''
         bb = cls.get(tuple)
-        return cls.set_color(bb, None)
-    @utils.multicase(tuple=types.TupleType, rgb=six.integer_types)
-    @classmethod
-    def set_color(cls, tuple, rgb, **frame):
-        """Sets the color of the basic-block identified by ``tuple`` to ``rgb``.
-        If the color ``frame`` is specified, set the frame to the specified color.
-        """
-        bb = cls.get(tuple)
-        return cls.set_color(bb, rgb, **frame)
+        return cls.color(bb)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
-    def set_color(cls, ea, none):
-        '''Removes the color of the basic-block at address ``ea``.'''
-        res, fn, bb = cls.get_color(ea), by_address(ea), cls.id(ea)
+    def color(cls, ea, none):
+        '''Removes the color of the basic-block at the address ``ea``.'''
+        res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
         try: idaapi.clr_node_info2(fn.startEA, bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
         finally: idaapi.refresh_idaview_anyway()
 
@@ -821,13 +769,32 @@ class block(object):
             database.set_color(ea, None)
             # internal.netnode.alt.remove(ea, 0x14)
         return res
+    @utils.multicase(tuple=types.TupleType, none=types.NoneType)
+    @classmethod
+    def color(cls, tuple, none):
+        '''Removes the color of the basic-block identified by ``tuple``.'''
+        bb = cls.get(tuple)
+        return cls.color(bb, None)
+    @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
+    @classmethod
+    def color(cls, bb, none):
+        '''Removes the color of the basic-block ``bb``.'''
+        res, fn = cls.color(bb), by_address(bb.startEA)
+        try: idaapi.clr_node_info2(fn.startEA, bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+        finally: idaapi.refresh_idaview_anyway()
+
+        # clear the color of each item too.
+        for ea in block.iterate(bb):
+            database.set_color(ea, None)
+            #internal.netnode.alt.remove(ea, 0x14)
+        return res
     @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
     @classmethod
-    def set_color(cls, ea, rgb, **frame):
-        """Sets the color of the basic-block at address ``ea`` to ``rgb``.
+    def color(cls, ea, rgb, **frame):
+        """Sets the color of the basic-block at the address ``ea`` to ``rgb``.
         If the color ``frame`` is specified, set the frame to the specified color.
         """
-        res, fn, bb = cls.get_color(ea), by_address(ea), cls.id(ea)
+        res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
         n = idaapi.node_info_t()
 
         # specify the bgcolor
@@ -849,26 +816,13 @@ class block(object):
             database.set_color(ea, rgb)
             #internal.netnode.alt.set(ea, 0x14, n.bg_color)
         return res
-    @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
-    @classmethod
-    def set_color(cls, bb, none):
-        '''Removes the color of the basic-block ``bb``.'''
-        res, fn = cls.get_color(bb), by_address(bb.startEA)
-        try: idaapi.clr_node_info2(fn.startEA, bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
-        finally: idaapi.refresh_idaview_anyway()
-
-        # clear the color of each item too.
-        for ea in block.iterate(bb):
-            database.set_color(ea, None)
-            #internal.netnode.alt.remove(ea, 0x14)
-        return res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
-    def set_color(cls, bb, rgb, **frame):
+    def color(cls, bb, rgb, **frame):
         """Sets the color of the basic-block ``bb`` to ``rgb``.
         If the color ``frame`` is specified, set the frame to the specified color.
         """
-        res, fn, n = cls.get_color(bb), by_address(bb.startEA), idaapi.node_info_t()
+        res, fn, n = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
 
         # specify the bg color
         r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
@@ -889,97 +843,14 @@ class block(object):
             database.set_color(ea, rgb)
             #internal.netnode.alt.set(ea, 0x14, n.bg_color)
         return res
-
-    @utils.multicase()
-    @classmethod
-    def get_color(cls):
-        '''Returns the color of the current basic-block.'''
-        return cls.get_color(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def get_color(cls, ea):
-        '''Returns the color of the basic-block at address ``ea``.'''
-        bb = cls.get(ea)
-        return cls.get_color(bb)
-    @utils.multicase(tuple=types.TupleType)
-    @classmethod
-    def get_color(cls, tuple):
-        '''Returns the color of the basic-block ``bb``.'''
-        bb = cls.get(tuple)
-        return cls.get_color(bb)
-    @utils.multicase(bb=idaapi.BasicBlock)
-    @classmethod
-    def get_color(cls, bb):
-        '''Returns the color of the basic-block ``bb``.'''
-        fn, n = by_address(bb.startEA), idaapi.node_info_t()
-        ok = idaapi.get_node_info2(n, fn.startEA, bb.id)
-        if ok and n.valid_bg_color():
-            res = n.bg_color
-            b, r = (res&0xff0000)>>16, res&0x0000ff
-            return (r<<16) | (res&0x00ff00) | b
-        return None
-
-    @utils.multicase()
-    @classmethod
-    def color(cls):
-        '''Returns the color of the basic-block at the current address.'''
-        return cls.get_color(ui.current.address())
-    @utils.multicase(none=types.NoneType)
-    @classmethod
-    def color(cls, none):
-        '''Removes the color of the basic-block at the current address.'''
-        return cls.set_color(ui.current.address(), None)
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def color(cls, ea):
-        '''Returns the color of the basic-block at the address ``ea``.'''
-        return cls.get_color(ea)
-    @utils.multicase(bb=idaapi.BasicBlock)
-    @classmethod
-    def color(cls, bb):
-        '''Returns the color of the basic-block ``bb``.'''
-        return cls.get_color(bb)
-    @utils.multicase(tuple=types.TupleType)
-    @classmethod
-    def color(cls, tuple):
-        '''Returns the color of the basic-block identified by ``tuple``.'''
-        return cls.get_color(tuple)
-    @utils.multicase(ea=six.integer_types, none=types.NoneType)
-    @classmethod
-    def color(cls, ea, none):
-        '''Removes the color of the basic-block at the address ``ea``.'''
-        return cls.set_color(ea, None)
-    @utils.multicase(tuple=types.TupleType, none=types.NoneType)
-    @classmethod
-    def color(cls, tuple, none):
-        '''Removes the color of the basic-block identified by ``tuple``.'''
-        return cls.set_color(tuple, None)
-    @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
-    @classmethod
-    def color(cls, bb, none):
-        '''Removes the color of the basic-block ``bb``.'''
-        return cls.set_color(bb, None)
-    @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
-    @classmethod
-    def color(cls, ea, rgb, **frame):
-        """Sets the color of the basic-block at the address ``ea`` to ``rgb``.
-        If the color ``frame`` is specified, set the frame to the specified color.
-        """
-        return cls.set_color(ea, rgb, **frame)
-    @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
-    @classmethod
-    def color(cls, bb, rgb, **frame):
-        """Sets the color of the basic-block ``bb`` to ``rgb``.
-        If the color ``frame`` is specified, set the frame to the specified color.
-        """
-        return cls.set_color(bb, rgb, **frame)
     @utils.multicase(tuple=types.TupleType, rgb=six.integer_types)
     @classmethod
     def color(cls, tuple, rgb, **frame):
         """Sets the color of the basic-block identifed by ``tuple`` to ``rgb``.
         If the color ``frame`` is specified, set the frame to the specified color.
         """
-        return cls.set_color(tuple, rgb, **frame)
+        bb = cls.get(tuple)
+        return cls.color(bb, rgb, **frame)
 
     @utils.multicase()
     @classmethod
