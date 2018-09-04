@@ -425,6 +425,27 @@ class chunk(object):
             continue
         raise LookupError("{:s}.chunk({:#x}) : Unable to locate chunk for function {:#x}.".format(__name__, ea, address(func)))
 
+    @utils.multicase()
+    def top(cls):
+        '''Return the top address of the chunk at the current address.'''
+        left, _ = cls()
+        return left
+    @utils.multicase(ea=six.integer_types)
+    def top(cls, ea):
+        '''Return the top address of the chunk at address ``ea``.'''
+        left, _ = cls(ea)
+        return left
+    @utils.multicase()
+    def bottom(cls):
+        '''Return the bottom address of the chunk at the current address.'''
+        _, right = cls()
+        return right
+    @utils.multicase(ea=six.integer_types)
+    def bottom(cls, ea):
+        '''Return the bottom address of the chunk at address ``ea``.'''
+        _, right = cls(ea)
+        return right
+
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
     def add(cls, start, end):
