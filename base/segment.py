@@ -289,30 +289,8 @@ def name(segment):
     seg = by(segment)
     return idaapi.get_true_segm_name(seg)
 
-@utils.multicase(none=types.NoneType)
-def set_color(segment, none):
-    '''Clear the color of the segment identified by ``segment``.'''
-    seg = by(segment)
-    seg.color = 0xffffffff
-    return bool(seg.update())
-@utils.multicase(rgb=six.integer_types)
-def set_color(segment, rgb):
-    '''Set the color of the segment identified by ``segment`` to ``rgb``.'''
-    r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
-    seg = by(segment)
-    seg.color = (b<<16)|(rgb&0x00ff00)|r
-    return bool(seg.update())
-@utils.multicase(rgb=six.integer_types)
-def set_color(rgb):
-    '''Set the color of the current segment to ``rgb``.'''
-    return set_color(ui.current.segment(), rgb)
-@utils.multicase(none=types.NoneType)
-def set_color(none):
-    '''Clear the color of the current segment.'''
-    return set_color(ui.current.segment(), None)
-
 @utils.multicase()
-def get_color():
+def color():
     '''Return the color of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
@@ -320,32 +298,28 @@ def get_color():
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
 @utils.multicase()
-def get_color(segment):
+def color(segment):
     '''Return the color of the segment identified by ``segment``.'''
     seg = by(segment)
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
-
-@utils.multicase()
-def color():
-    '''Return the color of the current segment.'''
-    return get_color(ui.current.segment())
-@utils.multicase()
-def color(segment):
-    '''Return the color of the segment identified by ``segment``.'''
-    return get_color(segment)
 @utils.multicase(none=types.NoneType)
 def color(none):
     '''Clear the color of the current segment.'''
-    return set_color(ui.current.segment(), None)
+    return color(ui.current.segment(), None)
 @utils.multicase(none=types.NoneType)
 def color(segment, none):
     '''Clear the color of the segment identified by ``segment``.'''
-    return set_color(segment, None)
+    seg = by(segment)
+    seg.color = 0xffffffff
+    return bool(seg.update())
 @utils.multicase(rgb=six.integer_types)
 def color(segment, rgb):
     '''Sets the color of the segment identified by ``segment`` to ``rgb``.'''
-    return set_color(segment, rgb)
+    r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
+    seg = by(segment)
+    seg.color = (b<<16)|(rgb&0x00ff00)|r
+    return bool(seg.update())
 
 @utils.multicase()
 def within():
