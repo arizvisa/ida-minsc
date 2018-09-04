@@ -6,6 +6,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import six
 import functools, operator, itertools, types
 import argparse, logging
 import ast, contextlib
@@ -17,12 +18,27 @@ class FILTER:
     class FUNCTION:
         WHITELIST, BLACKLIST = set(), set()
 
+# some global constants
+class undefined(object): pass
+
 ### Namespace of idascripts-specific types that get evaluated to an internal type or a string
 class evaluate(object):
     def __new__(cls, path):
-        res = cls
-        for name in path.split('.'):
-            res = getattr(res, name)
+        '''Use the current namespace to try and get some primitive type of some kind'''
+
+        # walk the specified namespace resolving everything till we get a type
+        def __evaluate(ns, path):
+            res = cls
+            for name in path:
+                res = getattr(res, name)
+            return res
+
+        try:
+            # try and resolve the string using our namespace
+            res = __evaluate(cls, path.split('.'))
+        except AttributeError:
+            # otherwise, just return it unmodified
+            return path
         return res
 
     ## Miscellaneous internal types
@@ -67,6 +83,8 @@ class stringify(object):
             except AttributeError:
                 res = object
             return cls(res) if isinstance(res, type) else res
+        elif isinstance(object, (six.integer_types, float)):
+            return "{!s}".format(object)
         if not isinstance(object, tuple):
             return cls(cls.definitions[object])
         return tuple(cls(res) for res in object)
@@ -132,6 +150,13 @@ class Param(Reference):
 class ParamTuple(Reference):
     owner = property(fget=operator.attrgetter('_owner'))
     params = property(fget=operator.attrgetter('_params'))
+    def members(self):
+        res, = grammar.reduce(self.params)
+        return tuple(map(operator.itemgetter(0), res))
+    def __repr__(self):
+        cls = self.__class__
+        res, = grammar.reduce(self.params)
+        return "{:s}({:s})".format(cls.__name__, ','.join(p for p, in res))
 class ParamVariableList(Param): pass
 class ParamVariableKeyword(Param): pass
 
@@ -199,16 +224,6 @@ class grammar(object):
     def return_empty(yy):
         return '',
 
-    @staticmethod
-    def resolve(value):
-        global evaluate
-        if isinstance(value, basestring):
-            try:
-                res = evaluate(value)
-            except AttributeError:
-                res = value
-            return res
-        return value
     @staticmethod
     def reduce(type):
         # check if it's a reduction that requires a transform
@@ -404,6 +419,87 @@ class restructure(object):
         return '\n'.join(res)
 
     @classmethod
+    def Arguments(cls, ref):
+        global stringify, undefined
+        adefs, atypes, aparams = ref.get('defaults') or {}, ref.mc, ref.get('parameters')
+
+        # group arguments by their type
+        gargs = {}
+        for a in ref.args:
+            gargs.setdefault(Param if isinstance(a, ParamTuple) else type(a), []).append(a)
+            #gargs = dict(itertools.groupby(ref.args, type))
+
+        # aggregate the different parameter components according to the names and their types/defaults
+        args = []   # args in definition (name, defaults)
+        params = [] # parameters that are listed (name, description, types)
+        if Param in gargs:
+            for a in gargs[Param]:
+                # handle Param
+                if isinstance(a, Param):
+                    args.append((a.name, adefs.get(a.name, undefined())))
+                    params.append((a.name, aparams.get(a.name, undefined()), atypes.get(a.name, undefined())))
+                    continue
+                # handle ParamTuple
+                args.append(("({:s})".format(','.join(a.members())), undefined()))
+                for an in a.members():
+                    params.append((an, aparams.get(an, undefined()), atypes.get(an, undefined())))
+                continue
+        if ParamVariableList in gargs:
+            for a in gargs[ParamVariableList]:
+                args.append(("*{:s}".format(a.name), undefined()))
+                params.append((a.name, undefined(), undefined()))
+            pass
+        if ParamVariableKeyword in gargs:
+            for a in gargs[ParamVariableKeyword]:
+                args.append(("**{:s}".format(a.name), undefined()))
+                params.append((a.name, undefined(), undefined()))
+            pass
+
+        # transform any defaults that were specified into their string representation
+        res = []
+        for n, df in args:
+            if isinstance(df, undefined):
+                res.append((n, df))
+            elif df == '':
+                res.append((n, "''"))
+            elif df == ():
+                res.append((n, '()'))
+            elif isinstance(df, tuple):
+                res.append((n, '|'.join(map(stringify, df))))
+            elif isinstance(df, (six.integer_types, float)):
+                res.append((n, "{!s}".format(df)))
+            elif isinstance(df, basestring):
+                res.append((n, df))
+            else:
+                raise TypeError('args', n, df)
+            continue
+        args = res[:]
+
+        # transform any types that were specified into a string representation
+        res = []
+        for n, descr, ty in params:
+            # skip if there's no types defined
+            if isinstance(ty, undefined):
+                res.append((n, descr, ty))
+                continue
+
+            # convert any suspected resolvable types to a string
+            ty = stringify(evaluate(ty))
+            if isinstance(ty, basestring):
+                res.append((n, descr, ty))
+            elif isinstance(ty, types.TupleType):
+                t = tuple(ty)
+                if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
+                res.append((n, descr, '|'.join(map(stringify, t))))
+            else:
+                raise TypeError('params', n, ty)
+            continue
+        params = res[:]
+
+        # should be good to go
+        return args, params
+
+    @classmethod
     def Property(cls, ref):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         ns = ns[1:] if ref.name == '__new__' else ns[:]
@@ -419,44 +515,19 @@ class restructure(object):
         else: attrs.append(('getter', ref))
         if ref.has('setter'): attrs.append(('setter', ref.get('setter')))
 
-        params = []
+        props = []
         for n, r in attrs:
-            adefs, atypes, aparams = r.get('defaults') or {}, r.mc, r.get('parameters')
-
-            # ensure that all default arguments are stringified ahead of time so they're always there
-            adefs = {a : stringify(v) if not v and v not in {0, None} else v for a, v in adefs.iteritems()}
-
             fmt = ": param {name:s} {comment:s}"
-            params.append(fmt.format(name=n, comment=' '.join(cls.docstringToList(r.comment))))
+            props.append(fmt.format(name=n, comment=' '.join(cls.docstringToList(r.comment))))
 
-            #gargs = dict(itertools.groupby(ref.args, type))
-            gargs = {}
-            for a in r.args:
-                gargs.setdefault(type(a), []).append(a)
+            _, pparams = cls.Arguments(r)
 
-            args = []
-            if Param in gargs:
-                args.extend( (a.name, a.name, adefs.get(a.name, None), atypes.get(a.name, None)) for a in gargs[Param])
-            if ParamVariableList in gargs:
-                args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
-            if ParamVariableKeyword in gargs:
-                args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
-            args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args][1:]
-
-            for n, fn, _, ty in args:
-                if isinstance(ty, basestring): t = grammar.resolve(ty)
-                elif ty is None: t = ()
-                elif isinstance(ty, types.TupleType):
-                    t = tuple(ty)
-                    if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
-                else: raise TypeError(name, n, ty)
-                t = stringify(t)
-
-                fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
-                fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
-                params.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
+            for n, descr, ty in pparams[1:]:
+                fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
+                fmt += '' if isinstance(descr, undefined) else (' '+cls.escape(descr))
+                props.append(fmt.format(type=ty, name=cls.escape(n)))
             continue
-        res.extend(cls.indentlist(params, '   '))
+        res.extend(cls.indentlist(props, '   '))
 
         if attrs: res.append('')
 
@@ -471,46 +542,23 @@ class restructure(object):
         name = '.'.join(reversed(ns)) if ref.name == '__new__' else ref.name
 
         aliases = ref.get('aliases') or {}
-        adefs, atypes, aparams = ref.get('defaults') or {}, ref.mc, ref.get('parameters')
+        args, params = cls.Arguments(ref)
 
-        # ensure that all default arguments are stringified ahead of time so they're always there
-        adefs = {a : stringify(v) if not v and v not in {0, None} else v for a, v in adefs.iteritems()}
+        # now we can make the definition
+        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join(cls.escape(n) if isinstance(df, undefined) else "{:s}={!s}".format(cls.escape(n), df) for n, df in args))
 
-        #gargs = dict(itertools.groupby(ref.args, type))
-        gargs = {}
-        for a in ref.args:
-            gargs.setdefault(type(a), []).append(a)
-
-        args = []
-        if Param in gargs:
-            args.extend( (a.name, a.name, adefs.get(a.name, None), atypes.get(a.name, None)) for a in gargs[Param])
-        if ParamVariableList in gargs:
-            args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
-        if ParamVariableKeyword in gargs:
-            args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
-        args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args]
-
-        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={:s}'.format(fn, "''" if df == '' else '|'.join(map(stringify, df)) if isinstance(df, tuple) else stringify(df)) if df is not None else fn for _, fn, df, _ in args))
-
+        # populate the contents of the function
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
         if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
 
-        for n, fn, _, ty in args:
-            if isinstance(ty, basestring): t = grammar.resolve(ty)
-            elif ty is None: t = ()
-            elif isinstance(ty, types.TupleType):
-                t = tuple(ty)
-                if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
-            else: raise TypeError(name, n, ty)
-            t = stringify(t)
+        for n, descr, ty in params[1:]:
+            fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
+            fmt += '' if isinstance(descr, undefined) else (' '+cls.escape(descr))
+            res.append(fmt.format(type=ty, name=cls.escape(n)))
 
-            fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
-            fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
-            res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
-
-        if args: res.append('')
+        if params[1:]: res.append('')
 
         res = cls.indentlist(res, '   ')
         res[0:0] = (definition,)
@@ -523,46 +571,23 @@ class restructure(object):
         name = '.'.join(reversed(ns))
 
         aliases = ref.get('aliases') or {}
-        adefs, atypes, aparams = ref.get('defaults') or {}, ref.mc, ref.get('parameters')
+        args, params = cls.Arguments(ref)
 
-        # ensure that all default arguments are stringified ahead of time so they're always there
-        adefs = {a : stringify(v) if not v and v not in {0, None} else v for a, v in adefs.iteritems()}
+        # now we can make the definition
+        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join(cls.escape(n) if isinstance(df, undefined) else "{:s}={!s}".format(cls.escape(n), df) for n, df in args))
 
-        #gargs = dict(itertools.groupby(ref.args, type))
-        gargs = {}
-        for a in ref.args:
-            gargs.setdefault(type(a), []).append(a)
-
-        args = []
-        if Param in gargs:
-            args.extend( (a.name, a.name, adefs.get(a.name, None), atypes.get(a.name, None)) for a in gargs[Param])
-        if ParamVariableList in gargs:
-            args.extend( (a.name, '*{:s}'.format(a.name), None, None) for a in gargs[ParamVariableList] )
-        if ParamVariableKeyword in gargs:
-            args.extend( (a.name, '**{:s}'.format(a.name), None, None) for a in gargs[ParamVariableKeyword] )
-        args = [(n, cls.escape(fn), df, t) for n, fn, df, t in args]
-
-        definition = ".. py:function:: {name:s}({arguments:s})".format(name=name, arguments=', '.join('{:s}={!s}'.format(fn, "''" if df == '' else '|'.join(map(stringify, df)) if isinstance(df, tuple) else stringify(df)) if df is not None else fn for _, fn, df, _ in args))
-
+        # populate the contents of the function
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
         if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
 
-        for n, fn, _, ty in args:
-            if isinstance(ty, basestring): t = grammar.resolve(ty)
-            elif ty is None: t = ()
-            elif isinstance(ty, types.TupleType):
-                t = tuple(ty)
-                if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
-            else: raise TypeError(name, n, ty)
-            t = stringify(t)
+        for n, descr, ty in params:
+            fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
+            fmt += '' if isinstance(descr, undefined) else (' '+cls.escape(descr))
+            res.append(fmt.format(type=ty, name=cls.escape(n)))
 
-            fmt = ": param {type:s} {name:s}" if t else ": param {name:s}"
-            fmt += ' '+cls.escape(aparams[n]) if n in aparams else ''
-            res.append(fmt.format(type=t if isinstance(t, basestring) else '|'.join(t), name=fn))
-
-        if args: res.append('')
+        if params: res.append('')
 
         res = cls.indentlist(res, '   ')
         res[0:0] = (definition,)
@@ -672,7 +697,7 @@ class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
         arguments, defaults = node.args, node.args.defaults
 
         # figure out the defaults
-        defs = { a.id : grammar.resolve(grammar.reduce(df)[0]) for df, a in zip(reversed(defaults), reversed(arguments.args)) }
+        defs = { a.id : evaluate(grammar.reduce(df)[0]) for df, a in zip(reversed(defaults), reversed(arguments.args)) }
 
         # figure things out about which decorators were applied
         methodtypes = {m for m in decorators.attributes(node)}
