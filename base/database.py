@@ -886,47 +886,6 @@ def name(ea, none, **flags):
     '''Removes the name defined at the address ``ea``.'''
     return name(ea, '', **flags)
 
-def blocks(start, end):
-    '''Returns each block between the addresses ``start`` and ``end``.'''
-    block, _ = start, end = interface.address.head(start), address.tail(end)+1
-    for ea in iterate(start, end):
-        nextea = address.next(ea)
-
-        if _instruction.is_call(ea):
-            continue
-
-        if _instruction.is_return(ea):
-            yield block,nextea
-            block = ea
-
-        elif cxdown(ea):
-            yield block,nextea
-            block = nextea
-
-        elif cxup(ea) and block != ea:
-            yield block,ea
-            block = ea
-        continue
-    return
-
-# FIXME: The idaapi.is_basic_block_end api has got to be faster than doing it
-#        with ida's xrefs in python..
-if False:
-    def blocks(start, end):
-        '''Returns each block between the specified range of instructions.'''
-        start, end = interface.address.head(start), address.tail(end)+1
-        block = start
-        for ea in iterate(start, end):
-            nextea = address.next(ea)
-            idaapi.decode_insn(ea)
-            # XXX: for some reason idaapi.is_basic_block_end(...)
-            #      occasionally includes some stray 'call' instructions.
-            if idaapi.is_basic_block_end(ea):
-                yield block,nextea
-                block = nextea
-            continue
-        return
-
 @utils.multicase()
 def erase():
     '''Remove all of the defined tags at the current address.'''
@@ -1685,6 +1644,47 @@ class address(object):
         while res not in {idaapi.BADADDR, None} and left <= res < right and op(res, end):
             yield res
             res = step(res)
+        return
+
+    @classmethod
+    @utils.multicase(end=six.integer_types)
+    def blocks(cls, end):
+        '''Yields the bounds of each block from the current address to ``end``.'''
+        return cls.blocks(ui.current.address(), end)
+    @classmethod
+    @utils.multicase(start=six.integer_types, end=six.integer_types)
+    def blocks(cls, start, end):
+        '''Yields the bounds of each block between the addresses ``start`` and ``end``.'''
+        block, _ = start, end = interface.address.head(start), address.tail(end) + 1
+        for ea in cls.iterate(start, end):
+            nextea = cls.next(ea)
+
+            ## XXX: it seems that idaapi.is_basic_block_end requires the following to be called
+            # idaapi.decode_insn(ea)
+            ## XXX: for some reason is_basic_block_end will occasionally include some stray 'call' instructions
+            # if idaapi.is_basic_block_end(ea):
+            #     yield block, nextea
+            ## XXX: in later versions of ida, is_basic_block_end takes two args (ea, bool call_insn_stops_block)
+
+            # skip call instructions
+            if _instruction.is_call(ea):
+                continue
+
+            # halting instructions terminate a block
+            if _instruction.is_return(ea):
+                yield block, nextea
+                block = ea
+
+            # branch instructions will terminate a block
+            elif cxdown(ea):
+                yield block, nextea
+                block = nextea
+
+            # a branch target will also terminate a block
+            elif cxup(ea) and block != ea:
+                yield block, ea
+                block = ea
+            continue
         return
 
     @utils.multicase()
