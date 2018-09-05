@@ -131,9 +131,6 @@ def name(none):
 @utils.multicase(string=basestring)
 def name(string, *suffix):
     '''Set the name of the current function to ``string``.'''
-    # we use ui.current.address() instead of ui.current.function()
-    # in case the user might be hovering over an import table
-    # function and wanting to rename that instead.
     return name(ui.current.address(), string, *suffix)
 @utils.multicase(none=types.NoneType)
 def name(func, none):
@@ -167,7 +164,8 @@ def name(func, string, *suffix):
 @utils.multicase()
 def convention():
     '''Return the calling convention of the current function.'''
-    return convention(ui.current.function())
+    # use ui.current.address() instead of ui.current.function() to deal with import table entries
+    return convention(ui.current.address())
 @utils.multicase()
 def convention(func):
     """Return the calling convention of the function ``func``.
@@ -187,7 +185,8 @@ cc = utils.alias(convention)
 @utils.multicase()
 def prototype():
     '''Return the prototype of the current function if it has one.'''
-    return prototype(ui.current.function())
+    # use ui.current.address() instead of ui.current.function() to deal with import table entries
+    return prototype(ui.current.address())
 @utils.multicase()
 def prototype(func):
     '''Return the prototype of the function ``func`` if it has one.'''
