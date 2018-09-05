@@ -584,7 +584,31 @@ def op_value(ea, n):
 op = op_decode = utils.alias(op_value)
 
 ### tag:intel
-## FIXME: deprecate this, and somehow associate the segment register with the operand for the intel arch
+
+## older typeinfo stuff
+# idaapi.set_typeinfo(ea, opnum, flags, ti)
+# idaapi.get_typeinfo(ea, opnum, &flags, &buf)
+# idaapi.typeflag(ea, &oldflag, type, opnum)
+
+## XXX: maybe figure out if there's some way to do this generically
+# idaapi.set_op_type(ea, type, opnum)
+
+## XXX: figure out a useful name to implement the following to apply a data offset to an operand
+# def? op_offset(ea, n, type, target = BADADDR, base = 0, tdelta = 0) -> int
+
+## XXX: maybe we should figure out how to use this if we can distinguish between a structure_t and a frame's member_t
+# def op_stkvar(*args):
+
+## old method for applying a complex type to an operand
+# def op_type(ea, n)
+#    '''Apply the specified type to a stack variable'''
+#    py_op = operand(ea,n)
+#    py_v = py_op.addr
+#    py_t = idc.ParseType("type string", flags)[1]
+#    py_name = "stack variable name"
+#    idaapi.apply_type_to_stkarg(py_op, py_v, py_t, py_name)
+
+## XXX: deprecate this, and somehow associate the segment register with the operand for the intel arch
 @utils.multicase(n=six.integer_types)
 def op_segment(n):
     '''Returns the segment register used by the ``n``th operand of the instruction at the current address.'''
@@ -600,6 +624,7 @@ def op_segment(ea, n):
         return architecture.by_index(segment)
     #raise NotImplementedError("{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for specified operand number. : {!r}".format(__name__, ea, n, segment))
     return None
+# FIXME: maybe use idaapi.op_seg(*args) to apply a segment to an operand?
 
 @utils.multicase(opnum=six.integer_types)
 def op_structure(opnum):
@@ -774,6 +799,9 @@ def op_enumeration(ea, opnum):
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
         raise TypeError("{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
+    # is the following api call the correct way to do this?
+    # idaapi.get_enum_id(*args):
+
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
     if res is None:
         raise TypeError("{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d}.".format(__name__, ea, opnum, opnum))
@@ -822,21 +850,6 @@ def op_string(ea, opnum, strtype):
     return ok
 
 ## flags
-# idaapi.set_typeinfo(ea, opnum, flags, ti)
-# idaapi.get_typeinfo(ea, opnum, &flags, &buf)
-
-# idaapi.set_op_type(ea, type, opnum)
-# idaapi.typeflag(ea, &oldflag, type, opnum)
-
-## lvars
-# def op_type(ea, n)
-#    '''Apply the specified type to a stack variable'''
-#    py_op = operand(ea,n)
-#    py_v = py_op.addr
-#    py_t = idc.ParseType("type string", flags)[1]
-#    py_name = "stack variable name"
-#    idaapi.apply_type_to_stkarg(py_op, py_v, py_t, py_name)
-
 @utils.multicase(n=six.integer_types)
 def op_refs(n):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the ``n``th operand of the current instruction.'''
@@ -1053,21 +1066,6 @@ def is_calli(ea):
     F = feature(ea)
     return is_call(ea) and all(F&x == x for x in {idaapi.CF_CALL, idaapi.CF_JUMP})
 
-## op_t.flags
-#OF_NO_BASE_DISP = 0x80 #  o_displ: base displacement doesn't exist meaningful only for o_displ type if set, base displacement (x.addr) doesn't exist.
-#OF_OUTER_DISP = 0x40 #  o_displ: outer displacement exists meaningful only for o_displ type if set, outer displacement (x.value) exists.
-#PACK_FORM_DEF = 0x20 #  !o_reg + dt_packreal: packed factor defined
-#OF_NUMBER = 0x10 # can be output as number only if set, the operand can be converted to a number only
-#OF_SHOW = 0x08 #  should the operand be displayed? if clear, the operand is hidden and should not be displayed
-
-#def set_op_type(*args):
-#def op_enum(*args):
-#def get_enum_id(*args):
-#def op_seg(*args):
-#def op_stkvar(*args):
-#def op_*(
-#def? op_offset(ea, n, type, target = BADADDR, base = 0, tdelta = 0) -> int
-
 ## operand type registration
 ## XXX: This namespace is deleted after each method has been assigned to their lookup table
 class operand_types:
@@ -1179,8 +1177,16 @@ class operand_types:
             if op.specval & 0x00ff0000 == 0x001f0000 and index == base:
                 index = None
 
+            ## specval means kind of the following:
             # OF_NO_BASE_DISP = 1 then .addr doesn't exist
             # OF_OUTER_DISP = 1 then .value exists
+
+            ## op_t.flags:
+            # OF_NO_BASE_DISP = 0x80 #  o_displ: base displacement doesn't exist meaningful only for o_displ type if set, base displacement (x.addr) doesn't exist.
+            # OF_OUTER_DISP = 0x40 #  o_displ: outer displacement exists meaningful only for o_displ type if set, outer displacement (x.value) exists.
+            # PACK_FORM_DEF = 0x20 #  !o_reg + dt_packreal: packed factor defined
+            # OF_NUMBER = 0x10 # can be output as number only if set, the operand can be converted to a number only
+            # OF_SHOW = 0x08 #  should the operand be displayed? if clear, the operand is hidden and should not be displayed
 
         elif op.type == idaapi.o_mem:
             if F1 == 0:
@@ -1559,6 +1565,8 @@ class Mips(architecture_t):
         [ setitem(i2s(_), self.new(i2s(_), 32)) for _ in itertools.chain([7, 31], six.moves.range(20, 26))]
 
 ## global initialization
+def __ev_newprc__(pnum, keep_cfg):
+    return __newprc__(pnum)
 def __newprc__(id):
     plfm, m = idaapi.ph.id, __import__('sys').modules[__name__]
     if plfm == idaapi.PLFM_386:     # id == 15
@@ -1572,172 +1580,6 @@ def __newprc__(id):
         return
     m.architecture, m.register = res, res.r
     m.arch, m.reg = m.architecture, m.register
+
+# initialize a default processor of some kind on initial import
 __newprc__(0)
-
-def __ev_newprc__(pnum, keep_cfg):
-    return __newprc__(pnum)
-
-### an intermediary representation for operands/operations
-# FIXME: the following IR (heh) is entirely dependant on the intel architecture, replace it or remove it
-OOBIS = collections.namedtuple('OpOffsetBaseIndexScale', ('op', 'offset', 'base', 'index', 'scale'))
-
-## tag:intel
-class ir_op:
-    """Returns an operand as a parseable intermediary representation"""
-    class __base__(object):
-        def __init__(self, size=0):
-            self.__size = size
-        name = property(fget=lambda s: s.__class__.__name__)
-        size = property(fget=lambda s: s.__size)
-        def str(self):
-            return "{:s}({:d})".format(self.name, self.size)
-        def __repr__(self):
-            return self.str()
-        def __eq__(self, other):
-            classname = self.__class__.__name__
-            if isinstance(other, basestring):
-                if other.endswith(')'):
-                    other_name = other.split('(')[0]
-                    other_size = other.split('(')[-1].split(')')[0]
-                    try: return cmp(classname, other_name) == 0 and self.size == int(other_size)
-                    except ValueError: return False
-                return cmp(classname, other) == 0
-            return isinstance(self, other) if isinstance(other, builtins.type) else super(object, self) == other
-    class store(__base__): pass
-    class load(__base__): pass
-    class loadstore(__base__): pass
-    class assign(__base__): pass
-    class value(__base__): pass
-    class modify(__base__): pass
-    class unknown(__base__): pass
-
-## tag:intel
-class ir:
-    """Returns a sort-of intermediary representation that excludes the semantics of an instruction."""
-    table = {
-        'immediate':    {'r' : ir_op.value,   'w' : ir_op.assign,   'rw' : ir_op.modify,      '' : ir_op.value},
-        'memory':       {'r' : ir_op.load,    'w' : ir_op.store,    'rw' : ir_op.loadstore,   '' : ir_op.unknown},
-        'phrase':       {'r' : ir_op.load,    'w' : ir_op.store,    'rw' : ir_op.loadstore,   '' : ir_op.unknown},
-        'register':     {'r' : ir_op.value,   'w' : ir_op.assign,   'rw' : ir_op.modify,      '' : ir_op.unknown},
-    }
-
-    @utils.multicase(opnum=six.integer_types)
-    @classmethod
-    def op(cls, opnum): return cls.op(ui.current.address(), opnum)
-    @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-    @classmethod
-    def op(cls, ea, opnum):
-        """Returns an operand as a tuple.
-
-        (store, immediate, register, index, scale)
-        (load, immediate, register, index, scale)
-        (value, immediate, register, index, scale)
-        (assign, immediate, register, index, scale)
-        """
-        op, state = operand(ea, opnum), op_state(ea, opnum)
-        t, sz = __optype__.lookup(op.type), __optype__.size(op)
-        operation = cls.table[t.__name__][state]
-
-        # if mnemonic is lea, then demote it from a memory operation
-        # FIXME: i _really_ don't like this hack.
-        if mnem(ea).upper() == 'LEA':
-            if operation == ir_op.load:
-                operation = ir_op.value
-            elif operation == ir_op.store:
-                operation = ir_op.assign
-            else:
-                operation = operation
-
-        if t.__name__ == 'phrase':
-            imm, base, index, scale = t(op)
-        elif t.__name__ in {'immediate', 'memory'}:
-            imm, base, index, scale = t(op), None, None, None
-        else:
-            imm, base, index, scale = None, t(op), None, None
-
-        if operation == ir_op.load:
-            sz = database.config.bits() // 8
-
-        global architecture
-        base = None if base is None else base if isinstance(base, register_t) else architecture.by_indexsize(base, size=sz)
-        index = None if index is None else index if isinstance(base, register_t) else architecture.by_indexsize(index, size=sz)
-
-        return OOBIS(operation(__optype__.size(op)), *(imm, base, index, scale))
-
-    @utils.multicase()
-    @classmethod
-    def instruction(cls): return cls.instruction(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def instruction(cls, ea):
-        result = []
-        for opnum in six.moves.range(ops_count(ea)):
-            operation, offset, base, index, scale = cls.op(ea,  opnum)
-            sz = operation.size
-            if operation == ir_op.modify:
-                result.append(OOBIS(ir_op.assign(sz), offset, base, index, scale))
-                result.append(OOBIS(ir_op.value(sz), offset, base, index, scale))
-            elif operation == ir_op.loadstore:
-                result.append(OOBIS(ir_op.load(sz), offset, base, index, scale))
-                result.append(OOBIS(ir_op.store(sz), offset, base, index, scale))
-            else:
-                result.append(OOBIS(operation, offset, base, index, scale))
-            continue
-
-        # if mnemonic is stack-related, then add the other implicit operation
-        # FIXME: ...and another pretty bad hack to figure out how to remove
-        global register, architecture
-        sp, sz = register.sp.id, database.config.bits()/8
-        if mnem(ea).upper() == 'PUSH':
-            result.append(OOBIS(ir_op.store(sz), 0, architecture.by_indexsize(sp, size=sz), 0, 1))
-        elif mnem(ea).upper() == 'POP':
-            result.append(OOBIS(ir_op.load(sz), 0, architecture.by_indexsize(sp, size=sz), 0, 1))
-        elif mnem(ea).upper().startswith('RET'):
-            if len(result) > 0:
-                result.append(OOBIS(ir_op.modify(sz), 0, architecture.by_indexsize(sp, size=sz), 0, 1))
-            result.append(OOBIS(ir_op.load(sz), 0, architecture.by_indexsize(sp, size=sz), 0, 1))
-        elif mnem(ea).upper() == 'CALL':
-            result.append(OOBIS(ir_op.store(sz), 0, architecture.by_indexsize(sp, size=sz), 0, 1))
-
-        return mnem(ea), result
-    at = utils.alias(instruction, 'ir')
-
-    @utils.multicase()
-    @classmethod
-    def value(cls): return cls.value(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def value(cls, ea):
-        _, res = cls.at(ea)
-        value = [v for v in res if v.op == 'value']
-        return value
-
-    @utils.multicase()
-    @classmethod
-    def store(cls): return cls.store(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def store(cls, ea):
-        _, res = cls.at(ea)
-        store = [v for v in res if v.op == 'store']
-        return store
-
-    @utils.multicase()
-    @classmethod
-    def load(cls): return cls.load(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def load(cls, ea):
-        _, res = cls.at(ea)
-        load = [v for v in res if v.op == 'load']
-        return load
-
-    @utils.multicase()
-    @classmethod
-    def assign(cls): return cls.assign(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def assign(cls, ea):
-        _, res = cls.at(ea)
-        assign = [v for v in res if v.op == 'assign']
-        return assign
