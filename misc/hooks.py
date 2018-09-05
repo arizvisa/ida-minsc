@@ -546,7 +546,7 @@ def set_func_start(pfn, new_start):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
-                logging.debug("{:s}.set_func_start({:#x}, {#x}): Decreasing refcount for contents tag {!r} and increasing refcount for globals tag {!r}".format(__name__, pfn.startEA, new_start, k, k))
+                logging.debug("{:s}.set_func_start({:#x}, {:#x}): Decreasing refcount for contents tag {!r} and increasing refcount for globals tag {!r}".format(__name__, pfn.startEA, new_start, k, k))
             continue
         return
 
@@ -557,7 +557,7 @@ def set_func_start(pfn, new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                logging.debug("{:s}.set_func_start({:#x}, {#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, new_start, k, k))
+                logging.debug("{:s}.set_func_start({:#x}, {:#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, new_start, k, k))
             continue
         return
     return
@@ -572,7 +572,7 @@ def set_func_end(pfn, new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                logging.debug("{:s}.set_func_end({:#x}, {#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, new_end, k, k))
+                logging.debug("{:s}.set_func_end({:#x}, {:#x}): Decreasing refcount for global tag {!r} and increasing refcount for contents tag {!r}".format(__name__, pfn.startEA, new_end, k, k))
             continue
         return
 
@@ -583,7 +583,7 @@ def set_func_end(pfn, new_end):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
-                logging.debug("{:s}.set_func_end({:#x}, {#x}): Decreasing refcount for contents tag {!r} and increasing refcount for globals tag {!r}".format(__name__, pfn.startEA, new_end, k, k))
+                logging.debug("{:s}.set_func_end({:#x}, {:#x}): Decreasing refcount for contents tag {!r} and increasing refcount for globals tag {!r}".format(__name__, pfn.startEA, new_end, k, k))
             continue
         return
     return
