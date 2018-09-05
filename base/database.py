@@ -3121,7 +3121,7 @@ class xref(object):
         return target not in xref.data_down(ea)
 
     @staticmethod
-    def clear(ea):
+    def erase(ea):
         '''Clear all references at the address ``ea``.'''
         ea = interface.address.inside(ea)
         return all(ok for ok in (xref.del_code(ea), xref.del_data(ea)))
