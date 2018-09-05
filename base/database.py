@@ -519,17 +519,18 @@ def read(ea, size):
     return idaapi.get_many_bytes(ea, end-start) or ''
 
 @utils.multicase(data=bytes)
-def write(data, **original):
-    '''Modify the database at the current address with the bytes ``data``.'''
-    return write(ui.current.address(), data, **original)
+def write(data, **persist):
+    '''Modify the database at the current address with the bytes specified in ``data``.'''
+    return write(ui.current.address(), data, **persist)
 @utils.multicase(ea=six.integer_types, data=bytes)
-def write(ea, data, **original):
-    """Modify the database at address ``ea`` with the bytes ``data``
+def write(ea, data, **persist):
+    """Modify the database at address ``ea`` with the bytes specified in ``data``
 
-    If the bool ``original`` is specified, then modify what IDA considers the original bytes.
+    If the bool ``persist`` is specified, then modify what IDA considers the original bytes.
     """
     ea, _ = interface.address.within(ea, ea + len(data))
-    return idaapi.patch_many_bytes(ea, data) if original.get('original', False) else idaapi.put_many_bytes(ea, data)
+    originalQ = builtins.next((persist[k] for k in ('original', 'persist', 'store', 'save') if k in persist), False)
+    return idaapi.patch_many_bytes(ea, data) if originalQ else idaapi.put_many_bytes(ea, data)
 
 class names(object):
     """
