@@ -11,7 +11,7 @@ class remote(object):
     '''For poor folk without a dbgeng'''
     def __init__(self, remotebaseaddress, localbaseaddress=None):
         if localbaseaddress is None:
-            localbaseaddress = database.baseaddress()
+            localbaseaddress = database.config.baseaddress()
         self.lbase = localbaseaddress
         self.rbase = remotebaseaddress
 

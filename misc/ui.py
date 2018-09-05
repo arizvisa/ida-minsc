@@ -480,7 +480,7 @@ try:
             res.setVisible(False)
             res.setWindowModality(blocking)
             res.setAutoClose(True)
-            path = "{:s}/{:s}".format(_database.path(), _database.filename())
+            path = "{:s}/{:s}".format(_database.config.path(), _database.config.filename())
             self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
 
         # properties
@@ -676,7 +676,7 @@ else:
         Helper class used to construct and show a progress-bar using the console.
         """
         def __init__(self, blocking=True):
-            self.__path__ = "{:s}/{:s}".format(_database.path(), _database.filename())
+            self.__path__ = "{:s}/{:s}".format(_database.config.path(), _database.config.filename())
             self.__value__ = 0
             self.__min__, self.__max__ = 0, 0
             return

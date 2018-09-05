@@ -38,27 +38,6 @@ def here():
     return ui.current.address()
 h = utils.alias(here)
 
-def filename():
-    '''Returns the filename that the database was built from.'''
-    return idaapi.get_root_filename()
-def idb():
-    '''Return the full path to the database.'''
-    res = idaapi.cvar.database_idb if idaapi.__version__ < 7.0 else idaapi.get_path(idaapi.PATH_TYPE_IDB)
-    return res.replace(os.sep, '/')
-def module():
-    '''Return the module name as per the windows loader.'''
-    res = filename()
-    res = os.path.split(res)
-    return os.path.splitext(res[1])[0]
-def path():
-    '''Return the full path to the directory containing the database.'''
-    return os.path.split(idb())[0]
-
-def baseaddress():
-    '''Returns the baseaddress of the database.'''
-    return idaapi.get_imagebase()
-base = utils.alias(baseaddress)
-
 @utils.multicase()
 def within():
     '''Should always return `True`.'''
@@ -83,6 +62,36 @@ class config(object):
     """
 
     info = idaapi.get_inf_structure()
+
+    @classmethod
+    def filename(cls):
+        '''Returns the filename that the database was built from.'''
+        return idaapi.get_root_filename()
+
+    @classmethod
+    def idb(cls):
+        '''Return the full path to the database.'''
+        res = idaapi.cvar.database_idb if idaapi.__version__ < 7.0 else idaapi.get_path(idaapi.PATH_TYPE_IDB)
+        return res.replace(os.sep, '/')
+
+    @classmethod
+    def module(cls):
+        '''Return the module name as per the windows loader.'''
+        res = cls.filename()
+        res = os.path.split(res)
+        return os.path.splitext(res[1])[0]
+
+    @classmethod
+    def path(cls):
+        '''Return the full path to the directory containing the database.'''
+        res = cls.idb()
+        path, _ = os.path.split(res)
+        return path
+
+    @classmethod
+    def baseaddress(cls):
+        '''Returns the baseaddress of the database.'''
+        return idaapi.get_imagebase()
 
     @classmethod
     def readonly(cls):
@@ -203,7 +212,10 @@ class config(object):
             '''Return the segment register size for the database.'''
             return idaapi.ph_get_segreg_size()
 
-range = bounds = utils.alias(config.bounds)
+range = bounds = utils.alias(config.bounds, 'config')
+filename, idb, module, path = utils.alias(config.filename, 'config'), utils.alias(config.idb, 'config'), utils.alias(config.module, 'config'), utils.alias(config.path, 'config')
+path = utils.alias(config.path, 'config')
+baseaddress = base = utils.alias(config.baseaddress, 'config')
 
 class functions(object):
     """
@@ -2800,13 +2812,13 @@ class type(object):
             return _structure.by(res)
 
         @utils.multicase()
-        @staticmethod
-        def id():
+        @classmethod
+        def id(cls):
             '''Return the identifier of the structure at the current address.'''
-            return type.structure.id(ui.current.address())
+            return cls.id(ui.current.address())
         @utils.multicase(ea=six.integer_types)
-        @staticmethod
-        def id(ea):
+        @classmethod
+        def id(cls, ea):
             '''Return the identifier of the structure at address ``ea``.'''
             ea = interface.address.within(ea)
 
@@ -2821,25 +2833,25 @@ class type(object):
             return ti.tid
 
         @utils.multicase()
-        @staticmethod
-        def size():
+        @classmethod
+        def size(cls):
             '''Return the total size of the structure at the current address.'''
             return type.size(ui.current.address())
         @utils.multicase(ea=six.integer_types)
-        @staticmethod
-        def size(ea):
+        @classmethod
+        def size(cls, ea):
             '''Return the total size of the structure at address ``ea``.'''
             return type.size(ea)
     struc = struct = structure  # ns alias
 
     @utils.multicase()
-    @staticmethod
-    def switch():
+    @classmethod
+    def switch(cls):
         '''Return the switch_t at the current address.'''
         return get.switch(ui.current.address())
     @utils.multicase(ea=six.integer_types)
-    @staticmethod
-    def switch(ea):
+    @classmethod
+    def switch(cls, ea):
         '''Return the switch_t at the address ``ea``.'''
         return get.switch(ea)
 
