@@ -179,7 +179,7 @@ def iterate(segment):
 @utils.multicase(segment=idaapi.segment_t)
 def iterate(segment):
     '''Iterate through all of the addresses within the segment ``segment``.'''
-    for ea in database.iterate(segment.startEA, segment.endEA):
+    for ea in database.address.iterate(segment.startEA, segment.endEA):
         yield ea
     return
 

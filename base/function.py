@@ -364,7 +364,7 @@ class chunks(object):
     def iterate(cls, func):
         '''Iterate through all the instructions for each chunk in the function ``func``.'''
         for start, end in cls(func):
-            for ea in itertools.ifilter(database.type.is_code, database.iterate(start, end)):
+            for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, end)):
                 yield ea
             continue
         return
@@ -985,7 +985,7 @@ class block(object):
     def iterate(cls, ea):
         '''Yield all the addresses in the basic-block at address ``ea``.'''
         left, right = cls(ea)
-        return database.iterate(left, right)
+        return database.address.iterate(left, right)
     @utils.multicase(tuple=types.TupleType)
     @classmethod
     def iterate(cls, tuple):
@@ -997,7 +997,7 @@ class block(object):
     def iterate(cls, bb):
         '''Yield all the addresses in the basic-block ``bb``.'''
         left, right = bb.startEA, bb.endEA
-        return database.iterate(left, right)
+        return database.address.iterate(left, right)
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod

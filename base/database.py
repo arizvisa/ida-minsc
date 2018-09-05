@@ -886,27 +886,6 @@ def name(ea, none, **flags):
     '''Removes the name defined at the address ``ea``.'''
     return name(ea, '', **flags)
 
-# FIXME: This can be moved into database.address.iterate as it's not used anywhere.
-# FIXME: Add a predicate for only selecting types that match something
-def iterate(start, end, step=None):
-    '''Iterate through all of the instruction and data boundaries from address ``start`` to ``end``.'''
-    if step:
-        logging.warn("{:s}.iterate({:#x}, {:#x}, {!r}) : The `step` argument for this function will soon be deprecated!".format(__name__, start, end, step))
-    start, end = builtins.map(interface.address.head, (start, end))
-    left, right = config.bounds()
-    right = idaapi.prev_not_tail(right)
-
-    if start == end: return
-
-    step = step or (address.prev if start > end else address.next)
-    op = operator.ge if start >= end else operator.lt
-
-    res = start
-    while res not in {idaapi.BADADDR, None} and left <= res < right and op(res, end):
-        yield res
-        res = step(res)
-    return
-
 def blocks(start, end):
     '''Returns each block between the addresses ``start`` and ``end``.'''
     block, _ = start, end = interface.address.head(start), address.tail(end)+1
@@ -1668,32 +1647,44 @@ class address(object):
 
     @staticmethod
     def __walk__(ea, next, match):
-        '''Return the first address from ``ea`` that doesn't ``match``. ``next`` is used to determine the next address.'''
+        '''Return the first address from ``ea`` using ``next`` for stepping until the provided callable doesn't ``match``.'''
         res = interface.address.inside(ea)
         while res not in {None, idaapi.BADADDR} and match(res):
             res = next(res)
         return res
 
-    # FIXME: Deprecate this as it's not used for anything
-    @utils.multicase()
+    @utils.multicase(end=six.integer_types)
     @classmethod
-    def iterate(cls):
-        '''Return an iterator that walks forward through the database from the current address.'''
-        return cls.iterate(ui.current.address(), cls.next)
-    @utils.multicase(ea=six.integer_types)
+    def iterate(cls, end):
+        '''Iterate from the current address to ``end``.'''
+        return cls.iterate(ui.current.address(), end)
+    @utils.multicase(end=six.integer_types, step=callable)
     @classmethod
-    def iterate(cls, ea):
-        '''Return an iterator that walks forward through the database starting at the  address ``ea``.'''
-        return cls.iterate(ea, cls.next)
-    @utils.multicase(ea=six.integer_types)
+    def iterate(cls, end, step):
+        '''Iterate from the current address to ``end`` using the callable ``step`` to determine the next address.'''
+        return cls.iterate(ui.current.address(), end, step)
+    @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
-    def iterate(cls, ea, next):
-        '''Return an iterator that walks through the database starting at the address ``ea``. Use ``next`` to determine the next address.'''
-        logging.warn("{:s}.iterate({:#x}, {!r}) : This function will soon be deprecated!".format('.'.join((__name__, cls.__name__)), start, end, step))
-        ea = interface.address.inside(ea)
-        while ea not in {None, idaapi.BADADDR}:
-            yield ea
-            ea = next(ea)
+    def iterate(cls, start, end):
+        '''Iterate from address ``start`` to ``end``.'''
+        start, end = builtins.map(interface.address.head, (start, end))
+        step = cls.prev if start > end else cls.next
+        return cls.iterate(start, end, step)
+    @utils.multicase(start=six.integer_types, end=six.integer_types, step=callable)
+    @classmethod
+    def iterate(cls, start, end, step):
+        '''Iterate from address ``start`` to ``end`` using the callable ``step`` to determine the next address.'''
+        start, end = builtins.map(interface.address.head, (start, end))
+        left, right = config.bounds()
+        right = idaapi.prev_not_tail(right)
+
+        if start == end: return
+        op = operator.ge if start >= end else operator.lt
+
+        res = start
+        while res not in {idaapi.BADADDR, None} and left <= res < right and op(res, end):
+            yield res
+            res = step(res)
         return
 
     @utils.multicase()

@@ -342,7 +342,7 @@ def __process_functions():
         for ci, (l, r) in enumerate(chunks):
             p.update(text=text(len(chunks), 's' if len(chunks) != 1 else ''), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
             ui.navigation.analyze(l)
-            for ea in database.iterate(l, r):
+            for ea in database.address.iterate(l, r):
                 # FIXME: no need to iterate really since we should have
                 #        all of the addresses
                 for k, v in six.iteritems(database.tag(ea)):
@@ -483,7 +483,7 @@ def func_tail_appended(pfn, tail):
     global State
     if State != state.ready: return
     # tail = func_t
-    for ea in database.iterate(tail.startEA, tail.endEA):
+    for ea in database.address.iterate(tail.startEA, tail.endEA):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=pfn.startEA)
@@ -495,7 +495,7 @@ def removing_func_tail(pfn, tail):
     global State
     if State != state.ready: return
     # tail = area_t
-    for ea in database.iterate(tail.startEA, tail.endEA):
+    for ea in database.address.iterate(tail.startEA, tail.endEA):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=pfn.startEA)
             internal.comment.globals.inc(ea, k)
@@ -508,7 +508,7 @@ def add_func(pfn):
     if State != state.ready: return
     # convert all globals into contents
     for l, r in function.chunks(pfn):
-        for ea in database.iterate(l, r):
+        for ea in database.address.iterate(l, r):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
@@ -522,7 +522,7 @@ def del_func(pfn):
     if State != state.ready: return
     # convert all contents into globals
     for l, r in function.chunks(pfn):
-        for ea in database.iterate(l, r):
+        for ea in database.address.iterate(l, r):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
@@ -542,7 +542,7 @@ def set_func_start(pfn, new_start):
     # new_start has removed addresses from function
     # replace contents with globals
     if pfn.startEA > new_start:
-        for ea in database.iterate(new_start, pfn.startEA):
+        for ea in database.address.iterate(new_start, pfn.startEA):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
@@ -553,7 +553,7 @@ def set_func_start(pfn, new_start):
     # new_start has added addresses to function
     # replace globals with contents
     elif pfn.startEA < new_start:
-        for ea in database.iterate(pfn.startEA, new_start):
+        for ea in database.address.iterate(pfn.startEA, new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
@@ -568,7 +568,7 @@ def set_func_end(pfn, new_end):
     # new_end has added addresses to function
     # replace globals with contents
     if new_end > pfn.endEA:
-        for ea in database.iterate(pfn.endEA, new_end):
+        for ea in database.address.iterate(pfn.endEA, new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=pfn.startEA)
@@ -579,7 +579,7 @@ def set_func_end(pfn, new_end):
     # new_end has removed addresses from function
     # replace contents with globals
     elif new_end < pfn.endEA:
-        for ea in database.iterate(new_end, pfn.endEA):
+        for ea in database.address.iterate(new_end, pfn.endEA):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=pfn.startEA)
                 internal.comment.globals.inc(ea, k)
