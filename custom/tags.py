@@ -44,6 +44,7 @@ def locationToAddress(loc):
 
 def addressToLocation(ea, chunks=None):
     """Convert the address ``ea`` to a (function, chunkid, offset).
+
     If the list ``chunks`` is specified, then use them as a tuple of ranges to calculate the offset.
     """
     F, chunks = func.by(ea), chunks or [ch for ch in func.chunks(ea)]
@@ -110,6 +111,7 @@ class read(object):
     @classmethod
     def everything(cls, location=False):
         """Return all the tags within the database as (Globals, Contents, Frames).
+
         If ``location`` is specified, then store the key for the contents tags as a relative location.
         """
         global read
@@ -161,6 +163,7 @@ class read(object):
     @staticmethod
     def contents(location=False):
         """Yields all the contents of each function within the database.
+
         If ``location`` is specified, then yield a location relative to the function chunk as the key.
         """
         global read
@@ -211,6 +214,7 @@ class apply(object):
     @classmethod
     def frame(cls, ea, frame, **tagmap):
         """Apply the data in ``frame`` to the function at ``ea``.
+
         If ``tagmap`` is specified, map the tags being applied through it.
         """
         tagmap_output = ", {:s}".format(', '.join("{:s}={:s}".format(k, v) for k, v in six.iteritems(tagmap))) if tagmap else ''
@@ -421,6 +425,7 @@ class export(object):
     @classmethod
     def content(cls, F, *tags, **location):
         """Select all the content tags in function ``F`` that match the specified ``tags`` by using the tag cache.
+
         If ``location`` is specified, then yield a relative location based on (FunctionEA, ChunkId, Offset) as the key.
         """
         identity = lambda res: res
@@ -459,6 +464,7 @@ class export(object):
     @classmethod
     def everything(cls, *tags, **location):
         """Return the selected tags using the tag cache as (Globals, Contents, Frames).
+
         If ``location`` is set to True, then yield the Contents keyed by its location.
         """
         global export
@@ -496,6 +502,7 @@ class export(object):
     @staticmethod
     def contents(*tags, **location):
         """Return all the contents tags (using the tag cache) that match the specified ``tags``.
+
         If ``location`` is specified, then yield the (FunctionEA, ChunkId, Offset) as the key.
         """
         global export

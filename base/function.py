@@ -84,6 +84,7 @@ def comment(**repeatable):
 @utils.multicase()
 def comment(func, **repeatable):
     """Return the comment for the function ``func``.
+
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
     fn = by(func)
@@ -96,6 +97,7 @@ def comment(string, **repeatable):
 @utils.multicase(string=basestring)
 def comment(func, string, **repeatable):
     """Set the comment for the function ``func`` to ``string``.
+
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
     fn = by(func)
@@ -173,6 +175,7 @@ def convention():
 @utils.multicase()
 def convention(func):
     """Return the calling convention of the function ``func``.
+
     The integer returned corresponds to one of the idaapi.CM_CC_* constants.
     """
     rt, ea = interface.addressOfRuntimeOrStatic(func)
@@ -306,6 +309,7 @@ def new():
 @utils.multicase(start=six.integer_types)
 def new(start, **end):
     """Make a function at the address ``start`` and return its entrypoint.
+
     If the address ``end`` is specified, then stop processing the function at its address.
     """
     start = interface.address.inside(start)
@@ -603,14 +607,13 @@ class blocks(object):
     @utils.multicase()
     @classmethod
     def digraph(cls):
-        """Return a `networkx.DiGraph` of the function at the current address.
-        Requires the `networkx` module in order to build the graph.
-        """
+        '''Return a `networkx.DiGraph` of the function at the current address.'''
         return cls.digraph(ui.current.function())
     @utils.multicase()
     @classmethod
     def digraph(cls, func):
         """Return a `networkx.DiGraph` of the function at the address ``ea``.
+
         Requires the `networkx` module in order to build the graph.
         """
         fn = by(func)
@@ -867,6 +870,7 @@ class block(object):
     @classmethod
     def color(cls, ea, rgb, **frame):
         """Sets the color of the basic-block at the address ``ea`` to ``rgb``.
+
         If the color ``frame`` is specified, set the frame to the specified color.
         """
         res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
@@ -894,9 +898,7 @@ class block(object):
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
     def color(cls, bb, rgb, **frame):
-        """Sets the color of the basic-block ``bb`` to ``rgb``.
-        If the color ``frame`` is specified, set the frame to the specified color.
-        """
+        '''Sets the color of the basic-block ``bb`` to ``rgb``.'''
         res, fn, n = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
 
         # specify the bg color
@@ -921,9 +923,7 @@ class block(object):
     @utils.multicase(tuple=types.TupleType, rgb=six.integer_types)
     @classmethod
     def color(cls, tuple, rgb, **frame):
-        """Sets the color of the basic-block identifed by ``tuple`` to ``rgb``.
-        If the color ``frame`` is specified, set the frame to the specified color.
-        """
+        '''Sets the color of the basic-block identifed by ``tuple`` to ``rgb``.'''
         bb = cls.at(tuple)
         return cls.color(bb, rgb, **frame)
 
@@ -1002,30 +1002,25 @@ class block(object):
     @utils.multicase(reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
-        """Yield each `(address, operand-number, operand-state)` within the current basic-block that touches one of the registers identified by ``regs``.
-        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
-        """
+        '''Yield each `(address, opnum, state)` within the current block that touches any of the specified ``regs``.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
-        """Yield each `(address, operand-number, operand-state)` within the basic-block containing ``ea`` that touches one of the registers identified by ``regs``.
-        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
-        """
+        '''Yield each `(address, opnum, state)` within the block containing ``ea`` that touches any of the specified``regs``.'''
         blk = blocks.at(ea)
         return cls.register(blk, reg, *regs, **modifiers)
     @utils.multicase(tuple=types.TupleType, reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, tuple, reg, *regs, **modifiers):
-        """Yield each `(address, operand-number, operand-state)` within the basic-block identified by ``tuple`` that touches one of the registers identified by ``regs``.
-        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
-        """
+        '''Yield each `(address, opnum, state)` within the block identified by ``tuple`` that touches any of the specified ``regs``.'''
         bb = cls.at(tuple)
         return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, instruction.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
-        """Yield each `(address, operand-number, operand-state)` within the basic-block ``bb`` that touches one of the registers identified by ``regs``.
+        """Yield each `(address, opnum, state)` within the block ``bb`` that touches any of the specified ``regs``.
+
         If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
         """
         iterops = interface.regmatch.modifier(**modifiers)
@@ -1163,7 +1158,11 @@ class frame(object):
 
     class args(object):
         """
-        Information about the function frame's arguments.
+        Namespace for returning information about the arguments within a function's
+        frame. By default, this namespace will yield each argument as a tuple
+        containing the (offset, name, size).
+
+        At the moment, register-based calling conventions are not supported.
         """
 
         @utils.multicase()
@@ -1173,7 +1172,8 @@ class frame(object):
         @utils.multicase()
         def __new__(cls, func):
             """Yield each argument for the function ``func`` in order.
-            Each result is of the format (offset into stack, name, size).
+
+            Each result is of the format (offset, name, size).
             """
             rt, ea = interface.addressOfRuntimeOrStatic(func)
             if rt:
@@ -1226,7 +1226,8 @@ class frame(object):
 
     class lvars(object):
         """
-        Information about the function frame's lvars.
+        Namespace describing information about the local variables defined within
+        a function's frame.
         """
         @utils.multicase()
         @classmethod
@@ -1243,7 +1244,8 @@ class frame(object):
 
     class regs(object):
         """
-        Information about the function frame's saved registers.
+        Namespace containing information about the registers that are saved when
+        constructing a function's frame.
         """
 
         @utils.multicase()
@@ -1580,13 +1582,12 @@ class type(object):
 
 @utils.multicase(reg=(basestring, instruction.register_t))
 def register(reg, *regs, **modifiers):
-    """Yield each `(address, operand-number, operand-state)` within the current function that touches one of the registers identified by ``regs``.
-    If the keyword ``write`` is True, then only return the result if it's writing to the register.
-    """
+    '''Yield each `(address, opnum, state)` within the current function that touches any of the specified ``regs``.'''
     return register(ui.current.function(), reg, *regs, **modifiers)
 @utils.multicase(reg=(basestring, instruction.register_t))
 def register(func, reg, *regs, **modifiers):
-    """Yield each `(address, operand-number, operand-state)` within the function ``func`` that touches one of the registers identified by ``regs``.
+    """Yield each `(address, opnum, state)` within the function ``func`` that touches any of the specified``regs``.
+
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     iterops = interface.regmatch.modifier(**modifiers)
@@ -1606,6 +1607,7 @@ def stackdelta(delta, **direction):
 @utils.multicase(delta=six.integer_types)
 def stackdelta(ea, delta, **direction):
     """Return the boundaries of the address ``ea`` that fit within the specified stack ``delta``.
+
     If the integer ``direction`` is provided, search backwards if its value is less than 0.
     """
     dir = direction.get('direction', direction.get('dir', -1))

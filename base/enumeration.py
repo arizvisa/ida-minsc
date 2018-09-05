@@ -140,6 +140,7 @@ def name(enum, name):
 @utils.multicase()
 def comment(enum, **repeatable):
     """Return the comment for the enumeration identified by ``enum``.
+
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
     eid = by(enum)
@@ -147,6 +148,7 @@ def comment(enum, **repeatable):
 @utils.multicase(comment=basestring)
 def comment(enum, comment, **repeatable):
     """Set the comment for the enumeration identified by ``enum`` to ``comment``.
+
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
     eid = by(enum)
@@ -273,6 +275,7 @@ class member(object):
     @classmethod
     def add(cls, enum, name, value, **bitmask):
         """Add an enumeration member ``name`` with the specified ``value`` to the enumeration identified by ``enum``.
+
         If the int, ``bitmask``, is specified then used it as the bitmask for the enumeration.
         """
         eid = by(enum)
@@ -392,6 +395,7 @@ class member(object):
     @classmethod
     def comment(cls, mid, **repeatable):
         """Return the comment for the enumeration member ``mid``.
+
         If the bool ``repeatable`` is specified, then return the repeatable comment.
         """
         return idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True))
@@ -406,6 +410,7 @@ class member(object):
     @classmethod
     def comment(cls, mid, comment, **repeatable):
         """Set the comment for the enumeration member id ``mid`` to ``comment``.
+
         If the bool ``repeatable`` is specified, then set the repeatable comment.
         """
         return idaapi.set_enum_member_cmt(mid, comment, kwds.get('repeatable', True))
@@ -433,6 +438,7 @@ class member(object):
     @classmethod
     def value(cls, enum, member, value, **bitmask):
         """Set the ``value`` for the enumeration ``member`` belonging to ``enum``.
+
         If the integer ``bitmask`` is specified, then use it as a bitmask. Otherwise assume all bits are set.
         """
         eid = by(enum)

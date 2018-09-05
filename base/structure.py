@@ -222,6 +222,7 @@ class structure_t(object):
 
     def refs(self):
         """Return the `(address, opnum, type)` of all the references (code & data) to this structure within the database.
+
         If `opnum` is `None`, then the returned `address` has the structure applied to it.
         If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
         """
@@ -449,6 +450,7 @@ def name(structure, string, *suffix):
 @utils.multicase(id=six.integer_types)
 def comment(id, **repeatable):
     """Return the comment of the structure identified by ``id``.
+
     If the bool ``repeatable`` is specified, return the repeatable comment.
     """
     return idaapi.get_struc_cmt(id, repeatable.get('repeatable', True))
@@ -459,6 +461,7 @@ def comment(structure, **repeatable):
 @utils.multicase(cmt=basestring)
 def comment(id=six.integer_types, cmt=basestring, **repeatable):
     """Set the comment of the structure identified by ``id`` to ``cmt``.
+
     If the bool ``repeatable`` is specified, set the repeatable comment.
     """
     return idaapi.set_struc_cmt(id, cmt, repeatable.get('repeatable', True))
@@ -490,7 +493,7 @@ def size(structure):
     return size(structure.id)
 @utils.multicase(id=six.integer_types)
 def size(id):
-    """Return the size of the structure identified by ``id``."""
+    '''Return the size of the structure identified by ``id``.'''
     return idaapi.get_struc_size(id)
 
 @utils.multicase(structure=structure_t)
@@ -500,6 +503,7 @@ def members(structure):
 @utils.multicase(id=six.integer_types)
 def members(id):
     """Yield each member of the structure identified by ``id``.
+
     Each iteration yields the `((offset, size), (name, comment, repeatable-comment))` of each member.
     """
 
@@ -532,6 +536,7 @@ def fragment(structure, offset, size):
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
 def fragment(id, offset, size):
     """Yield each member of the structure identified by ``id`` from the ``offset`` up to the ``size``.
+
     Each iteration yields `((offset, size), (name, comment, repeatable comment))` for each member within the specified bounds.
     """
     member = members(id)
@@ -791,6 +796,7 @@ class members_t(object):
     @utils.multicase(name=(basestring, tuple), offset=six.integer_types)
     def add(self, name, type, offset):
         """Add a member at ``offset`` with the given ``name`` and ``type``.
+
         To specify a particular size, ``type`` can be a tuple with the second element referring to the size.
         """
         flag, typeid, nbytes = interface.typemap.resolve(type)

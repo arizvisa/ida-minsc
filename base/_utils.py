@@ -392,7 +392,7 @@ class process(object):
         not kwds.get('paused',False) and self.start(command)
 
     def start(self, command=None, **options):
-        """Start the specified ``command`` with the requested **options"""
+        '''Start the specified ``command`` with the requested ``options``.'''
         if self.running:
             raise OSError("Process {:d} is still running.".format(self.id))
         if self.updater or len(self.threads):
@@ -420,7 +420,7 @@ class process(object):
         return self
 
     def __start_updater(self, daemon=True, timeout=0):
-        """Start the updater thread. **used internally**"""
+        '''Start the updater thread. **used internally**'''
         import Queue
         def task_exec(emit, data):
             if hasattr(emit,'send'):
@@ -466,7 +466,7 @@ class process(object):
         return updater
 
     def __start_monitoring(self, stdout, stderr=None):
-        """Start monitoring threads. **used internally**"""
+        '''Start monitoring threads. **used internally**'''
         program = self.program
         name = "thread-{:x}".format(program.pid)
 
@@ -489,7 +489,7 @@ class process(object):
 
     @staticmethod
     def subprocess(program, cwd, environment, newlines, joined, shell=True, show=False):
-        """Create a subprocess using subprocess.Popen."""
+        '''Create a subprocess using subprocess.Popen.'''
         stderr = subprocess.STDOUT if joined else subprocess.PIPE
         if os.name == 'nt':
             si = subprocess.STARTUPINFO()
@@ -547,7 +547,7 @@ class process(object):
         return "Process {:d} {:s}".format(self.id, 'is still running' if res is None else "has terminated with code {:d}".format(res))
 
     def write(self, data):
-        """Write `data` directly to program's stdin"""
+        '''Write `data` directly to program's stdin.'''
         if self.running and not self.program.stdin.closed:
             if self.updater and self.updater.is_alive():
                 return self.program.stdin.write(data)
@@ -555,26 +555,26 @@ class process(object):
         raise IOError("Unable to write to stdin for process. {:s}.".format(self.__format_process_state()))
 
     def close(self):
-        """Closes stdin of the program"""
+        '''Closes stdin of the program.'''
         if self.running and not self.program.stdin.closed:
             return self.program.stdin.close()
         raise IOError("Unable to close stdin for process. {:s}.".format(self.__format_process_state()))
 
     def signal(self, signal):
-        """Raise a signal to the program"""
+        '''Raise a signal to the program.'''
         if self.running:
             return self.program.send_signal(signal)
         raise IOError("Unable to raise signal {!r} to process. {:s}.".format(signal, self.__format_process_state()))
 
     def exception(self):
-        """Grab an exception if there's any in the queue"""
+        '''Grab an exception if there's any in the queue.'''
         if self.exceptionQueue.empty(): return
         res = self.exceptionQueue.get()
         self.exceptionQueue.task_done()
         return res
 
     def wait(self, timeout=0.0):
-        """Wait a given amount of time for the process to terminate"""
+        '''Wait a given amount of time for the process to terminate.'''
         program = self.program
         if program is None:
             raise RuntimeError("Program {:s} is not running.".format(self.commandline))
@@ -609,7 +609,7 @@ class process(object):
         return self.__terminate()
 
     def __terminate(self):
-        """Sends a SIGKILL signal and then waits for program to complete"""
+        '''Sends a SIGKILL signal and then waits for program to complete.'''
         self.program.kill()
         while self.running: continue
 
@@ -621,7 +621,7 @@ class process(object):
         raise res[0],res[1],res[2]
 
     def __stop_monitoring(self):
-        """Cleanup monitoring threads"""
+        '''Cleanup monitoring threads.'''
         P = self.program
         if P.poll() is None:
             raise RuntimeError("Unable to stop monitoring while process {!r} is still running.".format(P))
@@ -914,39 +914,3 @@ class matcher(object):
     def match(self, type, value, iterable):
         matcher = self.__predicate__[type](value)
         return itertools.ifilter(matcher, iterable)
-
-if __name__ == '__main__':
-    fn = lambda: 0
-    del(fn)
-
-    @multicase()
-    def fn():
-        '''contains no arguments'''
-        return 0
-
-    @multicase(name=basestring)
-    def fn(name):
-        '''contains `name` which is a string'''
-        return 1
-
-    @multicase()
-    def fn(something):
-        '''contains an unknown field `something`'''
-        return 2
-
-    @multicase(blah1=six.integer_types)
-    def fn(blah1, blah2):
-        """This has the following format:
-        blah1 -- is an int
-        blah2 -- is unknown"""
-        return 3
-
-    @multicase(blah=str, blah2=int)
-    def fn(blah,blah2,*args):
-        return 4
-
-    @multicase(blah=str, blah2=int)
-    def fn(blah,blah2,**kwds):
-        return 5
-
-    print fn()

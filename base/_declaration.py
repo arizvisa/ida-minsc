@@ -38,17 +38,17 @@ def demangle(string):
 def mangled(string):
     return any(string.startswith(n) for n in ('?', '__'))
 
-# examples to test below code with
-"??_U@YAPAXI@Z"
-"?_BADOFF_func@std@@YAABJXZ"
-"??$_Div@N@?$_Complex_base@NU_C_double_complex@@@std@@IAEXABV?$complex@N@1@@Z"
-"??6?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEAAV01@PBX@Z"
-"??1?$basic_ostream@DU?$char_traits@D@std@@@std@@UAE@XZ"
-"??_F?$basic_stringstream@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QAEXXZ"
-"??1type_info@@UAE@XZ"
-"sub_784B543B"
-"?_Atexit@@YAXP6AXXZ@Z"
-"?__ArrayUnwind@@YGXPAXIHP6EX0@Z@Z"
+## examples to test below code with
+#"??_U@YAPAXI@Z"
+#"?_BADOFF_func@std@@YAABJXZ"
+#"??$_Div@N@?$_Complex_base@NU_C_double_complex@@@std@@IAEXABV?$complex@N@1@@Z"
+#"??6?$basic_ostream@DU?$char_traits@D@std@@@std@@QAEAAV01@PBX@Z"
+#"??1?$basic_ostream@DU?$char_traits@D@std@@@std@@UAE@XZ"
+#"??_F?$basic_stringstream@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@QAEXXZ"
+#"??1type_info@@UAE@XZ"
+#"sub_784B543B"
+#"?_Atexit@@YAXP6AXXZ@Z"
+#"?__ArrayUnwind@@YGXPAXIHP6EX0@Z@Z"
 
 # FIXME: this code is so hacky, that i need unit-tests for it...which should be properly fixed.
 #        1] If I write a parser, I can easily split out these components. (proper fix)

@@ -7,7 +7,9 @@ import internal, ui
 import idaapi
 
 class typemap:
-    """Convert bidirectionally from a pythonic type into an idaapi type"""
+    """
+    Convert bidirectionally from a pythonic type into an idaapi type
+    """
 
     FF_MASKSIZE = 0xf0000000    # Mask that select's the flag's size
     FF_MASK = 0xfff00000        # Mask that select's the flag's repr
@@ -395,6 +397,7 @@ class node(object):
     @staticmethod
     def sup_functype(sup):
         """Given a supval, return the pointer size, model, and calling convention for a function.
+
         This string is typically found in a supval[0x3000] of a function.
         """
         res, iterable = [], iter(sup)
@@ -563,7 +566,9 @@ class namedtypedtuple(tuple):
     def __getstate__(self): return
 
 class symbol_t(object):
-    """A type that is used to describe a value that is symbolic in nature.
+    """
+    A type that is used to describe a value that is symbolic in nature.
+
     Used primarily as a type-checking mechanism.
     """
 

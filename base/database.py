@@ -58,7 +58,10 @@ def bottom():
 
 class config(object):
     """
-    Namespace containing various read-only properties about the database.
+    Namespace containing the various read-only properties about the database.
+    This includes things such as the database boundaries, filenames, path to
+    the generated database, etc. Some tools for determining the type of the
+    binary are also included.
     """
 
     info = idaapi.get_inf_structure()
@@ -374,9 +377,7 @@ class functions(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        """Search through all of the functions within the database and return the first result.
-        Please review the help for functions.list for the definition of ``type``.
-        """
+        '''Search through all of the functions within the database and return the first result.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
@@ -441,9 +442,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        """Iterate through each segment defined in the database.
-        Please review the help for segments.list for the definition of ``type``.
-        """
+        '''Iterate through each segment defined in the database.'''
         return segment.__iterate__(**type)
 
     @utils.multicase(name=basestring)
@@ -454,9 +453,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        """Search through all of the segments within the database and return the first result.
-        Please review the help for `segments.list` for the definition of ``type``.
-        """
+        '''Search through all of the segments within the database and return the first result.'''
         return segment.search(**type)
 
 @utils.multicase()
@@ -478,7 +475,8 @@ def disassemble(**options):
     return disassemble(ui.current.address(), **options)
 @utils.multicase(ea=six.integer_types)
 def disassemble(ea, **options):
-    """Disassemble the instructions at the address ``ea``.
+    """Disassemble the instructions at the address specified by ``ea``.
+
     If the integer ``count`` is specified, then return ``count`` number of instructions.
     If the bool ``comments`` is `True`, then return the comments for each instruction as well.
     """
@@ -527,6 +525,7 @@ def write(data, **original):
 @utils.multicase(ea=six.integer_types, data=bytes)
 def write(ea, data, **original):
     """Modify the database at address ``ea`` with the bytes ``data``
+
     If the bool ``original`` is specified, then modify what IDA considers the original bytes.
     """
     ea, _ = interface.address.within(ea, ea + len(data))
@@ -623,9 +622,7 @@ class names(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        """Search through all of the names within the database and return the first result.
-        Please review the help for `names.list` for the definition of ``type``.
-        """
+        '''Search through all of the names within the database and return the first result.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -684,6 +681,7 @@ class search(object):
     @staticmethod
     def by_bytes(ea, string, **direction):
         """Search through the database at address ``ea`` for the bytes specified by ``string``.
+
         If ``reverse`` is specified as a bool, then search backwards from the given address.
         """
         flags = idaapi.SEARCH_UP if direction.get('reverse', False) else idaapi.SEARCH_DOWN
@@ -699,6 +697,7 @@ class search(object):
     @staticmethod
     def by_regex(ea, string, **options):
         """Search the database at address ``ea`` for the regex matched by ``string``.
+
         If ``reverse`` is specified as a bool, then search backwards from the given address.
         If ``sensitive`` is specified as bool, then perform a case-sensitive search.
         """
@@ -782,7 +781,8 @@ def name(**flags):
     return name(ui.current.address(), **flags)
 @utils.multicase(ea=six.integer_types)
 def name(ea, **flags):
-    """Return the name defined at the address ``ea``.
+    """Return the name defined at the address specified by ``ea``.
+
     If ``flags`` is specified, then use the specified value as the flags.
     """
     ea = interface.address.inside(ea)
@@ -813,6 +813,7 @@ def name(none, **flags):
 @utils.multicase(ea=six.integer_types, string=basestring)
 def name(ea, string, *suffix, **flags):
     """Renames the address  specified by ``ea`` to ``string``.
+
     If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
     If ``flags`` is specified, then use the specified value as the flags.
     If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
@@ -989,6 +990,7 @@ def comment(**repeatable):
 @utils.multicase(ea=six.integer_types)
 def comment(ea, **repeatable):
     """Return the comment at the address ``ea``.
+
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
     return idaapi.get_cmt(interface.address.inside(ea), repeatable.get('repeatable', False))
@@ -999,6 +1001,7 @@ def comment(string, **repeatable):
 @utils.multicase(ea=six.integer_types, string=basestring)
 def comment(ea, string, **repeatable):
     """Set the comment at address ``ea`` to ``string``.
+
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
     res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), string, repeatable.get('repeatable', False))
@@ -1158,9 +1161,7 @@ class entries(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        """Search through all of the entry-points within the database and return the first result.
-        Please review the help for entry.list for the definition of ``type``.
-        """
+        '''Search through all of the entry-points within the database and return the first result.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -1465,6 +1466,7 @@ class imports(object):
         return cls.__iterate__()
 
     # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
+
     __formats__ = staticmethod(lambda (module, name, ordinal): name or "Ordinal{:d}".format(ordinal))
     __formatl__ = staticmethod(lambda (module, name, ordinal): "{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal))))
     __format__ = __formatl__
@@ -1484,7 +1486,8 @@ class imports(object):
     @classmethod
     def __iterate__(cls):
         """Iterate through all of the imports in the database.
-        Yields `(ea, (module, name, ordinal))` for each iteration.
+
+        Yields `(address, (module, name, ordinal))` for each iteration.
         """
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
@@ -1625,9 +1628,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        """Search through all of the imports within the database and return the first result.
-        Please review the help for imports.list for the definition of ``type``.
-        """
+        '''Search through all of the imports within the database and return the first result.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
@@ -1732,7 +1733,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prev(cls, ea):
-        '''Return the previous address from the address ``ea``.'''
+        '''Return the previous address from the address specified by ``ea``.'''
         return cls.prev(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
@@ -1742,14 +1743,13 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prev(cls, ea, count):
-        """Return the previous address from the address ``ea``.
-        Skip ``count`` addresses before returning.
-        """
+        '''Return the `count`th previous address from the address specified by ``ea``.'''
         return cls.prevF(ea, utils.fidentity, count)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def prev(cls, ea, predicate, count):
         """Return the previous address from the address ``ea`` that matches ``predicate``.
+
         Skip ``count`` addresses before returning.
         """
         return cls.prevF(ea, predicate, count)
@@ -1777,14 +1777,13 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def next(cls, ea, count):
-        """Return the next address from the address ``ea``.
-        Skip ``count`` addresses before returning.
-        """
+        '''Return the `count`th next address from the address specified by ``ea``.'''
         return cls.nextF(ea, utils.fidentity, count)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def next(cls, ea, predicate, count):
         """Return the next address from the address ``ea`` that matches ``predicate``.
+
         Skip ``count`` addresses before returning.
         """
         return cls.nextF(ea, predicate, count)
@@ -1803,6 +1802,7 @@ class address(object):
     @classmethod
     def prevF(cls, ea, predicate, count):
         """Return the previous address from the address ``ea`` that matches ``predicate``..
+
         Skip ``count`` addresses before returning.
         """
         Fprev, Finverse = utils.fcompose(interface.address.within, idaapi.prev_not_tail), utils.fcompose(predicate, operator.not_)
@@ -1832,6 +1832,7 @@ class address(object):
     @classmethod
     def nextF(cls, ea, predicate, count):
         """Return the next address from the address ``ea`` that matches ``predicate``..
+
         Skip ``count`` addresses before returning.
         """
         Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
@@ -1865,9 +1866,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevref(cls, ea, count):
-        """Returns the previous address from ``ea`` that has anything referencing it.
-        Skip ``count`` references before returning.
-        """
+        '''Returns the `count`th previous address from ``ea`` that has anything referencing it.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fxref, count)
 
@@ -1896,9 +1895,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextref(cls, ea, count):
-        """Returns the next address from ``ea`` that has anything referencing it.
-        Skip ``count`` references before returning.
-        """
+        '''Returns the `count`th next address from ``ea`` that has anything referencing it.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fxref, count)
 
@@ -1927,9 +1924,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevdref(cls, ea, count):
-        """Returns the previous address from ``ea`` that has data referencing it.
-        Skip ``count`` results before returning.
-        """
+        '''Returns the `count`th previous address from ``ea`` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fdref, count)
 
@@ -1958,9 +1953,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextdref(cls, ea, count):
-        """Returns the next address from ``ea`` that has data referencing it.
-        Skip ``count`` results before returning.
-        """
+        '''Returns the `count`th next address from ``ea`` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fdref, count)
     prevdata, nextdata = utils.alias(prevdref, 'address'), utils.alias(nextdref, 'address')
@@ -1990,9 +1983,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevcref(cls, ea, count):
-        """Returns the previous address from ``ea`` that has code referencing it.
-        Skip ``count`` results before returning.
-        """
+        '''Returns the `count`th previous address from ``ea`` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fcref, count)
 
@@ -2021,9 +2012,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextcref(cls, ea, count):
-        """Returns the next address from ``ea`` that has code referencing it.
-        Skip ``count`` results before returning.
-        """
+        '''Returns the `count`th next address from ``ea`` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fcref, count)
     prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
@@ -2369,6 +2358,7 @@ class address(object):
     @classmethod
     def prevtag(cls, ea, **tagname):
         """Returns the previous address from ``ea`` that contains a tag.
+
         If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
         """
         return cls.prevtag(ea, 1, **tagname)
@@ -2401,6 +2391,7 @@ class address(object):
     @classmethod
     def nexttag(cls, ea, **tagname):
         """Returns the next address from ``ea`` that contains a tag.
+
         If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
         """
         return cls.nexttag(ea, 1, **tagname)
@@ -2942,6 +2933,7 @@ class xref(object):
     @staticmethod
     def code(ea, descend):
         """Return all of the code xrefs that refer to the address ``ea``.
+
         If the bool ``descend`` is defined, then return only code refs that are referred by the specified address.
         """
         if descend:
@@ -2973,6 +2965,7 @@ class xref(object):
     @staticmethod
     def data(ea, descend):
         """Return all of the data xrefs that refer to the address ``ea``.
+
         If the bool ``descend`` is defined, then return only the data refs that are referred by the specified address.
         """
         if descend:
@@ -3072,6 +3065,7 @@ class xref(object):
     @staticmethod
     def add_code(ea, target, **reftype):
         """Add a code reference from address ``ea`` to ``target``.
+
         If the reftype ``call`` is `True`, then specify this ref as a function call.
         """
         ea, target = interface.address.inside(ea, target)
@@ -3094,6 +3088,7 @@ class xref(object):
     @staticmethod
     def add_data(ea, target, **reftype):
         """Add a data reference from the address ``ea`` to ``target``.
+
         If the reftype ``write`` is `True`, then specify that this ref is writing to the target.
         """
         ea, target = interface.address.inside(ea, target)
@@ -3175,9 +3170,7 @@ class marks(object):
     @utils.multicase(ea=six.integer_types, description=basestring)
     @classmethod
     def new(cls, ea, description, **extra):
-        """Create a mark at the address ``ea`` with the given ``description``.
-        Returns the index of the newly created mark.
-        """
+        '''Create a mark at the address ``ea`` with the given ``description`` and return its index.'''
         ea = interface.address.inside(ea)
         try:
             idx = cls.__find_slotaddress(ea)
@@ -3366,9 +3359,7 @@ def mark(ea, none):
     return marks.remove(ea)
 @utils.multicase(ea=six.integer_types, description=basestring)
 def mark(ea, description):
-    """Sets the mark at address ``ea`` to the specified ``description``.
-    Returns the previous description of the mark.
-    """
+    '''Sets the mark at address ``ea`` to the specified ``description``.'''
     return marks.new(ea, description)
 
 class extra(object):
@@ -3717,6 +3708,7 @@ class set(object):
     @classmethod
     def data(cls, ea, size, **type):
         """Set the data at address ``ea`` to have the specified ``size`` and ``type``.
+
         If ``type`` is not specified, then choose the correct type based on the size.
         """
         lookup = {
@@ -3748,6 +3740,7 @@ class set(object):
     @classmethod
     def alignment(cls, ea, **alignment):
         """Set the data at address ``ea`` as aligned.
+
         If ``alignment`` is specified, then use it as the default alignment.
         If ``size`` is specified, then align that number of bytes.
         """
@@ -3812,6 +3805,7 @@ class set(object):
     @classmethod
     def string(cls, ea, size, **type):
         """Set the data at address ``ea`` to a string with the specified ``size``.
+
         If ``type`` is specified, use a string of the specified type.
         """
         type = type.get('type', idaapi.ASCSTR_LAST)
@@ -3927,9 +3921,11 @@ class get(object):
     @classmethod
     def unsigned(cls, ea, size, **byteorder):
         """Read an unsigned integer from the address ``ea`` with the specified ``size``.
+
         If ``byteorder`` is 'big' then read in big-endian form.
         If ``byteorder`` is 'little' then read in little-endian form.
-        ``byteorder`` defaults to the format used by the database architecture.
+
+        The default value of ``byteorder`` is the same as specified by the database architecture.
         """
         data = read(ea, size)
         endian = byteorder.get('order', None) or byteorder.get('byteorder', config.byteorder())
@@ -3952,8 +3948,10 @@ class get(object):
     @classmethod
     def signed(cls, ea, size, **byteorder):
         """Read a signed integer from the address ``ea`` with the specified ``size``.
+
         If ``byteorder`` is 'big' then read in big-endian form.
         If ``byteorder`` is 'little' then read in little-endian form.
+
         The default value of ``byteorder`` is the same as specified by the database architecture.
         """
         bits = size*8
@@ -4097,7 +4095,8 @@ class get(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, **length):
-        """Return the values of the array at address ``ea``.
+        """Return the values of the array at the address specified by ``ea``.
+
         If the int ``length`` is defined, then use it as the number of elements for the array.
         """
         ea = interface.address.within(ea)
@@ -4173,6 +4172,7 @@ class get(object):
     @classmethod
     def structure(cls, ea, **structure):
         """Return the `structure_t` at address ``ea`` as a dict of ctypes.
+
         If the ``structure`` argument is specified, then use that specific structure type.
         """
         ea = interface.address.within(ea)

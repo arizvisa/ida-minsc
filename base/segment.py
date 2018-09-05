@@ -146,9 +146,7 @@ def search(name):
     return by(like=string)
 @utils.multicase()
 def search(**type):
-    """Search through all the segments for one that matches ``type``.
-    Please review the help for segment.list for the definition of ``type``.
-    """
+    '''Search through all the segments for one that matches ``type``.'''
     return by(**type)
 
 ## properties
@@ -371,9 +369,10 @@ def _save_file(filename, ea, size, offset=0):
 
 def load(filename, ea, size=None, offset=0, **kwds):
     """Load the specified ``filename`` to the address ``ea`` as a segment.
+
     If ``size`` is not specified, use the length of the file.
-    ``offset`` represents the offset into the file to use.
-    ``name`` can be used to name the segment.
+    The keyword ``offset`` represents the offset into the file to use.
+    The keyword ``name`` can be used to name the segment.
     """
     filesize = os.stat(filename).st_size
 
@@ -385,7 +384,8 @@ def load(filename, ea, size=None, offset=0, **kwds):
 
 def map(ea, size, newea, **kwds):
     """Map ``size`` bytes of data from ``ea`` into a new segment at ``newea``.
-    ``name`` can be used to name the segment.
+
+    The keyword ``name`` can be used to name the segment.
     """
     fpos,data = idaapi.get_fileregion_offset(ea),database.read(ea, size)
     if len(data) != size:
@@ -399,10 +399,11 @@ def map(ea, size, newea, **kwds):
 # creation/destruction
 def new(offset, size, name, **kwds):
     """Create a segment at ``offset`` with ``size`` and name it according to ``name``.
-    ``bits`` can be used to specify the bit size of the segment
-    ``comb`` can be used to specify any flags (idaapi.sc*)
-    ``align`` can be used to specify paragraph alignment (idaapi.sa*)
-    ``org`` specifies the origin of the segment (must be paragraph aligned due to ida)
+
+    The keyword ``bits`` can be used to specify the bit size of the segment
+    The keyword ``comb`` can be used to specify any flags (idaapi.sc*)
+    The keyword ``align`` can be used to specify paragraph alignment (idaapi.sa*)
+    The keyword ``org`` specifies the origin of the segment (must be paragraph aligned due to ida)
     """
     s = idaapi.get_segm_by_name(name)
     if s is not None:
@@ -460,6 +461,7 @@ create = utils.alias(new)
 
 def remove(segment, remove=False):
     """Remove the segment identified by ``segment``.
+
     If the bool ``remove`` is specified, then remove the content of the segment from the database.
     """
     if not isinstance(segment, idaapi.segment_t):

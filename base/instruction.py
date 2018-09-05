@@ -153,7 +153,8 @@ class map_t(object):
         return "{:s} {!r}".format(self.__class__, self.__state__)
 
 class architecture_t(object):
-    """Base class to represent how IDA maps the registers and types returned from an operand to a register that's uniquely identifiable by the user.
+    """
+    Base class to represent how IDA maps the registers and types returned from an operand to a register that's uniquely identifiable by the user.
 
     This is necessary as for some architectures IDA will not include all the register names and thus will use the same register-index to represent two registers that are of different types. As an example, on the Intel processor module the `al` and `ax` regs are returned in the operand as an index to the "ax" string. Similarly on the 64-bit version of the processor module, all of the registers `ax`, `eax`, and `rax` have the same index.
     """
@@ -162,6 +163,7 @@ class architecture_t(object):
 
     def __init__(self, **cache):
         """Instantiate an `architecture_t` object which represents the registers available to an architecture.
+
         If ``cache`` is defined, then use the specified dictionary to map an ida (register-name, register-dtype) to a string containing the commonly recognized register-name.
         """
         self.__register__, self.__cache__ = map_t(), cache.get('cache', {})
@@ -212,13 +214,15 @@ class architecture_t(object):
 
     def by_index(self, index):
         """Lookup a register according to its ``index``.
-        Size is the default that's set according to the IDA version.
+
+        The register size is based on the architecture of the instance of IDA that is running.
         """
         res = idaapi.ph.regnames[index]
         return self.by_name(res)
     byIndex = utils.alias(by_index, 'architecture')
     def by_indextype(self, index, dtyp):
         """Lookup a register according to its ``index`` and ``dtyp``.
+
         Some examples of dtypes: idaapi.dt_byte, idaapi.dt_word, idaapi.dt_dword, idaapi.dt_qword
         """
         res = idaapi.ph.regnames[index]
@@ -448,12 +452,14 @@ ops_const = utils.alias(ops_constant)
 @utils.multicase(reg=(basestring, register_t))
 def ops_register(reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at the current address which touches one of the registers identified by ``regs``.
+
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
 @utils.multicase(reg=(basestring, register_t))
 def ops_register(ea, reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at address ``ea`` that touches one of the registers identified by ``regs``.
+
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     ea = interface.address.inside(ea)
@@ -470,6 +476,7 @@ def operand():
 @utils.multicase(none=types.NoneType)
 def operand(none):
     """Returns all the `idaapi.op_t` instances of the instruction at the current address.
+
     (Not really intended to be used. Please use the zero-argument version.))
     """
     return operand(ui.current.address(), None)
@@ -550,6 +557,7 @@ def op_type(n):
 @utils.multicase(ea=six.integer_types, n=six.integer_types)
 def op_type(ea, n):
     """Returns the type of the ``n``th operand as a string for the instruction at the address ``ea``.
+
     Some of the types returned are: imm, reg, phrase, or addr
     """
     res = operand(ea, n)
@@ -666,31 +674,24 @@ def op_structure(ea, opnum):
     return tuple(res + [ofs]) if ofs > 0 else tuple(res)
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
-    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
+    '''Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.'''
     return op_structure(ui.current.address(), opnum, [structure], **delta)
 @utils.multicase(opnum=six.integer_types, id=six.integer_types)
 def op_structure(opnum, id, **delta):
-    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
+    '''Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.'''
     return op_structure(ui.current.address(), opnum, id, **delta)
 @utils.multicase(opnum=six.integer_types, path=(types.TupleType, types.ListType))
 def op_structure(opnum, path, **delta):
-    """Apply the structure members in ``path`` to the instruction operand ``opnum`` at the current address.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
+    '''Apply the structure members in ``path`` to the instruction operand ``opnum`` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(ea, opnum, structure, **delta):
-    """Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
-    If the offset ``delta`` is specified, shift the structure by that amount.
-    """
+    '''Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.'''
     return op_structure(ea, opnum, structure.id, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
 def op_structure(ea, opnum, id, **delta):
     """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
+
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
     ea = interface.address.inside(ea)
@@ -714,6 +715,7 @@ def op_structure(ea, opnum, id, **delta):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(types.TupleType, types.ListType))
 def op_structure(ea, opnum, path, **delta):
     """Apply the structure members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
+
     If the offset ``delta`` is specified, shift the structure by that amount.
     """
     ea = interface.address.inside(ea)
@@ -1069,7 +1071,8 @@ def is_calli(ea):
 ## operand type registration
 ## XXX: This namespace is deleted after each method has been assigned to their lookup table
 class operand_types:
-    """Namespace containing all of the operand type handlers.
+    """
+    Namespace containing all of the operand type handlers.
     """
     @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
@@ -1149,7 +1152,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
     def phrase(ea, op):
-        """Returns an operand as a `(offset, basereg, indexreg, scale)` tuple."""
+        '''Returns an operand as a `(offset, basereg, indexreg, scale)` tuple.'''
         F1, F2 = op.specflag1, op.specflag2
         if op.type in {idaapi.o_displ, idaapi.o_phrase}:
             if F1 == 0:
@@ -1301,7 +1304,8 @@ class intelop:
     SO = SegmentOffset
 
     class SegmentOffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
-        """A tuple containing an intel operand `(offset, base, index, scale)`.
+        """
+        A tuple containing an intel operand `(offset, base, index, scale)`.
         Within the tuple, `base` and `index` are registers.
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
@@ -1316,7 +1320,8 @@ class intelop:
     SOBIS = SegmentOffsetBaseIndexScale
 
     class OffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
-        """A tuple containing an intel operand `(offset, base, index, scale)`.
+        """
+        A tuple containing an intel operand `(offset, base, index, scale)`.
         Within the tuple, `base` and `index` are registers.
         """
         _fields = ('offset', 'base', 'index', 'scale')
@@ -1332,7 +1337,8 @@ class intelop:
 ## arm operands
 class armop:
     class flex(interface.namedtypedtuple, interface.symbol_t):
-        """A tuple containing an arm flexible-operand `(Rn, shift, n)`.
+        """
+        A tuple containing an arm flexible-operand `(Rn, shift, n)`.
         A flexible operand is an operation that allows the architecture to apply
         a binary shift or rotation to the value of a register.
         """
@@ -1349,7 +1355,8 @@ class armop:
             yield r
 
     class list(interface.namedtypedtuple, interface.symbol_t):
-        """A tuple containing an arm register list `(reglist,)`.
+        """
+        A tuple containing an arm register list `(reglist,)`.
         `reglist` contains a set of `register_t` which can be used to test membership.
         """
         _fields = ('reglist',)
@@ -1387,7 +1394,8 @@ class armop:
             yield r
 
     class mem(interface.namedtypedtuple, interface.symbol_t):
-        """A tuple for an arm memory operand containing the `(address, value)`.
+        """
+        A tuple for an arm memory operand containing the `(address, value)`.
         `address` contains the actual value that's stored within the operand.
         `value` contains the dereferenced value at the operand's address.
         """
@@ -1430,9 +1438,9 @@ class mipsop:
 
 ## architecture registers
 class Intel(architecture_t):
-    """An implementation of the Intel architecture.
-    This can be used to locate registers that are of a specific size
-    or are related to another set of registers.
+    """
+    An implementation of the Intel architecture.
+    This can be used to locate registers that are of a specific size or are related to another set of registers.
     """
     prefix = ''
     def __init__(self):
@@ -1484,7 +1492,8 @@ class Intel(architecture_t):
         ## 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
 
 class AArch32(architecture_t):
-    """An implementation of the AArch32 architecture.
+    """
+    An implementation of the AArch32 architecture.
     This class is used to locate registers by name, index, or size.
     """
     prefix = '%'
@@ -1508,7 +1517,8 @@ class AArch32(architecture_t):
         # FIXME: include x registers
 
 class Mips(architecture_t):
-    """An implementation of the Mips architecture.
+    """
+    An implementation of the Mips architecture.
     This class is used to locate registers by name, index, or size.
     """
     prefix = '$'

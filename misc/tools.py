@@ -169,6 +169,7 @@ def below(ea, includeSegment=False):
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea=None, target=None):
     """Output the function call at ``ea`` and its arguments in C-form.
+
     If ``target`` is specified, then assume that the instruction is calling ``target``.
     """
     ea = current.address() if ea is None else ea
@@ -256,6 +257,7 @@ def sourcechain(fn, *args, **kwds):
 
 def map(F, **kwargs):
     """Execute provided callback on all functions in database. Synonymous to map(F, database.functions()).
+
     ``F`` is defined as a function(address, **kwargs) or function(index, address, **kwargs).
     Any extra arguments are passed to ``F`` unmodified.
     """
@@ -308,6 +310,7 @@ class function(object):
     @classmethod
     def instruction(cls, function, predicate):
         """Search through the function ``function`` for any instruction that matches with the callable ``predicate``.
+
         ``predicate`` is a callable that takes one argument which is the result of database.instruction(ea).
         """
         for ea in func.iterate(function):
@@ -325,6 +328,7 @@ class function(object):
     @classmethod
     def address(cls, function, predicate):
         """Search through the ``function`` for any address that matches with the callable ``predicate``.
+
         ``predicate`` is a callable that takes one argument which is passed the address to match.
         """
         for ea in func.iterate(function):

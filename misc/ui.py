@@ -100,7 +100,7 @@ class state(object):
     """
     @classmethod
     def graphview(cls):
-        """Returns `True` if the current function is being viewed in graph view mode."""
+        '''Returns `True` if the current function is being viewed in graph view mode.'''
         res = idaapi.get_inf_structure()
         if idaapi.__version__ < 7.0:
             return res.graph_view != 0
@@ -276,7 +276,7 @@ class timer(object):
     clock = {}
     @classmethod
     def register(cls, id, interval, callable):
-        """register a python function as a timer"""
+        '''Register a python ``function as a timer.'''
         if id in cls.clock:
             idaapi.unregister_timer(cls.clock[id])
 
@@ -290,7 +290,7 @@ class timer(object):
         del(cls.clock[id])
     @classmethod
     def reset(cls):
-        """remove all timers"""
+        '''Remove all the registered timers.'''
         for id, clk in six.iteritems(cls.clock):
             idaapi.unregister_timer(clk)
             del(cls.clock[id])
@@ -319,6 +319,7 @@ class navigation(object):
     @classmethod
     def auto(cls, ea, **type):
         """Set the auto-analysis address and type on the navigation bar to ``ea``.
+
         If ``type`` is specified, then update using the specified auto-analysis type.
         """
         return cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
@@ -377,14 +378,14 @@ class window(object):
         return idaapi.get_current_viewer()
     @classmethod
     def main(cls):
-        """Return the active main window"""
+        '''Return the active main window.'''
         global application
         q = application()
         return q.activeWindow()
 
 class windows(object):
     """
-    enumerating and filtering all the window types that are available.
+    Enumerating and filtering all the window types that are available.
     """
     def __new__(cls):
         global application
@@ -393,7 +394,7 @@ class windows(object):
 
 class widget(object):
     """
-    selecting a specific or particular widget.
+    Selecting a specific or particular widget.
     """
     def __new__(self, (x, y)):
         res = (x, y)
@@ -409,7 +410,7 @@ class widget(object):
 
 class clipboard(object):
     """
-    interacting with the clipboard state.
+    Interacting with the clipboard state.
     """
     def __new__(cls):
         global application
@@ -554,7 +555,9 @@ try:
         return res.instance()
 
     class mouse(mouse):
-        """mouse interface"""
+        """
+        Mouse interface.
+        """
         @classmethod
         def position(cls):
             qt = PySide.QtGui.QCursor
@@ -562,7 +565,9 @@ try:
             return res.x(), res.y()
 
     class keyboard(keyboard):
-        """PySide keyboard interface"""
+        """
+        PySide keyboard interface.
+        """
         @classmethod
         def input(cls):
             return q.inputContext()
@@ -612,8 +617,7 @@ class hook(object):
 ## (which is probably pretty unsafe in IDA, but let's hope).
 class queue(object):
     """
-    Exposes the ability to queue the execution of functions so they
-    run asynchronously.
+    Exposes the ability to queue the execution of functions so they run asynchronously.
 
     This is probably pretty unsafe in IDA, but let's hope.
     """
@@ -653,7 +657,9 @@ class queue(object):
 ### Helper classes to use or inherit from
 # XXX: why was this base class implemented again??
 class InputBox(idaapi.PluginForm):
-    """Creating an InputBox to interact with the user"""
+    """
+    Creating an InputBox to interact with the user...
+    """
     def OnCreate(self, form):
         self.parent = self.FormToPyQtWidget(form)
 
