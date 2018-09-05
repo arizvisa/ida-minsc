@@ -328,7 +328,9 @@ def remove(func):
 ## chunks
 class chunks(object):
     """
-    List all the chunks associated with a given function.
+    Namespace for interacting with the different chunks assocaited with a
+    function. By default this namespace will yield the boundaries of each
+    chunk associated with a function.
     """
     @utils.multicase()
     def __new__(cls):
@@ -351,7 +353,9 @@ class chunks(object):
 
 class chunk(object):
     """
-    Modify a specific chunk associated with a given function.
+    Namespace for interacting with a specific chunk belonging to a function.
+    By default this namespace will return the bounds of the chunk containing
+    the specified address.
     """
     @utils.multicase()
     def __new__(cls):
@@ -461,7 +465,16 @@ def contains(func, ea):
 
 class blocks(object):
     """
-    Interact with all the basic-blocks within the specified function.
+    Namespace for interacting with all of the basic-blocks within the specified
+    function. By default this namespace will yield the boundaries of each
+    basic-block defined within the function.
+
+    This namespace provides a small number of utilities that can be used to
+    extract the basic-blocks of a function and convert them into a flow-graph
+    such as `idaapi.FlowChart`, or a digraph as used by the `networkx` module.
+
+    Due to `idaapi.FlowChart` and networkx's digraph being used so often, these
+    functions are exported globally as `function.flowchart` and `function.digraph`.
     """
     @utils.multicase()
     def __new__(cls):
@@ -597,7 +610,9 @@ digraph = graph = utils.alias(blocks.digraph, 'blocks')
 
 class block(object):
     """
-    Interact with a specific basic-block within the given function.
+    Namespace for interacting with a specific basic-block belonging to a
+    function. By default the current basic-block will be returned as its
+    bounds.
     """
     @utils.multicase()
     @classmethod
@@ -1040,7 +1055,9 @@ class block(object):
 
 class frame(object):
     """
-    Interact with a function's frame.
+    Namespace for getting specific information about a particular function's
+    frame. By default, this namespace will return a `structure_t` representing
+    the frame belonging to the specified function.
     """
     @utils.multicase()
     def __new__(cls):
@@ -1447,7 +1464,10 @@ def switches(func):
 
 class type(object):
     """
-    Query any information about the type of the given function.
+    Namespace allowing one to query type information belonging to a specified
+    function. This allows one to get any attributes that IDA or a user has
+    applied to a function within the database. This can be used to filter
+    functions that have particular attributes.
     """
     @utils.multicase()
     @classmethod

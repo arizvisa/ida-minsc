@@ -79,7 +79,7 @@ def bottom():
 
 class config(object):
     """
-    Database configuration.
+    Namespace containing various read-only properties about the database.
     """
 
     info = idaapi.get_inf_structure()
@@ -177,11 +177,45 @@ class config(object):
     def bounds(cls):
         return cls.info.minEA, cls.info.maxEA
 
+    class registers(object):
+        """
+        Namespace for returning the register names + sizes configured in the database.
+        """
+        @classmethod
+        def names(cls):
+            '''Return all of the register names in the database.'''
+            return idaapi.ph_get_regnames()
+        @classmethod
+        def segments(cls):
+            '''Return all of the segment registers in the database.'''
+            names = cls.names()
+            return [names[i] for i in six.moves.range(idaapi.ph_get_regFirstSreg(), idaapi.ph_get_regLastSreg()+1)]
+        @classmethod
+        def codesegment(cls):
+            '''Return all of the code segment registers in the database.'''
+            return cls.names()[idaapi.ph_get_regCodeSreg()]
+        @classmethod
+        def datasegment(cls):
+            '''Return all of the data segment registers in the database.'''
+            return cls.names()[idaapi.ph_get_regDataSreg()]
+        @classmethod
+        def segmentsize(cls):
+            '''Return the segment register size for the database.'''
+            return idaapi.ph_get_segreg_size()
+
 range = bounds = utils.alias(config.bounds)
 
 class functions(object):
     """
-    Enumerate all of the functions inside the database.
+    Namespace used for listing all the functions inside the database. By
+    default a list is returned containing the address of each function.
+
+    The different types that one can match functions with are the following:
+        `address` or `ea` - Match according to the function's address
+        `name` - Match according to the exact name
+        `like` - Filter the function names according to a glob
+        `regex` - Filter the function names according to a regular-expression
+        `predicate` - Filter the functions by passing their `idaapi.func_t` to a callable
     """
     __matcher__ = utils.matcher()
     __matcher__.boolean('name', operator.eq, utils.fcompose(function.by,function.name))
@@ -345,8 +379,21 @@ class functions(object):
 
 class segments(object):
     """
-    Enumerate all of the segments within the database.
+    Namespace used for listing all the segments inside the database. By
+    default each segment's boundaries are yielded.
+
+    The different types that one can match segments with are the following:
+        `name` - Match according to the true segment name
+        `like` - Filter the segment names according to a glob
+        `regex` - Filter the segment names according to a regular-expression
+        `index` - Match the segment by its index
+        `identifier` - Match the segment by its identifier (`idaapi.segment_t.name`)
+        `selector` - Match the segment by its selector (`idaapi.segment_t.sel`)
+        `greater` or `gt` - Filter the segments for any after the specified address
+        `less` or `lt` - Filter the segments for any before the specified address
+        `predicate` - Filter the segments by passing its `idaapi.segment_t` to a callable
     """
+
     def __new__(cls):
         '''Yield the bounds of each segment within the current database.'''
         for s in segment.__iterate__():
@@ -474,7 +521,16 @@ def write(ea, data, **original):
 
 class names(object):
     """
-    Enumerate all of the entries inside the database's names list.
+    Namespace used for listing all the names (or symbols) within the database.
+    By default default the (address, name) is yielded.
+
+    The different types that one can filter the symbols with are the following:
+        `address` - Match according to the address of the symbol
+        `name` - Match according to the name of the symbol
+        `like` - Filter the symbol names according to a glob
+        `regex` - Filter the symbol names according to a regular-expression
+        `index` - Match the symbol according to its index
+        `predicate` - Filter the symbols by passing their address to a callable
     """
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', idaapi.get_nlist_ea), __matcher__.mapping('ea', idaapi.get_nlist_ea)
@@ -586,7 +642,24 @@ class names(object):
 
 class search(object):
     """
-    Search the database for arbitrary data using IDA's searching functionality.
+    Namespace used for searching the database using IDA's find functionality.
+
+    By default the name is used, however there are 3 search methods that are
+    available. The methods that are provided are:
+
+        `search.by_bytes` - Search by the specified hex bytes
+        `search.by_regex` - Search by the specified regex
+        `search.by_name`  - Search by the specified name
+
+    Each search method has its own options, but all of them take an extra
+    boolean option, `reverse`, which specifies whether to search backwards
+    from the starting position or forwards.
+
+    The `search.iterate` function allows one to iterate through all the results
+    discovered in the database. One variation of `search.iterate` takes a 3rd
+    parameter `predicate`. One can provide one of the search methods provided
+    or include their own. This function will then yield each matched search
+    result.
     """
 
     @utils.multicase(string=bytes)
@@ -654,6 +727,7 @@ class search(object):
         return
 
     def __new__(cls, string):
+        '''Search through the database for the specified ``string``.'''
         return cls.by_name(here(), string)
 
 byName = by_name = utils.alias(search.by_name, 'search')
@@ -919,9 +993,22 @@ def comment(ea, string, **repeatable):
         raise ValueError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
     return res
 
-class entry(object):
+class entries(object):
     """
-    Enumerate all of the entrypoints inside the database.
+    Namespace used for listing all of the entry points (or exports) within the
+    database. By default the address of each entrypoint will be yielded.
+
+    This namespace is also aliased as `database.exports`.
+
+    The different types that one can match entrypoints with are the following:
+        `address` or `ea` - Match according to the entrypoint's address
+        `name` - Match according to the exact name
+        `like` - Filter the entrypoint names according to a glob
+        `regex` - Filter the entrypoint names according to a regular-expression
+        `index` - Match according to the entrypoint's index (ordinal)
+        `greater` or `gt` - Filter the entrypoints for any after the specified address
+        `less` or `lt` - Filter the entrypoints for any before the specified address
+        `predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
     """
 
     __matcher__ = utils.matcher()
@@ -935,6 +1022,11 @@ class entry(object):
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal)
     __matcher__.predicate('pred', idaapi.get_entry_ordinal)
     __matcher__.boolean('index', operator.eq)
+
+    def __new__(cls):
+        for ea in cls.iterate():
+            yield ea
+        return
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1110,7 +1202,7 @@ class entry(object):
         return res
 
     add = utils.alias(new, 'entry')
-exports = entry     # XXX: ns alias
+exports = entries     # XXX: ns alias
 
 def tags():
     '''Returns all of the tag names used globally.'''
@@ -1341,7 +1433,20 @@ selectcontent = utils.alias(selectcontents)
 ## imports
 class imports(object):
     """
-    Enumerate all of the imports inside the database.
+    Namespace used for listing all of the imports within the database. By
+    default the (address, (shared-object, symbol-name, hint)) is yielded
+    for each import.
+
+    The different types that one can match imports with are the following:
+        `address` or `ea` - Match according to the import's address
+        `name` - Match according to the import's symbol name
+        `module` - Filter the imports according to the specified module name
+        `fullname` - Match according to the full symbol name (module + symbol)
+        `like` - Filter the symbol names of all the imports according to a glob
+        `regex` - Filter the symbol names of all the imports according to a regular-expression
+        `ordinal` - Match according to the import's hint (ordinal)
+        `index` - Match according index of the import
+        `predicate` Filter the imports by passing the above (default) tuple to a callable
     """
     def __new__(cls):
         return cls.__iterate__()
@@ -1527,37 +1632,28 @@ getImportModules = utils.alias(imports.modules, 'imports')
 getImports = utils.alias(imports.list, 'imports')
 
 ###
-class register(object):
-    '''register information'''
-    @classmethod
-    def names(cls):
-        '''Return all of the register names in the database.'''
-        return idaapi.ph_get_regnames()
-    @classmethod
-    def segments(cls):
-        '''Return all of the segment registers in the database.'''
-        names = cls.names()
-        return [names[i] for i in six.moves.range(idaapi.ph_get_regFirstSreg(), idaapi.ph_get_regLastSreg()+1)]
-    @classmethod
-    def codesegment(cls):
-        '''Return all of the code segment registers in the database.'''
-        return cls.names()[idaapi.ph_get_regCodeSreg()]
-    @classmethod
-    def datasegment(cls):
-        '''Return all of the data segment registers in the database.'''
-        return cls.names()[idaapi.ph_get_regDataSreg()]
-    @classmethod
-    def segmentsize(cls):
-        '''Return the segment register size for the database.'''
-        return idaapi.ph_get_segreg_size()
-
 class address(object):
     """
-    Functions for navigating through the addresses within the database.
+    Namespace used for transforming an address in the database to another
+    address according to various constraints. Essentially these functions are
+    used to assist with navigation. These functions allow one to navigate
+    between the next and previous "calls", data references, or even unknown
+    (undefined) addresses.
+
+    This namespace is also aliased as `database.a`.
+
+    Some of the more common functions are used so often that they're also
+    aliased as globals. Some of these are:
+        `database.next` - Moving to the "next" address
+        `database.prev` - Moving to the "previous" address
+        `database.nextref` - Moving to the "next" address with a reference
+        `database.prevref` - Moving to the "previous" address with a reference
+        `database.nextreg` - Moving to the "next" address using a register
+        `database.prevreg` - Moving to the "previous" address using a register
     """
 
     @staticmethod
-    def walk(ea, next, match):
+    def __walk__(ea, next, match):
         '''Return the first address from ``ea`` that doesn't ``match``. ``next`` is used to determine the next address.'''
         res = interface.address.inside(ea)
         while res not in {None, idaapi.BADADDR} and match(res):
@@ -1704,7 +1800,7 @@ class address(object):
         if Fprev(ea) == idaapi.BADADDR:
             raise StandardError("{:s}.prevF: Refusing to seek past the top of the database: ({:#x} <= {:#x})".format('.'.join((__name__, cls.__name__)), ea, config.bounds()[0]))
 
-        res = cls.walk(Fprev(ea), Fprev, Finverse)
+        res = cls.__walk__(Fprev(ea), Fprev, Finverse)
         return cls.prevF(res, predicate, count-1) if count > 1 else res
 
     @utils.multicase(predicate=builtins.callable)
@@ -1726,7 +1822,7 @@ class address(object):
         Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
         if Fnext(ea) == idaapi.BADADDR:
             raise StandardError("{:s}.nextF: Refusing to seek past the bottom of the database: ({:#x} >= {:#x})".format('.'.join((__name__, cls.__name__)), idaapi.get_item_end(ea), config.bounds()[1]))
-        res = cls.walk(Fnext(ea), Fnext, Finverse)
+        res = cls.__walk__(Fnext(ea), Fnext, Finverse)
         return cls.nextF(res, predicate, count-1) if count > 1 else res
 
     @utils.multicase()
@@ -1953,7 +2049,7 @@ class address(object):
         else:
             fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), all)
 
-            start = cls.walk(ea, cls.prev, fwithin)
+            start = cls.__walk__(ea, cls.prev, fwithin)
             start = top() if start == idaapi.BADADDR else start
 
         # define a predicate for cls.walk to continue looping when true
@@ -1969,7 +2065,7 @@ class address(object):
             return ea
 
         # now walk while none of our registers match
-        res = cls.walk(prevea, cls.prev, F)
+        res = cls.__walk__(prevea, cls.prev, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
             raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x}{:+#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
@@ -2014,7 +2110,7 @@ class address(object):
         else:
             fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), builtins.all)
 
-            end = cls.walk(ea, cls.next, fwithin)
+            end = cls.__walk__(ea, cls.next, fwithin)
             end = bottom() if end == idaapi.BADADDR else end
 
         # define a predicate for cls.walk to continue looping when true
@@ -2030,7 +2126,7 @@ class address(object):
             return ea
 
         # now walk while none of our registers match
-        res = cls.walk(nextea, cls.next, F)
+        res = cls.__walk__(nextea, cls.next, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
             raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x}{:+#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', ea, end, res))
@@ -2052,7 +2148,7 @@ class address(object):
         logging.warn("{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change!".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
-        res = cls.walk(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
+        res = cls.__walk__(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res < start:
             raise ValueError("{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} < {:#x} ".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, start))
         return res
@@ -2070,7 +2166,7 @@ class address(object):
         logging.warn("{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change!".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
-        res = cls.walk(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
+        res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res >= end:
             raise ValueError("{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} >= {:#x}".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, end))
         return res
@@ -2367,7 +2463,15 @@ prevreg, nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.
 
 class type(object):
     """
-    Functions for interacting with the different types defined within the database.
+    Namespace for fetching type information from the different addresses
+    defined within the database. The functions within this namespace allow
+    one to extract various type information from the different locations
+    within the database.
+
+    This namespace is also aliased as `database.t`.
+
+    By default, this namespace will return the `idaapi.DT_TYPE` of the
+    specified address.
     """
 
     @utils.multicase()
@@ -2626,17 +2730,10 @@ class type(object):
     labelQ = utils.alias(is_label, 'type')
 
     class array(object):
-        """Returns information about an array that is defined within the database.
-
-        Example:
-        > print type.array(ea)
-        array('u', u'License key is invalid\\x00')
-        > print type.array.element(ea)
-        2
-        > print type.array.length(ea)
-        23
-        > print type.array.size(ea)
-        46
+        """
+        Namespace for returning type information about an array that is defined
+        within the database. By default this namespace will return the array's
+        element size and number of elements as a tuple (size, count).
         """
         @utils.multicase()
         def __new__(cls):
@@ -2684,13 +2781,10 @@ class type(object):
             return type.size(ea)
 
     class structure(object):
-        """Returns information about a structure that is defined within the database.
-
-        Example:
-        > print type.structure(ea)
-        <type 'structure' name='TypeDescriptor' size=+8>
-        > print hex(type.structure.id(ea))
-        ff0000e4
+        """
+        Namespace for returning type information about a structure that is defined
+        within the database. By default this namespace will return the `structure_t`
+        at the given address.
         """
         @utils.multicase()
         def __new__(cls):
@@ -2797,7 +2891,22 @@ getStructureId = get_strucid = get_structureid = utils.alias(type.structure.id, 
 
 class xref(object):
     """
-    Functions for interacting with all of the cross-references inside the database.
+    Namespace for navigating the cross-references (xrefs) associated with an
+    address in the database. This lets one identify code xrefs from data xrefs
+    and even allows one to add or remove xrefs as they see fit.
+
+    This namespace is also aliased as `database.x`.
+
+    Some of the more common functions are used so often that they're also
+    aliased as globals. Some of these are:
+        `database.up` - Return all addresses that reference an address
+        `database.down` - Return all addresses that an address references
+        `database.drefs` - Return all the data references for an address
+        `database.crefs` - Return all the code references for an address
+        `database.dxup` - Return all the data references that reference an address
+        `database.dxdown` - Return all the data references that an address references
+        `database.cxup` - Return all the code references that reference an address
+        `database.cxdown` - Return all the code references that an address references
     """
 
     @utils.multicase()
@@ -3021,7 +3130,13 @@ up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
 # create/erase a mark at the specified address in the .idb
 class marks(object):
     """
-    Interact with all of the marks defined within the database.
+    Namespace for interacting with the marks table within the database. By
+    default, this namespace yields the (address, description) of each mark
+    within the database.
+
+    This allows one to manage the marks. Although it is suggested to utilize
+    "tags" as they provide significantly more flexibility. Using marks allows
+    for one to use IDA's mark window for quick navigation to a mark.
     """
     MAX_SLOT_COUNT = 0x400
     table = {}
@@ -3242,7 +3357,9 @@ def mark(ea, description):
 
 class extra(object):
     """
-    Allow one to manipulate the extra comments that suffix or prefix a given address.
+    Namespace for interacting with IDA's "extra" comments that can be
+    associated with an address. This allows one to prefix or suffix an
+    address with a large block of text simulating a paragraph.
     """
 
     MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
@@ -3537,9 +3654,10 @@ ex = extra  # XXX: ns alias
 
 class set(object):
     """
-    Sets values (or really types) of addresses within the database.
-
-    Returns the size of the item that the type was successfully applied to.
+    Namespace for setting the type of an address within the database. This
+    allows one to apply a particular type to a given address. This allows
+    one to specify whether a type is a string, undefined, code, data, an
+    array, or even a structure.
     """
     @utils.multicase()
     @classmethod
@@ -3685,6 +3803,12 @@ class set(object):
         return idaapi.get_item_size(ea) if ok else 0
 
     class integer(object):
+        """
+        Namespace used for applying various sized integer types to a particular
+        address.
+
+        This namespace is also aliased as `database.set.i`.
+        """
         @utils.multicase()
         @classmethod
         def byte(cls):
@@ -3767,9 +3891,10 @@ class set(object):
 
 class get(object):
     """
-    Reads the value from an address within the database.
-
-    Unless specified otherwise, the size and type will correspond with what is specified by the database.
+    Namespace used to fetch data from the database at a given address. This
+    allows one to interpret the meaning that has been defined and then act
+    on it. These include standard function for reading integers of different
+    sizes, structures, and even arrays.
     """
     @utils.multicase()
     @classmethod
@@ -3821,7 +3946,12 @@ class get(object):
         return (res - (2**bits)) if res&sf else res
 
     class integer(object):
-        '''Read different integer types out of the database.'''
+        """
+        Namespace containing the different ISO standard integer types that
+        can be used to read integers out of the database.
+
+        This namespace is also aliased as `database.get.i`.
+        """
         @utils.multicase()
         def __new__(cls, **byteorder):
             return get.unsigned(**byteorder)
@@ -4069,6 +4199,13 @@ class get(object):
     struc = struct = utils.alias(structure, 'get')
 
     class switch(object):
+        """
+        Function for fetching an instance of a `switch_t` from a given address.
+        Despite this being a namespace, by default it is intended to be used
+        as a function against any known component of a switch. It will then
+        return a class that allows one to query the different attributes of
+        an `idaapi.switch_info_t`.
+        """
         @classmethod
         def __getlabel(cls, ea):
             f = type.flags(ea)
