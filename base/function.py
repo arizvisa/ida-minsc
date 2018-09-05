@@ -1217,11 +1217,11 @@ def tag_read(func):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except LookupError:
         logging.warn("{:s}.tag_read({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func)))
-        return database.tag_read(func)
+        return database.tag(func)
 
     if rt:
         logging.warn("{:s}.tag_read({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
-        return database.tag_read(ea)
+        return database.tag(ea)
 
     fn, repeatable = by_address(ea), True
     res = comment(fn, repeatable=False)
@@ -1269,12 +1269,12 @@ def tag_write(func, key, value):
     except LookupError:
         # If we're not even in a function, then use a database tag.
         logging.warn("{:s}.tag_write({!r}, {!r}, ...) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, func, key))
-        return database.tag_write(func, key, value)
+        return database.tag(func, key, value)
 
     # If so, then write the tag to the import
     if rt:
         logging.warn("{:s}.tag_write({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
-        return database.tag_write(ea, key, value)
+        return database.tag(ea, key, value)
 
     # Otherwise, it's a function.
     fn = by_address(ea)
@@ -1301,12 +1301,12 @@ def tag_write(func, key, none):
     except LookupError:
         # If we're not even in a function, then use a database tag.
         logging.warn("{:s}.tag_write({:s}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key))
-        return database.tag_write(func, key, none)
+        return database.tag(func, key, none)
 
     # If so, then write the tag to the import
     if rt:
         logging.warn("{:s}.tag_write({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
-        return database.tag_write(ea, key, none)
+        return database.tag(ea, key, none)
 
     # Otherwise, it's a function.
     fn = by_address(ea)
