@@ -50,220 +50,6 @@ from internal import utils, interface
 
 import idaapi
 
-## register lookups and types
-class register_t(interface.symbol_t):
-    '''A register type.'''
-
-    @property
-    def symbols(self):
-        yield self
-
-    @property
-    def id(self):
-        '''Returns the index of the register.'''
-        res = idaapi.ph.regnames
-        try: return res.index(self.realname or self.name)
-        except ValueError: pass
-        return -1
-
-    @property
-    def name(self):
-        '''Returns the register's name.'''
-        return self.__name__
-    @property
-    def dtype(self):
-        '''Returns the IDA dtype of the register.'''
-        return self.__dtype__
-    @property
-    def size(self):
-        '''Returns the size of the register.'''
-        return self.__size__
-    @property
-    def position(self):
-        '''Returns the binary offset into the full register where it begins at.'''
-        return self.__position__
-
-    def __str__(self):
-        return self.architecture.prefix + self.name
-
-    def __repr__(self):
-        try:
-            dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi, name) == self.dtype]
-        except ValueError:
-            dt = 'unknown'
-        cls = self.__class__
-        return "<{:s}({:d},{:s}) {!r} {:d}:{:+d}>".format('.'.join((__name__,'register',cls.__name__)), self.id, dt, self.name, self.position, self.size)
-        #return "{:s} {:s} {:d}:{:+d}".format(self.__class__, dt, self.position, self.size, dt)
-
-    def __eq__(self, other):
-        if isinstance(other, basestring):
-            return self.name.lower() == other.lower()
-        elif isinstance(other, register_t):
-            return self is other
-        elif hasattr(other, '__eq__'):  # XXX: i fucking hate python
-            return other.__eq__(self)
-        return other is self
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def __contains__(self, other):
-        '''Returns True if the ``other`` register is a sub-register of ``self``.'''
-        return other in six.viewvalues(self.__children__)
-
-    def subsetQ(self, other):
-        '''Returns True if the ``other`` register is a part of ``self``.'''
-        def collect(node):
-            res = set([node])
-            [res.update(collect(n)) for n in six.itervalues(node.__children__)]
-            return res
-        return other in self.alias or other in collect(self)
-
-    def supersetQ(self, other):
-        '''Returns `True` if the ``other`` register is a superset of ``self``.'''
-        res, pos = set(), self
-        while pos is not None:
-            res.add(pos)
-            pos = pos.__parent__
-        return other in self.alias or other in res
-
-    def relatedQ(self, other):
-        '''Returns `True` if the ``other`` register affects ``self`` when it's modified'''
-        return self.supersetQ(other) or self.subsetQ(other)
-
-class map_t(object):
-    __slots__ = ('__state__',)
-    def __init__(self):
-        object.__setattr__(self, '__state__', {})
-
-    def __getattr__(self, name):
-        if name.startswith('__'):
-            return getattr(self.__class__, name)
-        res = self.__state__
-        return res[name]
-
-    def __setattr__(self, name, register):
-        res = self.__state__
-        return res.__setitem__(name, register)
-
-    def __contains__(self, name):
-        return name in self.__state__
-
-    def __repr__(self):
-        return "{:s} {!r}".format(self.__class__, self.__state__)
-
-class architecture_t(object):
-    """
-    Base class to represent how IDA maps the registers and types returned from an operand to a register that's uniquely identifiable by the user.
-
-    This is necessary as for some architectures IDA will not include all the register names and thus will use the same register-index to represent two registers that are of different types. As an example, on the Intel processor module the `al` and `ax` regs are returned in the operand as an index to the "ax" string. Similarly on the 64-bit version of the processor module, all of the registers `ax`, `eax`, and `rax` have the same index.
-    """
-    __slots__ = ('__register__', '__cache__',)
-    r = register = property(fget=lambda s: s.__register__)
-
-    def __init__(self, **cache):
-        """Instantiate an `architecture_t` object which represents the registers available to an architecture.
-
-        If ``cache`` is defined, then use the specified dictionary to map an ida (register-name, register-dtype) to a string containing the commonly recognized register-name.
-        """
-        self.__register__, self.__cache__ = map_t(), cache.get('cache', {})
-
-    def new(self, name, bits, idaname=None, **kwargs):
-        '''Add a register to the architecture's cache.'''
-
-        # older
-        if idaapi.__version__ < 7.0:
-            dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
-        # newer
-        else:
-            dtype_by_size = idaapi.get_dtyp_by_size
-
-        dtype = next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
-        #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
-        namespace = dict(register_t.__dict__)
-        namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits})
-        namespace['realname'] = idaname
-        namespace['alias'] = kwargs.get('alias', set())
-        namespace['architecture'] = self
-        res = type(name, (register_t,), namespace)()
-        self.__register__.__state__[name] = res
-        self.__cache__[idaname or name, dtype] = name
-        return res
-
-    def child(self, parent, name, position, bits, idaname=None, **kwargs):
-        '''Add a child-register to the architecture's cache.'''
-
-        # older
-        if idaapi.__version__ < 7.0:
-            dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
-        # newer
-        else:
-            dtype_by_size = idaapi.get_dtyp_by_size
-
-        dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
-        namespace = dict(register_t.__dict__)
-        namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtyp, '__position__':position, '__size__':bits})
-        namespace['realname'] = idaname
-        namespace['alias'] = kwargs.get('alias', set())
-        namespace['architecture'] = self
-        res = type(name, (register_t,), namespace)()
-        self.__register__.__state__[name] = res
-        self.__cache__[idaname or name, dtyp] = name
-        parent.__children__[position] = res
-        return res
-
-    def by_index(self, index):
-        """Lookup a register according to its ``index``.
-
-        The register size is based on the architecture of the instance of IDA that is running.
-        """
-        res = idaapi.ph.regnames[index]
-        return self.by_name(res)
-    byIndex = utils.alias(by_index, 'architecture')
-    def by_indextype(self, index, dtyp):
-        """Lookup a register according to its ``index`` and ``dtyp``.
-
-        Some examples of dtypes: idaapi.dt_byte, idaapi.dt_word, idaapi.dt_dword, idaapi.dt_qword
-        """
-        res = idaapi.ph.regnames[index]
-        name = self.__cache__[res, dtyp]
-        return getattr(self.__register__, name)
-    byIndexType = utils.alias(by_indextype, 'architecture')
-    def by_name(self, name):
-        '''Lookup a register according to its ``name``.'''
-        if any(name.startswith(prefix) for prefix in ('%', '$')):        # at&t, mips
-            return getattr(self.__register__, name[1:].lower())
-        if name.lower() in self.__register__:
-            return getattr(self.__register__, name.lower())
-        return getattr(self.__register__, name)
-    byName = utils.alias(by_name, 'architecture')
-    def by_indexsize(self, index, size):
-        '''Lookup a register according to its ``index`` and ``size``.'''
-        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
-        dtyp = dtype_by_size(size)
-        return self.by_indextype(index, dtyp)
-    def promote(self, register, size=None):
-        '''Promote the specified ``register`` to its next larger ``size``.'''
-        parent = utils.fcompose(operator.attrgetter('__parent__'), utils.box, functools.partial(filter, None), iter, next)
-        try:
-            if size is None:
-                return parent(register)
-            return register if register.size == size else self.promote(parent(register), size=size)
-        except StopIteration: pass
-        cls = self.__class__
-        raise LookupError("{:s}.promote({:s}{:s}) : Unable to find register to promote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
-    def demote(self, register, size=None):
-        '''Demote the specified ``register`` to its next smaller ``size``.'''
-        childitems = utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('iteritems'))
-        firstchild = utils.fcompose(childitems, functools.partial(sorted, key=operator.itemgetter(0)), iter, next, operator.itemgetter(1))
-        try:
-            if size is None:
-                return firstchild(register)
-            return register if register.size == size else self.demote(firstchild(register), size=size)
-        except StopIteration: pass
-        cls = self.__class__
-        raise LookupError("{:s}.demote({:s}{:s}) : Unable to find register to demote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
-
 ## operand types
 class __optype__(object):
     '''Registration/Lookup table for all the different operand type decoders in an architecture.'''
@@ -449,14 +235,14 @@ def ops_constant(ea):
     return tuple(opnum for opnum, value in enumerate(ops_value(ea)) if isinstance(value, six.integer_types))
 ops_const = utils.alias(ops_constant)
 
-@utils.multicase(reg=(basestring, register_t))
+@utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at the current address which touches one of the registers identified by ``regs``.
 
     If the keyword ``write`` is True, then only return the result if it's writing to the register.
     """
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
-@utils.multicase(reg=(basestring, register_t))
+@utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(ea, reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at address ``ea`` that touches one of the registers identified by ``regs``.
 
@@ -1295,7 +1081,7 @@ del(operand_types)
 class intelop:
     class SegmentOffset(interface.namedtypedtuple, interface.symbol_t):
         _fields = ('segment', 'offset')
-        _types = ((types.NoneType, register_t), six.integer_types)
+        _types = ((types.NoneType, interface.register_t), six.integer_types)
 
         @property
         def symbols(self):
@@ -1309,7 +1095,7 @@ class intelop:
         Within the tuple, `base` and `index` are registers.
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
-        _types = ((types.NoneType, register_t), six.integer_types, (types.NoneType, register_t), (types.NoneType, register_t), six.integer_types)
+        _types = ((types.NoneType, interface.register_t), six.integer_types, (types.NoneType, interface.register_t), (types.NoneType, interface.register_t), six.integer_types)
 
         @property
         def symbols(self):
@@ -1325,7 +1111,7 @@ class intelop:
         Within the tuple, `base` and `index` are registers.
         """
         _fields = ('offset', 'base', 'index', 'scale')
-        _types = (six.integer_types, (types.NoneType, register_t), (types.NoneType, register_t), six.integer_types)
+        _types = (six.integer_types, (types.NoneType, interface.register_t), (types.NoneType, interface.register_t), six.integer_types)
 
         @property
         def symbols(self):
@@ -1343,7 +1129,7 @@ class armop:
         a binary shift or rotation to the value of a register.
         """
         _fields = ('Rn', 'shift', 'n')
-        _types = (register_t, six.integer_types, six.integer_types)
+        _types = (interface.register_t, six.integer_types, six.integer_types)
 
         register = property(fget=operator.itemgetter(0))
         t = type = property(fget=operator.itemgetter(1))
@@ -1370,7 +1156,7 @@ class armop:
     class disp(interface.namedtypedtuple, interface.symbol_t):
         '''A tuple for an arm operand containing the `(Rn, Offset)`.'''
         _fields = ('Rn', 'offset')
-        _types = (register_t, six.integer_types)
+        _types = (interface.register_t, six.integer_types)
 
         register = property(fget=operator.itemgetter(0))
         offset = property(fget=operator.itemgetter(1))
@@ -1383,7 +1169,7 @@ class armop:
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         '''A tuple for an arm operand containing the `(Rn, Rm)`.'''
         _fields = ('Rn', 'Rm')
-        _types = (register_t, register_t)
+        _types = (interface.register_t, interface.register_t)
 
         register = property(fget=operator.itemgetter(0))
         offset = property(fget=operator.itemgetter(1))
@@ -1412,7 +1198,7 @@ class mipsop:
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         '''A tuple for an arm operand containing the `(Rn, Offset)`.'''
         _fields = ('rt', 'imm')
-        _types = (register_t, six.integer_types)
+        _types = (interface.register_t, six.integer_types)
 
         register = property(fget=operator.itemgetter(0))
         immediate = property(fget=operator.itemgetter(1))
@@ -1437,7 +1223,7 @@ class mipsop:
         return res[regnum] if regnum in res else architecture.by_name("{:d}".format(regnum))
 
 ## architecture registers
-class Intel(architecture_t):
+class Intel(interface.architecture_t):
     """
     An implementation of the Intel architecture.
     This can be used to locate registers that are of a specific size or are related to another set of registers.
@@ -1491,7 +1277,7 @@ class Intel(architecture_t):
         ##mxcsr
         ## 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
 
-class AArch32(architecture_t):
+class AArch32(interface.architecture_t):
     """
     An implementation of the AArch32 architecture.
     This class is used to locate registers by name, index, or size.
@@ -1516,7 +1302,7 @@ class AArch32(architecture_t):
 
         # FIXME: include x registers
 
-class Mips(architecture_t):
+class Mips(interface.architecture_t):
     """
     An implementation of the Mips architecture.
     This class is used to locate registers by name, index, or size.

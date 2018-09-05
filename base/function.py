@@ -999,24 +999,24 @@ class block(object):
         left, right = bb.startEA, bb.endEA
         return database.iterate(left, right)
 
-    @utils.multicase(reg=(basestring, instruction.register_t))
+    @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the current block that touches any of the specified ``regs``.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
-    @utils.multicase(ea=six.integer_types, reg=(basestring, instruction.register_t))
+    @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing ``ea`` that touches any of the specified``regs``.'''
         blk = blocks.at(ea)
         return cls.register(blk, reg, *regs, **modifiers)
-    @utils.multicase(tuple=types.TupleType, reg=(basestring, instruction.register_t))
+    @utils.multicase(tuple=types.TupleType, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, tuple, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block identified by ``tuple`` that touches any of the specified ``regs``.'''
         bb = cls.at(tuple)
         return cls.register(bb, reg, *regs, **modifiers)
-    @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, instruction.register_t))
+    @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the block ``bb`` that touches any of the specified ``regs``.
@@ -1200,7 +1200,7 @@ class frame(object):
             if fr is None:  # unable to figure out arguments
                 raise LookupError("{:s}.arguments({:#x}) : Unable to determine function frame.".format(__name__, fn.startEA))
 
-            # FIXME: The calling conventions should be defined within the instruction.architecture_t
+            # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
                 logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. : {:#x}".format(__name__, fn.startEA, cc))
 
@@ -1580,11 +1580,11 @@ class type(object):
         return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
     thunkQ = utils.alias(is_thunk, 'type')
 
-@utils.multicase(reg=(basestring, instruction.register_t))
+@utils.multicase(reg=(basestring, interface.register_t))
 def register(reg, *regs, **modifiers):
     '''Yield each `(address, opnum, state)` within the current function that touches any of the specified ``regs``.'''
     return register(ui.current.function(), reg, *regs, **modifiers)
-@utils.multicase(reg=(basestring, instruction.register_t))
+@utils.multicase(reg=(basestring, interface.register_t))
 def register(func, reg, *regs, **modifiers):
     """Yield each `(address, opnum, state)` within the function ``func`` that touches any of the specified``regs``.
 
