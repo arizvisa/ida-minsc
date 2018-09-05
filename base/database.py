@@ -1117,16 +1117,12 @@ def tags():
     return internal.comment.globals.name()
 
 @utils.multicase()
-def tag_read():
-    '''Returns all of the tags at the current address.'''
-    return tag_read(ui.current.address())
-@utils.multicase(key=basestring)
-def tag_read(key):
-    '''Returns the tag identified by ``key`` at the current addres.'''
-    return tag_read(ui.current.address(), key)
+def tag():
+    '''Return all of the tags defined at the current address.'''
+    return tag(ui.current.address())
 @utils.multicase(ea=six.integer_types)
-def tag_read(ea):
-    '''Returns all of the tags defined at address ``ea``.'''
+def tag(ea):
+    '''Return all of the tags defined at address ``ea``.'''
     ea = interface.address.inside(ea)
 
     # if not within a function, then use a repeatable comment
@@ -1135,19 +1131,21 @@ def tag_read(ea):
     except: func = None
     repeatable = False if func else True
 
-    # fetch the tags at the given address
+    # fetch the tags from the repeatable and non-repeatable comment at the given address
     res = comment(ea, repeatable=False)
     d1 = internal.comment.decode(res)
     res = comment(ea, repeatable=True)
     d2 = internal.comment.decode(res)
 
+    # check to see if they're not overwriting each other
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
+        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
 
+    # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
     builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
 
-    # modify the decoded dictionary with implicit tags
+    # modify the decoded dictionary with any implicit tags
     aname = name(ea)
     if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', aname)
     eprefix = extra.get_prefix(ea)
@@ -1159,28 +1157,26 @@ def tag_read(ea):
 
     # now return what the user cares about
     return res
-@utils.multicase(ea=six.integer_types, key=basestring)
-def tag_read(ea, key):
-    '''Returns the tag identified by ``key`` from address ``ea``.'''
-    res = tag_read(ea)
-    return res[key]
-
 @utils.multicase(key=basestring)
-def tag_write(key, value):
-    '''Set the tag ``key`` to ``value`` at the current address.'''
-    return tag_write(ui.current.address(), key, value)
-@utils.multicase(key=basestring, none=types.NoneType)
-def tag_write(key, none):
-    '''Removes the tag specified by ``key`` from the current address ``ea``.'''
-    return tag_write(ui.current.address(), key, value)
+def tag(key):
+    '''Return the tag identified by ``key`` at the current address.'''
+    return tag(ui.current.address(), key)
+@utils.multicase(key=basestring)
+def tag(key, value):
+    '''Set the tag identified by ``key`` to ``value`` at the current address.'''
+    return tag(ui.current.address(), key, value)
 @utils.multicase(ea=six.integer_types, key=basestring)
-def tag_write(ea, key, value):
-    '''Set the tag ``key`` to ``value`` at the address ``ea``.'''
+def tag(ea, key):
+    '''Returns the tag identified by ``key`` from address ``ea``.'''
+    res = tag(ea)
+    return res[key]
+@utils.multicase(ea=six.integer_types, key=basestring)
+def tag(ea, key, value):
+    '''Set the tag identified by ``key`` to ``value`` at the address ``ea``.'''
     if value is None:
-        raise ValueError("{:s}.tag_write({:#x}, {!r}, ...) : Tried to set tag {!r} to an invalid value. : {!r}".format(__name__, ea, key, key, value))
+        raise ValueError("{:s}.tag({:#x}, {!r}, ...) : Tried to set tag {!r} to an invalid value. : {!r}".format(__name__, ea, key, key, value))
 
-    # if the user wants to change the '__name__' tag, then
-    # change the name fo' real.
+    # if an implicit tag was specified, then dispatch to the correct handler
     if key == '__name__':
         return name(ea, value, listed=True)
     if key == '__extra_prefix__':
@@ -1190,32 +1186,35 @@ def tag_write(ea, key, value):
     if key == '__color__':
         return color(ea, value)
 
-    # if not within a function, then use a repeatable comment
-    # otherwise, use a non-repeatable one
+    # if not within a function, then use a repeatable comment otherwise, use a non-repeatable one
     try: func = function.by_address(ea)
     except: func = None
     repeatable = False if func else True
 
-    # grab the current value
+    # grab the current tag out of the correct repeatable or non-repeatable comment
     ea = interface.address.inside(ea)
     state = internal.comment.decode(comment(ea, repeatable=not repeatable))
     state and comment(ea, '', repeatable=not repeatable) # clear the old one
     state.update(internal.comment.decode(comment(ea, repeatable=repeatable)))
 
-    # update the tag's reference
+    # update the tag's reference if we're actually adding a key and not overwriting it
     if key not in state:
         if func:
             internal.comment.contents.inc(ea, key)
         else:
             internal.comment.globals.inc(ea, key)
 
-    # now we can actually update the tag
+    # now we can actually update the tag and encode it into the comment
     res, state[key] = state.get(key, None), value
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
     return res
+@utils.multicase(key=basestring, none=types.NoneType)
+def tag(key, none):
+    '''Remove the tag identified by ``key`` from the current address.'''
+    return tag(ui.current.address(), key, none)
 @utils.multicase(ea=six.integer_types, key=basestring, none=types.NoneType)
-def tag_write(ea, key, none):
-    '''Removes the tag specified by ``key`` from the address ``ea``.'''
+def tag(ea, key, none):
+    '''Removes the tag identified by ``key`` at the address ``ea``.'''
     ea = interface.address.inside(ea)
 
     # if the '__name__' is being cleared, then really remove it.
@@ -1226,8 +1225,7 @@ def tag_write(ea, key, none):
     if key == '__extra_suffix__':
         return extra.del_suffix(ea)
 
-    # if not within a function, then fetch the repeatable comment
-    # otherwise update the non-repeatable one
+    # if not within a function, then fetch the repeatable comment otherwise update the non-repeatable one
     try: func = function.by_address(ea)
     except: func = None
     repeatable = False if func else True
@@ -1239,46 +1237,14 @@ def tag_write(ea, key, none):
     res = state.pop(key)
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
 
-    # delete its reference
+    # delete its reference since it's been removed from the dict
     if func:
         internal.comment.contents.dec(ea, key)
     else:
         internal.comment.globals.dec(ea, key)
 
+    # return the previous value back to the user because we're nice
     return res
-
-@utils.multicase()
-def tag():
-    '''Return all of the tags defined at the current address.'''
-    return tag_read(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def tag(ea):
-    '''Return all of the tags defined at address ``ea``.'''
-    return tag_read(ea)
-@utils.multicase(key=basestring)
-def tag(key):
-    '''Return the tag identified by ``key`` at the current address.'''
-    return tag_read(ui.current.address(), key)
-@utils.multicase(key=basestring)
-def tag(key, value):
-    '''Set the tag identified by ``key`` to ``value`` at the current address.'''
-    return tag_write(ui.current.address(), key, value)
-@utils.multicase(ea=six.integer_types, key=basestring)
-def tag(ea, key):
-    '''Return the tag at address ``ea`` identified by ``key``.'''
-    return tag_read(ea, key)
-@utils.multicase(ea=six.integer_types, key=basestring)
-def tag(ea, key, value):
-    '''Set the tag identified by ``key`` to ``value`` at address ``ea``.'''
-    return tag_write(ea, key, value)
-@utils.multicase(key=basestring, none=types.NoneType)
-def tag(key, none):
-    '''Remove the tag identified by ``key`` at the current address.'''
-    return tag_write(ui.current.address(), key, None)
-@utils.multicase(ea=six.integer_types, key=basestring, none=types.NoneType)
-def tag(ea, key, none):
-    '''Removes the tag identified by ``key`` at the address ``ea``.'''
-    return tag_write(ea, key, None)
 
 # FIXME: consolidate the boolean querying logic into the utils module
 # FIXME: document this properly
