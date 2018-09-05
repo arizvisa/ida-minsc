@@ -249,6 +249,7 @@ class functions(object):
             ch = idaapi.get_next_func(ch.startEA)
         return result
 
+    @utils.multicase()
     @classmethod
     def __iterate__(cls):
         '''Iterates through all of the functions in the current database (ripped from idautils).'''
@@ -636,7 +637,7 @@ class names(object):
         '''Return the address of the string at ``index``.'''
         return idaapi.get_nlist_ea(index)
     @classmethod
-    def get(cls, ea):
+    def at(cls, ea):
         res = idaapi.get_nlist_idx(ea)
         return idaapi.get_nlist_ea(res), idaapi.get_nlist_name(res)
 
@@ -1061,7 +1062,7 @@ class entries(object):
         filterable = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), iterable)
         result = itertools.imap(utils.second, filterable)
         return builtins.next(result, None)
-    @utils.multicase(index=six.integer_types)
+
     @classmethod
     def __address__(cls, index):
         '''Returns the address of the entry-point at the specified ``index``.'''
@@ -1468,15 +1469,15 @@ class imports(object):
     __matcher__.predicate('pred', lambda n:n)
     __matcher__.mapping('index', utils.first)
 
-    @staticmethod
-    def __iterate__():
+    @classmethod
+    def __iterate__(cls):
         """Iterate through all of the imports in the database.
         Yields `(ea, (module, name, ordinal))` for each iteration.
         """
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
             result = []
-            idaapi.enum_import_names(idx, utils.fcompose(utils.box,result.append,utils.fdiscard(lambda:True)))
+            idaapi.enum_import_names(idx, utils.fcompose(utils.box, result.append, utils.fdiscard(lambda: True)))
             for ea, name, ordinal in result:
                 yield ea, (module, name, ordinal)
             continue
@@ -1500,12 +1501,12 @@ class imports(object):
     # searching
     @utils.multicase()
     @classmethod
-    def get(cls):
+    def at(cls):
         '''Returns the import at the current address.'''
-        return cls.get(ui.current.address())
+        return cls.at(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def get(cls, ea):
+    def at(cls, ea):
         '''Return the import at the address ``ea``.'''
         ea = interface.address.inside(ea)
         res = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
@@ -1513,7 +1514,7 @@ class imports(object):
             return utils.second(builtins.next(res))
         except StopIteration:
             pass
-        raise LookupError("{:s}.get({:#x}) : Unable to determine import at specified address.".format('.'.join((__name__, cls.__name__)), ea))
+        raise LookupError("{:s}.at({:#x}) : Unable to determine import at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase()
     @classmethod
@@ -1541,7 +1542,7 @@ class imports(object):
     @classmethod
     def fullname(cls, ea):
         '''Return the full name of the import at address ``ea``.'''
-        return cls.__formatl__(cls.get(ea))
+        return cls.__formatl__(cls.at(ea))
 
     @utils.multicase()
     @classmethod
@@ -1552,7 +1553,7 @@ class imports(object):
     @classmethod
     def name(cls, ea):
         '''Return the name of the import at address ``ea``.'''
-        return cls.__formats__(cls.get(ea))
+        return cls.__formats__(cls.at(ea))
 
     @utils.multicase()
     @classmethod
@@ -1563,7 +1564,7 @@ class imports(object):
     @classmethod
     def ordinal(cls, ea):
         '''Return the ordinal of the import at the address ``ea``.'''
-        _, _, ordinal = cls.get(ea)
+        _, _, ordinal = cls.at(ea)
         return ordinal
 
     # FIXME: maybe implement a modules class for getting information on import modules
@@ -1662,10 +1663,12 @@ class address(object):
 
     # FIXME: Deprecate this as it's not used for anything
     @utils.multicase()
+    @classmethod
     def iterate(cls):
         '''Return an iterator that walks forward through the database from the current address.'''
         return cls.iterate(ui.current.address(), cls.next)
     @utils.multicase(ea=six.integer_types)
+    @classmethod
     def iterate(cls, ea):
         '''Return an iterator that walks forward through the database starting at the  address ``ea``.'''
         return cls.iterate(ea, cls.next)
@@ -2618,7 +2621,7 @@ class type(object):
     @staticmethod
     def has_comment(ea):
         '''Return `True` if the address at ``ea`` is commented.'''
-        return bool(type.flags(interface.address.within(ea), idaapi.FF_COMM) == idaapi.FF_COMM)
+        return type.flags(interface.address.within(ea), idaapi.FF_COMM) == idaapi.FF_COMM
     commentQ = utils.alias(has_comment, 'type')
 
     @utils.multicase()
@@ -2630,7 +2633,7 @@ class type(object):
     @staticmethod
     def has_reference(ea):
         '''Return `True` if the address at ``ea`` has a reference.'''
-        return bool(type.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF)
+        return type.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF
     referenceQ = refQ = utils.alias(has_reference, 'type')
 
     @utils.multicase()
@@ -2654,7 +2657,7 @@ class type(object):
     @staticmethod
     def has_customname(ea):
         '''Return `True` if the address at ``ea`` has a custom-name.'''
-        return bool(type.flags(interface.address.within(ea), idaapi.FF_NAME) == idaapi.FF_NAME)
+        return type.flags(interface.address.within(ea), idaapi.FF_NAME) == idaapi.FF_NAME
     customnameQ = utils.alias(has_customname, 'type')
 
     @utils.multicase()
@@ -2666,7 +2669,7 @@ class type(object):
     @staticmethod
     def has_dummyname(ea):
         '''Return `True` if the address at ``ea`` has a dummy-name.'''
-        return bool(type.flags(ea, idaapi.FF_LABL) == idaapi.FF_LABL)
+        return type.flags(ea, idaapi.FF_LABL) == idaapi.FF_LABL
     dummynameQ = utils.alias(has_dummyname, 'type')
 
     @utils.multicase()
@@ -2915,9 +2918,11 @@ class xref(object):
         '''Return all of the code xrefs that refer to the current address.'''
         return xref.code(ui.current.address(), False)
     @utils.multicase(descend=bool)
+    @staticmethod
     def code(descend):
         return xref.code(ui.current.address(), descend)
     @utils.multicase(ea=six.integer_types)
+    @staticmethod
     def code(ea):
         '''Return all of the code xrefs that refer to the address ``ea``.'''
         return xref.code(ea, False)
@@ -3118,6 +3123,7 @@ class xref(object):
 
     @staticmethod
     def clear(ea):
+        '''Clear all references at the address ``ea``.'''
         ea = interface.address.inside(ea)
         return all(ok for ok in (xref.del_code(ea), xref.del_data(ea)))
 x = xref    # XXX: ns alias
@@ -3216,7 +3222,7 @@ class marks(object):
     def by_address(cls):
         '''Return the mark at the current address.'''
         return cls.by_address(ui.current.address())
-    @utils.multicase()
+    @utils.multicase(ea=six.integer_types)
     @classmethod
     def by_address(cls, ea):
         '''Return the (address, description) of the mark at the given address ``ea``.'''
@@ -3246,7 +3252,6 @@ class marks(object):
             '''Return the description of the mark at the specified ``index``.'''
             return cls.__location().markdesc(index)
 
-        @utils.multicase(ea=six.integer_types)
         @classmethod
         def __find_slotaddress(cls, ea):
             '''Return the index of the mark at the specified address ``ea``.'''
@@ -3292,7 +3297,6 @@ class marks(object):
             '''Return the description of the mark at the specified ``index``.'''
             return idaapi.get_mark_comment(index)
 
-        @utils.multicase(ea=six.integer_types)
         @classmethod
         def __find_slotaddress(cls, ea):
             '''Return the index of the mark at the specified address ``ea``.'''
@@ -3377,7 +3381,7 @@ class extra(object):
         return cls.__has_extra__(ui.current.address(), idaapi.E_PREV)
     @utils.multicase()
     @classmethod
-    def has_suffix(cls, ea):
+    def has_suffix(cls):
         '''Returns `True` if the item at the current address has extra suffix lines.'''
         return cls.__has_extra__(ui.current.address(), idaapi.E_NEXT)
     @utils.multicase(ea=six.integer_types)

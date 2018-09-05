@@ -808,7 +808,7 @@ def addressOfRuntimeOrStatic(func):
         if not database.is_data(func): six.reraise(*exc_info)
 
         # ensure that we're an import, otherwise throw original exception
-        try: database.imports.get(func)
+        try: database.imports.at(func)
         except LookupError: six.reraise(*exc_info)
 
         # yep, we're an import

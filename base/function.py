@@ -335,8 +335,7 @@ class chunks(object):
     @utils.multicase()
     def __new__(cls):
         '''Yield the bounds of each chunk within current function.'''
-        return chunks(ui.current.function())
-
+        return cls(ui.current.function())
     @utils.multicase()
     def __new__(cls, func):
         '''Yield the bounds of each chunk for the function ``func``.'''
@@ -351,6 +350,45 @@ class chunks(object):
             if not fci.next(): break
         return
 
+    @utils.multicase()
+    @classmethod
+    def iterate(cls):
+        '''Iterate through all the instructions for each chunk in the current function.'''
+        return cls.iterate(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def iterate(cls, func):
+        '''Iterate through all the instructions for each chunk in the function ``func``.'''
+        for start, end in cls(func):
+            for ea in itertools.ifilter(database.type.is_code, database.iterate(start, end)):
+                yield ea
+            continue
+        return
+
+    @utils.multicase()
+    @classmethod
+    def at(cls):
+        '''Return a tuple containing the bounds of the current function chunk.'''
+        return cls.at(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def at(cls, ea):
+        '''Return a tuple containing the bounds of the function chunk at the address ``ea``.'''
+        fn = by_address(ea)
+        return cls.at(fn, ea)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def at(cls, func, ea):
+        '''Return a tuple containing the bounds of the function chunk belonging to ``func`` at the address ``ea``.'''
+        fn = by(func)
+        for left, right in cls(fn):
+            if left <= ea < right:
+                return left, right
+            continue
+        raise LookupError("{:s}.at({:#x}, {:#x}) : Unable to locate chunk for function {:#x}.".format('.'.join((__name__, cls.__name__)), address(fn), ea, address(fn)))
+
+iterate = utils.alias(chunks.iterate, 'chunks')
+
 class chunk(object):
     """
     Namespace for interacting with a specific chunk belonging to a function.
@@ -360,33 +398,49 @@ class chunk(object):
     @utils.multicase()
     def __new__(cls):
         '''Return a tuple containing the bounds of the function chunk at the current address.'''
-        return cls(ui.current.address())
+        return chunks.at(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
         '''Return a tuple containing the bounds of the function chunk at the address ``ea``.'''
-        fn = by_address(ea)
-        for left, right in chunks(fn):
-            if left <= ea < right:
-                return left, right
-            continue
-        raise LookupError("{:s}.chunk({:#x}) : Unable to locate chunk for function {:#x}.".format(__name__, ea, address(func)))
+        return chunks.at(ea)
 
     @utils.multicase()
+    @classmethod
+    def at(cls):
+        '''Return a tuple containing the bounds of the current function chunk.'''
+        return cls.at(ui.current.function(), ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def at(cls, ea):
+        '''Return a tuple containing the bounds of the function chunk at the address ``ea``.'''
+        fn = by_address(ea)
+        return cls.at(fn, ea)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def at(cls, func, ea):
+        '''Return a tuple containing the bounds of the function chunk belonging to ``func`` at the address ``ea``.'''
+        return chunks.at(func, ea)
+
+    @utils.multicase()
+    @classmethod
     def top(cls):
         '''Return the top address of the chunk at the current address.'''
         left, _ = cls()
         return left
     @utils.multicase(ea=six.integer_types)
+    @classmethod
     def top(cls, ea):
         '''Return the top address of the chunk at address ``ea``.'''
         left, _ = cls(ea)
         return left
     @utils.multicase()
+    @classmethod
     def bottom(cls):
         '''Return the bottom address of the chunk at the current address.'''
         _, right = cls()
         return right
     @utils.multicase(ea=six.integer_types)
+    @classmethod
     def bottom(cls, ea):
         '''Return the bottom address of the chunk at address ``ea``.'''
         _, right = cls(ea)
@@ -514,22 +568,25 @@ class blocks(object):
 
     @utils.multicase()
     @classmethod
-    def get(cls):
-        '''Return the `idaapi.BasicBlock` at the current address.'''
-        return cls.get(ui.current.function(), ui.current.address())
+    def at(cls):
+        '''Return the `idaapi.BasicBlock` at the current address in the current function.'''
+        return cls.at(ui.current.function(), ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def get(cls, ea):
-        '''Return the `idaapi.BasicBlock` in at the address ``ea``.'''
+    def at(cls, ea):
+        '''Return the `idaapi.BasicBlock` of address ``ea`` in the current function.'''
         fn = by_address(ea)
-        return cls.get(fn, ea)
+        return cls.at(fn, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def get(cls, func, ea):
+    def at(cls, func, ea):
         '''Return the `idaapi.BasicBlock` in function ``func`` at address ``ea``.'''
         fn = by(func)
-        res = (bb for bb in blocks.iterate(fn) if bb.startEA <= ea < bb.endEA)
-        return next(res)
+        for bb in blocks.iterate(fn):
+            if bb.startEA <= ea < bb.endEA:
+                return bb
+            continue
+        raise LookupError("{:s}.at({:#x}, {:#x}) : Unable to locate idaapi.BasicBlock for function {:#x}.".format('.'.join((__name__, cls.__name__)), address(fn), ea, address(fn)))
 
     @utils.multicase()
     @classmethod
@@ -616,47 +673,47 @@ class block(object):
     """
     @utils.multicase()
     @classmethod
-    def get(cls):
-        '''Return the idaapi.BasicBlock of the current address in the current function.'''
-        return cls.get(ui.current.function(), ui.current.address())
+    def at(cls):
+        '''Return the `idaapi.BasicBlock` of the current address in the current function.'''
+        return cls.at(ui.current.function(), ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def get(cls, ea):
-        '''Return the idaapi.BasicBlock of address ``ea`` in the current function.'''
+    def at(cls, ea):
+        '''Return the `idaapi.BasicBlock` of address ``ea`` in the current function.'''
         fn = by_address(ea)
-        return cls.get(fn, ea)
+        return cls.at(fn, ea)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def get(cls, func, ea):
-        '''Return the idaapi.BasicBlock of address ``ea`` in the function ``func``.'''
-        return blocks.get(func, ea)
+    def at(cls, func, ea):
+        '''Return the `idaapi.BasicBlock` of address ``ea`` in the function ``func``.'''
+        return blocks.at(func, ea)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
-    def get(cls, bb):
-        '''Return the idaapi.BasicBlock of the basic-block ``bb``.'''
+    def at(cls, bb):
+        '''Return the `idaapi.BasicBlock` of the basic-block ``bb``.'''
         return bb
     @utils.multicase(tuple=types.TupleType)
     @classmethod
-    def get(cls, tuple):
-        '''Return the idaapi.BasicBlock identified by ``tuple``.'''
+    def at(cls, tuple):
+        '''Return the `idaapi.BasicBlock` identified by ``tuple``.'''
         left, _ = tuple
-        return cls.get(left)
+        return cls.at(left)
 
     @utils.multicase()
     @classmethod
     def id(cls):
         '''Return the block id of the current address in the current function.'''
-        return cls.get(ui.current.function(), ui.current.address()).id
+        return cls.at(ui.current.function(), ui.current.address()).id
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def id(cls, ea):
         '''Return the block id of address ``ea`` in the current function.'''
-        return cls.get(ea).id
+        return cls.at(ea).id
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def id(cls, func, ea):
         '''Return the block id of address ``ea`` in the function ``func``.'''
-        return cls.get(func, ea).id
+        return cls.at(func, ea).id
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
     def id(cls, bb):
@@ -666,7 +723,7 @@ class block(object):
     @classmethod
     def id(cls, tuple):
         '''Return the block id of the basic-block identified by ``tuple``.'''
-        return cls.get(tuple).id
+        return cls.at(tuple).id
 
     @utils.multicase()
     def __new__(cls):
@@ -679,7 +736,7 @@ class block(object):
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, func, ea):
         '''Returns the boundaries of the basic-block at address ``ea`` in function ``func``.'''
-        res = blocks.get(func, ea)
+        res = blocks.at(func, ea)
         return res.startEA, res.endEA
     @utils.multicase(bb=idaapi.BasicBlock)
     def __new__(cls, bb):
@@ -755,7 +812,7 @@ class block(object):
     @classmethod
     def color(cls, ea):
         '''Returns the color of the basic-block at the address ``ea``.'''
-        bb = cls.get(ea)
+        bb = cls.at(ea)
         return cls.color(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
@@ -772,7 +829,7 @@ class block(object):
     @classmethod
     def color(cls, tuple):
         '''Returns the color of the basic-block identified by ``tuple``.'''
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.color(bb)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
@@ -791,7 +848,7 @@ class block(object):
     @classmethod
     def color(cls, tuple, none):
         '''Removes the color of the basic-block identified by ``tuple``.'''
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.color(bb, None)
     @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
     @classmethod
@@ -867,7 +924,7 @@ class block(object):
         """Sets the color of the basic-block identifed by ``tuple`` to ``rgb``.
         If the color ``frame`` is specified, set the frame to the specified color.
         """
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.color(bb, rgb, **frame)
 
     @utils.multicase()
@@ -879,13 +936,13 @@ class block(object):
     @classmethod
     def before(cls, ea):
         '''Return the addresses of all the instructions that branch to the basic-block at address ``ea``.'''
-        res = blocks.get(ea)
+        res = blocks.at(ea)
         return cls.before(res)
     @utils.multicase(tuple=types.TupleType)
     @classmethod
     def before(cls, tuple):
         '''Return the addresses of all the instructions that branch to the basic-block identified by ``tuple``.'''
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.before(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
@@ -903,13 +960,13 @@ class block(object):
     @classmethod
     def after(cls, ea):
         '''Return the addresses of all the instructions that the basic-block at address ``ea`` leaves to.'''
-        bb = cls.get(ea)
+        bb = cls.at(ea)
         return cls.after(bb)
     @utils.multicase(tuple=types.TupleType)
     @classmethod
     def after(cls, tuple):
         '''Return the addresses of all the instructions that branch to the basic-block identified by ``tuple``.'''
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.after(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
@@ -933,7 +990,7 @@ class block(object):
     @classmethod
     def iterate(cls, tuple):
         '''Yield all the addresses in the basic-block identified by ``tuple``.'''
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.iterate(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
@@ -955,7 +1012,7 @@ class block(object):
         """Yield each `(address, operand-number, operand-state)` within the basic-block containing ``ea`` that touches one of the registers identified by ``regs``.
         If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
         """
-        blk = blocks.get(ea)
+        blk = blocks.at(ea)
         return cls.register(blk, reg, *regs, **modifiers)
     @utils.multicase(tuple=types.TupleType, reg=(basestring, instruction.register_t))
     @classmethod
@@ -963,7 +1020,7 @@ class block(object):
         """Yield each `(address, operand-number, operand-state)` within the basic-block identified by ``tuple`` that touches one of the registers identified by ``regs``.
         If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
         """
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, instruction.register_t))
     @classmethod
@@ -995,7 +1052,7 @@ class block(object):
     @classmethod
     def read(cls, tuple):
         '''Return all the bytes contained in the basic-block identified by ``tuple``.'''
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.read(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
@@ -1019,7 +1076,7 @@ class block(object):
     @classmethod
     def disassemble(cls, tuple, **options):
         '''Returns the disassembly of the basic-block identified by ``tuple``.'''
-        bb = cls.get(tuple)
+        bb = cls.at(tuple)
         return cls.disassemble(bb)
     @utils.multicase(bb=idaapi.BasicBlock)
     @classmethod
@@ -1121,7 +1178,7 @@ class frame(object):
             rt, ea = interface.addressOfRuntimeOrStatic(func)
             if rt:
                 target = func
-                database.imports.get(target)
+                database.imports.at(target)
 
                 # grab from declaration
                 o = 0
@@ -1209,19 +1266,6 @@ get_spdelta = spdelta = utils.alias(frame.delta, 'frame')
 arguments = args = frame.args
 
 ## instruction iteration/searching
-@utils.multicase()
-def iterate():
-    '''Iterate through all the instructions for each chunk in the current function.'''
-    return iterate(ui.current.function())
-@utils.multicase()
-def iterate(func):
-    '''Iterate through all the instructions for each chunk in the function ``func``.'''
-    for start, end in chunks(func):
-        for ea in itertools.ifilter(database.type.is_code, database.iterate(start, end)):
-            yield ea
-        continue
-    return
-
 ## tagging
 @utils.multicase()
 def tag():
