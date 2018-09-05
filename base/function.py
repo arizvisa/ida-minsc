@@ -1207,24 +1207,35 @@ def iterate(func):
 
 ## tagging
 @utils.multicase()
-def tag_read():
-    '''Returns all the tags for the current function.'''
-    return tag_read(ui.current.function())
+def tag():
+    '''Returns all the tags defined for the current function.'''
+    return tag(ui.current.address())
 @utils.multicase(key=basestring)
-def tag_read(key):
-    '''Returns the value for the tag ``key`` for the current function.'''
-    return tag_read(ui.current.function(), key)
+def tag(key):
+    '''Returns the value of the tag identified by ``key`` for the current function.'''
+    return tag(ui.current.address(), key)
+@utils.multicase(key=basestring)
+def tag(key, value):
+    '''Sets the value for the tag ``key`` to ``value`` for the current function.'''
+    return tag(ui.current.address(), key, value)
+@utils.multicase(key=basestring)
+def tag(func, key):
+    '''Returns the value of the tag identified by ``key`` for the function ``func``.'''
+    res = tag(func)
+    if key in res:
+        return res[key]
+    raise KeyError("{:s}.tag({!r}, {!r}) : Unable to read tag {!r} from function.".format(__name__, func, key, key))
 @utils.multicase()
-def tag_read(func):
+def tag(func):
     '''Returns all the tags defined for the function ``func``.'''
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except LookupError:
-        logging.warn("{:s}.tag_read({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func)))
+        logging.warn("{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func)))
         return database.tag(func)
 
     if rt:
-        logging.warn("{:s}.tag_read({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
+        logging.warn("{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
         return database.tag(ea)
 
     fn, repeatable = by_address(ea), True
@@ -1234,7 +1245,7 @@ def tag_read(func):
     d2 = internal.comment.decode(res)
 
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag_read({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2, ', '.join(d1.viewkeys() & d2.viewkeys())))
+        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2, ', '.join(d1.viewkeys() & d2.viewkeys())))
 
     res = {}
     map(res.update, (d1, d2) if repeatable else (d2, d1))
@@ -1246,38 +1257,22 @@ def tag_read(func):
     # ..and now hand it off.
     return res
 @utils.multicase(key=basestring)
-def tag_read(func, key):
-    '''Returns the value for the tag ``key`` for the function ``func``.'''
-    res = tag_read(func)
-    if key in res:
-        return res[key]
-    raise KeyError("{:s}.tag_read({!r}, {!r}) : Unable to read tag {!r} from function {:#x}.".format(__name__, func, key, key, address(func)))
-
-@utils.multicase(key=basestring)
-def tag_write(key, value):
-    '''Set the tag ``key`` to ``value`` for the current function.'''
-    return tag_write(ui.current.function(), key, value)
-@utils.multicase(key=basestring, none=types.NoneType)
-def tag_write(key, none):
-    '''Removes the tag ``key`` from the current function.'''
-    return tag_write(ui.current.function(), key, None)
-@utils.multicase(key=basestring)
-def tag_write(func, key, value):
-    '''Set the tag ``key`` to ``value`` for the function ``func``.'''
+def tag(func, key, value):
+    '''Sets the value for the tag ``key`` to ``value`` for the function ``func``.'''
     if value is None:
-        raise ValueError("{:s}.tag_write({!r}) : Tried to set tag {!r} to an unsupported type.".format(__name__, ea, key))
+        raise ValueError("{:s}.tag({!r}) : Tried to set tag {!r} to an unsupported type.".format(__name__, ea, key))
 
     # Check to see if function tag is being applied to an import
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except LookupError:
         # If we're not even in a function, then use a database tag.
-        logging.warn("{:s}.tag_write({!r}, {!r}, ...) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, func, key))
+        logging.warn("{:s}.tag({!r}, {!r}, ...) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, func, key))
         return database.tag(func, key, value)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag_write({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
+        logging.warn("{:s}.tag({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
         return database.tag(ea, key, value)
 
     # Otherwise, it's a function.
@@ -1287,29 +1282,36 @@ def tag_write(func, key, value):
     if key == '__name__':
         return name(fn, value)
 
-    state = internal.comment.decode(comment(fn, repeatable=1))
+    # decode the comment, fetch the old key, re-assign the new key, and then re-encode it
+    state = internal.comment.decode(comment(fn, repeatable=True))
     res, state[key] = state.get(key, None), value
-    comment(fn, internal.comment.encode(state), repeatable=1)
+    comment(fn, internal.comment.encode(state), repeatable=True)
 
+    # if we weren't able to find a key in the dict, then one was added and we need to update its reference
     if res is None:
         internal.comment.globals.inc(fn.startEA, key)
 
+    # return what we fetched from the dict
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
-def tag_write(func, key, none):
+def tag(key, none):
+    '''Removes the tag identified by ``key`` for the current function.'''
+    return tag(ui.current.address(), key, None)
+@utils.multicase(key=basestring, none=types.NoneType)
+def tag(func, key, none):
     '''Removes the tag identified by ``key`` from the function ``func``.'''
-    #fn = by(func)
+
     # Check to see if function tag is being applied to an import
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except LookupError:
         # If we're not even in a function, then use a database tag.
-        logging.warn("{:s}.tag_write({:s}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key))
+        logging.warn("{:s}.tag({:s}, {!r}, ...) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key))
         return database.tag(func, key, none)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag_write({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
+        logging.warn("{:s}.tag({:#x}, {!r}, ...) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key))
         return database.tag(ea, key, none)
 
     # Otherwise, it's a function.
@@ -1318,46 +1320,17 @@ def tag_write(func, key, none):
     # if the user wants to remove the '__name__' tag then remove the name from the function.
     if key == '__name__':
         return name(fn, None)
+    elif key == '__color__':
+        return color(fn, None)
 
-    state = internal.comment.decode(comment(fn, repeatable=1))
+    # decode the comment, remove the key, and then re-encode it
+    state = internal.comment.decode(comment(fn, repeatable=True))
     res = state.pop(key)
-    comment(fn, internal.comment.encode(state), repeatable=1)
+    comment(fn, internal.comment.encode(state), repeatable=True)
 
+    # if we got here without raising an exception, then the tag was stored so update the cache
     internal.comment.globals.dec(fn.startEA, key)
     return res
-
-@utils.multicase()
-def tag():
-    '''Returns all the tags defined for the current function.'''
-    return tag_read(ui.current.address())
-@utils.multicase(key=basestring)
-def tag(key):
-    '''Returns the value of the tag identified by ``key`` for the current function.'''
-    return tag_read(ui.current.address(), key)
-@utils.multicase(key=basestring)
-def tag(key, value):
-    '''Sets the value for the tag ``key`` to ``value`` for the current function.'''
-    return tag_write(ui.current.address(), key, value)
-@utils.multicase(key=basestring)
-def tag(func, key):
-    '''Returns the value of the tag identified by ``key`` for the function ``func``.'''
-    return tag_read(func, key)
-@utils.multicase()
-def tag(func):
-    '''Returns all the tags for the function ``func``.'''
-    return tag_read(func)
-@utils.multicase(key=basestring)
-def tag(func, key, value):
-    '''Sets the value for the tag ``key`` to ``value`` for the function ``func``.'''
-    return tag_write(func, key, value)
-@utils.multicase(key=basestring, none=types.NoneType)
-def tag(key, none):
-    '''Removes the tag identified by ``key`` for the current function.'''
-    return tag_write(ui.current.address(), key, None)
-@utils.multicase(key=basestring, none=types.NoneType)
-def tag(func, key, none):
-    '''Removes the tag identified by ``key`` for the function ``func``.'''
-    return tag_write(func, key, None)
 
 @utils.multicase()
 def tags():
