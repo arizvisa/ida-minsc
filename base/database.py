@@ -914,7 +914,10 @@ def comment(ea, string, **repeatable):
     """Set the comment at address ``ea`` to ``string``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
-    return idaapi.set_cmt(interface.address.inside(ea), string, repeatable.get('repeatable', False))
+    res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), string, repeatable.get('repeatable', False))
+    if not ok:
+        raise ValueError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
+    return res
 
 class entry(object):
     """

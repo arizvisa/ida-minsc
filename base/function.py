@@ -80,26 +80,30 @@ def offset(func):
 def comment(**repeatable):
     '''Return the comment for the current function.'''
     fn = ui.current.function()
-    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', 1))
+    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
 @utils.multicase()
 def comment(func, **repeatable):
     """Return the comment for the function ``func``.
     If the bool ``repeatable`` is specified, then return the repeatable comment.
     """
     fn = by(func)
-    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', 1))
+    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
 @utils.multicase(string=basestring)
 def comment(string, **repeatable):
     '''Set the comment for the current function to ``string``.'''
     fn = ui.current.function()
-    return idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', 1))
+    return comment(fn, string, **repeatable)
 @utils.multicase(string=basestring)
 def comment(func, string, **repeatable):
     """Set the comment for the function ``func`` to ``string``.
     If the bool ``repeatable`` is specified, then modify the repeatable comment.
     """
     fn = by(func)
-    return idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', 1))
+
+    res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', True))
+    if not ok:
+        raise ValueError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
+    return res
 
 @utils.multicase()
 def name():
