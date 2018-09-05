@@ -159,9 +159,9 @@ def name(func, string, *suffix):
     # now we can assign the name
     if rt:
         # FIXME: shuffle the new name into the prototype and then re-mangle it
-        res = database.set_name(ea, string)
+        res = database.name(ea, string)
     else:
-        res = database.set_name(ea, string, flags=idaapi.SN_PUBLIC)
+        res = database.name(ea, string, flags=idaapi.SN_PUBLIC)
     return res
 
 @utils.multicase()

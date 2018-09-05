@@ -690,11 +690,11 @@ def go_offset(offset):
 goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
 
 @utils.multicase()
-def get_name(**flags):
-    '''Return the name defined at the current address.'''
-    return get_name(ui.current.address(), **flags)
+def name(**flags):
+    '''Returns the name at the current address.'''
+    return name(ui.current.address(), **flags)
 @utils.multicase(ea=six.integer_types)
-def get_name(ea, **flags):
+def name(ea, **flags):
     """Return the name defined at the address ``ea``.
     If ``flags`` is specified, then use the specified value as the flags.
     """
@@ -715,27 +715,26 @@ def get_name(ea, **flags):
 
     # return the name at the specified address or not
     return aname or None
-
-@utils.multicase(none=types.NoneType)
-def set_name(none, **flags):
-    '''Remove the name at the current address.'''
-    return set_name(ui.current.address(), '', **flags)
-@utils.multicase(ea=six.integer_types, none=types.NoneType)
-def set_name(ea, none, **flags):
-    '''Remove the name defined at the address ``ea``.'''
-    return set_name(ea, '', **flags)
 @utils.multicase(string=basestring)
-def set_name(string, **flags):
-    '''Rename the current address to ``string``.'''
-    return set_name(ui.current.address(), string, **flags)
+def name(string, *suffix, **flags):
+    '''Renames the current address to ``string``.'''
+    return name(ui.current.address(), string, *suffix, **flags)
+@utils.multicase(none=types.NoneType)
+def name(none, **flags):
+    '''Removes the name at the current address.'''
+    return name(ui.current.address(), '', **flags)
 @utils.multicase(ea=six.integer_types, string=basestring)
-def set_name(ea, string, **flags):
-    """Rename the address specified by ``ea`` to ``string``.
+def name(ea, string, *suffix, **flags):
+    """Renames the address  specified by ``ea`` to ``string``.
     If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
     If ``flags`` is specified, then use the specified value as the flags.
     If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
     """
+    # combine name with its suffix
+    res = (string,) + suffix
+    string = interface.tuplename(*res)
 
+    # validate the address
     ea = interface.address.inside(ea)
 
     # XXX: what's this for?
@@ -785,45 +784,19 @@ def set_name(ea, string, **flags):
     # validate the name
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
-        logging.warn("{:s}.set_name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
+        logging.warn("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
         string = res
 
     # set the name and use the value of 'flags' if it was explicit
-    res, ok = get_name(ea), idaapi.set_name(ea, string or "", flags.get('flags', fl))
+    res, ok = name(ea), idaapi.set_name(ea, string or "", flags.get('flags', fl))
 
     if not ok:
-        raise ValueError("{:s}.set_name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
+        raise ValueError("{:s}.name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
     return res
-
-@utils.multicase()
-def name():
-    '''Returns the name at the current address.'''
-    return get_name(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def name(ea):
-    '''Returns the name at the address ``ea``.'''
-    return get_name(ea) or None
-@utils.multicase(string=basestring)
-def name(string, *suffix, **flags):
-    '''Renames the current address to ``string``.'''
-    return name(ui.current.address(), string, *suffix, **flags)
-@utils.multicase(none=types.NoneType)
-def name(none):
-    '''Removes the name at the current address.'''
-    return set_name(ui.current.address(), None)
-@utils.multicase(ea=six.integer_types, string=basestring)
-def name(ea, string, *suffix, **flags):
-    """Renames the address  ``ea`` to ``string``.
-    If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
-    If ``flags`` is specified, then use the specified value as the flags.
-    If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
-    """
-    res = (string,) + suffix
-    return set_name(ea, interface.tuplename(*res), **flags)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
-def name(ea, none):
-    '''Removes the name at address ``ea``.'''
-    return set_name(ea, None)
+def name(ea, none, **flags):
+    '''Removes the name defined at the address ``ea``.'''
+    return name(ea, '', **flags)
 
 # FIXME: This can be moved into database.address.iterate as it's not used anywhere.
 # FIXME: Add a predicate for only selecting types that match something
@@ -1172,7 +1145,7 @@ def tag_read(ea):
     builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
 
     # modify the decoded dictionary with implicit tags
-    aname = get_name(ea)
+    aname = name(ea)
     if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', aname)
     eprefix = extra.get_prefix(ea)
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
@@ -1206,7 +1179,7 @@ def tag_write(ea, key, value):
     # if the user wants to change the '__name__' tag, then
     # change the name fo' real.
     if key == '__name__':
-        return set_name(ea, value, listed=True)
+        return name(ea, value, listed=True)
     if key == '__extra_prefix__':
         return extra.set_prefix(ea, value)
     if key == '__extra_suffix__':
@@ -1244,7 +1217,7 @@ def tag_write(ea, key, none):
 
     # if the '__name__' is being cleared, then really remove it.
     if key == '__name__':
-        return set_name(ea, None, listed=True)
+        return name(ea, None, listed=True)
     if key == '__extra_prefix__':
         return extra.del_prefix(ea)
     if key == '__extra_suffix__':
