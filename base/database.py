@@ -3027,7 +3027,6 @@ class marks(object):
     table = {}
 
     # FIXME: implement a matcher class for this too
-
     def __new__(cls):
         '''Yields each of the marked positions within the database.'''
         res = builtins.list(cls.iterate()) # make a copy in-case someone is actively modifying it
@@ -3048,13 +3047,13 @@ class marks(object):
         """
         ea = interface.address.inside(ea)
         try:
-            idx = cls.get_slotindex(ea)
+            idx = cls.__find_slotaddress(ea)
             ea, res = cls.by_index(idx)
             logging.warn("{:s}.new({:#x}, ...) : Replacing mark {:d} at {:#x} : {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, res, description))
         except KeyError:
-            res, idx = None, cls.free_slotindex()
+            res, idx = None, cls.__free_slotindex()
             logging.info("{:s}.new({:#x}, ...) : Creating mark {:d} at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, description))
-        cls.set_description(idx, ea, description, **extra)
+        cls.__set_description(idx, ea, description, **extra)
         return res
 
     @utils.multicase()
@@ -3067,9 +3066,9 @@ class marks(object):
     def remove(cls, ea):
         '''Remove the mark at the specified address ``ea`` returning the previous description.'''
         ea = interface.address.inside(ea)
-        idx = cls.get_slotindex(ea)
-        descr = cls.get_description(idx)
-        cls.set_description(idx, ea, '')
+        idx = cls.__find_slotaddress(ea)
+        descr = cls.__get_description(idx)
+        cls.__set_description(idx, ea, '')
         logging.warn("{:s}.remove({:#x}) : Removed mark {:d} at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, descr))
         return descr
 
@@ -3093,7 +3092,7 @@ class marks(object):
     def by_index(cls, index):
         '''Return the (address, description) of the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
-            return (cls.get_slotaddress(index), cls.get_description(index))
+            return (cls.__get_slotaddress(index), cls.__get_description(index))
         raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__, cls.__name__)), index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
     byIndex = utils.alias(by_index, 'marks')
 
@@ -3106,51 +3105,39 @@ class marks(object):
     @classmethod
     def by_address(cls, ea):
         '''Return the (address, description) of the mark at the given address ``ea``.'''
-        return cls.by_index(cls.get_slotindex(ea))
-    byAddress = utils.alias(by_address, 'marks')
+        return cls.by_index(cls.__find_slotaddress(ea))
+    by = byAddress = utils.alias(by_address, 'marks')
 
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def get_slotindex(cls):
-        '''Get the index of the mark at the current address.'''
-        return cls.get_slotindex(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def get_slotindex(cls, ea):
-        '''Get the index of the mark at address ``ea``.'''
-        return cls.find_slotaddress(ea)
-
-    @utils.multicase()
-    @classmethod
-    def find_slotaddress(cls):
-        return cls.find_slotaddress(ui.current.address())
-
+    ## Internal functions depending on which version of IDA is being used (<7.0)
     if idaapi.__version__ < 7.0:
         @classmethod
-        def location(cls, **attrs):
+        def __location(cls, **attrs):
             '''Return a location_t object with the specified attributes.'''
             res = idaapi.curloc()
             builtins.list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
             return res
 
         @classmethod
-        def set_description(cls, index, ea, description, **extra):
-            res = cls.location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
+        def __set_description(cls, index, ea, description, **extra):
+            '''Modify the mark at ``index`` to point to the address ``ea`` with the specified ``description``.'''
+            res = cls.__location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
             title, descr = description, description
             res.mark(index, title, descr)
             #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
             return index
 
         @classmethod
-        def get_description(cls, index):
-            return cls.location().markdesc(index)
+        def __get_description(cls, index):
+            '''Return the description of the mark at the specified ``index``.'''
+            return cls.__location().markdesc(index)
 
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def find_slotaddress(cls, ea):
+        def __find_slotaddress(cls, ea):
+            '''Return the index of the mark at the specified address ``ea``.'''
             # FIXME: figure out how to fail if this address isn't found
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
-            res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
+            res, iterable = itertools.tee(itertools.imap(cls.__get_slotaddress, res))
             try:
                 count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
             except IndexError:
@@ -3161,36 +3148,41 @@ class marks(object):
             return count
 
         @classmethod
-        def free_slotindex(cls):
+        def __free_slotindex(cls):
+            '''Return the index of the next available mark slot.'''
             return cls.length()
 
         @classmethod
-        def get_slotaddress(cls, slotidx):
-            '''Get the address of the mark at index ``slotidx``.'''
-            loc = cls.location()
+        def __get_slotaddress(cls, index):
+            '''Return the address of the mark at the specified ``index``.'''
+            loc = cls.__location()
             intp = idaapi.int_pointer()
-            intp.assign(slotidx)
+            intp.assign(index)
             res = loc.markedpos(intp)
             if res == idaapi.BADADDR:
-                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), slotidx))
+                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index))
             return address.head(res)
 
-    else:   # idaapi.__version__ >= 7.0
+    ## Internal functions depending on which version of IDA is being used (>= 7.0)
+    else:
         @classmethod
-        def set_description(cls, index, ea, description, **extra):
+        def __set_description(cls, index, ea, description, **extra):
+            '''Modify the mark at ``index`` to point to the address ``ea`` with the specified ``description``.'''
             idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, description)
             #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
             return index
 
         @classmethod
-        def get_description(cls, index):
+        def __get_description(cls, index):
+            '''Return the description of the mark at the specified ``index``.'''
             return idaapi.get_mark_comment(index)
 
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def find_slotaddress(cls, ea):
+        def __find_slotaddress(cls, ea):
+            '''Return the index of the mark at the specified address ``ea``.'''
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
-            res, iterable = itertools.tee(itertools.imap(cls.get_slotaddress, res))
+            res, iterable = itertools.tee(itertools.imap(cls.__get_slotaddress, res))
             try:
                 count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
             except IndexError:
@@ -3201,22 +3193,20 @@ class marks(object):
             return count
 
         @classmethod
-        def free_slotindex(cls):
+        def __free_slotindex(cls):
+            '''Return the index of the next available mark slot.'''
             res = builtins.next((i for i in six.moves.range(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
             if res is None:
                 raise ValueError("{:s}.free_slotindex : No free slots available for mark.".format('.'.join((__name__, 'bookmarks', cls.__name__))))
             return res
 
         @classmethod
-        def get_slotaddress(cls, slotidx):
-            '''Get the address of the mark at index ``slotidx``.'''
-            res = idaapi.get_marked_pos(slotidx)
+        def __get_slotaddress(cls, index):
+            '''Get the address of the mark at index ``index``.'''
+            res = idaapi.get_marked_pos(index)
             if res == idaapi.BADADDR:
-                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), slotidx))
+                raise KeyError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index))
             return address.head(res)
-
-    getSlotIndex = utils.alias(get_slotindex, 'marks')
-    findSlotAddress = utils.alias(find_slotaddress, 'marks')
 
 @utils.multicase()
 def mark():
