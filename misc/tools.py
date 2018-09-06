@@ -22,6 +22,30 @@ import logging
 import database, function as func, instruction, segment
 import ui, internal
 
+def map(F, **kwargs):
+    """Execute the callback ``F`` on all functions in the database. Synonymous to map(F, database.functions()) but with some extra logging.
+
+    The ``F`` parameter is defined as a function taking either an
+    `(address, **kwargs)` or a `(index, address, **kwargs)`. Any keyword
+    arguments are passed to ``F`` unmodified.
+    """
+    f1 = lambda (idx,ea), **kwargs: F(ea, **kwargs)
+    f2 = lambda (idx,ea), **kwargs: F(idx, ea, **kwargs)
+    f = f1 if F.func_code.co_argcount == 1 else f2
+
+    result, all = [], database.functions()
+    total = len(all)
+    if len(all):
+        ea = next(iter(all))
+        try:
+            for i, ea in enumerate(all):
+                ui.navigation.set(ea)
+                print("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
+                result.append( f((i, ea), **kwargs) )
+        except KeyboardInterrupt:
+            print("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
+    return result
+
 # For poor folk without a dbgeng
 class remote(object):
     """
@@ -271,130 +295,3 @@ def makecall(ea=None, target=None):
     except:
         pass
     return "{:s}({:s})".format(internal.declaration.demangle(database.name(fn)), ','.join(result))
-
-def source(ea, *regs):
-    '''Return a list of (address, operand) for each instruction that writes to the specified ``regs``.'''
-    res = []
-    for r in regs:
-        pea = database.address.prevreg(ea, r, write=1)
-        res.append( (pea,tuple(instruction.ops_read(pea))) )
-    return res
-
-# XXX: this is as hacky as things can get without SSA. slay this thing.
-def sourcechain(fn, *args, **kwds):
-    '''Backtrack through each address in the function ``fn`` whilst attempting to locate where a register's value originates from.'''
-#    sentinel = kwds.get('types', set(('imm','phrase','addr','void')))
-    sentinel = kwds.get('types', set(('imm','addr','void')))
-
-    # XXX: was this supposed to be a linked list of relationships
-    #      to the top of a function?
-    result = {}
-    for ea,opi in source(*args):
-        if not func.contains(fn, ea): continue
-        opt = tuple(instruction.op_type(ea,i) for i in opi)
-        for i,t in zip(opi,opt):
-            if t in sentinel:
-                result.setdefault(ea,set()).add(i)
-            elif t in {'reg'}:
-                result.setdefault(ea,set()).add(i)
-                r = instruction.op_value(ea,i)
-                for a,b in sourcechain(fn, ea, r):
-                    builtins.map(result.setdefault(a,set()).add, b)
-            elif t in {'phrase'}:
-                result.setdefault(ea,set()).add(i)
-                _,(r1,r2,_) = instruction.op_value(ea,i)
-                for a,b in sourcechain(fn, ea, *tuple(r for r in (r1, r2) if r is not None)):
-                    builtins.map(result.setdefault(a,set()).add, b)
-            elif t in {'imm', 'addr'}:
-                result.setdefault(ea,set()).add(i)
-            else:
-                raise ValueError, (t, ea, i)
-            continue
-        continue
-    return [(ea, result[ea]) for ea in sorted(six.viewkeys(result))]
-
-def map(F, **kwargs):
-    """Execute the callback ``F`` on all functions in the database. Synonymous to map(F, database.functions()) but with some extra logging.
-
-    The ``F`` parameter is defined as a function taking either an
-    `(address, **kwargs)` or a `(index, address, **kwargs)`. Any keyword
-    arguments are passed to ``F`` unmodified.
-    """
-    f1 = lambda (idx,ea), **kwargs: F(ea, **kwargs)
-    f2 = lambda (idx,ea), **kwargs: F(idx, ea, **kwargs)
-    f = f1 if F.func_code.co_argcount == 1 else f2
-
-    result, all = [], database.functions()
-    total = len(all)
-    if len(all):
-        ea = next(iter(all))
-        try:
-            for i, ea in enumerate(all):
-                ui.navigation.set(ea)
-                print("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
-                result.append( f((i, ea), **kwargs) )
-        except KeyboardInterrupt:
-            print("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
-    return result
-
-# XXX: This namespace should be deprecated
-class function(object):
-    """
-    A namespace containing tools for iterating through all the instructions
-    in a function and filtering them by some means.
-    """
-
-    @internal.utils.multicase(regex=six.string_types)
-    @classmethod
-    def regex(cls, regex):
-        '''Return each instruction in the current function that matches the string ``regex``.'''
-        return cls.regex(ui.current.function(), regex)
-    @internal.utils.multicase(regex=six.string_types)
-    @classmethod
-    def regex(cls, function, regex):
-        '''Return each instruction in the ``function`` that matches the string ``regex``.'''
-        pattern = re.compile(regex, re.I)
-        for ea in func.iterate(function):
-            insn = re.sub(' +', ' ', database.instruction(ea))
-            if pattern.search(insn) is not None:
-                yield ea
-            continue
-        return
-
-    @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
-    @classmethod
-    def instruction(cls, predicate):
-        '''Search through the current function for any instruction that matches with the callable ``predicate``.'''
-        return cls.instruction(ui.current.address(), predicate)
-    @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
-    @classmethod
-    def instruction(cls, function, predicate):
-        """Search through the function ``function`` for any instruction that matches with the callable ``predicate``.
-
-        The parameter ``predicate`` is a callable that takes one argument which
-        is the result of database.instruction(ea).
-        """
-        for ea in func.iterate(function):
-            res = database.instruction(ea)
-            if predicate(res):
-                yield ea
-            continue
-        return
-
-    @classmethod
-    def address(cls, predicate):
-        '''Search through the current function for any address that matches with the callable ``predicate``.'''
-        return cls.instruction(ui.current.address(), predicate)
-    @internal.utils.multicase(match=(types.FunctionType, types.MethodType))
-    @classmethod
-    def address(cls, function, predicate):
-        """Search through the ``function`` for any address that matches with the callable ``predicate``.
-
-        The parameter ``predicate`` is a callable that takes one argument which
-        is passed the address to match.
-        """
-        for ea in func.iterate(function):
-            if predicate(ea):
-                yield ea
-            continue
-        return
