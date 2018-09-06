@@ -2,10 +2,18 @@
 Tagfix module
 
 This module is provided to a user to allow one to rebuild the
-tag-cache that is built when a database is finished processing.
-If the tag-cache is corrupted through some means, this module
-can be used to rebuild the tag-cache by manually scanning the
-currently defined comments in order to allow one to query again.
+cache that is built when a database is finished processing. If
+the cache is corrupted through some means, this module can be
+used to rebuild the tag-cache by manually scanning the currently
+defined tags and resetting its references in order to allow one
+to query again.
+
+To manually rebuild the cache for the database, use the following:
+> custom.tagfix.everything()
+
+Likewise to rebuild the cache for just the globals or the contents:
+> custom.tagfix.globals()
+> custom.tagfix.contents()
 """
 
 import six, sys, logging

@@ -6,7 +6,20 @@ within the database. Once exported, these tags can then be pickled
 or then re-applied to the same or another database. Some options
 are allowed which will let a user apply transformations to the tags
 before applying them to a target database.
+
+To fetch all of the tags from the database:
+> res = custom.tags.read()
+
+To export only specific tags from the database:
+> res = custom.tags.export('tag1', 'tag2', ...)
+
+To apply previously read tags to the database:
+> custom.tags.apply(res)
+
+To apply previously read tags with different names to the database:
+> custom.tags.apply(res, tag1='my_tag1', tag2='my_tag2', ...)
 """
+
 import six, sys, logging
 import functools, operator, itertools, types, string
 
@@ -558,3 +571,5 @@ class export(object):
             res = dict(export.frame(ea, *tags))
             if res: yield ea, res
         return
+
+__all__ = ['list', 'read', 'export', 'apply']
