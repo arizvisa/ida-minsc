@@ -447,12 +447,12 @@ class restructure(object):
         if ParamVariableList in gargs:
             for a in gargs[ParamVariableList]:
                 args.append(("*{:s}".format(a.name), undefined()))
-                params.append((a.name, undefined(), undefined()))
+                params.append((a.name, aparams.get(a.name, undefined()), atypes.get(a.name, undefined())))
             pass
         if ParamVariableKeyword in gargs:
             for a in gargs[ParamVariableKeyword]:
                 args.append(("**{:s}".format(a.name), undefined()))
-                params.append((a.name, undefined(), undefined()))
+                params.append((a.name, aparams.get(a.name, undefined()), atypes.get(a.name, undefined())))
             pass
 
         # transform any defaults that were specified into their string representation
