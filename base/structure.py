@@ -325,7 +325,7 @@ class structure_t(object):
     @property
     def comment(self, repeatable=True):
         '''Return the repeatable comment for the structure.'''
-        return idaapi.get_struc_cmt(self.id, True) or idaapi.get_struc_cmt(self.id, False)
+        return idaapi.get_struc_cmt(self.id, repeatable) or idaapi.get_struc_cmt(self.id, not repeatable)
     @comment.setter
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to ``value``.'''
@@ -999,7 +999,7 @@ class member_t(object):
     @property
     def comment(self, repeatable=True):
         '''Return the repeatable comment of the member.'''
-        return idaapi.get_member_cmt(self.id, True) or idaapi.get_member_cmt(self.id, False)
+        return idaapi.get_member_cmt(self.id, repeatable) or idaapi.get_member_cmt(self.id, not repeatable)
     @comment.setter
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment of the member to ``value``.'''
