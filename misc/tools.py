@@ -29,8 +29,8 @@ def map(F, **kwargs):
     `(address, **kwargs)` or a `(index, address, **kwargs)`. Any keyword
     arguments are passed to ``F`` unmodified.
     """
-    f1 = lambda (idx,ea), **kwargs: F(ea, **kwargs)
-    f2 = lambda (idx,ea), **kwargs: F(idx, ea, **kwargs)
+    f1 = lambda (idx, ea), **kwargs: F(ea, **kwargs)
+    f2 = lambda (idx, ea), **kwargs: F(idx, ea, **kwargs)
     f = f1 if F.func_code.co_argcount == 1 else f2
 
     result, all = [], database.functions()
@@ -92,17 +92,17 @@ def colormarks(color=0x7f007f):
     """
     # tag and color
     f = set()
-    for ea,m in database.marks():
+    for ea, m in database.marks():
         database.tag(ea, 'mark', m)
         if database.color(ea) is None:
             database.color(ea, color)
         try: f.add(func.top(ea))
-        except (LookupError,ValueError): pass
+        except (LookupError, ValueError): pass
 
     # tag the functions too
     for ea in list(f):
         m = func.marks(ea)
-        func.tag(ea, 'marks', [ea for ea,_ in m])
+        func.tag(ea, 'marks', [ea for ea, _ in m])
     return
 
 def recovermarks():
@@ -113,20 +113,20 @@ def recovermarks():
     """
     # collect
     result = []
-    for fn,l in database.select('marks'):
-        m = set( (l['marks']) if hasattr(l['marks'],'__iter__') else [int(x,16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
-        res = [(ea,d['mark']) for ea,d in func.select(fn,'mark')]
-        if m != set(a for a,_ in res):
-            logging.warning("{:#x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, builtins.map(hex,m), builtins.map(hex,set(a for a,_ in res))))
+    for fn, l in database.select('marks'):
+        m = set( (l['marks']) if hasattr(l['marks'], '__iter__') else [int(x, 16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
+        res = [(ea, d['mark']) for ea, d in func.select(fn, 'mark')]
+        if m != set(a for a, _ in res):
+            logging.warning("{:#x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, builtins.map(hex, m), builtins.map(hex, set(a for a, _ in res))))
         result.extend(res)
-    result.sort(cmp=lambda x,y: cmp(x[1],y[1]))
+    result.sort(cmp=lambda x, y: cmp(x[1], y[1]))
 
     # discovered marks versus database marks
     result = dict(result)
-    current = {ea:descr for ea,descr in database.marks()}
+    current = {ea : descr for ea, descr in database.marks()}
 
     # create tags
-    for x,y in result.items():
+    for x, y in result.items():
         if x in current:
             logging.warning("{:#x}: skipping already existing mark : {!r}".format(x, current[x]))
             continue
@@ -154,7 +154,7 @@ def checkmarks():
     this tool will emit where those backtraces intersect.
     """
     res = []
-    for a,m in database.marks():
+    for a, m in database.marks():
         try:
             res.append((func.top(a), a, m))
         except ValueError:
@@ -162,24 +162,24 @@ def checkmarks():
         continue
 
     d = list(res)
-    d.sort( lambda a,b: cmp(a[0], b[0]) )
+    d.sort( lambda a, b: cmp(a[0], b[0]) )
 
     flookup = {}
-    for fn,a,m in d:
+    for fn, a, m in d:
         try:
-            flookup[fn].append((a,m))
+            flookup[fn].append((a, m))
         except:
-            flookup[fn] = [(a,m)]
+            flookup[fn] = [(a, m)]
         continue
 
-    functions = [ (k,v) for k,v in flookup.items() if len(v) > 1 ]
+    functions = [ (k, v) for k, v in flookup.items() if len(v) > 1 ]
     if not functions:
         logging.warning('There are no functions available containing multiple marks.')
         return
 
-    for k,v in functions:
+    for k, v in functions:
         print >>sys.stdout, "{:#x} : in function {:s}".format(k, func.name(func.byAddress(k)))
-        print >>sys.stdout, '\n'.join( ("- {:#x} : {:s}".format(a,m) for a,m in sorted(v)) )
+        print >>sys.stdout, '\n'.join( ("- {:#x} : {:s}".format(a, m) for a, m in sorted(v)) )
     return
 
 def collect(ea, sentinel):
@@ -235,14 +235,14 @@ def collectcall(ea, sentinel=set()):
 # FIXME: Don't emit the +0 if offset is 0
 def above(ea, includeSegment=False):
     '''Return all of the function names and their offset that calls the function at ``ea``.'''
-    tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)),ea-func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
-    return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.up(ea))
+    tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
+    return '\n'.join(':'.join((segment.name(ea), tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.up(ea))
 
 # FIXME: Don't emit the +0 if offset is 0
 def below(ea, includeSegment=False):
     '''Return all of the function names and their offset that are called by the function at ``ea``.'''
-    tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)),ea-func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
-    return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.down(ea))
+    tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
+    return '\n'.join(':'.join((segment.name(ea), tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.down(ea))
 
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea=None, target=None):
@@ -257,11 +257,11 @@ def makecall(ea=None, target=None):
         return None
 
     if database.config.bits() != 32:
-        raise RuntimeError("{:s}.makecall({!r},{!r}) : Unable to determine arguments for {:s} due to {:d}-bit calling convention.".format(__name__, ea, target, database.disasm(ea), database.config.bits()))
+        raise RuntimeError("{:s}.makecall({!r}, {!r}) : Unable to determine arguments for {:s} due to {:d}-bit calling convention.".format(__name__, ea, target, database.disasm(ea), database.config.bits()))
 
     if target is None:
         # scan down until we find a call that references something
-        chunk, = ((l,r) for l,r in func.chunks(ea) if l <= ea <= r)
+        chunk, = ((l, r) for l, r in func.chunks(ea) if l <= ea <= r)
         result = []
         while (len(result) < 1) and ea < chunk[1]:
             # FIXME: it's probably not good to just scan for a call
@@ -269,26 +269,26 @@ def makecall(ea=None, target=None):
                 ea = database.next(ea)
                 continue
             result = database.cxdown(ea)
-            if len(result) == 0: raise TypeError("{:s}.makecall({!r},{!r}) : Unable to determine number of arguments".format(__name__, ea, target))
+            if len(result) == 0: raise TypeError("{:s}.makecall({!r}, {!r}) : Unable to determine number of arguments".format(__name__, ea, target))
 
         if len(result) != 1:
-            raise ValueError("{:s}.makecall({!r},{!r}) : Too many targets for call at {:#x} : {!r}".format(__name__, ea, result))
+            raise ValueError("{:s}.makecall({!r}, {!r}) : Too many targets for call at {:#x} : {!r}".format(__name__, ea, result))
         fn, = result
     else:
         fn = target
 
     try:
         result = []
-        for offset,name,size in func.arguments(fn):
+        for offset, name, size in func.arguments(fn):
             left = database.address.prevstack(ea, offset+database.config.bits()/8)
             # FIXME: if left is not an assignment or a push, find last assignment
-            result.append((name,left))
+            result.append((name, left))
     except LookupError:
-        raise LookupError("{:s}.makecall({!r},{!r}) : Unable to get arguments for target function".format(__name__, ea, target))
+        raise LookupError("{:s}.makecall({!r}, {!r}) : Unable to get arguments for target function".format(__name__, ea, target))
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
-#    result = ["{:s}={:s}".format(name,instruction.op_repr(ea, 0)) for name,ea in result]
-    result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea,0), write=1), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea,0), write=1))) if instruction.op_type(ea,0) == 'reg' else instruction.op_repr(ea, 0)) for name,ea in result]
+#    result = ["{:s}={:s}".format(name, instruction.op_repr(ea, 0)) for name, ea in result]
+    result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea, 0), write=1), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea, 0), write=1))) if instruction.op_type(ea, 0) == 'reg' else instruction.op_repr(ea, 0)) for name, ea in result]
 
     try:
         return "{:s}({:s})".format(internal.declaration.demangle(func.name(func.by_address(fn))), ','.join(result))

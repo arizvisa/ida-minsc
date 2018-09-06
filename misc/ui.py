@@ -17,8 +17,9 @@ user to interact with the different windows that are currently
 in use. This can allow for one to automatically show or hide a
 window that they wish to expose to the user.
 """
+
 import six
-import sys,os
+import sys, os
 import logging
 
 import idaapi, internal
@@ -88,7 +89,7 @@ class current(object):
         # XXX: there's probably a better way to do this rather than looking
         #      at the mouse cursor position
         x, y = mouse.position()
-        return widget.at((x,y))
+        return widget.at((x, y))
     @classmethod
     def window(cls):
         '''Return the current window that is being used.'''
@@ -200,7 +201,7 @@ class names(appwindow):
     @classmethod
     def at(cls, index):
         '''Return the address and the symbol name of the specified ``index``.'''
-        return idaapi.get_nlist_ea(index),idaapi.get_nlist_name(index)
+        return idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
     @classmethod
     def name(cls, index):
         '''Return the name at the specified ``index``.'''
@@ -244,13 +245,13 @@ class strings(appwindow):
             raise RuntimeError
         config = idaapi.strwinsetup_t()
         config.minlen = 3
-        config.ea1,config.ea2 = idaapi.cvar.inf.minEA,idaapi.cvar.inf.maxEA
+        config.ea1, config.ea2 = idaapi.cvar.inf.minEA, idaapi.cvar.inf.maxEA
         config.display_only_existing_strings = True
         config.only_7bit = True
         config.ignore_heads = False
 
-        res = [idaapi.ASCSTR_TERMCHR,idaapi.ASCSTR_PASCAL,idaapi.ASCSTR_LEN2,idaapi.ASCSTR_UNICODE,idaapi.ASCSTR_LEN4,idaapi.ASCSTR_ULEN2,idaapi.ASCSTR_ULEN4]
-        config.strtypes = reduce(lambda t,c: t | (2**c), res, 0)
+        res = [idaapi.ASCSTR_TERMCHR, idaapi.ASCSTR_PASCAL, idaapi.ASCSTR_LEN2, idaapi.ASCSTR_UNICODE, idaapi.ASCSTR_LEN4, idaapi.ASCSTR_ULEN2, idaapi.ASCSTR_ULEN4]
+        config.strtypes = reduce(lambda t, c: t | (2**c), res, 0)
         assert idaapi.set_strlist_options(config)
         #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
@@ -387,20 +388,20 @@ class menu(object):
     @classmethod
     def add(cls, path, name, callable, hotkey='', flags=0, args=()):
         '''Register a ``callable`` as a menu item at the specified ``path`` with the provided ``name``.'''
-        if (path,name) in cls.state:
+        if (path, name) in cls.state:
             cls.rm(path, name)
         ctx = idaapi.add_menu_item(path, name, hotkey, flags, callable, args)
-        cls.state[path,name] = ctx
+        cls.state[path, name] = ctx
     @classmethod
     def rm(cls, path, name):
         '''Remove the menu item at the specified ``path`` with the provided ``name``.'''
-        idaapi.del_menu_item( cls.state[path,name] )
-        del cls.state[path,name]
+        idaapi.del_menu_item( cls.state[path, name] )
+        del cls.state[path, name]
     @classmethod
     def reset(cls):
         '''Remove all currently registered menu items.'''
         for path, name in six.iterkeys(state):
-            cls.rm(path,name)
+            cls.rm(path, name)
         return
 
 ### Qt wrappers and namespaces
@@ -543,7 +544,7 @@ try:
             self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
 
         # properties
-        canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s,v: s.object.canceled.connect(v))
+        canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s, v: s.object.canceled.connect(v))
         maximum = property(fget=lambda s: s.object.maximum())
         minimum = property(fget=lambda s: s.object.minimum())
         current = property(fget=lambda s: s.object.value())
@@ -749,7 +750,7 @@ class InputBox(idaapi.PluginForm):
         pass
 
     def Show(self, caption, options=0):
-        return super(InputBox,self).Show(caption, options)
+        return super(InputBox, self).Show(caption, options)
 
 ### figure out which progress-bar to define as `Progress`.
 # if a UIProgress one was successfully defined, then use that one.
@@ -770,7 +771,7 @@ else:
             self.__min__, self.__max__ = 0, 0
             return
 
-        canceled = property(fget=lambda s: False, fset=lambda s,v: None)
+        canceled = property(fget=lambda s: False, fset=lambda s, v: None)
         maximum = property(fget=lambda s: self.__max__)
         minimum = property(fget=lambda s: self.__min__)
         current = property(fget=lambda s: self.__value__)
@@ -786,7 +787,7 @@ else:
         def update(self, **options):
             '''Update the current state of the progress bar.'''
             minimum, maximum = options.get('min', None), options.get('max', None)
-            text,title,tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
+            text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
 
             if minimum is not None:
                 self.__min__ = minimum
