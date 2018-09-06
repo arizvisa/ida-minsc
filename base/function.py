@@ -495,11 +495,11 @@ add_chunk, remove_chunk, assign_chunk = utils.alias(chunk.add, 'chunk'), utils.a
 
 @utils.multicase()
 def within():
-    '''Return `True` if the current address is within a function.'''
+    '''Return true if the current address is within a function.'''
     return within(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def within(ea):
-    '''Return `True` if the address ``ea`` is within a function.'''
+    '''Return true if the address ``ea`` is within a function.'''
     ea = interface.address.within(ea)
     return idaapi.get_func(ea) is not None
 
@@ -1021,7 +1021,7 @@ class block(object):
     def register(cls, bb, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the block ``bb`` that touches any of the specified ``regs``.
 
-        If the keyword ``write`` is `True`, then only return the result if it's writing to the register.
+        If the keyword ``write`` is true, then only return the result if it's writing to the register.
         """
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use( (reg,) + regs )
@@ -1518,12 +1518,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_noframe(cls):
-        '''Return `True` if the current function has no frame.'''
+        '''Return true if the current function has no frame.'''
         return cls.has_noframe(ui.current.function())
     @utils.multicase()
     @classmethod
     def has_noframe(cls, func):
-        '''Return `True` if the function ``func`` has no frame.'''
+        '''Return true if the function ``func`` has no frame.'''
         fn = by(func)
         return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_FRAME == 0)
     noframeQ = utils.alias(has_noframe, 'type')
@@ -1531,12 +1531,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_name(cls):
-        '''Return `True` if the current function has a user-defined name.'''
+        '''Return true if the current function has a user-defined name.'''
         return cls.has_name(ui.current.function())
     @utils.multicase()
     @classmethod
     def has_name(cls, func):
-        '''Return `True` if the function ``func`` has a user-defined name.'''
+        '''Return true if the function ``func`` has a user-defined name.'''
         ea = address(func)
         return database.type.has_customname(ea)
     nameQ = customnameQ = has_customname = utils.alias(has_name, 'type')
@@ -1544,12 +1544,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def has_noreturn(cls):
-        '''Return `True` if the current function does not return.'''
+        '''Return true if the current function does not return.'''
         return cls.has_noreturn(ui.current.function())
     @utils.multicase()
     @classmethod
     def has_noreturn(cls, func):
-        '''Return `True` if the function ``func`` does not return.'''
+        '''Return true if the function ``func`` does not return.'''
         fn = by(func)
         return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
     noreturnQ = utils.alias(has_noreturn, 'type')
@@ -1557,12 +1557,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_library(cls):
-        '''Return `True` if the current function is considered a library function.'''
+        '''Return true if the current function is considered a library function.'''
         return cls.is_library(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_library(cls, func):
-        '''Return `True` if the function ``func`` is considered a library function.'''
+        '''Return true if the function ``func`` is considered a library function.'''
         fn = by(func)
         return fn.flags & idaapi.FUNC_LIB == idaapi.FUNC_LIB
     libraryQ = utils.alias(is_library, 'type')
@@ -1570,12 +1570,12 @@ class type(object):
     @utils.multicase()
     @classmethod
     def is_thunk(cls):
-        '''Return `True` if the current function is considered a code thunk.'''
+        '''Return true if the current function is considered a code thunk.'''
         return cls.is_thunk(ui.current.function())
     @utils.multicase()
     @classmethod
     def is_thunk(cls, func):
-        '''Return `True` if the function ``func`` is considered a code thunk.'''
+        '''Return true if the function ``func`` is considered a code thunk.'''
         fn = by(func)
         return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
     thunkQ = utils.alias(is_thunk, 'type')
