@@ -33,22 +33,23 @@ import database as _database
 
 class current(object):
     """
-    Fetching things from current visual state.
-
-    Used to fetch information about what the user has currently selected.
+    Namespace containing tools that fetch information about the current
+    selection state. This can be used to get things that are currently
+    selected such as the address, function, segment, clipboard, widget,
+    or even the current window in use.
     """
     @classmethod
     def address(cls):
-        '''Current address'''
+        '''Return the current address.'''
         return idaapi.get_screen_ea()
     @classmethod
     def color(cls):
-        '''Current color'''
+        '''Return the color of the current item.'''
         ea = cls.address()
         return idaapi.get_item_color(ea)
     @classmethod
     def function(cls):
-        '''Current function'''
+        '''Return the current function.'''
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
@@ -56,16 +57,16 @@ class current(object):
         return res
     @classmethod
     def segment(cls):
-        '''Current segment'''
+        '''Return the current segment.'''
         ea = cls.address()
         return idaapi.getseg(ea)
     @classmethod
     def status(cls):
-        '''IDA Status'''
+        '''Return the IDA status.'''
         raise NotImplementedError
     @classmethod
     def symbol(cls):
-        '''Return the symbol name directly under the cursor'''
+        '''Return the current highlighted symbol name.'''
         return idaapi.get_highlighted_identifier()
     @classmethod
     def selection(cls):
@@ -79,10 +80,11 @@ class current(object):
         return _database.address.head(pl_l.ea), _database.address.tail(pl_r.ea)
     @classmethod
     def opnum(cls):
+        '''Return the currently selected operand number.'''
         return idaapi.get_opnum()
     @classmethod
     def widget(cls):
-        '''Current widget'''
+        '''Return the current widget that the mouse is hovering over.'''
         # XXX: there's probably a better way to do this rather than looking
         #      at the mouse cursor position
         x, y = mouse.position()
@@ -96,11 +98,14 @@ class current(object):
 
 class state(object):
     """
-    Class for interacting with the state of IDA's interface.
+    Namespace for fetching or interacting with the current state of
+    IDA's interface. These are things such as waiting for IDA's
+    analysis queue, or determining whether the function is being
+    viewed in graph view or not.
     """
     @classmethod
     def graphview(cls):
-        '''Returns `True` if the current function is being viewed in graph view mode.'''
+        '''Returns true if the current function is being viewed in graph view mode.'''
         res = idaapi.get_inf_structure()
         if idaapi.__version__ < 7.0:
             return res.graph_view != 0
@@ -111,30 +116,40 @@ class state(object):
         '''Wait until IDA's autoanalysis queues are empty.'''
         return idaapi.autoWait() if idaapi.__version__ < 7.0 else idaapi.auto_wait()
 
-def beep():
-    return idaapi.beep()
+    @classmethod
+    def beep(cls):
+        '''Beep using IDA's interface.'''
+        return idaapi.beep()
 
-def refresh():
-    '''Refresh all of IDA's windows.'''
-    global disassembly
-    idaapi.refresh_lists()
-    disassembly.refresh()
+    @classmethod
+    def refresh(cls):
+        '''Refresh all of IDA's windows.'''
+        global disassembly
+        idaapi.refresh_lists()
+        disassembly.refresh()
+
+wait, beep, refresh = internal.utils.alias(state.wait, 'state'), internal.utils.alias(state.beep, 'state'), internal.utils.alias(state.refresh, 'state')
 
 class appwindow(object):
+    """
+    Base namespace used for interacting with the windows provided by IDA.
+    """
     @classmethod
     def open(cls, *args):
+        '''Open or show the window belonging to the namespace.'''
         global widget
         res = cls.__open__(*args) if args else cls.__open__(*getattr(cls, '__open_defaults__', ()))
         return widget.form(res)
 
     @classmethod
     def close(cls):
+        '''Close or hide the window belonging to the namespace.'''
         res = cls.open()
         return res.deleteLater()
 
 class disassembly(appwindow):
     """
-    Interacting with the Disassembly window.
+    Namespace for interacting with the Disassembly window.
     """
     __open__ = staticmethod(idaapi.open_disasm_window)
     __open_defaults__ = ('Disassembly', )
@@ -146,71 +161,79 @@ class disassembly(appwindow):
 
 class exports(appwindow):
     """
-    Interacting with the Exports window.
+    Namespace for interacting with the Exports window.
     """
     __open__ = staticmethod(idaapi.open_exports_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class imports(appwindow):
     """
-    Interacting with the Imports window.
+    Namespace for interacting with the Imports window.
     """
     __open__ = staticmethod(idaapi.open_imports_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class names(appwindow):
     """
-    Interacting with the Names window.
+    Namespace for interacting with the Names window.
     """
     __open__ = staticmethod(idaapi.open_names_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
     @classmethod
     def refresh(cls):
+        '''Refresh the names list.'''
         return idaapi.refresh_lists()
     @classmethod
     def size(cls):
+        '''Return the number of elements in the names list.'''
         return idaapi.get_nlist_size()
     @classmethod
     def contains(cls, ea):
+        '''Return whether the address ``ea`` is referenced in the names list.'''
         return idaapi.is_in_nlist(ea)
     @classmethod
     def search(cls, ea):
+        '''Return the index of the address ``ea`` in the names list.'''
         return idaapi.get_nlist_idx(ea)
 
     @classmethod
     def at(cls, index):
+        '''Return the address and the symbol name of the specified ``index``.'''
         return idaapi.get_nlist_ea(index),idaapi.get_nlist_name(index)
     @classmethod
     def name(cls, index):
+        '''Return the name at the specified ``index``.'''
         return idaapi.get_nlist_name(index)
     @classmethod
     def ea(cls, index):
+        '''Return the address at the specified ``index``.'''
         return idaapi.get_nlist_ea(index)
 
     @classmethod
     def iterate(cls):
+        '''Iterate through all of the address and symbols in the names list.'''
         for idx in six.moves.range(cls.size()):
             yield cls.at(idx)
         return
 
 class functions(appwindow):
     """
-    Interacting with the Functions window.
+    Namespace for interacting with the Functions window.
     """
     __open__ = staticmethod(idaapi.open_funcs_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class structures(appwindow):
     """
-    Interacting with the Structures window.
+    Namespace for interacting with the Structures window.
     """
     __open__ = staticmethod(idaapi.open_structs_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
 
 class strings(appwindow):
     """
-    Interacting with the Strings window.
+    Namespace for interacting with the Strings window.
     """
     __open__ = staticmethod(idaapi.open_strings_window)
     __open_defaults__ = (idaapi.BADADDR, idaapi.BADADDR, idaapi.BADADDR)
@@ -236,12 +259,15 @@ class strings(appwindow):
 
     @classmethod
     def refresh(cls):
+        '''Refresh the strings list.'''
         return idaapi.refresh_lists()
     @classmethod
     def size(cls):
+        '''Return the number of elements in the strings list.'''
         return idaapi.get_strlist_qty()
     @classmethod
     def at(cls, index):
+        '''Return the string at the specified ``index``.'''
         string = idaapi.string_info_t()
         res = idaapi.get_strlist_item(index, string)
         if not res:
@@ -249,10 +275,12 @@ class strings(appwindow):
         return string
     @classmethod
     def get(cls, index):
+        '''Return the address and the string at the specified ``index``.'''
         si = cls.at(index)
         return si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
     @classmethod
     def iterate(cls):
+        '''Iterate through all of the address and strings in the strings list.'''
         for index in six.moves.range(cls.size()):
             si = cls.at(index)
             yield si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
@@ -260,23 +288,26 @@ class strings(appwindow):
 
 class segments(appwindow):
     """
-    Interacting with the Segments window.
+    Namespace for interacting with the Segments window.
     """
     __open__ = staticmethod(idaapi.open_segments_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class notepad(appwindow):
     """
-    Interacting with the Notepad window.
+    Namespace for interacting with the Notepad window.
     """
     __open__ = staticmethod(idaapi.open_notepad_window)
     __open_defaults__ = ()
 
 class timer(object):
+    """
+    Namespace for registering a python callable to a timer in IDA.
+    """
     clock = {}
     @classmethod
     def register(cls, id, interval, callable):
-        '''Register a python ``function as a timer.'''
+        '''Register the specified ``callable`` with the requested ``id`` to be called at every ``interval``.'''
         if id in cls.clock:
             idaapi.unregister_timer(cls.clock[id])
 
@@ -285,6 +316,7 @@ class timer(object):
         return res
     @classmethod
     def unregister(cls, id):
+        '''Unregister the specified ``id``.'''
         raise NotImplementedError('need a lock or signal here')
         idaapi.unregister_timer(cls.clock[id])
         del(cls.clock[id])
@@ -299,7 +331,7 @@ class timer(object):
 ### updating the state of the colored navigation band
 class navigation(object):
     """
-    Exposes the ability to update the state of the colored navigation band.
+    Namespace for updating the state of the colored navigation band.
     """
     if all(not hasattr(idaapi, name) for name in ['show_addr', 'showAddr']):
         __set__ = staticmethod(lambda ea: None)
@@ -348,33 +380,41 @@ class navigation(object):
 ### interfacing with IDA's menu system
 # FIXME: add some support for actually manipulating menus
 class menu(object):
+    """
+    Namespace for registering items in IDA's menu system.
+    """
     state = {}
     @classmethod
     def add(cls, path, name, callable, hotkey='', flags=0, args=()):
+        '''Register a ``callable`` as a menu item at the specified ``path`` with the provided ``name``.'''
         if (path,name) in cls.state:
             cls.rm(path, name)
         ctx = idaapi.add_menu_item(path, name, hotkey, flags, callable, args)
         cls.state[path,name] = ctx
     @classmethod
     def rm(cls, path, name):
+        '''Remove the menu item at the specified ``path`` with the provided ``name``.'''
         idaapi.del_menu_item( cls.state[path,name] )
         del cls.state[path,name]
     @classmethod
     def reset(cls):
+        '''Remove all currently registered menu items.'''
         for path, name in six.iterkeys(state):
             cls.rm(path,name)
         return
 
 ### Qt wrappers and namespaces
 def application():
+    '''Return the current instance of the IDA Application.'''
     raise NotImplementedError
 
 class window(object):
     """
-    selecting a specific or particular window.
+    Namespace for selecting a specific or particular window.
     """
     @classmethod
     def viewer(cls):
+        '''Return the current viewer.'''
         return idaapi.get_current_viewer()
     @classmethod
     def main(cls):
@@ -385,50 +425,61 @@ class window(object):
 
 class windows(object):
     """
-    Enumerating and filtering all the window types that are available.
+    Interact with any or all of the top-level windows for the application.
     """
     def __new__(cls):
+        '''Return all of the top-level windows.'''
         global application
         q = application()
         return q.topLevelWindows()
 
 class widget(object):
     """
-    Selecting a specific or particular widget.
+    Namespace for selecting a specific or particular widget.
     """
     def __new__(self, (x, y)):
+        '''Return the widget at the specified ``x`` and ``y`` coordinate.'''
         res = (x, y)
         return cls.at(res)
     @classmethod
     def at(cls, (x, y)):
+        '''Return the widget at the specified ``x`` and ``y`` coordinate.'''
         global application
         q = application()
         return q.widgetAt(x, y)
     @classmethod
     def form(cls, twidget):
+        '''Return a widget as an IDA plugin form.'''
         raise NotImplementedError
 
 class clipboard(object):
     """
-    Interacting with the clipboard state.
+    Namespace for interacting with the current clipboard state.
     """
     def __new__(cls):
+        '''Return the current clipboard.'''
         global application
         clp = application()
         return clp.clipboard()
 
 class mouse(object):
-    '''mouse interface'''
+    """
+    Base namespace for interacting with the mouse input.
+    """
     @classmethod
     def buttons(cls):
+        '''Return the current mouse buttons that are being clicked.'''
         global application
         q = application()
         return q.mouseButtons()
 
 class keyboard(object):
-    '''keyboard interface'''
+    """
+    Base namespace for interacting with the keyboard input.
+    """
     @classmethod
     def modifiers(cls):
+        '''Return the current keyboard modifiers that are being used.'''
         global application
         q = application()
         return q.keyboardModifiers()
@@ -436,14 +487,14 @@ class keyboard(object):
     hotkey = {}
     @classmethod
     def map(cls, key, callable):
-        '''map a key to a python function'''
+        '''Map a specific ``key`` to a python ``callable``.'''
         if key in cls.hotkey:
             idaapi.del_hotkey(cls.hotkey[key])
         cls.hotkey[key] = res = idaapi.add_hotkey(key, callable)
         return res
     @classmethod
     def unmap(cls, key):
-        '''unmap a key'''
+        '''Unmap the specified ``key`` from its callable.'''
         idaapi.del_hotkey(cls.hotkey[key])
         del(cls.hotkey[key])
     add, rm = internal.utils.alias(map, 'keyboard'), internal.utils.alias(unmap, 'keyboard')
@@ -455,26 +506,33 @@ try:
     from PyQt5.Qt import QObject
 
     def application():
+        '''Return the current instance of the IDA Application.'''
         q = PyQt5.Qt.qApp
         return q.instance()
 
     class mouse(mouse):
-        '''mouse interface'''
+        """
+        Namespace for interacting with the mouse input.
+        """
         @classmethod
         def position(cls):
+            '''Return the current (x, y) position of the cursor.'''
             qt = PyQt5.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
 
     class keyboard(keyboard):
-        '''PyQt5 keyboard interface'''
+        """
+        Namespace for interacting with the keyboard input.
+        """
         @classmethod
         def input(cls):
+            '''Return the current keyboard input context.'''
             raise NotImplementedError
 
     class UIProgress(object):
         """
-        Helper class used to construct and show a progress-bar in PyQt5.
+        Helper class used to simplify the showing of a progress bar in IDA's UI.
         """
         def __init__(self, blocking=True):
             self.object = res = PyQt5.Qt.QProgressDialog()
@@ -492,6 +550,7 @@ try:
 
         # methods
         def open(self, width=0.8, height=0.1):
+            '''Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.'''
             global window
 
             # XXX: spin until main is defined because IDA seems to be racy..
@@ -512,9 +571,11 @@ try:
             self.object.show()
 
         def close(self):
+            '''Close the current progress bar.'''
             self.object.close()
 
         def update(self, **options):
+            '''Update the current state of the progress bar.'''
             minimum, maximum = options.get('min', None), options.get('max', None)
             text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
 
@@ -537,8 +598,12 @@ try:
             return res
 
     class widget(widget):
+        """
+        Namespace for selecting a specific or particular widget.
+        """
         @classmethod
         def form(cls, twidget):
+            '''Return a widget as an IDA plugin form.'''
             ns = idaapi.PluginForm
             return ns.FormToPyQtWidget(twidget)
 
@@ -551,15 +616,17 @@ try:
     import PySide.QtCore, PySide.QtGui
 
     def application():
+        '''Return the current instance of the IDA Application.'''
         res = PySide.QtCore.QCoreApplication
         return res.instance()
 
     class mouse(mouse):
         """
-        Mouse interface.
+        Namespace for interacting with the mouse input.
         """
         @classmethod
         def position(cls):
+            '''Return the current (x, y) position of the cursor.'''
             qt = PySide.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
@@ -570,11 +637,16 @@ try:
         """
         @classmethod
         def input(cls):
+            '''Return the current keyboard input context.'''
             return q.inputContext()
 
     class widget(widget):
+        """
+        Namespace for selecting a specific or particular widget.
+        """
         @classmethod
         def form(cls, twidget):
+            '''Return a widget as an IDA plugin form.'''
             ns = idaapi.PluginForm
             return ns.FormToPySideWidget(twidget)
 
@@ -584,7 +656,12 @@ except ImportError:
 ### wrapper that uses a priorityhook around IDA's hooking capabilities.
 class hook(object):
     """
-    Exposes the ability of hooking different parts of IDA.
+    Namespace which exposes the ability to hook different parts of IDA.
+
+    There are 3 different components in IDA that can be hooked. These
+    are available as `hook.idp`, `hook.idb`, and `hook.ui`. Please refer
+    to the documentation for `idaapi.IDP_Hooks`, `idaapi.IDB_Hooks`, and
+    `idaapi.UI_Hooks` for identifying what's available.
     """
     @classmethod
     def __start_ida__(cls):
@@ -617,9 +694,11 @@ class hook(object):
 ## (which is probably pretty unsafe in IDA, but let's hope).
 class queue(object):
     """
-    Exposes the ability to queue the execution of functions so they run asynchronously.
+    Namespace that exposes the ability to queue execution of python
+    callables asynchronously so that they run at the same time as
+    IDA and signal when they're completed.
 
-    This is probably pretty unsafe in IDA, but let's hope.
+    XXX: This is probably pretty unsafe in IDA, but let's hope.
     """
     @classmethod
     def __start_ida__(cls):
@@ -646,19 +725,22 @@ class queue(object):
 
     @classmethod
     def add(cls, callable, *args, **kwds):
+        '''Add the specified ``callable`` to the execution queue passing to it any extra arguments.'''
         if not cls.execute.running:
             logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
         return cls.execute.push(callable, *args, **kwds)
 
     @classmethod
     def pop(cls):
+        '''Block until the next available result has been returned.'''
         return next(cls.execute)
 
 ### Helper classes to use or inherit from
 # XXX: why was this base class implemented again??
 class InputBox(idaapi.PluginForm):
     """
-    Creating an InputBox to interact with the user...
+    A class designed to be inherited from that can be used
+    to interact with the user.
     """
     def OnCreate(self, form):
         self.parent = self.FormToPyQtWidget(form)
@@ -672,14 +754,15 @@ class InputBox(idaapi.PluginForm):
 ### figure out which progress-bar to define as `Progress`.
 # if a UIProgress one was successfully defined, then use that one.
 if 'UIProgress' in locals():
-    class Progress(UIProgress): pass
+    class Progress(UIProgress):
+        '''The default progress bar with which to show progress.'''
 
 # otherwise we just fall-back to the console-only one.
 else:
     logging.warn("{:s}:Using console-only implementation of the ui.progress class.".format(__name__))
     class ConsoleProgress(object):
         """
-        Helper class used to construct and show a progress-bar using the console.
+        Helper class used to simplify the showing of a progress bar in IDA's console.
         """
         def __init__(self, blocking=True):
             self.__path__ = "{:s}/{:s}".format(_database.config.path(), _database.config.filename())
@@ -693,12 +776,15 @@ else:
         current = property(fget=lambda s: self.__value__)
 
         def open(self, width=0.8, height=0.1):
+            '''Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.'''
             return
 
         def close(self):
+            '''Close the current progress bar.'''
             return
 
         def update(self, **options):
+            '''Update the current state of the progress bar.'''
             minimum, maximum = options.get('min', None), options.get('max', None)
             text,title,tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
 
@@ -714,9 +800,18 @@ else:
 
             logging.info(text)
             return self.__value__
-    class Progress(ConsoleProgress): pass
+
+    class Progress(ConsoleProgress):
+        '''The default progress bar with which to show progress.'''
 
 def ask(string, **default):
+    """Ask the user a question providing the option to choose "yes", "no", or "cancel".
+
+    If any of the options are specified as a boolean, then it is
+    assumed that this option will be the default. If the user
+    chooses "cancel", then this value will be returned instead of
+    the value `None`.
+    """
     state = {'no': 0, 'yes': 1, 'cancel': -1}
     results = {0: False, 1: True}
     if default:

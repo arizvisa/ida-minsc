@@ -1,29 +1,58 @@
+"""
+Tools module
+
+This module provides miscellaneous tools that a user may find
+useful in their reversing adventures. This includes classes
+for performing address translations, coloring marks or tags,
+recursively walking through basic blocks until a sentinel
+block has been reached, or even recursivelly walking a
+function's childrens until a particular sentinel function
+is encountered.
+
+The tools defined within here are unorganized and thus may
+shift around during development as they find their place.
+"""
+
 import six, sys, logging
 from six.moves import builtins
 
 import functools, operator, itertools, types
 import logging
 
-import database, function as func, instruction
+import database, function as func, instruction, segment
 import ui, internal
 
+# For poor folk without a dbgeng
 class remote(object):
-    '''For poor folk without a dbgeng'''
-    def __init__(self, remotebaseaddress, localbaseaddress=None):
-        if localbaseaddress is None:
-            localbaseaddress = database.config.baseaddress()
-        self.lbase = localbaseaddress
-        self.rbase = remotebaseaddress
+    """
+    An object that can be used to transform addresses to and from
+    a debugging target so that one does not need to rebase their
+    entire database, or come up with some other tricks to translate
+    a binary address to its runtime address.
+    """
+    def __init__(self, remote, local=None):
+        """Create a new instance with the specified ``remote`` base address.
+
+        If ``local`` is not specified, then use the current database's base
+        address for performing calculations.
+        """
+        if local is None:
+            local = database.config.baseaddress()
+        self.lbase = local
+        self.rbase = remote
 
     def get(self, ea):
+        '''Translate a remote address to the local database address.'''
         offset = ea - self.rbase
         return offset + self.lbase
 
     def put(self, ea):
+        '''Translate a local database address to the remote address.'''
         offset = ea - self.lbase
         return offset + self.rbase
 
     def go(self, ea):
+        '''Seek the database to the specified remote address.'''
         res = self.get(ea)
         database.go(res)
 
@@ -31,7 +60,12 @@ class remote(object):
 ##          in the future, this would be abstracted into a arbitrarily sized tree.
 
 def colormarks(color=0x7f007f):
-    '''Iterate through all database marks and tag+color their address'''
+    """Walk through the current list of marks whilst coloring them with the specified ``color``.
+
+    Each mark's address is tagged with its description, and if the
+    address belongs to a function, the function is also tagged with the
+    address of the marks that it contains.
+    """
     # tag and color
     f = set()
     for ea,m in database.marks():
@@ -48,7 +82,11 @@ def colormarks(color=0x7f007f):
     return
 
 def recovermarks():
-    '''Utilizing any tag information found in the database, recreate all the database marks.'''
+    """Walk through the tags made by `colormarks` and re-create the marks that were found.
+
+    This is useful if any marks were accidentally deleted and can be used for
+    recovering them as long as they were initally tagged properly.
+    """
     # collect
     result = []
     for fn,l in database.select('marks'):
@@ -86,7 +124,11 @@ def recovermarks():
     colormarks()
 
 def checkmarks():
-    '''Output all functions (sys.stdout) containing more than 1 mark.'''
+    """Emit all functions that contain more than 1 mark within them.
+
+    As an example, if marks are used to keep track of backtraces then
+    this tool will emit where those backtraces intersect.
+    """
     res = []
     for a,m in database.marks():
         try:
@@ -117,7 +159,12 @@ def checkmarks():
     return
 
 def collect(ea, sentinel):
-    '''Collect all the basic-blocks starting at address ``ea`` and terminating when an address in the set ``sentinel`` is reached.'''
+    """Collect all the basic-blocks starting at address ``ea`` and recurse until a terminating block is encountered.
+
+    If the set ``sentinel`` is specified, then its addresses are used as
+    sentinel blocks and collection will terminate when those blocks are
+    reached.
+    """
     if isinstance(sentinel, list):
         sentinel = set(sentinel)
     if not all((sentinel, isinstance(sentinel, set))):
@@ -135,7 +182,12 @@ def collect(ea, sentinel):
     return _collect(addr, set([blk]))
 
 def collectcall(ea, sentinel=set()):
-    '''Collect all the children functions starting at function ``ea`` and terminating when a function in the set ``sentinel`` is reached.'''
+    """Collect all of the function calls starting at function ``ea`` and recurse until a terminating function is encountered.
+
+    If the set ``sentinel`` is specified, then its addresses are used as
+    sentinel functions and collection will terminate when one of those
+    functions are reached.
+    """
     if isinstance(sentinel, list):
         sentinel = set(sentinel)
     if not isinstance(sentinel, set):
@@ -156,21 +208,25 @@ def collectcall(ea, sentinel=set()):
     addr = func.top(ea)
     return _collectcall(addr, set([addr]))
 
+# FIXME: Don't emit the +0 if offset is 0
 def above(ea, includeSegment=False):
-    '''Display all the callers of the function at /ea/'''
+    '''Return all of the function names and their offset that calls the function at ``ea``.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)),ea-func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
     return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.up(ea))
 
+# FIXME: Don't emit the +0 if offset is 0
 def below(ea, includeSegment=False):
-    '''Display all the functions that the function at /ea/ can call'''
+    '''Return all of the function names and their offset that are called by the function at ``ea``.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)),ea-func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
     return '\n'.join(':'.join((segment.name(ea),tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.down(ea))
 
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea=None, target=None):
-    """Output the function call at ``ea`` and its arguments in C-form.
+    """Output the function call at ``ea`` and its arguments with the address they originated from.
 
-    If ``target`` is specified, then assume that the instruction is calling ``target``.
+    If ``target`` is specified, then assume that the instruction is
+    calling ``target`` instead of the target address that the call
+    is referencing.
     """
     ea = current.address() if ea is None else ea
     if not func.contains(ea, ea):
@@ -217,14 +273,16 @@ def makecall(ea=None, target=None):
     return "{:s}({:s})".format(internal.declaration.demangle(database.name(fn)), ','.join(result))
 
 def source(ea, *regs):
-    '''Return the addresses and which specific operands write to the specified regs'''
+    '''Return a list of (address, operand) for each instruction that writes to the specified ``regs``.'''
     res = []
     for r in regs:
         pea = database.address.prevreg(ea, r, write=1)
         res.append( (pea,tuple(instruction.ops_read(pea))) )
     return res
 
+# XXX: this is as hacky as things can get without SSA. slay this thing.
 def sourcechain(fn, *args, **kwds):
+    '''Backtrack through each address in the function ``fn`` whilst attempting to locate where a register's value originates from.'''
 #    sentinel = kwds.get('types', set(('imm','phrase','addr','void')))
     sentinel = kwds.get('types', set(('imm','addr','void')))
 
@@ -256,10 +314,11 @@ def sourcechain(fn, *args, **kwds):
     return [(ea, result[ea]) for ea in sorted(six.viewkeys(result))]
 
 def map(F, **kwargs):
-    """Execute provided callback on all functions in database. Synonymous to map(F, database.functions()).
+    """Execute the callback ``F`` on all functions in the database. Synonymous to map(F, database.functions()) but with some extra logging.
 
-    ``F`` is defined as a function(address, **kwargs) or function(index, address, **kwargs).
-    Any extra arguments are passed to ``F`` unmodified.
+    The ``F`` parameter is defined as a function taking either an
+    `(address, **kwargs)` or a `(index, address, **kwargs)`. Any keyword
+    arguments are passed to ``F`` unmodified.
     """
     f1 = lambda (idx,ea), **kwargs: F(ea, **kwargs)
     f2 = lambda (idx,ea), **kwargs: F(idx, ea, **kwargs)
@@ -281,7 +340,8 @@ def map(F, **kwargs):
 # XXX: This namespace should be deprecated
 class function(object):
     """
-    Tools for iterating through a function looking for a match of some kind.
+    A namespace containing tools for iterating through all the instructions
+    in a function and filtering them by some means.
     """
 
     @internal.utils.multicase(regex=six.string_types)
@@ -311,7 +371,8 @@ class function(object):
     def instruction(cls, function, predicate):
         """Search through the function ``function`` for any instruction that matches with the callable ``predicate``.
 
-        ``predicate`` is a callable that takes one argument which is the result of database.instruction(ea).
+        The parameter ``predicate`` is a callable that takes one argument which
+        is the result of database.instruction(ea).
         """
         for ea in func.iterate(function):
             res = database.instruction(ea)
@@ -329,7 +390,8 @@ class function(object):
     def address(cls, function, predicate):
         """Search through the ``function`` for any address that matches with the callable ``predicate``.
 
-        ``predicate`` is a callable that takes one argument which is passed the address to match.
+        The parameter ``predicate`` is a callable that takes one argument which
+        is passed the address to match.
         """
         for ea in func.iterate(function):
             if predicate(ea):
