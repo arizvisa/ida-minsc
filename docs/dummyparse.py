@@ -551,7 +551,7 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
+        if aliases: res.extend(["Aliases: {:s}".format(', '.join((ns[-1] + '.' + n for n in aliases)))] + [''])
 
         for n, descr, ty in params[1:]:
             fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
@@ -580,7 +580,7 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if aliases: res.extend(["Aliases: {:s}".format(', '.join(aliases))] + [''])
+        if aliases: res.extend(["Aliases: {:s}".format(', '.join((ns[-1] + '.' + n for n in aliases)))] + [''])
 
         for n, descr, ty in params:
             fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
