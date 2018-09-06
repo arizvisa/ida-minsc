@@ -9,7 +9,7 @@ currently defined comments in order to allow one to query again.
 """
 
 import six, sys, logging
-import functools,operator,itertools,types
+import functools, operator, itertools, types
 
 import database as db, function as func, ui
 import internal
@@ -18,19 +18,27 @@ import idaapi
 output = sys.stderr
 
 def fetch_contents(f):
-    addr,tags = {},{}
+    """Fetch the reference count for the contents of function ``f`` in the database.
+
+    Returns the tuple `(func, address, tags)` where the `address` and `tags`
+    fields are both dictionaries containing the reference count for
+    the addresses and tag names. The field `func` contains the address of the
+    function.
+    """
+    addr, tags = {}, {}
 
     for ea in func.iterate(f):
         ui.navigation.auto(ea)
         res = db.tag(ea)
         #res.pop('name', None)
         for k, v in six.iteritems(res):
-            addr[ea] = addr.get(ea,0) + 1
-            tags[k] = tags.get(k,0) + 1
+            addr[ea] = addr.get(ea, 0) + 1
+            tags[k] = tags.get(k, 0) + 1
         continue
-    return func.top(f), addr, tags
+    return func.address(f), addr, tags
 
 def check_contents(ea):
+    '''Validate the cache defined for the contents of the function ``ea``.'''
     node, key = internal.netnode.get(internal.comment.tagging.node()), internal.comment.contents._key(ea)
     tag = internal.comment.decode(db.comment(key))
 
@@ -43,6 +51,7 @@ def check_contents(ea):
     return True
 
 def check_global(ea):
+    '''Validate the cache defined for the global at the address ``ea``.'''
     if func.within(ea): return False
 
     cache = internal.comment.decode(db.comment(db.top()))
@@ -62,7 +71,13 @@ def check_global(ea):
     return True
 
 def fetch_globals_functions():
-    addr,tags = {},{}
+    """Fetch the reference count for the global tags (function) in the database.
+
+    Returns the tuple `(address, tags)` where the `address` and `tags`
+    fields are both dictionaries containing the reference count for
+    the addresses and tag names.
+    """
+    addr, tags = {}, {}
     t = len(list(db.functions()))
     for i, ea in enumerate(db.functions()):
         ui.navigation.auto(ea)
@@ -76,7 +91,13 @@ def fetch_globals_functions():
     return addr, tags
 
 def fetch_globals_data():
-    addr,tags = {},{}
+    """Fetch the reference count for the global tags (non-function) in the database.
+
+    Returns the tuple `(address, tags)` where the `address` and `tags`
+    fields are both dictionaries containing the reference count for
+    the addresses and tag names.
+    """
+    addr, tags = {}, {}
     left, right = db.range()
     print >>output, 'globals: fetching tags from data'
     for ea in db.iterate(left, right):
@@ -92,13 +113,19 @@ def fetch_globals_data():
     return addr, tags
 
 def fetch_globals():
+    """Fetch the reference count of all of the global tags for both functions and non-functions.
+
+    Returns the tuple `(address, tags)` where the `address` and `tags`
+    fields are both dictionaries containing the reference count for
+    the addresses and tag names.
+    """
     # read addr and tags from all functions/globals
-    faddr,ftags = fetch_globals_functions()
-    daddr,dtags = fetch_globals_data()
+    faddr, ftags = fetch_globals_functions()
+    daddr, dtags = fetch_globals_data()
 
     # consolidate tags into individual dictionaries
     print >>output, 'globals: aggregating results'
-    addr,tags = dict(faddr), dict(ftags)
+    addr, tags = dict(faddr), dict(ftags)
     for k, v in six.iteritems(daddr):
         addr[k] = addr.get(k, 0) + v
     for k, v in six.iteritems(dtags):
@@ -107,12 +134,12 @@ def fetch_globals():
     print >>output, "globals: found {:d} addrs".format(len(addr))
     print >>output, "globals: found {:d} tags".format(len(tags))
 
-    return addr,tags
+    return addr, tags
 
 def contents(ea):
-    '''Iterate through all addresses in the function ``ea`` and its tagcache collecting any found tags.'''
+    '''Re-build the cache for the contents of the function ``ea``.'''
     try:
-        func.top(ea)
+        func.address(ea)
     except LookupError:
         return {}, {}
 
@@ -149,7 +176,7 @@ def contents(ea):
     return addr, tags
 
 def globals():
-    '''Iterate through all globals in the database and update the tagcache with any found tags.'''
+    '''Re-build the cache for all of the globals in the database.'''
 
     # read all function and data tags
     addr, tags = fetch_globals()
@@ -166,7 +193,7 @@ def globals():
     return addr, tags
 
 def all():
-    '''Iterate through everything in the database and update the tagcache with any found tags.'''
+    '''Re-build the cache for all the globals and contents in the database.'''
     total = len(list(db.functions()))
 
     # process all function contents tags
@@ -179,19 +206,18 @@ def all():
     _, _ = globals()
 
 def customnames():
-    '''Add all custom names defined in the database to the tagcache as "__name__"'''
+    '''Iterate through all of the custom names defined in the database and update the cache with their reference counts.'''
     # FIXME: first delete all the custom names '__name__' tag
     left, right = db.range()
     for ea in db.iterate(left, right):
-        ctx = internal.comment.globals if not func.within(ea) or func.top(ea) == ea else internal.comment.contents
+        ctx = internal.comment.globals if not func.within(ea) or func.address(ea) == ea else internal.comment.contents
         if db.type.has_customname(ea):
             ctx.inc(ea, '__name__')
         continue
     return
 
 def extracomments():
-    '''Add all extra cmts in the database to the tagcache as "__extra_prefix__" or "__extra_suffix__"'''
-    # FIXME: first delete all the custom names '__name__' tag
+    '''Iterate through all of the extra comments defined in the database and update the cache with their reference counts.'''
     left, right = db.range()
     for ea in db.iterate(left, right):
         ctx = internal.comment.contents if func.within(ea) else internal.comment.globals
@@ -204,14 +230,15 @@ def extracomments():
     return
 
 def everything():
-    '''Re-create the tag cache for all found tags and custom names within the database.'''
+    '''Re-create the cache for all the tags found in the database.'''
     erase()
     all()
 
 def erase_globals():
+    '''Erase the cache defined for all of the global tags in the database.'''
     n = internal.comment.tagging.node()
     res = internal.netnode.hash.fiter(n), internal.netnode.alt.fiter(n), internal.netnode.sup.fiter(n)
-    res = map(list,res)
+    res = map(list, res)
     total = sum(map(len, res))
     hashes, alts, sups = res
 
@@ -228,12 +255,13 @@ def erase_globals():
         yield current + idx, ea
 
     current += len(sups)
-    for idx, (ea,_) in enumerate(alts):
+    for idx, (ea, _) in enumerate(alts):
         internal.netnode.alt.remove(n, ea)
         yield current + idx, ea
     return
 
 def erase_contents():
+    '''Erase the contents cache defined for each function in the database.'''
     res = db.functions()
     total, tag = len(res), internal.comment.contents.btag
     yield total
@@ -244,6 +272,7 @@ def erase_contents():
     return
 
 def erase():
+    '''Erase the current cache from the database.'''
     iter1, iter2 = erase_contents(), erase_globals()
     total = sum(map(next, (iter1, iter2)))
 
@@ -257,4 +286,4 @@ def erase():
         print >>output, "erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), res+idx, total)
     return
 
-__all__ = ['everything','globals','contents']
+__all__ = ['everything', 'globals', 'contents']
