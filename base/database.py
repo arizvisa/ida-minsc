@@ -1735,7 +1735,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prev(cls, ea, count):
-        '''Return the `count`th previous address from the address specified by ``ea``.'''
+        '''Return the previous ``count`` addresses from the address specified by ``ea``.'''
         return cls.prevF(ea, utils.fidentity, count)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
@@ -1769,7 +1769,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def next(cls, ea, count):
-        '''Return the `count`th next address from the address specified by ``ea``.'''
+        '''Return the next ``count`` addresses from the address specified by ``ea``.'''
         return cls.nextF(ea, utils.fidentity, count)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
@@ -1858,7 +1858,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevref(cls, ea, count):
-        '''Returns the `count`th previous address from ``ea`` that has anything referencing it.'''
+        '''Returns the previous ``count`` addresses from ``ea`` that has anything referencing it.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fxref, count)
 
@@ -1887,7 +1887,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextref(cls, ea, count):
-        '''Returns the `count`th next address from ``ea`` that has anything referencing it.'''
+        '''Returns the next ``count`` addresses from ``ea`` that has anything referencing it.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fxref, count)
 
@@ -1916,7 +1916,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevdref(cls, ea, count):
-        '''Returns the `count`th previous address from ``ea`` that has data referencing it.'''
+        '''Returns the previous ``count`` addresses from ``ea`` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fdref, count)
 
@@ -1945,7 +1945,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextdref(cls, ea, count):
-        '''Returns the `count`th next address from ``ea`` that has data referencing it.'''
+        '''Returns the next ``count`` addresses from ``ea`` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fdref, count)
     prevdata, nextdata = utils.alias(prevdref, 'address'), utils.alias(nextdref, 'address')
@@ -1975,7 +1975,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevcref(cls, ea, count):
-        '''Returns the `count`th previous address from ``ea`` that has code referencing it.'''
+        '''Returns the previous ``count`` addresses from ``ea`` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fcref, count)
 
@@ -2004,7 +2004,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextcref(cls, ea, count):
-        '''Returns the `count`th next address from ``ea`` that has code referencing it.'''
+        '''Returns the next ``count`` addresses from ``ea`` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fcref, count)
     prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
