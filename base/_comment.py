@@ -1,26 +1,60 @@
 """
-Abstraction around IDA's comments to allow one to store arbitrary python objects within them. These encoded python objects follow a constraint in that they also must be human-readable.
+Comment module (internal)
 
-Each comment stores a dictionary that has the following format:
+This module contains the functionality for encoding and decoding
+arbitrary python objects into IDA's comments and is thus a major
+component of the way the tag system in this plugin works.
+
+These encoded python objects are constrained in that they must also
+double as being human readable in IDA's disassembly view. This then
+allows one to essentially store a dictionary within each comment that
+can be used to read/write primitive python objects.
+
+Each comment stored at an address is a list of key-value pairs
+separated by newlines. Each key represents a tag and so as a comment,
+it has the following appearance.
 
     [key1] value1
     [key2] value2
     ...
 
-If a comment does not follow the specified format, then it is assumed that the comment's value is unencoded and its key is "" (empty). This implies that if your comment at an address is simply "HeapHandle", then its dictionary is {'':'HeapHandle'}. Most basic pythonic objects can be stored, if one needs to store a more complex type it is suggested that the developer either marshal/pickle it and then base64 encode it at a given address w/ a key.
+If a comment does not follow this format, then it assumed that the
+comment's value is a simple unencoded tag and can be accessed via
+the '' key (empty). This means that if your comment is simply the
+string "HeapHandle", then its dictionary will look similar to
+`{'' : 'HeapHandle'}`.
 
-Some value types are encoded in order to retain any specific information about the value as well as to allow a user to read the value's immediate contents. For example:
+Unfortunately IDA has a limitation on the length of comments and so
+arbitrarily long data will not be able to be stored. This includes
+things such as more complex types or custom objects. If one truly
+needs to store a more complex type then it is suggested that the user
+marshal or pickle their object, compress it in some way, and then
+base64 encode it at a given address with their key. Still this is not
+recommended, but who am I to stop a user from wanting to be crazy.
+
+Some of the values are encoded in order to retain any specific
+information about the value as well as still allowing the user to read
+the tag's immediate contents. By default all integers are always
+encoded as hexadecimal. If you can't read hex, then you should save
+your database and quit your job. Or you could also practice it I guess.
+It's the next power of 2 from decimal and is hence pretty important.
+Strings and other types that contain any line-breaking characters also
+get encoded whereas both lists and most iterable types are stored as-is.
+
+Some examples of how tag values are encoded are as follows:
 
     4021 -> 0xfb5
     -100 -> -0x64
     0.5 -> float(0.5)
-
     'hello world\nhow\'re ya' -> hello world\nhow're ya
     {10,20,30} -> set([10, 20, 30])
 
-Lists and Dictionary types are stored as-is. Integral types are always portrayed in hexadecimal form as IDA uses hexadecimal everywhere. Despite one being allowed to specify a comment that's a decimal or an octal number, when encoding a tag it will always be in a hexadecimal format. This way if a user has tagged an address in a comment, they may double-click on it to convince IDA to follow it.
-
-String types have the ability to escape certain characters.  The characters that have special meaning are '\n', '\r', and '\t'. Similarly if a backslash is escaped, it will result in a single '\'. If any other character is prefixed with a backslash, it will decode into a character prefixed with a backslash. This is different from what one would expect in that all characters might be escaped but is done so that one would not need to recursively escape and unescape strings that are stored.
+With regards to string, only certain characters are escaped because
+I don't know if IDA's comments support unicode. So, the characters
+that have special meaning are '\n', '\r', and '\t'. Similarly if a
+backslash is escaped, it will result in a single '\'. If any other
+character is prefixed with a backslash, it will decode into a character
+that is prefixed with a backslash.
 """
 
 import itertools,functools,operator

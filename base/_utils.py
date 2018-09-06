@@ -1,3 +1,12 @@
+"""
+Utilities module (internal)
+
+This module contains a number of tools that help with the interface for this
+plugin. This contains things such as the multicase decorator, the matcher
+class for querying and filtering lists of things, support for aliasing
+functions, and a number of functional programming primitives (combinators).
+"""
+
 import six
 from six.moves import builtins
 
@@ -82,17 +91,20 @@ count = compose(builtins.iter, builtins.list, builtins.len)
 
 # cheap pattern-like matching
 class Pattern(object):
+    '''Base class for fake pattern matching against a tuple.'''
     def __eq__(self, other):
         return self.__cmp__(other) == 0
     __call__ = __eq__
     def __repr__(self):
         return 'Pattern()'
 class PatternAny(Pattern):
+    '''Object for matching against anything it is compared against.'''
     def __cmp__(self, other):
         return 0
     def __repr__(self):
         return "{:s}({:s})".format('Pattern', '*')
 class PatternAnyType(Pattern):
+    '''Object for matching against any type it is compared against.'''
     def __init__(self, other):
         self.type = other
     def __cmp__(self, other):
@@ -102,6 +114,10 @@ class PatternAnyType(Pattern):
 
 ### decorators
 class multicase(object):
+    """
+    A lot of magic is in this class which allows one to define multiple cases
+    for a single function.
+    """
     CO_OPTIMIZED                = 0x00001
     CO_NEWLOCALS                = 0x00002
     CO_VARARGS                  = 0x00004
@@ -123,6 +139,7 @@ class multicase(object):
     cache_name = '__multicase_cache__'
 
     def __new__(cls, *other, **t_args):
+        '''Decorate a case of a function with the specified types.'''
         def result(wrapped):
             # extract the FunctionType and its arg types
             cons, func = cls.reconstructor(wrapped), cls.ex_function(wrapped)
@@ -180,6 +197,7 @@ class multicase(object):
 
     @classmethod
     def document(cls, name, cache):
+        '''Generate documentation for a multicased function.'''
         res = []
         for func, types, _ in cache:
             doc = (func.__doc__ or '').split('\n')
@@ -193,6 +211,7 @@ class multicase(object):
 
     @classmethod
     def prototype(cls, func, types={}):
+        '''Generate a prototype for an instance of a function.'''
         args, defaults, (star, starstar) = cls.ex_args(func)
         argsiter = (("{:s}={:s}".format(n, "{:s}".format('|'.join(t.__name__ for t in types[n])) if not isinstance(types[n], type) and hasattr(types[n], '__iter__') else types[n].__name__) if types.has_key(n) else n) for n in args)
         res = (argsiter, ("*{:s}".format(star),) if star else (), ("**{:s}".format(starstar),) if starstar else ())
@@ -200,6 +219,7 @@ class multicase(object):
 
     @classmethod
     def match(cls, (args, kwds), heap):
+        '''Given the specified ``args`` and ``kwds``, find the correct function according to its types.'''
         # FIXME: yep, done in O(n) time.
         for f, ts, (sa, af, defaults, (argname, kwdname)) in heap:
             # populate our arguments
@@ -242,6 +262,7 @@ class multicase(object):
 
     @classmethod
     def new_wrapper(cls, func, cache):
+        '''Create a new wrapper that will determine the correct function to call.'''
         # define the wrapper...
         def F(*arguments, **keywords):
             heap = [res for _,res in heapq.nsmallest(len(cache), cache)]
@@ -267,6 +288,7 @@ class multicase(object):
 
     @classmethod
     def ex_function(cls, object):
+        '''Extract the actual function type from a callable.'''
         if isinstance(object, types.FunctionType):
             return object
         elif isinstance(object, types.MethodType):
@@ -280,6 +302,7 @@ class multicase(object):
 
     @classmethod
     def reconstructor(cls, n):
+        '''Return a closure that returns the original callable type for a function.'''
         if isinstance(n, types.FunctionType):
             return lambda f: f
         if isinstance(n, types.MethodType):
@@ -294,6 +317,7 @@ class multicase(object):
 
     @classmethod
     def ex_args(cls, f):
+        '''Extract the arguments from a function.'''
         c = f.func_code
         varnames_count, varnames_iter = c.co_argcount, iter(c.co_varnames)
         args = tuple(itertools.islice(varnames_iter, varnames_count))
@@ -306,6 +330,7 @@ class multicase(object):
 
     @classmethod
     def generatorQ(cls, func):
+        '''Returns true if ``func`` is a generator.'''
         func = cls.ex_function(func)
         return bool(func.func_code.co_flags & CO_VARGEN)
 
@@ -889,8 +914,12 @@ class execution(object):
             self.result.put((item,res,err))
         return
 
-# FIXME: figure out how to match against a bounds
+# FIXME: figure out how to match against a bounds in a non-hacky way
 class matcher(object):
+    """
+    An object that allows one to match or filter a list of things in an
+    sort of elegant way.
+    """
     def __init__(self):
         self.__predicate__ = {}
     def __attrib__(self, *attribute):

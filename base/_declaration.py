@@ -1,3 +1,13 @@
+"""
+Declaration module (internal)
+
+This module contains some tools used for extracting information out of
+function and type declarations.
+
+TODO: Implement parsers for some of the C++ symbol manglers in order to
+      query them for specific attributes or type information.
+"""
+
 import function as fn,database as db
 import idaapi
 
@@ -53,7 +63,7 @@ def mangled(string):
 # FIXME: this code is so hacky, that i need unit-tests for it...which should be properly fixed.
 #        1] If I write a parser, I can easily split out these components. (proper fix)
 #        2] If I use IDA's metadata to figure out each type, I can use those strings to cull them out of the declaration. (hackish)
-#        3] I could use properly unmaintainable nfa-based pattern matching. (regex)
+#        3] I could use completely unmaintainable nfa-based pattern matching. (regexes whee)
 #        4] I could continue to use string operations to cut parts out...except that they're unable to solve this problem
 #           due to the need to keep a recursive state somewhere in order to associate types with. (current)
 class extract:
