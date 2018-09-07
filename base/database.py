@@ -58,10 +58,10 @@ def bottom():
 
 class config(object):
     """
-    Namespace containing the various read-only properties about the database.
-    This includes things such as the database boundaries, filenames, path to
-    the generated database, etc. Some tools for determining the type of the
-    binary are also included.
+    This namespace contains various read-only properties about the
+    database.  This includes things such as the database boundaries,
+    its filename, the path to the generated database, etc. Some tools
+    for determining the type of the binary are also included.
     """
 
     info = idaapi.get_inf_structure()
@@ -194,7 +194,8 @@ class config(object):
 
     class registers(object):
         """
-        Namespace for returning the register names + sizes configured in the database.
+        This namespace returns the available register names and their
+        sizes for the database.
         """
         @classmethod
         def names(cls):
@@ -225,8 +226,9 @@ baseaddress = base = utils.alias(config.baseaddress, 'config')
 
 class functions(object):
     """
-    Namespace used for listing all the functions inside the database. By
-    default a list is returned containing the address of each function.
+    This namespace is used for listing all the functions inside the
+    database. By default a list is returned containing the address of
+    each function.
 
     The different types that one can match functions with are the following:
 
@@ -388,8 +390,8 @@ class functions(object):
 
 class segments(object):
     """
-    Namespace used for listing all the segments inside the database. By
-    default each segment's boundaries are yielded.
+    This namespace is used for listing all the segments inside the
+    database. By default each segment's boundaries are yielded.
 
     The different types that one can match segments with are the following:
 
@@ -521,8 +523,8 @@ def write(ea, data, **persist):
 
 class names(object):
     """
-    Namespace used for listing all the names (or symbols) within the database.
-    By default default the (address, name) is yielded.
+    This namespace is used for listing all the names (or symbols)
+    within the database. By default the `(address, name)` is yielded.
 
     The different types that one can filter the symbols with are the following:
 
@@ -632,10 +634,11 @@ class names(object):
 
 class search(object):
     """
-    Namespace used for searching the database using IDA's find functionality.
+    This namespace used for searching the database using IDA's find
+    functionality.
 
-    By default the name is used, however there are 3 search methods that are
-    available. The methods that are provided are:
+    By default the name is used, however there are 3 search methods
+    that are available. The methods that are provided are:
 
         `search.by_bytes` - Search by the specified hex bytes
         `search.by_regex` - Search by the specified regex
@@ -736,11 +739,11 @@ def go(ea):
 # returns the offset of ea from the baseaddress
 @utils.multicase()
 def offset():
-    '''Return the current address converted to an offset from the base-address of the database.'''
+    '''Return the current address converted to an offset from the base address of the database.'''
     return offset(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def offset(ea):
-    '''Return the address ``ea`` converted to an offset from the base-address of the database.'''
+    '''Return the address ``ea`` converted to an offset from the base address of the database.'''
     return interface.address.inside(ea) - baseaddress()
 getoffset = getOffset = o = utils.alias(offset)
 
@@ -931,8 +934,9 @@ def comment(ea, string, **repeatable):
 
 class entries(object):
     """
-    Namespace used for listing all of the entry points (or exports) within the
-    database. By default the address of each entrypoint will be yielded.
+    This namespace can be used to enumerate all of the entry points and
+    exports that are defined within the database By default the address
+    of each entrypoint will be yielded.
 
     This namespace is also aliased as `database.exports`.
 
@@ -1368,9 +1372,17 @@ selectcontent = utils.alias(selectcontents)
 ## imports
 class imports(object):
     """
-    Namespace used for listing all of the imports within the database. By
-    default the (address, (shared-object, symbol-name, hint)) is yielded
-    for each import.
+    This namespace is used for listing all of the imports within the
+    database. Each import is represented by an address along with any
+    naming information that is required to dynamically link external
+    symbols with the binary.
+
+    By default a tuple is yielded for each import with the format
+    `(address, (shared-object, name, hint))`. In this tuple,
+    `shared-object` represents the name of the shared object the
+    import is imported from. The `name` is the symbol name to link
+    with, and `hint` is the import ordinal hint which is used to speed
+    up the linking process.
 
     The different types that one can match imports with are the following:
 
@@ -1558,11 +1570,13 @@ getImports = utils.alias(imports.list, 'imports')
 ###
 class address(object):
     """
-    Namespace used for transforming an address in the database to another
-    address according to various constraints. Essentially these functions are
-    used to assist with navigation. These functions allow one to navigate
-    between the next and previous "calls", data references, or even unknown
-    (undefined) addresses.
+    This namespace is used for translating an address in the database
+    to another address according to a number of constraints or types.
+    Essentially these functions are used to assist with navigation.
+    As an example, these functions allow one to navigate between the
+    next and previous "call" instructions, addressese that contain
+    data references, or even to navigate to unknown (undefined)
+    addresses.
 
     This namespace is also aliased as `database.a`.
 
@@ -2125,12 +2139,12 @@ class address(object):
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def nextstack(cls, delta):
-        '''Return the next instruction that is past the sp delta ``delta``.'''
+        '''Return the next instruction that is past the sp ``delta``.'''
         return cls.nextstack(ui.current.address(), delta)
     @utils.multicase(ea=six.integer_types, delta=six.integer_types)
     @classmethod
     def nextstack(cls, ea, delta):
-        '''Return the next instruction from ``ea`` that is past the sp delta ``delta``.'''
+        '''Return the next instruction from ``ea`` that is past the sp ``delta``.'''
         logging.warn("{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change!".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
@@ -2435,10 +2449,10 @@ prevreg, nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.
 
 class type(object):
     """
-    Namespace for fetching type information from the different addresses
-    defined within the database. The functions within this namespace allow
-    one to extract various type information from the different locations
-    within the database.
+    This namespace is for fetching type information from the different
+    addresses defined within the database. The functions within this
+    namespace allow one to extract various type information from the
+    different locations within the database.
 
     This namespace is also aliased as `database.t`.
 
@@ -2703,9 +2717,10 @@ class type(object):
 
     class array(object):
         """
-        Namespace for returning type information about an array that is defined
-        within the database. By default this namespace will return the array's
-        element size and number of elements as a tuple (size, count).
+        This namespace is for returning type information about an array
+        that is defined within the database. By default this namespace
+        will return the array's element size and number of elements as
+        a tuple `(size, count)`.
         """
         @utils.multicase()
         def __new__(cls):
@@ -2754,9 +2769,9 @@ class type(object):
 
     class structure(object):
         """
-        Namespace for returning type information about a structure that is defined
-        within the database. By default this namespace will return the `structure_t`
-        at the given address.
+        This namespace for returning type information about a structure
+        that is defined within the database. By default this namespace
+        will return the `structure_t` at the given address.
         """
         @utils.multicase()
         def __new__(cls):
@@ -2863,14 +2878,15 @@ getStructureId = get_strucid = get_structureid = utils.alias(type.structure.id, 
 
 class xref(object):
     """
-    Namespace for navigating the cross-references (xrefs) associated with an
-    address in the database. This lets one identify code xrefs from data xrefs
-    and even allows one to add or remove xrefs as they see fit.
+    This namespace is for navigating the cross-references (xrefs)
+    associated with an address in the database. This lets one identify
+    code xrefs from data xrefs and even allows one to add or remove
+    xrefs as they see fit.
 
     This namespace is also aliased as `database.x`.
 
-    Some of the more common functions are used so often that they're also
-    aliased as globals. Some of these are:
+    Some of the more common functions are used so often that they're
+    also aliased as globals. Some of these are:
 
         `database.up` - Return all addresses that reference an address
         `database.down` - Return all addresses that an address references
@@ -2880,6 +2896,7 @@ class xref(object):
         `database.dxdown` - Return all the data references that an address references
         `database.cxup` - Return all the code references that reference an address
         `database.cxdown` - Return all the code references that an address references
+
     """
 
     @utils.multicase()
@@ -3110,13 +3127,14 @@ up, down = utils.alias(xref.up, 'xref'), utils.alias(xref.down, 'xref')
 # create/erase a mark at the specified address in the .idb
 class marks(object):
     """
-    Namespace for interacting with the marks table within the database. By
-    default, this namespace yields the (address, description) of each mark
-    within the database.
+    This namespace is for interacting with the marks table within the
+    database. By default, this namespace is capable of yielding the
+    `(address, description)` of each mark within the database.
 
-    This allows one to manage the marks. Although it is suggested to utilize
-    "tags" as they provide significantly more flexibility. Using marks allows
-    for one to use IDA's mark window for quick navigation to a mark.
+    This allows one to manage the marks. Although it is suggested to
+    utilize "tags" as they provide significantly more flexibility.
+    Using marks allows for one to use IDA's mark window for quick
+    navigation to a mark.
     """
     MAX_SLOT_COUNT = 0x400
     table = {}
@@ -3331,9 +3349,10 @@ def mark(ea, description):
 
 class extra(object):
     """
-    Namespace for interacting with IDA's "extra" comments that can be
-    associated with an address. This allows one to prefix or suffix an
-    address with a large block of text simulating a paragraph.
+    This namespace is for interacting with IDA's "extra" comments that
+    can be associated with an address. This allows one to prefix or
+    suffix an address with a large block of text simulating a
+    multilined or paragraph comment.
     """
 
     MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
@@ -3628,10 +3647,10 @@ ex = extra  # XXX: ns alias
 
 class set(object):
     """
-    Namespace for setting the type of an address within the database. This
-    allows one to apply a particular type to a given address. This allows
-    one to specify whether a type is a string, undefined, code, data, an
-    array, or even a structure.
+    This namespace for setting the type of an address within the
+    database. This allows one to apply a particular type to a given
+    address. This allows one to specify whether a type is a string,
+    undefined, code, data, an array, or even a structure.
     """
     @utils.multicase()
     @classmethod
@@ -3781,8 +3800,8 @@ class set(object):
 
     class integer(object):
         """
-        Namespace used for applying various sized integer types to a particular
-        address.
+        This namespace used for applying various sized integer types to
+        a particular address.
 
         This namespace is also aliased as `database.set.i`.
         """
@@ -3868,10 +3887,12 @@ class set(object):
 
 class get(object):
     """
-    Namespace used to fetch data from the database at a given address. This
-    allows one to interpret the meaning that has been defined and then act
-    on it. These include standard function for reading integers of different
-    sizes, structures, and even arrays.
+    This namespace used to fetch and decode the data from the database
+    at a given address. This allows one to interpret the semantics of
+    parts of the database and then perform an action based on what was
+    decoded. This includes standard functions for reading integers of
+    different sizes, decoding structures, and even reading of arrays
+    from the database.
     """
     @utils.multicase()
     @classmethod
@@ -3928,7 +3949,7 @@ class get(object):
 
     class integer(object):
         """
-        Namespace containing the different ISO standard integer types that
+        This namespace contains the different ISO standard integer types that
         can be used to read integers out of the database.
 
         This namespace is also aliased as `database.get.i`.
@@ -4134,6 +4155,7 @@ class get(object):
     @utils.multicase()
     @classmethod
     def structure(cls):
+        '''Return the `structure_t` at the current address.'''
         return cls.structure(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
