@@ -279,6 +279,79 @@ class grammar(object):
         ast.USub : operator.isub,
     }
 
+class backticklexer(object):
+    '''Scan for words that are double-backticked or single-backticked and replace them with some format string'''
+    def __init__(self, fmtsingle, fmtdouble):
+        '''Replace single-backticked strings with ``fmtsingle`` and double-backticked stringss with ``fmtdouble``.'''
+        self.format_single = fmtsingle
+        self.format_double = fmtdouble
+
+    def lex(self, string):
+        '''Run the instance against ``string``.'''
+        res = []
+        result = self.aggregate(res); next(result)
+        lex = self.__scan_singletick(result); next(lex)
+        self.read(iter(string), lex)
+        return str().join(res)
+
+    @staticmethod
+    def read(source, ticker):
+        try:
+            while True:
+                ch = next(source)
+                ticker.send(ch)
+        except StopIteration: ticker.close()
+
+    @staticmethod
+    def aggregate(result):
+        try:
+            while True:
+                result.append( (yield) )
+        except GeneratorExit: return
+
+    def __scan_singletick(self, result):
+        ch = (yield)
+        try:
+            while True:
+                if ch == '`':
+                    doubletick, singletick = [], []
+                    ch = (yield)
+                    c_double = self.aggregate(doubletick); next(c_double)
+                    c_single = self.aggregate(singletick); next(c_single)
+                    scanner = self.__scan_doubletick(c_double, c_single); next(scanner)
+                    try:
+                        while True:
+                            scanner.send(ch)
+                            ch = (yield)
+                    except StopIteration: pass
+                    if doubletick:
+                        res = str().join(doubletick)
+                        map(result.send, self.format_double(res))
+                    elif singletick:
+                        res = str().join(singletick)
+                        map(result.send, self.format_single(res))
+                    scanner.close()
+                else:
+                    result.send(ch)
+                ch = (yield)
+        except GeneratorExit: result.close()
+
+    def __scan_doubletick(self, double, single):
+        ch = (yield)
+        if ch == '`':
+            ch = (yield)
+            while True:
+                double.send(ch)
+                ch = (yield)
+                if ch == '`': break
+            ch = (yield)
+            return
+
+        while ch != '`':
+            single.send(ch)
+            ch = (yield)
+        return
+
 ### Converting Reference types into reStructuredText
 class restructure(object):
     ## small utility functions
@@ -304,15 +377,20 @@ class restructure(object):
         return [prefix + line for line in strings]
     @classmethod
     def walk(cls, ref, field):
+        '''Return every parent element whilst excluding the final module.'''
         while ref.has(field):
             yield ref
             ref = ref.get(field)
-        yield ref
+        return
     @classmethod
     def docstringToList(cls, cmt):
-        res = cls.escape(cmt)
-        res = cmt.replace('``', '**')
+        L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
+        res = cls.escape(L.lex(cmt))
         return res.strip().split('\n')
+    @classmethod
+    def paramDescriptionToRst(cls, descr):
+        L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
+        return cls.escape(L.lex(descr))
 
     ## Reference type converters
     @classmethod
@@ -334,20 +412,23 @@ class restructure(object):
             else:
                 raise TypeError(ch)
             continue
-        res = cls.indentlist(res, '   ')
         res[0:0] = (definition,)
         return '\n'.join(res)
 
     @classmethod
-    def Namespace(cls, ref):
+    def Namespace(cls, ref, depth=0):
         if ref.get('skippable') and not len([ch for ch in ref.children if not isinstance(ch, Namespace)]): return ''
 
         ns = [r.name for r in cls.walk(ref, 'namespace')]
-        name = '.'.join(reversed(ns))
+        name = r'.'.join(reversed(ns))
 
-        definition = ".. py:namespace {name:s}".format(name=name)
+        #definition = ".. py:namespace {name:s}".format(name=name)
+        sectionchar = '=-^'
 
         res = []
+        res.append(sectionchar[depth] * len(name))
+        res.append(cls.escape(name))
+        res.append(sectionchar[depth] * len(name))
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
         if ref.has('details'): res.extend(cls.escape(ref.get('details')).strip().split('\n') + [''])
@@ -355,7 +436,7 @@ class restructure(object):
             if isinstance(ch, Function):
                 res.extend(cls.Function(ch).split('\n'))
             elif isinstance(ch, Namespace):
-                rows = cls.Namespace(ch).split('\n')
+                rows = cls.Namespace(ch, depth=depth+1).split('\n')
                 if filter(None, rows): res.extend(rows)
             elif isinstance(ch, Class):
                 rows = cls.Class(ch).split('\n')
@@ -363,12 +444,10 @@ class restructure(object):
             else:
                 raise TypeError(ch)
             continue
-        res = cls.indentlist(res, '   ')
-        res[0:0] = (definition,)
         return '\n'.join(res)
 
     @classmethod
-    def Class(cls, ref):
+    def Class(cls, ref, depth=0):
         if ref.get('skippable') and not ref.children: return ''
 
         ns = [r.name for r in cls.walk(ref, 'namespace')]
@@ -412,7 +491,7 @@ class restructure(object):
             if isinstance(ch, Function):
                 res.extend(cls.Method(ch).split('\n'))
             elif isinstance(ch, Namespace):
-                res.extend(cls.Namespace(ch).split('\n'))
+                res.extend(cls.Namespace(ch, depth=depth+1).split('\n'))
             else:
                 raise TypeError(ch)
             continue
@@ -492,7 +571,7 @@ class restructure(object):
             elif isinstance(ty, types.TupleType):
                 t = tuple(ty)
                 if all(isinstance(n, tuple) for n in t): t = tuple(map(operator.itemgetter(0), t))
-                res.append((n, descr, '|'.join(map(stringify, t))))
+                res.append((n, descr, tuple(map(stringify, t))))
             else:
                 raise TypeError('params', n, ty)
             continue
@@ -519,13 +598,13 @@ class restructure(object):
 
         props = []
         for n, r in attrs:
-            fmt = ": param {name:s} {comment:s}"
+            fmt = ":param {name:s}: {comment:s}"
             props.append(fmt.format(name=n, comment=' '.join(cls.docstringToList(r.comment))))
 
             _, pparams = cls.Arguments(r)
 
             for n, descr, ty in pparams[1:]:
-                fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
+                fmt = ":param {name:s}:" if isinstance(ty, undefined) else ":param {type:s} {name:s}:"
                 fmt += '' if isinstance(descr, undefined) else (' '+cls.escape(descr))
                 props.append(fmt.format(type=ty, name=cls.escape(n)))
             continue
@@ -541,7 +620,7 @@ class restructure(object):
     def Method(cls, ref):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         ns = ns[1:] if ref.name == '__new__' else ns[:]
-        name = '.'.join(reversed(ns)) if ref.name == '__new__' else ref.name
+        name = r'\.'.join(reversed(ns)) if ref.name == '__new__' else ref.name
 
         aliases = ref.get('aliases') or {}
         args, params = cls.Arguments(ref)
@@ -553,12 +632,13 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if aliases: res.extend(["Aliases: {:s}".format(', '.join((ns[-1] + '.' + n for n in aliases)))] + [''])
+        if aliases: res.extend(["Aliases: {:s}".format(', '.join(map(":py:func:`{:s}`".format, aliases)))] + [''])
 
         for n, descr, ty in params[1:]:
-            fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
-            fmt += '' if isinstance(descr, undefined) else (' '+cls.escape(descr))
-            res.append(fmt.format(type=ty, name=cls.escape(n)))
+            res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
+            if not isinstance(ty, undefined):
+                res.append(":type {name:s}: {types:s}".format(name=cls.escape(n), types=' or '.join(map(cls.escape, ty)) if isinstance(ty, tuple) else cls.escape(ty)))
+            continue
 
         if params[1:]: res.append('')
 
@@ -570,7 +650,7 @@ class restructure(object):
     def Function(cls, ref):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         ns = ns[1:] if ref.name == '__new__' else ns[:]
-        name = '.'.join(reversed(ns))
+        name = r'\.'.join(reversed(ns))
 
         aliases = ref.get('aliases') or {}
         args, params = cls.Arguments(ref)
@@ -582,12 +662,13 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if aliases: res.extend(["Aliases: {:s}".format(', '.join((ns[-1] + '.' + n for n in aliases)))] + [''])
+        if aliases: res.extend(["Aliases: {:s}".format(', '.join(map(":py:func:`{:s}`".format, aliases)))] + [''])
 
         for n, descr, ty in params:
-            fmt = ": param {name:s}" if isinstance(ty, undefined) else ": param {type:s} {name:s}"
-            fmt += '' if isinstance(descr, undefined) else (' '+cls.escape(descr))
-            res.append(fmt.format(type=ty, name=cls.escape(n)))
+            res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
+            if not isinstance(ty, undefined):
+                res.append(":type {name:s}: {types:s}".format(name=cls.escape(n), types=' or '.join(map(cls.escape, ty)) if isinstance(ty, tuple) else cls.escape(ty)))
+            continue
 
         if params: res.append('')
 
