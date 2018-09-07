@@ -177,16 +177,19 @@ class config(object):
 
     @classmethod
     def entry(cls):
+        '''Return the first entry point for the database.'''
         if idaapi.__version__ < 7.0:
             return cls.info.beginEA
         return cls.info.start_ip
 
     @classmethod
     def margin(cls):
+        '''Return the current margin position for the current database.'''
         return cls.info.margin
 
     @classmethod
     def bounds(cls):
+        '''Return the bounds of the current database as a tuple formatted as `(left, right)`'''
         return cls.info.minEA, cls.info.maxEA
 
     class registers(object):
@@ -244,7 +247,7 @@ class functions(object):
     #__matcher__.boolean('greater', operator.le, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max))
     #__matcher__.boolean('less', operator.ge, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)), __matcher__.boolean('lt', operator.gt, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min))
 
-    # entry-point matching
+    # entry point matching
     __matcher__.boolean('greater', operator.le, function.top), __matcher__.boolean('gt', operator.lt, function.top)
     __matcher__.boolean('less', operator.ge, function.top), __matcher__.boolean('lt', operator.gt, function.top)
 
@@ -308,16 +311,7 @@ class functions(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        """List all of the functions in the database that match ``type``.
-
-        Search can be constrained by the named argument ``type``.
-        like = glob match against function name
-        ea, address = function contains address
-        name = exact function name match
-        regex = regular-expression against function name
-        greater, less = greater-or-equal against bounds, less-or-equal against bounds
-        pred = function predicate
-        """
+        '''List all of the functions in the database that match the keywords specified by ``type``.'''
         res = builtins.list(cls.iterate(**type))
 
         flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
@@ -422,16 +416,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        """List all the segments defined in the database.
-
-        Search type can be identified by providing a named argument.
-        like = glob match
-        regex = regular expression
-        selector = segment selector
-        index = particular index
-        name = specific segment name
-        predicate = function predicate
-        """
+        '''List all of the segments in the database that match the keywords specified by ``type``.'''
         return segment.list(**type)
 
     @utils.multicase(name=basestring)
@@ -594,16 +579,7 @@ class names(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        """List all of the names in the database that match ``type``.
-
-        Search can be constrained by the named argument ``type``.
-        like = glob match against name
-        ea, address = name is at address
-        name = exact name match
-        regex = regular-expression against name
-        index = name at index
-        pred = function predicate
-        """
+        '''List all of the names in the database that match the keywords specified by ``type``.'''
         res = builtins.list(cls.__iterate__(**type))
 
         maxindex = max(res or [1])
@@ -685,7 +661,8 @@ class search(object):
 
         If ``reverse`` is specified as a bool, then search backwards from the given address.
         """
-        flags = idaapi.SEARCH_UP if direction.get('reverse', False) else idaapi.SEARCH_DOWN
+        reverseQ = builtins.next((direction[k] for k in ('reverse','reversed','up','backwards') if k in direction), False)
+        flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         return idaapi.find_binary(ea, idaapi.BADADDR, ' '.join("{:d}".format(six.byte2int(ch)) for ch in string), 10, idaapi.SEARCH_CASE | flags)
     byBytes = by_bytes
 
@@ -702,7 +679,8 @@ class search(object):
         If ``reverse`` is specified as a bool, then search backwards from the given address.
         If ``sensitive`` is specified as bool, then perform a case-sensitive search.
         """
-        flags = idaapi.SEARCH_UP if options.get('reverse',False) else idaapi.SEARCH_DOWN
+        reverseQ = builtins.next((options[k] for k in ('reverse','reversed','up','backwards') if k in options), False)
+        flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive',False) else 0
         return idaapi.find_binary(ea, idaapi.BADADDR, string, options.get('radix',16), flags)
     byRegex = by_regex
@@ -999,18 +977,18 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     def iterate(cls, string):
-        '''Iterate through all of the entry-points in the database with a glob that matches ``string``.'''
+        '''Iterate through all of the entry points in the database with a glob that matches ``string``.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the entry-points in the database that match ``type``.'''
+        '''Iterate through all of the entry points in the database that match ``type``.'''
         res = itertools.imap(cls.__address__, cls.__iterate__(**type))
         for ea in res: yield ea
 
     @classmethod
     def __index__(cls, ea):
-        '''Returns the index of the entry-point at the specified ``address``.'''
+        '''Returns the index of the entry point at the specified ``address``.'''
         f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
         iterable = itertools.imap(utils.fcompose(utils.fmap(f, lambda n:n), builtins.tuple), six.moves.range(idaapi.get_entry_qty()))
         filterable = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), iterable)
@@ -1019,63 +997,53 @@ class entries(object):
 
     @classmethod
     def __address__(cls, index):
-        '''Returns the address of the entry-point at the specified ``index``.'''
+        '''Returns the address of the entry point at the specified ``index``.'''
         res = cls.__entryordinal__(index)
         res = idaapi.get_entry(res)
         return None if res == idaapi.BADADDR else res
 
-    # Returns the name of the entry-point at the specified ``index``.
+    # Returns the name of the entry point at the specified ``index``.
     __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
-    # Returns the ordinal of the entry-point at the specified ``index``.
+    # Returns the ordinal of the entry point at the specified ``index``.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
     @utils.multicase()
     @classmethod
     def ordinal(cls):
-        '''Returns the ordinal of the entry-point at the current address.'''
+        '''Returns the ordinal of the entry point at the current address.'''
         return cls.ordinal(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def ordinal(cls, ea):
-        '''Returns the ordinal of the entry-point at the address ``ea``.'''
+        '''Returns the ordinal of the entry point at the address ``ea``.'''
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryordinal__(res)
-        raise ValueError("{:s}.ordinal({:#x}) : No entry-point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
+        raise ValueError("{:s}.ordinal({:#x}) : No entry point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase()
     @classmethod
     def name(cls):
-        '''Returns the name of the entry-point at the current address.'''
+        '''Returns the name of the entry point at the current address.'''
         return cls.name(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def name(cls, ea):
-        '''Returns the name of the entry-point at the address ``ea``.'''
+        '''Returns the name of the entry point at the address ``ea``.'''
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryname__(res)
-        raise ValueError("{:s}.name({:#x}) : No entry-point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
+        raise ValueError("{:s}.name({:#x}) : No entry point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase(string=basestring)
     @classmethod
     def list(cls, string):
-        '''List all of the entry-points matching the glob ``string`` against the name.'''
+        '''List all of the entry points matching the glob ``string`` against the name.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        """List all of the entry-points within the database that match ``type`.
-
-        Search can be constrained by the named argument ``type``.
-        like = glob match against entry-point name
-        ea, address = exact address match
-        name = exact entry-point name match
-        regex = regular-expression against entry-point name
-        index = particular index
-        greater, less = greater-or-equal against address, less-or-equal against address
-        pred = function predicate
-        """
+        '''List all of the entry points in the database that match the keywords specified by ``type``.'''
         res = builtins.list(cls.__iterate__(**type))
 
         to_address = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -1095,12 +1063,12 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     def search(cls, string):
-        '''Search through all of the entry-point names matching the glob ``string`` and return the first result.'''
+        '''Search through all of the entry point names matching the glob ``string`` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the entry-points within the database and return the first result.'''
+        '''Search through all of the entry points within the database and return the first result.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -1117,7 +1085,7 @@ class entries(object):
     @utils.multicase()
     @classmethod
     def new(cls):
-        '''Makes an entry-point at the current address.'''
+        '''Makes an entry point at the current address.'''
         ea,entryname,ordinal = ui.current.address(), name(ui.current.address()) or function.name(ui.current.address()), idaapi.get_entry_qty()
         if entryname is None:
             raise ValueError("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
@@ -1125,7 +1093,7 @@ class entries(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def new(cls, ea):
-        '''Makes an entry-point at the specified address ``ea``.'''
+        '''Makes an entry point at the specified address ``ea``.'''
         entryname, ordinal = name(ea) or function.name(ea), idaapi.get_entry_qty()
         if entryname is None:
             raise ValueError("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
@@ -1133,23 +1101,23 @@ class entries(object):
     @utils.multicase(name=basestring)
     @classmethod
     def new(cls, name):
-        '''Adds an entry-point to the database with the ``name`` using the next available index as the ordinal.'''
+        '''Adds the current address as an entry point using ``name`` and the next available index as the ordinal.'''
         return cls.new(ui.current.address(), name, idaapi.get_entry_qty())
     @utils.multicase(ea=six.integer_types, name=basestring)
     @classmethod
     def new(cls, ea, name):
-        '''Makes the specified address ``ea`` an entry-point having the specified ``name``.'''
+        '''Makes the specified address ``ea`` an entry point having the specified ``name``.'''
         ordinal = idaapi.get_entry_qty()
         return cls.new(ea, name, ordinal)
     @utils.multicase(name=basestring, ordinal=six.integer_types)
     @classmethod
     def new(cls, name, ordinal):
-        '''Adds an entry-point with the specified ``name`` to the database using ``ordinal`` as its index.'''
+        '''Adds an entry point with the specified ``name`` to the database using ``ordinal`` as its index.'''
         return cls.new(ui.current.address(), name, ordinal)
     @utils.multicase(ea=six.integer_types, name=basestring, ordinal=six.integer_types)
     @classmethod
     def new(cls, ea, name, ordinal):
-        '''Adds an entry-point at ``ea`` with the specified ``name`` and ``ordinal``.'''
+        '''Adds an entry point at ``ea`` with the specified ``name`` and ``ordinal``.'''
         res = idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
         ui.state.wait()
         return res
@@ -1193,9 +1161,9 @@ def tag(ea):
     # modify the decoded dictionary with any implicit tags
     aname = name(ea)
     if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', aname)
-    eprefix = extra.get_prefix(ea)
+    eprefix = extra.__get_prefix__(ea)
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
-    esuffix = extra.get_suffix(ea)
+    esuffix = extra.__get_suffix__(ea)
     if esuffix is not None: res.setdefault('__extra_suffix__', esuffix)
     col = color(ea)
     if col is not None: res.setdefault('__color__', col)
@@ -1225,9 +1193,9 @@ def tag(ea, key, value):
     if key == '__name__':
         return name(ea, value, listed=True)
     if key == '__extra_prefix__':
-        return extra.set_prefix(ea, value)
+        return extra.__set_prefix__(ea, value)
     if key == '__extra_suffix__':
-        return extra.set_suffix(ea, value)
+        return extra.__set_suffix__(ea, value)
     if key == '__color__':
         return color(ea, value)
 
@@ -1266,9 +1234,9 @@ def tag(ea, key, none):
     if key == '__name__':
         return name(ea, None, listed=True)
     if key == '__extra_prefix__':
-        return extra.del_prefix(ea)
+        return extra.__del_prefix__(ea)
     if key == '__extra_suffix__':
-        return extra.del_suffix(ea)
+        return extra.__del_suffix__(ea)
 
     # if not within a function, then fetch the repeatable comment otherwise update the non-repeatable one
     try: func = function.by_address(ea)
@@ -1296,12 +1264,17 @@ def tag(ea, key, none):
 # FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=basestring)
 def select(tag, *And, **boolean):
+    '''Query all of the global tags in the database for the specified `tag` and any others specified as ``And``.'''
     res = (tag,) + And
     boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())).union(res))
     return select(**boolean)
 @utils.multicase()
 def select(**boolean):
-    '''Fetch all of the functions containing the specified tags within its declaration'''
+    """Query all the global tags for any tags specified by ``boolean``. Yields each address found along with the matching tags as a dictionary.
+
+    If ``And`` contains an iterable then require the returned address contains them.
+    If ``Or`` contains an iterable then include any other tags that are specified.
+    """
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
@@ -1337,12 +1310,17 @@ def select(**boolean):
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
 def selectcontents(tag, *Or, **boolean):
+    '''Query all function contents for the specified ``tag`` or any others specified as ``Or``.'''
     res = (tag,) + Or
     boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())).union(res))
     return selectcontents(**boolean)
 @utils.multicase()
 def selectcontents(**boolean):
-    '''Fetch all of the functions containing the specified tags within its contents.'''
+    """Query all function contents for any tags specified by ``boolean``. Yields each function and the tags that match as a set.
+
+    If ``And`` contains an iterable then require the returned function contains them.
+    If ``Or`` contains an iterable then include any other tags that are specified.
+    """
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
 
@@ -1535,19 +1513,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        """List all of the imports in the database that match ``type``.
-
-        Search can be constrained by the named argument ``type``.
-        like = glob match against import short name
-        ea, address = import is at address
-        fullname = glob match against import long name -> MODULE!function
-        module = glob match against module
-        ordinal = exact match against import ordinal number
-        name = exact match against import name
-        regex = regular-expression against import name
-        index = import name at index
-        pred = function predicate
-        """
+        '''List all of the imports in the database that match the keywords specified by ``type``.'''
         res = builtins.list(cls.iterate(**type))
 
         maxaddr = max(builtins.map(utils.first, res) or [idaapi.BADADDR])
@@ -2263,10 +2229,12 @@ class address(object):
         '''Return the next branch instruction that matches ``predicate``.'''
         return cls.nextbranch(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
+    @classmethod
     def nextbranch(cls, ea):
         '''Return the next branch instruction from the address ``ea``.'''
         return cls.nextbranch(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
+    @classmethod
     def nextbranch(cls, ea, predicate):
         '''Return the next branch instruction from the address ``ea`` that matches ``predicate``.'''
         Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
@@ -3457,26 +3425,26 @@ class extra(object):
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def get_prefix(cls, ea):
+    def __get_prefix__(cls, ea):
         '''Return the prefixed comment at address ``ea``.'''
         return cls.__get__(ea, idaapi.E_PREV)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def get_suffix(cls, ea):
+    def __get_suffix__(cls, ea):
         '''Return the suffixed comment at address ``ea``.'''
         return cls.__get__(ea, idaapi.E_NEXT)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def del_prefix(cls, ea):
+    def __del_prefix__(cls, ea):
         '''Delete the prefixed comment at address ``ea``.'''
         res = cls.__get__(ea, idaapi.E_PREV)
         cls.__del__(ea, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def del_suffix(cls, ea):
+    def __del_suffix__(cls, ea):
         '''Delete the suffixed comment at address ``ea``.'''
         res = cls.__get__(ea, idaapi.E_NEXT)
         cls.__del__(ea, idaapi.E_NEXT)
@@ -3484,110 +3452,110 @@ class extra(object):
 
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
-    def set_prefix(cls, ea, string):
+    def __set_prefix__(cls, ea, string):
         '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
-        res, ok = cls.del_prefix(ea), cls.__set__(ea, string, idaapi.E_PREV)
+        res, ok = cls.__del_prefix__(ea), cls.__set__(ea, string, idaapi.E_PREV)
         ok = cls.__set__(ea, string, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
-    def set_suffix(cls, ea, string):
+    def __set_suffix__(cls, ea, string):
         '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
-        res, ok = cls.del_suffix(ea), cls.__set__(ea, string, idaapi.E_NEXT)
+        res, ok = cls.__del_suffix__(ea), cls.__set__(ea, string, idaapi.E_NEXT)
         return res
 
     @utils.multicase()
     @classmethod
-    def get_prefix(cls):
+    def __get_prefix__(cls):
         '''Return the prefixed comment at the current address.'''
-        return cls.get_prefix(ui.current.address())
+        return cls.__get_prefix__(ui.current.address())
     @utils.multicase()
     @classmethod
-    def get_suffix(cls):
+    def __get_suffix__(cls):
         '''Return the suffixed comment at the current address.'''
-        return cls.get_suffix(ui.current.address())
+        return cls.__get_suffix__(ui.current.address())
     @utils.multicase()
     @classmethod
-    def del_prefix(cls):
+    def __del_prefix__(cls):
         '''Delete the prefixed comment at the current address.'''
-        return cls.del_prefix(ui.current.address())
+        return cls.__del_prefix__(ui.current.address())
     @utils.multicase()
     @classmethod
-    def del_suffix(cls):
+    def __del_suffix__(cls):
         '''Delete the suffixed comment at the current address.'''
-        return cls.del_suffix(ui.current.address())
+        return cls.__del_suffix__(ui.current.address())
     @utils.multicase(string=basestring)
     @classmethod
-    def set_prefix(cls, string):
+    def __set_prefix__(cls, string):
         '''Set the prefixed comment at the current address to the specified ``string``.'''
-        return cls.set_prefix(ui.current.address(), string)
+        return cls.__set_prefix__(ui.current.address(), string)
     @utils.multicase(string=basestring)
     @classmethod
-    def set_suffix(cls, string):
+    def __set_suffix__(cls, string):
         '''Set the suffixed comment at the current address to the specified ``string``.'''
-        return cls.set_suffix(ui.current.address(), string)
+        return cls.__set_suffix__(ui.current.address(), string)
 
     @utils.multicase()
     @classmethod
     def prefix(cls):
         '''Return the prefixed comment at the current address.'''
-        return cls.get_prefix(ui.current.address())
+        return cls.__get_prefix__(ui.current.address())
     @utils.multicase(string=basestring)
     @classmethod
     def prefix(cls, string):
         '''Set the prefixed comment at the current address to the specified ``string``.'''
-        return cls.set_prefix(ui.current.address(), string)
+        return cls.__set_prefix__(ui.current.address(), string)
     @utils.multicase(none=types.NoneType)
     @classmethod
     def prefix(cls, none):
         '''Delete the prefixed comment at the current address.'''
-        return cls.del_prefix(ui.current.address())
+        return cls.__del_prefix__(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prefix(cls, ea):
         '''Return the prefixed comment at address ``ea``.'''
-        return cls.get_prefix(ea)
+        return cls.__get_prefix__(ea)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def prefix(cls, ea, string):
         '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
-        return cls.set_prefix(ea, string)
+        return cls.__set_prefix__(ea, string)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
     def prefix(cls, ea, none):
         '''Delete the prefixed comment at address ``ea``.'''
-        return cls.del_prefix(ea)
+        return cls.__del_prefix__(ea)
 
     @utils.multicase()
     @classmethod
     def suffix(cls):
         '''Return the suffixed comment at the current address.'''
-        return cls.get_suffix(ui.current.address())
+        return cls.__get_suffix__(ui.current.address())
     @utils.multicase(string=basestring)
     @classmethod
     def suffix(cls, string):
         '''Set the suffixed comment at the current address to the specified ``string``.'''
-        return cls.set_suffix(ui.current.address(), string)
+        return cls.__set_suffix__(ui.current.address(), string)
     @utils.multicase(none=types.NoneType)
     @classmethod
     def suffix(cls, none):
         '''Delete the suffixed comment at the current address.'''
-        return cls.del_suffix(ui.current.address())
+        return cls.__del_suffix__(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def suffix(cls, ea):
         '''Return the suffixed comment at address ``ea``.'''
-        return cls.get_suffix(ea)
+        return cls.__get_suffix__(ea)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def suffix(cls, ea, string):
         '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
-        return cls.set_suffix(ea, string)
+        return cls.__set_suffix__(ea, string)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
     def suffix(cls, ea, none):
         '''Delete the suffixed comment at address ``ea``.'''
-        return cls.del_suffix(ea)
+        return cls.__del_suffix__(ea)
 
     @classmethod
     def __insert_space(cls, ea, count, (getter, setter, remover)):
@@ -3604,26 +3572,26 @@ class extra(object):
     @classmethod
     def preinsert(cls, ea, count):
         '''Insert ``count`` lines in front of the item at address ``ea``.'''
-        res = cls.get_prefix, cls.set_prefix, cls.del_prefix
+        res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def preappend(cls, ea, count):
         '''Append ``count`` lines in front of the item at address ``ea``.'''
-        res = cls.get_prefix, cls.set_prefix, cls.del_prefix
+        res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postinsert(cls, ea, count):
         '''Insert ``count`` lines after the item at address ``ea``.'''
-        res = cls.get_suffix, cls.set_suffix, cls.del_suffix
+        res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postappend(cls, ea, count):
         '''Append ``count`` lines after the item at address ``ea``.'''
-        res = cls.get_suffix, cls.set_suffix, cls.del_suffix
+        res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(count=six.integer_types)

@@ -1409,25 +1409,33 @@ def tags(func):
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
 def select(**boolean):
+    '''Query the contents of the current function for any tags specified by ``boolean``'''
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 def select(tag, *And, **boolean):
+    '''Query the contents of the current function for the specified ``tag`` and any others specified as ``And``.'''
     res = (tag,) + And
     boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 def select(func, tag, *And, **boolean):
+    '''Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``And``.'''
     res = (tag,) + And
     boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
 def select(func, tag, *And, **boolean):
+    '''Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``And``.'''
     res = set(builtins.list(tag) + builtins.list(And))
     boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(func, **boolean)
 @utils.multicase()
 def select(func, **boolean):
-    '''Fetch a list of addresses within the function that contain the specified tags.'''
+    """Query the contents of the function ``func`` for any tags specified by ``boolean``. Yields each address found along with the matching tags as a dictionary.
+
+    If ``And`` contains an iterable then require the returned address contains them.
+    If ``Or`` contains an iterable then include any other tags that are specified.
+    """
     fn = by(func)
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : set(v if isinstance(v, containers) else {v}) for k, v in boolean.viewitems()}
