@@ -381,7 +381,7 @@ class restructure(object):
         while ref.has(field):
             yield ref
             ref = ref.get(field)
-        return
+        yield ref
     @classmethod
     def docstringToList(cls, cmt):
         L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
@@ -419,10 +419,9 @@ class restructure(object):
     def Namespace(cls, ref, depth=0):
         if ref.get('skippable') and not len([ch for ch in ref.children if not isinstance(ch, Namespace)]): return ''
 
-        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        ns = [r.name for r in cls.walk(ref, 'namespace')][:-1]
         name = r'.'.join(reversed(ns))
 
-        #definition = ".. py:namespace {name:s}".format(name=name)
         sectionchar = '=-^'
 
         res = []
@@ -430,8 +429,18 @@ class restructure(object):
         res.append(cls.escape(name))
         res.append(sectionchar[depth] * len(name))
         res.append('')
-        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if ref.has('details'): res.extend(cls.escape(ref.get('details')).strip().split('\n') + [''])
+
+        if ref.comment:
+            for line in cls.docstringToList(ref.comment):
+                res.append("| {:s}".format(line))
+            res.append('')
+
+        if ref.has('details'):
+            details = ref.get('details')
+            for line in cls.escape(details).strip().split('\n'):
+                res.append("| {:s}".format(line))
+            res.append('')
+
         for ch in ref.children:
             if isinstance(ch, Function):
                 res.extend(cls.Function(ch).split('\n'))
@@ -528,12 +537,12 @@ class restructure(object):
         if ParamVariableList in gargs:
             for a in gargs[ParamVariableList]:
                 args.append(("*{:s}".format(a.name), undefined()))
-                params.append((a.name, aparams.get(a.name, undefined()), atypes.get(a.name, undefined())))
+                params.append(("*{:s}".format(a.name), aparams.get(a.name, undefined()), atypes.get(a.name, undefined())))
             pass
         if ParamVariableKeyword in gargs:
             for a in gargs[ParamVariableKeyword]:
                 args.append(("**{:s}".format(a.name), undefined()))
-                params.append((a.name, aparams.get(a.name, undefined()), atypes.get(a.name, undefined())))
+                params.append(("**{:s}".format(a.name), aparams.get(a.name, undefined()), atypes.get(a.name, undefined())))
             pass
 
         # transform any defaults that were specified into their string representation
@@ -631,8 +640,11 @@ class restructure(object):
         # populate the contents of the function
         res = []
         res.append('')
-        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if aliases: res.extend(["Aliases: {:s}".format(', '.join(map(":py:func:`{:s}`".format, aliases)))] + [''])
+        if ref.comment:
+            res.extend(cls.docstringToList(ref.comment) + [''])
+        if aliases:
+            f = functools.partial(":py:func:`{:s}.{:s}`".format, ns[-1])
+            res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
 
         for n, descr, ty in params[1:]:
             res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
@@ -661,8 +673,11 @@ class restructure(object):
         # populate the contents of the function
         res = []
         res.append('')
-        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if aliases: res.extend(["Aliases: {:s}".format(', '.join(map(":py:func:`{:s}`".format, aliases)))] + [''])
+        if ref.comment:
+            res.extend(cls.docstringToList(ref.comment) + [''])
+        if aliases:
+            f = functools.partial(":py:func:`{:s}.{:s}`".format, ns[-1])
+            res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
 
         for n, descr, ty in params:
             res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
