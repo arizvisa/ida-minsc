@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# idascripts documentation build configuration file, created by
+# ida-minsc documentation build configuration file, created by
 # sphinx-quickstart on Fri Mar  2 11:49:24 2018.
 #
 # This file is execfile()d with the current directory set to its
@@ -16,38 +16,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
-import sys
-
-import mock
-
-import mock
-
-ida_mock = mock.MagicMock()
-ida_mock.__version__ = 7.0
-ida_mock.BADADDR = 0xdeadbeef # File "./base/_interface.py", line 559, in <module>
-ida_mock.ph.id = 15           # File "./base/instruction.py", line 1337, in __newprc__
-ida_mock.PLFM_386 = 15           # File "./base/instruction.py", line 1337, in __newprc__
-
-ida_mock.IDP_Hooks = object
-ida_mock.IDB_Hooks = object
-ida_mock.UI_Hooks = object
-
-ida_mock.IDP_Hooks = mock.Mock
-ida_mock.IDB_Hooks = mock.Mock
-ida_mock.UI_Hooks = mock.Mock
-
-sys.modules['idaapi'] = ida_mock
-sys.modules['ida'] = ida_mock
-sys.modules['idc'] = ida_mock
-sys.modules['idautils'] = ida_mock
-
-for folder in ['', 'app', 'base', 'custom', 'misc']:
-    sys.path.insert(0, os.path.abspath('../{}/'.format(folder)))
-
-sys.path.insert(0, os.path.abspath('../'))
-import mock_idapythonrc
-
+import sys, os
 
 # -- General configuration ------------------------------------------------
 
@@ -73,7 +42,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'idascripts'
+project = u'ida-minsc'
 copyright = u'2018, Ali Rizvi-Santiago'
 author = u'Ali Rizvi-Santiago'
 
@@ -144,7 +113,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'idascriptsdoc'
+htmlhelp_basename = 'ida-minsc.doc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -171,8 +140,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'idascripts.tex', u'idascripts Documentation',
-     u'Ali', 'manual'),
+    (master_doc, 'ida-minsc.tex', u'ida-minsc Documentation',
+     u'Ali Rizvi-Santiago', 'manual'),
 ]
 
 
@@ -181,7 +150,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'idascripts', u'idascripts Documentation',
+    (master_doc, 'ida-minsc', u'ida-minsc Documentation',
      [author], 1)
 ]
 
@@ -192,8 +161,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'idascripts', u'idascripts Documentation',
-     author, 'idascripts', 'One line description of project.',
+    (master_doc, 'ida-minsc', u'ida-minsc Documentation',
+     author, 'ida-minsc', 'One line description of project.',
      'Miscellaneous'),
 ]
 
