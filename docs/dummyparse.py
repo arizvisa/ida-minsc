@@ -46,8 +46,8 @@ class evaluate(object):
     from six.moves import builtins
 
     class structure:
-        structure_t = 'structure.structure_t'
-        member_t = 'structure.member_t'
+        structure_t = 'structure_t'
+        member_t = 'member_t'
     _structure = structure
 
     class interface:
@@ -68,6 +68,8 @@ class stringify(object):
         unicode: 'unicode',
         chr: 'chr',
         callable: 'callable',
+        tuple: 'tuple',
+        set: 'set',
         types.NoneType: 'None',
     }
     stringmap = {
@@ -85,7 +87,8 @@ class stringify(object):
         elif isinstance(object, (six.integer_types, float)):
             return "{!s}".format(object)
         if not isinstance(object, tuple):
-            return cls(cls.definitions[object])
+            res = cls.definitions[object]
+            return cls(res)
         return tuple(cls(res) for res in object)
 
 ### Reference types which represent the parsed tree
@@ -857,7 +860,6 @@ class RootVisitor(FunctionVisitor, NamespaceVisitor, ConditionalVisitor):
         if not isinstance(ref, Reference):
             raise TypeError(ref)
         self._ref = ref
-        self._ref.set(docstring='')
 
     def visit_Expr(self, node):
         '''Grab the first module docstring.'''
