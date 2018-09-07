@@ -229,6 +229,7 @@ class functions(object):
     default a list is returned containing the address of each function.
 
     The different types that one can match functions with are the following:
+
         `address` or `ea` - Match according to the function's address
         `name` - Match according to the exact name
         `like` - Filter the function names according to a glob
@@ -391,6 +392,7 @@ class segments(object):
     default each segment's boundaries are yielded.
 
     The different types that one can match segments with are the following:
+
         `name` - Match according to the true segment name
         `like` - Filter the segment names according to a glob
         `regex` - Filter the segment names according to a regular-expression
@@ -523,6 +525,7 @@ class names(object):
     By default default the (address, name) is yielded.
 
     The different types that one can filter the symbols with are the following:
+
         `address` - Match according to the address of the symbol
         `name` - Match according to the name of the symbol
         `like` - Filter the symbol names according to a glob
@@ -934,6 +937,7 @@ class entries(object):
     This namespace is also aliased as `database.exports`.
 
     The different types that one can match entrypoints with are the following:
+
         `address` or `ea` - Match according to the entrypoint's address
         `name` - Match according to the exact name
         `like` - Filter the entrypoint names according to a glob
@@ -1369,6 +1373,7 @@ class imports(object):
     for each import.
 
     The different types that one can match imports with are the following:
+
         `address` or `ea` - Match according to the import's address
         `name` - Match according to the import's symbol name
         `module` - Filter the imports according to the specified module name
@@ -1563,6 +1568,7 @@ class address(object):
 
     Some of the more common functions are used so often that they're also
     aliased as globals. Some of these are:
+
         `database.next` - Moving to the "next" address
         `database.prev` - Moving to the "previous" address
         `database.nextref` - Moving to the "next" address with a reference
@@ -2865,6 +2871,7 @@ class xref(object):
 
     Some of the more common functions are used so often that they're also
     aliased as globals. Some of these are:
+
         `database.up` - Return all addresses that reference an address
         `database.down` - Return all addresses that an address references
         `database.drefs` - Return all the data references for an address
