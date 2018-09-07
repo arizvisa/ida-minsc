@@ -18,9 +18,9 @@ is used and will take an address and the operand index.
 
 To request the actual IDA types (`insn_t` and `op_t`) there are
 two tools that are provided. The `instruction.at($$)` tool will
-take an address and return an `insn_t`. To get an `op_t`, the
-`instruction.operand($$, $)` tool is provided. This will take
-an address an in index at which point an `op_t` will be returned.
+take an address and return an `insn_t`. To get an `op_t`, a user
+can use `instruction.operand($$, $)`. This will take an address
+and an index and return the desired `op_t`.
 
 Some globals are also defined for the given architecture which
 can be used to query or access the registers that are currently
