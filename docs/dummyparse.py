@@ -44,10 +44,7 @@ class evaluate(object):
     ## Miscellaneous internal types
     import six, types
     from six.moves import builtins
-    class instruction:
-        register_t = 'register_t'
 
-    _instruction = instruction
     class structure:
         structure_t = 'structure.structure_t'
         member_t = 'structure.member_t'
@@ -56,6 +53,8 @@ class evaluate(object):
     class interface:
         symbol_t = 'symbol_t'
         namedtypedtuple = 'namedtypedtuple'
+        register_t = 'register_t'
+        architecture_t = 'architecture_t'
 
 ### Namespace of internal python types and how to convert them into a string
 class stringify(object):
