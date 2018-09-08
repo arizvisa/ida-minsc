@@ -18,7 +18,16 @@ To list the different enumerations available in the database, one
 can use `enumeration.list(...)` specifying their preferred method
 of filtering. This will list all of the available enumerations at
 which point the user can then request it by passing an identifier
-to `enumeration.by($$)`.
+to `enumeration.by($$)`. The types that can be used to filter are
+as follows:
+
+    `name` - Match according to the enumeration name
+    `like` - Filter the enumeration names according to a glob
+    `regex` - Filter the enumeration names according to a regular-expression
+    `index` - Match the enumeration by its index
+    `identifier` or `id` - Match the enumeration by its identifier
+    `predicate` - Filter the enumerations by passing their identifier to a callable
+
 """
 
 import six
@@ -42,9 +51,11 @@ def count():
 
 @utils.multicase(enum=six.integer_types)
 def flags(enum):
+    '''Return the flags for the enumeration identified by ``enum``.'''
     return idaapi.get_enum_flag(enum)
 @utils.multicase(enum=six.integer_types, mask=six.integer_types)
 def flags(enum, mask):
+    '''Return the flags for the enumeration identified by ``enum`` and masked with ``mask``.'''
     return idaapi.get_enum_flag(enum) & mask
 
 def by_name(name):
@@ -65,6 +76,7 @@ byIndex = utils.alias(by_index)
 
 @utils.multicase(index=six.integer_types)
 def by(index):
+    '''Return the identifier for the enumeration at the specified ``index``.'''
     bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
     highbyte = 0xff << (bits-8)
     if index & highbyte == highbyte:
@@ -72,16 +84,11 @@ def by(index):
     return by_index(index)
 @utils.multicase(name=basestring)
 def by(name):
+    '''Return the identifier for the enumeration with the specified ``name``.'''
     return by_name(name)
 @utils.multicase()
 def by(**type):
-    """Search through all the enumerations within the database and return the first result.
-
-    like = glob match
-    regex = regular expression
-    index = particular index
-    identifier or id = internal id number
-    """
+    '''Return the enumeration matching the specified ``type``.'''
     searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(iterate(**type))
@@ -498,6 +505,7 @@ class member(object):
 
     @classmethod
     def list(cls, enum):
+        '''List all the members belonging to the enumeration identified by ``enum``.'''
         # FIXME: make this consistent with every other .list
         eid = by(enum)
         res = builtins.list(cls.iterate(eid))
