@@ -385,8 +385,12 @@ class restructure(object):
     @classmethod
     def docstringToList(cls, cmt):
         L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
-        res = cls.escape(L.lex(cmt))
-        return res.strip().split('\n')
+        escaped = cls.escape(L.lex(cmt))
+
+        res = []
+        for line in escaped.strip().split('\n'):
+            res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line.strip())
+        return res
     @classmethod
     def paramDescriptionToRst(cls, descr):
         L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
@@ -417,7 +421,7 @@ class restructure(object):
             # now we can use the comment
             res.append('')
             for line in iterable:
-                res.append("| {:s}".format(line))
+                res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line.strip())
             res.append('')
         else:
             res.append('')
@@ -455,14 +459,11 @@ class restructure(object):
         res.append('')
 
         if ref.comment:
-            for line in cls.docstringToList(ref.comment):
-                res.append("| {:s}".format(line))
+            res.extend(cls.docstringToList(ref.comment))
             res.append('')
 
         if ref.has('details'):
-            details = ref.get('details')
-            for line in cls.escape(details).strip().split('\n'):
-                res.append("| {:s}".format(line))
+            res.extend(cls.docstringToList(ref.get('details')))
             res.append('')
 
         for ch in ref.children:
@@ -493,14 +494,11 @@ class restructure(object):
         # class documentation
         res.append('')
         if ref.comment:
-            for line in cls.docstringToList(ref.comment):
-                res.append("| {:s}".format(line))
+            res.extend(cls.docstringToList(ref.comment))
             res.append('')
 
         if ref.has('details'):
-            details = ref.get('details')
-            for line in cls.escape(details).strip().split('\n'):
-                res.append("| {:s}".format(line))
+            res.extend(cls.docstringToList(ref.get('details')))
             res.append('')
 
         # split up the properties from the methods
