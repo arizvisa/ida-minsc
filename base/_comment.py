@@ -1,4 +1,4 @@
-"""
+r"""
 Comment module (internal)
 
 This module contains the functionality for encoding and decoding
