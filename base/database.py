@@ -4299,7 +4299,7 @@ class get(object):
 
         # FIXME: add support for string types
         # FIXME: consolidate this conversion into interface or something
-        st = _structure.instance(sid, offset=ea)
+        st = _structure.by_identifier(sid, offset=ea)
         typelookup = {
             (int,-1) : ctypes.c_int8, (int,1) : ctypes.c_uint8,
             (int,-2) : ctypes.c_int16, (int,2) : ctypes.c_uint16,

@@ -142,7 +142,7 @@ class typemap:
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
         if dt == idaapi.FF_STRU and isinstance(typeid, six.integer_types):
             # FIXME: figure out how to fix this recursive module dependency
-            t = sys.modules.get('structure', __import__('structure')).instance(typeid)
+            t = sys.modules.get('structure', __import__('structure')).by_identifier(typeid)
             sz = t.size
             return t if sz == size else [t, size // sz]
         if dt not in cls.inverted:

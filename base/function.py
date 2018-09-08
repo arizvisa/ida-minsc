@@ -1167,9 +1167,9 @@ class frame(object):
         fn = by(func)
         res = idaapi.get_frame(fn.startEA)
         if res is not None:
-            return structure.instance(res.id, offset=-fn.frsize)
+            return structure.by_identifier(res.id, offset=-fn.frsize)
         logging.info("{:s}.frame({:#x}) : Function {:s} does not have a frame.".format(__name__, fn.startEA, name(fn.startEA)))
-        return structure.instance(idaapi.BADADDR)
+        return structure.by_identifier(idaapi.BADADDR)
 
     @utils.multicase()
     @classmethod
