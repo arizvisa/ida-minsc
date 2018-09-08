@@ -389,7 +389,7 @@ class restructure(object):
 
         res = []
         for line in escaped.strip().split('\n'):
-            res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line.strip())
+            res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else line.strip())
         return res
     @classmethod
     def paramDescriptionToRst(cls, descr):
@@ -421,7 +421,7 @@ class restructure(object):
             # now we can use the comment
             res.append('')
             for line in iterable:
-                res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line.strip())
+                res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else line.strip())
             res.append('')
         else:
             res.append('')

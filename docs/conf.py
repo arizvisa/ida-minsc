@@ -28,7 +28,7 @@ extensions = [
 
 ## Python specifics
 primary_domain = 'py'
-highlight_language = 'python2'
+highlight_language = 'python'
 pygments_style = 'sphinx'
 
 todo_include_todos = False
