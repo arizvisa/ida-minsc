@@ -395,10 +395,35 @@ class restructure(object):
     ## Reference type converters
     @classmethod
     def Module(cls, ref):
-        definition = ".. py:module:: {name:s}".format(name=ref.name)
-        res = []
-        res.append('')
-        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
+        res = [".. py:module:: {name:s}".format(name=ref.name)]
+
+        descr = ''
+        if ref.comment:
+            res.append('')
+
+            iterable = iter(cls.docstringToList(ref.comment))
+
+            # extract and procses the description
+            descr = next(iterable)
+            definition = "{:s} -- {:s}".format(ref.name, descr)
+            res.append('=' * len(definition))
+            res.append(definition)
+            res.append('=' * len(definition))
+
+            # remove all initial whitespace
+            itertools.takewhile(lambda s: not s, iterable)
+            next(iterable)
+
+            # now we can use the comment
+            res.append('')
+            for line in iterable:
+                res.append("| {:s}".format(line))
+            res.append('')
+        else:
+            res.append('')
+            res.append('=' * len(ref.name))
+            res.append(ref.name)
+            res.append('=' * len(ref.name))
 
         for ch in ref.children:
             if isinstance(ch, Function):
@@ -412,7 +437,6 @@ class restructure(object):
             else:
                 raise TypeError(ch)
             continue
-        res[0:0] = (definition,)
         return '\n'.join(res)
 
     @classmethod
@@ -422,7 +446,7 @@ class restructure(object):
         ns = [r.name for r in cls.walk(ref, 'namespace')][:-1]
         name = r'.'.join(reversed(ns))
 
-        sectionchar = '=-^'
+        sectionchar = '-^'
 
         res = []
         res.append(sectionchar[depth] * len(name))
@@ -468,8 +492,16 @@ class restructure(object):
 
         # class documentation
         res.append('')
-        if ref.comment: res.extend(cls.docstringToList(ref.comment) + [''])
-        if ref.has('details'): res.extend(['details:'] + cls.escape(ref.get('details')).split('\n') + [''])
+        if ref.comment:
+            for line in cls.docstringToList(ref.comment):
+                res.append("| {:s}".format(line))
+            res.append('')
+
+        if ref.has('details'):
+            details = ref.get('details')
+            for line in cls.escape(details).strip().split('\n'):
+                res.append("| {:s}".format(line))
+            res.append('')
 
         # split up the properties from the methods
         global types
