@@ -357,7 +357,7 @@ class restructure(object):
     ## small utility functions
     @classmethod
     def escape(cls, string):
-        def escape_chars(iterable, characters=u'*'):
+        def escape_chars(iterable, characters=u'*\\'):
             characters = set(characters)
             for ch in iterable:
                 if ch in characters:
@@ -385,11 +385,11 @@ class restructure(object):
     @classmethod
     def docstringToList(cls, cmt):
         L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
-        escaped = cls.escape(L.lex(cmt))
+        formatted = L.lex(cmt)
 
         res = []
-        for line in escaped.strip().split('\n'):
-            res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else line.strip())
+        for line in formatted.strip().split('\n'):
+            res.append("- {:s}".format(cls.escape(line.strip())) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else cls.escape(line.strip()))
         return res
     @classmethod
     def paramDescriptionToRst(cls, descr):
@@ -420,8 +420,7 @@ class restructure(object):
 
             # now we can use the comment
             res.append('')
-            for line in iterable:
-                res.append("- {:s}".format(line.strip()) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else line.strip())
+            res.extend(iterable)
             res.append('')
         else:
             res.append('')
