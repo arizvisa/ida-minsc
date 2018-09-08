@@ -450,7 +450,7 @@ class widget(object):
         return q.widgetAt(x, y)
     @classmethod
     def form(cls, twidget):
-        '''Return a widget as an IDA plugin form.'''
+        '''Return an IDA plugin form as a UI widget.'''
         raise NotImplementedError
 
 class clipboard(object):
@@ -604,7 +604,7 @@ try:
         """
         @classmethod
         def form(cls, twidget):
-            '''Return a widget as an IDA plugin form.'''
+            '''Return an IDA plugin form as a UI widget.'''
             ns = idaapi.PluginForm
             return ns.FormToPyQtWidget(twidget)
 
@@ -647,7 +647,7 @@ try:
         """
         @classmethod
         def form(cls, twidget):
-            '''Return a widget as an IDA plugin form.'''
+            '''Return an IDA plugin form as a UI widget.'''
             ns = idaapi.PluginForm
             return ns.FormToPySideWidget(twidget)
 
@@ -697,7 +697,7 @@ class queue(object):
     """
     This namespace exposes the ability to queue execution of python
     callables asynchronously so that they run at the same time as
-    IDA and signal when they have completed and a result is ready.
+    IDA and signal when they have completed and a result is available.
 
     XXX: This is probably pretty unsafe in IDA, but let's hope.
     """

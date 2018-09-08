@@ -23,7 +23,7 @@ import database, function as func, instruction, segment
 import ui, internal
 
 def map(F, **kwargs):
-    """Execute the callback ``F`` on all functions in the database. Synonymous to `map(F, database.functions())` but with some extra logging.
+    """Execute the callback ``F`` on all functions in the database. Synonymous to `map(F, database.functions())` but with some extra logging to display the current progress.
 
     The ``F`` parameter is defined as a function taking either an
     `(address, **kwargs)` or a `(index, address, **kwargs)`. Any
