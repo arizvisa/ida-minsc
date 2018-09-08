@@ -40,6 +40,7 @@ def list():
     return {res for res in itertools.chain(*(res for _, res in db.selectcontents()))}
 
 ### internal utility functions and classes
+@document.properties(name='the string to check for an IDA naming scheme')
 def lvarNameQ(name):
     '''Determine whether a `name` is something that IDA named automatically.'''
     if any(name.startswith(n) for n in ('arg_', 'var_')):
@@ -49,6 +50,7 @@ def lvarNameQ(name):
         return name[1:] in {'s', 'r'}
     return False
 
+@document.properties(loc='an address or a location tuple to convert to an address')
 def locationToAddress(loc):
     '''Convert the function location `loc` back into an address.'''
 
@@ -61,6 +63,7 @@ def locationToAddress(loc):
     ## otherwise, it's already an address
     return loc
 
+@document.properties(ea='an address to possibly convert to a location', chunks='the list of chunks to convert the address with')
 def addressToLocation(ea, chunks=None):
     """Convert the address `ea` to a `(function, id, offset)`.
 
@@ -95,12 +98,14 @@ class read(object):
     are at different addresses than when the tags were read.
     """
 
+    @document.properties(location='whether to read the contents tags as an address or a location')
     def __new__(cls, location=False):
         '''Read all of the tags defined within the database.'''
         return cls.everything(location=location)
 
     ## reading the content from a function
     @classmethod
+    @document.properties(ea='the address of the function to yield the content for')
     def content(cls, ea):
         '''Iterate through every tag belonging to the contents of the function at `ea`.'''
         F = func.by(ea)
@@ -116,6 +121,7 @@ class read(object):
 
     ## reading the tags from a frame
     @classmethod
+    @document.properties(ea='the address of the function containing the frame members to yield')
     def frame(cls, ea):
         '''Iterate through each field within the frame belonging to the function `ea`.'''
         F = func.by(ea)
@@ -147,6 +153,7 @@ class read(object):
 
     ## reading everything from the entire database
     @classmethod
+    @document.properties(location='whether to read the contents tags as an address or a location')
     def everything(cls, location=False):
         """Read all of the tags defined within the database.
 
@@ -202,6 +209,7 @@ class read(object):
 
     ## reading the contents from the entire database
     @staticmethod
+    @document.properties(location='whether to read the contents tags as an address or a location')
     def contents(location=False):
         """Iterate through the contents tags for all the functions within the database.
 
@@ -249,6 +257,7 @@ class apply(object):
     before actually writing them back into the database.
     """
 
+    @document.properties(Globals='the globals tags that were read', Contents='the contents tags that were read', Frames='the frame members that were read', tagmap='a dictionary used to map the original tags with before applying them to the database')
     def __new__(cls, (Globals, Contents, Frames), **tagmap):
         '''Apply the tags in the argument `(Globals, Contents, Frames)` back into the database.'''
         res = Globals, Contents, Frames
@@ -256,6 +265,7 @@ class apply(object):
 
     ## applying the content to a function
     @classmethod
+    @document.properties(Contents='the contents tags to apply', tagmap='a dictionary used to map the original tags with before applying them to the database')
     def content(cls, Contents, **tagmap):
         '''Apply `Contents` back into a function's contents within the database.'''
         global apply
@@ -263,6 +273,7 @@ class apply(object):
 
     ## applying a frame to a function
     @classmethod
+    @document.properties(ea='the address of the function to apply the frame to', frame='the frame members to apply', tagmap='a dictionary used to map the original tags with before applying them to the database')
     def frame(cls, ea, frame, **tagmap):
         '''Apply the fields from `frame` back into the function at `ea`.'''
         tagmap_output = u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(k), internal.utils.string.escape(v)) for k, v in six.iteritems(tagmap))) if tagmap else ''
@@ -374,6 +385,7 @@ class apply(object):
 
     ## apply everything to the entire database
     @classmethod
+    @document.properties(Globals='the globals tags to apply', Contents='the contents tags to apply', Frames='the frame members to apply', tagmap='a dictionary used to map the original tags with before applying them to the database')
     def everything(cls, (Globals, Contents, Frames), **tagmap):
         '''Apply the tags in the argument `(Globals, Contents, Frames)` back into the database.'''
         global apply
@@ -419,6 +431,7 @@ class apply(object):
 
     ## applying tags to the globals
     @staticmethod
+    @document.properties(Globals='the globals tags to apply', tagmap='a dictionary used to map the original tags with before applying them to the database')
     def globals(Globals, **tagmap):
         '''Apply the tags in `Globals` back into the database.'''
         global apply
@@ -457,6 +470,7 @@ class apply(object):
 
     ## applying contents tags to all the functions
     @staticmethod
+    @document.properties(Contents='the contents tags to apply', tagmap='a dictionary used to map the original tags with before applying them to the database')
     def contents(Contents, **tagmap):
         '''Apply the tags in `Contents` back into each function within the database.'''
         global apply
@@ -499,6 +513,7 @@ class apply(object):
 
     ## applying frames to all the functions
     @staticmethod
+    @document.properties(Frames='the frame members to apply', tagmap='a dictionary used to map the original tags with before applying them to the database')
     def frames(Frames, **tagmap):
         '''Apply the fields from `Frames` back into each function's frame.'''
         global apply
@@ -528,12 +543,14 @@ class export(object):
     are at different addresses than when the tags were read.
     """
 
+    @document.parameters(tags='an iterable of the tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
     def __new__(cls, *tags, **location):
         '''Read the specified tags within the database using the cache.'''
         return cls.everything(*tags, **location)
 
     ## query the content from a function
     @classmethod
+    @document.parameters(F='the function to export the content from', tags='an iterable of the contents tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
     def content(cls, F, *tags, **location):
         '''Iterate through the specified `tags` belonging to the contents of the function at `ea` using the cache.'''
         identity = lambda res: res
@@ -547,6 +564,7 @@ class export(object):
 
     ## query the frame from a function
     @classmethod
+    @document.parameters(F='the function to export the frame members from', tags='an iterable of the tags used to select the frame members to export')
     def frame(cls, F, *tags):
         '''Iterate through each field containing the specified `tags` within the frame belonging to the function `ea`.'''
         global read, internal
@@ -570,6 +588,7 @@ class export(object):
 
     ## query the entire database for the specified tags
     @classmethod
+    @document.parameters(tags='an iterable of the tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
     def everything(cls, *tags, **location):
         """Read all of the specified `tags` within the database using the cache.
 
@@ -601,6 +620,7 @@ class export(object):
 
     ## query all the globals matching the specified tags
     @staticmethod
+    @document.parameters(tags='an iterable of the global tags to export')
     def globals(*tags):
         '''Iterate through all of the specified global `tags` within the database using the cache.'''
         iterable = db.select(Or=tags) if tags else db.select()
@@ -611,6 +631,7 @@ class export(object):
 
     ## query all the contents in each function that match the specified tags
     @staticmethod
+    @document.parameters(tags='an iterable of the contents tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
     def contents(*tags, **location):
         """Iterate through the specified contents `tags` within the database using the cache.
 
@@ -630,6 +651,7 @@ class export(object):
 
     ## query all the frames that match the specified tags
     @staticmethod
+    @document.parameters(tags='an iterable of the tags used to select the frame members to export')
     def frames(*tags):
         '''Iterate through the fields in each function's frame containing the specified `tags`.'''
         global export

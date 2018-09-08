@@ -146,7 +146,7 @@ class config(object):
         return cls.info.version
 
     @classmethod
-    @document.parameters(typestr='this is a c-like type specification.')
+    @document.parameters(typestr='this is a c-like type specification')
     def type(cls, typestr):
         '''Evaluates a type string and returns its size according to the compiler used by the database.'''
         lookup = {
@@ -317,14 +317,14 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the function names with.')
+    @document.parameters(string='the glob to filter the function names with')
     def iterate(cls, string):
         '''Iterate through all of the functions in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter functions with.')
+    @document.parameters(type='any keyword that can be used to filter functions with')
     def iterate(cls, **type):
         '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
         if not type:
@@ -340,14 +340,14 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the function names with.')
+    @document.parameters(string='the glob to filter the function names with')
     def list(cls, string):
         '''List all of the functions in the database with a glob that matches `string`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter the functions with.')
+    @document.parameters(type='any keyword that can be used to filter the functions with')
     def list(cls, **type):
         '''List all of the functions in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
@@ -405,14 +405,14 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the function names with.')
+    @document.parameters(string='the glob to filter the function names with')
     def search(cls, string):
         '''Search through all of the functions matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter the functions with.')
+    @document.parameters(type='any keyword that can be used to filter the functions with')
     def search(cls, **type):
         '''Search through all of the functions within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -464,14 +464,14 @@ class segments(object):
     @utils.multicase(name=basestring)
     @classmethod
     @utils.string.decorate_arguments('name')
-    @document.parameters(name='the glob to filter the segment names with.')
+    @document.parameters(name='the glob to filter the segment names with')
     def iterate(cls, name):
         '''List all of the segments defined in the database that match the glob `name`.'''
         return cls.list(like=name)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter the segments with.')
+    @document.parameters(type='any keyword that can be used to filter the segments with')
     def list(cls, **type):
         '''List all of the segments in the database that match the keyword specified by `type`.'''
         return segment.list(**type)
@@ -479,14 +479,14 @@ class segments(object):
     @utils.multicase(name=basestring)
     @classmethod
     @utils.string.decorate_arguments('name')
-    @document.parameters(name='the glob to filter the segment names with.')
+    @document.parameters(name='the glob to filter the segment names with')
     def iterate(cls, name):
         '''Iterate through all of the segments in the database with a glob that matches `name`.'''
         return cls.iterate(like=name)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter segments with.')
+    @document.parameters(type='any keyword that can be used to filter segments with')
     def iterate(cls, **type):
         '''Iterate through all the segments defined in the database matching the keyword specified by `type`.'''
         return segment.__iterate__(**type)
@@ -494,14 +494,14 @@ class segments(object):
     @utils.multicase(name=basestring)
     @classmethod
     @utils.string.decorate_arguments('name')
-    @document.parameters(string='the glob to filter the segment names with.')
+    @document.parameters(name='the glob to filter the segment names with')
     def search(cls, name):
         '''Search through all of the segments matching the glob `name` and return the first result.'''
         return cls.search(like=name)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter the segments with.')
+    @document.parameters(type='any keyword that can be used to filter the segments with')
     def search(cls, **type):
         '''Search through all of the segments within the database and return the first result matching the keyword specified by `type`.'''
         return segment.search(**type)
@@ -665,14 +665,14 @@ class names(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the symbol names with.')
+    @document.parameters(string='the glob to filter the symbol names with')
     def iterate(cls, string):
         '''Iterate through all of the names in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter symbols with.')
+    @document.parameters(type='any keyword that can be used to filter symbols with')
     def iterate(cls, **type):
         '''Iterate through all of the names in the database that match the keyword specified by `type`.'''
         for idx in cls.__iterate__(**type):
@@ -683,14 +683,14 @@ class names(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the symbol names with.')
+    @document.parameters(string='the glob to filter the symbol names with')
     def list(cls, string):
         '''List all of the names in the database with a glob that matches `string`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter symbols with.')
+    @document.parameters(type='any keyword that can be used to filter symbols with')
     def list(cls, **type):
         '''List all of the names in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.__iterate__(**type))
@@ -708,14 +708,14 @@ class names(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the symbol names with.')
+    @document.parameters(string='the glob to filter the symbol names with')
     def search(cls, string):
         '''Search through all of the names matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter symbols with.')
+    @document.parameters(type='any keyword that can be used to filter symbols with')
     def search(cls, **type):
         '''Search through all of the names within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -1254,14 +1254,14 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the entry points with.')
+    @document.parameters(string='the glob to filter the entry points with')
     def iterate(cls, string):
         '''Iterate through all of the entry points in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter entries with.')
+    @document.parameters(type='any keyword that can be used to filter entries with')
     def iterate(cls, **type):
         '''Iterate through all of the entry points in the database that match the keyword specified by `type`.'''
         res = itertools.imap(cls.__address__, cls.__iterate__(**type))
@@ -1321,14 +1321,14 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the entry points with.')
+    @document.parameters(string='the glob to filter the entry points with')
     def list(cls, string):
         '''List all of the entry points matching the glob `string` against the name.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter entries with.')
+    @document.parameters(type='any keyword that can be used to filter entries with')
     def list(cls, **type):
         '''List all of the entry points in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.__iterate__(**type))
@@ -1350,14 +1350,14 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the entry points with.')
+    @document.parameters(string='the glob to filter the entry points with')
     def search(cls, string):
         '''Search through all of the entry point names matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter entries with.')
+    @document.parameters(type='any keyword that can be used to filter entries with')
     def search(cls, **type):
         '''Search through all of the entry points within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -1537,7 +1537,7 @@ def tag(ea, key, value):
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
-@document.parameters(none='the value `None`')
+@document.parameters(key='a string representing the tag name', none='the value `None`')
 def tag(key, none):
     '''Remove the tag identified by `key` from the current address.'''
     return tag(ui.current.address(), key, none)
@@ -1768,14 +1768,14 @@ class imports(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the imports with.')
+    @document.parameters(string='the glob to filter the imports with')
     def iterate(cls, string):
         '''Iterate through all of the imports in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter imports with.')
+    @document.parameters(type='any keyword that can be used to filter imports with')
     def iterate(cls, **type):
         '''Iterate through all of the imports in the database that match the keyword specified by `type`.'''
         if not type: type = {'predicate':lambda n: True}
@@ -1870,7 +1870,7 @@ class imports(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the imports with.')
+    @document.parameters(string='the glob to filter the imports with')
     def list(cls, string):
         '''List all of the imports matching the glob `string` against the fullname.'''
         return cls.list(fullname=string)
@@ -1878,7 +1878,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter imports with.')
+    @document.parameters(type='any keyword that can be used to filter imports with')
     def list(cls, **type):
         '''List all of the imports in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
@@ -1895,14 +1895,14 @@ class imports(object):
     @utils.multicase(string=basestring)
     @classmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the glob to filter the imports with.')
+    @document.parameters(string='the glob to filter the imports with')
     def search(cls, string):
         '''Search through all of the imports matching the fullname glob `string`.'''
         return cls.search(fullname=string)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
-    @document.parameters(type='any keyword that can be used to filter imports with.')
+    @document.parameters(type='any keyword that can be used to filter imports with')
     def search(cls, **type):
         '''Search through all of the imports within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
