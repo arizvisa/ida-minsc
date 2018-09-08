@@ -29,12 +29,11 @@ the `instruction.register` object is created. This object allows
 one to reference a register that is defined for the architecture.
 
 Another object that is created is the `instruction.architecture`
-object. This object allows one to search, promote, or demote a
-register. Searching for a register can be done by index or by name.
-The `instruction.architecture` object can also be used to promote
-or demote a register between its various bits. This allows one to
-navigate between the 8-bit, 16-bit, 32-bit, or 64-bit versions of
-a register available in the architecture.
+object. Searching for a register can be done by index and size
+or simply by its name. This object also allows one to promote
+or demote a register between its various sizes. This allows one
+to navigate between the 8-bit, 16-bit, 32-bit, or 64-bit versions
+of a register available in the architecture.
 """
 
 import six
