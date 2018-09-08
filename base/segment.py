@@ -7,6 +7,27 @@ or work with segments within a database.
 The base argument type for some of the utilities within this module
 is the `segment_t`. This type is interchangeable with the address
 or the segment name and so either can be used to identify a segment.
+
+When listing or enumerating segments there are different types that
+oen can use in order to filter or match them. These types are as
+follows:
+
+    `name` - Match according to the exact segment name
+    `like` - Filter the segment names according to a glob
+    `regex` - Filter the function names according to a regular-expression
+    `index` - Match the segment by its index
+    `identifier` - Match the segment by its identifier
+    `selector` - Match the segment by its selector
+    `greater` or `gt` - Filter the segments for any after the specified address
+    `less` or `lt` - Filter the segments for any before the specified address
+    `predicate` - Filter the segments by passing their `idaapi.segment_t` to a callable
+
+Some examples of using these keywords are as follows::
+
+    > for l, r in database.segments(): ...
+    > database.segments.list(regex=r'\.r?data')
+    > iterable = database.segments.iterate(like='*text*')
+    > result = database.segments.search(greater=0x401000)
 """
 
 import six
@@ -116,16 +137,7 @@ def by():
     return by_address(ui.current.address())
 @utils.multicase()
 def by(**type):
-    """Search through all the segments within the database for a particular result.
-
-    Search type can be identified by providing a named argument.
-    like = glob match
-    regex = regular expression
-    selector = segment selector
-    index = particular index
-    name = specific segment name
-    predicate = function predicate
-    """
+    '''Return the segment matching the specified ``type``.'''
     searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(__iterate__(**type))
@@ -349,7 +361,7 @@ def contains(segment, ea):
 
 ## functions
 # shamefully ripped from idc.py
-def _load_file(filename, ea, size, offset=0):
+def __load_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     res = idaapi.open_linput(path, False)
     if not res:
@@ -358,7 +370,7 @@ def _load_file(filename, ea, size, offset=0):
     idaapi.close_linput(res)
     return ok
 
-def _save_file(filename, ea, size, offset=0):
+def __save_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
     of = idaapi.fopenWB(path)
     if not of:
@@ -377,7 +389,7 @@ def load(filename, ea, size=None, offset=0, **kwds):
     filesize = os.stat(filename).st_size
 
     cb = filesize - offset if size is None else size
-    res = _load_file(filename, ea, cb, offset)
+    res = __load_file(filename, ea, cb, offset)
     if not res:
         raise IOError("{:s}.load({!r}, {:#x}, {:+#x}, {:#x}) : Unable to load file into {:#x}:{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, ea, cb, os.path.relpath(filename)))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
@@ -481,7 +493,7 @@ def save(filename, segment, offset=0):
     If the int ``offset`` is specified, then begin writing into the file at the specified offset.
     """
     if isinstance(segment, idaapi.segment_t):
-        return _save_file(filename, segment.startEA, size(segment), offset)
+        return __save_file(filename, segment.startEA, size(segment), offset)
     return save(filename, by(segment))
 export = utils.alias(save)
 
