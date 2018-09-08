@@ -382,7 +382,7 @@ class functions(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the functions within the database and return the first result.'''
+        '''Search through all of the functions within the database and return the first result matching ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
@@ -447,7 +447,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through each segment defined in the database.'''
+        '''Iterate through each segment defined in the database matching ``type``.'''
         return segment.__iterate__(**type)
 
     @utils.multicase(name=basestring)
@@ -458,7 +458,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the segments within the database and return the first result.'''
+        '''Search through all of the segments within the database and return the first result matching ``type``.'''
         return segment.search(**type)
 
 @utils.multicase()
@@ -628,7 +628,7 @@ class names(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the names within the database and return the first result.'''
+        '''Search through all of the names within the database and return the first result matching ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -1107,7 +1107,7 @@ class entries(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the entry points within the database and return the first result.'''
+        '''Search through all of the entry points within the database and return the first result matching ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -1588,7 +1588,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the imports within the database and return the first result.'''
+        '''Search through all of the imports within the database and return the first result matching ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))

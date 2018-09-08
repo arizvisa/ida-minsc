@@ -69,19 +69,11 @@ def __iterate__(**type):
 
 @utils.multicase(string=basestring)
 def list(string):
+    '''List all of the segments whose name matches the glob specified by ``string``.'''
     return list(like=string)
 @utils.multicase()
 def list(**type):
-    """List all the segments defined in the database.
-
-    Search type can be identified by providing a named argument.
-    like = glob match
-    regex = regular expression
-    selector = segment selector
-    index = particular index
-    name = specific segment name
-    predicate = function predicate
-    """
+    '''List all of the segments in the database that match the keywords specified by ``type``.'''
     res = builtins.list(__iterate__(**type))
 
     maxindex = max(builtins.map(operator.attrgetter('index'), res) or [1])
@@ -133,8 +125,8 @@ def by(ea):
     return by_address(ea)
 @utils.multicase()
 def by():
-    '''Return the segment containing the current address.'''
-    return by_address(ui.current.address())
+    '''Return the current segment.'''
+    return ui.current.segment()
 @utils.multicase()
 def by(**type):
     '''Return the segment matching the specified ``type``.'''
@@ -154,11 +146,11 @@ def by(**type):
 
 @utils.multicase(name=basestring)
 def search(name):
-    '''Search through all the segments using globbing.'''
+    '''Search through all the segments and return the first one matching the glob ``name``.'''
     return by(like=string)
 @utils.multicase()
 def search(**type):
-    '''Search through all the segments for one that matches ``type``.'''
+    '''Search through all the segments and return the first one that matches ``type``.'''
     return by(**type)
 
 ## properties
