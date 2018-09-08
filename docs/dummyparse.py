@@ -357,7 +357,7 @@ class restructure(object):
     ## small utility functions
     @classmethod
     def escape(cls, string):
-        def escape_chars(iterable, characters=u'*\\'):
+        def escape_chars(iterable, characters=u'*'):
             characters = set(characters)
             for ch in iterable:
                 if ch in characters:
