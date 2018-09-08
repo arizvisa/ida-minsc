@@ -14,7 +14,7 @@ version = u''
 release = u''
 
 ## Paths and sources
-templates_path = ['_templates']
+templates_path = ['templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 source_suffix = {
@@ -41,7 +41,7 @@ master_doc = 'index'
 html_theme = 'classic'
 # html_theme_options = {}
 
-html_static_path = ['_static']
+html_static_path = ['static']
 
 #html_sidebars = {
 #    '**': [
