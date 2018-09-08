@@ -192,7 +192,7 @@ class multicase(object):
             return cons(res)
 
         if len(other) > 1:
-            raise SyntaxError("{:s} : More than one callable was specified. Not sure which callable to clone state from. : {!r}".format('.'.join((__name__, cls.__name__)), other))
+            raise SyntaxError("{:s} : More than one callable was specified ({!r}). Not sure which callable to clone original state from.".format('.'.join((__name__, cls.__name__)), other))
         return result
 
     @classmethod
@@ -258,7 +258,7 @@ class multicase(object):
 
         error_arguments = (n.__class__.__name__ for n in args)
         error_keywords = ("{:s}={:s}".format(n, kwds[n].__class__.__name__) for n in kwds)
-        raise LookupError("@multicase.call({:s}, {{{:s}}}) : does not match any defined prototypes : {:s}".format(', '.join(error_arguments) if args else '*()', ', '.join(error_keywords), ', '.join(cls.prototype(f,t) for f,t,_ in heap)))
+        raise LookupError("@multicase.call({:s}, The type {{{:s}}}) does not match any of the available prototypes. The prototypes that are available are {:s}.".format(', '.join(error_arguments) if args else '*()', ', '.join(error_keywords), ', '.join(cls.prototype(f,t) for f,t,_ in heap)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
@@ -388,7 +388,7 @@ class process(object):
     exceptionQueue = property(fget=lambda s: s.__exceptionQueue)
 
     def __init__(self, command, **kwds):
-        """Creates a new instance that monitors subprocess.Popen(/command/), the created process starts in a paused state.
+        """Creates a new instance that monitors subprocess.Popen(``command``), the created process starts in a paused state.
 
         Keyword options:
         env<dict> = os.environ -- environment to execute program with
@@ -577,19 +577,19 @@ class process(object):
             if self.updater and self.updater.is_alive():
                 return self.program.stdin.write(data)
             raise IOError("Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.".format(self.id))
-        raise IOError("Unable to write to stdin for process. {:s}.".format(self.__format_process_state()))
+        raise IOError("Unable to write to stdin for process. Current state is {:s}.".format(self.__format_process_state()))
 
     def close(self):
         '''Closes stdin of the program.'''
         if self.running and not self.program.stdin.closed:
             return self.program.stdin.close()
-        raise IOError("Unable to close stdin for process. {:s}.".format(self.__format_process_state()))
+        raise IOError("Unable to close stdin for process. Current state is {:s}.".format(self.__format_process_state()))
 
     def signal(self, signal):
         '''Raise a signal to the program.'''
         if self.running:
             return self.program.send_signal(signal)
-        raise IOError("Unable to raise signal {!r} to process. {:s}.".format(signal, self.__format_process_state()))
+        raise IOError("Unable to raise signal {!r} to process. Current state is {:s}.".format(signal, self.__format_process_state()))
 
     def exception(self):
         '''Grab an exception if there's any in the queue.'''
@@ -765,7 +765,7 @@ class execution(object):
 
     def notify(self):
         '''Notify the execution queue that it should process anything that is queued.'''
-        logging.debug("{:s}.notify : Waking up execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
+        logging.debug("{:s}.notify : Waking up execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
         self.queue.acquire()
         self.queue.notify()
         self.queue.release()
@@ -783,17 +783,17 @@ class execution(object):
 
     def __start(self):
         cls = self.__class__
-        logging.debug("{:s}.start : Starting execution queue thread. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.debug("{:s}.start : Starting execution queue thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         self.ev_terminating.clear(), self.ev_unpaused.set()
         self.thread.daemon = True
         return self.thread.start()
 
     def __stop(self):
         cls = self.__class__
-        logging.debug("{:s}.stop : Terminating execution queue thread. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.debug("{:s}.stop : Terminating execution queue thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         if not self.thread.is_alive():
             cls = self.__class__
-            logging.warn("{:s}.stop : Execution queue has already been terminated. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.warn("{:s}.stop : Execution queue has already been terminated as {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
             return
         self.ev_unpaused.set(), self.ev_terminating.set()
         self.queue.acquire()
@@ -805,9 +805,9 @@ class execution(object):
         '''Start to dispatch callables in the execution queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.start : Unable to resume an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.fatal("{:s}.start : Unable to resume an already terminated execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
             return False
-        logging.info("{:s}.start : Resuming execution queue. :{!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.info("{:s}.start : Resuming the execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.set()
         self.queue.acquire()
         self.queue.notify_all()
@@ -818,9 +818,9 @@ class execution(object):
         '''Pause the execution queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.stop : Unable to pause an already terminated execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.fatal("{:s}.stop : Unable to pause the execution queue {!r} as it has already been terminated.".format('.'.join(('internal',__name__,cls.__name__)), self))
             return False
-        logging.info("{:s}.stop : Pausing execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.info("{:s}.stop : Pausing execution queue thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.clear()
         self.queue.acquire()
         self.queue.notify_all()
@@ -833,7 +833,7 @@ class execution(object):
         res = functools.partial(F, *args, **kwds)
 
         cls = self.__class__
-        logging.debug("{:s}.push : Adding callable {!r} to execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), F, self))
+        logging.debug("{:s}.push : Adding the callable {!r} to the execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), F, self))
         # shove it down a multiprocessing.Queue
         self.queue.acquire()
         self.state.append(res)
@@ -845,10 +845,10 @@ class execution(object):
         '''Pop a result off of the result queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.pop : Refusing to wait for a result when execution queue has already terminated. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.fatal("{:s}.pop : Refusing to wait for a result when execution queue has already terminated. Execution queue is {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
             raise Queue.Empty
 
-        logging.debug("{:s}.pop : Popping result off of execution queue. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self))
+        logging.debug("{:s}.pop : Popping result off of the execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
         try:
             _, res, err = self.result.get(block=0)
             if err != (None, None, None):
@@ -887,14 +887,14 @@ class execution(object):
         consumer = self.__consume(self.ev_terminating, self.queue, self.state)
         executor = self.__dispatch(self.lock); next(executor)
 
-        logging.debug("{:s}.running : Execution queue is now running. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.debug("{:s}.running : The execution queue is now running with thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
         while not self.ev_terminating.is_set():
             # check if we're allowed to execute
             if not self.ev_unpaused.is_set():
                 self.ev_unpaused.wait()
 
             # pull a callable out of the queue
-            logging.debug("{:s}.running : Waiting for an item.. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+            logging.debug("{:s}.running : Waiting for an item on thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
             self.queue.acquire()
             item = next(consumer)
             self.queue.release()
@@ -906,11 +906,11 @@ class execution(object):
             if self.ev_terminating.is_set(): break
 
             # now we can execute it
-            logging.debug("{:s}.running : Executing {!r} asynchronously. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), item, self.thread))
+            logging.debug("{:s}.running : Executing {!r} asynchronously with thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), item, self.thread))
             res, err = executor.send(item)
 
             # and stash our result
-            logging.debug("{:s}.running : Received result {!r} from {!r}. : {!r}".format('.'.join(('internal',__name__,cls.__name__)), (res,err), item, self.thread))
+            logging.debug("{:s}.running : Received result {!r} from {!r} on thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), (res,err), item, self.thread))
             self.result.put((item,res,err))
         return
 

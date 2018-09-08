@@ -17,8 +17,10 @@ import idaapi
 
 class typemap:
     """
-    Namespace providing bidirectional conversion from IDA's types to
-    something more pythonic. This namespace is pretty magical.
+    This namespace provides bidirectional conversion from IDA's types
+    to something more pythonic. This namespace is actually pretty
+    magical in that it dumbs down IDA's types for humans without
+    needing a reference.
 
     Normally IDA defines types as flags and enumerations which require
     a user to know the correct ones in order to infer information about
@@ -159,7 +161,7 @@ class typemap:
 
     @classmethod
     def resolve(cls, pythonType):
-        '''Convert the provided ``pythonType`` to IDA's (flag, typeid, size).'''
+        '''Convert the provided ``pythonType`` to IDA's `(flag, typeid, size)`.'''
         sz, count = None, 1
         # FIXME: figure out how to fix this recursive module dependency
 
@@ -329,10 +331,11 @@ class priorityhook(object):
 
 class address(object):
     """
-    Namespace providing tools that assist with correcting arguments
-    provided to a function. This includes things such as verifying
-    that an argument references an address within the database,
-    is pointing to the "head" or "tail" of an address, etc.
+    This namespace provides tools that assist with correcting
+    arguments that a user will provide to a function. This includes
+    things such as verifying that an argument references an address
+    within the database, is pointing to the "head" or "tail" of an
+    address, etc.
 
     This is needed because some APIs that IDAPython exposes tend to
     be crashy when you give it a bogus address. This way parameters
@@ -393,7 +396,7 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
-            raise TypeError("{:s} : Specified address is not of the correct type ({!r} -> {!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
+            raise TypeError("{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
             raise StandardError("{:s} : An invalid address ({:#x}) was specified.".format(entryframe.f_code.co_name, ea))
@@ -407,7 +410,7 @@ class address(object):
         entryframe = cls.pframe()
         start, end = cls.within(start, end)
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
-            raise TypeError("{:s} : Specified addresses are not of the correct type ({!r}, {!r}) -> ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
+            raise TypeError("{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
         return cls.head(start, end, silent=True)
     @classmethod
     def inside(cls, *args):
@@ -421,14 +424,14 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
-            raise TypeError("{:s} : Specified address is not of the correct type ({!r} -> {!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
+            raise TypeError("{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
             raise StandardError("{:s} : An invalid address {:#x} was specified.".format(entryframe.f_code.co_name, ea))
 
         if not cls.__within__(ea):
             l, r = cls.__bounds__()
-            raise StandardError("{:s} : Specified address {:#x} not within bounds of database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, l, r))
+            raise StandardError("{:s} : The specified address {:#x} not within bounds of database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, l, r))
         return ea
     @classmethod
     def __within2__(cls, start, end):
@@ -436,12 +439,12 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
-            raise TypeError("{:s} : Specified addresses are not of the correct type ({!r}, {!r}) -> ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
+            raise TypeError("{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
 
         # FIXME: off-by-one here, as end can be the size of the db.
         if any(not cls.__within__(ea) for ea in (start, end-1)):
             l, r = cls.__bounds__()
-            raise StandardError("{:s} : Address range ({:#x}<>{:#x}) not within bounds of database ({:#x}<>{:#x}.)".format(entryframe.f_code.co_name, start, end, l, r))
+            raise StandardError("{:s} : The address range ({:#x}<>{:#x}) is not within the bounds of database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, start, end, l, r))
         return start, end
     @classmethod
     def within(cls, *args):
@@ -451,9 +454,9 @@ class address(object):
 
 class node(object):
     """
-    Namespace containing a number of methods that extract information from some
-    of the undocumented structures that IDA stores within a netnode for a given
-    address.
+    This namespace contains a number of methods that extract information
+    from some of the undocumented structures that IDA stores within 
+    netnodes for various addresses in a database.
 
     XXX: Hopefully these are correct!
     """
@@ -468,7 +471,7 @@ class node(object):
 
         # pointer and model
         by = onext(iterable)
-        if by&0xf0:
+        if by & 0xf0:
             # FIXME: If this doesn't match, then this is a type that forwards to the real function type.
             raise TypeError(by)
         res.append( (by&idaapi.CM_MASK) )
@@ -537,7 +540,7 @@ class node(object):
             count, res = le(sup[:2]), sup[2:]
             chunks = zip(*((iter(res),)*4))
             if len(chunks) != count:
-                raise ValueError("{:s}.op_id('{:s}') -> id32 : Number of chunks ({:d}) does not match count ({:d}): {!r}".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
+                raise ValueError("{:s}.op_id('{:s}') -> id32 : The number of chunks ({:d}) does not match the count ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, 0x3f000000), res)
             return tuple(res)
@@ -560,7 +563,7 @@ class node(object):
             chunks = zip(*((iterable,)*5))
             #count = le(chunks.pop(0))
             if len(chunks) != count:
-                raise ValueError("{:s}.op_id('{:s}') -> id64 : Number of chunks ({:d}) does not match count ({:d}): {!r}".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
+                raise ValueError("{:s}.op_id('{:s}') -> id64 : Number of chunks ({:d}) does not match count ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, 0xc0000000ff), res)
             return tuple(ror(n, 8, 64) for n in res)
@@ -589,7 +592,7 @@ class namedtypedtuple(tuple):
     def __new__(cls, *args):
         res = args[:]
         for n, t, x in zip(cls._fields, cls._types, args):
-            if not isinstance(x, t): raise TypeError("Unexpected type for field {:s}: {!r} != {!r}".format(n, t, type(x)))
+            if not isinstance(x, t): raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n, t))
         return tuple.__new__(cls, res)
 
     @classmethod
@@ -598,7 +601,7 @@ class namedtypedtuple(tuple):
         if len(result) != len(cls._fields):
             raise TypeError("Expected {:d} arguments, got {:d}.".format(len(cls._fields), len(result)))
         for n, t, x in zip(cls._fields, cls._types, result):
-            if not isinstance(x, t): raise TypeError("Unexpected type for field {:s}: {!r} != {!r}".format(n, t, type(x)))
+            if not isinstance(x, t): raise TypeError("Unexpected type ({!r} for field {:s} should be {!r}.".format(type(x), n, t))
         return result
 
     @classmethod
@@ -606,7 +609,7 @@ class namedtypedtuple(tuple):
         res = (t for n, t in zip(cls._fields, cls._types) if n == name)
         try: return next(res)
         except StopIteration:
-            raise ValueError("Got unexpected field name: {:s}".format(name))
+            raise ValueError("Got an unexpected field name {!r}.".format(name))
 
     def __getattribute__(self, name):
         try:
@@ -625,7 +628,7 @@ class namedtypedtuple(tuple):
     def _replace(self, **kwds):
         result = self._make(map(kwds.pop, self._fields, self))
         if kwds:
-            raise ValueError("Got unexpected field names: {!r}".format(six.viewkeys(kwds)))
+            raise ValueError("Got some unexpected field names {!r}.".format(six.viewkeys(kwds)))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
@@ -734,15 +737,16 @@ class register_t(symbol_t):
 
 class regmatch(object):
     """
-    Namespace used to assist with doing register matching against instructions.
-    This simplifies the interface for register matching so that one can specify
-    whether any number of registers are written to or read from.
+    This namespace is used to assist with doing register matching
+    against instructions. This simplifies the interface for register
+    matching so that one can specify whether any number of registers
+    are written to or read from.
     """
     def __new__(cls, *regs, **modifiers):
         if not regs:
             args = ', '.join(map("{:s}".format, regs))
             mods = ', '.join(map(internal.utils.unbox("{:s}={!r}".format), six.iteritems(modifiers)))
-            raise AssertionError("{:s}({:s}{:s}) : Specified registers are empty.".format('.'.join((__name__, cls.__name__)), args, (', '+mods) if mods else ''))
+            raise AssertionError("{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join((__name__, cls.__name__)), args, (', '+mods) if mods else ''))
         use, iterops = cls.use(regs), cls.modifier(**modifiers)
         def match(ea):
             return any(map(functools.partial(use, ea), iterops(ea)))
@@ -792,7 +796,7 @@ elif idaapi.BADADDR == 0xffffffffffffffff:
     sval_t = ctypes.c_longlong
 else:
     sval_t = ctypes.c_int
-    logging.fatal("{:s} : Unable to determine size of BADADDR in order to determine boundaries of sval_t. Setting default size to {:d}-bits. : {:#x}".format(__name__, ctypes.sizeof(sval_t), idaapi.BADADDR))
+    logging.fatal("{:s} : Unable to determine size of idaapi.BADADDR in order to determine boundaries of sval_t. Setting default size to {:d}-bits. The value of idaapi.BADADDR is {!r}.".format(__name__, ctypes.sizeof(sval_t), idaapi.BADADDR))
 
 #Ref_Types = {
 #    0 : 'Data_Unknown', 1 : 'Data_Offset',
@@ -944,7 +948,7 @@ class switch_t(object):
         # FIXME: check that this works with a different .ind_lowcase
         if case < self.base or case >= self.count + self.base:
             cls = self.__class__
-            raise ValueError("{:s}.case({:#x}) : Specified case was out of bounds ({:#x}<>{:#x}).".format(cls.__name__, case, self.base, self.base+self.count - 1))
+            raise ValueError("{:s}.case({:#x}) : The specified case was out of bounds ({:#x}<>{:#x}).".format(cls.__name__, case, self.base, self.base+self.count - 1))
         idx = case - self.base
         if self.indirectQ():
             idx = self.index[idx]
@@ -1012,7 +1016,12 @@ def addressOfRuntimeOrStatic(func):
 
 ## internal enumerations that idapython missed
 class fc_block_type_t:
-    '''internal enumerations that idapython missed'''
+    """
+    This namespace contains a number of internal enumerations for
+    `idaapi.FlowChart` that were missed by IDAPython. This can
+    be used for checking the type of the various elements within
+    an `idaapi.FlowChart`.
+    """
     fcb_normal = 0  # normal block
     fcb_indjump = 1 # block ends with indirect jump
     fcb_ret = 2     # return block
@@ -1157,7 +1166,7 @@ class architecture_t(object):
             return register if register.size == size else self.promote(parent(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise LookupError("{:s}.promote({:s}{:s}) : Unable to find register to promote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+        raise LookupError("{:s}.promote({:s}{:s}) : Unable to find the register to promote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
     def demote(self, register, size=None):
         '''Demote the specified ``register`` to its next smaller ``size``.'''
         childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('iteritems'))
@@ -1168,4 +1177,4 @@ class architecture_t(object):
             return register if register.size == size else self.demote(firstchild(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise LookupError("{:s}.demote({:s}{:s}) : Unable to find register to demote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+        raise LookupError("{:s}.demote({:s}{:s}) : Unable to find the register to demote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))

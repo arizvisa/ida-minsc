@@ -79,8 +79,8 @@ dummy = dummy()
 ### read without using the tag cache
 class read(object):
     """
-    Namespace containing tools that can be used to manually read tags out of
-    the database without using the cache.
+    This namespace contains tools that can be used to manually read
+    tags out of the database without using the cache.
 
     If ``location`` is specified as true, then read each contents tag
     according to its location rather than an address. This allows one
@@ -122,7 +122,7 @@ class read(object):
 
             # if it's a structure, then the type is the structure name
             if isinstance(member.type, struc.structure_t):
-                logging.info("{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} : {!r}".format('.'.join((__name__, cls.__name__)), ea, member.offset, member.type))
+                logging.info("{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!r}.".format('.'.join((__name__, cls.__name__)), ea, member.offset, member.type))
                 type = member.type.name
 
             # otherwise, the type is a tuple that we can serializer
@@ -227,8 +227,8 @@ class read(object):
 ### Applying tags to the database
 class apply(object):
     """
-    Namespace containing tools that can be used to apply tags that have been
-    previously read back into the database.
+    This namespace contains tools that can be used to apply tags that
+    have been previously read back into the database.
 
     Various functions defined within this namespace take a variable number of
     keyword arguments which represent a mapping for the tag names. When a
@@ -259,12 +259,12 @@ class apply(object):
             try:
                 member = F.by_offset(offset)
             except LookupError:
-                logging.warn("{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Skipping application of data to it. : {!r}".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, (name, type, comment)))
+                logging.warn("{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Skipping application of the name ({!r}), type ({!r}), and comment ({!r}) to it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, name, type, comment))
                 continue
 
             if member.name != name:
                 if any(not member.name.startswith(n) for n in ('arg_', 'var_', ' ')):
-                    logging.warn("{:s}.frame({:#x}, ...{:s}) : Renaming frame member {:+#x} with new name. : {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, member.name, name))
+                    logging.warn("{:s}.frame({:#x}, ...{:s}) : Renaming frame member {:+#x} from the name {!r} to {!r}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, member.name, name))
                 member.name = name
 
             # check what's going to be overwritten with different values prior to doing it
@@ -276,13 +276,13 @@ class apply(object):
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
                 for name in six.viewkeys(res) - six.viewkeys(new):
-                    logging.warn("{:s}.frame({:#x}, ...{:s}) : Refusing requested tag mapping as it results in tag {!r} overwriting tag {!r} for frame member {:+#x}: {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, tagmap[name], name, offset, res[tagmap[name]], res[name]))
+                    logging.warn("{:s}.frame({:#x}, ...{:s}) : Refusing requested tag mapping as it results in the tag {!r} overwriting tag {!r} for the frame member {:+#x}. The value {!r} would be overwritten by {!r}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, name, tagmap[name], offset, res[name], res[tagmap[name]]))
                 pass
 
             # warn the user about what's going to be overwritten prior to doing it
             for name in six.viewkeys(state) & six.viewkeys(new):
                 if state[name] == new[name]: continue
-                logging.warn("{:s}.frame({:#x}, ...{:s}) : Overwriting tag {!r} for frame member {:+#x} with new value. : {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, name, offset, state[name], new[name]))
+                logging.warn("{:s}.frame({:#x}, ...{:s}) : Overwriting tag {!r} for frame member {:+#x} with new value {!r}. The old value was {!r}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, name, offset, new[name], state[name]))
 
             # now we can update the current dictionary
             mapstate = { name : value for name, value in six.iteritems(new) if state.get(name, dummy) != value }
@@ -296,7 +296,7 @@ class apply(object):
                 try:
                     member.type = struc.by(type)
                 except LookupError:
-                    logging.warn("{:s}.frame({:#x}, ...{:s}): Unable to find structure {!r} for member at {:+#x}. Skipping. it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, type, offset))
+                    logging.warn("{:s}.frame({:#x}, ...{:s}): Unable to find structure {!r} for member at {:+#x}. Skipping it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, type, offset))
 
             # otherwise, it's a pythonic tuple that we can just assign
             else:
@@ -369,19 +369,19 @@ class apply(object):
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
                 for name in six.viewkeys(res) - six.viewkeys(new):
-                    logging.warn("{:s}.globals(...{:s}) : {:#x} : Refusing requested tag mapping as it results in tag {!r} overwriting tag {!r} for a global tag: {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), tagmap_output, ea, tagmap[name], name, res[tagmap[name]], res[name]))
+                    logging.warn("{:s}.globals(...{:s}) : Refusing requested tag mapping as it results in the tag {!r} overwriting the tag {!r} in the global {:#x}. The value {!r} would be replaced with {!r}.".format('.'.join((__name__, cls.__name__)), tagmap_output, name, tagmap[name], ea, res[name], res[tagmap[name]]))
                 pass
 
             # check what's going to be overwritten with different values prior to doing it
             for name in six.viewkeys(state) & six.viewkeys(new):
                 if state[name] == new[name]: continue
-                logging.warn("{:s}.globals(...{:s}) : {:#x} : Overwriting global tag {!r} with new value: {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), tagmap_output, ea, name, state[name], new[name]))
+                logging.warn("{:s}.globals(...{:s}) : Overwriting tag {!r} for global at {:#x} with new value {!r}. Old value was {!r}.".format('.'.join((__name__, cls.__name__)), tagmap_output, name, ea, new[name], state[name]))
 
             # now we can apply the tags to the global address
             try:
                 [ ns.tag(ea, name, value) for name, value in six.iteritems(new) if state.get(name, dummy) != value ]
             except:
-                logging.warn("{:s}.globals(...{:s}) : {:#x} : Unable to apply tags to global: {!r}".format('.'.join((__name__, cls.__name__)), tagmap_output, ea, new), exc_info=True)
+                logging.warn("{:s}.globals(...{:s}) : Unable to apply tags ({!r}) to global {:#x}.".format('.'.join((__name__, cls.__name__)), tagmap_output, new, ea), exc_info=True)
 
             # increase our counter
             count += 1
@@ -411,19 +411,19 @@ class apply(object):
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
                 for name in six.viewkeys(res) - six.viewkeys(new):
-                    logging.warn("{:s}.contents(...{:s}) : {:#x} : Refusing requested tag mapping as it results in tag {!r} overwriting tag {!r} for a contents tag: {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), tagmap_output, ea, tagmap[name], name, res[tagmap[name]], res[name]))
+                    logging.warn("{:s}.contents(...{:s}) : Refusing requested tag mapping as it results in the tag {!r} overwriting tag {!r} for the contents at {:#x}. The value {!r} would be overwritten by {!r}.".format('.'.join((__name__, cls.__name__)), tagmap_output, name, tagmap[name], ea, res[name], res[tagmap[name]]))
                 pass
 
             # inform the user if any tags are being overwritten with different values
             for name in six.viewkeys(state) & six.viewkeys(new):
                 if state[name] == new[name]: continue
-                logging.warn("{:s}.contents(...{:s}) : {:#x} : Overwriting contents tag {!r} with new value: {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), tagmap_output, ea, name, state[name], new[name]))
+                logging.warn("{:s}.contents(...{:s}) : Overwriting contents tag {!r} for address {:#x} with new value {!r}. Old value was {!r}.".format('.'.join((__name__, cls.__name__)), tagmap_output, name, ea, new[name], state[name]))
 
             # write the tags to the contents address
             try:
                 [ db.tag(ea, name, value) for name, value in six.iteritems(new) if state.get(name, dummy) != value ]
             except:
-                logging.warn("{:s}.contents(...{:s}) : {:#x} : Unable to apply tags to location: {!r}".format('.'.join((__name__, cls.__name__)), tagmap_output, ea, new), exc_info=True)
+                logging.warn("{:s}.contents(...{:s}) : Unable to apply tags {!r} to location {:#x}.".format('.'.join((__name__, cls.__name__)), tagmap_output, new, ea), exc_info=True)
 
             # increase our counter
             count += 1
@@ -441,7 +441,7 @@ class apply(object):
             try:
                 apply.frame(ea, res, **tagmap)
             except:
-                logging.warn("{:s}.frames(...{:s}) : {:#x} : Unable to apply tags to frame: {!r}".format('.'.join((__name__, cls.__name__)), tagmap_output, ea, res), exc_info=True)
+                logging.warn("{:s}.frames(...{:s}) : Unable to apply tags ({!r}) to frame at {:#x}.".format('.'.join((__name__, cls.__name__)), tagmap_output, res, ea), exc_info=True)
 
             # increase our counter
             count += 1
@@ -450,8 +450,8 @@ class apply(object):
 ### Exporting tags from the database using the tag cache
 class export(object):
     """
-    Namespace containing tools that can be used to quickly read
-    specific tags using the cache.
+    This namespace contains tools that can be used to quickly
+    export specific tagss out of the database using the cache.
 
     If ``location`` is specified as true, then read each contents tag
     according to its location rather than an address. This allows one

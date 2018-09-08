@@ -34,10 +34,10 @@ import database as _database
 
 class current(object):
     """
-    Namespace containing tools that fetch information about the current
-    selection state. This can be used to get things that are currently
-    selected such as the address, function, segment, clipboard, widget,
-    or even the current window in use.
+    This namespace contains tools for fetching information about the
+    current selection state. This can be used to get the state of
+    thigns that are currently selected such as the address, function,
+    segment, clipboard, widget, or even the current window in use.
     """
     @classmethod
     def address(cls):
@@ -54,7 +54,7 @@ class current(object):
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
-            raise StandardError("{:s}.function : Not currently inside a function.".format('.'.join((__name__, cls.__name__))))
+            raise StandardError("{:s}.function() : Not currently inside a function.".format('.'.join((__name__, cls.__name__))))
         return res
     @classmethod
     def segment(cls):
@@ -76,7 +76,7 @@ class current(object):
         left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
         ok = idaapi.read_selection(view, left, right)
         if not ok:
-            raise StandardError("{:s}.selection : Unable to read selection.".format('.'.join((__name__, cls.__name__))))
+            raise StandardError("{:s}.selection() : Unable to read selection.".format('.'.join((__name__, cls.__name__))))
         pl_l, pl_r = left.place(view), right.place(view)
         return _database.address.head(pl_l.ea), _database.address.tail(pl_r.ea)
     @classmethod
@@ -99,10 +99,10 @@ class current(object):
 
 class state(object):
     """
-    Namespace for fetching or interacting with the current state of
-    IDA's interface. These are things such as waiting for IDA's
-    analysis queue, or determining whether the function is being
-    viewed in graph view or not.
+    This namespace is for fetching or interacting with the current
+    state of IDA's interface. These are things such as waiting for
+    IDA's analysis queue, or determining whether the function is
+    being viewed in graph view or not.
     """
     @classmethod
     def graphview(cls):
@@ -150,7 +150,7 @@ class appwindow(object):
 
 class disassembly(appwindow):
     """
-    Namespace for interacting with the Disassembly window.
+    This namespace is for interacting with the Disassembly window.
     """
     __open__ = staticmethod(idaapi.open_disasm_window)
     __open_defaults__ = ('Disassembly', )
@@ -162,21 +162,21 @@ class disassembly(appwindow):
 
 class exports(appwindow):
     """
-    Namespace for interacting with the Exports window.
+    This namespace is for interacting with the Exports window.
     """
     __open__ = staticmethod(idaapi.open_exports_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class imports(appwindow):
     """
-    Namespace for interacting with the Imports window.
+    This namespace is for interacting with the Imports window.
     """
     __open__ = staticmethod(idaapi.open_imports_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class names(appwindow):
     """
-    Namespace for interacting with the Names window.
+    This namespace is for interacting with the Names window.
     """
     __open__ = staticmethod(idaapi.open_names_window)
     __open_defaults__ = (idaapi.BADADDR, )
@@ -220,21 +220,21 @@ class names(appwindow):
 
 class functions(appwindow):
     """
-    Namespace for interacting with the Functions window.
+    This namespace is for interacting with the Functions window.
     """
     __open__ = staticmethod(idaapi.open_funcs_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class structures(appwindow):
     """
-    Namespace for interacting with the Structures window.
+    This namespace is for interacting with the Structures window.
     """
     __open__ = staticmethod(idaapi.open_structs_window)
     __open_defaults__ = (idaapi.BADADDR, 0)
 
 class strings(appwindow):
     """
-    Namespace for interacting with the Strings window.
+    This namespace is for interacting with the Strings window.
     """
     __open__ = staticmethod(idaapi.open_strings_window)
     __open_defaults__ = (idaapi.BADADDR, idaapi.BADADDR, idaapi.BADADDR)
@@ -272,7 +272,7 @@ class strings(appwindow):
         string = idaapi.string_info_t()
         res = idaapi.get_strlist_item(index, string)
         if not res:
-            raise RuntimeError, "idaapi.get_strlist_item({:d}) -> {!r}".format(index, res)
+            raise RuntimeError("{:s}.at({:d}) : The call to idaapi.get_strlist_item({:d}) returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
         return string
     @classmethod
     def get(cls, index):
@@ -289,21 +289,21 @@ class strings(appwindow):
 
 class segments(appwindow):
     """
-    Namespace for interacting with the Segments window.
+    This namespace is for interacting with the Segments window.
     """
     __open__ = staticmethod(idaapi.open_segments_window)
     __open_defaults__ = (idaapi.BADADDR, )
 
 class notepad(appwindow):
     """
-    Namespace for interacting with the Notepad window.
+    This namespace is for interacting with the Notepad window.
     """
     __open__ = staticmethod(idaapi.open_notepad_window)
     __open_defaults__ = ()
 
 class timer(object):
     """
-    Namespace for registering a python callable to a timer in IDA.
+    This namespace is for registering a python callable to a timer in IDA.
     """
     clock = {}
     @classmethod
@@ -318,7 +318,7 @@ class timer(object):
     @classmethod
     def unregister(cls, id):
         '''Unregister the specified ``id``.'''
-        raise NotImplementedError('need a lock or signal here')
+        raise NotImplementedError("{:s}.unregister({!s}) : A lock or a signal s needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
         idaapi.unregister_timer(cls.clock[id])
         del(cls.clock[id])
     @classmethod
@@ -332,7 +332,7 @@ class timer(object):
 ### updating the state of the colored navigation band
 class navigation(object):
     """
-    Namespace for updating the state of the colored navigation band.
+    This namespace is for updating the state of the colored navigation band.
     """
     if all(not hasattr(idaapi, name) for name in ['show_addr', 'showAddr']):
         __set__ = staticmethod(lambda ea: None)
@@ -382,7 +382,7 @@ class navigation(object):
 # FIXME: add some support for actually manipulating menus
 class menu(object):
     """
-    Namespace for registering items in IDA's menu system.
+    This namespace is for registering items in IDA's menu system.
     """
     state = {}
     @classmethod
@@ -411,7 +411,7 @@ def application():
 
 class window(object):
     """
-    Namespace for selecting a specific or particular window.
+    This namespace is for selecting a specific or particular window.
     """
     @classmethod
     def viewer(cls):
@@ -436,7 +436,7 @@ class windows(object):
 
 class widget(object):
     """
-    Namespace for selecting a specific or particular widget.
+    This namespace is for selecting a specific or particular widget.
     """
     def __new__(self, (x, y)):
         '''Return the widget at the specified ``x`` and ``y`` coordinate.'''
@@ -455,7 +455,7 @@ class widget(object):
 
 class clipboard(object):
     """
-    Namespace for interacting with the current clipboard state.
+    This namespace is for interacting with the current clipboard state.
     """
     def __new__(cls):
         '''Return the current clipboard.'''
@@ -513,18 +513,18 @@ try:
 
     class mouse(mouse):
         """
-        Namespace for interacting with the mouse input.
+        This namespace is for interacting with the mouse input.
         """
         @classmethod
         def position(cls):
-            '''Return the current (x, y) position of the cursor.'''
+            '''Return the current `(x, y)` position of the cursor.'''
             qt = PyQt5.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
 
     class keyboard(keyboard):
         """
-        Namespace for interacting with the keyboard input.
+        This namespace is for interacting with the keyboard input.
         """
         @classmethod
         def input(cls):
@@ -600,7 +600,7 @@ try:
 
     class widget(widget):
         """
-        Namespace for selecting a specific or particular widget.
+        This namespace is for selecting a specific or particular widget.
         """
         @classmethod
         def form(cls, twidget):
@@ -609,7 +609,7 @@ try:
             return ns.FormToPyQtWidget(twidget)
 
 except ImportError:
-    logging.warn("{:s}:Unable to locate PyQt5.Qt module.".format(__name__))
+    logging.warn("{:s} : Unable to locate PyQt5.Qt module.".format(__name__))
 
 ### PySide-specific functions and namespaces
 try:
@@ -623,11 +623,11 @@ try:
 
     class mouse(mouse):
         """
-        Namespace for interacting with the mouse input.
+        This namespace is for interacting with the mouse input.
         """
         @classmethod
         def position(cls):
-            '''Return the current (x, y) position of the cursor.'''
+            '''Return the current `(x, y)` position of the cursor.'''
             qt = PySide.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
@@ -643,7 +643,7 @@ try:
 
     class widget(widget):
         """
-        Namespace for selecting a specific or particular widget.
+        This namespace is for selecting a specific or particular widget.
         """
         @classmethod
         def form(cls, twidget):
@@ -652,12 +652,12 @@ try:
             return ns.FormToPySideWidget(twidget)
 
 except ImportError:
-    logging.warn("{:s}:Unable to locate PySide module.".format(__name__))
+    logging.warn("{:s} : Unable to locate PySide module.".format(__name__))
 
 ### wrapper that uses a priorityhook around IDA's hooking capabilities.
 class hook(object):
     """
-    Namespace which exposes the ability to hook different parts of IDA.
+    This namespace exposes the ability to hook different parts of IDA.
 
     There are 3 different components in IDA that can be hooked. These
     are available as `hook.idp`, `hook.idb`, and `hook.ui`. Please refer
@@ -695,16 +695,16 @@ class hook(object):
 ## (which is probably pretty unsafe in IDA, but let's hope).
 class queue(object):
     """
-    Namespace that exposes the ability to queue execution of python
+    This namespace exposes the ability to queue execution of python
     callables asynchronously so that they run at the same time as
-    IDA and signal when they're completed.
+    IDA and signal when they have completed and a result is ready.
 
     XXX: This is probably pretty unsafe in IDA, but let's hope.
     """
     @classmethod
     def __start_ida__(cls):
         if hasattr(cls, 'execute') and not cls.execute.dead:
-            logging.warn("{:s}.start : Skipping re-instantiation of execution queue. : {!r}".format('.'.join((__name__, cls.__name__)), cls.execute))
+            logging.warn("{:s}.start : Skipping re-instantiation of execution queue {!r}.".format('.'.join((__name__, cls.__name__)), cls.execute))
             return
         cls.execute = internal.utils.execution()
         return
@@ -728,7 +728,7 @@ class queue(object):
     def add(cls, callable, *args, **kwds):
         '''Add the specified ``callable`` to the execution queue passing to it any extra arguments.'''
         if not cls.execute.running:
-            logging.warn("{:s}.add : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
+            logging.warn("{:s}.add(...) : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
         return cls.execute.push(callable, *args, **kwds)
 
     @classmethod
@@ -760,7 +760,7 @@ if 'UIProgress' in locals():
 
 # otherwise we just fall-back to the console-only one.
 else:
-    logging.warn("{:s}:Using console-only implementation of the ui.progress class.".format(__name__))
+    logging.warn("{:s} : Using console-only implementation of the ui.Progress class.".format(__name__))
     class ConsoleProgress(object):
         """
         Helper class used to simplify the showing of a progress bar in IDA's console.

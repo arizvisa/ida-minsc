@@ -315,7 +315,7 @@ def op_repr(ea, n):
     try:
         res = outop(insn.ea, n) or "{:s}".format(op_value(insn.ea, n))
     except ValueError, e:
-        logging.warn("{:s}({:#x}, {:d}) : Unable to strip tags from operand. Returning the result from {:s} instead. : {!r}".format('.'.join((__name__,'op_repr')), ea, n, '.'.join((__name__,'op_value')), oppr(insn.ea, n)))
+        logging.warn("{:s}({:#x}, {:d}) : Unable to strip tags from operand {!r}. Returning the result from {:s} instead.".format('.'.join((__name__,'op_repr')), ea, n, oppr(insn.ea, n), '.'.join((__name__,'op_value'))))
         return "{:s}".format(op_value(insn.ea, n))
     return res
 
@@ -681,7 +681,7 @@ def op_refs(ea, n):
             member, stkofs = idaapi.get_stkvar(inst, op, res)
 
         if stkofs != stkofs_:
-            logging.warn("{:s}.op_refs({:#x}, {:d}) : Stack offsets for instruction operand do not match. : {:#x} != {:#x}".format(__name__, inst.ea, n, stkofs, stkofs_))
+            logging.warn("{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was calculated ({:#x}).".format(__name__, inst.ea, n, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
@@ -883,7 +883,8 @@ def is_calli(ea):
 ## XXX: This namespace is deleted after each method has been assigned to their lookup table
 class operand_types:
     """
-    Namespace containing all of the operand type handlers for each architecture.
+    This namespace contains all of the operand type handlers for each
+    architecture.
     """
     @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
@@ -975,7 +976,7 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise TypeError("{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
+                raise TypeError("{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
@@ -1011,7 +1012,7 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise TypeError("{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d} : op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
+                raise TypeError("{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
             offset = op.addr
 
         else:
@@ -1109,7 +1110,8 @@ del(operand_types)
 ## intel operands
 class intelop:
     """
-    Namespace containing different operands that can be returned on the Intel architecture.
+    This namespace contains the different operand types that can be
+    returned for the Intel architecture.
     """
     class SegmentOffset(interface.namedtypedtuple, interface.symbol_t):
         """

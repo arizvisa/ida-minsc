@@ -1,3 +1,14 @@
+"""
+Netnode module (internal)
+
+This module wraps IDA's netnode API and dumbs it down so that a user
+can be mindless when reading/writing/enumerating data out of a netnode.
+This is an internal module and is not expected to be used by the user.
+
+TODO: Implement a wrapper around IDA's blob types so that we can simulate
+      a filesystem.
+"""
+
 import six
 import idaapi
 

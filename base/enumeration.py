@@ -87,7 +87,7 @@ def by(**type):
     res = builtins.list(iterate(**type))
     if len(res) > 1:
         map(logging.info, ("[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
-        logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one.".format(__name__, searchstring, len(res)))
+        logging.warn("{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {!r}.".format(__name__, searchstring, len(res), res[0]))
 
     res = next(iter(res), None)
     if res is None:
@@ -112,7 +112,7 @@ def new(name, flags=0):
     idx = count()
     res = idaapi.add_enum(idx, name, flags)
     if res == idaapi.BADADDR:
-        raise ValueError("{:s}.create : Unable to create enumeration named {:s}".format(__name__, name))
+        raise ValueError("{:s}.create : Unable to create enumeration named {:s}.".format(__name__, name))
     return res
 
 @utils.multicase(id=six.integer_types)
@@ -286,7 +286,7 @@ class member(object):
 
         err = {getattr(idaapi, n) : n for n in ('ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV')}
         if ok in err.viewkeys():
-            raise ValueError("{:s}.add({:#x}, {!r}, {:#x}, bitmask={!r}) : Unable to add member to enumeration. : {:s}({:d})".format('.'.join((__name__,cls.__name__)), eid, name, value, bitmask, err[ok], ok))
+            raise ValueError("{:s}.add({:#x}, {!r}, {:#x}, bitmask={!r}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join((__name__,cls.__name__)), eid, name, value, bitmask, err[ok], ok))
         return cls.by_value(eid, value)
     new = create = utils.alias(add, 'member')
 

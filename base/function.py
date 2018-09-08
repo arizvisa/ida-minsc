@@ -41,7 +41,7 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
-        raise LookupError("{:s}.by_address({:#x}) : Unable to locate function".format(__name__, ea))
+        raise LookupError("{:s}.by_address({:#x}) : Unable to locate function.".format(__name__, ea))
     return res
 byAddress = by_address
 
@@ -49,7 +49,7 @@ def by_name(name):
     '''Return the function with the specified ``name``.'''
     ea = idaapi.get_name_ea(idaapi.BADADDR, name)
     if ea == idaapi.BADADDR:
-        raise LookupError("{:s}.by_name({!r}) : Unable to locate function".format(__name__, name))
+        raise LookupError("{:s}.by_name({!r}) : Unable to locate function.".format(__name__, name))
     return idaapi.get_func(ea)
 byName = by_name
 
@@ -104,7 +104,7 @@ def comment(func, string, **repeatable):
 
     res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', True))
     if not ok:
-        raise ValueError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
+        raise ValueError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
     return res
 
 @utils.multicase()
@@ -119,14 +119,14 @@ def name(func):
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     if rt:
         res = get_name(ea)
-        return internal.declaration.demangle(res) if internal.declaration.mangled(res) else res
-        #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
+        return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
+        #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     res = idaapi.get_func_name(ea)
     if not res: res = get_name(ea)
     if not res: res = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
     return res
-    #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
-    #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangled(res) else res
+    #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
+    #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
 @utils.multicase(none=types.NoneType)
 def name(none):
     '''Remove the custom-name from the current function.'''
@@ -156,7 +156,7 @@ def name(func, string, *suffix):
     # filter out invalid characters
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
-        logging.warn("{:s}.name({:#x}, {!r}) : Stripping invalid chars from function name. : {!r}".format(__name__, ea, string, res))
+        logging.warn("{:s}.name({:#x}, {!r}) : Stripped the invalid chars from the function name resulting in {!r}.".format(__name__, ea, string, res))
         string = res
 
     # now we can assign the name
@@ -205,7 +205,7 @@ def prototype(func):
         result = res[:idx] + ' ' + funcname + res[idx:]
 
     except ValueError:
-        if not internal.declaration.mangled(funcname):
+        if not internal.declaration.mangledQ(funcname):
             raise
         result = internal.declaration.demangle(funcname)
     return result
@@ -332,9 +332,9 @@ def remove(func):
 ## chunks
 class chunks(object):
     """
-    Namespace for interacting with the different chunks assocaited with a
-    function. By default this namespace will yield the boundaries of each
-    chunk associated with a function.
+    This namespace is for interacting with the different chunks
+    associated with a function. By default this namespace will yield
+    the boundaries of each chunk associated with a function.
     """
     @utils.multicase()
     def __new__(cls):
@@ -346,7 +346,7 @@ class chunks(object):
         fn = by(func)
         fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
         if not fci.main():
-            raise ValueError("{:s}.chunks({:#x}) : Unable to create a func_tail_iterator_t".format(__name__, fn.startEA))
+            raise ValueError("{:s}.chunks({:#x}) : Unable to create an idaapi.func_tail_iterator_t.".format(__name__, fn.startEA))
 
         while True:
             ch = fci.chunk()
@@ -395,9 +395,9 @@ iterate = utils.alias(chunks.iterate, 'chunks')
 
 class chunk(object):
     """
-    Namespace for interacting with a specific chunk belonging to a function.
-    By default this namespace will return the bounds of the chunk containing
-    the specified address.
+    This namespace is for interacting with a specific chunk belonging
+    to a function. By default this namespace will return the bounds of
+    the chunk containing the requested address.
     """
     @utils.multicase()
     def __new__(cls):
@@ -523,16 +523,18 @@ def contains(func, ea):
 
 class blocks(object):
     """
-    Namespace for interacting with all of the basic-blocks within the specified
-    function. By default this namespace will yield the boundaries of each
-    basic-block defined within the function.
+    This namespace is for interacting with all of the basic blocks within
+    the specified function. By default this namespace will yield the
+    boundaries of each basic-block defined within the function.
 
-    This namespace provides a small number of utilities that can be used to
-    extract the basic-blocks of a function and convert them into a flow-graph
-    such as `idaapi.FlowChart`, or a digraph as used by the `networkx` module.
+    This namespace provides a small number of utilities that can be
+    used to extract the basic blocks of a function and convert them
+    into a flow-graph such as `idaapi.FlowChart`, or a digraph as used
+    by the `networkx` module.
 
-    Due to `idaapi.FlowChart` and networkx's digraph being used so often, these
-    functions are exported globally as `function.flowchart` and `function.digraph`.
+    Due to `idaapi.FlowChart` and networkx's digraph being used so
+    often, these functions are exported globally as `function.flowchart`
+    and `function.digraph`.
     """
     @utils.multicase()
     def __new__(cls):
@@ -670,9 +672,11 @@ digraph = graph = utils.alias(blocks.digraph, 'blocks')
 
 class block(object):
     """
-    Namespace for interacting with a specific basic-block belonging to a
-    function. By default the current basic-block will be returned as its
-    bounds.
+    This namespace is for interacting with a single basic block
+    belonging to a function. By default the bounds of the selected
+    basic block will be returned. This bounds or an address within
+    these bounds can then be used in other functions within this
+    namespace.
     """
     @utils.multicase()
     @classmethod
@@ -1107,9 +1111,10 @@ class block(object):
 
 class frame(object):
     """
-    Namespace for getting specific information about a particular function's
-    frame. By default, this namespace will return a `structure_t` representing
-    the frame belonging to the specified function.
+    This namespace is for getting information about the selected
+    function's frame. By default, this namespace will return a
+    `structure_t` representing the frame belonging to the specified
+    function.
     """
     @utils.multicase()
     def __new__(cls):
@@ -1158,11 +1163,12 @@ class frame(object):
 
     class args(object):
         """
-        Namespace for returning information about the arguments within a function's
-        frame. By default, this namespace will yield each argument as a tuple
-        containing the (offset, name, size).
+        This namespace is for returning information about the arguments
+        within a function's frame. By default, this namespace will yield
+        each argument as a tuple containing the `(offset, name, size)`.
 
-        At the moment, register-based calling conventions are not supported.
+        At the moment, register-based calling conventions are not
+        supported.
         """
 
         @utils.multicase()
@@ -1198,11 +1204,11 @@ class frame(object):
             # grab from structure
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise LookupError("{:s}.arguments({:#x}) : Unable to determine function frame.".format(__name__, fn.startEA))
+                raise LookupError("{:s}.arguments({:#x}) : Unable to get the function frame.".format(__name__, fn.startEA))
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. : {:#x}".format(__name__, fn.startEA, cc))
+                logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format(__name__, fn.startEA, cc))
 
             base = get_vars_size(fn)+get_regs_size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, get_args_size(fn)):
@@ -1226,8 +1232,8 @@ class frame(object):
 
     class lvars(object):
         """
-        Namespace describing information about the local variables defined within
-        a function's frame.
+        This namespace provides information about the local variables
+        defined within a function's frame.
         """
         @utils.multicase()
         @classmethod
@@ -1244,8 +1250,8 @@ class frame(object):
 
     class regs(object):
         """
-        Namespace containing information about the registers that are saved when
-        constructing a function's frame.
+        This namespace provides information about the registers that
+        are saved when a function constructs its frame.
         """
 
         @utils.multicase()
@@ -1308,7 +1314,7 @@ def tag(func):
     d2 = internal.comment.decode(res)
 
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', d1 if repeatable else d2, ', '.join(d1.viewkeys() & d2.viewkeys())))
+        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another due to the keys {:s}. Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     res = {}
     map(res.update, (d1, d2) if repeatable else (d2, d1))
@@ -1481,7 +1487,7 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.is_call(ea):
-                    logging.warn("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. : {:s}".format(__name__, fn.startEA, database.disassemble(ea)))
+                    logging.warn("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
                     #resultCode.append((ea, 0))
                 continue
             resultData.extend( (ea, x) for x in database.xref.data_down(ea) )
@@ -1518,10 +1524,10 @@ def switches(func):
 
 class type(object):
     """
-    Namespace allowing one to query type information belonging to a specified
-    function. This allows one to get any attributes that IDA or a user has
-    applied to a function within the database. This can be used to filter
-    functions that have particular attributes.
+    This namespace allows one to query type information about a
+    specified function. This allows one to get any attributes that IDA
+    or a user has applied to a function within the database. This alows
+    one to filter functions according to their particular attributes.
     """
     @utils.multicase()
     @classmethod

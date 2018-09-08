@@ -23,11 +23,11 @@ import database, function as func, instruction, segment
 import ui, internal
 
 def map(F, **kwargs):
-    """Execute the callback ``F`` on all functions in the database. Synonymous to map(F, database.functions()) but with some extra logging.
+    """Execute the callback ``F`` on all functions in the database. Synonymous to `map(F, database.functions())` but with some extra logging.
 
     The ``F`` parameter is defined as a function taking either an
-    `(address, **kwargs)` or a `(index, address, **kwargs)`. Any keyword
-    arguments are passed to ``F`` unmodified.
+    `(address, **kwargs)` or a `(index, address, **kwargs)`. Any
+    keyword arguments are passed to ``F`` unmodified.
     """
     f1 = lambda (idx, ea), **kwargs: F(ea, **kwargs)
     f2 = lambda (idx, ea), **kwargs: F(idx, ea, **kwargs)
@@ -269,10 +269,10 @@ def makecall(ea=None, target=None):
                 ea = database.next(ea)
                 continue
             result = database.cxdown(ea)
-            if len(result) == 0: raise TypeError("{:s}.makecall({!r}, {!r}) : Unable to determine number of arguments".format(__name__, ea, target))
+            if len(result) == 0: raise TypeError("{:s}.makecall({!r}, {!r}) : Unable to determine number of arguments.".format(__name__, ea, target))
 
         if len(result) != 1:
-            raise ValueError("{:s}.makecall({!r}, {!r}) : Too many targets for call at {:#x} : {!r}".format(__name__, ea, result))
+            raise ValueError("{:s}.makecall({!r}, {!r}) : An invalid number of targets was returned for the call at {:#x}. The call targets that were returned are {!r}.".format(__name__, ea, result))
         fn, = result
     else:
         fn = target
@@ -284,7 +284,7 @@ def makecall(ea=None, target=None):
             # FIXME: if left is not an assignment or a push, find last assignment
             result.append((name, left))
     except LookupError:
-        raise LookupError("{:s}.makecall({!r}, {!r}) : Unable to get arguments for target function".format(__name__, ea, target))
+        raise LookupError("{:s}.makecall({!r}, {!r}) : Unable to get arguments for target function.".format(__name__, ea, target))
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
 #    result = ["{:s}={:s}".format(name, instruction.op_repr(ea, 0)) for name, ea in result]

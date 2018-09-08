@@ -380,8 +380,8 @@ class functions(object):
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
             builtins.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(res)))
-            f = utils.fcompose(function.by,function.name)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            f = utils.fcompose(function.by, function.name)
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results. Returning the first function {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -611,7 +611,7 @@ class names(object):
         if len(res) > 1:
             builtins.map(logging.info, (("[{:d}] {:x} {:s}".format(idx, idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx))) for idx in res))
             f1, f2 = idaapi.get_nlist_ea, idaapi.get_nlist_name
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x} {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -857,14 +857,14 @@ def name(ea, string, *suffix, **flags):
     # validate the name
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
-        logging.warn("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name. : {!r}".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
+        logging.warn("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
         string = res
 
     # set the name and use the value of 'flags' if it was explicit
     res, ok = name(ea), idaapi.set_name(ea, string or "", flags.get('flags', fl))
 
     if not ok:
-        raise ValueError("{:s}.name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
+        raise ValueError("{:s}.name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
     return res
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
@@ -929,7 +929,7 @@ def comment(ea, string, **repeatable):
     """
     res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), string, repeatable.get('repeatable', False))
     if not ok:
-        raise ValueError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s})".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
+        raise ValueError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
     return res
 
 class entries(object):
@@ -1083,7 +1083,7 @@ class entries(object):
         if len(res) > 1:
             builtins.map(logging.info, (("[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
             f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {:x}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -1160,7 +1160,7 @@ def tag(ea):
 
     # check to see if they're not overwriting each other
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another. Giving the {:s} comment priority: {:s}".format(__name__, ea, 'repeatable' if repeatable else 'non-repeatable', ', '.join(d1.viewkeys() & d2.viewkeys())))
+        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another due to the keys {:s}. Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
@@ -1195,7 +1195,7 @@ def tag(ea, key):
 def tag(ea, key, value):
     '''Set the tag identified by ``key`` to ``value`` at the address ``ea``.'''
     if value is None:
-        raise ValueError("{:s}.tag({:#x}, {!r}, ...) : Tried to set tag {!r} to an invalid value. : {!r}".format(__name__, ea, key, key, value))
+        raise ValueError("{:s}.tag({:#x}, {!r}, ...) : Tried to set tag {!r} to an invalid value {!r}.".format(__name__, ea, key, key, value))
 
     # if an implicit tag was specified, then dispatch to the correct handler
     if key == '__name__':
@@ -1348,7 +1348,7 @@ def selectcontents(**boolean):
         # check to see that the dict's keys match
         if builtins.set(d.viewkeys()) != res:
             # FIXME: include query in warning
-            logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob instead of supval. : {:#x}".format(__name__, ea))
+            logging.warn("{:s}.selectcontents : Contents cache is out of sync. Using contents blob at {:#x} instead of supval.".format(__name__, ea))
 
         # now start aggregating the keys that the user is looking for
         res, d = builtins.set(), internal.comment.contents.name(ea)
@@ -1557,7 +1557,7 @@ class imports(object):
         if len(res) > 1:
             builtins.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in res))
             f = utils.fcompose(utils.second, cls.__formatl__)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, returning the first one. : {!r}".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn("{:s}.search({:s}) : Found {:d} matching results. Returning the first import {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -1791,7 +1791,7 @@ class address(object):
             Fprev = idaapi.prev_not_tail
 
         if Fprev(ea) == idaapi.BADADDR:
-            raise StandardError("{:s}.prevF: Refusing to seek past the top of the database: ({:#x} <= {:#x})".format('.'.join((__name__, cls.__name__)), ea, config.bounds()[0]))
+            raise StandardError("{:s}.prevF: Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), config.bounds()[0], ea))
 
         res = cls.__walk__(Fprev(ea), Fprev, Finverse)
         return cls.prevF(res, predicate, count-1) if count > 1 else res
@@ -1815,7 +1815,7 @@ class address(object):
         """
         Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
         if Fnext(ea) == idaapi.BADADDR:
-            raise StandardError("{:s}.nextF: Refusing to seek past the bottom of the database: ({:#x} >= {:#x})".format('.'.join((__name__, cls.__name__)), idaapi.get_item_end(ea), config.bounds()[1]))
+            raise StandardError("{:s}.nextF: Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), config.bounds()[1], idaapi.get_item_end(ea)))
         res = cls.__walk__(Fnext(ea), Fnext, Finverse)
         return cls.nextF(res, predicate, count-1) if count > 1 else res
 
@@ -2043,14 +2043,14 @@ class address(object):
         prevea = cls.prev(ea)
         if prevea is None:
             # FIXME: include registers in message
-            logging.fatal("{:s}.prevreg({:s}, ...) : Unable to start walking from previous address. : {:#x}".format('.'.join((__name__, cls.__name__)), args, ea))
+            logging.fatal("{:s}.prevreg({:s}, ...) : Unable to start walking from the previous address of {:#x}.".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
 
         # now walk while none of our registers match
         res = cls.__walk__(prevea, cls.prev, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
-            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x}{:+#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
+            raise ValueError("{:s}.prevreg({:s}, ...) : Unable to find register{:s} within the chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2104,14 +2104,14 @@ class address(object):
         nextea = cls.next(ea)
         if nextea is None:
             # FIXME: include registers in message
-            logging.fatal("{:s}.nextreg({:s}) : Unable to start walking from next address. : {:#x}".format('.'.join((__name__, cls.__name__)), args, ea))
+            logging.fatal("{:s}.nextreg({:s}) : Unable to start walking from the next address of {:#x}.".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
 
         # now walk while none of our registers match
         res = cls.__walk__(nextea, cls.next, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
-            raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk. {:#x}{:+#x} : {:#x}".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', ea, end, res))
+            raise ValueError("{:s}.nextreg({:s}, ...) : Unable to find register{:s} within chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', ea, end, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2127,12 +2127,12 @@ class address(object):
     @classmethod
     def prevstack(cls, ea, delta):
         '''Return the previous instruction from ``ea`` that is past the specified sp ``delta``.'''
-        logging.warn("{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change!".format('.'.join((__name__, cls.__name__)), ea, delta))
+        logging.warn("{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
         res = cls.__walk__(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res < start:
-            raise ValueError("{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} < {:#x} ".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, start))
+            raise ValueError("{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the top ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, start, fn, res))
         return res
 
     # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
@@ -2145,12 +2145,12 @@ class address(object):
     @classmethod
     def nextstack(cls, ea, delta):
         '''Return the next instruction from ``ea`` that is past the sp ``delta``.'''
-        logging.warn("{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change!".format('.'.join((__name__, cls.__name__)), ea, delta))
+        logging.warn("{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
         res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res >= end:
-            raise ValueError("{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking outside the bounds of the function {:#x} : {:#x} >= {:#x}".format('.'.join((__name__, cls.__name__)), ea, delta, fn, res, end))
+            raise ValueError("{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the bottom ({:#x} of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, end, fn, res))
         return res
     prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
 
@@ -2724,11 +2724,11 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the array's (element, length) at the current address.'''
+            '''Return the array's `(element, length)` at the current address.'''
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the array's (element, length) at the address specified by ``ea``.'''
+            '''Return the array's `(element, length)` at the address specified by ``ea``.'''
             return cls.element(ea), cls.length(ea)
 
         @utils.multicase()
@@ -2796,12 +2796,12 @@ class type(object):
 
             res = type.flags(ea, idaapi.DT_TYPE)
             if res != idaapi.FF_STRU:
-                raise TypeError("{:s}.id({:#x}) : type at specified locatiopn is not an FF_STRU({:#x}) : {:#x}".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
+                raise TypeError("{:s}.id({:#x}) : The type at specified addresss is not an FF_STRU({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
 
             ti, F = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, F, ti)
             if not res:
-                raise ValueError("{:s}.id({:#x}) : idaapi.get_opinfo returned {:#x} at {:#x}".format('.'.join((__name__, 'type', 'structure')), ea, res, ea))
+                raise ValueError("{:s}.id({:#x}) : The call to idaapi.get_opinfo returned {:#x} at {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, res, ea))
             return ti.tid
 
         @utils.multicase()
@@ -3160,10 +3160,10 @@ class marks(object):
         try:
             idx = cls.__find_slotaddress(ea)
             ea, res = cls.by_index(idx)
-            logging.warn("{:s}.new({:#x}, ...) : Replacing mark {:d} at {:#x} : {!r} -> {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, res, description))
+            logging.warn("{:s}.new({:#x}, ...) : Replacing mark {:d} at {:#x} and changing the description from {!r} to {!r}.".format('.'.join((__name__, cls.__name__)), ea, idx, ea, res, description))
         except KeyError:
             res, idx = None, cls.__free_slotindex()
-            logging.info("{:s}.new({:#x}, ...) : Creating mark {:d} at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, description))
+            logging.info("{:s}.new({:#x}, ...) : Creating mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, idx, ea, description))
         cls.__set_description(idx, ea, description, **extra)
         return res
 
@@ -3180,7 +3180,7 @@ class marks(object):
         idx = cls.__find_slotaddress(ea)
         descr = cls.__get_description(idx)
         cls.__set_description(idx, ea, '')
-        logging.warn("{:s}.remove({:#x}) : Removed mark {:d} at {:#x} : {!r}".format('.'.join((__name__, cls.__name__)), ea, idx, ea, descr))
+        logging.warn("{:s}.remove({:#x}) : Removed mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, idx, ea, descr))
         return descr
 
     @classmethod
@@ -3201,10 +3201,10 @@ class marks(object):
 
     @classmethod
     def by_index(cls, index):
-        '''Return the (address, description) of the mark at the specified ``index`` in the mark list.'''
+        '''Return the `(address, description)` of the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.__get_slotaddress(index), cls.__get_description(index))
-        raise KeyError("{:s}.by_index({:d}) : Mark slot index is out of bounds. : {:s}".format('.'.join((__name__, cls.__name__)), index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
+        raise KeyError("{:s}.by_index({:d}) : The specified mark slot index ({:d}) is out of bounds ({:s}).".format('.'.join((__name__, cls.__name__)), index, index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
     byIndex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
@@ -3215,7 +3215,7 @@ class marks(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def by_address(cls, ea):
-        '''Return the (address, description) of the mark at the given address ``ea``.'''
+        '''Return the `(address, description)` of the mark at the given address ``ea``.'''
         return cls.by_index(cls.__find_slotaddress(ea))
     by = byAddress = utils.alias(by_address, 'marks')
 
@@ -4143,13 +4143,13 @@ class get(object):
             return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
         else:
             query_l = itertools.imap(utils.unbox('{:s}={!r}'.format), six.iteritems(length))
-            raise TypeError("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. : {:#x} & idaapi.DT_TYPE = {:#x}".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if query_l else '', ea, F, T))
+            raise TypeError("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the idaapi.DT_TYPE as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if query_l else '', ea, F, T))
 
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
         res = array.array(t, read(ea, count * cb))
         if len(res) != count:
-            logging.warn("{:s}.get({:#x}) : Unexpected length : ({:d} != {:d})".format('.'.join((__name__, cls.__name__)), ea, len(res), count))
+            logging.warn("{:s}.get({:#x}) : The decoded array length {:d} is not the same as the expected length {:d}.".format('.'.join((__name__, cls.__name__)), ea, len(res), count))
         return res
 
     @utils.multicase()

@@ -13,21 +13,21 @@ import idaapi
 
 ### c declaration stuff
 def function(ea):
-    '''returns the C function declaration at given address'''
+    '''Returns the C function declaration at the address ``ea``.'''
     result = idaapi.idc_get_type(ea)
     if result is None:
-        raise ValueError("function {:x} does not have a declaration".format(ea))
+        raise ValueError("The function {:x} does not have a declaration.".format(ea))
     return result
 
 def arguments(ea):
-    '''returns an array of all the function's C arguments'''
+    '''Returns an array of all of the arguments within the prototype of the function at ``ea``.'''
     decl = function(ea)
     args = decl[ decl.index('(')+1: decl.rindex(')') ]
     result = [ x.strip() for x in args.split(',')]
     return result
 
 def size(string):
-    '''returns the size of a c declaration'''
+    '''Returns the size of a type described by a C declaration in ``string``.'''
     string = string.strip()
     if string.lower() == 'void':
         return 0
@@ -37,15 +37,16 @@ def size(string):
         result = idaapi.idc_parse_decl(idaapi.cvar.idati, string if string.endswith(';') else string+';', 0)
 
     if result is None:
-        raise TypeError("Unable to parse C declaration : {!r}".format(string))
+        raise TypeError("Unable to parse the C declaration {!r}.".format(string))
     _,type,_ = result
     return idaapi.get_type_size0(idaapi.cvar.idati, type)
 
 def demangle(string):
-    '''demangle's a symbol to a human-decipherable string'''
+    '''Given a mangled C++ ``string``, demangle it back into a human-readable symbol.'''
     return extract.declaration(string)
 
-def mangled(string):
+def mangledQ(string):
+    '''Return true if the provided ``string`` has been mangled.'''
     return any(string.startswith(n) for n in ('?', '__'))
 
 ## examples to test below code with
