@@ -335,6 +335,12 @@ class chunks(object):
     This namespace is for interacting with the different chunks
     associated with a function. By default this namespace will yield
     the boundaries of each chunk associated with a function.
+
+    Some of the ways to use this namespace are::
+
+        > for l, r in function.chunks(): ...
+        > for ea in function.chunks.iterate(ea): ...
+
     """
     @utils.multicase()
     def __new__(cls):
@@ -398,6 +404,14 @@ class chunk(object):
     This namespace is for interacting with a specific chunk belonging
     to a function. By default this namespace will return the bounds of
     the chunk containing the requested address.
+
+    The functions in this namespace can be used as::
+
+        > l, r = function.chunk(ea)
+        > ea = function.chunk.top()
+        > function.chunk.add(function.by(), 0x401000, 0x402000)
+        > function.chunk.remove(ea)
+
     """
     @utils.multicase()
     def __new__(cls):
@@ -535,6 +549,13 @@ class blocks(object):
     Due to `idaapi.FlowChart` and networkx's digraph being used so
     often, these functions are exported globally as `function.flowchart`
     and `function.digraph`.
+
+    Some examples of this namespace's usage::
+
+        > for bb in function.blocks(): ...
+        > chart = function.blocks.flowchart(ea)
+        > G = function.blocks.graph()
+
     """
     @utils.multicase()
     def __new__(cls):
@@ -677,6 +698,18 @@ class block(object):
     basic block will be returned. This bounds or an address within
     these bounds can then be used in other functions within this
     namespace.
+
+    Some examples of this functionality can be::
+
+        > B = function.block(ea)
+        > bid = function.block.id()
+        > c = function.block.color(ea, rgb)
+        > print function.block.before(ea)
+        > for ea in function.block.iterate(): print database.disasm(ea)
+        > for ea, op, st in function.block.register('eax', read=1): ...
+        > print function.block.read().encode('hex')
+        > print function.block.disasm(ea)
+
     """
     @utils.multicase()
     @classmethod
@@ -1115,6 +1148,13 @@ class frame(object):
     function's frame. By default, this namespace will return a
     `structure_t` representing the frame belonging to the specified
     function.
+
+    Some ways of using this can be::
+
+        > print function.frame()
+        > print hex(function.frame.id(ea))
+        > sp = function.frame.delta(ea)
+
     """
     @utils.multicase()
     def __new__(cls):
@@ -1169,6 +1209,12 @@ class frame(object):
 
         At the moment, register-based calling conventions are not
         supported.
+
+        Some ways of using this are::
+
+            > print function.frame.args(f)
+            > print function.frame.args.size(ea)
+
         """
 
         @utils.multicase()
@@ -1234,6 +1280,11 @@ class frame(object):
         """
         This namespace provides information about the local variables
         defined within a function's frame.
+
+        Some ways to get this information can be::
+
+            > print function.frame.lvars.size()
+
         """
         @utils.multicase()
         @classmethod
@@ -1252,6 +1303,11 @@ class frame(object):
         """
         This namespace provides information about the registers that
         are saved when a function constructs its frame.
+
+        An example of using this namespace::
+
+            > print function.frame.regs.size(ea)
+
         """
 
         @utils.multicase()
@@ -1528,6 +1584,12 @@ class type(object):
     specified function. This allows one to get any attributes that IDA
     or a user has applied to a function within the database. This alows
     one to filter functions according to their particular attributes.
+
+    Some simple ways of getting information about a function::
+
+        > print function.type.has_noframe()
+        > for ea in filter(function.type.is_library, database.functions()): ...
+
     """
     @utils.multicase()
     @classmethod

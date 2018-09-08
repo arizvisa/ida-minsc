@@ -53,9 +53,10 @@ import idaapi
 ## operand types
 class __optype__(object):
     """
-    Registration table for all the different operand type decoders available
-    for all the architectures. This is used for looking up an operand according
-    to the operand and processor types.
+    This namespace is a registration table for all the different operand
+    type decoders available for the known architectures. This is used
+    for looking up an operand according to the operand and processor
+    types.
     """
     cache = {}
     @classmethod
@@ -883,8 +884,9 @@ def is_calli(ea):
 ## XXX: This namespace is deleted after each method has been assigned to their lookup table
 class operand_types:
     """
-    This namespace contains all of the operand type handlers for each
-    architecture.
+    This internal namespace is responsible for registering the operand
+    type handlers for each architecture inside `__optype__` and is
+    deleted after they are registered.
     """
     @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
@@ -1110,8 +1112,8 @@ del(operand_types)
 ## intel operands
 class intelop:
     """
-    This namespace contains the different operand types that can be
-    returned for the Intel architecture.
+    This internal namespace contains the different operand types that
+    can be returned for the Intel architecture.
     """
     class SegmentOffset(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -1179,6 +1181,11 @@ class intelop:
 
 ## arm operands
 class armop:
+    """
+    This internal namespace contains the different operand types that
+    can be returned for the Arm architecture.
+    """
+
     class flex(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple representing a flexible operand as available on the Arm architecture.
@@ -1276,6 +1283,11 @@ class armop:
 
 ## mips operands
 class mipsop:
+    """
+    This internal namespace contains the different operand types that
+    can be returned for the Mips architecture.
+    """
+
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple for representing a memory phrase on the Mips architecture.

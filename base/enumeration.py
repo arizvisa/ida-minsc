@@ -242,28 +242,26 @@ def list(**type):
 ## members
 class member(object):
     """
-    This class allows one to interact with the members of a defined enumeration.
+    This namespace allows one to interact with the memberes of an
+    enumeration once the enumeration's id has been determined.
+    This allows one to iterate through all of the enmeration's
+    members or add and remove values to the enumeration.
 
-    Examples:
-        e = enum.byName('example_enumeration')
-        print enum.repr(e)
+    Some examples of how to use this namespace can be::
 
-        enum.member.rename(e, 'oldname', 'newname')
+        > e = enum.by('example_enumeration')
+        > print enum.repr(e)
+        > oldname = enum.member.rename(e, 'oldname', 'newname')
+        > n = enum.member.add(e, 'name', 0x1000)
+        > ok = enum.member.remove(n)
+        > n = enum.member.byName(e, 'name')
+        > n = enum.member.byValue(e, 0x1000)
+        > oldname = enum.member.name(n, 'somename')
+        > res = enum.member.value(n, 0x100)
+        > oldcomment = enum.member.comment(n, 'This is an test value')
+        > for m in enum.member.iterate(e): ...
+        > enum.member.list(e)
 
-        n = enum.member.add(e, 'name', 0x1000)
-        enum.member.remove(n)
-
-        n = enum.member.byName(e, 'name')
-        n = enum.member.byValue(e, 0x1000)
-
-        enum.member.name(n, 'somename')
-        enum.member.value(n, 0x100)
-        enum.member.comment(n, 'This is an test value')
-
-        for n in enum.member.iterate(e):
-            print enum.member.name(n)
-            print enum.member.value(n)
-            print enum.member.comment(n)
     """
 
     @classmethod

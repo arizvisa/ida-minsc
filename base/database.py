@@ -225,7 +225,7 @@ path = utils.alias(config.path, 'config')
 baseaddress = base = utils.alias(config.baseaddress, 'config')
 
 class functions(object):
-    """
+    r"""
     This namespace is used for listing all the functions inside the
     database. By default a list is returned containing the address of
     each function.
@@ -237,6 +237,14 @@ class functions(object):
         `like` - Filter the function names according to a glob
         `regex` - Filter the function names according to a regular-expression
         `predicate` - Filter the functions by passing their `idaapi.func_t` to a callable
+
+    Some examples of how to use these keywords are as follows::
+
+        > for ea in database.functions(): ...
+        > database.functions.list('*sub*')
+        > iterable = database.functions.iterate(regex='.*alloc')
+        > result = database.functions.search(like='*alloc*')
+
     """
     __matcher__ = utils.matcher()
     __matcher__.boolean('name', operator.eq, utils.fcompose(function.by,function.name))
@@ -389,7 +397,7 @@ class functions(object):
         return res
 
 class segments(object):
-    """
+    r"""
     This namespace is used for listing all the segments inside the
     database. By default each segment's boundaries are yielded.
 
@@ -404,6 +412,14 @@ class segments(object):
         `greater` or `gt` - Filter the segments for any after the specified address
         `less` or `lt` - Filter the segments for any before the specified address
         `predicate` - Filter the segments by passing its `idaapi.segment_t` to a callable
+
+    Some examples of using these keywords are as follows::
+
+        > for l, r in database.segments(): ...
+        > database.segments.list(regex=r'\.r?data')
+        > iterable = database.segments.iterate(like='*text*')
+        > result = database.segments.search(greater=0x401000)
+
     """
 
     def __new__(cls):
@@ -534,6 +550,14 @@ class names(object):
         `regex` - Filter the symbol names according to a regular-expression
         `index` - Match the symbol according to its index
         `predicate` - Filter the symbols by passing their address to a callable
+
+    Some examples of using these keywords are as follows::
+
+        > list(database.names())
+        > database.names.list(index=31)
+        > iterable = database.names.iterate(like='str.*')
+        > result = database.names.search(name='some_really_sick_symbol_name')
+
     """
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', idaapi.get_nlist_ea), __matcher__.mapping('ea', idaapi.get_nlist_ea)
@@ -950,6 +974,13 @@ class entries(object):
         `greater` or `gt` - Filter the entrypoints for any after the specified address
         `less` or `lt` - Filter the entrypoints for any before the specified address
         `predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
+
+    Some examples of using these keywords are as follows::
+
+        > database.entries.list(greater=h())
+        > iterable = database.entries.iterate(like='Nt*')
+        > result = database.entries.search(index=0)
+
     """
 
     __matcher__ = utils.matcher()
@@ -1395,6 +1426,13 @@ class imports(object):
         `ordinal` - Match according to the import's hint (ordinal)
         `index` - Match according index of the import
         `predicate` Filter the imports by passing the above (default) tuple to a callable
+
+    Some examples of using these keywords are as follows:;
+
+        > database.imports.list(module='kernelbase.dll')
+        > iterable = database.imports.iterate(like='*alloc*')
+        > result = database.imports.search(index=42)
+
     """
     def __new__(cls):
         return cls.__iterate__()
@@ -1589,6 +1627,14 @@ class address(object):
         `database.prevref` - Moving to the "previous" address with a reference
         `database.nextreg` - Moving to the "next" address using a register
         `database.prevreg` - Moving to the "previous" address using a register
+
+    Some examples of using this namespace can be::
+
+        > ea = database.a.next(ea)
+        > ea = database.a.prevreg(ea, 'edx', write=1)
+        > ea = database.a.nextref(ea)
+        > ea = database.a.prevcall(ea)
+
     """
 
     @staticmethod
@@ -2458,6 +2504,15 @@ class type(object):
 
     By default, this namespace will return the `idaapi.DT_TYPE` of the
     specified address.
+
+    Some examples of using this namespace can be::
+
+        > print database.type.size(ea)
+        > print database.type.is_initialized(ea)
+        > print database.type.is_data(ea)
+        > length = database.t.array.length(ea)
+        > st = database.t.structure(ea)
+
     """
 
     @utils.multicase()
@@ -2721,6 +2776,14 @@ class type(object):
         that is defined within the database. By default this namespace
         will return the array's element size and number of elements as
         a tuple `(size, count)`.
+
+        Some examples of using this namespace can be::
+
+            > cb, length = databaes.t.array()
+            > print database.t.array.size(ea)
+            > print database.t.array.element(ea)
+            > print database.t.array.length(ea)
+
         """
         @utils.multicase()
         def __new__(cls):
@@ -2772,6 +2835,13 @@ class type(object):
         This namespace for returning type information about a structure
         that is defined within the database. By default this namespace
         will return the `structure_t` at the given address.
+
+        Some of the ways to use this namespace are::
+
+            > st = database.t.struct()
+            > print database.t.struct.size()
+            > st = structure.by(database.t.id(ea))
+
         """
         @utils.multicase()
         def __new__(cls):
@@ -2896,6 +2966,14 @@ class xref(object):
         `database.dxdown` - Return all the data references that an address references
         `database.cxup` - Return all the code references that reference an address
         `database.cxdown` - Return all the code references that an address references
+
+    Some ways to utilize this namespace can be::
+
+        > print database.x.up()
+        > for ea in database.x.down(): ...
+        > for ea in database.x.cu(ea): ...
+        > ok = database.x.add_code(ea, target)
+        > ok = database.x.del_data(ea)
 
     """
 
@@ -3135,6 +3213,14 @@ class marks(object):
     utilize "tags" as they provide significantly more flexibility.
     Using marks allows for one to use IDA's mark window for quick
     navigation to a mark.
+
+    The functions in this namespace can be used like::
+
+        > for ea, descr in database.marks(): ...
+        > database.marks.new('this is my description')
+        > database.marks.remove(ea)
+        > ea, descr = database.marks.by(ea)
+
     """
     MAX_SLOT_COUNT = 0x400
     table = {}
@@ -3348,11 +3434,19 @@ def mark(ea, description):
     return marks.new(ea, description)
 
 class extra(object):
-    """
+    r"""
     This namespace is for interacting with IDA's "extra" comments that
     can be associated with an address. This allows one to prefix or
     suffix an address with a large block of text simulating a
     multilined or paragraph comment.
+
+    To add extra comments, one can do this like::
+
+        > res = database.ex.prefix(ea, 'this\nis\na\nmultilined\ncomment')
+        > res = database.ex.suffix(ea, "whee\nok...i'm over it.")
+        > database.ex.insert(ea, 1)
+        > database.extra.append(ea, 2)
+
     """
 
     MAX_ITEM_LINES = 5000   # defined in cfg/ida.cfg according to python/idc.py
@@ -3651,6 +3745,14 @@ class set(object):
     database. This allows one to apply a particular type to a given
     address. This allows one to specify whether a type is a string,
     undefined, code, data, an array, or even a structure.
+
+    This can be used as in the following examples::
+
+        > database.set.unknown(ea)
+        > database.set.aligned(ea, alignment=0x10)
+        > database.set.string(ea)
+        > database.set.structure(ea, structure.by('mystructure'))
+
     """
     @utils.multicase()
     @classmethod
@@ -3803,7 +3905,12 @@ class set(object):
         This namespace used for applying various sized integer types to
         a particular address.
 
-        This namespace is also aliased as `database.set.i`.
+        This namespace is also aliased as `database.set.i` and can be used
+        as follows::
+
+            > database.set.i.byte(ea)
+            > database.set.i.qword(ea)
+
         """
         @utils.multicase()
         @classmethod
@@ -3893,6 +4000,17 @@ class get(object):
     decoded. This includes standard functions for reading integers of
     different sizes, decoding structures, and even reading of arrays
     from the database.
+
+    In order to decode various things out of the database, some of the
+    following examples can be used::
+
+        > res = database.get.signed()
+        > res = database.get.unsigned(ea, 8, byteorder='big')
+        > res = database.get.array(ea)
+        > res = database.get.array(length=42)
+        > res = database.get.structure(ea)
+        > res = database.get.structure(ea, structure=structure.by('mystructure'))
+
     """
     @utils.multicase()
     @classmethod
@@ -3952,7 +4070,13 @@ class get(object):
         This namespace contains the different ISO standard integer types that
         can be used to read integers out of the database.
 
-        This namespace is also aliased as `database.get.i`.
+        This namespace is also aliased as `database.get.i` and can be used
+        like in the following examples::
+
+            > res = database.get.i.uint32_t()
+            > res = database.get.i.sint64_t(ea)
+            > res = database.get.i.uint8_t(ea)
+
         """
         @utils.multicase()
         def __new__(cls, **byteorder):
@@ -4210,6 +4334,12 @@ class get(object):
         as a function against any known component of a switch. It will then
         return a class that allows one to query the different attributes of
         an `idaapi.switch_info_t`.
+
+        This namespace can be used as in the following example::
+
+            > sw = database.get.switch(ea)
+            > print sw
+
         """
         @classmethod
         def __getlabel(cls, ea):

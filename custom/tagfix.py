@@ -8,12 +8,15 @@ used to rebuild the tag-cache by manually scanning the currently
 defined tags and resetting its references in order to allow one
 to query again.
 
-To manually rebuild the cache for the database, use the following:
-> custom.tagfix.everything()
+To manually rebuild the cache for the database, use the following::
 
-Likewise to rebuild the cache for just the globals or the contents:
-> custom.tagfix.globals()
-> custom.tagfix.contents()
+    > custom.tagfix.everything()
+
+Likewise to rebuild the cache for just the globals or the contents::
+
+    > custom.tagfix.globals()
+    > custom.tagfix.contents()
+
 """
 
 import six, sys, logging
