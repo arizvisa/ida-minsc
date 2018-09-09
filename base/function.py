@@ -54,13 +54,21 @@ def by_name(name):
 byName = utils.alias(by_name)
 
 @utils.multicase()
-def by(): return by_address(ui.current.address())
+def by():
+    '''Return the current function.'''
+    return by_address(ui.current.address())
 @utils.multicase(func=idaapi.func_t)
-def by(func): return func
+def by(func):
+    '''Return the function identified by ``func``.'''
+    return func
 @utils.multicase(ea=six.integer_types)
-def by(ea): return by_address(ea)
+def by(ea):
+    '''Return the function at the address ``ea``.'''
+    return by_address(ea)
 @utils.multicase(name=basestring)
-def by(name): return by_name(name)
+def by(name):
+    '''Return the function with the specified ``name``.'''
+    return by_name(name)
 
 # FIXME: implement a matcher class for func_t
 
