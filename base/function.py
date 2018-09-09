@@ -377,7 +377,7 @@ def new():
     return new(ui.current.address())
 @document.aliases('make', 'add')
 @utils.multicase(start=six.integer_types)
-@document.parameters(new='the starting address of the function to create', end='if `end` is specified as an address, then use it to determine the end of the created function')
+@document.parameters(start='the starting address of the function to create', end='if `end` is specified as an address, then use it to determine the end of the created function')
 def new(start, **end):
     """Make a function at the address `start` and return its entrypoint.
 

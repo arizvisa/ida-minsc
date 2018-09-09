@@ -127,7 +127,7 @@ def by_address(ea):
     return seg
 byAddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
-@document.parameters(ea='an `idaapi.segment_t` to return')
+@document.parameters(segment='an `idaapi.segment_t` to return')
 def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
     return segment
@@ -167,7 +167,7 @@ def by(**type):
 
 @utils.multicase(name=basestring)
 @utils.string.decorate_arguments('name')
-@document.parameters(string='the glob to match the segment name with')
+@document.parameters(name='the glob to match the segment name with')
 def search(name):
     '''Search through all the segments and return the first one matching the glob `name`.'''
     return by(like=name)

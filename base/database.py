@@ -4003,7 +4003,7 @@ class marks(object):
     @document.aliases('marks.by')
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    @document.parameters(index='the address of a mark')
+    @document.parameters(ea='the address of a mark')
     def by_address(cls, ea):
         '''Return the `(address, description)` of the mark at the given address `ea`.'''
         return cls.by_index(cls.__find_slotaddress(ea))
@@ -4130,7 +4130,7 @@ def mark(ea):
     return res
 @utils.multicase(description=basestring)
 @utils.string.decorate_arguments('description')
-@document.parameters(ea='the description to set the mark with')
+@document.parameters(description='the description to set the mark with')
 def mark(description):
     '''Set the mark at the current address to the specified `description`.'''
     return mark(ui.current.address(), description)
@@ -4191,14 +4191,14 @@ class extra(object):
     @document.aliases('extra.prefixQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    @document.parameters('the address to check for a prefix comment')
+    @document.parameters(ea='the address to check for a prefix comment')
     def has_prefix(cls, ea):
         '''Returns true if the item at the address `ea` has extra prefix lines.'''
         return cls.__has_extra__(ea, idaapi.E_PREV)
     @document.aliases('extra.suffixQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    @document.parameters('the address to check for a suffix comment')
+    @document.parameters(ea='the address to check for a suffix comment')
     def has_suffix(cls, ea):
         '''Returns true if the item at the address `ea` has extra suffix lines.'''
         return cls.__has_extra__(ea, idaapi.E_NEXT)
@@ -4595,13 +4595,13 @@ class set(object):
 
     @utils.multicase(size=six.integer_types)
     @classmethod
-    @document.parameters(size='the amount of bytes to set')
+    @document.parameters(size='the amount of bytes to set', type='if `type` is specified then use the specified IDA type (`idaapi.FF_*`) or `structure_t`')
     def data(cls, size, **type):
         '''Set the data at the current address to have the specified `size` and `type`.'''
         return cls.data(ui.current.address(), size, **type)
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
-    @document.parameters(ea='an address in the database', size='the amount of bytes to set')
+    @document.parameters(ea='an address in the database', size='the amount of bytes to set', type='if `type` is specified then use the specified IDA type (`idaapi.FF_*`) or `structure_t`')
     def data(cls, ea, size, **type):
         """Set the data at address `ea` to have the specified `size` and `type`.
 

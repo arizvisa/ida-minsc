@@ -154,12 +154,12 @@ def new(name, offset):
 
 @utils.multicase(name=basestring)
 @utils.string.decorate_arguments('name')
-@document.parameters(name='the name of the structure to return')
+@document.parameters(name='the name of the structure to return', options='if `offset` is specified then use it as the base offset of the structure')
 def by(name, **options):
     '''Return a structure by its name.'''
     return by_name(name, **options)
 @utils.multicase(id=six.integer_types)
-@document.parameters(id='the identifier or the index of the structure to return')
+@document.parameters(id='the identifier or the index of the structure to return', options='if `offset` is specified then use it as the base offset of the structure')
 def by(id, **options):
     '''Return a structure by its index or id.'''
     res = id
@@ -958,7 +958,7 @@ class members_t(object):
         '''Return the member with the specified `name`.'''
         return self.by_name(name)
     @utils.multicase(offset=six.integer_types)
-    @document.parameters(name='the offset of the member to return')
+    @document.parameters(offset='the offset of the member to return')
     def by(self, offset):
         '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
@@ -1017,7 +1017,7 @@ class members_t(object):
     byoffset = byOffset = utils.alias(by_offset, 'members_t')
 
     @document.aliases('members_t.by_id', 'members_t.byId')
-    @document.paramaters(id='the identifier of the member to return')
+    @document.parameters(id='the identifier of the member to return')
     def by_identifier(self, id):
         '''Return the member in the structure that has the specified `id`.'''
         res = idaapi.get_member_by_id(id)
@@ -1296,7 +1296,7 @@ class member_t(object):
         return utils.string.of(res)
     @name.setter
     @utils.string.decorate_arguments('string')
-    @document.properties(string='the new name to rename the member to')
+    @document.parameters(string='the new name to rename the member to')
     def name(self, string):
         '''Set the name of the member to `string`.'''
         if isinstance(string, tuple):
