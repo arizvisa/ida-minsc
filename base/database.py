@@ -2044,22 +2044,22 @@ class address(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, reg, *regs, **modifiers):
-        '''Return the previous address containing an instruction that uses one of the specified registers ``regs``.'''
+        '''Return the previous address containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
         return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, predicate, reg, *regs, **modifiers):
-        '''Return the previous address containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the previous address containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
         return cls.prevreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
-        '''Return the previous address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.'''
+        '''Return the previous address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
         return cls.prevreg(ea, utils.fconst(True), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, ea, predicate, reg, *regs, **modifiers):
-        '''Return the previous address from ``ea`` containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the previous address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
         args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
@@ -2105,22 +2105,22 @@ class address(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that uses one of the specified registers ``regs``.'''
+        '''Return the next address containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
         return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, predicate, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the next address containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
         return cls.nextreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
-        '''Return the next address from ``ea`` containing an instruction that uses one of the specified registers ``regs``.'''
+        '''Return the next address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
         return cls.nextreg(ea, utils.fconst(True), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, ea, predicate, reg, *regs, **modifiers):
-        '''Return the next address from ``ea`` containing an instruction that uses one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the next address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
         regs = (reg,) + regs
         count = modifiers.get('count',1)
         args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))

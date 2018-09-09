@@ -408,12 +408,12 @@ class chunks(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the current function that touches any of the specified ``regs``.'''
+        '''Yield each `(address, opnum, state)` within the current function that touches ``reg`` or any of the specified ``regs``.'''
         return cls.register(ui.current.function(), reg, *regs, **modifiers)
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, func, reg, *regs, **modifiers):
-        """Yield each `(address, opnum, state)` within the function ``func`` that touches any of the specified``regs``.
+        """Yield each `(address, opnum, state)` within the function ``func`` that touches ``reg`` or any of the specified ``regs``.
 
         If the keyword ``write`` is True, then only return the result if it's writing to the register.
         """
@@ -1069,24 +1069,24 @@ class block(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the current block that touches any of the specified ``regs``.'''
+        '''Yield each `(address, opnum, state)` within the current block that touches ``reg`` or any of the specified ``regs``.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the block containing ``ea`` that touches any of the specified``regs``.'''
+        '''Yield each `(address, opnum, state)` within the block containing ``ea`` that touches ``reg`` or any of the specified ``regs``.'''
         blk = blocks.at(ea)
         return cls.register(blk, reg, *regs, **modifiers)
     @utils.multicase(tuple=types.TupleType, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, tuple, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the block identified by ``tuple`` that touches any of the specified ``regs``.'''
+        '''Yield each `(address, opnum, state)` within the block identified by ``tuple`` that touches ``reg`` or any of the specified ``regs``.'''
         bb = cls.at(tuple)
         return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
-        """Yield each `(address, opnum, state)` within the block ``bb`` that touches any of the specified ``regs``.
+        """Yield each `(address, opnum, state)` within the block ``bb`` that touches ``reg`` or any of the specified ``regs``.
 
         If the keyword ``write`` is true, then only return the result if it's writing to the register.
         """
