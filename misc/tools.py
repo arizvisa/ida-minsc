@@ -49,7 +49,7 @@ def map(F, **kwargs):
 # For poor folk without a dbgeng
 class remote(object):
     """
-    An object that can be used to transform addresses to and from
+    An object that can be used to translate addresses to and from
     a debugging target so that one does not need to rebase their
     entire database, or come up with some other tricks to translate
     a binary address to its runtime address.
@@ -183,7 +183,7 @@ def checkmarks():
     return
 
 def collect(ea, sentinel):
-    """Collect all the basic-blocks starting at address ``ea`` and recurse until a terminating block is encountered.
+    """Collect all the basic blocks starting at address ``ea`` and recurse until a terminating block is encountered.
 
     If the set ``sentinel`` is specified, then its addresses are used as
     sentinel blocks and collection will terminate when those blocks are

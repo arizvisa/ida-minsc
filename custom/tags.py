@@ -4,7 +4,7 @@ Tags module
 This module exposes tools for exporting the currently defined tags
 within the database. Once exported, these tags can then be pickled
 or then re-applied to the same or another database. Some options
-are allowed which will let a user apply transformations to the tags
+are allowed which will let a user apply translations to the tags
 before applying them to a target database.
 
 To fetch all of the tags from the database::
@@ -89,7 +89,7 @@ class read(object):
 
     If ``location`` is specified as true, then read each contents tag
     according to its location rather than an address. This allows one
-    to perform a transformation of the tags in case the function chunks
+    to perform a translation of the tags in case the function chunks
     are at different addresses than when the tags were read.
     """
 
@@ -460,7 +460,7 @@ class export(object):
 
     If ``location`` is specified as true, then read each contents tag
     according to its location rather than an address. This allows one
-    to perform a transformation of the tags in case the function chunks
+    to perform a translation of the tags in case the function chunks
     are at different addresses than when the tags were read.
     """
 
@@ -473,12 +473,12 @@ class export(object):
     def content(cls, F, *tags, **location):
         '''Iterate through the specified ``tags`` belonging to the contents of the function at ``ea`` using the cache.'''
         identity = lambda res: res
-        transform = addressToLocation if location.get('location', False) else identity
+        translate = addressToLocation if location.get('location', False) else identity
 
         iterable = func.select(F, Or=tags) if tags else func.select(F)
         for ea, res in iterable:
             ui.navigation.set(ea)
-            if res: yield transform(ea), res
+            if res: yield translate(ea), res
         return
 
     ## query the frame from a function
