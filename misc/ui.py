@@ -166,6 +166,7 @@ class appwindow(object):
     Base namespace used for interacting with the windows provided by IDA.
     """
     @classmethod
+    @document.parameters(args='any options or arguments to pass to the windows open function')
     def open(cls, *args):
         '''Open or show the window belonging to the namespace.'''
         global widget
@@ -371,6 +372,7 @@ class timer(object):
         cls.clock[id] = res = idaapi.register_timer(interval, callable)
         return res
     @classmethod
+    @document.parameters(id='the unique id of the callable to unregister')
     def unregister(cls, id):
         '''Unregister the specified `id`.'''
         raise internal.exceptions.UnsupportedCapability(u"{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
@@ -407,7 +409,7 @@ class navigation(object):
         return cls.__set__(ea)
 
     @classmethod
-    @document.parameters(ea='the address to set the auto-analysis address to on the navigation bar')
+    @document.parameters(ea='the address to set the auto-analysis address to on the navigation bar', type='if `type` is specified as an `idaapi.AU_*`, then use this as the navigation type')
     def auto(cls, ea, **type):
         """Set the auto-analysis address and type on the navigation bar to `ea`.
 
