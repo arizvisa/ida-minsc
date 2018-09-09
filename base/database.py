@@ -1148,7 +1148,7 @@ def color(ea, none):
     '''Remove the color at the address `ea`.'''
     return idaapi.set_item_color(interface.address.inside(ea), 0xffffffff)
 @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
-@document.parameters(ea='an address in the database', rgb='a number representing the red, green, and blue values (0x00RRGGBB)')
+@document.parameters(ea='an address in the database', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)')
 def color(ea, rgb):
     '''Set the color at address `ea` to `rgb`.'''
     r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
