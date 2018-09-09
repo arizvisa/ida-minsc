@@ -1475,19 +1475,19 @@ def tag(ea):
     return res
 @utils.multicase(key=basestring)
 @utils.string.decorate_arguments('key')
-@document.parameters(key='a string representing the tag name')
+@document.parameters(key='a string representing the tag name to return')
 def tag(key):
     '''Return the tag identified by `key` at the current address.'''
     return tag(ui.current.address(), key)
 @utils.multicase(key=basestring)
 @utils.string.decorate_arguments('key', 'value')
-@document.parameters(key='a string representing the tag name', value='a python object to store at the tag')
+@document.parameters(key='a string representing the tag name to assign to', value='a python object to store at the tag')
 def tag(key, value):
     '''Set the tag identified by `key` to `value` at the current address.'''
     return tag(ui.current.address(), key, value)
 @utils.multicase(ea=six.integer_types, key=basestring)
 @utils.string.decorate_arguments('key')
-@document.parameters(ea='an address in the database', key='a string representing the tag name')
+@document.parameters(ea='an address in the database', key='a string representing the tag name to return')
 def tag(ea, key):
     '''Returns the tag identified by `key` from address `ea`.'''
     res = tag(ea)
@@ -1496,7 +1496,7 @@ def tag(ea, key):
     raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag \"{:s}\" from address.".format(__name__, ea, key, utils.string.escape(key, '"')))
 @utils.multicase(ea=six.integer_types, key=basestring)
 @utils.string.decorate_arguments('key', 'value')
-@document.parameters(ea='an address in the database', key='a string representing the tag name', value='a python object to store at the tag')
+@document.parameters(ea='an address in the database', key='a string representing the tag name to assign', value='a python object to store at the tag')
 def tag(ea, key, value):
     '''Set the tag identified by `key` to `value` at the address `ea`.'''
     if value is None:
@@ -1537,13 +1537,13 @@ def tag(ea, key, value):
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
-@document.parameters(key='a string representing the tag name', none='the value `None`')
+@document.parameters(key='a string representing the tag name to remove', none='the value `None`')
 def tag(key, none):
     '''Remove the tag identified by `key` from the current address.'''
     return tag(ui.current.address(), key, none)
 @utils.multicase(ea=six.integer_types, key=basestring, none=types.NoneType)
 @utils.string.decorate_arguments('key')
-@document.parameters(ea='an address in the database', key='a string representing the tag name', none='the value `None`')
+@document.parameters(ea='an address in the database', key='a string representing the tag name to remove', none='the value `None`')
 def tag(ea, key, none):
     '''Removes the tag identified by `key` at the address `ea`.'''
     ea = interface.address.inside(ea)
