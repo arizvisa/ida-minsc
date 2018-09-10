@@ -24,7 +24,7 @@ import ui, internal
 
 from internal import document
 
-@document.paramters(F='the callback to execute on each function', kwargs='any extra arguments to pass to the callback')
+@document.parameters(F='the callback to execute on each function', kwargs='any extra arguments to pass to the callback')
 def map(F, **kwargs):
     """Execute the callback `F` on all functions in the database. Synonymous to `map(F, database.functions())` but with some extra logging to display the current progress.
 
@@ -58,7 +58,7 @@ class remote(object):
     entire database, or come up with some other tricks to translate
     a binary address to its runtime address.
     """
-    @document.paramters(remote='the remote address to translate to', local='the address to translate from. if none was specified then use the base address from the current database.')
+    @document.parameters(remote='the remote address to translate to', local='the address to translate from. if none was specified then use the base address from the current database.')
     def __init__(self, remote, local=None):
         """Create a new instance with the specified `remote` base address.
 
@@ -70,19 +70,19 @@ class remote(object):
         self.lbase = local
         self.rbase = remote
 
-    @document.paramters(ea='a remote address to convert to the database address')
+    @document.parameters(ea='a remote address to convert to the database address')
     def get(self, ea):
         '''Translate a remote address to the local database address.'''
         offset = ea - self.rbase
         return offset + self.lbase
 
-    @document.paramters(ea='the local address in the database to convert to a remote one')
+    @document.parameters(ea='the local address in the database to convert to a remote one')
     def put(self, ea):
         '''Translate a local database address to the remote address.'''
         offset = ea - self.lbase
         return offset + self.rbase
 
-    @document.paramters(ea='the remote address to seek to in the database')
+    @document.parameters(ea='the remote address to seek to in the database')
     def go(self, ea):
         '''Seek the database to the specified remote address.'''
         res = self.get(ea)
@@ -91,7 +91,7 @@ class remote(object):
 ## XXX: would be useful to have a quick wrapper class for interacting with Ida's mark list
 ##          in the future, this would be abstracted into a arbitrarily sized tree.
 
-@document.paramters(color='the rgb color value to color each mark address with')
+@document.parameters(color='the rgb color value to color each mark address with')
 def colormarks(color=0x7f007f):
     """Walk through the current list of marks whilst coloring them with the specified `color`.
 
@@ -194,7 +194,7 @@ def checkmarks():
         print >>sys.stdout, '\n'.join( ("- {:#x} : {:s}".format(a, m) for a, m in sorted(v)) )
     return
 
-@document.paramters(ea='the address of the basic block to start at', sentinel='an iterable containing the addresses of any basic blocks to terminate at')
+@document.parameters(ea='the address of the basic block to start at', sentinel='an iterable containing the addresses of any basic blocks to terminate at')
 def collect(ea, sentinel):
     """Collect all the basic blocks starting at address `ea` and recurse until a terminating block is encountered.
 
@@ -218,7 +218,7 @@ def collect(ea, sentinel):
     addr, _ = blk = func.block(ea)
     return _collect(addr, set([blk]))
 
-@document.paramters(ea='the address of the function to start at', sentinel='an iterable containing the addresses of any functions to terminate at')
+@document.parameters(ea='the address of the function to start at', sentinel='an iterable containing the addresses of any functions to terminate at')
 def collectcall(ea, sentinel=set()):
     """Collect all of the function calls starting at function `ea` and recurse until a terminating function is encountered.
 
@@ -247,14 +247,14 @@ def collectcall(ea, sentinel=set()):
     return _collectcall(addr, set([addr]))
 
 # FIXME: Don't emit the +0 if offset is 0
-@document.paramters(ea='the address of the function to output calls to', includeSegment='whether to include the segment name in the output')
+@document.parameters(ea='the address of the function to output calls to', includeSegment='whether to include the segment name in the output')
 def above(ea, includeSegment=False):
     '''Return all of the function names and their offset that calls the function at `ea`.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
     return '\n'.join(':'.join((segment.name(ea), tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.up(ea))
 
 # FIXME: Don't emit the +0 if offset is 0
-@document.paramters(ea='the address of the function to output calls from', includeSegment='whether to include the segment name in the output')
+@document.parameters(ea='the address of the function to output calls from', includeSegment='whether to include the segment name in the output')
 def below(ea, includeSegment=False):
     '''Return all of the function names and their offset that are called by the function at `ea`.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
