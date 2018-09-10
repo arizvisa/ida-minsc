@@ -18,7 +18,7 @@ import multiprocessing, Queue
 
 import idaapi
 
-__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -34,8 +34,10 @@ fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)
 fhasattr = fattributeQ = fattrQ = lambda attribute: frpartial(hasattr, attribute)
 # return a closure that always returns ``object``.
 fconstant = fconst = falways = always = lambda object: lambda *a, **k: object
-# a closure that returns its argument
+# a closure that returns its argument always
 fpassthru = fpass = fidentity = fid = lambda object: object
+# a closure that returns a default value if its object is false-y
+fdefault = lambda default: lambda object: object or default
 # return the first, second, or third item of a box.
 first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right
