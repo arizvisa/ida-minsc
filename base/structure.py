@@ -74,13 +74,18 @@ __matcher__.predicate('pred')
 
 def __iterate__():
     '''Iterate through all structures defined in the database.'''
-    idx = idaapi.get_first_struc_idx()
-    while idx != idaapi.get_last_struc_idx():
-        identifier = idaapi.get_struc_by_idx(idx)
-        yield __instance__(identifier)
-        idx = idaapi.get_next_struc_idx(idx)
-    idx = idaapi.get_last_struc_idx()
-    yield __instance__(idaapi.get_struc_by_idx(idx))
+    res = idaapi.get_first_struc_idx()
+    if res == idaapi.BADADDR: return
+
+    while res not in { idaapi.get_last_struc_idx(), idaapi.BADADDR }:
+        id = idaapi.get_struc_by_idx(res)
+        yield __instance__(id)
+        res = idaapi.get_next_struc_idx(res)
+
+    res = idaapi.get_last_struc_idx()
+    if res != idaapi.BADADDR:
+        yield __instance__(idaapi.get_struc_by_idx(res))
+    return
 
 @utils.multicase(string=basestring)
 def iterate(string):
@@ -105,7 +110,7 @@ def list(**type):
     res = builtins.list(iterate(**type))
 
     maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
-    maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), len), res) or [1])
+    maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), utils.fdefault(''), len), res) or [1])
     maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), res) or [1])
 
     for st in res:

@@ -348,7 +348,8 @@ class functions(object):
             args, fargs = 1, lambda ea: []
 
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10)) if maxindex else 1
-        cmaxoffset = math.floor(math.log(offset(maxentry)) or 1)/math.log(16)
+        try: cmaxoffset = math.floor(math.log(offset(maxentry)) or 1)/math.log(16)
+        except: cmaxoffset = 0
         cmaxentry = math.floor(math.log(maxentry or 1)/math.log(16))
         cmaxaddr = math.floor(math.log(maxaddr or 1)/math.log(16))
         cminaddr = math.floor(math.log(minaddr or 1)/math.log(16))

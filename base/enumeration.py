@@ -38,6 +38,8 @@ import functools, operator, itertools
 import logging, sys, math
 import fnmatch, re
 
+import database
+
 import internal
 from internal import utils
 
@@ -226,11 +228,12 @@ def list(**type):
     '''List all of the enumerations within the database that match the keyword specified by ``type``.'''
     res = builtins.list(iterate(**type))
 
-    maxindex = max(builtins.map(idaapi.get_enum_idx, res))
-    maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res))
-    maxsize = max(builtins.map(size, res))
+    maxindex = max(builtins.map(idaapi.get_enum_idx, res) or [1])
+    maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) or [0])
+    maxsize = max(builtins.map(size, res) or [0])
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
+    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
+    except: cmask = 0
 
     for n in res:
         six.print_("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
