@@ -188,13 +188,6 @@ def mask(enum):
     res = size(eid)
     return 2**res-1 if res > 0 else idaapi.BADADDR
 
-def members(enum):
-    '''Return the name of each member from the enumeration identified by ``enum``.'''
-    eid = by(enum)
-    for n in member.iterate(eid):
-        yield member.name(n)
-    return
-
 def repr(enum):
     '''Return a printable summary of the enumeration identified by ``enum``.'''
     eid = by(enum)
@@ -247,29 +240,39 @@ def list(**type):
     return
 
 ## members
-class member(object):
+class members(object):
     """
     This namespace allows one to interact with the memberes of an
     enumeration once the enumeration's id has been determined.
     This allows one to iterate through all of the enmeration's
     members or add and remove values to the enumeration.
 
+    By default this namespace will yield the name of all of the
+    members of an enumeration. These
+
     Some examples of how to use this namespace can be::
 
         > e = enum.by('example_enumeration')
         > print enum.repr(e)
-        > oldname = enum.member.rename(e, 'oldname', 'newname')
-        > n = enum.member.add(e, 'name', 0x1000)
-        > ok = enum.member.remove(n)
-        > n = enum.member.byName(e, 'name')
-        > n = enum.member.byValue(e, 0x1000)
-        > oldname = enum.member.name(n, 'somename')
-        > res = enum.member.value(n, 0x100)
-        > oldcomment = enum.member.comment(n, 'This is an test value')
-        > for m in enum.member.iterate(e): ...
-        > enum.member.list(e)
+        > oldname = enum.members.rename(e, 'oldname', 'newname')
+        > n = enum.members.add(e, 'name', 0x1000)
+        > ok = enum.members.remove(n)
+        > n = enum.members.byName(e, 'name')
+        > n = enum.members.byValue(e, 0x1000)
+        > oldname = enum.members.name(n, 'somename')
+        > res = enum.members.value(n, 0x100)
+        > oldcomment = enum.members.comment(n, 'This is an test value')
+        > for m in enum.members.iterate(e): ...
+        > enum.members.list(e)
 
     """
+
+    def __new__(cls, enum):
+        '''Yield the name of each member from the enumeration identified by ``enum``.'''
+        eid = by(enum)
+        for n in cls.iterate(eid):
+            yield cls.name(n)
+        return
 
     @classmethod
     def parent(cls, mid):
@@ -515,3 +518,5 @@ class member(object):
         for i, mid in enumerate(res):
              six.print_("[{:d}] {:>0{:d}x} {:s}".format(i, cls.value(mid), maxvalue, cls.name(mid)))
         return
+
+member = members    # XXX: ns alias
