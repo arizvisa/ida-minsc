@@ -40,8 +40,7 @@ master_doc = 'index'
 ## HTML configuration
 html_theme = 'classic'
 # html_theme_options = {}
-
-html_static_path = ['html-static']
+# html_static_path = ['html-static']
 
 #html_sidebars = {
 #    '**': [

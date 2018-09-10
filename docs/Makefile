@@ -1,13 +1,13 @@
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
 SPHINXPROJ    = idascripts
-SOURCEDIR     = .
+SOURCEDIR     = ./source
 BUILDDIR      = _build
 RSTGENERATE   = python dummyparse.py
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 ROOTDIR := $(realpath $(MAKEDIR)..)
-STATICDIR := $(SOURCEDIR)/static
+STATICDIR := ./static
 
 # Various targets used for auto-generation of documentation
 base_targets = database enumeration function instruction segment structure
@@ -49,18 +49,30 @@ _sphinx_targets += gettext changes xml pseudoxml linkcheck doctest coverage
 
 $(foreach target,$(_sphinx_targets),$(eval $(call sphinx_target,$(target))))
 
-all: source | html
+all: configuration source | html
+
+configuration: $(SOURCEDIR)/conf.py
+	$(info [*] Duplicated configuration into $<)
 
 ## targets for auto-generating docs
-$(foreach target,$(base_targets),$(eval $(call make_docs,$(SOURCEDIR)/source/$(target).rst,$(ROOTDIR)/base/$(target).py)))
 
-$(foreach target,$(misc_targets),$(eval $(call make_docs,$(SOURCEDIR)/source/$(target).rst,$(ROOTDIR)/misc/$(target).py)))
+# base modules
+$(foreach target,$(base_targets),$(eval $(call make_docs,$(SOURCEDIR)/$(target).rst,$(ROOTDIR)/base/$(target).py)))
 
-$(foreach target,$(custom_targets),$(eval $(call make_docs,$(SOURCEDIR)/source/$(target).rst,$(ROOTDIR)/custom/$(target).py)))
+# miscellaneous modules
+$(foreach target,$(misc_targets),$(eval $(call make_docs,$(SOURCEDIR)/$(target).rst,$(ROOTDIR)/misc/$(target).py)))
 
-$(foreach target,$(static_targets),$(eval $(call copy_target,$(SOURCEDIR)/source/$(notdir $(target)),$(target))))
+# custom modules
+$(foreach target,$(custom_targets),$(eval $(call make_docs,$(SOURCEDIR)/$(target).rst,$(ROOTDIR)/custom/$(target).py)))
 
+# static targets
+$(foreach target,$(static_targets),$(eval $(call copy_target,$(SOURCEDIR)/$(notdir $(target)),$(target))))
+
+# auto-generation of all modules
 _source_targets = $(foreach target,$(base_targets) $(misc_targets) $(custom_targets),source/$(target).rst)
-_static_targets = $(foreach target,$(static_targets),$(SOURCEDIR)/source/$(notdir $(target)))
+_static_targets = $(foreach target,$(static_targets),$(SOURCEDIR)/$(notdir $(target)))
 source: $(_source_targets) $(_static_targets)
 	$(info [!] Completed generation of documentation)
+
+# configuration file
+$(eval $(call copy_target,$(SOURCEDIR)/conf.py,$(MAKEDIR)conf.py))
