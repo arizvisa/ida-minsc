@@ -18,7 +18,7 @@ import multiprocessing, Queue
 
 import idaapi
 
-__all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','fapply','fcurry','frpartial','freversed','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','fapply','fcurry','frpartial','freversed','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -30,8 +30,12 @@ funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.a
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item ``key``.
 fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), iter, next, fpartial(operator.eq, None))
+# return a closure that will get a particular element from an object
+fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
 # return a closure that will check if its argument has an ``attribute``.
-fhasattr = fattributeQ = fattrQ = lambda attribute: frpartial(hasattr, attribute)
+fhasattr = fattributeQ = lambda attribute: frpartial(hasattr, attribute)
+# return a closure that will get a particular attribute from an object
+fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(object, attribute, *default)
 # return a closure that always returns ``object``.
 fconstant = fconst = falways = lambda object: lambda *a, **k: object
 # a closure that returns its argument always
