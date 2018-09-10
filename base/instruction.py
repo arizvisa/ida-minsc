@@ -625,7 +625,7 @@ def op_string(ea, opnum):
     '''Return the string type (`idaapi.STRTYPE_`) of operand ``opnum`` for the instruction at ``ea``.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
     if fl & idaapi.STRLIT == 0:
-        raise TypeError("{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
+        raise TypeError("{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
     if res is None:
