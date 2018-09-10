@@ -438,7 +438,7 @@ def __save_file(filename, ea, size, offset=0):
     return res
 
 @utils.string.decorate_arguments('filename')
-@document.parameters(filename='a filename to read from', ea='the address to map to', size='the number of bytes to map', offset='the offset into the file to read from', kwds='if `name` is specified, then use it as the segment name')
+@document.parameters(filename='a filename to read from', ea='the address to map to', size='the number of bytes to map', offset='the offset into the file to read from', kwds='if ``name`` is specified as a string, then use it as the name for the new segment')
 def load(filename, ea, size=None, offset=0, **kwds):
     """Load the specified `filename` to the address `ea` as a segment.
 
@@ -454,7 +454,7 @@ def load(filename, ea, size=None, offset=0, **kwds):
         raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}{:s}) : Unable to load file into {:#x}{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', ea, cb, utils.string.escape(os.path.relpath(filename), '"')))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
 
-@document.parameters(ea='the address of the data to map', size='the number of bytes to map', newea='the target address to map the data to', kwds='if `name` is specified then use it as the segment name')
+@document.parameters(ea='the address of the data to map', size='the number of bytes to map', newea='the target address to map the data to', kwds='if ``name`` is specified as a string, then use it as the name for the new segment')
 def map(ea, size, newea, **kwds):
     """Map `size` bytes of data from `ea` into a new segment at `newea`.
 

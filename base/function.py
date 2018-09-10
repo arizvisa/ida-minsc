@@ -377,7 +377,7 @@ def new():
     return new(ui.current.address())
 @document.aliases('make', 'add')
 @utils.multicase(start=six.integer_types)
-@document.parameters(start='the starting address of the function to create', end='if `end` is specified as an address, then use it to determine the end of the created function')
+@document.parameters(start='the starting address of the function to create', end='if ``end`` is specified as an address, then use it to determine the end of the created function')
 def new(start, **end):
     """Make a function at the address `start` and return its entrypoint.
 
@@ -478,13 +478,13 @@ class chunks(object):
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the current function that uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.function(), reg, *regs, **modifiers)
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(func='the function to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(func='the function to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def register(cls, func, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the function `func` that uses `reg` or any one of the registers in `regs`.
 
@@ -1084,7 +1084,7 @@ class block(object):
         return res
     @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
     @classmethod
-    @document.parameters(ea='the address belonging to the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if `frame` is specified, then set the frame of the basic block to this color')
+    @document.parameters(ea='the address belonging to the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     def color(cls, ea, rgb, **frame):
         """Sets the color of the basic block at the address `ea` to `rgb`.
 
@@ -1114,7 +1114,7 @@ class block(object):
         return res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
-    @document.parameters(bb='the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if `frame` is specified, then set the frame of the basic block to this color')
+    @document.parameters(bb='the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     def color(cls, bb, rgb, **frame):
         '''Sets the color of the basic block `bb` to `rgb`.'''
         res, fn, n = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
@@ -1140,7 +1140,7 @@ class block(object):
         return res
     @utils.multicase(bounds=types.TupleType, rgb=six.integer_types)
     @classmethod
-    @document.parameters(bounds='the boundaries of the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if `frame` is specified, then set the frame of the basic block to this color')
+    @document.parameters(bounds='the boundaries of the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     def color(cls, bounds, rgb, **frame):
         '''Sets the color of the basic block identifed by `bounds` to `rgb`.'''
         bb = cls.at(bounds)
@@ -1237,27 +1237,27 @@ class block(object):
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the current block that uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(ea='the address belonging to the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(ea='the address belonging to the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
         blk = blocks.at(ea)
         return cls.register(blk, reg, *regs, **modifiers)
     @utils.multicase(bounds=types.TupleType, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(bounds='the boundaries of the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(bounds='the boundaries of the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def register(cls, bounds, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block identified by `bounds` that uses `reg` or any one of the registers in `regs`.'''
         bb = cls.at(bounds)
         return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(bb='the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(bb='the basic block to identify registers in', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def register(cls, bb, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the block `bb` that uses `reg` or any one of the registers in `regs`.
 
@@ -1756,12 +1756,12 @@ def tags(func):
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('And', 'Or')
-@document.parameters(boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def select(**boolean):
     '''Query the contents of the current function for any tags specified by `boolean`'''
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
-@document.parameters(tag='a required tag name to search the contents for', Or='any other tag names to include', boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(tag='a required tag name to search the contents for', Or='any other tag names to include', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(tag, *Or, **boolean):
     '''Query the contents of the current function for the specified `tag` and any others specified as `Or`.'''
@@ -1770,7 +1770,7 @@ def select(tag, *Or, **boolean):
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
-@document.parameters(func='the function containing the contents tags to select', tag='a required tag name to search the contents for', Or='any other tag names to include', boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(func='the function containing the contents tags to select', tag='a required tag name to search the contents for', Or='any other tag names to include', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def select(func, tag, *Or, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
     res = (tag,) + Or
@@ -1778,7 +1778,7 @@ def select(func, tag, *Or, **boolean):
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
 @utils.string.decorate_arguments('tag', 'And', 'Or')
-@document.parameters(func='the function containing the contents tags to select', tag='a list of tag names to search the contents for', Or='any other tag names to include', boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(func='the function containing the contents tags to select', tag='a list of tag names to search the contents for', Or='any other tag names to include', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def select(func, tag, *Or, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
     res = tuple(iter(tag)) + Or
@@ -1786,7 +1786,7 @@ def select(func, tag, *Or, **boolean):
     return select(func, **boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
-@document.parameters(func='the function containing the contents tags to select', boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(func='the function containing the contents tags to select', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def select(func, **boolean):
     """Query the contents of the function `func` for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
 

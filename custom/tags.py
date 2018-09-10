@@ -543,14 +543,14 @@ class export(object):
     are at different addresses than when the tags were read.
     """
 
-    @document.parameters(tags='an iterable of the tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
+    @document.parameters(tags='an iterable of the tags to export', location='if ``location`` is true, then export the contents tags as a location instead of an address')
     def __new__(cls, *tags, **location):
         '''Read the specified tags within the database using the cache.'''
         return cls.everything(*tags, **location)
 
     ## query the content from a function
     @classmethod
-    @document.parameters(F='the function to export the content from', tags='an iterable of the contents tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
+    @document.parameters(F='the function to export the content from', tags='an iterable of the contents tags to export', location='if ``location`` is true, then export the contents tags as a location instead of an address')
     def content(cls, F, *tags, **location):
         '''Iterate through the specified `tags` belonging to the contents of the function at `ea` using the cache.'''
         identity = lambda res: res
@@ -588,7 +588,7 @@ class export(object):
 
     ## query the entire database for the specified tags
     @classmethod
-    @document.parameters(tags='an iterable of the tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
+    @document.parameters(tags='an iterable of the tags to export', location='if ``location`` is true, then export the contents tags as a location instead of an address')
     def everything(cls, *tags, **location):
         """Read all of the specified `tags` within the database using the cache.
 
@@ -631,7 +631,7 @@ class export(object):
 
     ## query all the contents in each function that match the specified tags
     @staticmethod
-    @document.parameters(tags='an iterable of the contents tags to export', location='if `location` is true, then export the contents tags as a location instead of an address')
+    @document.parameters(tags='an iterable of the contents tags to export', location='if ``location`` is true, then export the contents tags as a location instead of an address')
     def contents(*tags, **location):
         """Iterate through the specified contents `tags` within the database using the cache.
 

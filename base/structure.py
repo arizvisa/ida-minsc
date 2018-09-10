@@ -154,12 +154,12 @@ def new(name, offset):
 
 @utils.multicase(name=basestring)
 @utils.string.decorate_arguments('name')
-@document.parameters(name='the name of the structure to return', options='if `offset` is specified then use it as the base offset of the structure')
+@document.parameters(name='the name of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by(name, **options):
     '''Return a structure by its name.'''
     return by_name(name, **options)
 @utils.multicase(id=six.integer_types)
-@document.parameters(id='the identifier or the index of the structure to return', options='if `offset` is specified then use it as the base offset of the structure')
+@document.parameters(id='the identifier or the index of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by(id, **options):
     '''Return a structure by its index or id.'''
     res = id
@@ -192,7 +192,7 @@ def search(string):
 
 @utils.string.decorate_arguments('name')
 @document.aliases('byName')
-@document.parameters(name='the name of the structure to return', options='if `offset` is specified then use it as the base offset of the structure')
+@document.parameters(name='the name of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by_name(name, **options):
     '''Return a structure by its name.'''
     res = utils.string.to(name)
@@ -207,7 +207,7 @@ def by_name(name, **options):
 byName = utils.alias(by_name)
 
 @document.aliases('byIndex')
-@document.parameters(index='the index of the structure to return', options='if `offset` is specified then use it as the base offset of the structure')
+@document.parameters(index='the index of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by_index(index, **options):
     '''Return a structure by its index.'''
     id = idaapi.get_struc_by_idx(index)
@@ -219,7 +219,7 @@ def by_index(index, **options):
 byIndex = utils.alias(by_index)
 
 @document.aliases('by_id', 'byIdentifier', 'byId')
-@document.parameters(identifier='the identifier of the structure to return', options='if `offset` is specified then use it as the base offset of the structure')
+@document.parameters(identifier='the identifier of the structure to return', options='if ``offset`` is specified, then use it as the base offset of the structure')
 def by_identifier(identifier, **options):
     '''Return the structure identified by `identifier`.'''
     return __instance__(identifier, **options)

@@ -528,13 +528,13 @@ def instruction(ea):
     return reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), res, '')
 
 @utils.multicase()
-@document.parameters(options='`count` is used to specify the number of instructions to disassemble. `comments` specifies whether comments are included.')
+@document.parameters(options='if ``count`` is specified as an integer, this will specify the number of instructions to disassemble. if ``comments`` is specified as a boolean, this will determine whether comments are included or not.')
 def disassemble(**options):
     '''Disassemble the instructions at the current address.'''
     return disassemble(ui.current.address(), **options)
 @document.aliases('disasm')
 @utils.multicase(ea=six.integer_types)
-@document.parameters(ea='an address within the database', options='`count` is used to specify the number of instructions to disassemble. `comments` specifies whether comments are included.')
+@document.parameters(ea='an address within the database', options='if ``count`` is specified as an integer, this will specify the number of instructions to disassemble. if ``comments`` is specified as a boolean, this will determine whether comments are included or not.')
 def disassemble(ea, **options):
     """Disassemble the instructions at the address specified by `ea`.
 
@@ -777,14 +777,14 @@ class search(object):
     @document.aliases('search.byBytes')
     @utils.multicase()
     @staticmethod
-    @document.parameters(data='the bytes to search for', direction='if `reverse` is specified as true then search backwards')
+    @document.parameters(data='the bytes to search for', direction='if ``reverse`` is specified as true then search backwards')
     def by_bytes(data, **direction):
         '''Search through the database at the current address for the bytes specified by `data`.'''
         return search.by_bytes(ui.current.address(), data, **direction)
     @document.aliases('search.byBytes')
     @utils.multicase(ea=six.integer_types)
     @staticmethod
-    @document.parameters(ea='the starting address to search from', data='the bytes to search for', direction='if `reverse` is specified as true then search backwards')
+    @document.parameters(ea='the starting address to search from', data='the bytes to search for', direction='if ``reverse`` is specified as true then search backwards')
     def by_bytes(ea, data, **direction):
         """Search through the database at address `ea` for the bytes specified by `data`.
 
@@ -818,7 +818,7 @@ class search(object):
     @utils.multicase(string=basestring)
     @staticmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(string='the regex to search for', options='if `reverse` is specified as true then search backwards. if `sensitive` is true, then search with regards to the case.')
+    @document.parameters(string='the regex to search for', options='if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.')
     def by_regex(string, **options):
         '''Search through the database at the current address for the regex matched by `string`.'''
         return search.by_regex(ui.current.address(), string, **options)
@@ -826,7 +826,7 @@ class search(object):
     @utils.multicase(ea=six.integer_types, string=basestring)
     @staticmethod
     @utils.string.decorate_arguments('string')
-    @document.parameters(ea='the starting address to search from', string='the regex to search for', options='if `reverse` is specified as true then search backwards. if `sensitive` is true, then search with regards to the case.')
+    @document.parameters(ea='the starting address to search from', string='the regex to search for', options='if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.')
     def by_regex(ea, string, **options):
         """Search the database at address `ea` for the regex matched by `string`.
 
@@ -1586,7 +1586,7 @@ def tag(ea, key, none):
 # FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('And', 'Or')
-@document.parameters(tag='a required tag name to search for', And='any other required tag names', boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(tag='a required tag name to search for', And='any other required tag names', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def select(tag, *And, **boolean):
     '''Query all of the global tags in the database for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
@@ -1594,7 +1594,7 @@ def select(tag, *And, **boolean):
     return select(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
-@document.parameters(boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def select(**boolean):
     """Query all the global tags for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
 
@@ -1637,7 +1637,7 @@ def select(**boolean):
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
-@document.parameters(tag='a required tag name to search for', Or='any other optional tag names', boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(tag='a required tag name to search for', Or='any other optional tag names', boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def selectcontents(tag, *Or, **boolean):
     '''Query all function contents for the specified `tag` or any others specified as `Or`.'''
     res = (tag,) + Or
@@ -1645,7 +1645,7 @@ def selectcontents(tag, *Or, **boolean):
     return selectcontents(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
-@document.parameters(boolean='either `And` or `Or` which specifies required or optional tags (respectively)')
+@document.parameters(boolean='either ``And`` or ``Or`` which specifies required or optional tags (respectively)')
 def selectcontents(**boolean):
     """Query all function contents for any tags specified by `boolean`. Yields each function and the tags that match as a set.
 
@@ -1971,7 +1971,7 @@ class address(object):
         return cls.iterate(ui.current.address(), end)
     @utils.multicase(end=six.integer_types, step=callable)
     @classmethod
-    @document.parameters(end='the address to stop iterating at', step='a callable that seeks to the next address like `address.next`')
+    @document.parameters(end='the address to stop iterating at', step='a callable that seeks to the next address such as `address.next`')
     def iterate(cls, end, step):
         '''Iterate from the current address to `end` using the callable `step` to determine the next address.'''
         return cls.iterate(ui.current.address(), end, step)
@@ -1985,7 +1985,7 @@ class address(object):
         return cls.iterate(start, end, step)
     @utils.multicase(start=six.integer_types, end=six.integer_types, step=callable)
     @classmethod
-    @document.parameters(start='the address to start iterating at', end='the address to stop iterating at', step='a callable that seeks to the next address like `address.next`')
+    @document.parameters(start='the address to start iterating at', end='the address to stop iterating at', step='a callable that seeks to the next address such as `address.next`')
     def iterate(cls, start, end, step):
         '''Iterate from address `start` to `end` using the callable `step` to determine the next address.'''
         start, end = interface.address.inside(start, end)
@@ -2452,28 +2452,28 @@ class address(object):
     @document.aliases('prevreg')
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def prevreg(cls, reg, *regs, **modifiers):
         '''Return the previous address containing an instruction that uses `reg` or any one of the specified registers `regs`.'''
         return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
     @document.aliases('prevreg')
     @utils.multicase(predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def prevreg(cls, predicate, reg, *regs, **modifiers):
         '''Return the previous address containing an instruction that uses `reg` or any one of the specified registers `regs` and matches `predicate`.'''
         return cls.prevreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @document.aliases('prevreg')
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(ea='an address in the datbase', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(ea='an address in the datbase', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def prevreg(cls, ea, reg, *regs, **modifiers):
         '''Return the previous address from `ea` containing an instruction that uses `reg` or any one of the specified registers `regs`.'''
         return cls.prevreg(ea, utils.fconst(True), reg, *regs, **modifiers)
     @document.aliases('prevreg')
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def prevreg(cls, ea, predicate, reg, *regs, **modifiers):
         '''Return the previous address from `ea` containing an instruction that uses `reg` or any one of the specified registers `regs` and matches `predicate`.'''
         regs = (reg,) + regs
@@ -2522,28 +2522,28 @@ class address(object):
     @document.aliases('nextreg')
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def nextreg(cls, reg, *regs, **modifiers):
         '''Return the next address containing an instruction that uses `reg` or any one of the registers in `regs`.'''
         return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
     @document.aliases('nextreg')
     @utils.multicase(predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def nextreg(cls, predicate, reg, *regs, **modifiers):
         '''Return the next address containing an instruction that matches `predicate` and uses `reg` or any one of the registers in `regs`.'''
         return cls.nextreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @document.aliases('nextreg')
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(ea='an address in the database', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(ea='an address in the database', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def nextreg(cls, ea, reg, *regs, **modifiers):
         '''Return the next address from `ea` containing an instruction that uses `reg` or any one of the registers in `regs`.'''
         return cls.nextreg(ea, utils.fconst(True), reg, *regs, **modifiers)
     @document.aliases('nextreg')
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
-    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if `write` or `read` is true, then only find addresses that are written to or read from (respectively)')
+    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with instructions', reg='a register of some kind', regs='any other registers to match for', modifiers='if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)')
     def nextreg(cls, ea, predicate, reg, *regs, **modifiers):
         '''Return the next address from `ea` containing an instruction that matches `predicate` and uses `reg` or any one of the registers in `regs`.'''
         regs = (reg,) + regs
@@ -2837,7 +2837,7 @@ class address(object):
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def prevtag(cls, **tagname):
         '''Return the previous address that contains a tag.'''
         return cls.prevtag(ui.current.address(), 1, **tagname)
@@ -2845,7 +2845,7 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(predicate='a callable used to match addresses with a comment or tag', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(predicate='a callable used to match addresses with a comment or tag', tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def prevtag(cls, predicate, **tagname):
         '''Return the previous address that contains a tag and matches `predicate`.'''
         return cls.prevtag(ui.current.address(), predicate, **tagname)
@@ -2853,7 +2853,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(ea='an address in the database', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(ea='an address in the database', tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def prevtag(cls, ea, **tagname):
         """Returns the previous address from `ea` that contains a tag.
 
@@ -2864,7 +2864,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with a comment or tag', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with a comment or tag', tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def prevtag(cls, ea, predicate, **tagname):
         '''Returns the previous address from `ea` that contains a tag and matches `predicate`.'''
         tagname = tagname.get('tagname', None)
@@ -2875,7 +2875,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(ea='an address in the database', count='the number of instructions to skip', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(ea='an address in the database', count='the number of instructions to skip', tagname='if ``tagname`` is assigned a string, then only match against the specified tag otherwise look for any kind of comment')
     def prevtag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
@@ -2885,7 +2885,7 @@ class address(object):
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def nexttag(cls, **tagname):
         '''Return the next address that contains a tag.'''
         return cls.nexttag(ui.current.address(), 1, **tagname)
@@ -2893,7 +2893,7 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(predicate='a callable used to match addresses with a comment or tag', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(predicate='a callable used to match addresses with a comment or tag', tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def nexttag(cls, predicate, **tagname):
         '''Return the next address that contains a tag and matches `predicate`.'''
         return cls.nexttag(ui.current.address(), predicate, **tagname)
@@ -2901,7 +2901,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(ea='an address in the database', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(ea='an address in the database', tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def nexttag(cls, ea, **tagname):
         """Returns the next address from `ea` that contains a tag.
 
@@ -2912,7 +2912,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with a comment or tag', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(ea='an address in the database', predicate='a callable used to match addresses with a comment or tag', tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def nexttag(cls, ea, predicate, **tagname):
         '''Returns the next address from `ea` that contains a tag and matches `predicate`.'''
         tagname = tagname.get('tagname', None)
@@ -2923,7 +2923,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     @utils.string.decorate_arguments('tagname')
-    @document.parameters(ea='an address in the database', count='the number of instructions to skip', tagname='if `tagname` is assigned, the only match against the specified tag otherwise look for comments')
+    @document.parameters(ea='an address in the database', count='the number of instructions to skip', tagname='if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment')
     def nexttag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
@@ -4595,13 +4595,13 @@ class set(object):
 
     @utils.multicase(size=six.integer_types)
     @classmethod
-    @document.parameters(size='the amount of bytes to set', type='if `type` is specified then use the specified IDA type (`idaapi.FF_*`) or `structure_t`')
+    @document.parameters(size='the amount of bytes to set', type='if ``type`` is specified as an IDA type (`idaapi.FF_*`) or a `structure_t` then apply it to the given address')
     def data(cls, size, **type):
         '''Set the data at the current address to have the specified `size` and `type`.'''
         return cls.data(ui.current.address(), size, **type)
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
-    @document.parameters(ea='an address in the database', size='the amount of bytes to set', type='if `type` is specified then use the specified IDA type (`idaapi.FF_*`) or `structure_t`')
+    @document.parameters(ea='an address in the database', size='the amount of bytes to set', type='if ``type`` is specified then as an IDA type (`idaapi.FF_*`) or a `structure_t` then apply it to the given address')
     def data(cls, ea, size, **type):
         """Set the data at address `ea` to have the specified `size` and `type`.
 
@@ -4841,14 +4841,14 @@ class set(object):
     @document.aliases('set.struc', 'set.struct')
     @utils.multicase(type=_structure.structure_t)
     @classmethod
-    @document.parameters(type='a `structure_t` containing the type to apply')
+    @document.parameters(type='a `structure_t` containing the structure to apply')
     def structure(cls, type):
         '''Set the data at the current address to the structure_t specified by `type`.'''
         return cls.structure(ui.current.address(), type)
     @document.aliases('set.struc', 'set.struct')
     @utils.multicase(ea=six.integer_types, type=_structure.structure_t)
     @classmethod
-    @document.parameters(ea='an address in the database', type='a `structure_t` containing the type to apply')
+    @document.parameters(ea='an address in the database', type='a `structure_t` containing the structure to apply')
     def structure(cls, ea, type):
         '''Set the data at address `ea` to the structure_t specified by `type`.'''
         ok = cls.data(ea, type.size, type=type)

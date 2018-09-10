@@ -37,7 +37,7 @@ def application():
     '''Return the current instance of the IDA Application.'''
     raise internal.exceptions.MissingMethodError
 
-@document.parameters(string='the string to ask the user', default='if `yes`, `no`, or `cancel` is set to true, then use that value as the default')
+@document.parameters(string='the string to ask the user', default='if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default')
 def ask(string, **default):
     """Ask the user a question providing the option to choose "yes", "no", or "cancel".
 
@@ -409,7 +409,7 @@ class navigation(object):
         return cls.__set__(ea)
 
     @classmethod
-    @document.parameters(ea='the address to set the auto-analysis address to on the navigation bar', type='if `type` is specified as an `idaapi.AU_*`, then use this as the navigation type')
+    @document.parameters(ea='the address to set the auto-analysis address to on the navigation bar', type='if ``type`` is specified as an `idaapi.AU_*`, then use this as the navigation type')
     def auto(cls, ea, **type):
         """Set the auto-analysis address and type on the navigation bar to `ea`.
 
