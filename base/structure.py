@@ -208,7 +208,7 @@ class structure_t(object):
         self.__members__ = members_t(self, baseoffset=offset)
 
     def up(self):
-        '''Return all the addresses that reference this specific structure.'''
+        '''Return all the structure members and addresses that reference this specific structure.'''
         x, sid = idaapi.xrefblk_t(), self.id
 
         # grab first structure that references this one
@@ -221,14 +221,31 @@ class structure_t(object):
         while x.next_to():
             res.append((x.frm, x.iscode, x.type))
 
-        # convert refs into a list of OREFs
-        refs = [ interface.OREF(xrfrom, xriscode, interface.ref_t.of(xrtype)) for xrfrom, xriscode, xrtype in res ]
+        # walk through all references figuring out if its a structure member or an address
+        refs = []
+        for xrfrom, xriscode, xrtype in res:
+            # if it's an address, then just create a regular reference
+            if database.contains(xrfrom):
+                refs.append( interface.OREF(xrfrom, xriscode, interface.ref_t.of(xrtype)) )
+                continue
 
-        # return as a list
-        return [ref if database.contains(ref[0]) else __instance__(ref[0]) for ref in refs]
+            # so it's not, which means this must be a member id
+            fullname = idaapi.get_member_fullname(xrfrom)
+
+            sptr = idaapi.get_member_struc(fullname)
+            if not sptr:
+                logging.warn("{:s}.instance({:s}).up : Unable to find structure from member name {!r} while trying to handle reference for {:#x}.".format(__name__, self.name, fullname, xrfrom))
+                continue
+
+            # we figured out the owner, so find the member with the ref, and add it.
+            st = __instance__(sptr.id)
+            refs.append(st.by_identifier(xrfrom))
+
+        # and that's it, so we're done.
+        return refs
 
     def down(self):
-        '''Return all the structures that are referenced by this specific structure.'''
+        '''Return all the structure members and addresses that are referenced by this specific structure.'''
         x, sid = idaapi.xrefblk_t(), self.id
 
         # grab structures that this one references
@@ -241,11 +258,28 @@ class structure_t(object):
         while x.next_from():
             res.append((x.to, x.iscode, x.type))
 
-        # convert refs into a list of OREFs
-        refs = [ interface.OREF(xrto, xriscode, interface.ref_t.of(xrtype)) for xrto, xriscode, xrtype in res ]
+        # walk through all references figuring out if its a structure member or an address
+        refs = []
+        for xrto, xriscode, xrtype in res:
+            # if it's  an address, then just create a regular reference
+            if database.contains(xrto):
+                refs.append( interface.OREF(xrto, xriscode, interface.ref_t.of(xrtype)) )
+                continue
 
-        # return it as a tuple
-        return [ref if database.contains(ref[0]) else __instance__(ref[0]) for ref in refs]
+            # so it's not, which means this must be a member id
+            fullname = idaapi.get_member_fullname(xrto)
+
+            sptr = idaapi.get_member_struc(fullname)
+            if not sptr:
+                logging.warn("{:s}.instance({:s}).down : Unable to find structure from member name {!r} while trying to handle reference for {:#x}.".format(__name__, self.name, fullname, xrto))
+                continue
+
+            # we figured out the owner, so find the member with the ref, and add it.
+            st = __instance__(sptr.id)
+            refs.append(st.by_identifier(xrto))
+
+        # and that's it, so we're done.
+        return refs
 
     def refs(self):
         """Return the `(address, opnum, type)` of all the code and data references within the database that reference this structure.
