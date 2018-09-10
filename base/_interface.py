@@ -883,7 +883,7 @@ class AddressOpnumReftype(namedtypedtuple):
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
-    _types = (long, (types.NoneType, int), ref_t)
+    _types = (six.integer_types, (types.NoneType,) + six.integer_types, ref_t)
 OREF = AddressOpnumReftype
 
 # XXX: is .startea always guaranteed to point to an instruction that modifies
