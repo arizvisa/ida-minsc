@@ -754,7 +754,7 @@ class regmatch(object):
         '''Construct a closure that can be used for matching instruction using the specified ``regs`` and ``modifiers``.'''
         if not regs:
             args = ', '.join(map("{:s}".format, regs))
-            mods = ', '.join(map(internal.utils.unbox("{:s}={!r}".format), six.iteritems(modifiers)))
+            mods = ', '.join(map(internal.utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
             raise AssertionError("{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join((__name__, cls.__name__)), args, (', '+mods) if mods else ''))
         use, iterops = cls.use(regs), cls.modifier(**modifiers)
         def match(ea):
@@ -1169,7 +1169,7 @@ class architecture_t(object):
         return self.by_indextype(index, dtype)
     def promote(self, register, size=None):
         '''Promote the specified ``register`` to its next larger ``size``.'''
-        parent = internal.utils.fcompose(operator.attrgetter('__parent__'), internal.utils.box, functools.partial(filter, None), iter, next)
+        parent = internal.utils.fcompose(operator.attrgetter('__parent__'), internal.utils.fbox, functools.partial(filter, None), iter, next)
         try:
             if size is None:
                 return parent(register)

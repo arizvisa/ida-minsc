@@ -18,14 +18,14 @@ import multiprocessing, Queue
 
 import idaapi
 
-__all__ = ['fbox','fboxed','box','boxed','funbox','unbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','compose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','partial','fapply','fcurry','frpartial','freversed','frev','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fhasattr','fattributeQ','fattrQ','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','fapply','fcurry','frpartial','freversed','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
 # box any specified arguments
-fbox = fboxed = box = boxed = lambda *a: a
+fbox = fboxed = lambda *a: a
 # return a closure that executes ``f`` with the arguments unboxed.
-funbox = unbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **builtins.dict(k.items() + kp.items()))
+funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **builtins.dict(k.items() + kp.items()))
 # return a closure that will check that ``object`` is an instance of ``type``.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item ``key``.
@@ -33,7 +33,7 @@ fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)
 # return a closure that will check if its argument has an ``attribute``.
 fhasattr = fattributeQ = fattrQ = lambda attribute: frpartial(hasattr, attribute)
 # return a closure that always returns ``object``.
-fconstant = fconst = falways = always = lambda object: lambda *a, **k: object
+fconstant = fconst = falways = lambda object: lambda *a, **k: object
 # a closure that returns its argument always
 fpassthru = fpass = fidentity = fid = lambda object: object
 # a closure that returns a default value if its object is false-y
@@ -41,7 +41,7 @@ fdefault = lambda default: lambda object: object or default
 # return the first, second, or third item of a box.
 first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right
-fcompose = compose = lambda *f: builtins.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), builtins.reversed(f))
+fcompose = lambda *f: builtins.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), builtins.reversed(f))
 # return a closure that executes function ``f`` whilst discarding any extra arguments
 fdiscard = lambda f: lambda *a, **k: f()
 # return a closure that executes function ``crit`` and then returns/executes ``f`` or ``t`` based on whether or not it's successful.
@@ -60,7 +60,7 @@ def flazy(f, *a, **k):
     return lazy
 fmemo = flazy
 # return a closure with the function's arglist partially applied
-fpartial = partial = functools.partial
+fpartial = functools.partial
 # return a closure that applies the provided arguments to the function ``f``.
 fapply = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **builtins.dict(k.items() + kp.items()))
 # return a closure that will use the specified arguments to call the provided function.
@@ -68,7 +68,7 @@ fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a+ap), **builtins.dict(k.items
 # return a closure that applies the initial arglist to the end of function ``f``.
 frpartial = lambda f, *a, **k: lambda *ap, **kp: f(*(ap + builtins.tuple(builtins.reversed(a))), **builtins.dict(k.items() + kp.items()))
 # return a closure that applies the arglist to function ``f`` in reverse.
-freversed = frev = lambda f, *a, **k: lambda *ap, **kp: f(*builtins.reversed(a + ap), **builtins.dict(k.items() + kp.items()))
+freversed = freverse = lambda f, *a, **k: lambda *ap, **kp: f(*builtins.reversed(a + ap), **builtins.dict(k.items() + kp.items()))
 # return a closure that executes function ``f`` and includes the caught exception (or None) as the first element in the boxed result.
 def fcatch(f, *a, **k):
     def fcatch(*a, **k):
@@ -77,19 +77,19 @@ def fcatch(f, *a, **k):
     return functools.partial(fcatch, *a, **k)
 fexc = fexception = fcatch
 # boolean inversion of the result of a function
-fcomplement = fnot = complement = frpartial(fcompose, operator.not_)
+fcomplement = fnot = frpartial(fcompose, operator.not_)
 # converts a list to an iterator, or an iterator to a list
-ilist, liter = compose(builtins.list, builtins.iter), compose(builtins.iter, builtins.list)
+ilist, liter = fcompose(builtins.list, builtins.iter), fcompose(builtins.iter, builtins.list)
 # converts a tuple to an iterator, or an iterator to a tuple
-ituple, titer = compose(builtins.tuple, builtins.iter), compose(builtins.iter, builtins.tuple)
+ituple, titer = fcompose(builtins.tuple, builtins.iter), fcompose(builtins.iter, builtins.tuple)
 # take ``count`` number of elements from an iterator
-itake = lambda count: compose(builtins.iter, fmap(*(builtins.next,)*count), builtins.tuple)
+itake = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*count), builtins.tuple)
 # get the ``nth`` element from an iterator
-iget = lambda count: compose(builtins.iter, fmap(*(builtins.next,)*(count)), builtins.tuple, operator.itemgetter(-1))
+iget = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*(count)), builtins.tuple, operator.itemgetter(-1))
 # copy from itertools
 imap, ifilter, ichain, izip = itertools.imap, itertools.ifilter, itertools.chain, itertools.izip
 # count number of elements of a container
-count = compose(builtins.iter, builtins.list, builtins.len)
+count = fcompose(builtins.iter, builtins.list, builtins.len)
 
 # cheap pattern-like matching
 class Pattern(object):
@@ -931,17 +931,17 @@ class matcher(object):
         return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda v: compose(attr, functools.partial(functools.partial(operator.eq, v)))
+        self.__predicate__[type] = lambda v: fcompose(attr, functools.partial(functools.partial(operator.eq, v)))
     def mapping(self, type, function, *attribute):
         attr = self.__attrib__(*attribute)
-        mapper = compose(attr, function)
-        self.__predicate__[type] = lambda v: compose(mapper, functools.partial(operator.eq, v))
+        mapper = fcompose(attr, function)
+        self.__predicate__[type] = lambda v: fcompose(mapper, functools.partial(operator.eq, v))
     def boolean(self, type, function, *attribute):
         attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda v: compose(attr, functools.partial(function, v))
+        self.__predicate__[type] = lambda v: fcompose(attr, functools.partial(function, v))
     def predicate(self, type, *attribute):
         attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = functools.partial(compose, attr)
+        self.__predicate__[type] = functools.partial(fcompose, attr)
     def match(self, type, value, iterable):
         matcher = self.__predicate__[type](value)
         return itertools.ifilter(matcher, iterable)

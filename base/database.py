@@ -1465,7 +1465,7 @@ class imports(object):
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
             result = []
-            idaapi.enum_import_names(idx, utils.fcompose(utils.box, result.append, utils.fdiscard(lambda: True)))
+            idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, result.append, utils.fconstant(True)))
             for ea, name, ordinal in result:
                 yield ea, (module, name, ordinal)
             continue
@@ -2063,7 +2063,7 @@ class address(object):
         '''Return the previous address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), modifiers.items()))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -2124,7 +2124,7 @@ class address(object):
         '''Return the next address from ``ea`` containing an instruction that matches ``predicate`` and uses ``reg`` or any one of the registers in ``regs``.'''
         regs = (reg,) + regs
         count = modifiers.get('count',1)
-        args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), modifiers.items()))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -3321,7 +3321,7 @@ class marks(object):
             res = cls.__location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
             title, descr = description, description
             res.mark(index, title, descr)
-            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
+            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
             return index
 
         @classmethod
@@ -3366,7 +3366,7 @@ class marks(object):
         def __set_description(cls, index, ea, description, **extra):
             '''Modify the mark at ``index`` to point to the address ``ea`` with the specified ``description``.'''
             idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, description)
-            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.unbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
+            #raise KeyError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
             return index
 
         @classmethod
@@ -4267,7 +4267,7 @@ class get(object):
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
             return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
         else:
-            query_l = itertools.imap(utils.unbox('{:s}={!r}'.format), six.iteritems(length))
+            query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
             raise TypeError("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the idaapi.DT_TYPE as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if query_l else '', ea, F, T))
 
         total, cb = type.array.size(ea), type.array.element(ea)
