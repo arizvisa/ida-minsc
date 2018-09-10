@@ -208,13 +208,13 @@ class structure_t(object):
         self.__members__ = members_t(self, baseoffset=offset)
 
     def up(self):
-        '''Return all the structures that reference this specific structure.'''
+        '''Return all the addresses that reference this specific structure.'''
         x, sid = idaapi.xrefblk_t(), self.id
 
         # grab first structure that references this one
         ok = x.first_to(sid, 0)
-        if not ok:
-            return ()
+        if not ok or x.frm == idaapi.BADADDR:
+            return []
 
         # continue collecting all structures that references this one
         res = [(x.frm, x.iscode, x.type)]
@@ -224,8 +224,8 @@ class structure_t(object):
         # convert refs into a list of OREFs
         refs = [ interface.OREF(xrfrom, xriscode, interface.ref_t.of(xrtype)) for xrfrom, xriscode, xrtype in res ]
 
-        # return as a tuple
-        return map(utils.fcompose(operator.itemgetter(0), __instance__), refs)
+        # return as a list
+        return [ref if database.contains(ref[0]) else __instance__(ref[0]) for ref in refs]
 
     def down(self):
         '''Return all the structures that are referenced by this specific structure.'''
@@ -233,7 +233,7 @@ class structure_t(object):
 
         # grab structures that this one references
         ok = x.first_from(sid, 0)
-        if not ok:
+        if not ok or x.to == idaapi.BADADDR:
             return []
 
         # continue collecting all structures that this one references
@@ -245,7 +245,7 @@ class structure_t(object):
         refs = [ interface.OREF(xrto, xriscode, interface.ref_t.of(xrtype)) for xrto, xriscode, xrtype in res ]
 
         # return it as a tuple
-        return map(utils.fcompose(operator.itemgetter(0), __instance__), refs)
+        return [ref if database.contains(ref[0]) else __instance__(ref[0]) for ref in refs]
 
     def refs(self):
         """Return the `(address, opnum, type)` of all the code and data references within the database that reference this structure.
