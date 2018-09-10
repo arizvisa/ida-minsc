@@ -19,13 +19,13 @@ static_targets = $(wildcard $(STATICDIR)/*.rst)
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-.PHONY: help Makefile
+.PHONY: help all
 
 ## macros for doing stuff
 
 # forwarding things to a sphinx target
 define sphinx_target
-$(1): Makefile
+$(1): source
 	@$$(SPHINXBUILD) -M $$@ "$$(SOURCEDIR)" "$$(BUILDDIR)" $$(SPHINXOPTS) $$(O)
 endef
 
@@ -49,7 +49,7 @@ _sphinx_targets += gettext changes xml pseudoxml linkcheck doctest coverage
 
 $(foreach target,$(_sphinx_targets),$(eval $(call sphinx_target,$(target))))
 
-all: help
+all: source | html
 
 ## targets for auto-generating docs
 $(foreach target,$(base_targets),$(eval $(call make_docs,$(SOURCEDIR)/source/$(target).rst,$(ROOTDIR)/base/$(target).py)))
