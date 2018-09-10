@@ -303,7 +303,7 @@ class functions(object):
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the functions in the database that match ``type``.'''
+        '''Iterate through all of the functions in the database that match the keyword specified by ``type``.'''
         if not type:
             #type = {'predicate':lambda n: True}
             for n in cls():
@@ -322,7 +322,7 @@ class functions(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the functions in the database that match the keywords specified by ``type``.'''
+        '''List all of the functions in the database that match the keyword specified by ``type``.'''
         res = builtins.list(cls.iterate(**type))
 
         flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
@@ -382,7 +382,7 @@ class functions(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the functions within the database and return the first result matching ``type``.'''
+        '''Search through all of the functions within the database and return the first result matching the keyword specified by ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
@@ -436,7 +436,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the segments in the database that match the keywords specified by ``type``.'''
+        '''List all of the segments in the database that match the keyword specified by ``type``.'''
         return segment.list(**type)
 
     @utils.multicase(name=basestring)
@@ -447,7 +447,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through each segment defined in the database matching ``type``.'''
+        '''Iterate through all the segments defined in the database matching the keyword specified by``type``.'''
         return segment.__iterate__(**type)
 
     @utils.multicase(name=basestring)
@@ -458,7 +458,7 @@ class segments(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the segments within the database and return the first result matching ``type``.'''
+        '''Search through all of the segments within the database and return the first result matching the keyword specified by ``type``.'''
         return segment.search(**type)
 
 @utils.multicase()
@@ -595,7 +595,7 @@ class names(object):
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the names in the database that match ``type``.'''
+        '''Iterate through all of the names in the database that match the keyword specified by``type``.'''
         for idx in cls.__iterate__(**type):
             yield idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
         return
@@ -608,7 +608,7 @@ class names(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the names in the database that match the keywords specified by ``type``.'''
+        '''List all of the names in the database that match the keyword specified by ``type``.'''
         res = builtins.list(cls.__iterate__(**type))
 
         maxindex = max(res or [1])
@@ -628,7 +628,7 @@ class names(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the names within the database and return the first result matching ``type``.'''
+        '''Search through all of the names within the database and return the first result matching the keyword specified by ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -1021,7 +1021,7 @@ class entries(object):
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the entry points in the database that match ``type``.'''
+        '''Iterate through all of the entry points in the database that match the keyword specified by``type``.'''
         res = itertools.imap(cls.__address__, cls.__iterate__(**type))
         for ea in res: yield ea
 
@@ -1082,7 +1082,7 @@ class entries(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the entry points in the database that match the keywords specified by ``type``.'''
+        '''List all of the entry points in the database that match the keyword specified by ``type``.'''
         res = builtins.list(cls.__iterate__(**type))
 
         to_address = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -1107,7 +1107,7 @@ class entries(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the entry points within the database and return the first result matching ``type``.'''
+        '''Search through all of the entry points within the database and return the first result matching the keyword specified by ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -1478,7 +1478,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the imports in the database that match ``type``.'''
+        '''Iterate through all of the imports in the database that match the keyword specified by ``type``.'''
         if not type: type = {'predicate':lambda n: True}
         res = builtins.list(cls.__iterate__())
         for key, value in six.iteritems(type):
@@ -1568,7 +1568,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the imports in the database that match the keywords specified by ``type``.'''
+        '''List all of the imports in the database that match the keyword specified by ``type``.'''
         res = builtins.list(cls.iterate(**type))
 
         maxaddr = max(builtins.map(utils.first, res) or [idaapi.BADADDR])
@@ -1588,7 +1588,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the imports within the database and return the first result matching ``type``.'''
+        '''Search through all of the imports within the database and return the first result matching the keyword specified by ``type``.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))

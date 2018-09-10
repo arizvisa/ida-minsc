@@ -88,7 +88,7 @@ def iterate(string):
     return cls.iterate(like=string)
 @utils.multicase()
 def iterate(**type):
-    '''Iterate through all of the structures that match the keywords specified by ``type``.'''
+    '''Iterate through all of the structures that match the keyword specified by ``type``.'''
     if not type: type = {'predicate':lambda n: True}
     res = builtins.list(__iterate__())
     for key, value in six.iteritems(type):
@@ -101,7 +101,7 @@ def list(string):
     return list(like=string)
 @utils.multicase()
 def list(**type):
-    '''List all the structures within the database that match the keywords specified by ``type``.'''
+    '''List all the structures within the database that match the keyword specified by ``type``.'''
     res = builtins.list(iterate(**type))
 
     maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
@@ -728,7 +728,7 @@ class members_t(object):
     # searching members
     @utils.multicase()
     def iterate(self, **type):
-        '''Iterate through all of the members in the structure that match the keywords specified by ``type``.'''
+        '''Iterate through all of the members in the structure that match the keyword specified by ``type``.'''
         if not type: type = {'predicate':lambda n: True}
         res = builtins.list(iter(self))
         for key, value in six.iteritems(type):
@@ -741,7 +741,7 @@ class members_t(object):
         return self.list(like=string)
     @utils.multicase()
     def list(self, **type):
-        '''List all the members within the structure that match the keywords specified by ``type``.'''
+        '''List all the members within the structure that match the keyword specified by ``type``.'''
         res = builtins.list(self.iterate(**type))
 
         escape = repr

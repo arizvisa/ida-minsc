@@ -73,7 +73,7 @@ def list(string):
     return list(like=string)
 @utils.multicase()
 def list(**type):
-    '''List all of the segments in the database that match the keywords specified by ``type``.'''
+    '''List all of the segments in the database that match the keyword specified by ``type``.'''
     res = builtins.list(__iterate__(**type))
 
     maxindex = max(builtins.map(operator.attrgetter('index'), res) or [1])
@@ -150,7 +150,7 @@ def search(name):
     return by(like=string)
 @utils.multicase()
 def search(**type):
-    '''Search through all the segments and return the first one that matches the keywords in ``type``.'''
+    '''Search through all the segments and return the first one that matches the keyword specified by ``type``.'''
     return by(**type)
 
 ## properties
