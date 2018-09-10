@@ -5,14 +5,15 @@ This module exposes a number of tools that can be used to interact
 with the enumerations or their members defined within the database.
 
 The base argument type for interacting with an enumeration is the
-enumeration identifier. This is an opaque integer id that will need
-to be passed to the different tools in order to reference the
-enumeration that the user is referring to.
+enumeration identifier `idaapi.enum_t`. This is an opaque integer
+that will need to be passed to the different tools in order to
+reference the enumeration that the user is referring to.
 
 There are a number of tools within the `member` namespace that can
 be used to enumerate or locate the members of an enumeration. As
 typically an enumeration is simply a constant, each result that is
-returned will either be a value or a name.
+returned will either be a value or a name. The identifier for these
+is a `idaapi.uval_t`.
 
 To list the different enumerations available in the database, one
 can use `enumeration.list(...)` specifying their preferred method
@@ -88,7 +89,7 @@ def by(name):
     return by_name(name)
 @utils.multicase()
 def by(**type):
-    '''Return the enumeration matching the specified ``type``.'''
+    '''Return the enumeration matching the keywords specified by ``type``.'''
     searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(iterate(**type))
@@ -101,17 +102,22 @@ def by(**type):
         raise LookupError("{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
+@utils.multicase(string=basestring)
 def search(string):
     '''Search through all the enumerations using globbing.'''
     return by(like=string)
+@utils.multicase()
+def search(**type):
+    '''Search through all the enumerations and return the first one that matches the keywords in ``type``.'''
+    return by(**type)
 
-def keys(id):
-    '''Return the names of all of the elements of the enumeration ``id``.'''
-    return [member.name(n) for n in member.iterate(id)]
+def keys(enum):
+    '''Return the names of all of the elements of the enumeration identified by ``enum``.'''
+    return [member.name(n) for n in member.iterate(enum)]
 
-def values(id):
-    '''Return the values of all of the elements of the enumeration ``id``.'''
-    return [member.value(n) for n in member.iterate(id)]
+def values(enum):
+    '''Return the values of all of the elements of the enumeration identified by ``enum``.'''
+    return [member.value(n) for n in member.iterate(enum)]
 
 ## creation/deletion
 def new(name, flags=0):
@@ -122,14 +128,16 @@ def new(name, flags=0):
         raise ValueError("{:s}.create : Unable to create enumeration named {:s}.".format(__name__, name))
     return res
 
-@utils.multicase(id=six.integer_types)
-def delete(id):
-    return idaapi.del_enum(id)
 @utils.multicase(name=basestring)
 def delete(name):
     '''Delete the enumeration with the specified ``name``.'''
     eid = by_name(name)
     return delete(eid)
+@utils.multicase()
+def delete(enum):
+    '''Delete the enumeration identified by ``enum``.'''
+    eid = by(enum)
+    return idaapi.del_enum(eid)
 create,remove = utils.alias(new),utils.alias(delete)
 
 ## setting enum options
@@ -225,15 +233,7 @@ def list(string):
     return list(like=string)
 @utils.multicase()
 def list(**type):
-    """List all the enumerations within the database.
-
-    Search type can be identified by providing a named argument.
-    like = glob match
-    regex = regular expression
-    index = particular index
-    identifier = particular id number
-    pred = function predicate
-    """
+    '''List all of the enumerations within the database that match the keywords specified by ``type``.'''
     res = builtins.list(iterate(**type))
 
     maxindex = max(builtins.map(idaapi.get_enum_idx, res))
@@ -483,6 +483,7 @@ class member(object):
 
     @classmethod
     def __iterate__(cls, eid):
+        '''Iterate through all the members of the enumeration identified by ``eid``.'''
         bmask = idaapi.BADADDR & mask(eid)
         res = idaapi.get_first_enum_member(eid, bmask)
         if res == idaapi.BADADDR: return

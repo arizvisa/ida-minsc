@@ -398,11 +398,12 @@ class structure_t(object):
         '''Return the size of the structure.'''
         return idaapi.get_struc_size(self.ptr)
     @size.setter
-    def size(self, new):
+    def size(self, size):
+        '''Expand the structure to the new ``size`` that is specified.'''
         res = idaapi.get_struc_size(self.ptr)
-        ok = idaapi.expand_struc(self.ptr, 0, new - res, True)
+        ok = idaapi.expand_struc(self.ptr, 0, size - res, True)
         if not ok:
-            logging.fatal("{:s}.instance({:s}).size : Unable to resize structure {:s} from {:#x} bytes to {:#x} bytes.".format(__name__, self.name, self.name, res, new))
+            logging.fatal("{:s}.instance({:s}).size : Unable to resize structure {:s} from {:#x} bytes to {:#x} bytes.".format(__name__, self.name, self.name, res, size))
         return res
 
     @property
@@ -822,7 +823,7 @@ class members_t(object):
     by_id = byId = byIdentifier = utils.alias(by_identifier, 'members_t')
 
     def near_offset(self, offset):
-        '''Return the member near to the specified ``offset``.'''
+        '''Return the member nearest to the specified ``offset``.'''
         min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr), idaapi.get_struc_last_offset(self.owner.ptr)))
         if (offset < min) or (offset >= max):
             logging.warn("{:s}.instance({:s}).members.near_offset : Requested offset {:+#x} not within bounds {:#x}<->{:#x}. Trying anyways..".format(__name__, self.owner.name, offset, min, max))

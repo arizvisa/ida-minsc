@@ -28,8 +28,8 @@ import internal
 import idaapi
 output = sys.stderr
 
-def fetch_contents(f):
-    """Fetch the reference count for the contents of function ``f`` in the database.
+def fetch_contents(fn):
+    """Fetch the reference count for the contents of function ``fn`` in the database.
 
     Returns the tuple `(func, address, tags)` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
@@ -38,7 +38,7 @@ def fetch_contents(f):
     """
     addr, tags = {}, {}
 
-    for ea in func.iterate(f):
+    for ea in func.iterate(fn):
         ui.navigation.auto(ea)
         res = db.tag(ea)
         #res.pop('name', None)
@@ -46,7 +46,7 @@ def fetch_contents(f):
             addr[ea] = addr.get(ea, 0) + 1
             tags[k] = tags.get(k, 0) + 1
         continue
-    return func.address(f), addr, tags
+    return func.address(fn), addr, tags
 
 def check_contents(ea):
     '''Validate the cache defined for the contents of the function ``ea``.'''

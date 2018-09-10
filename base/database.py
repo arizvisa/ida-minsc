@@ -190,7 +190,7 @@ class config(object):
     @classmethod
     def bounds(cls):
         '''Return the bounds of the current database as a tuple formatted as `(left, right)`'''
-        return cls.info.minEA, cls.info.maxEA
+        return interface.bounds_t(cls.info.minEA, cls.info.maxEA)
 
     class registers(object):
         """
@@ -425,7 +425,7 @@ class segments(object):
     def __new__(cls):
         '''Yield the bounds of each segment within the current database.'''
         for s in segment.__iterate__():
-            yield s.startEA, s.endEA
+            yield interface.bounds_t(s.startEA, s.endEA)
         return
 
     @utils.multicase(name=basestring)
@@ -2105,22 +2105,22 @@ class address(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
+        '''Return the next address containing an instruction that uses ``reg`` or any one of the registers in ``regs``.'''
         return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, predicate, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the next address containing an instruction that matches ``predicate`` and uses ``reg`` or any one of the registers in ``regs``.'''
         return cls.nextreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
-        '''Return the next address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
+        '''Return the next address from ``ea`` containing an instruction that uses ``reg`` or any one of the registers in ``regs``.'''
         return cls.nextreg(ea, utils.fconst(True), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, ea, predicate, reg, *regs, **modifiers):
-        '''Return the next address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the next address from ``ea`` containing an instruction that matches ``predicate`` and uses ``reg`` or any one of the registers in ``regs``.'''
         regs = (reg,) + regs
         count = modifiers.get('count',1)
         args = ', '.join(["{:x}".format(ea)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.unbox("{:s}={!r}".format), modifiers.items()))
@@ -2131,7 +2131,7 @@ class address(object):
 
         # if within a function, then make sure we're within the chunk's bounds.
         if function.within(ea):
-            (_,end) = function.chunk(ea)
+            (_, end) = function.chunk(ea)
             fwithin = functools.partial(operator.gt, end)
 
         # otherwise ensure that we're not in a function and we're a code type.

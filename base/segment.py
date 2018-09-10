@@ -1,4 +1,4 @@
-"""
+r"""
 Segment module
 
 This module provides a number of tools that can be used to enumerate
@@ -56,7 +56,7 @@ __matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', o
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 
 def __iterate__(**type):
-    '''Iterate through each segment defined in the database.'''
+    '''Iterate through each segment defined in the database that match the keywords specified by ``type``.'''
     if not type: type = {'predicate':lambda n: True}
     def newsegment(index):
         res = idaapi.getnseg(index)
@@ -129,7 +129,7 @@ def by():
     return ui.current.segment()
 @utils.multicase()
 def by(**type):
-    '''Return the segment matching the specified ``type``.'''
+    '''Return the segment matching the specified keywords in ``type``.'''
     searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(__iterate__(**type))
@@ -150,7 +150,7 @@ def search(name):
     return by(like=string)
 @utils.multicase()
 def search(**type):
-    '''Search through all the segments and return the first one that matches ``type``.'''
+    '''Search through all the segments and return the first one that matches the keywords in ``type``.'''
     return by(**type)
 
 ## properties
@@ -177,12 +177,12 @@ def iterate():
     return iterate(seg)
 @utils.multicase()
 def iterate(segment):
-    '''Iterate through all of the addresses within the segment identified by ``segment``.'''
+    '''Iterate through all of the addresses within the specified ``segment``.'''
     seg = by(segment)
     return iterate(seg)
 @utils.multicase(segment=idaapi.segment_t)
 def iterate(segment):
-    '''Iterate through all of the addresses within the segment ``segment``.'''
+    '''Iterate through all of the addresses within the `idaapi.segment_t` represented by ``segment``.'''
     for ea in database.address.iterate(segment.startEA, segment.endEA):
         yield ea
     return
@@ -337,18 +337,18 @@ def contains(ea):
     '''Returns true if the address ``ea`` is contained within the current segment.'''
     return contains(ui.current.segment(), ea)
 @utils.multicase(segaddr=six.integer_types, ea=six.integer_types)
-def contains(segaddr, ea):
-    '''Returns true if the address ``ea`` is contained within the segment owning the specified ``segaddr``.'''
-    seg = by_address(segaddr)
+def contains(address, ea):
+    '''Returns true if the address ``ea`` is contained within the segment belonging to the specified ``address``.'''
+    seg = by_address(address)
     return contains(seg, ea)
 @utils.multicase(name=basestring, ea=six.integer_types)
-def contains(segname, ea):
-    '''Returns true if the address ``ea`` is contained within the segment named ``segname``.'''
-    seg = by_name(segname)
+def contains(name, ea):
+    '''Returns true if the address ``ea`` is contained within the segment with the specified ``name``.'''
+    seg = by_name(name)
     return contains(seg, ea)
 @utils.multicase(segment=idaapi.segment_t, ea=six.integer_types)
 def contains(segment, ea):
-    '''Returns true if the address ``ea`` is contained within the specified ``segment``.'''
+    '''Returns true if the address ``ea`` is contained within the `idaapi.segment_t` specified by ``segment``.'''
     return segment.startEA <= ea < segment.endEA
 
 ## functions

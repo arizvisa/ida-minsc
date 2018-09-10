@@ -17,10 +17,10 @@ Likewise when dealing with a single operand, the `op_` prefix
 is used and will take an address and the operand index.
 
 To request the actual IDA types (`insn_t` and `op_t`) there are
-two tools that are provided. The `instruction.at($$)` tool will
-take an address and return an `insn_t`. To get an `op_t`, a user
-can use `instruction.operand($$, $)`. This will take an address
-and an index and return the desired `op_t`.
+two tools that are provided. The `instruction.at(address)` tool
+will take an address and return an `insn_t`. To get an `op_t`, a
+user can use `instruction.operand(address, opnum)`. This will take
+an address and an index and return the desired `op_t`.
 
 Some globals are also defined for the given architecture which
 can be used to query or access the registers that are currently
@@ -237,11 +237,11 @@ opts = utils.alias(ops_type)
 
 @utils.multicase()
 def ops_state():
-    '''Returns a tuple of the state `(r, w, rw)` of all the operands for the instruction at the current address.'''
+    '''Returns a tuple for all the operands containing one of the states "r", "w", or "rw"` describing how the operands for the current instruction operands are modified.'''
     return ops_state(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_state(ea):
-    '''Returns a tuple of the state `(r, w, rw)` of all the operands for the instruction at address ``ea``.'''
+    '''Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address ``ea``.'''
     ea = interface.address.inside(ea)
     f = feature(ea)
     res = ( ((f&ops_state.read[i]), (f&ops_state.write[i])) for i in six.moves.range(ops_count(ea)) )
@@ -283,14 +283,14 @@ ops_const = utils.alias(ops_constant)
 
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(reg, *regs, **modifiers):
-    """Yields the index of each operand in the instruction at the current address which touches one of the registers identified by ``regs``.
+    """Yields the index of each operand in the instruction at the current address that uses ``reg`` or any one of the registers in ``regs``.
 
     If the keyword ``write`` is true, then only return the result if it's writing to the register.
     """
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(ea, reg, *regs, **modifiers):
-    """Yields the index of each operand in the instruction at address ``ea`` that touches one of the registers identified by ``regs``.
+    """Yields the index of each operand in the instruction at address ``ea`` that uses ``reg`` or any one of the registers in ``regs``.
 
     If the keyword ``write`` is true, then only return the result if it's writing to the register.
     """
@@ -432,7 +432,7 @@ def op_structure(opnum):
     return op_structure(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
-    '''Return the structure that operand ``opnum`` for instruction ``ea`` actually referencese.'''
+    '''Return the structure that operand ``opnum`` for instruction ``ea`` actually references.'''
     ti, fl, op = idaapi.opinfo_t(), database.type.flags(ea), operand(ea, opnum)
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise TypeError("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
@@ -1127,6 +1127,7 @@ class intelop:
 
         @property
         def symbols(self):
+            '''Yield the `segment` register from the tuple if it is defined.'''
             s, _ = self
             if s is not None: yield s
     SO = SegmentOffset
@@ -1149,6 +1150,7 @@ class intelop:
 
         @property
         def symbols(self):
+            '''Yield the `segment`, `base`, and the `index` registers from the tuple if they are defined.'''
             s, _, b, i, _ = self
             if s is not None: yield s
             if b is not None: yield b
@@ -1172,6 +1174,7 @@ class intelop:
 
         @property
         def symbols(self):
+            '''Yield the `base`, and the `index` registers from the tuple if they are defined.'''
             _, b, i, _ = self
             if b is not None: yield b
             if i is not None: yield i
@@ -1204,6 +1207,7 @@ class armop:
 
         @property
         def symbols(self):
+            '''Yield the `Rn` register from the tuple.'''
             r, _, _ = self
             yield r
 
@@ -1219,6 +1223,7 @@ class armop:
 
         @property
         def symbols(self):
+            '''Yield any of the registers within the `reglist` field belonging to the tuple.'''
             res, = self
             for r in res: yield r
 
@@ -1240,6 +1245,7 @@ class armop:
 
         @property
         def symbols(self):
+            '''Yield the `Rn` register from the tuple.'''
             r, _ = self
             yield r
 
@@ -1256,13 +1262,15 @@ class armop:
             interface.register_t,
         )
 
-        register = property(fget=operator.itemgetter(0))
-        offset = property(fget=operator.itemgetter(1))
+        first = property(fget=operator.itemgetter(0))
+        second = property(fget=operator.itemgetter(1))
 
         @property
         def symbols(self):
-            r, _ = self
-            yield r
+            '''Yield the `Rn` and `Rm` registers from the tuple.'''
+            rn, rm = self
+            yield rn
+            yield rm
 
     class mem(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -1276,6 +1284,7 @@ class armop:
 
         @property
         def symbols(self):
+            '''This operand type is not composed of any symbols.'''
             raise StopIteration
             yield   # so that this function is still treated as a generator
 
@@ -1301,6 +1310,7 @@ class mipsop:
 
         @property
         def symbols(self):
+            '''Yield the `rt` register from this tuple.'''
             r, _ = self
             yield r
 

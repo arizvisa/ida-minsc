@@ -455,7 +455,7 @@ class address(object):
 class node(object):
     """
     This namespace contains a number of methods that extract information
-    from some of the undocumented structures that IDA stores within 
+    from some of the undocumented structures that IDA stores within
     netnodes for various addresses in a database.
 
     XXX: Hopefully these are correct!
@@ -590,14 +590,20 @@ class namedtypedtuple(tuple):
     _types = ()
 
     def __new__(cls, *args):
+        '''Construct a new instance of a tuple using the specified ``args``.'''
         res = args[:]
         for n, t, x in zip(cls._fields, cls._types, args):
             if not isinstance(x, t): raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n, t))
         return tuple.__new__(cls, res)
 
     @classmethod
-    def _make(cls, iterable, new=tuple.__new__, len=len):
-        result = new(cls, iterable)
+    def _make(cls, iterable, cons=tuple.__new__, len=len):
+        """Make a tuple using the values specified in ``iterable``.
+
+        If ``cons`` is specified as a callable, then use it to construct the type.
+        If ``len`` is specified as a callable, then use it to return the length.
+        """
+        result = cons(cls, iterable)
         if len(result) != len(cls._fields):
             raise TypeError("Expected {:d} arguments, got {:d}.".format(len(cls._fields), len(result)))
         for n, t, x in zip(cls._fields, cls._types, result):
@@ -606,6 +612,7 @@ class namedtypedtuple(tuple):
 
     @classmethod
     def _type(cls, name):
+        '''Return the type for the field ``name``.'''
         res = (t for n, t in zip(cls._fields, cls._types) if n == name)
         try: return next(res)
         except StopIteration:
@@ -626,6 +633,7 @@ class namedtypedtuple(tuple):
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     def _replace(self, **kwds):
+        '''Assign the specified ``kwds`` to the fields in the tuple.'''
         result = self._make(map(kwds.pop, self._fields, self))
         if kwds:
             raise ValueError("Got some unexpected field names {!r}.".format(six.viewkeys(kwds)))
@@ -743,6 +751,7 @@ class regmatch(object):
     are written to or read from.
     """
     def __new__(cls, *regs, **modifiers):
+        '''Construct a closure that can be used for matching instruction using the specified ``regs`` and ``modifiers``.'''
         if not regs:
             args = ', '.join(map("{:s}".format, regs))
             mods = ', '.join(map(internal.utils.unbox("{:s}={!r}".format), six.iteritems(modifiers)))
@@ -843,8 +852,9 @@ class ref_t(set):
     def __repr__(self):
         return "ref_t({:s})".format(str().join(sorted(self)))
 
-    def __init__(self, type, iterable):
-        self.F = type
+    def __init__(self, xrtype, iterable):
+        '''Construct a `ref_t` using ``xrtype`` and any semantics specified in ``iterable``.'''
+        self.F = xrtype
         self.update(iterable)
 
     @classmethod
@@ -1178,3 +1188,11 @@ class architecture_t(object):
         except StopIteration: pass
         cls = self.__class__
         raise LookupError("{:s}.demote({:s}{:s}) : Unable to find the register to demote to.".format('.'.join((__name__,cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+
+class bounds_t(namedtypedtuple):
+    """
+    This tuple is used to represent references that describe a bounds
+    and has the format `(left, right)`.
+    """
+    _fields = ('left', 'right')
+    _types = (six.integer_types, six.integer_types)
