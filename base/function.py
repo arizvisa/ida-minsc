@@ -1284,7 +1284,7 @@ class frame(object):
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.warn("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format(__name__, fn.startEA, cc))
+                logging.info("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format(__name__, fn.startEA, cc))
 
             base = get_vars_size(fn)+get_regs_size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, get_args_size(fn)):
