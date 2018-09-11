@@ -32,6 +32,29 @@ import database as _database
 # another item menu to toolbar
 # find the QAction associated with a command (or keypress)
 
+def application():
+    '''Return the current instance of the IDA Application.'''
+    raise NotImplementedError
+
+def ask(string, **default):
+    """Ask the user a question providing the option to choose "yes", "no", or "cancel".
+
+    If any of the options are specified as a boolean, then it is
+    assumed that this option will be the default. If the user
+    chooses "cancel", then this value will be returned instead of
+    the value `None`.
+    """
+    state = {'no': 0, 'yes': 1, 'cancel': -1}
+    results = {0: False, 1: True}
+    if default:
+        keys = {n for n in default.viewkeys()}
+        keys = {n.lower() for n in keys if default.get(n, False)}
+        dflt = next((k for k in keys), 'cancel')
+    else:
+        dflt = 'cancel'
+    res = idaapi.ask_yn(state[dflt], string)
+    return results.get(res, None)
+
 class current(object):
     """
     This namespace contains tools for fetching information about the
@@ -405,10 +428,6 @@ class menu(object):
         return
 
 ### Qt wrappers and namespaces
-def application():
-    '''Return the current instance of the IDA Application.'''
-    raise NotImplementedError
-
 class window(object):
     """
     This namespace is for selecting a specific or particular window.
@@ -804,22 +823,3 @@ else:
 
     class Progress(ConsoleProgress):
         '''The default progress bar with which to show progress.'''
-
-def ask(string, **default):
-    """Ask the user a question providing the option to choose "yes", "no", or "cancel".
-
-    If any of the options are specified as a boolean, then it is
-    assumed that this option will be the default. If the user
-    chooses "cancel", then this value will be returned instead of
-    the value `None`.
-    """
-    state = {'no': 0, 'yes': 1, 'cancel': -1}
-    results = {0: False, 1: True}
-    if default:
-        keys = {n for n in default.viewkeys()}
-        keys = {n.lower() for n in keys if default.get(n, False)}
-        dflt = next((k for k in keys), 'cancel')
-    else:
-        dflt = 'cancel'
-    res = idaapi.ask_yn(state[dflt], string)
-    return results.get(res, None)
