@@ -864,7 +864,10 @@ class ConditionalVisitor(ast.NodeVisitor):
             expr = grammar.reduce(node.test)[0]
             ok = eval(expr)
 
-        if ok is None: return
+        if ok is None:
+            map(self.visit, node.body)
+            map(self.visit, node.orelse)
+            return
 
         if ok:
             map(self.visit, node.body)

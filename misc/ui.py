@@ -608,12 +608,13 @@ try:
     import PyQt5.Qt
     from PyQt5.Qt import QObject
 
+    @document.hidden
     def application():
         '''Return the current instance of the IDA Application.'''
         q = PyQt5.Qt.qApp
         return q.instance()
 
-    @document.namespace
+    @document.hidden
     class mouse(mouse):
         """
         This namespace is for interacting with the mouse input.
@@ -625,7 +626,7 @@ try:
             res = qt.pos()
             return res.x(), res.y()
 
-    @document.namespace
+    @document.hidden
     class keyboard(keyboard):
         """
         This namespace is for interacting with the keyboard input.
@@ -737,7 +738,7 @@ try:
                 self.object.setValue(options['value'])
             return res
 
-    @document.namespace
+    @document.hidden
     class widget(widget):
         """
         This namespace is for selecting a specific or particular widget.
@@ -757,12 +758,13 @@ try:
     import PySide
     import PySide.QtCore, PySide.QtGui
 
+    @document.hidden
     def application():
         '''Return the current instance of the IDA Application.'''
         res = PySide.QtCore.QCoreApplication
         return res.instance()
 
-    @document.namespace
+    @document.hidden
     class mouse(mouse):
         """
         This namespace is for interacting with the mouse input.
@@ -774,7 +776,7 @@ try:
             res = qt.pos()
             return res.x(), res.y()
 
-    @document.namespace
+    @document.hidden
     class keyboard(keyboard):
         """
         PySide keyboard interface.
@@ -784,7 +786,7 @@ try:
             '''Return the current keyboard input context.'''
             return q.inputContext()
 
-    @document.namespace
+    @document.hidden
     class widget(widget):
         """
         This namespace is for selecting a specific or particular widget.
