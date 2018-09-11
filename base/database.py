@@ -769,17 +769,17 @@ def offset():
 @utils.multicase(ea=six.integer_types)
 def offset(ea):
     '''Return the address ``ea`` converted to an offset from the base address of the database.'''
-    return interface.address.inside(ea) - baseaddress()
+    return interface.address.inside(ea) - config.baseaddress()
 getoffset = getOffset = o = utils.alias(offset)
 
 def translate(offset):
     '''Translate the specified ``offset`` to an address in the database.'''
-    return baseaddress()+offset
+    return config.baseaddress() + offset
 coof = convert_offset = convertOffset = utils.alias(translate)
 
 def go_offset(offset):
     '''Jump to the specified ``offset`` within the database.'''
-    res = ui.current.address()-baseaddress()
+    res = ui.current.address() - config.baseaddress()
     ea = coof(offset)
     idaapi.jumpto(interface.address.inside(ea))
     return res
