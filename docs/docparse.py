@@ -818,6 +818,27 @@ class decorators(object):
         res = (d for d in node.decorator_list if isinstance(d, ast.Call))
         return [(n, a, k, sa, sk) for n, a, k, sa, sk in map(grammar.reduce, res)]
 
+    @classmethod
+    def check(cls, node):
+        available = {
+            'document.aliases',
+            'document.hidden',
+            'document.parameters',
+            'document.namespace',
+            'document.classdef',
+            'document.details',
+            'document.rename',
+        }
+
+        if any(n.startswith('document.') and n not in available for n in cls.attributes(node)):
+            raise TypeError("Unknown document attribute: {!r}".format(cls.attributes(node)))
+
+        for n, a, _, _, _ in cls.functions(node):
+            if n.startswith('document.') and n not in available:
+                raise TypeError("Unknown document decorator: {!s}".format(n))
+            continue
+        return
+
 ### Visitor parser mix-ins
 class FullNameMixin(object):
     def fullname(self, ref, node):
@@ -911,6 +932,9 @@ class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
         # figure out the defaults
         defs = { a.id : evaluate(grammar.reduce(df)[0]) for df, a in zip(reversed(defaults), reversed(arguments.args)) }
 
+        # verify that all the document decorators are spelled correctly
+        decorators.check(node)
+
         # figure things out about which decorators were applied
         methodtypes = {m for m in decorators.attributes(node)}
         multicase = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == u'utils.multicase')
@@ -996,6 +1020,9 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
     def visit_ClassDef(self, node):
         '''Anything that's a class is considered a namespace'''
         cls, visible = self.__class__, self.match_ClassDef(node)
+
+        # verify that all the document decorators are spelled correctly
+        decorators.check(node)
 
         # figure out which type it is according to the decorators
         attributes = decorators.attributes(node)
