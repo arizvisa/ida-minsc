@@ -1,28 +1,18 @@
-=========
-IDA-Minsc
-=========
+=======
+Modules
+=======
 
-Aenean placerat orci et neque porta, nec commodo ante vehicula. Praesent
-rutrum suscipit placerat. Aliquam justo felis, venenatis sit amet
-consectetur eget, sagittis in eros. Maecenas a neque mollis, pharetra
-dolor in, aliquam ligula. Morbi pulvinar eleifend erat, id semper purus
-pretium ac. Praesent id ex orci. Nullam at sagittis erat. Vivamus feugiat
-enim diam, sit amet rutrum tellus maximus ut.
-
-Concepts
---------
-.. toctree::
-   multicase
-   tagging
-   matching
-   combinators
-   pythontyping
+Each of the modules exposed by this project are suggested by the author
+to be thought of as a namespace that contains functions related to the
+module that they're a part of. There are a number of modules which are
+exposed by default whereas others such as :py:mod:`custom` are available
+via the "custom" namespace.
 
 Available modules
 -----------------
 
 .. toctree::
-   :name: mastertoc
+   :name: moduletoc
    :maxdepth: 1
    :caption: These modules compose the majority of this project and provide
              various tools that allow one to interact with the IDA database.

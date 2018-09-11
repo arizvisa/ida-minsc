@@ -4,7 +4,7 @@ Tagging and the querying of the tag cache
 =========================================
 
 This project provides an interesting interface based on some research
-(:ref:`1<tagging-references>`) that was done by one of the authors at the
+[:ref:`1<tagging-references>`] that was done by one of the authors at the
 Ekoparty conference in 2011. The author is gratious to TippingPoint/3com/HP
 for providing him the resources and time in which to do this research.
 
@@ -473,9 +473,9 @@ within the :py:mod:`custom` namespace::
 
 .. _tagging-examples:
 
------------------------------------
-Examples - Application or Retrieval
------------------------------------
+------------------------------------
+Examples -- Application or Retrieval
+------------------------------------
 
 The other aspect of the tag api is the application and retrieval of tags at
 a particular address. As was explained bit in :ref:`tagging-usage`, this

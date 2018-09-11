@@ -22,7 +22,7 @@ constants or flags to represent the type they wish to apply.
 
 This project attempts to simplify this by introducing a concept referred
 to as "Pythonic" types. This is done by dual-using the semantics of the
-types available in the Python language (:ref:`1<pythontyping-references>`)
+types available in the Python language [:ref:`1<pythontyping-references>`]
 to determine the correct constants and flags needed by IDA.
 
 .. _pythontyping-references:

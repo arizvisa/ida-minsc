@@ -1,16 +1,16 @@
 .. _multicase-intro:
 
-Functions and Objects
-=====================
+Multicased functions and classes as namespaces
+==============================================
 
-Python (:ref:`1<multicase-references>`) is a dynamically typed object-oriented language
+Python [:ref:`1<multicase-references>`] is a dynamically typed object-oriented language
 which revolves around "duck-typing" (or lack of typing) to accomplish its
 various needs. Despite this project being written in Python, it uses
 functions and objects entirely different from the way Python is typically
-used.  Taking some ideas from Perl (:ref:`2<multicase-references>`), this project
+used.  Taking some ideas from Perl [:ref:`2<multicase-references>`], this project
 allows there to be multiple variations of a function depending on the types
 that are provided to a function as parameters. These are referred to as
-multi-cased functions. The author is gratious to Talos/Cisco (:ref:`3<multicase-references>`) 
+multi-cased functions. The author is gratious to Talos/Cisco [:ref:`3<multicase-references>`] 
 for providing him the resources and time in order to develop this component.
 
 Typically when calling a function or an object in Python, the parameters and
@@ -52,9 +52,9 @@ refer to :ref:`multicase-functions` for more details.
 
 .. _multicase-namespaces:
 
-----------
-Namespaces
-----------
+---------------------
+Classes as namespaces
+---------------------
 
 As was prior mentioned, this project heavily uses a concept known as namespaces
 which changes the semantics of the way objects are used. Although this project
