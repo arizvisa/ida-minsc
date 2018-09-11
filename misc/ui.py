@@ -493,6 +493,11 @@ class mouse(object):
         q = application()
         return q.mouseButtons()
 
+    @classmethod
+    def position(cls):
+        '''Return the current `(x, y)` position of the cursor.'''
+        raise NotImplementedError
+
 class keyboard(object):
     """
     Base namespace for interacting with the keyboard input.
@@ -518,6 +523,11 @@ class keyboard(object):
         idaapi.del_hotkey(cls.hotkey[key])
         del(cls.hotkey[key])
     add, rm = internal.utils.alias(map, 'keyboard'), internal.utils.alias(unmap, 'keyboard')
+
+    @classmethod
+    def input(cls):
+        '''Return the current keyboard input context.'''
+        raise NotImplementedError
 
 ### PyQt5-specific functions and namespaces
 ## these can overwrite any of the classes defined above
