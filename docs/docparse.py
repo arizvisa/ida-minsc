@@ -513,8 +513,10 @@ class restructure(object):
 
         # namespace bases
         if ref.has('bases'):
-            bases = map(stringify, ref.bases)
+            bases = map(stringify, ref.get('bases'))
+            bases = map(functools.partial("{:s}.{:s}".format, ns[-1]), bases)
             res.append("Bases: {:s}".format(', '.join(map(":py:class:`{:s}`".format, bases))))
+            res.append('')
 
         # namespace documentation
         if ref.comment:
@@ -553,8 +555,8 @@ class restructure(object):
     def Class(cls, ref, depth=0):
         if ref.get('skippable') and not ref.children: return ''
 
-        ns = [r.name for r in cls.walk(ref, 'namespace')][:-1]
-        name = '.'.join(reversed(ns))
+        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        name = '.'.join(reversed(ns[:-1]))
 
         res, sectionchar = [], '*^*'
 
@@ -1076,6 +1078,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
     def append_namespace(self, node):
         attributes = decorators.attributes(node)
         details = [details for n, (details,), _, _, _ in decorators.functions(node) if n == 'document.details']
+        bases = [b[0] for b in map(grammar.reduce, node.bases) if b[0] != 'object']
 
         try:
             docstring = ast.get_docstring(node) or ''
@@ -1084,6 +1087,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
 
         # construct the namespace
         res = Namespace(node=node, name=node.name, namespace=self._ref, docstring=docstring)
+        if bases: res.set(bases=bases)
         if attributes: res.set(attributes=attributes)
         if details: res.set(details=details)
         return res
