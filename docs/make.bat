@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=idascripts
+set SPHINXPROJ=ida-minsc
 
 if "%1" == "" goto help
 

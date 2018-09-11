@@ -1,6 +1,6 @@
 SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
-SPHINXPROJ    = idascripts
+SPHINXPROJ    = ida-minsc
 SOURCEDIR     = ./source
 BUILDDIR      = _build
 RSTGENERATE   = python dummyparse.py
