@@ -49,8 +49,10 @@ Combinators
 
    Given any number of :py:data:`args`, box them into a tuple.
 
-   Aliases: fboxed
+   Aliases: ``fboxed``
+
    :param \*args: any number of objects to box as a tuple
+   :return: a tuple containing the arguments that were boxed
 
 .. py:function:: funbox(callable, *initial_args, **initial_kwargs)(*boxed_args, **boxed_kwargs)
 
@@ -77,7 +79,7 @@ Combinators
    Given an :py:data:`item`, return a closure that will return true or false
    based on whether or not :py:data:`object` contains it.
 
-   Aliases: fitemQ
+   Aliases: ``fitemQ``
 
    :param item: any kind of python object
    :param object: any kind of python object to test
@@ -88,7 +90,7 @@ Combinators
    :py:data:`object`. If :py:data:`default` is specified, then if the
    item does not exist in :py:data:`object` return it instead.
 
-   Aliases: fitem
+   Aliases: ``fitem``
 
    :param item: any kind of python object to pass to :py:func:`operator.getitem`.
    :param object: any kind of python object to return an item from
@@ -101,7 +103,7 @@ Combinators
    true or false based on whether or not :py:data:`object` has the specified
    :py:data:`attribute`.
 
-   Aliases: fattributeQ
+   Aliases: ``fattributeQ``
 
    :param attribute: the attribute to check for
    :type attribute: str
@@ -113,7 +115,7 @@ Combinators
    from the :py:data:`object`. If :py:data:`default` is specified, then if the
    attribute does not exist in :py:data:`object` return it instead.
 
-   Aliases: fattribute
+   Aliases: ``fattribute``
 
    :param attribute: an attribute to return from the :py:data:`object`
    :type attribute: str
@@ -126,7 +128,7 @@ Combinators
    Given an :py:data:`object`, return it. This is the identity function
    and is typically used to ignore transforming an object.
 
-   Aliases: fpass, fidentity, fid
+   Aliases: ``fpass``, ``fidentity``, ``fid``
 
    :param object: any kind of python object to return
 
@@ -164,7 +166,7 @@ Combinators
    the function returns a truthy value, or return :py:data:`false` if it
    returns a false-y value.
 
-   Aliases: fcond
+   Aliases: ``fcond``
 
    :param crit: a callable that takes an argument and returns true or false
    :param true: an object or a function to return (or execute) when value is true
@@ -188,7 +190,7 @@ Combinators
    time this closure is called with the same arguments, the cached version will
    be returned instead.
 
-   Aliases: flazy
+   Aliases: ``flazy``
 
    :param callable: any callable to memoize the results for
    :param \*initial_args: any initial arguments to prefix to the callable
@@ -255,7 +257,7 @@ Combinators
    :py:data:`extra_kwargs` is provided, then continue to apply these to the
    :py:data:`callable` but backwards.
 
-   Aliases: frev
+   Aliases: ``freverse``
 
    :param callable: the callable to apply the arguments to
    :param \*reverse_args: the arguments to apply to the end of :py:data:`callable`
@@ -274,7 +276,7 @@ Combinators
    be the exception object if one was raised. If one wasn't raised, then the
    first element will be the value :py:obj:`None`.
 
-   Aliases: fexc,  fexception
+   Aliases: ``fexc``, ``fexception``
 
    :param callable: the callable to catch an exception in
    :param \*initial_args: the initial arguments to apply to the :py:data:`callable`
@@ -288,7 +290,7 @@ Combinators
    keyword arguments :py:data:`initial_kwargs`, return a closure that will
    invert the result (`not`) returned from the :py:data:`callable`.
 
-   Aliases: fnot
+   Aliases: ``fnot``
 
    :param callable: the callable to invert the result for
    :param \*initial_args: the initial arguments to apply to the :py:data:`callable`
@@ -347,7 +349,7 @@ Combinators
 
 .. py:function:: itake(count)(iterable)
 
-   Given an integer :py:data;`count`, return a closure that will consume
+   Given an integer :py:data:`count`, return a closure that will consume
    that number of elements from the provided :py:data:`iterable` and
    return them as a tuple.
 

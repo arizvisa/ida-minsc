@@ -99,6 +99,7 @@ related documentation for the full functionality of each matcher instance.
 
    :param type: a keyword argument representing the type of match to perform and
                 what value to match it against
+   :return: the first item that was matched
 
 .. py:function:: namespace.iterate(**type)
 
@@ -109,3 +110,4 @@ related documentation for the full functionality of each matcher instance.
 
    :param type: a keyword argument representing the type of match to perform and
                 what value to match it against
+   :return: an iterator that yields each matched result

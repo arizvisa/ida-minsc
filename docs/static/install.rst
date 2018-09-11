@@ -110,12 +110,12 @@ included in the root namespace:
 There are a number of modules that are aliased to shorten the typing required
 to access their members. Some of these are:
 
-- :py:mod:`database` -- Aliased as `db`
-- :py:mod:`function` -- Aliased as `func`
-- :py:mod:`instruction` -- Aliased as `ins`
-- :py:mod:`structure` -- Aliased as `struc`
-- :py:mod:`enumeration` -- Aliased as `enum`
-- :py:mod:`segment` -- Aliased as `seg`
+- :py:mod:`database` -- Aliased as ``db``
+- :py:mod:`function` -- Aliased as ``func``
+- :py:mod:`instruction` -- Aliased as ``ins``
+- :py:mod:`structure` -- Aliased as ``struc``
+- :py:mod:`enumeration` -- Aliased as ``enum``
+- :py:mod:`segment` -- Aliased as ``seg``
 
 Through these aliases, it is hoped for by the author that the user is enabled
 to write very quick and hacky code that will assist them to get the work they

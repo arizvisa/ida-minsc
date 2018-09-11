@@ -208,5 +208,4 @@ To return a function by name (string)::
    > f = func.by(name)
 
 There are a number of these types of functions available. Please review the
-:py:func:`help` of the particular function to see all of the variations of
-a multicased function.
+:py:func:`help` of the particular function to see all of the variations it has.
