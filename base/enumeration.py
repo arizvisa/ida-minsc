@@ -3,7 +3,6 @@ Enumeration module
 
 This module exposes a number of tools that can be used to interact
 with the enumerations or their members defined within the database.
-
 The base argument type for interacting with an enumeration is the
 enumeration identifier `idaapi.enum_t`. This is an opaque integer
 that will need to be passed to the different tools in order to
