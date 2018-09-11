@@ -428,30 +428,79 @@ class restructure(object):
             res.append(ref.name)
             res.append('=' * len(ref.name))
 
-        res.append('--------------')
-        res.append('Functions list')
-        res.append('--------------')
-        res.append('')
-
-        for ch in ref.children:
-            if isinstance(ch, Function):
-                res.extend(cls.Function(ch).split('\n'))
-            elif isinstance(ch, Namespace):
-                rows = cls.Namespace(ch).split('\n')
-                if filter(None, rows): res.extend(rows)
-            elif isinstance(ch, Class):
-                rows = cls.Class(ch).split('\n')
-                if filter(None, rows): res.extend(cls.Class(ch).split('\n'))
+        # split up the member into separate lists
+        functions, namespaces, classes = [], [], []
+        for t, iterable in itertools.groupby(ref.children, type):
+            if issubclass(t, Function):
+                functions.extend(iterable)
+            elif issubclass(t, Namespace):
+                namespaces.extend(iterable)
+            elif issubclass(t, Class):
+                classes.extend(iterable)
             else:
-                raise TypeError(ch)
+                raise TypeError(t)
             continue
+
+        # add each type individually
+        if functions:
+            res.append('-------------')
+            res.append('Function list')
+            res.append('-------------')
+            res.append('')
+            res.extend(map(operator.methodcaller('strip'), """
+            The functions that are available in this module use multicased
+            functions and aliases. For more information on this, please see
+            :ref:`multicase-aliases` and :ref:`multicase-functions`.
+            """.strip().split('\n')))
+            res.append('')
+
+            for ch in sorted(functions, key=operator.attrgetter('name')):
+                res.extend(cls.Function(ch).split('\n'))
+
+        if namespaces:
+            res.append('--------------')
+            res.append('Namespace list')
+            res.append('--------------')
+            res.append('')
+            res.extend(map(operator.methodcaller('strip'), """
+            These are the namespaces available within this module. Namespaces
+            group similar functions that can be used typically for the same
+            concept. Please see :ref:`multicase-namespaces` for more
+            information on namespaces. For more information on multicase
+            functions or aliases, please see :ref:`multicase-functions` or
+            :ref:`multicase-aliases`.
+            """.strip().split('\n')))
+            res.append('')
+
+            for ch in sorted(namespaces, key=operator.attrgetter('name')):
+                res.extend(cls.Namespace(ch).split('\n'))
+
+        if classes:
+            res.append('----------')
+            res.append('Class list')
+            res.append('----------')
+            res.append('')
+            res.extend(map(operator.methodcaller('strip'), """
+            Classes provide the definition necessary to instantiate an object.
+            In most cases, a class is returned when calling one of the prior
+            listed functions and thus have no need to be manually instantiated.
+            Classes may also have aliases defined for them. Please refer to the
+            documentation for the class to see what is available. For more
+            information on aliases, please see :ref:`multicase-aliases`.
+            """.split('\n')))
+            res.append('')
+
+            for ch in sorted(classes, key=operator.attrgetter('name')):
+                rows = cls.Class(ch).split('\n')
+                if filter(None, rows): res.extend(rows)
+
         return '\n'.join(res)
 
     @classmethod
     def Namespace(cls, ref, depth=0):
         if ref.get('skippable') and not len([ch for ch in ref.children if not isinstance(ch, Namespace)]): return ''
 
-        ns = [r.name for r in cls.walk(ref, 'namespace')][:-1]
+        ns = [r.name for r in cls.walk(ref, 'namespace')]
         name = r'.'.join(reversed(ns))
 
         res, sectionchar = [], '*^*'
@@ -476,18 +525,28 @@ class restructure(object):
             res.extend(cls.docstringToList(ref.get('details')))
             res.append('')
 
-        for ch in ref.children:
-            if isinstance(ch, Function):
-                res.extend(cls.Function(ch).split('\n'))
-            elif isinstance(ch, Namespace):
-                rows = cls.Namespace(ch, depth=depth+1).split('\n')
-                if filter(None, rows): res.extend(rows)
-            elif isinstance(ch, Class):
-                rows = cls.Class(ch).split('\n')
-                if filter(None, rows): res.extend(cls.Class(ch).split('\n'))
+        # split up the member into separate lists
+        functions, namespaces, classes = [], [], []
+        for t, iterable in itertools.groupby(ref.children, type):
+            if issubclass(t, Function):
+                functions.extend(iterable)
+            elif issubclass(t, Namespace):
+                namespaces.extend(iterable)
+            elif issubclass(t, Class):
+                classes.extend(iterable)
             else:
-                raise TypeError(ch)
+                raise TypeError(t)
             continue
+
+        # add each type individually
+        for ch in sorted(functions, key=operator.attrgetter('name')):
+            res.extend(cls.Function(ch).split('\n'))
+        for ch in sorted(namespaces, key=operator.attrgetter('name')):
+            res.extend(cls.Namespace(ch, depth=depth+1).split('\n'))
+        for ch in sorted(classes, key=operator.attrgetter('name')):
+            rows = cls.Class(ch, depth=depth+1).split('\n')
+            if filter(None, rows): res.extend(rows)
+
         return '\n'.join(res)
 
     @classmethod
@@ -534,7 +593,7 @@ class restructure(object):
 
         # group related properties together
         grouped = []
-        for ch in props:
+        for ch in sorted(props, key=lambda ch: ch.name.lower()):
             if ch.owner == ch:
                 grouped.append(ch)
             elif ch.get('property') == 'getter':
@@ -544,13 +603,13 @@ class restructure(object):
             continue
 
         # process properties
-        for ch in grouped:
+        for ch in sorted(grouped, key=lambda ch: ch.name.lower()):
             if not isinstance(ch, PropertyFunction):
                 raise TypeError(ch)
             res.append(cls.Property(ch))
 
         # process functions
-        for ch in children:
+        for ch in sorted(children, key=lambda ch: ch.name.lower()):
             if isinstance(ch, Function):
                 res.extend(cls.Method(ch).split('\n'))
             elif isinstance(ch, Namespace):
