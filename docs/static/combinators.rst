@@ -1,3 +1,5 @@
+.. _combinators-intro:
+
 Functional combinators
 ======================
 
@@ -11,6 +13,8 @@ user if they wish to use it in their endeavors. These can be used for
 creating one-liner functions that transform an input into various types,
 constructing a function that will consume or test its input, or really
 just any number of things.
+
+.. _combinators-examples:
 
 Examples
 --------
@@ -35,6 +39,8 @@ string when undefined::
    > f = fcompose(fdefault(''), "{!s}".format)
    > print f('hi')
    > print f(None)
+
+.. _combinators-list:
 
 Combinators
 -----------

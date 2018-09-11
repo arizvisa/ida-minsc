@@ -1,14 +1,16 @@
+.. _multicase-intro:
+
 Functions and Objects
 =====================
 
-Python :ref:`1<references>` is a dynamically typed object-oriented language
+Python (:ref:`1<multicase-references>`) is a dynamically typed object-oriented language
 which revolves around "duck-typing" (or lack of typing) to accomplish its
 various needs. Despite this project being written in Python, it uses
 functions and objects entirely different from the way Python is typically
-used.  Taking some ideas from Perl (:ref:`2<references>`), this project
+used.  Taking some ideas from Perl (:ref:`2<multicase-references>`), this project
 allows there to be multiple variations of a function depending on the types
 that are provided to a function as parameters. These are referred to as
-multi-cased functions. The author is gratious to Talos/Cisco (:ref:`3<references>`) 
+multi-cased functions. The author is gratious to Talos/Cisco (:ref:`3<multicase-references>`) 
 for providing him the resources and time in order to develop this component.
 
 Typically when calling a function or an object in Python, the parameters and
@@ -28,7 +30,7 @@ to group functions that are similar whilst using the :py:func:`classmethod` and
 In essence, this transforms an object definition into a namespace which can
 contain functions that perform similar tasks. By grouping functions like this
 it is hoped that this will greatly simplify the required knowledge in order
-to utilise the components of this project. Please see :ref:`namespaces` for
+to utilise the components of this project. Please see :ref:`multicase-namespaces` for
 more information.
 
 Another concept is implemented to assist with simplifying the required knowledge
@@ -39,16 +41,16 @@ just need to recall what it is that they wish to do, and then feed which
 parameters they currently have to it. A multi-cased function will then take
 these parameters, identify which variation of the function to call based on the
 types of the parameters passed, and then dispatch to the correct function. Please
-refer to :ref:`multicase` for more details.
+refer to :ref:`multicase-functions` for more details.
 
-.. _references
+.. _multicase-references:
 .. rubric:: References
 
 1. `The Python Programming Language <https://www.python.org/>`_
 2. `The Perl Programming Language <https://www.perl.org/about.html/>`_
 3. `Cisco Talos <https://www.talosintelligence.com/about>`_
 
-.. _namespaces:
+.. _multicase-namespaces:
 
 ----------
 Namespaces
@@ -78,10 +80,10 @@ the semantics of objects and methods entirely. When calling :py:func:`help` on
 these namespaces, the functions available can then be listed.
 
 This style of object is used in a number of modules such as :py:mod:`database`,
-:py:mod:`function`, or :py:mod:`enumeration`. Please review :ref:`examples-namespace`
+:py:mod:`function`, or :py:mod:`enumeration`. Please review :ref:`multicase-examples-namespace`
 for some examples of using namespaces.
 
-.. _multicase:
+.. _multicase-functions:
 
 --------------------
 Multicased functions
@@ -122,9 +124,9 @@ as::
        myfunc(key=basestring) -> Takes a string
    >
    
-Some examples of calling these types of functions are at :ref:`examples-functions`.
+Some examples of calling these types of functions are at :ref:`multicase-examples-functions`.
 
-.. _examples-namespace:
+.. _multicase-examples-namespace:
 
 ---------------------
 Examples -- Namespace
@@ -157,7 +159,7 @@ address::
     >
     > top = function.chunk.top(ea)
 
-.. _examples-functions:
+.. _multicase-examples-functions:
 
 ---------------------
 Examples -- Functions
@@ -191,7 +193,7 @@ be removed::
 
 If a user wants to fetch a function and they're not sure of the type of the
 parameter they received, the :py:func:`function.by` multicased function supports
-a variety of ways to receive the type for a parameter::
+a variety of ways to receive the type for a parameter.
 
 To return the current function::
 

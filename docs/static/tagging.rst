@@ -1,10 +1,12 @@
+.. _tagging-intro:
+
 Tagging and the querying of the tag cache
 =========================================
 
-This project provides an interesting interface based on some research (:ref:`1<references>`)
-that was done by one of the authors at the Ekoparty conference in 2011. The author is
-gratious to TippingPoint/3com/HP for providing him the resources and time in which
-to do this research.
+This project provides an interesting interface based on some research
+(:ref:`1<tagging-references>`) that was done by one of the authors at the
+Ekoparty conference in 2011. The author is gratious to TippingPoint/3com/HP
+for providing him the resources and time in which to do this research.
 
 Typically when recalling addresses in an IDA database, users will use one of the
 already existing facilities for navigation. This includes things such as names or
@@ -25,9 +27,9 @@ navigates the database and shares information with other users.
 This system allows for a user to store a primitive python object within a comment
 which can then be decoded back into its original type thus allowing a user to
 store and retrieve a python object associated with an address. This is described
-in detail later at :ref:`tag-encoding`. These values can then later be queried
+in detail later at :ref:`tagging-encoding`. These values can then later be queried
 in order to reference the addresses of the types that the user has marked. This
-is also described in detail at :ref:`tag-querying`.
+is also described in detail at :ref:`tagging-querying`.
 
 Using a mechanism such as this facilitates a user to be able to quickly tag
 a number of related functions or addresses, and perform some sort of
@@ -38,12 +40,12 @@ tagging an instruction address with a breakpoint command to later feed
 to a debugger, or even simply tagging the results of a hit-tracer for later
 review is greatly simplified.
 
-.. _references:
+.. _tagging-references:
 .. rubric:: References
 
 1. [Eko7-2011] -- `Portnoy, Aaron, and Ali Rizvi-Santiago. Experiments Using IDA Pro as a Data Store. Ekoparty, 21 Sep. 2011, www.youtube.com/watch?v=A4yXdir_59E <https://www.youtube.com/watch?v=A4yXdir_59E>`_
 
-.. _tag-types:
+.. _tagging-types:
 
 ---------
 Tag types
@@ -53,7 +55,7 @@ Comments are hence split up into two parts that compose a dictionary, these are
 the "key" and the "value". Each location or object that can be tagged, will
 include a specially formatted comment that isolates these components so that
 they can later be queried. These tags are then cached in a netnode so that they
-be easily queried (:ref:`tag-querying`) to then later revisit or extract information
+be easily queried (:ref:`tagging-querying`) to then later revisit or extract information
 to process.
 
 In essence, these tags are grouped into two different types. One of which
@@ -70,10 +72,10 @@ store attributes describing the semantics of what is being reversed at a given
 address within a function.
 
 When querying a tag, it is important to distinguish between which tag the user
-wishes to search through. This is described in detail at :ref:`tag-querying`.
-Some examples of querying are described at :ref:`tag-querying-examples`.
+wishes to search through. This is described in detail at :ref:`tagging-querying`.
+Some examples of querying are described at :ref:`tagging-examples-querying`.
 
-.. _tag-format:
+.. _tagging-format:
 
 -----------
 Tag formats
@@ -87,7 +89,7 @@ specific newline-delimited format.
 This format represents the attributes commonly associated with a dictionary. If
 a user chooses to not use this special format, then when utilizing the tag api
 the entire comment is treated as an "empty" tag using an empty string as its key.
-Please see :ref:`tag-examples` for an example of this.
+Please see :ref:`tagging-examples` for an example of this.
 
 Due to a limitation of IDA with regards to the size of comments and this abuse
 of using comments to store tag values, tags have a limited size. If the user
@@ -148,7 +150,7 @@ type of "non-repeatable" will be chosen. When tagging to a global, or an actual
 function, the comment type that will be chosen will be "repeatable." This choice
 is hidden behind the tagging API.
 
-.. _tag-encoding:
+.. _tagging-encoding:
 
 ---------------------
 Tag encoding/decoding
@@ -166,7 +168,7 @@ recommended that the user familiarizes his or herself with this numerical
 format).
 
 Strings are escaped in a few ways, replacing characters that might
-interfere with the :ref:`tag-format` with their backslash-prefixed
+interfere with the :ref:`tagging-format` with their backslash-prefixed
 equivalents. When retrieving a string encoded within a tag, these
 characters will then be decoded into their original forms.
 
@@ -189,7 +191,7 @@ to serialize their object, applying some compression to the resulting data,
 followed by encoding into a character set using "base64", encoding to hex,
 or some similar mechanism.
 
-.. _tag-querying:
+.. _tagging-querying:
 
 -------------
 Querying tags
@@ -200,14 +202,14 @@ identify a good time to pre-build the tag cache. Once IDA has finished its
 analysis, the tag cache will begin to be built. This consists of iterating
 through the different places that can be tagged and reference counting whats
 available. By default all comments that do not fit the correct format
-(see :ref:`tag-format`) will be internally treated as the "empty" tag.
+(see :ref:`tagging-format`) will be internally treated as the "empty" tag.
 
 Once the creation of this cache has been completed, this project will keep
 track of any comments and tags that are created by the user and automatically
 update the cache. This will then allow a user to quickly query the tags that
 they have marked up in a database. If this cache gets corrupted in some way,
 one can repair the cache by using the module :py:mod:`tagfix`. Please see
-:ref:`tag-interaction-tagfix` for more information.
+:ref:`tagging-modules-tagfix` for more information.
 
 When querying a tag, as mentioned before, the tag's type is of significant
 importance. This is due to there being two different ways of querying them
@@ -228,7 +230,8 @@ When calling either :py:func:`database.select`, or :py:func:`function.select`,
 an iterator is returned. This iterator yields a tuple containing the address the
 tag was found at, as well as a dictionary containing the values of the tags that
 were queried. This then allows a user to act on the tags such as emitting them
-to the console, or storing them in another data structure. See :ref:`tag-querying-examples-global`
+to the console, or storing them in another data structure. See
+:ref:`tagging-examples-querying-globals`
 for such an example.
 
 When calling :py:func:`database.selectcontents`, however, an iterator that returns
@@ -236,8 +239,8 @@ the function and the tag membership is returned. Each iteration of this iterator
 will yield the address of the function, followed by a :py:class:`set` of the
 contents tags that were found in the function. This tuple can then be immediately
 passed to :py:func:`function.select` in order to iterate through all the contents
-tags matched within the database. See :ref:`tag-querying-examples-content` for how a user
-can use this.
+tags matched within the database. See :ref:`tagging-examples-querying-content`
+for how a user can use this.
 
 Each of these functions takes a variable number of parameters as well as boolean
 types that specify whether to require specific tags in order to return a result,
@@ -247,7 +250,7 @@ required in order to yield an address. If the keyword :py:data:`Or` is specified
 then this informs the function to optionally include any tags that were requested
 if they are defined for the address that is returned.
 
-.. _tag-usage:
+.. _tagging-usage:
 
 -------------------------
 Storage/Retrieval of tags
@@ -264,7 +267,7 @@ where for :py:mod:`function`, the primary type is the considered the function.
 
 This implies that :py:func:`database.tag` is used to tag a specific address
 belonging to a function's contents or a global, whereas :py:func:`function.tag`
-is used to tag the function itself. This is demonstrated at :ref:`tag-examples`.
+is used to tag the function itself. This is demonstrated at :ref:`tagging-examples`.
 
 When executing either of these tag functions, there are 4 variations of each
 of them. The first variations is when only a tag name is provided. This
@@ -320,7 +323,7 @@ like::
          res[ea] = function.tag(ea)
    > print "All the tags in the world: %r"% res
 
-.. _tag-interaction:
+.. _tagging-modules:
 
 -----------
 Tag modules
@@ -333,7 +336,7 @@ serialize for later importing, translating tags within the database in order
 to match up to another database, etc. These modules are available via the
 :py:mod:`custom` namespace.
 
-.. _tag-interaction-tags:
+.. _tagging-modules-tags:
 
 Tag modules -- tags
 *******************
@@ -342,7 +345,7 @@ The custom :py:mod:`tags` module allows for one to export or import all of the
 tags within a database. Please review the documentation for :py:mod:`tags` for
 more about the capabilities of this module.
 
-.. _tag-interaction-tagfix:
+.. _tagging-modules-tagfix:
 
 Tag modules -- tagfix
 *********************
@@ -356,7 +359,7 @@ This module exposes a number of functions that can be used to rebuild the tag
 cache entirely. Please review the documentation for :py:mod:`tagfix` for more
 information on how to do this.
 
-.. _tag-querying-examples:
+.. _tagging-examples-querying:
 
 --------------------
 Examples -- Querying
@@ -371,7 +374,7 @@ with an address belonging to a function.
 are a lot more flexible and poweful, they might not be familiar to the average
 user. Apologies in advance.)
 
-.. _tag-querying-examples-global:
+.. _tagging-examples-querying-globals:
 
 Examples -- Querying "Global" tags
 **********************************
@@ -409,7 +412,7 @@ by querying the "empty" tag::
          print "Comment: %s"% tags['']
    >
 
-.. _tag-querying-examples-content:
+.. _tagging-examples-querying-content:
 
 Examples -- Querying "Contents" tags
 ************************************
@@ -468,14 +471,14 @@ within the :py:mod:`custom` namespace::
     > res = custom.tags.list()
     > print repr(res)
 
-.. _tag-examples:
+.. _tagging-examples:
 
 -----------------------------------
 Examples - Application or Retrieval
 -----------------------------------
 
 The other aspect of the tag api is the application and retrieval of tags at
-a particular address. As was explained bit in :ref:`tag-usage`, this
+a particular address. As was explained bit in :ref:`tagging-usage`, this
 functionality is performed by either :py:func:`database.tag` or :py:func:`function.tag`.
 
 To tag all of the marks inside the database::

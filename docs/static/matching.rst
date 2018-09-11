@@ -1,3 +1,5 @@
+.. _matching-intro:
+
 Matching/Filtering of IDA types
 ===============================
 
@@ -14,8 +16,8 @@ required properties to filter said types.
 
 This project actually implements a number of these filtering methods to
 avoid the user having to implement this themselves. This is done by providing
-what are known as :ref:`matchers` for the various types that IDA exposes to
-a user. These :ref:`matchers` let a user provide a keyword argument describing
+what are known as :ref:`matching-functions` for the various types that IDA exposes to
+a user. These :ref:`matching-functions` let a user provide a keyword argument describing
 the method to filter with which will then be used to return the filtered types
 to the user.
 
@@ -31,17 +33,21 @@ These keywords are then exposed to users via 3 general function styles. Each
 matcher will typically provide functionality similar to the :py:func:`namespace.list`,
 :py:func:`namespace.search`, and :py:func:`namespace.iterate` functions described
 within this document. This can then be used to filter the various types in IDA
-using one of the keywords that are supported by the :ref:`matcher` for said type.
+using one of the keywords that are supported by the :ref:`matching-functions` for
+said type.
+
+.. _matching-examples:
 
 Examples
 --------
 
-Some of the matcher classes that are available can be found within the :py:mod:`database`
-module, the :py:mod:`structure` and :py:mod:`enumeration` modules, or the :py:mod:`segment`
-modules. Within the :py:mod:`database` module, most of the :ref:`matchers` are
-defined within namespaces and represent different things such as :py:class:`imports`,
-:py:class:`entries`, :py:class:`names`, :py:class:`functions`, etc. It is recommended
-to review the help for these modules in order to understand exactly what is provided.
+Some of the matcher classes that are available can be found within the
+:py:mod:`database` module, the :py:mod:`structure` and :py:mod:`enumeration`
+modules, or the :py:mod:`segment` modules. Within the :py:mod:`database`
+module, most of the :ref:`matching-functions` are defined within namespaces
+and represent different things such as :py:class:`imports`, :py:class:`entries`,
+:py:class:`names`, :py:class:`functions`, etc. It is recommended to review
+the help for these modules in order to understand exactly what is provided.
 
 To list all of the structures within the database::
 
@@ -62,8 +68,7 @@ search for unnamed fields::
    > st = struc.by(...)
    > for m in st.iterate(regex='field_.\*$')
 
-.. _matcher:
-.. _matchers:
+.. _matching-functions:
 
 Common matcher functions
 ------------------------
@@ -100,7 +105,7 @@ related documentation for the full functionality of each matcher instance.
    When a user wishes to enumerate all of the matches of a particular type, they
    will need to use this function. Once given a keyword and value to match with,
    this function will iterate through all of the results that are available. These
-   results will be the core type that the :ref:`matcher` is filtering.
+   results will be the core type that the matcher is filtering.
 
    :param type: a keyword argument representing the type of match to perform and
                 what value to match it against
