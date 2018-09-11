@@ -3,7 +3,7 @@ SPHINXBUILD   = python -msphinx
 SPHINXPROJ    = ida-minsc
 SOURCEDIR     = ./source
 BUILDDIR      = _build
-RSTGENERATE   = python dummyparse.py
+RSTGENERATE   = python docparse.py
 
 MAKEDIR := $(dir $(firstword $(MAKEFILE_LIST)))
 ROOTDIR := $(realpath $(MAKEDIR)..)
