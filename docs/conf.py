@@ -17,10 +17,7 @@ release = u''
 templates_path = ['templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-source_suffix = {
-    '.rst' : 'restructuredText',
-    '.md' : 'markdown',
-}
+source_suffix = [ '.rst', '.md' ]
 
 extensions = [
     #'sphinx.ext.githubpages',
