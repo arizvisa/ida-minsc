@@ -16,6 +16,7 @@ Concepts
    tagging
    matching
    combinators
+   pythontyping
 
 Available modules
 -----------------
