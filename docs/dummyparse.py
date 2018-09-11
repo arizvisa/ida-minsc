@@ -52,7 +52,7 @@ class evaluate(object):
 
     class interface:
         symbol_t = 'symbol_t'
-        namedtypedtuple = 'namedtypedtuple'
+        namedtypedtuple = 'namedtuple'
         register_t = 'register_t'
         architecture_t = 'architecture_t'
 
@@ -428,6 +428,11 @@ class restructure(object):
             res.append(ref.name)
             res.append('=' * len(ref.name))
 
+        res.append('--------------')
+        res.append('Functions list')
+        res.append('--------------')
+        res.append('')
+
         for ch in ref.children:
             if isinstance(ch, Function):
                 res.extend(cls.Function(ch).split('\n'))
@@ -449,14 +454,20 @@ class restructure(object):
         ns = [r.name for r in cls.walk(ref, 'namespace')][:-1]
         name = r'.'.join(reversed(ns))
 
-        sectionchar = '-^'
+        res, sectionchar = [], '*^*'
 
-        res = []
-        res.append(sectionchar[depth] * len(name))
+        # namespace header
+        if depth <= 1: res.append(sectionchar[depth] * len(name))
         res.append(cls.escape(name))
         res.append(sectionchar[depth] * len(name))
         res.append('')
 
+        # namespace bases
+        if ref.has('bases'):
+            bases = map(stringify, ref.bases)
+            res.append("Bases: {:s}".format(', '.join(map(":py:class:`{:s}`".format, bases))))
+
+        # namespace documentation
         if ref.comment:
             res.extend(cls.docstringToList(ref.comment))
             res.append('')
@@ -483,12 +494,26 @@ class restructure(object):
     def Class(cls, ref, depth=0):
         if ref.get('skippable') and not ref.children: return ''
 
-        ns = [r.name for r in cls.walk(ref, 'namespace')]
+        ns = [r.name for r in cls.walk(ref, 'namespace')][:-1]
         name = '.'.join(reversed(ns))
 
-        res, definition = [], ".. py:class:: {name:s}".format(name=name)
+        res, sectionchar = [], '*^*'
 
-        if ref.has('bases'): res.append("Bases: {:s}".format(', '.join(map(stringify, ref.bases))))
+        # class header
+        header = []
+
+        if depth <= 1: header.append(sectionchar[depth] * len(name))
+        header.append(cls.escape(name))
+        header.append(sectionchar[depth] * len(name))
+
+        header.append('')
+        header.append(".. py:class:: {name:s}".format(name=name))
+
+        # class bases
+        if ref.has('bases'):
+            res.append('')
+            bases = map(stringify, ref.bases)
+            res.append("Bases: {:s}".format(', '.join(map(":py:class:`{:s}`".format, bases))))
 
         # class documentation
         res.append('')
@@ -534,7 +559,8 @@ class restructure(object):
                 raise TypeError(ch)
             continue
         res = cls.indentlist(res, '   ')
-        res[0:0] = (definition,)
+        res[0:0] = header
+
         return '\n'.join(res)
 
     @classmethod
@@ -672,7 +698,7 @@ class restructure(object):
         if ref.comment:
             res.extend(cls.docstringToList(ref.comment) + [''])
         if aliases:
-            f = functools.partial(":py:func:`{:s}.{:s}`".format, ns[-1])
+            f = functools.partial("``{:s}.{:s}``".format, ns[-1])
             res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
 
         for n, descr, ty in params[1:]:
@@ -705,7 +731,7 @@ class restructure(object):
         if ref.comment:
             res.extend(cls.docstringToList(ref.comment) + [''])
         if aliases:
-            f = functools.partial(":py:func:`{:s}.{:s}`".format, ns[-1])
+            f = functools.partial("``{:s}.{:s}``".format, ns[-1])
             res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
 
         for n, descr, ty in params:
