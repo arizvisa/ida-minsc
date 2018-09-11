@@ -389,13 +389,13 @@ def op_bits(ea, opnum):
     '''Returns the size (in bits) for the operand `opnum` belonging to the instruction at the address `ea`.'''
     return 8 * op_size(ea, opnum)
 
-@document.aliaes('op_type')
+@document.aliases('op_type')
 @utils.multicase(opnum=six.integer_types)
 @document.parameters(opnum='the operand number of the current instruction')
 def opt(opnum):
     '''Returns the type of the operand `opnum` belonging to the current instruction.'''
     return opt(ui.current.address(), opnum)
-@document.aliaes('op_type')
+@document.aliases('op_type')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 @document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def opt(ea, opnum):

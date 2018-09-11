@@ -1434,13 +1434,13 @@ class frame(object):
         fn = by(func)
         return fn.frame
 
-    @document.aliaess('get_spdelta')
+    @document.aliases('get_spdelta')
     @utils.multicase()
     @classmethod
     def delta(cls):
         '''Returns the stack delta for the current address within its function.'''
         return cls.delta(ui.current.address())
-    @document.aliaess('get_spdelta')
+    @document.aliases('get_spdelta')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     @document.parameters(ea='the address to return the stack delta for')
@@ -1448,7 +1448,7 @@ class frame(object):
         '''Returns the stack delta for the address `ea` within its given function.'''
         fn, ea = by_address(ea), interface.address.inside(ea)
         return idaapi.get_spd(fn, ea)
-    @document.aliaess('get_spdelta')
+    @document.aliases('get_spdelta')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     @document.parameters(func='the function to get the stack delta from', ea='the address to return the stack delta for')
