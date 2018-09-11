@@ -997,6 +997,7 @@ class entries(object):
     __matcher__.boolean('index', operator.eq)
 
     def __new__(cls):
+        '''Yield the address of each entry point defined within the database.'''
         for ea in cls.iterate():
             yield ea
         return
@@ -1428,7 +1429,7 @@ class imports(object):
         `index` - Match according index of the import
         `predicate` Filter the imports by passing the above (default) tuple to a callable
 
-    Some examples of using these keywords are as follows:;
+    Some examples of using these keywords are as follows::
 
         > database.imports.list(module='kernelbase.dll')
         > iterable = database.imports.iterate(like='*alloc*')
@@ -1620,14 +1621,15 @@ class address(object):
     This namespace is also aliased as `database.a`.
 
     Some of the more common functions are used so often that they're also
-    aliased as globals. Some of these are:
+    aliased as globals. Each of these can be used for navigation or for
+    determining the next valid address. These are:
 
-        `database.next` - Moving to the "next" address
-        `database.prev` - Moving to the "previous" address
-        `database.nextref` - Moving to the "next" address with a reference
-        `database.prevref` - Moving to the "previous" address with a reference
-        `database.nextreg` - Moving to the "next" address using a register
-        `database.prevreg` - Moving to the "previous" address using a register
+        `database.next` - Return the "next" defined address
+        `database.prev` - Return the "previous" defined address
+        `database.nextref` - Return the "next" address with a reference.
+        `database.prevref` - Return the "previous" address with a reference
+        `database.nextreg` - Return the "next" address using a register
+        `database.prevreg` - Return the "previous" address using a register
 
     Some examples of using this namespace can be::
 
