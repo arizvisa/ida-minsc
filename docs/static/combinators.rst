@@ -6,12 +6,11 @@ complex logic, a number of primitive functions are provided which can
 be combined in arbitrary ways. This can facilitate the quick creation
 functions that can be used as one-liners.
 
-This is primarily used for :doc:`matching`, but is also exposed to the
+This was primarily developed for :doc:`matching`, but is also exposed to the
 user if they wish to use it in their endeavors. These can be used for
 creating one-liner functions that transform an input into various types,
 constructing a function that will consume or test its input, or really
 just any number of things.
-ones
 
 Examples
 --------
@@ -37,8 +36,8 @@ string when undefined::
    > print f('hi')
    > print f(None)
 
-Available combinators
----------------------
+Combinators
+-----------
 
 .. py:function:: fbox(*args)
 
