@@ -13,6 +13,7 @@ Concepts
 --------
 .. toctree::
    multicase
+   tagging
    matching
    combinators
 

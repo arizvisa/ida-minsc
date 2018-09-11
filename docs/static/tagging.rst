@@ -1,7 +1,7 @@
 Tagging and the querying of the tag cache
 =========================================
 
-This project provides an interesting interface based on some research (:ref:`1<References>`)
+This project provides an interesting interface based on some research (:ref:`1<references>`)
 that was done by one of the authors at the Ekoparty conference in 2011. The author is
 gratious to TippingPoint/3com/HP for providing him the resources and time in which
 to do this research.
