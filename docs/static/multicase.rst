@@ -83,6 +83,28 @@ This style of object is used in a number of modules such as :py:mod:`database`,
 :py:mod:`function`, or :py:mod:`enumeration`. Please review :ref:`multicase-examples-namespace`
 for some examples of using namespaces.
 
+.. _multicase-aliases:
+
+-------
+Aliases
+-------
+
+There are a number of functions and namespaces that are commonly used. To
+accommodate these common usage scenarios, a number of functions have much
+shorter or "camelCased" versions. These aliases are listed within the
+documentation for each function.
+
+Some examples of functions that may be aliased are :py:func:`database.disasm`
+which references :py:func:`database.disassemble` or :py:func:`function.cc`
+which references :py:func:`function.convention`.
+
+Namespaces may also be aliased. For example, the :py:mod:`database` module
+provides some aliases for the :py:class:`database.address` and
+:py:class:`database.xref` namespaces. :py:class:`database.address` is aliased
+to :py:class:`database.a` , and :py:class:`database.xref` is aliased as
+:py:class:`database.x`. This allows a user to quickly refer to a particular
+namespace as they see fit.
+
 .. _multicase-functions:
 
 --------------------
@@ -102,21 +124,21 @@ variation can include the prototype in its autodoc. Multicased functions are
 defined within all the modules in this project and within namespaces within each
 module. An example of how one might be defined is::
 
-   >@multicase(ea=(int, long))
-   >def myfunc(ea):
-   >    '''Takes an integer'''
-   >    print 'received an integer', ea
+   > @multicase(ea=(int, long))
+   > def myfunc(ea):
+         '''Takes an integer'''
+         print 'received an integer', ea
    >
-   >@multicase(name=str):
-   >def myfunc(name):
-   >    '''Takes a string'''
-   >    print 'received a string', name
+   > @multicase(name=str):
+   > def myfunc(name):
+         '''Takes a string'''
+         print 'received a string', name
    >
 
 This results in the documentation for the :py:func:`myfunc` function to appear
 as::
 
-   >help(myfunc)
+   > help(myfunc)
    Help on function myfunc in module database:
 
    myfunc(*arguments, **keywords)
