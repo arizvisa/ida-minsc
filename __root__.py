@@ -48,7 +48,7 @@ if idaapi.__version__ >= 6.95:
 import functools, operator, itertools, types
 from six.moves import builtins
 
-## context modules from idascripts
+## context modules from ida-minsc
 import segment, database, function, instruction
 import structure, enumeration
 

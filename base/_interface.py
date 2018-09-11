@@ -842,7 +842,7 @@ class ref_t(set):
             idaapi.dr_O : '&r', idaapi.dr_I : '&r',
             idaapi.dr_R : 'r', idaapi.dr_W : 'w',
         }
-    __mapper__[31] = '*'        # code 31 used internally by idascripts
+    __mapper__[31] = '*'        # code 31 used internally by ida-minsc
 
     def __and__(self, type):
         return type in self
@@ -868,7 +868,7 @@ class ref_t(set):
     def of_state(cls, state):
         '''Convert a `ref_t` in ``state`` back into an IDA reference type.'''
         if state == '*':
-            return cls(31, '*')     # code 31 used internally by idascripts
+            return cls(31, '*')     # code 31 used internally by ida-minsc
         res = set(state)
         for F, t in six.iteritems(cls.__mapper__):
             if set(t) == res:
