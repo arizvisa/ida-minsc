@@ -10,7 +10,7 @@ this allows a reverse-engineer to identify the relationships between
 the types used by instruction operands and global variables. This is
 normally exposed to the user by various commands or hotkeys.
 
-IDAPython and the IDA SDK exposes an API to allow a user to programmatically
+IDAPython and the IDA SDK expose an API to allow a user to programmatically
 apply and retrieve type information from the various places a type might
 have been applied to. There are a variety of functions that do this, and a
 number of enumerations, flags, and constants that allow one to customize
@@ -26,7 +26,7 @@ types available in the Python language [:ref:`1<pythontyping-references>`]
 to determine the correct constants and flags needed by IDA.
 
 .. _pythontyping-references:
-.. rubric:: Referencees
+.. rubric:: References
 
 1. `The Python Programming Language <https://www.python.org/>`_
 
@@ -39,7 +39,7 @@ Pythonic types format
 There are a number of places within this project that allow a user to
 display or apply a type. One such place where this is allowed is for
 a structure member. Although structure members in IDA contain numerous
-attributes one of them is the type field which can be used to assign
+attributes, one of them is the type field which can be used to assign
 a Pythonic type into.
 
 As mentioned before, Pythonic types utilise the semantics of the more
@@ -102,7 +102,7 @@ most general purposes this should suffice.
 However, if a user chooses to not use this interface, most of the functions
 that take pythonic types are also capable of taking an integer. This integer
 is the manually combined flags that represent an IDA type. It is however
-suggested by the author that the user familiarize themselves with the way
+suggested by the author that the users familiarize themselves with the way
 that Pythonic types appear in order to comprehend some of the output of
 functions that return their type in this format.
 

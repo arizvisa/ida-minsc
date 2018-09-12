@@ -9,7 +9,7 @@ filter them is via doing text searches and this is moreso used for
 navigation. When interacting with these types programmatically, there are
 a number of ways that a user can implement to filter or match them.
 
-However, this requires the user to implement these methods themselves
+However, this requires the user to implement these methods themselves,
 which can potentially require time searching through documentation
 in order to identify the required functionality in order to extract the
 required properties to filter said types.
@@ -94,7 +94,7 @@ related documentation for the full functionality of each matcher instance.
 
    Once a desired type has been determined, this function can then be used to
    return the first result that matches. If more than one result is returned,
-   then this function will warn the user the number of results that matched
+   then this function will warn the user the number of results that matched,
    whilst still returning the very first one.
 
    :param type: a keyword argument representing the type of match to perform and

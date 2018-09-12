@@ -27,7 +27,7 @@ execute the following at the IDAPython prompt to output the correct path:
 
     > print idaapi.get_user_idadir()
 
-To then clone the repository, once can use Git [:ref:`2<install-clone-references>`]
+To then clone the repository, one can use Git [:ref:`2<install-clone-references>`]
 to clone the repository in the following manner:
 
 .. code-block:: sh

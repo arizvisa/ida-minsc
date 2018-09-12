@@ -6,7 +6,7 @@ Functional combinators
 To simplify the generation of functions that can contain potentially
 complex logic, a number of primitive functions are provided which can
 be combined in arbitrary ways. This can facilitate the quick creation
-functions that can be used as one-liners.
+of functions that can be used as one-liners.
 
 This was primarily developed for :doc:`matching`, but is also exposed to the
 user if they wish to use it in their endeavors. These can be used for

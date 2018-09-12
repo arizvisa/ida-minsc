@@ -6,11 +6,11 @@ Multicased functions and classes as namespaces
 Python [:ref:`1<multicase-references>`] is a dynamically typed object-oriented language
 which revolves around "duck-typing" (or lack of typing) to accomplish its
 various needs. Despite this project being written in Python, it uses
-functions and objects entirely different from the way Python is typically
+functions and objects entirely differently from the way Python is typically
 used.  Taking some ideas from Perl [:ref:`2<multicase-references>`], this project
 allows there to be multiple variations of a function depending on the types
 that are provided to a function as parameters. These are referred to as
-multi-cased functions. The author is gratious to Talos/Cisco [:ref:`3<multicase-references>`] 
+multi-cased functions. The author is grateful to Talos/Cisco [:ref:`3<multicase-references>`] 
 for providing him the resources and time in order to develop this component.
 
 Typically when calling a function or an object in Python, the parameters and
@@ -34,9 +34,9 @@ to utilise the components of this project. Please see :ref:`multicase-namespaces
 more information.
 
 Another concept is implemented to assist with simplifying the required knowledge
-in order to utilise a Python library. These are reffered to as multi-cased
+in order to utilise a Python library. These are referred to as multi-cased
 functions. Multi-cased functions allow for the semantics of a function to change
-based on the types of the parameters are passed to it. This allows a user to
+based on the types of the parameters passed to it. This allows a user to
 just need to recall what it is that they wish to do, and then feed which
 parameters they currently have to it. A multi-cased function will then take
 these parameters, identify which variation of the function to call based on the
@@ -56,7 +56,7 @@ refer to :ref:`multicase-functions` for more details.
 Classes as namespaces
 ---------------------
 
-As was prior mentioned, this project heavily uses a concept known as namespaces
+As was previously mentioned, this project heavily uses a concept known as namespaces
 which changes the semantics of the way objects are used. Although this project
 provides a number of objects for things such as structures or registers, the
 majority of object definitions are actually treated as namespaces. This is done
@@ -74,7 +74,7 @@ or :py:attr:`staticmethod`. An example of this follows::
    >
 
 Defining an object in this manner allows for the different methods that are
-available in an object to be treated simply as functions discarding the object
+available in an object to be treated simply as functions, discarding the object
 that is bound to the method during construction of the object. This changes
 the semantics of objects and methods entirely. When calling :py:func:`help` on
 these namespaces, the functions available can then be listed.

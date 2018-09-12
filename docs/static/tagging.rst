@@ -5,7 +5,7 @@ Tagging and the querying of the tag cache
 
 This project provides an interesting interface based on some research
 [:ref:`1<tagging-references>`] that was done by one of the authors at the
-Ekoparty conference in 2011. The author is gratious to TippingPoint/3com/HP
+Ekoparty conference in 2011. The author is grateful to TippingPoint/3com/HP
 for providing him the resources and time in which to do this research.
 
 Typically when recalling addresses in an IDA database, users will use one of the
@@ -24,17 +24,17 @@ to programatically categorize information that a user might have inferred
 during their reversing endeavor in the hopes to improve the way that a user
 navigates the database and shares information with other users.
 
-This system allows for a user to store a primitive python object within a comment
-which can then be decoded back into its original type thus allowing a user to
+This system allows for a user to store a primitive python object within a comment,
+which can then be decoded back into its original type, thus allowing a user to
 store and retrieve a python object associated with an address. This is described
 in detail later at :ref:`tagging-encoding`. These values can then later be queried
 in order to reference the addresses of the types that the user has marked. This
 is also described in detail at :ref:`tagging-querying`.
 
-Using a mechanism such as this facilitates a user to be able to quickly tag
+Using such a mechanism, facilitates a user to be able to quickly tag
 a number of related functions or addresses, and perform some sort of
 processing against them. The work required to perform tasks such as
-tagging all the handlers related to some binary CGI, tagging various
+tagging all the handlers related to some CGI binary, tagging various
 instructions according to some attribute in order to later color them,
 tagging an instruction address with a breakpoint command to later feed
 to a debugger, or even simply tagging the results of a hit-tracer for later
@@ -183,7 +183,7 @@ Custom python objects, iterators, or callables are unfortunately not supported
 as tags. If the user really wishes to store these types, however, it is possible
 for one to serialize a type, and then store it as a string inside a tag. As
 previousy mentioned, however, this is not recommended and it is suggested by
-the author that a user use an alternative storage mechanism.
+the author that a user uses an alternative storage mechanism.
 
 If a user wishes to go against these recommendations, however, once can
 store an arbitrary type by using either :py:func:`pickle` or :py:func:`marshal`
@@ -256,7 +256,7 @@ if they are defined for the address that is returned.
 Storage/Retrieval of tags
 -------------------------
 
-The other aspect of the tag api is the programmatic storage and retrieval
+The other aspect of the tagging api is the programmatic storage and retrieval
 of tags defined at a particular address. This functionality is performed
 by either the :py:func:`database.tag` or the :py:func:`function.tag`
 functions. It's important to distinguish that the namespace these functions
@@ -481,7 +481,7 @@ within the :py:mod:`custom` namespace::
 Examples -- Application or Retrieval
 ------------------------------------
 
-The other aspect of the tag api is the application and retrieval of tags at
+The other aspect of the tagging api is the application and retrieval of tags at
 a particular address. As was explained bit in :ref:`tagging-usage`, this
 functionality is performed by either :py:func:`database.tag` or :py:func:`function.tag`.
 
