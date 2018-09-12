@@ -261,9 +261,13 @@ of tags defined at a particular address. This functionality is performed
 by either the :py:func:`database.tag` or the :py:func:`function.tag`
 functions. It's important to distinguish that the namespace these functions
 are contained in, do not distinguish whether a tag is a "global" or a
-"contents" tag. As described in the documentation for the :py:mod:`database`,
-the primary type for functions declared therein is considered the address
-where for :py:mod:`function`, the primary type is the considered the function.
+"contents" tag.
+
+As specified in :py:mod:`database`, the primary type that is typically passed
+to its functions is an address. This implies that :py:func:`database.tag` can
+be used to tag an address. This address may belong to a function's contents
+or a global address. :py:func:`function.tag`, however, is used to tag the
+function itself. This is demonstrated at :ref:`tagging-examples`.
 
 This implies that :py:func:`database.tag` is used to tag a specific address
 belonging to a function's contents or a global, whereas :py:func:`function.tag`

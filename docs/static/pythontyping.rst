@@ -42,12 +42,11 @@ a structure member. Although structure members in IDA contain numerous
 attributes one of them is the type field which can be used to assign
 a Pythonic type into.
 
-AS mentioned before, Pythonic types utilise the semantics of the more
-commonly known types in Python in order to enable the user of this
-project to describe the type of a receiver of type information such
-as a structure's field. A pythonic type is composed of what's referred
-to as a container type, and inside the container type is the element
-type.
+As mentioned before, Pythonic types utilise the semantics of the more
+commonly known types in Python in order to enable the user to view
+or apply a type to a structure field or other receiver of a type. A
+pythonic type is composed of what's referred to as a container type,
+and inside the container type is the element type.
 
 Describing the container
 ************************
