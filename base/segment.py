@@ -9,7 +9,7 @@ is the `segment_t`. This type is interchangeable with the address
 or the segment name and so either can be used to identify a segment.
 
 When listing or enumerating segments there are different types that
-oen can use in order to filter or match them. These types are as
+one can use in order to filter or match them. These types are as
 follows:
 
     `name` - Match according to the exact segment name

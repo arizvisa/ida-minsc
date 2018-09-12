@@ -1614,7 +1614,7 @@ class address(object):
     to another address according to a number of constraints or types.
     Essentially these functions are used to assist with navigation.
     As an example, these functions allow one to navigate between the
-    next and previous "call" instructions, addressese that contain
+    next and previous "call" instructions, addresses that contain
     data references, or even to navigate to unknown (undefined)
     addresses.
 

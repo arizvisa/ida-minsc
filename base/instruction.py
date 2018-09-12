@@ -5,8 +5,8 @@ This module exposes a number of tools for interacting with an
 instruction defined within the database. There are three types
 of tools within this module and each can be distinguished by their
 prefixes which can be used to decode the operands for an instruction.
-At the present time, only the Intel, AArch32, and Mips architectures
-are supported.
+At the present time, only the Intel, AArch32 (ARM), and MIPS
+architectures are supported.
 
 Although IDA internally uses the `insn_t` and `op_t` to represent
 an instruction and its operands, this module's base argument type
@@ -1043,21 +1043,21 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(ea, op):
-        '''Operand type decoder for returning a memory phrase on Arm.'''
+        '''Operand type decoder for returning a memory phrase on ARM.'''
         global architecture
         Rn, Rm = architecture.by_index(op.reg), architecture.by_index(op.specflag1)
         return armops.phrase(Rn, Rm)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
     def disp(ea, op):
-        '''Operand type decoder for returning a memory displacement on Arm.'''
+        '''Operand type decoder for returning a memory displacement on ARM.'''
         global architecture
         Rn = architecture.by_index(op.reg)
         return armops.disp(Rn, long(op.addr))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
-        '''Operand type decoder for returning a memory referece on Arm.'''
+        '''Operand type decoder for returning a memory referece on ARM.'''
         # get the address and the operand size
         addr, size = op.addr, idaapi.get_dtyp_size(op.dtyp)
         maxval = 1<<size*8
@@ -1072,7 +1072,7 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
     def flex(ea, op):
-        '''Operand type decoder for returning a flexible operand (shift-op) on Arm.'''
+        '''Operand type decoder for returning a flexible operand (shift-op) on ARM.'''
         global architecture
 
         Rn = architecture.by_index(op.reg)
@@ -1081,7 +1081,7 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
     def list(ea, op):
-        '''Operand type decoder for returning a register list on Arm.'''
+        '''Operand type decoder for returning a register list on ARM.'''
         global architecture
         res = set()
 
@@ -1095,7 +1095,7 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(ea, op):
-        '''Operand type decoder for returning a memory displacement on Mips.'''
+        '''Operand type decoder for returning a memory displacement on MIPS.'''
         global architecture
 
         rt, imm = architecture.by_index(op.reg), op.addr
@@ -1103,7 +1103,7 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
     def coprocessor(ea, op):
-        '''Operand type decoder for returning a co-processor register on Mips.'''
+        '''Operand type decoder for returning a co-processor register on MIPS.'''
         return mipsops.coproc(op.reg)
 del(operand_types)
 
@@ -1184,12 +1184,12 @@ class intelops:
 class armops:
     """
     This internal namespace contains the different operand types that
-    can be returned for the Arm architecture.
+    can be returned for the ARM architecture.
     """
 
     class flex(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing a flexible operand as available on the Arm architecture.
+        A tuple representing a flexible operand as available on the ARM architecture.
 
         Has the format `(Rn, shift, n)` which allows the architecture to apply
         a binary shift or rotation to the value of a register `Rn`.
@@ -1213,7 +1213,7 @@ class armops:
 
     class list(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing a register list on the Arm architecture.
+        A tuple representing a register list on the ARM architecture.
 
         Has the simple format `(reglist,)` where `reglist` is a set of registers
         that can be explicitly tested for membership.
@@ -1229,7 +1229,7 @@ class armops:
 
     class disp(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing a memory displacement on the Arm architecture.
+        A tuple representing a memory displacement on the ARM architecture.
 
         Has the format `(Rn, Offset)` where `Rn` is a register and `Offset` is
         the integer that is added to the register.
@@ -1251,7 +1251,7 @@ class armops:
 
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple for representing a memory phrase on the Arm architecture
+        A tuple for representing a memory phrase on the ARM architecture
 
         Has the format `(Rn, Rm)` where both are registers that compose the
         phrase.
@@ -1274,7 +1274,7 @@ class armops:
 
     class mem(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple for representing a memory operand on the Arm architecture.
+        A tuple for representing a memory operand on the ARM architecture.
 
         Has the format `(address, value)` where `address` is the actual value
         stored in the operand and `value` is the value that is dereferenced.
@@ -1292,12 +1292,12 @@ class armops:
 class mipsops:
     """
     This internal namespace contains the different operand types that
-    can be returned for the Mips architecture.
+    can be returned for the MIPS architecture.
     """
 
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple for representing a memory phrase on the Mips architecture.
+        A tuple for representing a memory phrase on the MIPS architecture.
 
         Has the format `(Rn, Offset)` where `Rn` is the register and `Offset`
         is the immediate that is added to the register.
@@ -1317,7 +1317,7 @@ class mipsops:
     @staticmethod
     def coproc(regnum):
         """
-        A callable that returns a co-processor for the Mips architecture.
+        A callable that returns a co-processor for the MIPS architecture.
 
         Takes a `regnum` argument which returns the correct register.
         """
@@ -1395,12 +1395,12 @@ class Intel(interface.architecture_t):
 
 class AArch32(interface.architecture_t):
     """
-    An implementation of all the registers available on the AArch32 (Arm) architecture.
+    An implementation of all the registers available on the AArch32 (ARM) architecture.
 
     This is used to locate or manage the different registers that are available.
 
     An instance of this class can be accessed as `instruction.architecture`
-    (or `instruction.arch`) when the current architecture of the database is Arm.
+    (or `instruction.arch`) when the current architecture of the database is ARM.
     """
     prefix = '%'
     def __init__(self):
@@ -1424,13 +1424,13 @@ class AArch32(interface.architecture_t):
 
 class Mips(interface.architecture_t):
     """
-    An implementation of all the registers available on the Mips architecture.
+    An implementation of all the registers available on the MIPS architecture.
 
     This includes the different co-processor registers that are also available
     but are treated as special instructions by IDA.
 
     An instance of this class can be accessed as `instruction.architecture`
-    (or `instruction.arch`) when the current architecture of the database is Mips.
+    (or `instruction.arch`) when the current architecture of the database is MIPS.
     """
     prefix = '$'
     def __init__(self):
