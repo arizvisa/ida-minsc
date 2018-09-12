@@ -9,15 +9,15 @@ against a structure such as renaming or enumerating the structure's
 members.
 
 The base argument type for getting a `structure_t` can be either a name,
-an identifier, or an index. Typically one will call `structure.by($$)`
-with either identifier which will then return an instance of their
+an identifier, or an index. Typically one will call `structure.by(...)`
+with either identifier type which will then return an instance of their
 `structure_t`.
 
 To list the different structures available in the database, one can use
 `structure.list(...)` with their chosen method of filtering. This will
 list all of the available structures at which point the user can then
-request it by passing an identifer to `structure.by($$)`. The chosen
-methods of filtering are:
+request it by passing an identifer to `structure.by(...)`. The
+chosen methods of filtering are:
 
     `name` - Match the structures to a structure name
     `like` - Filter the structure names according to a glob

@@ -18,7 +18,7 @@ To list the different enumerations available in the database, one
 can use `enumeration.list(...)` specifying their preferred method
 of filtering. This will list all of the available enumerations at
 which point the user can then request it by passing an identifier
-to `enumeration.by($$)`. The types that can be used to filter are
+to `enumeration.by(...)`. The types that can be used to filter are
 as follows:
 
     `name` - Match according to the enumeration name
