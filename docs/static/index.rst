@@ -1,15 +1,17 @@
 Welcome to IDA-Minsc
 ====================
 
-IDA-Minsc is a plugin that groups the different aspects of IDAPython's
-API into a more manageable and intuitive format which allows a
-reverse-engineer to script different aspects of their work without too
-much investment. Combined with a tagging system for marking specific parts
-of the databases and quickly retrieving them, most search and annotation
-needs can be performed in just a couple lines of code. The hope is that
-by simplifying the interaction with IDAPython's API, scripting is more
-of an implicit task as opposed to explicit development work that the
-reverse-engineer has to context switch into in order to perform.
+IDA-minsc is a plugin for IDA Pro that assists a user with scripting the
+IDAPython plugin that is bundled with the disassembler. This plugin groups the
+different aspects of the IDAPython API into a simpler format which allows a
+reverse engineer to script different aspects of their work with very little
+investment.
+
+A number of concepts are introduced such as a tagging system, support for
+multicased functions, and filtering with the intention that most search
+and annotation issues can be performed with just a few lines of code. This
+should enable a user to write quick, hacky, throwaway code that can be used
+to augment their reversing endeavors.
 
 Table of Contents
 =================
