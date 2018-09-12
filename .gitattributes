@@ -1,0 +1,7 @@
+* text=auto
+*.py text eol=lf
+
+*.pyc binary
+*.txt text eol=lf
+*.cfg text eol=lf
+*.lst text eol=lf

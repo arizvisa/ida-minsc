@@ -2,11 +2,9 @@
 
 EXPORT = [ 'nameDispatch', 'nameAllDispatches' ]
 
-import idc, comment
-
 import idc,idautils
-import function,comment,database
-#import __quicktime
+import function,database
+import app
 
 def nextMnemonic(ea, mnem, maxaddr=0xc0*0x1000000):
     res = idc.GetMnem(ea)
@@ -35,7 +33,7 @@ def getMajorDispatchTableAddress():
     res = nextMnemonic(res, 'lea', idc.GetFunctionAttr(res, idc.FUNCATTR_END))
     assert res != idc.BADADDR
     return idc.GetOperandValue(res, 1)
-        
+
 def resolveDispatcher(code):
     major = (code & 0x00ff0000) >> 0x10
     minor = code & 0xff00ffff
@@ -67,18 +65,18 @@ def FindLastAssignment(ea, register):
         if m == 'mov' and r == register:
             return ea
         continue
-    
+
     raise ValueError('FindLastAssignment(0x%x, %s) Found no matches'% (ea, register))
 
 def nameDispatch(address):
     '''Name the dispatch function at the specified address in quicktime.qts'''
     try:
-        start, end = function.getRange(address)
+        start, end = function.range(address)
 
     except ValueError:
         print '%x making a function'% address
         function.make(address)
-        start, end = function.getRange(address)
+        start, end = function.range(address)
 
     try:
         ea = FindLastAssignment(address, 'eax')
@@ -92,7 +90,7 @@ def nameDispatch(address):
     function.tag(start, 'code', hex(code))
     function.tag(start, 'group', 'dispatch')
     try:
-        function.tag(start, 'realname', __quicktime.qt_fv_list[code])
+        function.tag(start, 'realname', app.__quicktime.qt_fv_list[code])
     except KeyError:
         pass
 
