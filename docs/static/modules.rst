@@ -18,12 +18,12 @@ Available modules
              various tools that allow one to interact with the IDA database.
              These are each named according to the context they interact with.
 
-   database
-   enumeration
-   function
-   instruction
-   segment
-   structure
+   modules/database
+   modules/enumeration
+   modules/function
+   modules/instruction
+   modules/segment
+   modules/structure
 
 Miscellaneous modules
 ---------------------
@@ -35,8 +35,8 @@ Miscellaneous modules
              care to interact with. Eventually some of these modules
              will be migrated into the base modules.
 
-   ui
-   tools
+   modules/misc-ui
+   modules/misc-tools
 
 Custom modules
 --------------
@@ -48,5 +48,5 @@ Custom modules
              allow one to interact with some of the things that are provided
              by this project.
 
-   tags
-   tagfix
+   modules/custom-tags
+   modules/custom-tagfix

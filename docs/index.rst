@@ -1,18 +1,33 @@
-.. idascripts documentation master file, created by
-   sphinx-quickstart on Fri Mar  2 11:49:24 2018.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Welcome to IDA-Minsc
+====================
 
-Welcome to idascripts's documentation!
-======================================
+.. container::
+
+  .. image:: _images/hamster.svg
+     :align: left
+     :height: 75px
+     :alt: hamsters for everyone
+
+IDA-minsc is a plugin for IDA Pro that assists a user with scripting the
+IDAPython plugin that is bundled with the disassembler. This plugin groups the
+different aspects of the IDAPython API into a simpler format which allows a
+reverse engineer to script different aspects of their work with very little
+investment.
+
+A number of concepts are introduced such as a tagging system, support for
+multicased functions, and filtering with the intention that most search
+and annotation issues can be performed with just a few lines of code. This
+should enable a user to write quick, hacky, throwaway code that can be used
+to augment their reversing endeavors.
+
+Table of Contents
+=================
 
 .. toctree::
+   :name: mastertoc
+   :numbered:
    :maxdepth: 2
-   :caption: Contents:
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   install
+   concepts
+   modules
