@@ -104,6 +104,14 @@ The following pull requests are desired:
   There's a chance I broke some things, but who knows).
 * Documentation fixes
 
+## New Versions of IDA (Tags)
+
+If a new version of IDA gets release, a new tag will be created with
+a name matching the previous version of IDA that the plugin was developed
+against. This is primarily for bisecting against if something in the
+future gets broken. IDAPython's API is pretty much a moving target so
+we need all the help we can get!
+
 ## Conclusion
 
 Thanks for your interest in contributing to this plugin!
