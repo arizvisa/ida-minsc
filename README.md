@@ -34,9 +34,12 @@ to augment their reversing endeavors.
 Installation should be pretty simple and requires simply cloning the repository
 directly into the user's IDA user directory. On the Windows platform, this is
 typically located at `$APPDATA/Roaming/Hex-Rays/IDA Pro`. Whereas on the Linux
-platform this can be found at `$HOME/.idapro`. Once installed, after IDA Pro
-loads its IDAPython plugin, the `idapythonrc.py` belonging to IDA-minsc will be
-executed which will then populate the default namespace with the plugin.
+platform this can be found at `$HOME/.idapro`. This contents of this repository
+should actually replace that directory. If you have any files that presently
+reside there, simply move them into the repository's directory. After
+installation, IDA Pro should load its IDAPython plugin which should result in
+the `idapythonrc.py` belonging to IDA-minsc being executed which will then
+replace IDAPython's default namespace with the one belonging to the plugin's.
 
 To clone the repository in a directory `$TARGET`, one can simply do:
 
