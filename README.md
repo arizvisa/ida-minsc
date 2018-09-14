@@ -2,7 +2,9 @@
 
 <table>
     <tr>
-        <td width="10%"><img src="http://arizvisa.github.io/ida-minsc/_images/hamster.svg" height="10%" /></td>
+        <td width="10%">
+            <img src="http://arizvisa.github.io/ida-minsc/_images/hamster.svg" height="10%" />
+        </td>
         <td>
             <ul>
                 <li>Website: https://github.com/arizisa/ida-minsc</li>
@@ -70,28 +72,35 @@ Or to iterate through all the functions in the database, you can try:
     > for ea in database.functions():
           print hex(ea)
 
-Please refer to the documentation for more details on what you have available.
+Please refer to the documentation for more details on what this plugin
+makes available to you.
 
 ## Documentation
 
-Comprehensive documentation is available on Github or can be built via the
-"docs" branch. To build documentation, simply checkout the "docs" branch,
-change the directory to it and run GNU make as:
+Comprehensive documentation is available at [Github](https://arizvisa.github.io/ida-minsc).
+or can be built locally via the "docs" branch.
+
+If the user wishes to build documentation for local use, they will
+first need the [Sphinx](http://www.sphinx-doc.org/en/master/usage/installation.html)
+package to be installed. Afterwards, the entirety of the documentation
+resides in the "docs" branch. Simply check out the "docs" branch,
+change the directory to "docs", and then run GNU make as:
 
     $ make html
 
-This will result in the generated documentation being built in the current
-directory under the `_build` path. Documentation can be generated in a number
-of different formats. To list the available formats, type in `make help` at
-your command prompt.
+This will result in the generated documentation being built in the
+current directory under the `_build` path. Documentation can be
+generated for a number of different formats. To list the available
+formats, type in `make help` at your command prompt.
 
 ## Contributing
 
-See [CONTRIBUTING.md](https://github.com/arizvisa/ida-minsc/blob/master/CONTRIBUTING.md) for best practices on adding functionality to IDA-minsc.
+See [CONTRIBUTING.md](https://github.com/arizvisa/ida-minsc/blob/master/CONTRIBUTING.md)
+for best practices on adding functionality to IDA-minsc.
 
 ## Thanks
 
-Thanks to a number of anonymous people have helped the development of this
-plugin throughout the years.
+Thanks to a number of anonymous people have helped the development of
+this plugin throughout the years.
 
 [logo]: http://arizvisa.github.io/ida-minsc/_images/hamster.svg
