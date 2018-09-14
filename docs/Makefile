@@ -23,7 +23,9 @@ static_path = _static
 template_path = _templates
 
 # Save the current branch state
+cwd := $(realpath .)
 branch := $(shell git symbolic-ref --short HEAD)
+revision := $(shell git rev-parse HEAD)
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -68,20 +70,26 @@ $(foreach target,$(_sphinx_targets),$(eval $(call sphinx_target,$(target))))
 all: build
 
 build: configuration source | html
+	$(info [*] Successfully built html documentation)
 
 configuration: $(SOURCEDIR)/conf.py
 	$(info [*] Successfuly copied configuration into $<)
 
 source: $(SOURCEDIR)
-	$(info [*] Successfuly build source in $<)
+	$(info [*] Successfuly built source in $<)
 
 gh-pages: build
-	@git checkout '$@'
-	@( cd '$(ROOTDIR)' && git status --porcelain | grep ^A | tr ' ' ':' | cut -d: -f3 | xargs git reset )
+	$(info [*] Checking out branch: $@)
+	@git -C '$(ROOTDIR)' checkout -f '$@' 2>/dev/null
+	@git status --porcelain | grep ^A | tr ' ' ':' | cut -d: -f3 | xargs git -C '$(ROOTDIR)' reset
+	$(info [*] Moving documentation to target directory: $(ROOTDIR))
 	@tar -C '$(BUILDDIR)/html' -cf- . | tar -xvf- -C '$(ROOTDIR)'
-	@tar -C '$(BUILDDIR)/html' -cf- . | tar -tf- | ( cd '$(ROOTDIR)' && xargs git add )
-	@git commit -m 'Built documents from $(shell git rev-parse HEAD)'
-	@git checkout -f '$(branch)'
+	$(info [*] Creating commit from recent build of documentation)
+	@tar -C '$(BUILDDIR)/html' -cf- . | tar -tf- | xargs git -C '$(ROOTDIR)' add
+	-git commit -m 'gh-pages: built documents from commit $(revision). '
+	$(info [*] Successfully committed documentation to branch: $@)
+	@git -C '$(ROOTDIR)' checkout -f '$(branch)' 2>/dev/null
+	$(info [*] Restored previous branch: $(branch))
 
 ## targets for auto-building documentation
 _source_targets = $(foreach target,$(base_targets),$(SOURCEDIR)/$(MODULEDIR)/$(target).rst)
