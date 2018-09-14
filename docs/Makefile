@@ -18,6 +18,7 @@ base_targets = database enumeration function instruction segment structure
 misc_targets = ui tools
 custom_targets = tags tagfix
 
+make_path = $(realpath $(MAKEDIR))
 image_path = _images
 static_path = _static
 template_path = _templates
@@ -44,20 +45,20 @@ endef
 
 define copy_target
 $(1): $(2) | $$(dir $(1))
-	$$(info [*] Copying file from $(2) to $(1))
-	cp '$(2)' '$(1)'
+	@echo [*] Copying file from $(2) to $(1)
+	@cp '$(2)' '$(1)'
 endef
 
 define require_directory
 $(1):
-	$$(info [*] Creating required directory for source in $(1))
+	@echo [*] Creating required directory for source in $(1)
 	@mkdir -p $(1)
 endef
 
 # generate documentation from a module
 define make_docs
 $(1): $(2) | $$(dir $(1))
-	$$(info [*] Writing documentation for $(2) to $(1))
+	@echo [*] Writing documentation for $(2) to $(1)
 	$$(RSTGENERATE) -o '$$@' '$$<' $(3)
 endef
 
@@ -80,16 +81,18 @@ source: $(SOURCEDIR)
 	$(info [*] Successfuly built source in $<)
 
 gh-pages: build
-	$(info [*] Cloning branch $@ into directory: $(ghpages_path))
+	@echo [*] Cloning branch $@ into directory: $(ghpages_path)
 	@git clone -b '$@' '$(ROOTDIR)' '$(ghpages_path)'
-	$(info [*] Emptying out the previous commit that is being replaced.)
-	@git -C '$(ghpages_path)' diff-tree --no-commit-id --name-only -r '$@' | xargs git -C '$(ghpages_path)' rm -rf
-	$(info [*] Moving built documentation to target directory: $(ghpages_path))
-	@tar -C '$(BUILDDIR)/html' -cf- . | tar -xvf- -C '$(ghpages_path)'
-	$(info [*] Creating commit from current state of documentation)
-	@tar -C '$(BUILDDIR)/html' -cf- . | tar -tf- | xargs git -C '$(ghpages_path)' add
-	@git -C '$(ghpages_path)' commit -m 'gh-pages: built documents from commit $(revision).'
-	$(info [*] Successfully committed documentation to branch: $@)
+	@echo [*] Emptying out the previous commit that is being replaced.
+	-git -C '$(make_path)/$(ghpages_path)' diff-tree --no-commit-id --name-only -r '$@' | xargs git -C '$(make_path)/$(ghpages_path)' rm -qrf
+	@echo [*] Moving built documentation to target directory: $(ghpages_path)
+	@tar -C '$(BUILDDIR)/html' -cf- . | tar -xf- -C '$(make_path)/$(ghpages_path)'
+	@echo [*] Creating commit from current state of documentation
+	@tar -C '$(BUILDDIR)/html' -cf- . | tar -tf- | xargs git -C '$(make_path)/$(ghpages_path)' add
+	-git -C '$(make_path)/$(ghpages_path)' commit -q -m 'gh-pages: built documents from commit $(revision).'
+	@echo [*] Successfully committed documentation to branch: $@
+	@echo [*] Synchronizing branch $@ with directory: $(ghpages_path)
+	@git -C '$(make_path)/$(ghpages_path)' push origin '$@'
 
 ## targets for auto-building documentation
 _source_targets = $(foreach target,$(base_targets),$(SOURCEDIR)/$(MODULEDIR)/$(target).rst)
