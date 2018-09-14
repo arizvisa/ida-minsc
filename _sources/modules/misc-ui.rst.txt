@@ -1,0 +1,638 @@
+.. py:module:: ui
+
+ui -- User Interface module
+===========================
+
+This module exposes a number of tools and class definitions for
+interacting with IDA's user interface. This includes things such
+as getting the current state of user input, information about
+windows that are in use as well as utilities for simplifying the
+customization of the interface.
+
+There are a few namespaces that are provided in order to get the
+current state. The :py:obj:`ui.current` namespace allows for one to get
+the current address, function, segment, window, as well as a number
+of other things.
+
+A number of namespaces defined within this module also allows a
+user to interact with the different windows that are currently
+in use. This can allow for one to automatically show or hide a
+window that they wish to expose to the user.
+
+-------------
+Function list
+-------------
+
+The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+:ref:`multicase-aliases` and :ref:`multicase-functions`.
+
+.. py:function:: application()
+   
+   Return the current instance of the IDA Application.
+   
+.. py:function:: ask(string, \*\*default)
+   
+   Ask the user a question providing the option to choose "yes", "no", or "cancel".
+   
+   If any of the options are specified as a boolean, then it is
+   assumed that this option will be the default. If the user
+   chooses "cancel", then this value will be returned instead of
+   the value :py:obj:`None`.
+   
+   :param string: the string to ask the user
+   :param \*\*default: if :py:data:`yes`, :py:data:`no`, or :py:data:`cancel` is set to true, then use that value as the default
+   
+--------------
+Namespace list
+--------------
+
+These are the namespaces available within this module. Namespaces
+group similar functions that can be used typically for the same
+concept. Please see :ref:`multicase-namespaces` for more
+information on namespaces. For more information on multicase
+functions or aliases, please see :ref:`multicase-functions` or
+:ref:`multicase-aliases`.
+
+************
+ui.appwindow
+************
+
+Base namespace used for interacting with the windows provided by IDA.
+
+.. py:function:: appwindow\.close()
+   
+   Close or hide the window belonging to the namespace.
+   
+.. py:function:: appwindow\.open(\*args)
+   
+   Open or show the window belonging to the namespace.
+   
+   :param \*args: any options or arguments to pass to the windows open function
+   
+************
+ui.clipboard
+************
+
+This namespace is for interacting with the current clipboard state.
+
+.. py:function:: clipboard()
+   
+   Return the current clipboard.
+   
+**********
+ui.current
+**********
+
+This namespace contains tools for fetching information about the
+current selection state. This can be used to get the state of
+thigns that are currently selected such as the address, function,
+segment, clipboard, widget, or even the current window in use.
+
+.. py:function:: current\.address()
+   
+   Return the current address.
+   
+.. py:function:: current\.color()
+   
+   Return the color of the current item.
+   
+.. py:function:: current\.function()
+   
+   Return the current function.
+   
+.. py:function:: current\.opnum()
+   
+   Return the currently selected operand number.
+   
+.. py:function:: current\.segment()
+   
+   Return the current segment.
+   
+.. py:function:: current\.selection()
+   
+   Return the current address range of whatever is selected
+   
+.. py:function:: current\.status()
+   
+   Return the IDA status.
+   
+.. py:function:: current\.symbol()
+   
+   Return the current highlighted symbol name.
+   
+.. py:function:: current\.widget()
+   
+   Return the current widget that the mouse is hovering over.
+   
+.. py:function:: current\.window()
+   
+   Return the current window that is being used.
+   
+**************
+ui.disassembly
+**************
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Disassembly window.
+
+.. py:function:: disassembly\.refresh()
+   
+   Refresh the main IDA disassembly view.
+   
+**********
+ui.exports
+**********
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Exports window.
+
+************
+ui.functions
+************
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Functions window.
+
+**********
+ui.imports
+**********
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Imports window.
+
+***********
+ui.keyboard
+***********
+
+Base namespace for interacting with the keyboard input.
+
+.. py:function:: keyboard\.input()
+   
+   Return the current keyboard input context.
+   
+.. py:function:: keyboard\.map(key, callable)
+   
+   Map a specific :py:data:`key` to a python :py:data:`callable`.
+   
+   :param key: the key to map
+   :param callable: a python callable to execute when the specified key is pressed
+   
+.. py:function:: keyboard\.modifiers()
+   
+   Return the current keyboard modifiers that are being used.
+   
+.. py:function:: keyboard\.unmap(key)
+   
+   Unmap the specified :py:data:`key` from its callable.
+   
+   :param key: the key mapping to unmap
+   
+*******
+ui.menu
+*******
+
+This namespace is for registering items in IDA's menu system.
+
+.. py:function:: menu\.add(path, name, callable, hotkey='', flags=0, args=())
+   
+   Register a :py:data:`callable` as a menu item at the specified :py:data:`path` with the provided :py:data:`name`.
+   
+   :param path: the menu path to add the item to
+   :param name: the name of the item to add
+   :param callable: the callable to execute when the item is clicked
+   :param hotkey: the key mapping to map the menu item to
+   :param flags: any extra flags to pass to :py:obj:`idaapi.add_menu_item`
+   :param args: any parameters to pass to the callable
+   
+.. py:function:: menu\.reset()
+   
+   Remove all currently registered menu items.
+   
+.. py:function:: menu\.rm(path, name)
+   
+   Remove the menu item at the specified :py:data:`path` with the provided :py:data:`name`.
+   
+   :param path: the menu path containing the item to remove
+   :param name: the name of the item to remove
+   
+********
+ui.mouse
+********
+
+Base namespace for interacting with the mouse input.
+
+.. py:function:: mouse\.buttons()
+   
+   Return the current mouse buttons that are being clicked.
+   
+.. py:function:: mouse\.position()
+   
+   Return the current :py:obj:`(x, y)` position of the cursor.
+   
+********
+ui.names
+********
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Names window.
+
+.. py:function:: names\.at(index)
+   
+   Return the address and the symbol name of the specified :py:data:`index`.
+   
+   :param index: the index in the list to return
+   
+.. py:function:: names\.contains(ea)
+   
+   Return whether the address :py:data:`ea` is referenced in the names list.
+   
+   :param ea: the address of the symbol to check
+   
+.. py:function:: names\.ea(index)
+   
+   Return the address at the specified :py:data:`index`.
+   
+   :param index: the index in the list to return
+   
+.. py:function:: names\.iterate()
+   
+   Iterate through all of the address and symbols in the names list.
+   
+.. py:function:: names\.name(index)
+   
+   Return the name at the specified :py:data:`index`.
+   
+   :param index: the index in the list to return
+   
+.. py:function:: names\.refresh()
+   
+   Refresh the names list.
+   
+.. py:function:: names\.search(ea)
+   
+   Return the index of the address :py:data:`ea` in the names list.
+   
+   :param ea: the address of the symbol to return the index for
+   
+.. py:function:: names\.size()
+   
+   Return the number of elements in the names list.
+   
+*************
+ui.navigation
+*************
+
+This namespace is for updating the state of the colored navigation band.
+
+.. py:function:: navigation\.analyze(ea)
+   
+   :param ea: the address to set the auto-analysis analyze address to on the navigation bar
+   
+.. py:function:: navigation\.auto(ea, \*\*type)
+   
+   Set the auto-analysis address and type on the navigation bar to :py:data:`ea`.
+   
+   If :py:data:`type` is specified, then update using the specified auto-analysis type.
+   
+   :param ea: the address to set the auto-analysis address to on the navigation bar
+   :param \*\*type: if :py:data:`type` is specified as an :py:obj:`idaapi.AU_\*`, then use this as the navigation type
+   
+.. py:function:: navigation\.code(ea)
+   
+   :param ea: the address to set the auto-analysis code address to on the navigation bar
+   
+.. py:function:: navigation\.final(ea)
+   
+   :param ea: the address to set the auto-analysis final address to on the navigation bar
+   
+.. py:function:: navigation\.procedure(ea)
+   
+   :param ea: the address to set the auto-analysis procedure address to on the navigation bar
+   
+.. py:function:: navigation\.set(ea)
+   
+   Set the auto-analysis address on the navigation bar to :py:data:`ea`.
+   
+   :param ea: the address to set the navigation bar pointer to
+   
+.. py:function:: navigation\.signature(ea)
+   
+   :param ea: the address to set the auto-analysis signature address to on the navigation bar
+   
+.. py:function:: navigation\.stackpointer(ea)
+   
+   :param ea: the address to set the auto-analysis stackpointer address to on the navigation bar
+   
+.. py:function:: navigation\.tail(ea)
+   
+   :param ea: the address to set the auto-analysis tail address to on the navigation bar
+   
+.. py:function:: navigation\.type(ea)
+   
+   :param ea: the address to set the auto-analysis type address to on the navigation bar
+   
+.. py:function:: navigation\.unknown(ea)
+   
+   :param ea: the address to set the auto-analysis unknown address to on the navigation bar
+   
+.. py:function:: navigation\.weak(ea)
+   
+   :param ea: the address to set the auto-analysis weak address to on the navigation bar
+   
+**********
+ui.notepad
+**********
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Notepad window.
+
+********
+ui.queue
+********
+
+This namespace exposes the ability to queue execution of python
+callables asynchronously so that they run at the same time as
+IDA and signal when they have completed and a result is available.
+
+XXX: This is probably pretty unsafe in IDA, but let's hope.
+
+.. py:function:: queue\.add(callable, \*args, \*\*kwds)
+   
+   Add the specified :py:data:`callable` to the execution queue passing to it any extra arguments.
+   
+   :param callable: the python callable to execute
+   :param \*args: any positional arguments to pass to the callable
+   :param \*\*kwds: any keyword arguments to pass to the callable
+   
+.. py:function:: queue\.pop()
+   
+   Block until the next available result has been returned.
+   
+***********
+ui.segments
+***********
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Segments window.
+
+********
+ui.state
+********
+
+This namespace is for fetching or interacting with the current
+state of IDA's interface. These are things such as waiting for
+IDA's analysis queue, or determining whether the function is
+being viewed in graph view or not.
+
+.. py:function:: state\.beep()
+   
+   Beep using IDA's interface.
+   
+.. py:function:: state\.graphview()
+   
+   Returns true if the current function is being viewed in graph view mode.
+   
+.. py:function:: state\.refresh()
+   
+   Refresh all of IDA's windows.
+   
+.. py:function:: state\.wait()
+   
+   Wait until IDA's autoanalysis queues are empty.
+   
+**********
+ui.strings
+**********
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Strings window.
+
+.. py:function:: strings\.at(index)
+   
+   Return the string at the specified :py:data:`index`.
+   
+   :param index: the index of the string item to return
+   
+.. py:function:: strings\.get(index)
+   
+   Return the address and the string at the specified :py:data:`index`.
+   
+   :param index: the index of the string to return
+   
+.. py:function:: strings\.iterate()
+   
+   Iterate through all of the address and strings in the strings list.
+   
+.. py:function:: strings\.refresh()
+   
+   Refresh the strings list.
+   
+.. py:function:: strings\.size()
+   
+   Return the number of elements in the strings list.
+   
+*************
+ui.structures
+*************
+
+Bases: :py:class:`ui.appwindow`
+
+This namespace is for interacting with the Structures window.
+
+********
+ui.timer
+********
+
+This namespace is for registering a python callable to a timer in IDA.
+
+.. py:function:: timer\.register(id, interval, callable)
+   
+   Register the specified :py:data:`callable` with the requested :py:data:`id` to be called at every :py:data:`interval`.
+   
+   :param id: a unique id used to refer to the callable being registered in the timer
+   :param interval: what interval to execute the callable at
+   :param callable: a python callable to execute when the timer ticks
+   
+.. py:function:: timer\.reset()
+   
+   Remove all the registered timers.
+   
+.. py:function:: timer\.unregister(id)
+   
+   Unregister the specified :py:data:`id`.
+   
+   :param id: the unique id of the callable to unregister
+   
+*********
+ui.widget
+*********
+
+This namespace is for selecting a specific or particular widget.
+
+.. py:function:: widget((x,y))
+   
+   Return the widget at the specified :py:data:`x` and :py:data:`y` coordinate.
+   
+   :param x: the X coordinate of the widget
+   :param y: the Y coordinate of the widget
+   
+.. py:function:: widget\.at((x,y))
+   
+   Return the widget at the specified :py:data:`x` and :py:data:`y` coordinate.
+   
+   :param x: the X coordinate of the widget
+   :param y: the Y coordinate of the widget
+   
+.. py:function:: widget\.form(twidget)
+   
+   Return an IDA plugin form as a UI widget.
+   
+   :param twidget: the IDA plugin form to convert to a Qt widget
+   
+*********
+ui.window
+*********
+
+This namespace is for selecting a specific or particular window.
+
+.. py:function:: window\.main()
+   
+   Return the active main window.
+   
+.. py:function:: window\.viewer()
+   
+   Return the current viewer.
+   
+**********
+ui.windows
+**********
+
+Interact with any or all of the top-level windows for the application.
+
+.. py:function:: windows()
+   
+   Return all of the top-level windows.
+   
+----------
+Class list
+----------
+
+
+Classes provide the definition necessary to instantiate an object.
+In most cases, a class is returned when calling one of the prior
+listed functions and thus have no need to be manually instantiated.
+Classes may also have aliases defined for them. Please refer to the
+documentation for the class to see what is available. For more
+information on aliases, please see :ref:`multicase-aliases`.
+
+
+***************
+ConsoleProgress
+***************
+
+.. py:class:: ConsoleProgress
+   
+   Helper class used to simplify the showing of a progress bar in IDA's console.
+   
+   .. py:method:: close(self)
+      
+      Close the current progress bar.
+      
+   .. py:method:: open(self, width=0.8, height=0.1)
+      
+      Open a progress bar with the specified :py:data:`width` and :py:data:`height` relative to the dimensions of IDA's window.
+      
+      :param width: the percentage of IDA's dimensions to set the width to
+      :param height: the percentange of IDA's dimensions to set the height to
+      
+   .. py:method:: update(self, \*\*options)
+      
+      Update the current state of the progress bar.
+      
+      :param \*\*options:  The options to update the progress bar with. Some of these options are:
+   
+                   :py:obj:`minimum` - the minimum value on the progress bar
+                   :py:obj:`maximum` - the maximum value on the progress bar
+                   :py:obj:`text` - the current text to display
+                   :py:obj:`title` - the title of the progress bar
+                   :py:obj:`tooltip` - what to emit when the user hovers over the progress ar
+   
+               
+      
+********
+InputBox
+********
+
+.. py:class:: InputBox
+   
+   Bases: :py:class:`idaapi.PluginForm`
+   
+   A class designed to be inherited from that can be used
+   to interact with the user.
+   
+   .. py:method:: OnClose(self, form)
+      
+      :param form:
+      
+   .. py:method:: OnCreate(self, form)
+      
+      :param form:
+      
+   .. py:method:: Show(self, caption, options=0)
+      
+      :param caption: the title of the form to show
+      :param options: any flags to show the form with
+      
+********
+Progress
+********
+
+.. py:class:: Progress
+   
+   The default progress bar in with which to show progress.
+   
+   This is one of :py:obj:`ConsoleProgress` or :py:obj:`UIProgress` based on whether or not
+   the console or graphical user interface was detected.
+   
+**********
+UIProgress
+**********
+
+.. py:class:: UIProgress
+   
+   Helper class used to simplify the showing of a progress bar in IDA's UI.
+   
+   .. py:method:: close(self)
+      
+      Close the current progress bar.
+      
+   .. py:method:: open(self, width=0.8, height=0.1)
+      
+      Open a progress bar with the specified :py:data:`width` and :py:data:`height` relative to the dimensions of IDA's window.
+      
+      :param width: the percentage of IDA's dimensions to set the width to
+      :param height: the percentange of IDA's dimensions to set the height to
+      
+   .. py:method:: update(self, \*\*options)
+      
+      Update the current state of the progress bar.
+      
+      :param \*\*options:  The options to update the progress bar with. Some of these options are:
+   
+                   :py:obj:`minimum` - the minimum value on the progress bar
+                   :py:obj:`maximum` - the maximum value on the progress bar
+                   :py:obj:`text` - the current text to display
+                   :py:obj:`title` - the title of the progress bar
+                   :py:obj:`tooltip` - what to emit when the user hovers over the progress ar
+   
+               
+      

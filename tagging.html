@@ -1,0 +1,642 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>2.2. Tagging and the querying of the tag cache &#8212; IDA-minsc  documentation</title>
+    <link rel="stylesheet" href="_static/pyramid.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sidebar.css" type="text/css" />
+    <link rel="stylesheet" href="_static/content.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="2.3. Matching/Filtering of IDA types" href="matching.html" />
+    <link rel="prev" title="2.1. Multicased functions and classes as namespaces" href="multicase.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="matching.html" title="2.3. Matching/Filtering of IDA types"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="multicase.html" title="2.1. Multicased functions and classes as namespaces"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="concepts.html" accesskey="U">2. Concepts</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="tagging-and-the-querying-of-the-tag-cache">
+<span id="tagging-intro"></span><h1>2.2. Tagging and the querying of the tag cache<a class="headerlink" href="#tagging-and-the-querying-of-the-tag-cache" title="Permalink to this headline">¶</a></h1>
+<p>This project provides an interesting interface based on some research
+[<a class="reference internal" href="#tagging-references"><span class="std std-ref">1</span></a>] that was done by one of the authors at the
+Ekoparty conference in 2011. The author is grateful to TippingPoint/3com/HP
+for providing him the resources and time in which to do this research.</p>
+<p>Typically when recalling addresses in an IDA database, users will use one of the
+already existing facilities for navigation. This includes things such as names or
+marks. At this point, the user will utilize names or comments in order to recall
+what present work was being done at a particular location. One of the unfortunate
+attributes of this is that it is of variable difficulty to share this knowledge
+with other users. This can be any number of reasons related to inconsistency, but
+it’s suggested that this is because each reverser has a different personality as
+well as different intentions for each reversing project.</p>
+<p>In order to improve this methodology that users of IDA Pro tend to gravitate
+towards, a system based on the concept of treating IDA as a key-value store
+was introduced. This system abuses IDA’s comments in order to allow a user
+to programatically categorize information that a user might have inferred
+during their reversing endeavor in the hopes to improve the way that a user
+navigates the database and shares information with other users.</p>
+<p>This system allows for a user to store a primitive python object within a comment,
+which can then be decoded back into its original type, thus allowing a user to
+store and retrieve a python object associated with an address. This is described
+in detail later at <a class="reference internal" href="#tagging-encoding"><span class="std std-ref">Tag encoding/decoding</span></a>. These values can then later be queried
+in order to reference the addresses of the types that the user has marked. This
+is also described in detail at <a class="reference internal" href="#tagging-querying"><span class="std std-ref">Querying tags</span></a>.</p>
+<p>Using such a mechanism, facilitates a user to be able to quickly tag
+a number of related functions or addresses, and perform some sort of
+processing against them. The work required to perform tasks such as
+tagging all the handlers related to some CGI binary, tagging various
+instructions according to some attribute in order to later color them,
+tagging an instruction address with a breakpoint command to later feed
+to a debugger, or even simply tagging the results of a hit-tracer for later
+review is greatly simplified.</p>
+<p class="rubric" id="tagging-references">References</p>
+<ol class="arabic simple">
+<li>[Eko7-2011] – <a class="reference external" href="https://www.youtube.com/watch?v=A4yXdir_59E">Portnoy, Aaron, and Ali Rizvi-Santiago. Experiments Using IDA Pro as a Data Store. Ekoparty, 21 Sep. 2011, www.youtube.com/watch?v=A4yXdir_59E</a></li>
+</ol>
+<div class="section" id="tag-types">
+<span id="tagging-types"></span><h2>2.2.1. Tag types<a class="headerlink" href="#tag-types" title="Permalink to this headline">¶</a></h2>
+<p>Comments are hence split up into two parts that compose a dictionary, these are
+the “key” and the “value”. Each location or object that can be tagged, will
+include a specially formatted comment that isolates these components so that
+they can later be queried. These tags are then cached in a netnode so that they
+be easily queried (see <a class="reference internal" href="#tagging-querying"><span class="std std-ref">Querying tags</span></a>) to then later revisit or extract
+information to process.</p>
+<p>In essence, these tags are grouped into two different types. One of which
+is the “global” tag. A “global” tag is used to store attributes about a
+particular global such as a function, or an address outside of a function.
+These tags can then be used to search the database for something of reference
+which is a significant improvement to the way that marks work, and works around
+the limitation that a database has on its limited number of marks.</p>
+<p>The other type of tag is known as a “contents” tag. A “contents” tag is used to
+store attributes about an address that is inside a function and is commonly
+associated with the instructions that belong to a function. This allows one to
+store attributes describing the semantics of what is being reversed at a given
+address within a function.</p>
+<p>When querying a tag, it is important to distinguish between which tag the user
+wishes to search through. This is described in detail at <a class="reference internal" href="#tagging-querying"><span class="std std-ref">Querying tags</span></a>.
+Some examples of querying are described at <a class="reference internal" href="#tagging-examples-querying"><span class="std std-ref">Examples – Querying</span></a>.</p>
+</div>
+<div class="section" id="tag-formats">
+<span id="tagging-format"></span><h2>2.2.2. Tag formats<a class="headerlink" href="#tag-formats" title="Permalink to this headline">¶</a></h2>
+<p>In order to facilitate support tags and still allow for a user to quickly
+comprehend the intention of a tag. Tags are actually encoded within comments
+at the address that is “tagged”. This is done by encoding the tag using a
+specific newline-delimited format.</p>
+<p>This format represents the attributes commonly associated with a dictionary. If
+a user chooses to not use this special format, then when utilizing the tag api
+the entire comment is treated as an “empty” tag using an empty string as its key.
+Please see <a class="reference internal" href="#tagging-examples"><span class="std std-ref">Examples – Application or Retrieval</span></a> for an example of this.</p>
+<p>Due to a limitation of IDA with regards to the size of comments and this abuse
+of using comments to store tag values, tags have a limited size. If the user
+wishes to store a long tag at an address it is necessary for them to break it
+down into smaller components that do not exceed the maximum number of characters
+that IDA allots for each comment or to use another storage mechanism entirely.
+It is recommended by the author to only store light information and if a large
+value needs to be stored, that a user should really just use another storage
+mechanism. Long (and hidden) tags may be supported in the future, however.</p>
+<p>The format for a tag to an address within the database can look like the
+following:</p>
+<div class="highlight-tasm notranslate"><div class="highlight"><pre><span></span><span class="nf">call</span>    <span class="nv">sub_58B674</span>      <span class="c1">; [note] this calls some parser of some kind</span>
+                        <span class="c1">; [mark] (0x4, &#39;this is the 4th mark&#39;)</span>
+                        <span class="c1">; [break] .printf &quot;calling sub_58b674!\\n&quot;; dc @esp L4; p &quot;r @eax&quot;</span>
+                        <span class="c1">; [references] set([0x58b012, 0x581061, 0x501212])</span>
+                        <span class="c1">; [floating-value] float(0.500000)</span>
+</pre></div>
+</div>
+<p>When applying a tag to a function, this can look like the following:</p>
+<div class="highlight-tasm notranslate"><div class="highlight"><pre><span></span><span class="c1">; [node-type] leaf</span>
+<span class="c1">; [note] this seems to do something different based on the file type?</span>
+<span class="c1">; [synopsis] returns an unmodified @eax if by(ap_0-9) is zero, otherwise it returns @edx</span>
+<span class="c1">; [input] {&#39;%eax&#39; : &#39;p_bufferObject?&#39;, &#39;%edx&#39; : &#39;v_offset&#39;}</span>
+<span class="c1">; Attributes: bp-based frame</span>
+
+<span class="nf">sub_5801F4</span>      <span class="nv">proc</span> <span class="nv">near</span>
+<span class="nf">...</span>
+</pre></div>
+</div>
+<p>If a user chooses to not explicitly use the tagging API and wishes to use IDA’s
+regular commenting interface instead, they will simply need to specify the key
+name with brackets (“[” and “]”) with the value for the key immediately following.
+This should look similar to:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[synopsis] this is what i suspect this function is doing
+[note] this is some note or whatever
+[numbers] set([0x0, 0x1, 0x2, 0x3, 0x4, 0x5])
+[dict] {&#39;key1&#39; : &#39;value1&#39;, &#39;key2&#39; : 0x2a}
+[float] float(2.71828182846)
+[linked] 0x51b2080
+</pre></div>
+</div>
+<p>IDA supports two different types of comments within the database. A comment can
+be either a “repeatable” comment, or a “non-repeatable” comment. By default when
+tagging, this type of comment is automatically chosen based on whether the address
+belongs to a function, or a global. When fetching a tag, however, both types
+of comments are combined whilst giving priority to the automatically chosen
+comment type.</p>
+<p>When tagging an address belonging to a function’s contents, the default comment
+type of “non-repeatable” will be chosen. When tagging to a global, or an actual
+function, the comment type that will be chosen will be “repeatable.” This choice
+is hidden behind the tagging API.</p>
+</div>
+<div class="section" id="tag-encoding-decoding">
+<span id="tagging-encoding"></span><h2>2.2.3. Tag encoding/decoding<a class="headerlink" href="#tag-encoding-decoding" title="Permalink to this headline">¶</a></h2>
+<p>In order to allow a user to store and retrieve a primitive python types
+whilst still allowing for them to visually read the contents of the type,
+different python types are encoded in particular ways.</p>
+<p>Integral types, and strings are specially encoded. Integers are always stored
+as hexadecimal numbers in order to facilitate a user double-clicking on it to
+have IDA navigate to this address. (This assumes that the user is capable of
+reading hexadecimal. This is an integral part of reversing and it is highly
+recommended that the user familiarizes his or herself with this numerical
+format).</p>
+<p>Strings are escaped in a few ways, replacing characters that might
+interfere with the <a class="reference internal" href="#tagging-format"><span class="std std-ref">Tag formats</span></a> with their backslash-prefixed
+equivalents. When retrieving a string encoded within a tag, these
+characters will then be decoded into their original forms.</p>
+<p>Types such as the <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>, or <code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code>,
+are typically encoded as the <code class="xref py py-func docutils literal notranslate"><span class="pre">repr()</span></code> of their instance. This allows
+the usage of <code class="xref py py-func docutils literal notranslate"><span class="pre">eval()</span></code> to decode it back into a type. The iterable
+types such as <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> and <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code>, however, are iterated
+through in order to convert integers into their hexadecimal equivalents
+similar to the way integers are encoded.</p>
+<p>Custom python objects, iterators, or callables are unfortunately not supported
+as tags. If the user really wishes to store these types, however, it is possible
+for one to serialize a type, and then store it as a string inside a tag. As
+previousy mentioned, however, this is not recommended and it is suggested by
+the author that a user uses an alternative storage mechanism.</p>
+<p>If a user wishes to go against these recommendations, however, once can
+store an arbitrary type by using either <code class="xref py py-func docutils literal notranslate"><span class="pre">pickle()</span></code> or <code class="xref py py-func docutils literal notranslate"><span class="pre">marshal()</span></code>
+to serialize their object, applying some compression to the resulting data,
+followed by encoding into a character set using “base64”, encoding to hex,
+or some similar mechanism.</p>
+</div>
+<div class="section" id="querying-tags">
+<span id="tagging-querying"></span><h2>2.2.4. Querying tags<a class="headerlink" href="#querying-tags" title="Permalink to this headline">¶</a></h2>
+<p>When initially creating a database, this project will hook IDA in order to
+identify a good time to pre-build the tag cache. Once IDA has finished its
+analysis, the tag cache will begin to be built. This consists of iterating
+through the different places that can be tagged and reference counting whats
+available. By default all comments that do not fit the correct format
+(see <a class="reference internal" href="#tagging-format"><span class="std std-ref">Tag formats</span></a>) will be internally treated as the “empty” tag.</p>
+<p>Once the creation of this cache has been completed, this project will keep
+track of any comments and tags that are created by the user and automatically
+update the cache. This will then allow a user to quickly query the tags that
+they have marked up in a database. If this cache gets corrupted in some way,
+one can repair the cache by using the module <a class="reference internal" href="modules/custom-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tagfix</span></code></a>. Please see
+<a class="reference internal" href="#tagging-modules-tagfix"><span class="std std-ref">Tag modules – tagfix</span></a> for more information.</p>
+<p>When querying a tag, as mentioned before, the tag’s type is of significant
+importance. This is due to there being two different ways of querying them
+based on the type.</p>
+<p>Within the <a class="reference internal" href="modules/database.html#module-database" title="database"><code class="xref py py-mod docutils literal notranslate"><span class="pre">database</span></code></a> namespace are the functions <a class="reference internal" href="modules/database.html#database.select" title="database.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.select()</span></code></a>,
+and <a class="reference internal" href="modules/database.html#database.selectcontents" title="database.selectcontents"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.selectcontents()</span></code></a>. The <a class="reference internal" href="modules/database.html#database.select" title="database.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.select()</span></code></a> function is
+used for querying all of the global tags as well as any tags made explicitly to a
+function.</p>
+<p>The <a class="reference internal" href="modules/database.html#database.selectcontents" title="database.selectcontents"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.selectcontents()</span></code></a> function, however, is used to return the
+functions that contain the desired tags within the function’s contents. Once the
+functions in the database have been identified, the user can then use
+<a class="reference internal" href="modules/function.html#function.select" title="function.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.select()</span></code></a> function to query the contents of a function for
+specific tags.</p>
+<p>When calling either <a class="reference internal" href="modules/database.html#database.select" title="database.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.select()</span></code></a>, or <a class="reference internal" href="modules/function.html#function.select" title="function.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.select()</span></code></a>,
+an iterator is returned. This iterator yields a tuple containing the address the
+tag was found at, as well as a dictionary containing the values of the tags that
+were queried. This then allows a user to act on the tags such as emitting them
+to the console, or storing them in another data structure. See
+<a class="reference internal" href="#tagging-examples-querying-globals"><span class="std std-ref">Examples – Querying “Global” tags</span></a>
+for such an example.</p>
+<p>When calling <a class="reference internal" href="modules/database.html#database.selectcontents" title="database.selectcontents"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.selectcontents()</span></code></a>, however, an iterator that returns
+the function and the tag membership is returned. Each iteration of this iterator
+will yield the address of the function, followed by a <code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code> of the
+contents tags that were found in the function. This tuple can then be immediately
+passed to <a class="reference internal" href="modules/function.html#function.select" title="function.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.select()</span></code></a> in order to iterate through all the contents
+tags matched within the database. See <a class="reference internal" href="#tagging-examples-querying-content"><span class="std std-ref">Examples – Querying “Contents” tags</span></a>
+for how a user can use this.</p>
+<p>Each of these functions takes a variable number of parameters as well as boolean
+types that specify whether to require specific tags in order to return a result,
+or optionally include tags if they’re defined for an address. If the keyword
+<code class="xref py py-data docutils literal notranslate"><span class="pre">And</span></code> is specified as an argument, then any of the tags specified are
+required in order to yield an address. If the keyword <code class="xref py py-data docutils literal notranslate"><span class="pre">Or</span></code> is specified
+then this informs the function to optionally include any tags that were requested
+if they are defined for the address that is returned.</p>
+</div>
+<div class="section" id="storage-retrieval-of-tags">
+<span id="tagging-usage"></span><h2>2.2.5. Storage/Retrieval of tags<a class="headerlink" href="#storage-retrieval-of-tags" title="Permalink to this headline">¶</a></h2>
+<p>The other aspect of the tagging api is the programmatic storage and retrieval
+of tags defined at a particular address. This functionality is performed
+by either the <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a> or the <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>
+functions. It’s important to distinguish that the namespace these functions
+are contained in, do not distinguish whether a tag is a “global” or a
+“contents” tag.</p>
+<p>As specified in <a class="reference internal" href="modules/database.html#module-database" title="database"><code class="xref py py-mod docutils literal notranslate"><span class="pre">database</span></code></a>, the primary type that is typically passed
+to its functions is an address. This implies that <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a> can
+be used to tag an address. This address may belong to a function’s contents
+or a global address. <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>, however, is used to tag the
+function itself. This is demonstrated at <a class="reference internal" href="#tagging-examples"><span class="std std-ref">Examples – Application or Retrieval</span></a>.</p>
+<p>This implies that <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a> is used to tag a specific address
+belonging to a function’s contents or a global, whereas <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>
+is used to tag the function itself. This is demonstrated at <a class="reference internal" href="#tagging-examples"><span class="std std-ref">Examples – Application or Retrieval</span></a>.</p>
+<p>When executing either of these tag functions, there are 4 variations of each
+of them. The first variations is when only a tag name is provided. This
+variation will return the value of the tag at a given address and is thus used
+for reading a particular tag from an address. This looks like the following
+for <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">value</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;mytagname&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The next variation takes a tag name and its value and is thus used to write
+a value with the specified tag name at an address within the database. If a
+tag is being overwritten, this variation will return the original value
+of the tag that was overwritten. Some examples of how this can look like for
+for the <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a> function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;synopsis&#39;</span><span class="p">,</span> <span class="s1">&#39;this function is recursive&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="n">oldvalue</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;object&#39;</span><span class="p">,</span> <span class="s1">&#39;TList&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;marks&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mh">0x51b0102</span><span class="p">,</span> <span class="mh">0x51b0208</span><span class="p">,</span> <span class="mh">0x51b021f</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>The third variation is responsible for removing a tag at a given address.
+This is done by providing a tag name along with the python type <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>.
+When removing a tag name, the value of the tag name is always returned. This
+allows a user to save the tag name in case they wish to re-apply it elsewhere.
+Here’s how this can look like for the <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a> function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;removethis&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;object-type&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">iterate</span><span class="p">():</span>
+      <span class="n">res</span><span class="p">[</span><span class="n">ea</span><span class="p">]</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The final variation is responsible for returning all of the tags at a given
+address. This is done by only providing a location without including any
+specific tag name or anything. At this point, a dictionary will be returned
+which a user can use to enumerate all of the tags for an address or to even
+check for membership of a tag. Using <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>, this can look
+like:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;Current function&#39;s tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">res</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">functions</span><span class="p">():</span>
+      <span class="n">res</span><span class="p">[</span><span class="n">ea</span><span class="p">]</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;All the tags in the world: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">res</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="tag-modules">
+<span id="tagging-modules"></span><h2>2.2.6. Tag modules<a class="headerlink" href="#tag-modules" title="Permalink to this headline">¶</a></h2>
+<p>There are a few modules that are provided within this project that allows one
+to interact with all of the tags defined in a database. This can be used to
+perform various tasks such as exporting all the tags within a database to
+serialize for later importing, translating tags within the database in order
+to match up to another database, etc. These modules are available via the
+<code class="xref py py-mod docutils literal notranslate"><span class="pre">custom</span></code> namespace.</p>
+<div class="section" id="tag-modules-tags">
+<span id="tagging-modules-tags"></span><h3>2.2.6.1. Tag modules – tags<a class="headerlink" href="#tag-modules-tags" title="Permalink to this headline">¶</a></h3>
+<p>The custom <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tags</span></code></a> module allows for one to export or import all of the
+tags within a database. Please review the documentation for <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tags</span></code></a> for
+more about the capabilities of this module.</p>
+</div>
+<div class="section" id="tag-modules-tagfix">
+<span id="tagging-modules-tagfix"></span><h3>2.2.6.2. Tag modules – tagfix<a class="headerlink" href="#tag-modules-tagfix" title="Permalink to this headline">¶</a></h3>
+<p>The custom <a class="reference internal" href="modules/custom-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tagfix</span></code></a> module allows for one to rebuild the tag cache if
+the cache somehow gets corrupted in some way (due to IDA crashing whilst trying
+to write a netnode) or if a database did not complete it’s initial creation of
+the tag cache.</p>
+<p>This module exposes a number of functions that can be used to rebuild the tag
+cache entirely. Please review the documentation for <a class="reference internal" href="modules/custom-tagfix.html#module-tagfix" title="tagfix"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tagfix</span></code></a> for more
+information on how to do this.</p>
+</div>
+</div>
+<div class="section" id="examples-querying">
+<span id="tagging-examples-querying"></span><h2>2.2.7. Examples – Querying<a class="headerlink" href="#examples-querying" title="Permalink to this headline">¶</a></h2>
+<p>As described in the previous sections, tags have 2 different types and thus have
+2 different ways of querying them. “Global” tags can represent a tag associated
+with a given function or a global address, whereas “Contents” tags are associated
+with an address belonging to a function.</p>
+<p>(In the following examples, format strings are used. Although format-specifiers
+are a lot more flexible and poweful, they might not be familiar to the average
+user. Apologies in advance.)</p>
+<div class="section" id="examples-querying-global-tags">
+<span id="tagging-examples-querying-globals"></span><h3>2.2.7.1. Examples – Querying “Global” tags<a class="headerlink" href="#examples-querying-global-tags" title="Permalink to this headline">¶</a></h3>
+<p>Return all of the global addresses and functions that have the tag “note” applied
+to it and output them to the IDAPython console:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">):</span>
+      <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="s2">&quot;note: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>Return all of the global functions that have the tag “synopsis”, with the
+optional tag “note” applied to it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;synopsis&#39;</span><span class="p">,</span> <span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">,)):</span>
+      <span class="n">synopsis</span> <span class="o">=</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;synopsis&#39;</span><span class="p">]</span>
+      <span class="n">note</span> <span class="o">=</span> <span class="n">tags</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">,</span> <span class="s1">&#39;no notes found!&#39;</span><span class="p">)</span>
+      <span class="k">print</span> <span class="s2">&quot;Function: </span><span class="si">%x</span><span class="s2"> -- </span><span class="si">%s</span><span class="s2"> (note: </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">synopsis</span><span class="p">,</span> <span class="n">note</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>Return all addresses that have both the required tags “object-name”, and “object-size”,
+and include any tags that have “object-note” defined:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">And</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;object-name&#39;</span><span class="p">,</span> <span class="s1">&#39;object-size&#39;</span><span class="p">),</span> <span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;object-note&#39;</span><span class="p">,)):</span>
+      <span class="k">print</span> <span class="s2">&quot;Address: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">ea</span>
+      <span class="k">print</span> <span class="s2">&quot;Name/Size: </span><span class="si">%s</span><span class="s2">/</span><span class="si">%d</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-name&#39;</span><span class="p">],</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-size&#39;</span><span class="p">])</span>
+      <span class="k">if</span> <span class="s1">&#39;object-note&#39;</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">:</span>
+          <span class="k">print</span> <span class="s2">&quot;Comment: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-note&#39;</span><span class="p">]</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>Return all the comments defined globally within the database that are not specially formatted,
+by querying the “empty” tag:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
+      <span class="k">print</span> <span class="s2">&quot;Address: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">ea</span>
+      <span class="k">print</span> <span class="s2">&quot;Comment: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">]</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="examples-querying-contents-tags">
+<span id="tagging-examples-querying-content"></span><h3>2.2.7.2. Examples – Querying “Contents” tags<a class="headerlink" href="#examples-querying-contents-tags" title="Permalink to this headline">¶</a></h3>
+<p>Return all of the contents tags defined within the current function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">():</span>
+      <span class="k">print</span> <span class="s2">&quot;Ea: </span><span class="si">%x</span><span class="s2"> Tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>Return any instances of the “note” tag defined with a particular function at <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">):</span>
+      <span class="k">print</span> <span class="s2">&quot;Ea: </span><span class="si">%x</span><span class="s2"> Note: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>Iterate through the contents tags defined within the database looking for the
+tag “mark”:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;mark&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="o">*</span><span class="n">result</span><span class="p">):</span>
+          <span class="k">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;mark&#39;</span><span class="p">])</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>Another way to perform the above due to the result returned from <a class="reference internal" href="modules/database.html#database.selectcontents" title="database.selectcontents"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.selectcontents()</span></code></a>
+being the same as the input to <a class="reference internal" href="modules/function.html#function.select" title="function.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.select()</span></code></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;mark&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="k">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;mark&#39;</span><span class="p">])</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>Iterate through all the addresses in the function <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code> tagged with “mark” and also
+include any “note” tags:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">And</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;mark&#39;</span><span class="p">,),</span> <span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">,)):</span>
+      <span class="k">if</span> <span class="s1">&#39;note&#39;</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
+          <span class="k">print</span> <span class="s2">&quot;Noted mark found at </span><span class="si">%x</span><span class="s2"> -&gt; </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
+      <span class="k">else</span><span class="p">:</span>
+          <span class="k">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>To list all of the contents tags that have been used in the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">():</span>
+      <span class="k">print</span> <span class="s2">&quot;Function </span><span class="si">%x</span><span class="s2"> has the tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">res</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>This same functionality is also provided within the <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tags</span></code></a> module
+within the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom</span></code> namespace:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">custom</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="examples-application-or-retrieval">
+<span id="tagging-examples"></span><h2>2.2.8. Examples – Application or Retrieval<a class="headerlink" href="#examples-application-or-retrieval" title="Permalink to this headline">¶</a></h2>
+<p>The other aspect of the tagging api is the application and retrieval of tags at
+a particular address. As was explained bit in <a class="reference internal" href="#tagging-usage"><span class="std std-ref">Storage/Retrieval of tags</span></a>, this
+functionality is performed by either <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a> or <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>.</p>
+<p>To tag all of the marks inside the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">descr</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">marks</span><span class="p">():</span>
+      <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;mark&#39;</span><span class="p">,</span> <span class="n">descr</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>To fetch the empty tag at the current address and then print it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To export all of the tags for anything tagged “synopsis” in the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;synopsis&#39;</span><span class="p">):</span>
+      <span class="n">res</span><span class="p">[</span><span class="n">ea</span><span class="p">]</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>To rename all of the “empty” tags in a function to “comment”:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+      <span class="k">if</span> <span class="s1">&#39;&#39;</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="n">old</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;comment&#39;</span><span class="p">,</span> <span class="n">old</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>To obnoxiously tag every function with an index:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ea</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">functions</span><span class="p">()):</span>
+      <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;index&#39;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>To prefix all tags with the current username using the cache:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">getpass</span>
+<span class="o">&gt;</span> <span class="n">username</span> <span class="o">=</span> <span class="n">getpass</span><span class="o">.</span><span class="n">getuser</span><span class="p">()</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;transforming global tags&quot;</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">():</span>
+      <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;transforming contents tags&quot;</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">():</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+          <span class="k">continue</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="suggested-tag-names">
+<h2>2.2.9. Suggested tag names<a class="headerlink" href="#suggested-tag-names" title="Permalink to this headline">¶</a></h2>
+<p>When using tag names within a database, any tag name can be used. Tags that
+are wrapped with double-underscores (“__”) may also have additional useful
+side effects. Although any tag names can be used, it’s recommended by the
+author to choose consistent names to simplify exchanging knowledge with
+other users. Some recommended names can be:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">synopsis</span></code> – The potential semantics of a reversed function</li>
+<li><code class="docutils literal notranslate"><span class="pre">__color__</span></code> – The RGB color of an item at a particular address</li>
+<li><code class="docutils literal notranslate"><span class="pre">__name__</span></code> – The name associated with an address</li>
+<li><code class="docutils literal notranslate"><span class="pre">note</span></code> – Any general notes about an address determined the the user</li>
+<li><code class="docutils literal notranslate"><span class="pre">marks</span></code> – A set containing any marks contained within a function</li>
+<li><code class="docutils literal notranslate"><span class="pre">mark</span></code> – A string containing the description for a mark at an address</li>
+<li><code class="docutils literal notranslate"><span class="pre">object</span></code> – The name or address(es) of a related vtable applied to a function that is used to call a method.</li>
+<li><code class="docutils literal notranslate"><span class="pre">input</span></code> – A dictionary mapping register arguments to a function</li>
+<li><code class="docutils literal notranslate"><span class="pre">return</span></code> – A list containing the registers that a result is composed of</li>
+</ul>
+</div></blockquote>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div>
+  <h3 class="sidebar">IDA-minsc</h3>
+  <p class="sidebar logo">
+    <a href="index.html">
+      <img class="logo" src="_images/hamster.svg" alt="Logo"/>
+    </a>
+  </p>
+</div>
+  <h3 class="sidebar">Navigation</h3>
+  <p class="topless">
+    Next topic:
+    <a href="matching.html" title="next chapter">2.3. Matching/Filtering of IDA types</a>
+    <br />
+    Previous topic:
+    <a href="multicase.html" title="previous chapter">2.1. Multicased functions and classes as namespaces</a>
+    <br />
+  </p>
+  <h3 class="sidebar"><a href="index.html">Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">2.2. Tagging and the querying of the tag cache</a><ul>
+<li><a class="reference internal" href="#tag-types">2.2.1. Tag types</a></li>
+<li><a class="reference internal" href="#tag-formats">2.2.2. Tag formats</a></li>
+<li><a class="reference internal" href="#tag-encoding-decoding">2.2.3. Tag encoding/decoding</a></li>
+<li><a class="reference internal" href="#querying-tags">2.2.4. Querying tags</a></li>
+<li><a class="reference internal" href="#storage-retrieval-of-tags">2.2.5. Storage/Retrieval of tags</a></li>
+<li><a class="reference internal" href="#tag-modules">2.2.6. Tag modules</a><ul>
+<li><a class="reference internal" href="#tag-modules-tags">2.2.6.1. Tag modules – tags</a></li>
+<li><a class="reference internal" href="#tag-modules-tagfix">2.2.6.2. Tag modules – tagfix</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#examples-querying">2.2.7. Examples – Querying</a><ul>
+<li><a class="reference internal" href="#examples-querying-global-tags">2.2.7.1. Examples – Querying “Global” tags</a></li>
+<li><a class="reference internal" href="#examples-querying-contents-tags">2.2.7.2. Examples – Querying “Contents” tags</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#examples-application-or-retrieval">2.2.8. Examples – Application or Retrieval</a></li>
+<li><a class="reference internal" href="#suggested-tag-names">2.2.9. Suggested tag names</a></li>
+</ul>
+</li>
+</ul>
+
+<h3 class="sidebar">Search</h3>
+<div class="searchformwrapper">
+  <form class="search" action="search.html" method="get">
+    <input type="text" name="q" />
+    <input type="submit" value="Go" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+<div id="searchbox" role="search">
+  <script type="text/javascript">$('#searchbox').show(0);</script>
+</div><div class="remove-stupid-js-margin">
+ <p>
+   <h3 class="sidebar">Indices</h3>
+   <ul>
+     <li><a href="genindex.html">Index of Functions</a></li>
+     <li><a href="py-modindex.html">Index of Modules</a></li>
+   </ul>
+ </p>
+</div>
+  <div role="note" aria-label="source link">
+    <h3 class="sidebar">This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/tagging.rst.txt" rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="matching.html" title="2.3. Matching/Filtering of IDA types"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="multicase.html" title="2.1. Multicased functions and classes as namespaces"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="concepts.html" >2. Concepts</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

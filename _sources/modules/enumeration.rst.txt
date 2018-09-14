@@ -1,0 +1,352 @@
+.. py:module:: enumeration
+
+enumeration -- Enumeration module
+=================================
+
+This module exposes a number of tools that can be used to interact
+with the enumerations or their members defined within the database.
+The base argument type for interacting with an enumeration is the
+enumeration identifier :py:obj:`idaapi.enum_t`. This is an opaque integer
+that will need to be passed to the different tools in order to
+reference the enumeration that the user is referring to.
+
+There are a number of tools within the :py:obj:`member` namespace that can
+be used to enumerate or locate the members of an enumeration. As
+typically an enumeration is simply a constant, each result that is
+returned will either be a value or a name. The identifier for these
+is a :py:obj:`idaapi.uval_t`.
+
+To list the different enumerations available in the database, one
+can use :py:obj:`enumeration.list(...)` specifying their preferred method
+of filtering. This will list all of the available enumerations at
+which point the user can then request it by passing an identifier
+to :py:obj:`enumeration.by(...)`. The types that can be used to filter are
+as follows:
+
+- :py:obj:`name` - Match according to the enumeration name
+- :py:obj:`like` - Filter the enumeration names according to a glob
+- :py:obj:`regex` - Filter the enumeration names according to a regular-expression
+- :py:obj:`index` - Match the enumeration by its index
+- :py:obj:`identifier` or :py:obj:`id` - Match the enumeration by its identifier
+- :py:obj:`predicate` - Filter the enumerations by passing their identifier to a callable
+
+-------------
+Function list
+-------------
+
+The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+:ref:`multicase-aliases` and :ref:`multicase-functions`.
+
+.. py:function:: by(index)
+   
+   Return the identifier for the enumeration at the specified :py:data:`index`.
+   
+   :param index: the index or id of the enumeration to return
+   :type index: int or long
+   
+.. py:function:: by(name)
+   
+   Return the identifier for the enumeration with the specified :py:data:`name`.
+   
+   :param name: the name of the enumeration to return
+   :type name: str
+   
+.. py:function:: by(\*\*type)
+   
+   Return the identifier for the first enumeration matching the keyword specified by :py:data:`type`.
+   
+   :param \*\*type: any keyword that can be used to filter enumerations with
+   
+.. py:function:: by_index(index)
+   
+   Return the identifier for the enumeration at the specified :py:data:`index`.
+   
+   Aliases: ``enumeration.byIndex``
+   
+   :param index: the index of the enumeration to return
+   
+.. py:function:: by_name(name)
+   
+   Return the identifier for the enumeration with the given :py:data:`name`.
+   
+   Aliases: ``enumeration.byName``
+   
+   :param name: the name of the enumeration to return
+   
+.. py:function:: comment(enum, \*\*repeatable)
+   
+   Return the comment for the enumeration :py:data:`enum`.
+   
+   If the bool :py:data:`repeatable` is specified, then return the repeatable comment.
+   
+   :param enum: the enumeration to return the comment for
+   :param \*\*repeatable: whether the returned comment should be repeatable or not
+   
+.. py:function:: comment(enum, comment, \*\*repeatable)
+   
+   Set the comment for the enumeration :py:data:`enum` to :py:data:`comment`.
+   
+   If the bool :py:data:`repeatable` is specified, then modify the repeatable comment.
+   
+   :param enum: the enumeration to modify the comment for
+   :param comment: the comment to apply
+   :type comment: str
+   :param \*\*repeatable: whether the comment should be repeatable or not
+   
+.. py:function:: count()
+   
+   Return the total number of enumerations in the database.
+   
+.. py:function:: delete(enum)
+   
+   Delete the enumeration :py:data:`enum`.
+   
+   Aliases: ``enumeration.remove``
+   
+   :param enum: the enumeration to remove
+   
+.. py:function:: flags(enum)
+   
+   Return the flags for the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the flags for
+   
+.. py:function:: flags(enum, mask)
+   
+   Return the flags for the enumeration :py:data:`enum` and masked with :py:data:`mask`.
+   
+   :param enum: the enumeration to return the flags for
+   :param mask: the bit mask to apply to the flags
+   :type mask: int or long
+   
+.. py:function:: iterate(\*\*type)
+   
+   Iterate through all of the enumerations in the database that match the keyword specified by :py:data:`type`.
+   
+   :param \*\*type: any keyword that can be used to filter enumerations with
+   
+.. py:function:: list(string)
+   
+   List any enumerations that match the glob in :py:obj:`string`.
+   
+   :param string: the glob to filter the enumeration names with
+   :type string: str
+   
+.. py:function:: list(\*\*type)
+   
+   List all of the enumerations within the database that match the keyword specified by :py:data:`type`.
+   
+   :param \*\*type: any keyword that can be used to filter enumerations with
+   
+.. py:function:: mask(enum)
+   
+   Return the bitmask for the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the bitmask for
+   
+.. py:function:: name(enum)
+   
+   Return the name of the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the name of
+   
+.. py:function:: name(enum, name)
+   
+   Rename the enumeration :py:data:`enum` to :py:data:`name`.
+   
+   :param enum: the enumeration to rename
+   :param name: the name to rename the enumeration to
+   :type name: str
+   
+.. py:function:: names(enum)
+   
+   Return a list of all the names belonging to the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the names for
+   
+.. py:function:: new(name, flags=0)
+   
+   Create an enumeration with the specified :py:data:`name` and :py:data:`flags` using :py:obj:`idaapi.add_enum`.
+   
+   Aliases: ``enumeration.create``
+   
+   :param name: the name of the new enumeration
+   :param flags: any extra flags to pass to :py:obj:`idaapi.add_enum`
+   
+.. py:function:: repr(enum)
+   
+   Return a printable summary of the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to summarize
+   
+.. py:function:: search(string)
+   
+   Return the identifier of the first enumeration that matches the glob :py:data:`string`.
+   
+   :param string: the glob to match the enumeration name with
+   :type string: str
+   
+.. py:function:: search(\*\*type)
+   
+   Return the identifier of the first enumeration that matches the keyword specified by :py:data:`type`.
+   
+   :param \*\*type: any keyword that can be used to match an enumeration with
+   
+.. py:function:: size(enum)
+   
+   Return the number of bits for the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the width of
+   
+.. py:function:: size(enum, width)
+   
+   Set the number of bits for the enumeration :py:data:`enum` to :py:data:`width`.
+   
+   :param enum: the enumeration to set the width for
+   :param width: the number of bits to set the enumeration width to
+   :type width: int or long
+   
+.. py:function:: values(enum)
+   
+   Return a list of all the values belonging to the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the values of
+   
+--------------
+Namespace list
+--------------
+
+These are the namespaces available within this module. Namespaces
+group similar functions that can be used typically for the same
+concept. Please see :ref:`multicase-namespaces` for more
+information on namespaces. For more information on multicase
+functions or aliases, please see :ref:`multicase-functions` or
+:ref:`multicase-aliases`.
+
+*******************
+enumeration.members
+*******************
+
+This namespace allows one to interact with the members belonging
+to an enumeration once the enumeration's id has been determined.
+This allows one to iterate through all of its members or add
+and remove values to the enumeration.
+
+By default this namespace will yield the names of all of the
+members of an enumeration.
+
+Some examples of using this namespace are::
+
+    > eid = enum.by('example_enumeration')
+    > mid = enum.members.add(eid, 'name', 0x1000)
+    > ok = enum.members.remove(eid, mid)
+    > mid = enum.members.by_name(eid, 'name')
+    > mid = enum.members.by_value(eid, 0x1000)
+    > for mid in enum.members.iterate(eid): ...
+    > enum.members.list(e)
+
+.. py:function:: members(enum)
+   
+   Yield the name of each member from the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to yield the names for
+   
+.. py:function:: members\.add(enum, name, value, \*\*bitmask)
+   
+   Add an enumeration member :py:data:`name` with the specified :py:data:`value` to the enumeration :py:data:`enum`.
+   
+   If the int, :py:data:`bitmask`, is specified then used it as the bitmask for the enumeration.
+   
+   Aliases: ``enumeration.member.new``, ``enumeration.member.create``
+   
+   :param enum: the enumeration to add a member to
+   :param name: the name of the enumeration member
+   :param value: the value of the enumeration member
+   :param \*\*bitmask: if :py:data:`bitmask` is specified as an integer, then use it as the bitmask for the enumeration
+   
+.. py:function:: members\.by(enum, n)
+   
+   Return the member belonging to :py:data:`enum` identified by its index or id in :py:data:`n`.
+   
+   :param enum: the enumeration to return a member for
+   :param n: an index or an identifier of the enumeration to return
+   :type n: int or long
+   
+.. py:function:: members\.by(enum, member)
+   
+   Return the member with the given :py:data:`name` belonging to :py:data:`enum`.
+   
+   :param enum: the enumeration to return a member for
+   :param member: the name of the member to return
+   :type member: str
+   
+.. py:function:: members\.by_identifier(enum, mid)
+   
+   Return the member of the enumeration specified by :py:data:`enum` and its :py:data:`mid`.
+   
+   :param enum: the enumeration to return a member for
+   :param mid: the identifier of the enumeration member to return
+   
+.. py:function:: members\.by_index(enum, index)
+   
+   Return the member identifier for the member of the enumeration :py:data:`enum` at the specified :py:data:`index`.
+   
+   :param enum: the enumeration to return a member for
+   :param index: the index of the enumeration member to return
+   
+.. py:function:: members\.by_name(enum, name)
+   
+   Return the member identifier for the member of the enumeration :py:data:`enum` with the specified :py:data:`name`.
+   
+   Aliases: ``enumeration.member.byName``
+   
+   :param enum: the enumeration to return a member for
+   :param name: the name of the enumeration member to return
+   
+.. py:function:: members\.by_value(enum, value)
+   
+   Return the member identifier for the member of the enumeration :py:data:`enum` with the specified :py:data:`value`.
+   
+   Aliases: ``enumeration.member.byValue``
+   
+   :param enum: the enumeration to return a member for
+   :param value: the value of the enumeration member to return
+   
+.. py:function:: members\.iterate(enum)
+   
+   Iterate through all ids of each member associated with the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration containing the members to iterate through
+   
+.. py:function:: members\.list(enum)
+   
+   List all the members belonging to the enumeration identified by :py:data:`enum`.
+   
+   :param enum: the enumeration containing the members to list
+   
+.. py:function:: members\.mapping(enum)
+   
+   Return a dictionary mapping all the values values to their names for the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration containing the names and values to return
+   
+.. py:function:: members\.names(enum)
+   
+   Return a set of all the names belonging to the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the names for
+   
+.. py:function:: members\.remove(enum, member)
+   
+   Remove the specified :py:data:`member` of the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration containing the member to remove
+   :param member: the identifier or index of an enumeration member to remove
+   
+.. py:function:: members\.values(enum)
+   
+   Return a set of all the values belonging to the enumeration :py:data:`enum`.
+   
+   :param enum: the enumeration to return the values of
+   

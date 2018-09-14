@@ -1,0 +1,1164 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>3.2.1. ui – User Interface module &#8212; IDA-minsc  documentation</title>
+    <link rel="stylesheet" href="../_static/pyramid.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/sidebar.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/content.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3.2.2. tools – Tools module" href="misc-tools.html" />
+    <link rel="prev" title="3.1.6. structure – Structure module" href="structure.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="misc-tools.html" title="3.2.2. tools – Tools module"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="structure.html" title="3.1.6. structure – Structure module"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" accesskey="U">3. Modules</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <span class="target" id="module-ui"></span><div class="section" id="ui-user-interface-module">
+<h1>3.2.1. ui – User Interface module<a class="headerlink" href="#ui-user-interface-module" title="Permalink to this headline">¶</a></h1>
+<p>This module exposes a number of tools and class definitions for
+interacting with IDA’s user interface. This includes things such
+as getting the current state of user input, information about
+windows that are in use as well as utilities for simplifying the
+customization of the interface.</p>
+<p>There are a few namespaces that are provided in order to get the
+current state. The <code class="xref py py-obj docutils literal notranslate"><span class="pre">ui.current</span></code> namespace allows for one to get
+the current address, function, segment, window, as well as a number
+of other things.</p>
+<p>A number of namespaces defined within this module also allows a
+user to interact with the different windows that are currently
+in use. This can allow for one to automatically show or hide a
+window that they wish to expose to the user.</p>
+<div class="section" id="function-list">
+<h2>3.2.1.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
+<p>The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+<a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
+<dl class="function">
+<dt id="ui.application">
+<code class="descclassname">ui.</code><code class="descname">application</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.application" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current instance of the IDA Application.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.ask">
+<code class="descclassname">ui.</code><code class="descname">ask</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user a question providing the option to choose “yes”, “no”, or “cancel”.</p>
+<p>If any of the options are specified as a boolean, then it is
+assumed that this option will be the default. If the user
+chooses “cancel”, then this value will be returned instead of
+the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the string to ask the user</li>
+<li><strong>**default</strong> – if <code class="xref py py-data docutils literal notranslate"><span class="pre">yes</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">no</span></code>, or <code class="xref py py-data docutils literal notranslate"><span class="pre">cancel</span></code> is set to true, then use that value as the default</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="namespace-list">
+<h2>3.2.1.2. Namespace list<a class="headerlink" href="#namespace-list" title="Permalink to this headline">¶</a></h2>
+<p>These are the namespaces available within this module. Namespaces
+group similar functions that can be used typically for the same
+concept. Please see <a class="reference internal" href="../multicase.html#multicase-namespaces"><span class="std std-ref">Classes as namespaces</span></a> for more
+information on namespaces. For more information on multicase
+functions or aliases, please see <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a> or
+<a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
+<div class="section" id="ui-appwindow">
+<h3>3.2.1.2.1. ui.appwindow<a class="headerlink" href="#ui-appwindow" title="Permalink to this headline">¶</a></h3>
+<p>Base namespace used for interacting with the windows provided by IDA.</p>
+<dl class="function">
+<dt id="ui.appwindow.close">
+<code class="descclassname">appwindow.</code><code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.appwindow.close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Close or hide the window belonging to the namespace.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.appwindow.open">
+<code class="descclassname">appwindow.</code><code class="descname">open</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.appwindow.open" title="Permalink to this definition">¶</a></dt>
+<dd><p>Open or show the window belonging to the namespace.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*args</strong> – any options or arguments to pass to the windows open function</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-clipboard">
+<h3>3.2.1.2.2. ui.clipboard<a class="headerlink" href="#ui-clipboard" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for interacting with the current clipboard state.</p>
+<dl class="function">
+<dt id="ui.clipboard">
+<code class="descclassname">ui.</code><code class="descname">clipboard</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.clipboard" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current clipboard.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-current">
+<h3>3.2.1.2.3. ui.current<a class="headerlink" href="#ui-current" title="Permalink to this headline">¶</a></h3>
+<p>This namespace contains tools for fetching information about the
+current selection state. This can be used to get the state of
+thigns that are currently selected such as the address, function,
+segment, clipboard, widget, or even the current window in use.</p>
+<dl class="function">
+<dt id="ui.current.address">
+<code class="descclassname">current.</code><code class="descname">address</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.address" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.color">
+<code class="descclassname">current.</code><code class="descname">color</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.color" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the color of the current item.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.function">
+<code class="descclassname">current.</code><code class="descname">function</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.function" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.opnum">
+<code class="descclassname">current.</code><code class="descname">opnum</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.opnum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the currently selected operand number.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.segment">
+<code class="descclassname">current.</code><code class="descname">segment</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.segment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current segment.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.selection">
+<code class="descclassname">current.</code><code class="descname">selection</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.selection" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current address range of whatever is selected</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.status">
+<code class="descclassname">current.</code><code class="descname">status</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.status" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the IDA status.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.symbol">
+<code class="descclassname">current.</code><code class="descname">symbol</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.symbol" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current highlighted symbol name.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.widget">
+<code class="descclassname">current.</code><code class="descname">widget</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.widget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current widget that the mouse is hovering over.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.current.window">
+<code class="descclassname">current.</code><code class="descname">window</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.window" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current window that is being used.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-disassembly">
+<h3>3.2.1.2.4. ui.disassembly<a class="headerlink" href="#ui-disassembly" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Disassembly window.</p>
+<dl class="function">
+<dt id="ui.disassembly.refresh">
+<code class="descclassname">disassembly.</code><code class="descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.disassembly.refresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Refresh the main IDA disassembly view.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-exports">
+<h3>3.2.1.2.5. ui.exports<a class="headerlink" href="#ui-exports" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Exports window.</p>
+</div>
+<div class="section" id="ui-functions">
+<h3>3.2.1.2.6. ui.functions<a class="headerlink" href="#ui-functions" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Functions window.</p>
+</div>
+<div class="section" id="ui-imports">
+<h3>3.2.1.2.7. ui.imports<a class="headerlink" href="#ui-imports" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Imports window.</p>
+</div>
+<div class="section" id="ui-keyboard">
+<h3>3.2.1.2.8. ui.keyboard<a class="headerlink" href="#ui-keyboard" title="Permalink to this headline">¶</a></h3>
+<p>Base namespace for interacting with the keyboard input.</p>
+<dl class="function">
+<dt id="ui.keyboard.input">
+<code class="descclassname">keyboard.</code><code class="descname">input</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.input" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current keyboard input context.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.keyboard.map">
+<code class="descclassname">keyboard.</code><code class="descname">map</code><span class="sig-paren">(</span><em>key</em>, <em>callable</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.map" title="Permalink to this definition">¶</a></dt>
+<dd><p>Map a specific <code class="xref py py-data docutils literal notranslate"><span class="pre">key</span></code> to a python <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>key</strong> – the key to map</li>
+<li><strong>callable</strong> – a python callable to execute when the specified key is pressed</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.keyboard.modifiers">
+<code class="descclassname">keyboard.</code><code class="descname">modifiers</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.modifiers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current keyboard modifiers that are being used.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.keyboard.unmap">
+<code class="descclassname">keyboard.</code><code class="descname">unmap</code><span class="sig-paren">(</span><em>key</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.unmap" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unmap the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">key</span></code> from its callable.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>key</strong> – the key mapping to unmap</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-menu">
+<h3>3.2.1.2.9. ui.menu<a class="headerlink" href="#ui-menu" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for registering items in IDA’s menu system.</p>
+<dl class="function">
+<dt id="ui.menu.add">
+<code class="descclassname">menu.</code><code class="descname">add</code><span class="sig-paren">(</span><em>path</em>, <em>name</em>, <em>callable</em>, <em>hotkey=''</em>, <em>flags=0</em>, <em>args=()</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.menu.add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code> as a menu item at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">path</span></code> with the provided <code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>path</strong> – the menu path to add the item to</li>
+<li><strong>name</strong> – the name of the item to add</li>
+<li><strong>callable</strong> – the callable to execute when the item is clicked</li>
+<li><strong>hotkey</strong> – the key mapping to map the menu item to</li>
+<li><strong>flags</strong> – any extra flags to pass to <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.add_menu_item</span></code></li>
+<li><strong>args</strong> – any parameters to pass to the callable</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.menu.reset">
+<code class="descclassname">menu.</code><code class="descname">reset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.menu.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove all currently registered menu items.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.menu.rm">
+<code class="descclassname">menu.</code><code class="descname">rm</code><span class="sig-paren">(</span><em>path</em>, <em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.menu.rm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the menu item at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">path</span></code> with the provided <code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>path</strong> – the menu path containing the item to remove</li>
+<li><strong>name</strong> – the name of the item to remove</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-mouse">
+<h3>3.2.1.2.10. ui.mouse<a class="headerlink" href="#ui-mouse" title="Permalink to this headline">¶</a></h3>
+<p>Base namespace for interacting with the mouse input.</p>
+<dl class="function">
+<dt id="ui.mouse.buttons">
+<code class="descclassname">mouse.</code><code class="descname">buttons</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.mouse.buttons" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current mouse buttons that are being clicked.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.mouse.position">
+<code class="descclassname">mouse.</code><code class="descname">position</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.mouse.position" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current <code class="xref py py-obj docutils literal notranslate"><span class="pre">(x,</span> <span class="pre">y)</span></code> position of the cursor.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-names">
+<h3>3.2.1.2.11. ui.names<a class="headerlink" href="#ui-names" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Names window.</p>
+<dl class="function">
+<dt id="ui.names.at">
+<code class="descclassname">names.</code><code class="descname">at</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.at" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the address and the symbol name of the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index in the list to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.names.contains">
+<code class="descclassname">names.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.contains" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the address <a class="reference internal" href="#ui.names.ea" title="ui.names.ea"><code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code></a> is referenced in the names list.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the symbol to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.names.ea">
+<code class="descclassname">names.</code><code class="descname">ea</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.ea" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the address at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index in the list to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.names.iterate">
+<code class="descclassname">names.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the address and symbols in the names list.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.names.name">
+<code class="descclassname">names.</code><code class="descname">name</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the name at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index in the list to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.names.refresh">
+<code class="descclassname">names.</code><code class="descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.refresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Refresh the names list.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.names.search">
+<code class="descclassname">names.</code><code class="descname">search</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.search" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the index of the address <a class="reference internal" href="#ui.names.ea" title="ui.names.ea"><code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code></a> in the names list.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the symbol to return the index for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.names.size">
+<code class="descclassname">names.</code><code class="descname">size</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.names.size" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the number of elements in the names list.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-navigation">
+<h3>3.2.1.2.12. ui.navigation<a class="headerlink" href="#ui-navigation" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for updating the state of the colored navigation band.</p>
+<dl class="function">
+<dt id="ui.navigation.analyze">
+<code class="descclassname">navigation.</code><code class="descname">analyze</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.analyze" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis analyze address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.auto">
+<code class="descclassname">navigation.</code><code class="descname">auto</code><span class="sig-paren">(</span><em>ea</em>, <em>**type</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.auto" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the auto-analysis address and type on the navigation bar to <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>If <a class="reference internal" href="#ui.navigation.type" title="ui.navigation.type"><code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code></a> is specified, then update using the specified auto-analysis type.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address to set the auto-analysis address to on the navigation bar</li>
+<li><strong>**type</strong> – if <a class="reference internal" href="#ui.navigation.type" title="ui.navigation.type"><code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code></a> is specified as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.AU_*</span></code>, then use this as the navigation type</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.code">
+<code class="descclassname">navigation.</code><code class="descname">code</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.code" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis code address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.final">
+<code class="descclassname">navigation.</code><code class="descname">final</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.final" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis final address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.procedure">
+<code class="descclassname">navigation.</code><code class="descname">procedure</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.procedure" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis procedure address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.set">
+<code class="descclassname">navigation.</code><code class="descname">set</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.set" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the auto-analysis address on the navigation bar to <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the navigation bar pointer to</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.signature">
+<code class="descclassname">navigation.</code><code class="descname">signature</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.signature" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis signature address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.stackpointer">
+<code class="descclassname">navigation.</code><code class="descname">stackpointer</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.stackpointer" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis stackpointer address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.tail">
+<code class="descclassname">navigation.</code><code class="descname">tail</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.tail" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis tail address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.type">
+<code class="descclassname">navigation.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.type" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis type address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.unknown">
+<code class="descclassname">navigation.</code><code class="descname">unknown</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.unknown" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis unknown address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.navigation.weak">
+<code class="descclassname">navigation.</code><code class="descname">weak</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.navigation.weak" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address to set the auto-analysis weak address to on the navigation bar</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-notepad">
+<h3>3.2.1.2.13. ui.notepad<a class="headerlink" href="#ui-notepad" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Notepad window.</p>
+</div>
+<div class="section" id="ui-queue">
+<h3>3.2.1.2.14. ui.queue<a class="headerlink" href="#ui-queue" title="Permalink to this headline">¶</a></h3>
+<p>This namespace exposes the ability to queue execution of python
+callables asynchronously so that they run at the same time as
+IDA and signal when they have completed and a result is available.</p>
+<p>XXX: This is probably pretty unsafe in IDA, but let’s hope.</p>
+<dl class="function">
+<dt id="ui.queue.add">
+<code class="descclassname">queue.</code><code class="descname">add</code><span class="sig-paren">(</span><em>callable</em>, <em>*args</em>, <em>**kwds</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.queue.add" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code> to the execution queue passing to it any extra arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>callable</strong> – the python callable to execute</li>
+<li><strong>*args</strong> – any positional arguments to pass to the callable</li>
+<li><strong>**kwds</strong> – any keyword arguments to pass to the callable</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.queue.pop">
+<code class="descclassname">queue.</code><code class="descname">pop</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.queue.pop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Block until the next available result has been returned.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-segments">
+<h3>3.2.1.2.15. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Segments window.</p>
+</div>
+<div class="section" id="ui-state">
+<h3>3.2.1.2.16. ui.state<a class="headerlink" href="#ui-state" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for fetching or interacting with the current
+state of IDA’s interface. These are things such as waiting for
+IDA’s analysis queue, or determining whether the function is
+being viewed in graph view or not.</p>
+<dl class="function">
+<dt id="ui.state.beep">
+<code class="descclassname">state.</code><code class="descname">beep</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.beep" title="Permalink to this definition">¶</a></dt>
+<dd><p>Beep using IDA’s interface.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.state.graphview">
+<code class="descclassname">state.</code><code class="descname">graphview</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.graphview" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current function is being viewed in graph view mode.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.state.refresh">
+<code class="descclassname">state.</code><code class="descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.refresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Refresh all of IDA’s windows.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.state.wait">
+<code class="descclassname">state.</code><code class="descname">wait</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.wait" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wait until IDA’s autoanalysis queues are empty.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-strings">
+<h3>3.2.1.2.17. ui.strings<a class="headerlink" href="#ui-strings" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Strings window.</p>
+<dl class="function">
+<dt id="ui.strings.at">
+<code class="descclassname">strings.</code><code class="descname">at</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.at" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the string at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the string item to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.strings.get">
+<code class="descclassname">strings.</code><code class="descname">get</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.get" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the address and the string at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the string to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.strings.iterate">
+<code class="descclassname">strings.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the address and strings in the strings list.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.strings.refresh">
+<code class="descclassname">strings.</code><code class="descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.refresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Refresh the strings list.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.strings.size">
+<code class="descclassname">strings.</code><code class="descname">size</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.strings.size" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the number of elements in the strings list.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-structures">
+<h3>3.2.1.2.18. ui.structures<a class="headerlink" href="#ui-structures" title="Permalink to this headline">¶</a></h3>
+<p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ui.appwindow</span></code></p>
+<p>This namespace is for interacting with the Structures window.</p>
+</div>
+<div class="section" id="ui-timer">
+<h3>3.2.1.2.19. ui.timer<a class="headerlink" href="#ui-timer" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for registering a python callable to a timer in IDA.</p>
+<dl class="function">
+<dt id="ui.timer.register">
+<code class="descclassname">timer.</code><code class="descname">register</code><span class="sig-paren">(</span><em>id</em>, <em>interval</em>, <em>callable</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.timer.register" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code> with the requested <code class="xref py py-data docutils literal notranslate"><span class="pre">id</span></code> to be called at every <code class="xref py py-data docutils literal notranslate"><span class="pre">interval</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>id</strong> – a unique id used to refer to the callable being registered in the timer</li>
+<li><strong>interval</strong> – what interval to execute the callable at</li>
+<li><strong>callable</strong> – a python callable to execute when the timer ticks</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.timer.reset">
+<code class="descclassname">timer.</code><code class="descname">reset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.timer.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove all the registered timers.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.timer.unregister">
+<code class="descclassname">timer.</code><code class="descname">unregister</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.timer.unregister" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unregister the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">id</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> – the unique id of the callable to unregister</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-widget">
+<h3>3.2.1.2.20. ui.widget<a class="headerlink" href="#ui-widget" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for selecting a specific or particular widget.</p>
+<dl class="function">
+<dt id="ui.widget">
+<code class="descclassname">ui.</code><code class="descname">widget</code><span class="sig-paren">(</span><em>(x</em>, <em>y)</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the widget at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">x</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">y</span></code> coordinate.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>x</strong> – the X coordinate of the widget</li>
+<li><strong>y</strong> – the Y coordinate of the widget</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.at">
+<code class="descclassname">widget.</code><code class="descname">at</code><span class="sig-paren">(</span><em>(x</em>, <em>y)</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.at" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the widget at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">x</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">y</span></code> coordinate.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>x</strong> – the X coordinate of the widget</li>
+<li><strong>y</strong> – the Y coordinate of the widget</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.widget.form">
+<code class="descclassname">widget.</code><code class="descname">form</code><span class="sig-paren">(</span><em>twidget</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.widget.form" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return an IDA plugin form as a UI widget.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>twidget</strong> – the IDA plugin form to convert to a Qt widget</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-window">
+<h3>3.2.1.2.21. ui.window<a class="headerlink" href="#ui-window" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for selecting a specific or particular window.</p>
+<dl class="function">
+<dt id="ui.window.main">
+<code class="descclassname">window.</code><code class="descname">main</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.window.main" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the active main window.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.window.viewer">
+<code class="descclassname">window.</code><code class="descname">viewer</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.window.viewer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current viewer.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="ui-windows">
+<h3>3.2.1.2.22. ui.windows<a class="headerlink" href="#ui-windows" title="Permalink to this headline">¶</a></h3>
+<p>Interact with any or all of the top-level windows for the application.</p>
+<dl class="function">
+<dt id="ui.windows">
+<code class="descclassname">ui.</code><code class="descname">windows</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.windows" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return all of the top-level windows.</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="class-list">
+<h2>3.2.1.3. Class list<a class="headerlink" href="#class-list" title="Permalink to this headline">¶</a></h2>
+<p>Classes provide the definition necessary to instantiate an object.
+In most cases, a class is returned when calling one of the prior
+listed functions and thus have no need to be manually instantiated.
+Classes may also have aliases defined for them. Please refer to the
+documentation for the class to see what is available. For more
+information on aliases, please see <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
+<div class="section" id="consoleprogress">
+<h3>3.2.1.3.1. ConsoleProgress<a class="headerlink" href="#consoleprogress" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="ui.ConsoleProgress">
+<em class="property">class </em><code class="descclassname">ui.</code><code class="descname">ConsoleProgress</code><a class="headerlink" href="#ui.ConsoleProgress" title="Permalink to this definition">¶</a></dt>
+<dd><p>Helper class used to simplify the showing of a progress bar in IDA’s console.</p>
+<dl class="method">
+<dt id="ui.ConsoleProgress.close">
+<code class="descname">close</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ConsoleProgress.close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Close the current progress bar.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ui.ConsoleProgress.open">
+<code class="descname">open</code><span class="sig-paren">(</span><em>self</em>, <em>width=0.8</em>, <em>height=0.1</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ConsoleProgress.open" title="Permalink to this definition">¶</a></dt>
+<dd><p>Open a progress bar with the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">width</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">height</span></code> relative to the dimensions of IDA’s window.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>width</strong> – the percentage of IDA’s dimensions to set the width to</li>
+<li><strong>height</strong> – the percentange of IDA’s dimensions to set the height to</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="ui.ConsoleProgress.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>self</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ConsoleProgress.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update the current state of the progress bar.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**options</strong> – <p>The options to update the progress bar with. Some of these options are:</p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">minimum</span></code> - the minimum value on the progress bar
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum</span></code> - the maximum value on the progress bar
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">text</span></code> - the current text to display
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">title</span></code> - the title of the progress bar
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">tooltip</span></code> - what to emit when the user hovers over the progress ar</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="inputbox">
+<h3>3.2.1.3.2. InputBox<a class="headerlink" href="#inputbox" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="ui.InputBox">
+<em class="property">class </em><code class="descclassname">ui.</code><code class="descname">InputBox</code><a class="headerlink" href="#ui.InputBox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">idaapi.PluginForm</span></code></p>
+<p>A class designed to be inherited from that can be used
+to interact with the user.</p>
+<dl class="method">
+<dt id="ui.InputBox.OnClose">
+<code class="descname">OnClose</code><span class="sig-paren">(</span><em>self</em>, <em>form</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.InputBox.OnClose" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>form</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="ui.InputBox.OnCreate">
+<code class="descname">OnCreate</code><span class="sig-paren">(</span><em>self</em>, <em>form</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.InputBox.OnCreate" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>form</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="ui.InputBox.Show">
+<code class="descname">Show</code><span class="sig-paren">(</span><em>self</em>, <em>caption</em>, <em>options=0</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.InputBox.Show" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>caption</strong> – the title of the form to show</li>
+<li><strong>options</strong> – any flags to show the form with</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="progress">
+<h3>3.2.1.3.3. Progress<a class="headerlink" href="#progress" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="ui.Progress">
+<em class="property">class </em><code class="descclassname">ui.</code><code class="descname">Progress</code><a class="headerlink" href="#ui.Progress" title="Permalink to this definition">¶</a></dt>
+<dd><p>The default progress bar in with which to show progress.</p>
+<p>This is one of <a class="reference internal" href="#ui.ConsoleProgress" title="ui.ConsoleProgress"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ConsoleProgress</span></code></a> or <a class="reference internal" href="#ui.UIProgress" title="ui.UIProgress"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UIProgress</span></code></a> based on whether or not
+the console or graphical user interface was detected.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="uiprogress">
+<h3>3.2.1.3.4. UIProgress<a class="headerlink" href="#uiprogress" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="ui.UIProgress">
+<em class="property">class </em><code class="descclassname">ui.</code><code class="descname">UIProgress</code><a class="headerlink" href="#ui.UIProgress" title="Permalink to this definition">¶</a></dt>
+<dd><p>Helper class used to simplify the showing of a progress bar in IDA’s UI.</p>
+<dl class="method">
+<dt id="ui.UIProgress.close">
+<code class="descname">close</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.UIProgress.close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Close the current progress bar.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ui.UIProgress.open">
+<code class="descname">open</code><span class="sig-paren">(</span><em>self</em>, <em>width=0.8</em>, <em>height=0.1</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.UIProgress.open" title="Permalink to this definition">¶</a></dt>
+<dd><p>Open a progress bar with the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">width</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">height</span></code> relative to the dimensions of IDA’s window.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>width</strong> – the percentage of IDA’s dimensions to set the width to</li>
+<li><strong>height</strong> – the percentange of IDA’s dimensions to set the height to</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="ui.UIProgress.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>self</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.UIProgress.update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update the current state of the progress bar.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**options</strong> – <p>The options to update the progress bar with. Some of these options are:</p>
+<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">minimum</span></code> - the minimum value on the progress bar
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum</span></code> - the maximum value on the progress bar
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">text</span></code> - the current text to display
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">title</span></code> - the title of the progress bar
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">tooltip</span></code> - what to emit when the user hovers over the progress ar</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div>
+  <h3 class="sidebar">IDA-minsc</h3>
+  <p class="sidebar logo">
+    <a href="../index.html">
+      <img class="logo" src="../_images/hamster.svg" alt="Logo"/>
+    </a>
+  </p>
+</div>
+  <h3 class="sidebar">Navigation</h3>
+  <p class="topless">
+    Next topic:
+    <a href="misc-tools.html" title="next chapter">3.2.2. tools – Tools module</a>
+    <br />
+    Previous topic:
+    <a href="structure.html" title="previous chapter">3.1.6. structure – Structure module</a>
+    <br />
+  </p>
+  <h3 class="sidebar"><a href="../index.html">Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3.2.1. ui – User Interface module</a><ul>
+<li><a class="reference internal" href="#function-list">3.2.1.1. Function list</a></li>
+<li><a class="reference internal" href="#namespace-list">3.2.1.2. Namespace list</a><ul>
+<li><a class="reference internal" href="#ui-appwindow">3.2.1.2.1. ui.appwindow</a></li>
+<li><a class="reference internal" href="#ui-clipboard">3.2.1.2.2. ui.clipboard</a></li>
+<li><a class="reference internal" href="#ui-current">3.2.1.2.3. ui.current</a></li>
+<li><a class="reference internal" href="#ui-disassembly">3.2.1.2.4. ui.disassembly</a></li>
+<li><a class="reference internal" href="#ui-exports">3.2.1.2.5. ui.exports</a></li>
+<li><a class="reference internal" href="#ui-functions">3.2.1.2.6. ui.functions</a></li>
+<li><a class="reference internal" href="#ui-imports">3.2.1.2.7. ui.imports</a></li>
+<li><a class="reference internal" href="#ui-keyboard">3.2.1.2.8. ui.keyboard</a></li>
+<li><a class="reference internal" href="#ui-menu">3.2.1.2.9. ui.menu</a></li>
+<li><a class="reference internal" href="#ui-mouse">3.2.1.2.10. ui.mouse</a></li>
+<li><a class="reference internal" href="#ui-names">3.2.1.2.11. ui.names</a></li>
+<li><a class="reference internal" href="#ui-navigation">3.2.1.2.12. ui.navigation</a></li>
+<li><a class="reference internal" href="#ui-notepad">3.2.1.2.13. ui.notepad</a></li>
+<li><a class="reference internal" href="#ui-queue">3.2.1.2.14. ui.queue</a></li>
+<li><a class="reference internal" href="#ui-segments">3.2.1.2.15. ui.segments</a></li>
+<li><a class="reference internal" href="#ui-state">3.2.1.2.16. ui.state</a></li>
+<li><a class="reference internal" href="#ui-strings">3.2.1.2.17. ui.strings</a></li>
+<li><a class="reference internal" href="#ui-structures">3.2.1.2.18. ui.structures</a></li>
+<li><a class="reference internal" href="#ui-timer">3.2.1.2.19. ui.timer</a></li>
+<li><a class="reference internal" href="#ui-widget">3.2.1.2.20. ui.widget</a></li>
+<li><a class="reference internal" href="#ui-window">3.2.1.2.21. ui.window</a></li>
+<li><a class="reference internal" href="#ui-windows">3.2.1.2.22. ui.windows</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#class-list">3.2.1.3. Class list</a><ul>
+<li><a class="reference internal" href="#consoleprogress">3.2.1.3.1. ConsoleProgress</a></li>
+<li><a class="reference internal" href="#inputbox">3.2.1.3.2. InputBox</a></li>
+<li><a class="reference internal" href="#progress">3.2.1.3.3. Progress</a></li>
+<li><a class="reference internal" href="#uiprogress">3.2.1.3.4. UIProgress</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<h3 class="sidebar">Search</h3>
+<div class="searchformwrapper">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" />
+    <input type="submit" value="Go" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+<div id="searchbox" role="search">
+  <script type="text/javascript">$('#searchbox').show(0);</script>
+</div><div class="remove-stupid-js-margin">
+ <p>
+   <h3 class="sidebar">Indices</h3>
+   <ul>
+     <li><a href="../genindex.html">Index of Functions</a></li>
+     <li><a href="../py-modindex.html">Index of Modules</a></li>
+   </ul>
+ </p>
+</div>
+  <div role="note" aria-label="source link">
+    <h3 class="sidebar">This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/modules/misc-ui.rst.txt" rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="misc-tools.html" title="3.2.2. tools – Tools module"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="structure.html" title="3.1.6. structure – Structure module"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" >3. Modules</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

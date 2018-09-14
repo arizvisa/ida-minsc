@@ -1,0 +1,114 @@
+.. py:module:: tagfix
+
+tagfix -- Tagfix module
+=======================
+
+This module is provided to a user to allow one to rebuild the
+cache that is built when a database is finished processing. If
+the cache is corrupted through some means, this module can be
+used to rebuild the tag-cache by manually scanning the currently
+defined tags and resetting its references in order to allow one
+to query again.
+
+To manually rebuild the cache for the database, use the following::
+
+    > custom.tagfix.everything()
+
+Likewise to rebuild the cache for just the globals or the contents::
+
+    > custom.tagfix.globals()
+    > custom.tagfix.contents()
+
+-------------
+Function list
+-------------
+
+The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+:ref:`multicase-aliases` and :ref:`multicase-functions`.
+
+.. py:function:: all()
+   
+   Re-build the cache for all the globals and contents in the database.
+   
+.. py:function:: check_contents(ea)
+   
+   Validate the cache defined for the contents of the function :py:data:`ea`.
+   
+   :param ea: the address of the function to verify the contents tags for
+   
+.. py:function:: check_global(ea)
+   
+   Validate the cache defined for the global at the address :py:data:`ea`.
+   
+   :param ea: the address of the global to verify the tags for
+   
+.. py:function:: contents(ea)
+   
+   Re-build the cache for the contents of the function :py:data:`ea`.
+   
+   :param ea: the address of the function to build the cache for
+   
+.. py:function:: customnames()
+   
+   Iterate through all of the custom names defined in the database and update the cache with their reference counts.
+   
+.. py:function:: erase()
+   
+   Erase the current cache from the database.
+   
+.. py:function:: erase_contents()
+   
+   Erase the contents cache defined for each function in the database.
+   
+.. py:function:: erase_globals()
+   
+   Erase the cache defined for all of the global tags in the database.
+   
+.. py:function:: everything()
+   
+   Re-create the cache for all the tags found in the database.
+   
+.. py:function:: extracomments()
+   
+   Iterate through all of the extra comments defined in the database and update the cache with their reference counts.
+   
+.. py:function:: fetch_contents(fn)
+   
+   Fetch the reference count for the contents of function :py:data:`fn` in the database.
+   
+   Returns the tuple :py:obj:`(func, address, tags)` where the :py:obj:`address` and :py:obj:`tags`
+   fields are both dictionaries containing the reference count for
+   the addresses and tag names. The field :py:obj:`func` contains the address of the
+   function.
+   
+   :param fn: the function to fetch the contents tags from
+   
+.. py:function:: fetch_globals()
+   
+   Fetch the reference count of all of the global tags for both functions and non-functions.
+   
+   Returns the tuple :py:obj:`(address, tags)` where the :py:obj:`address` and :py:obj:`tags`
+   fields are both dictionaries containing the reference count for
+   the addresses and tag names.
+   
+.. py:function:: fetch_globals_data()
+   
+   Fetch the reference count for the global tags (non-function) in the database.
+   
+   Returns the tuple :py:obj:`(address, tags)` where the :py:obj:`address` and :py:obj:`tags`
+   fields are both dictionaries containing the reference count for
+   the addresses and tag names.
+   
+.. py:function:: fetch_globals_functions()
+   
+   Fetch the reference count for the global tags (function) in the database.
+   
+   Returns the tuple :py:obj:`(address, tags)` where the :py:obj:`address` and :py:obj:`tags`
+   fields are both dictionaries containing the reference count for
+   the addresses and tag names.
+   
+.. py:function:: globals()
+   
+   Re-build the cache for all of the globals in the database.
+   

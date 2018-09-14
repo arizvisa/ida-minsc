@@ -1,0 +1,289 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>3.3.2. tagfix – Tagfix module &#8212; IDA-minsc  documentation</title>
+    <link rel="stylesheet" href="../_static/pyramid.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/sidebar.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/content.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="3.3.1. tags – Tags module" href="custom-tags.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="custom-tags.html" title="3.3.1. tags – Tags module"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" accesskey="U">3. Modules</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <span class="target" id="module-tagfix"></span><div class="section" id="tagfix-tagfix-module">
+<h1>3.3.2. tagfix – Tagfix module<a class="headerlink" href="#tagfix-tagfix-module" title="Permalink to this headline">¶</a></h1>
+<p>This module is provided to a user to allow one to rebuild the
+cache that is built when a database is finished processing. If
+the cache is corrupted through some means, this module can be
+used to rebuild the tag-cache by manually scanning the currently
+defined tags and resetting its references in order to allow one
+to query again.</p>
+<p>To manually rebuild the cache for the database, use the following:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tagfix</span><span class="o">.</span><span class="n">everything</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Likewise to rebuild the cache for just the globals or the contents:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tagfix</span><span class="o">.</span><span class="n">globals</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tagfix</span><span class="o">.</span><span class="n">contents</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="section" id="function-list">
+<h2>3.3.2.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
+<p>The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+<a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
+<dl class="function">
+<dt id="tagfix.all">
+<code class="descclassname">tagfix.</code><code class="descname">all</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Re-build the cache for all the globals and contents in the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.check_contents">
+<code class="descclassname">tagfix.</code><code class="descname">check_contents</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.check_contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Validate the cache defined for the contents of the function <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the function to verify the contents tags for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.check_global">
+<code class="descclassname">tagfix.</code><code class="descname">check_global</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.check_global" title="Permalink to this definition">¶</a></dt>
+<dd><p>Validate the cache defined for the global at the address <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the global to verify the tags for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.contents">
+<code class="descclassname">tagfix.</code><code class="descname">contents</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Re-build the cache for the contents of the function <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – the address of the function to build the cache for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.customnames">
+<code class="descclassname">tagfix.</code><code class="descname">customnames</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.customnames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the custom names defined in the database and update the cache with their reference counts.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.erase">
+<code class="descclassname">tagfix.</code><code class="descname">erase</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.erase" title="Permalink to this definition">¶</a></dt>
+<dd><p>Erase the current cache from the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.erase_contents">
+<code class="descclassname">tagfix.</code><code class="descname">erase_contents</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.erase_contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Erase the contents cache defined for each function in the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.erase_globals">
+<code class="descclassname">tagfix.</code><code class="descname">erase_globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.erase_globals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Erase the cache defined for all of the global tags in the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.everything">
+<code class="descclassname">tagfix.</code><code class="descname">everything</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.everything" title="Permalink to this definition">¶</a></dt>
+<dd><p>Re-create the cache for all the tags found in the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.extracomments">
+<code class="descclassname">tagfix.</code><code class="descname">extracomments</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.extracomments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the extra comments defined in the database and update the cache with their reference counts.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.fetch_contents">
+<code class="descclassname">tagfix.</code><code class="descname">fetch_contents</code><span class="sig-paren">(</span><em>fn</em><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_contents" title="Permalink to this definition">¶</a></dt>
+<dd><p>Fetch the reference count for the contents of function <code class="xref py py-data docutils literal notranslate"><span class="pre">fn</span></code> in the database.</p>
+<p>Returns the tuple <code class="xref py py-obj docutils literal notranslate"><span class="pre">(func,</span> <span class="pre">address,</span> <span class="pre">tags)</span></code> where the <code class="xref py py-obj docutils literal notranslate"><span class="pre">address</span></code> and <a class="reference internal" href="custom-tags.html#module-tags" title="tags"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tags</span></code></a>
+fields are both dictionaries containing the reference count for
+the addresses and tag names. The field <code class="xref py py-obj docutils literal notranslate"><span class="pre">func</span></code> contains the address of the
+function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>fn</strong> – the function to fetch the contents tags from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.fetch_globals">
+<code class="descclassname">tagfix.</code><code class="descname">fetch_globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_globals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Fetch the reference count of all of the global tags for both functions and non-functions.</p>
+<p>Returns the tuple <code class="xref py py-obj docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="xref py py-obj docutils literal notranslate"><span class="pre">address</span></code> and <a class="reference internal" href="custom-tags.html#module-tags" title="tags"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tags</span></code></a>
+fields are both dictionaries containing the reference count for
+the addresses and tag names.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.fetch_globals_data">
+<code class="descclassname">tagfix.</code><code class="descname">fetch_globals_data</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_globals_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Fetch the reference count for the global tags (non-function) in the database.</p>
+<p>Returns the tuple <code class="xref py py-obj docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="xref py py-obj docutils literal notranslate"><span class="pre">address</span></code> and <a class="reference internal" href="custom-tags.html#module-tags" title="tags"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tags</span></code></a>
+fields are both dictionaries containing the reference count for
+the addresses and tag names.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.fetch_globals_functions">
+<code class="descclassname">tagfix.</code><code class="descname">fetch_globals_functions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.fetch_globals_functions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Fetch the reference count for the global tags (function) in the database.</p>
+<p>Returns the tuple <code class="xref py py-obj docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">tags)</span></code> where the <code class="xref py py-obj docutils literal notranslate"><span class="pre">address</span></code> and <a class="reference internal" href="custom-tags.html#module-tags" title="tags"><code class="xref py py-obj docutils literal notranslate"><span class="pre">tags</span></code></a>
+fields are both dictionaries containing the reference count for
+the addresses and tag names.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="tagfix.globals">
+<code class="descclassname">tagfix.</code><code class="descname">globals</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#tagfix.globals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Re-build the cache for all of the globals in the database.</p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div>
+  <h3 class="sidebar">IDA-minsc</h3>
+  <p class="sidebar logo">
+    <a href="../index.html">
+      <img class="logo" src="../_images/hamster.svg" alt="Logo"/>
+    </a>
+  </p>
+</div>
+  <h3 class="sidebar">Navigation</h3>
+  <p class="topless">
+    Previous topic:
+    <a href="custom-tags.html" title="previous chapter">3.3.1. tags – Tags module</a>
+    <br />
+  </p>
+  <h3 class="sidebar"><a href="../index.html">Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3.3.2. tagfix – Tagfix module</a><ul>
+<li><a class="reference internal" href="#function-list">3.3.2.1. Function list</a></li>
+</ul>
+</li>
+</ul>
+
+<h3 class="sidebar">Search</h3>
+<div class="searchformwrapper">
+  <form class="search" action="../search.html" method="get">
+    <input type="text" name="q" />
+    <input type="submit" value="Go" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+<div id="searchbox" role="search">
+  <script type="text/javascript">$('#searchbox').show(0);</script>
+</div><div class="remove-stupid-js-margin">
+ <p>
+   <h3 class="sidebar">Indices</h3>
+   <ul>
+     <li><a href="../genindex.html">Index of Functions</a></li>
+     <li><a href="../py-modindex.html">Index of Modules</a></li>
+   </ul>
+ </p>
+</div>
+  <div role="note" aria-label="source link">
+    <h3 class="sidebar">This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/modules/custom-tagfix.rst.txt" rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="custom-tags.html" title="3.3.1. tags – Tags module"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">IDA-minsc  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../modules.html" >3. Modules</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

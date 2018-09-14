@@ -1,0 +1,188 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>3. Modules &#8212; IDA-minsc  documentation</title>
+    <link rel="stylesheet" href="_static/pyramid.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sidebar.css" type="text/css" />
+    <link rel="stylesheet" href="_static/content.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="3.1.1. database – Database module" href="modules/database.html" />
+    <link rel="prev" title="2.5. Types in IDA" href="pythontyping.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules/database.html" title="3.1.1. database – Database module"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="pythontyping.html" title="2.5. Types in IDA"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="modules">
+<h1>3. Modules<a class="headerlink" href="#modules" title="Permalink to this headline">¶</a></h1>
+<p>Each of the modules exposed by this project are suggested by the author
+to be thought of as a namespace that contains functions related to the
+module that they’re a part of. There are a number of modules which are
+exposed by default whereas others such as <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom</span></code> are available
+via the “custom” namespace.</p>
+<div class="section" id="available-modules">
+<h2>3.1. Available modules<a class="headerlink" href="#available-modules" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound" id="moduletoc">
+<p class="caption"><span class="caption-text">These modules compose the majority of this project and provide
+various tools that allow one to interact with the IDA database.
+These are each named according to the context they interact with.</span><a class="headerlink" href="#moduletoc" title="Permalink to this toctree">¶</a></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/database.html">3.1.1. database – Database module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/enumeration.html">3.1.2. enumeration – Enumeration module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/function.html">3.1.3. function – Function module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/instruction.html">3.1.4. instruction – Instruction module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/segment.html">3.1.5. segment – Segment module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/structure.html">3.1.6. structure – Structure module</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="miscellaneous-modules">
+<h2>3.2. Miscellaneous modules<a class="headerlink" href="#miscellaneous-modules" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound" id="misctoc">
+<p class="caption"><span class="caption-text">These miscellaneous modules expose things that a user might
+care to interact with. Eventually some of these modules
+will be migrated into the base modules.</span><a class="headerlink" href="#misctoc" title="Permalink to this toctree">¶</a></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/misc-ui.html">3.2.1. ui – User Interface module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/misc-tools.html">3.2.2. tools – Tools module</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="custom-modules">
+<h2>3.3. Custom modules<a class="headerlink" href="#custom-modules" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound" id="customtoc">
+<p class="caption"><span class="caption-text">These custom modules are accessed via the `custom` namespace and
+allow one to interact with some of the things that are provided
+by this project.</span><a class="headerlink" href="#customtoc" title="Permalink to this toctree">¶</a></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/custom-tags.html">3.3.1. tags – Tags module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/custom-tagfix.html">3.3.2. tagfix – Tagfix module</a></li>
+</ul>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div>
+  <h3 class="sidebar">IDA-minsc</h3>
+  <p class="sidebar logo">
+    <a href="index.html">
+      <img class="logo" src="_images/hamster.svg" alt="Logo"/>
+    </a>
+  </p>
+</div>
+  <h3 class="sidebar">Navigation</h3>
+  <p class="topless">
+    Next topic:
+    <a href="modules/database.html" title="next chapter">3.1.1. database – Database module</a>
+    <br />
+    Previous topic:
+    <a href="pythontyping.html" title="previous chapter">2.5. Types in IDA</a>
+    <br />
+  </p>
+  <h3 class="sidebar"><a href="index.html">Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">3. Modules</a><ul>
+<li><a class="reference internal" href="#available-modules">3.1. Available modules</a></li>
+<li><a class="reference internal" href="#miscellaneous-modules">3.2. Miscellaneous modules</a></li>
+<li><a class="reference internal" href="#custom-modules">3.3. Custom modules</a></li>
+</ul>
+</li>
+</ul>
+
+<h3 class="sidebar">Search</h3>
+<div class="searchformwrapper">
+  <form class="search" action="search.html" method="get">
+    <input type="text" name="q" />
+    <input type="submit" value="Go" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+<div id="searchbox" role="search">
+  <script type="text/javascript">$('#searchbox').show(0);</script>
+</div><div class="remove-stupid-js-margin">
+ <p>
+   <h3 class="sidebar">Indices</h3>
+   <ul>
+     <li><a href="genindex.html">Index of Functions</a></li>
+     <li><a href="py-modindex.html">Index of Modules</a></li>
+   </ul>
+ </p>
+</div>
+  <div role="note" aria-label="source link">
+    <h3 class="sidebar">This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/modules.rst.txt" rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules/database.html" title="3.1.1. database – Database module"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="pythontyping.html" title="2.5. Types in IDA"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

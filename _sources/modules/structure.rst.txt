@@ -1,0 +1,763 @@
+.. py:module:: structure
+
+structure -- Structure module
+=============================
+
+This module exposes a number of tools and defines some classes that
+can be used to interacting with the structures defined in the database.
+The classes defined by this module wrap IDA's structure API and expose
+a simpler interface that can be used to perform various operations
+against a structure such as renaming or enumerating the structure's
+members.
+
+The base argument type for getting a :py:obj:`structure_t` can be either a name,
+an identifier, or an index. Typically one will call :py:obj:`structure.by(...)`
+with either identifier type which will then return an instance of their
+:py:obj:`structure_t`.
+
+To list the different structures available in the database, one can use
+:py:obj:`structure.list(...)` with their chosen method of filtering. This will
+list all of the available structures at which point the user can then
+request it by passing an identifer to :py:obj:`structure.by(...)`. The
+chosen methods of filtering are:
+
+- :py:obj:`name` - Match the structures to a structure name
+- :py:obj:`like` - Filter the structure names according to a glob
+- :py:obj:`regex` - Filter the structure names according to a regular-expression
+- :py:obj:`index` - Match the structures by its index
+- :py:obj:`identifier` or :py:obj:`id` - Match the structure by its id which is a :py:obj:`uval_t`
+- :py:obj:`predicate` - Filter the structures by passing the id (:py:obj:`uval_t`) to a callable
+
+Some examples of using these keywords are as follows::
+
+    > structure.list('my*')
+    > iterable = structure.iterate(regex='__.*')
+    > result = structure.search(index=42)
+
+-------------
+Function list
+-------------
+
+The functions that are available in this module use multicased
+functions and aliases. For more information on this, please see
+:ref:`multicase-aliases` and :ref:`multicase-functions`.
+
+.. py:function:: by(name, \*\*options)
+   
+   Return a structure by its name.
+   
+   :param name: the name of the structure to return
+   :type name: str
+   :param \*\*options: if :py:data:`offset` is specified, then use it as the base offset of the structure
+   
+.. py:function:: by(id, \*\*options)
+   
+   Return a structure by its index or id.
+   
+   :param id: the identifier or the index of the structure to return
+   :type id: int or long
+   :param \*\*options: if :py:data:`offset` is specified, then use it as the base offset of the structure
+   
+.. py:function:: by(\*\*type)
+   
+   Return the structure matching the keyword specified by :py:data:`type`.
+   
+   :param \*\*type: any keyword that can be used to match the structure with
+   
+.. py:function:: by_identifier(identifier, \*\*options)
+   
+   Return the structure identified by :py:data:`identifier`.
+   
+   Aliases: ``structure.byId``, ``structure.by_id``, ``structure.byIdentifier``
+   
+   :param identifier: the identifier of the structure to return
+   :param \*\*options: if :py:data:`offset` is specified, then use it as the base offset of the structure
+   
+.. py:function:: by_index(index, \*\*options)
+   
+   Return a structure by its index.
+   
+   Aliases: ``structure.byIndex``
+   
+   :param index: the index of the structure to return
+   :param \*\*options: if :py:data:`offset` is specified, then use it as the base offset of the structure
+   
+.. py:function:: by_name(name, \*\*options)
+   
+   Return a structure by its name.
+   
+   Aliases: ``structure.byName``
+   
+   :param name: the name of the structure to return
+   :param \*\*options: if :py:data:`offset` is specified, then use it as the base offset of the structure
+   
+.. py:function:: comment(id, \*\*repeatable)
+   
+   Return the comment of the structure identified by :py:data:`id`.
+   
+   If the bool :py:data:`repeatable` is specified, return the repeatable comment.
+   
+   :param id: the identifier of the structure
+   :type id: int or long
+   :param \*\*repeatable: whether the comment should be repeatable or not
+   
+.. py:function:: comment(structure, \*\*repeatable)
+   
+   Return the comment for the specified :py:data:`structure`.
+   
+   :param structure: the :py:obj:`structure_t` to return the comment for
+   :type structure: structure_t
+   :param \*\*repeatable: whether the comment should be repeatable or not
+   
+.. py:function:: comment(structure, cmt, \*\*repeatable)
+   
+   Set the comment to :py:data:`cmt` for the specified :py:data:`structure`.
+   
+   :param structure: the :py:obj:`structure_t` to apply the comment to
+   :type structure: structure_t
+   :param cmt: the comment to apply
+   :type cmt: str
+   :param \*\*repeatable: whether the comment should be repeatable or not
+   
+.. py:function:: comment(id, cmt, \*\*repeatable)
+   
+   Set the comment of the structure identified by :py:data:`id` to :py:data:`cmt`.
+   
+   If the bool :py:data:`repeatable` is specified, set the repeatable comment.
+   
+   :param id: the identifier of the structure
+   :type id: int or long
+   :param cmt: the comment to apply
+   :type cmt: str
+   :param \*\*repeatable: whether the comment should be repeatable or not
+   
+.. py:function:: fragment(structure, offset, size)
+   
+   Yield each member of the specified :py:data:`structure` from the :py:data:`offset` up to the :py:data:`size`.
+   
+   :param structure: the :py:obj:`structure_t` to yield the members for
+   :type structure: structure_t
+   :param offset: the starting offset of the fragment
+   :type offset: int or long
+   :param size: the size of the members to yield
+   :type size: int or long
+   
+.. py:function:: fragment(id, offset, size)
+   
+   Yield each member of the structure identified by :py:data:`id` from the :py:data:`offset` up to the :py:data:`size`.
+   
+   Each iteration yields a tuple of the following format for each
+   member within the requested bounds. This allows one to select
+   certain fragments of a structure which can then be used to export
+   to other programs or applications.
+   
+   - :py:obj:`((offset, size), (name, comment, repeatable))`
+   
+   In this tuple, the field :py:obj:`comment` represents the non-repeatable
+   comment whereas :py:obj:`repeatable` contains the member's :py:obj:`repeatable`
+   comment.
+   
+   :param id: the identifer of the structure to yield the members for
+   :type id: int or long
+   :param offset: the starting offset of the fragment
+   :type offset: int or long
+   :param size: the size of the members to yield
+   :type size: int or long
+   
+.. py:function:: index(id)
+   
+   Return the index of the structure identified by :py:data:`id`.
+   
+   :param id: the identifier of the structure to return the index for
+   :type id: int or long
+   
+.. py:function:: index(structure)
+   
+   Return the index of the specified :py:data:`structure`.
+   
+   :param structure: the :py:obj:`structure_t` to return the index for
+   :type structure: structure_t
+   
+.. py:function:: index(id, index)
+   
+   Move the structure identified by :py:data:`id` to the specified :py:data:`index` in the structure list.
+   
+   :param id: the identifier of the structure
+   :type id: int or long
+   :param index: the index to move the structure to
+   :type index: int or long
+   
+.. py:function:: index(structure, index)
+   
+   Move the specified :py:data:`structure` to the specified :py:data:`index` in the structure list.
+   
+   :param structure: the :py:obj:`structure_t` to move
+   :type structure: structure_t
+   :param index: the index to move the structure to
+   :type index: int or long
+   
+.. py:function:: iterate(string)
+   
+   Iterate through all of the structures in the database with a glob that matches :py:data:`string`.
+   
+   :param string: the glob to filter the structure names with
+   :type string: str
+   
+.. py:function:: iterate(\*\*type)
+   
+   Iterate through all of the structures that match the keyword specified by :py:data:`type`.
+   
+   :param \*\*type: any keyword that can be used to filter structures with
+   
+.. py:function:: list(string)
+   
+   List any structures that match the glob in :py:obj:`string`.
+   
+   :param string: the glob to filter the structure names with
+   :type string: str
+   
+.. py:function:: list(\*\*type)
+   
+   List all the structures within the database that match the keyword specified by :py:data:`type`.
+   
+   :param \*\*type: any keyword that can be used to filter structures with
+   
+.. py:function:: members(structure)
+   
+   Yield each member of the specified :py:data:`structure`.
+   
+   :param structure: the :py:obj:`structure_t` to yield the members for
+   :type structure: structure_t
+   
+.. py:function:: members(id)
+   
+   Yield each member of the structure identified by :py:data:`id`.
+   
+   Each iteration yields the :py:obj:`((offset, size), (name, comment, repeatable-comment))` of each member.
+   
+   :param id: the identifier of the structure to yield the members for
+   :type id: int or long
+   
+.. py:function:: name(id)
+   
+   Return the name of the structure identified by :py:data:`id`.
+   
+   :param id: the identifier of the structure to return the name for
+   
+.. py:function:: name(structure)
+   
+   :param structure: the :py:obj:`structure_t` to return the name for
+   :type structure: structure_t
+   
+.. py:function:: name(id, string, \*suffix)
+   
+   Set the name of the structure identified by :py:data:`id` to :py:data:`string`.
+   
+   :param id: the identifier of the structure to return the name for
+   :param string: the name to rename the structure to
+   :type string: str
+   :param \*suffix: any other names to append to the base name
+   
+.. py:function:: name(structure, string, \*suffix)
+   
+   Set the name of the structure_t :py:data:`structure` to :py:data:`string`.
+   
+   :param structure: the :py:obj:`structure_t` to rename
+   :type structure: structure_t
+   :param string: the name to rename the structure to
+   :type string: str
+   :param \*suffix: any other names to append to the base name
+   
+.. py:function:: new(name)
+   
+   Returns a new structure :py:data:`name`.
+   
+   :param name: the name of the structure to create
+   :type name: str
+   
+.. py:function:: new(name, offset)
+   
+   Returns a new structure :py:data:`name` using :py:data:`offset` as its base offset.
+   
+   :param name: the name of the structure to create
+   :type name: str
+   :param offset: the base offset of the structure
+   :type offset: int or long
+   
+.. py:function:: remove(structure)
+   
+   Remove the specified :py:data:`structure` from the database.
+   
+   Aliases: ``structure.delete``
+   
+   :param structure: the :py:obj:`structure_t` to remove from the database
+   :type structure: structure_t
+   
+.. py:function:: remove(name)
+   
+   Remove the structure with the specified :py:data:`name`.
+   
+   Aliases: ``structure.delete``
+   
+   :param name: the name of the structure to remove from the database
+   :type name: str
+   
+.. py:function:: remove(id)
+   
+   Remove a structure by its index or :py:data:`id`.
+   
+   Aliases: ``structure.delete``
+   
+   :param id: the identifier of the structure to remove from the database
+   :type id: int or long
+   
+.. py:function:: remove(\*\*type)
+   
+   Remove the first structure that matches the result described by :py:data:`type`.
+   
+   Aliases: ``structure.delete``
+   
+   :param \*\*type: any keyword that can be used to match the structure with
+   
+.. py:function:: search(string)
+   
+   Search through all the structures using globbing.
+   
+   :param string: the glob to match the structure name with
+   
+.. py:function:: size(structure)
+   
+   Return the size of the specified :py:data:`structure`.
+   
+   :param structure: the :py:obj:`structure_t` to return the size for
+   :type structure: structure_t
+   
+.. py:function:: size(id)
+   
+   Return the size of the structure identified by :py:data:`id`.
+   
+   :param id: the identifier of the structure to return the size for
+   :type id: int or long
+   
+----------
+Class list
+----------
+
+
+Classes provide the definition necessary to instantiate an object.
+In most cases, a class is returned when calling one of the prior
+listed functions and thus have no need to be manually instantiated.
+Classes may also have aliases defined for them. Please refer to the
+documentation for the class to see what is available. For more
+information on aliases, please see :ref:`multicase-aliases`.
+
+
+********
+member_t
+********
+
+.. py:class:: member_t
+   
+   This object is an abstraction around a single member belonging to
+   a structure. A member within a structue contains a number of
+   properties which this object will expose. Some of these properties
+   allow for a user to modify the member such as when the user needs
+   to modify the :py:obj:`type` or :py:obj:`name` of a member. Some methods are also
+   provided to allow for a user to :py:obj:`tag` the member with an
+   annotation, or enumerate all the addresses that reference the
+   member.
+   
+   .. py:attribute:: comment
+   
+      :param getter: Return the repeatable comment of the member.
+      :param repeatable: whether the comment should be repeatable or not
+      :param setter: Set the repeatable comment of the member to :py:data:`value`.
+      :param value: the comment to apply to the member
+      :param repeatable: whether the comment should be repeatable or not
+   
+   .. py:attribute:: dt_type
+   
+      :param getter: Return the :py:obj:`.dt_type` attribute of the member.
+   
+   .. py:attribute:: flag
+   
+      :param getter: Return the :py:obj:`.flag` attribute of the member.
+   
+   .. py:attribute:: fullname
+   
+      :param getter: Return the fullname of the member.
+   
+   .. py:attribute:: id
+   
+      :param getter: Return the :py:obj:`.id` attribute of the member.
+   
+   .. py:attribute:: index
+   
+      :param getter: Return the index of the member.
+   
+   .. py:attribute:: left
+   
+      :param getter: Return the beginning offset of the member.
+   
+   .. py:attribute:: name
+   
+      :param getter: Return the name of the member.
+      :param setter: Set the name of the member to :py:data:`string`.
+      :param string: the new name to rename the member to
+   
+   .. py:attribute:: offset
+   
+      :param getter: Return the offset of the member.
+   
+   .. py:attribute:: owner
+   
+      :param getter: Return the structure_t that owns the member.
+   
+   .. py:attribute:: ptr
+   
+      :param getter: Return the pointer of the :py:obj:`idaapi.member_t`.
+   
+   .. py:attribute:: right
+   
+      :param getter: Return the ending offset of the member.
+   
+   .. py:attribute:: size
+   
+      :param getter: Return the size of the member.
+   
+   .. py:attribute:: type
+   
+      :param getter: Return the type info of the member.
+      :param setter: Set the type of the member.
+      :param type: the pythonic type to set the member type to
+   
+   .. py:attribute:: typeid
+   
+      :param getter: Return the :py:obj:`.tid` attribute of the type of the member.
+   
+   .. py:method:: refs(self)
+      
+      Return the :py:obj:`(address, opnum, type)` of all the references to this member within the database.
+      
+   .. py:method:: tag(self)
+      
+      Return the tags associated with the member.
+      
+   .. py:method:: tag(self, key)
+      
+      Return the tag identified by :py:data:`key` belonging to the member.
+      
+      :param key: a string representing the tag name
+      :type key: str
+      
+   .. py:method:: tag(self, key, value)
+      
+      Set the tag identified by :py:data:`key` to :py:data:`value` for the member.
+      
+      :param key: a string representing the tag name
+      :type key: str
+      :param value: a python object to store at the tag
+      
+   .. py:method:: tag(self, key, none)
+      
+      Removes the tag specified by :py:data:`key` from the member.
+      
+      :param key: a string representing the tag name
+      :type key: str
+      :param none: the value :py:obj:`None`
+      :type none: None
+      
+*********
+members_t
+*********
+
+.. py:class:: members_t
+   
+   This object is an abstraction around all the members belonging to
+   a specific IDA structure. This object is implicitly part of a
+   :py:obj:`structure_t` and allows one to access each member of the structure
+   by its index as well as create new members and remove existing ones
+   from the structure.
+   
+   To list the different members available in the structure, one can
+   use :py:obj:`structure.list(...)` with a chosen method of filtering. This
+   will list all of the available members that match the keyword
+   that they specified. The keywords that are available to filter
+   members are:
+   
+   - :py:obj:`name` - Match the structure member by a name
+   - :py:obj:`offset` - Match the structure member by its offset
+   - :py:obj:`like` - Filter the structure members according to a glob
+   - :py:obj:`regex` - Filter the structure members according to a regular-expression
+   - :py:obj:`index` - Match the structure member by its index
+   - :py:obj:`fullname` - Filter the structure members by matching its full name according to a glob
+   - :py:obj:`comment` or :py:obj:`comments` - Filter the structure members by applying a glob to its comment
+   - :py:obj:`identifier` or :py:obj:`id` - Match the structure member by its identifier
+   - :py:obj:`greater` or :py:obj:`gt` - Filter the structure members for any after the specified offset
+   - :py:obj:`less` or :py:obj:`lt` - Filter the structure members for any before the specified offset
+   - :py:obj:`predicate` - Filter the structure members by passing the :py:obj:`member_t` to a callable
+   
+   Some examples of using these keywords are as follows::
+   
+       > st.members.list('field_4*')
+       > iterable = st.members.iterate(like='p_*')
+       > result = st.members.by(offset=0x2a)
+   
+   .. py:attribute:: owner
+   
+      :param getter: Return the :py:obj:`structure_t` that owns this :py:obj:`members_t`.
+   
+   .. py:attribute:: ptr
+   
+      :param getter: Return the pointer to the :py:obj:`idaapi.member_t` that contains all the members.
+   
+   .. py:method:: add(self, name)
+      
+      Append the specified member :py:data:`name` with the default type at the end of the structure.
+      
+      :param name: the name of the member to add
+      :type name: str or tuple
+      
+   .. py:method:: add(self, name, type)
+      
+      Append the specified member :py:data:`name` with the given :py:data:`type` at the end of the structure.
+      
+      :param name: the name of the member to add
+      :type name: str or tuple
+      :param type: the pythonic type of the new member to add
+      
+   .. py:method:: add(self, name, type, offset)
+      
+      Add a member at :py:data:`offset` with the given :py:data:`name` and :py:data:`type`.
+      
+      To specify a particular size, :py:data:`type` can be a tuple with the second element referring to the size.
+      
+      :param name: the name of the member to add
+      :type name: str or tuple
+      :param type: the pythonic type of the new member to add
+      :param offset: the offset to add the member at
+      :type offset: int or long
+      
+   .. py:method:: by(self, \*\*type)
+      
+      Return the member that matches the keyword specified by :py:data:`type`.
+      
+      :param \*\*type: any keyword that can be used to match the structure member with
+      
+   .. py:method:: by(self, name)
+      
+      Return the member with the specified :py:data:`name`.
+      
+      :param name: the name of the member to return
+      :type name: str
+      
+   .. py:method:: by(self, offset)
+      
+      Return the member at the specified :py:data:`offset`.
+      
+      :param offset: the offset of the member to return
+      :type offset: int or long
+      
+   .. py:method:: by_fullname(self, fullname)
+      
+      Return the member with the specified :py:data:`fullname`.
+      
+      Aliases: ``structure.members_t.byfullname``, ``structure.members_t.byFullName``
+      
+      :param fullname: the full name of the member to return
+      
+   .. py:method:: by_identifier(self, id)
+      
+      Return the member in the structure that has the specified :py:data:`id`.
+      
+      Aliases: ``structure.members_t.byId``, ``structure.members_t.by_id``
+      
+      :param id: the identifier of the member to return
+      
+   .. py:method:: by_name(self, name)
+      
+      Return the member with the specified :py:data:`name`.
+      
+      Aliases: ``structure.members_t.byname``, ``structure.members_t.byName``
+      
+      :param name: the name of the member to return
+      
+   .. py:method:: by_offset(self, offset)
+      
+      Return the member at the specified :py:data:`offset`.
+      
+      Aliases: ``structure.members_t.byoffset``, ``structure.members_t.byOffset``
+      
+      :param offset: the member of the offset to return
+      
+   .. py:method:: index(self, member_t)
+      
+      Return the index of the member specified by :py:data:`member_t`.
+      
+      :param member_t: the :py:obj:`member_t` to return the index for
+      
+   .. py:method:: iterate(self, \*\*type)
+      
+      Iterate through all of the members in the structure that match the keyword specified by :py:data:`type`.
+      
+      :param \*\*type: any keyword that can be used to filter the structure members with
+      
+   .. py:method:: list(self, string)
+      
+      List any members that match the glob in :py:obj:`string`.
+      
+      :param string: the glob to filter the structure member names with
+      :type string: str
+      
+   .. py:method:: list(self, \*\*type)
+      
+      List all the members within the structure that match the keyword specified by :py:data:`type`.
+      
+      :param \*\*type: any keyword that can be used to filter the structure members with
+      
+   .. py:method:: near_offset(self, offset)
+      
+      Return the member nearest to the specified :py:data:`offset`.
+      
+      Aliases: ``structure.members_t.nearoffset``, ``structure.members_t.near``, ``structure.members_t.nearOffset``
+      
+      :param offset: the offset nearest to the member to return
+      
+   .. py:method:: pop(self, index)
+      
+      Remove the member at the specified :py:data:`index`.
+      
+      :param index: the index of the member to remove
+      
+   .. py:method:: remove(self, offset)
+      
+      Remove the member at :py:data:`offset` from the structure.
+      
+      :param offset: the offset of the member to remove
+      
+   .. py:method:: remove(self, offset, size)
+      
+      Remove all the members from the structure from :py:data:`offset` up to :py:data:`size`.
+      
+      :param offset: the offset of the starting member to remove
+      :param size: the size of the members that follow to remove
+      
+***********
+structure_t
+***********
+
+.. py:class:: structure_t
+   
+   This object is an abstraction around an IDA structure type. This
+   allows for one to treat an IDA structure as a regular python object.
+   A number of methods and properties are provided in order to access
+   certain attributes of the structure.
+   
+   To access the members belonging to the structure, one can use the
+   :py:obj:`.members` property. This property is intended to be treated as an
+   array in order to access the different elements available. This
+   property also allows a user to create a new member or remove an
+   already existing one.
+   
+   .. py:attribute:: comment
+   
+      :param getter: Return the repeatable comment for the structure.
+      :param setter: Set the repeatable comment for the structure to :py:data:`value`.
+      :param value: a string repesenting the comment to apply
+      :param repeatable: whether the comment should be repeatable or not
+   
+   .. py:attribute:: id
+   
+      :param getter: Return the identifier of the structure.
+   
+   .. py:attribute:: index
+   
+      :param getter: Return the index of the structure.
+      :param setter: Set the index of the structure to :py:data:`idx`.
+      :param idx: the new index to move the structure to
+   
+   .. py:attribute:: members
+   
+      :param getter: Return the members belonging to the structure.
+   
+   .. py:attribute:: name
+   
+      :param getter: Return the name of the structure.
+      :param setter: Set the name of the structure to :py:data:`string`.
+      :param string: a string representing the new name of the structure
+   
+   .. py:attribute:: offset
+   
+      :param getter: Return the base offset of the structure.
+      :param setter: Set the base offset of the structure to :py:data:`offset`.
+      :param offset: the new base offset to assign to the structure
+   
+   .. py:attribute:: ptr
+   
+      :param getter: Return the pointer of the :py:obj:`idaapi.struc_t`.
+   
+   .. py:attribute:: size
+   
+      :param getter: Return the size of the structure.
+      :param setter: Expand the structure to the new :py:data:`size` that is specified.
+      :param size: an integer representing the new size to expand the structure to
+   
+   .. py:method:: contains(self, offset)
+      
+      Return whether the specified offset is contained by the structure.
+      
+      :param offset: the offset to check
+      
+   .. py:method:: destroy(self)
+      
+      Remove the structure from the database.
+      
+   .. py:method:: down(self)
+      
+      Return all the structure members and addresses that are referenced by this specific structure.
+      
+   .. py:method:: field(self, offset)
+      
+      Return the member at the specified offset.
+      
+      :param offset: the offset of the member to return
+      
+   .. py:method:: refs(self)
+      
+      Return the :py:obj:`(address, opnum, type)` of all the code and data references within the database that reference this structure.
+      
+      If :py:obj:`opnum` is :py:obj:`None`, then the returned :py:obj:`address` has the structure applied to it.
+      If :py:obj:`opnum` is defined, then the instruction at the returned :py:obj:`address` references a field that contains the specified structure.
+      
+   .. py:method:: tag(self)
+      
+      Return the tags associated with the structure.
+      
+   .. py:method:: tag(self, key)
+      
+      Return the tag identified by :py:data:`key` belonging to the structure.
+      
+      :param key: a string representing the tag name
+      :type key: str
+      
+   .. py:method:: tag(self, key, value)
+      
+      Set the tag identified by :py:data:`key` to :py:data:`value` for the structure.
+      
+      :param key: a string representing the tag name
+      :type key: str
+      :param value: a python object to store at the tag
+      
+   .. py:method:: tag(self, key, none)
+      
+      Removes the tag specified by :py:data:`key` from the structure.
+      
+      :param key: a string representing the tag name
+      :type key: str
+      :param none: the value :py:obj:`None`
+      :type none: None
+      
+   .. py:method:: up(self)
+      
+      Return all the structure members and addresses that reference this specific structure.
+      
