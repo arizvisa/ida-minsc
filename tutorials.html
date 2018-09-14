@@ -1,0 +1,663 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>4. Tutorials &#8212; IDA-minsc  documentation</title>
+    <link rel="stylesheet" href="_static/pyramid.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/sidebar.css" type="text/css" />
+    <link rel="stylesheet" href="_static/content.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="3.3.2. tagfix – Tagfix module" href="modules/custom-tagfix.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules/custom-tagfix.html" title="3.3.2. tagfix – Tagfix module"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="tutorials">
+<span id="id1"></span><h1>4. Tutorials<a class="headerlink" href="#tutorials" title="Permalink to this headline">¶</a></h1>
+<p>Each one of these tutorials are for the Intel platform.</p>
+<div class="section" id="disassembling-the-current-address">
+<span id="tutorials-easy"></span><h2>4.1. Disassembling the current address<a class="headerlink" href="#disassembling-the-current-address" title="Permalink to this headline">¶</a></h2>
+<p>This is an introductory tutorial which will show an example
+of a multicased function as well as exposing the user to
+aliases.</p>
+<ol class="arabic simple">
+<li>Most multicased functions have a variation that takes no
+parameters in order to imply the current address. Another
+way to do this, however, is to use <a class="reference internal" href="modules/database.html#database.here" title="database.here"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.here()</span></code></a>
+which is aliased as <code class="xref py py-func docutils literal notranslate"><span class="pre">database.h()</span></code>. This function is
+called so often however, that its been imported into the
+root namespace of this plugin. So we can literally just call
+<code class="xref py py-func docutils literal notranslate"><span class="pre">h()</span></code>.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li>To disassemble this instruction, we’ll rely on the <code class="xref py py-func docutils literal notranslate"><span class="pre">database.diassemble()</span></code>
+function that is aliased as <code class="xref py py-func docutils literal notranslate"><span class="pre">database.disasm()</span></code>.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li>As mentioned before, most multicased functions have a no-parameter
+variation which refers to the current address. Therefore another
+way of accomplishing this can be the following.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="setting-breakpoints-windbg-on-all-labels-in-a-function">
+<h2>4.2. Setting breakpoints (WinDbg) on all labels in a function<a class="headerlink" href="#setting-breakpoints-windbg-on-all-labels-in-a-function" title="Permalink to this headline">¶</a></h2>
+<p>This is an easy tutorial that will discuss tagging. Tags will be
+used to filtering functions for specific instruction types,
+identifying operands, and eventually generating breakpoints that
+can be imported into WinDbg.</p>
+<ol class="arabic simple">
+<li>We’ll start with by navigating to a function in IDA. Let’s just
+store its address for now.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">f</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">address</span><span class="p">()</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li>We’ll need to identify an address that has a label. We can use
+<a class="reference internal" href="modules/database.html#database.type.has_label" title="database.type.has_label"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.has_label()</span></code></a> for that. Let’s navigate to
+a label and make sure it works (of course it works).</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">db</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">has_label</span><span class="p">()</span>
+<span class="bp">True</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li>Now we can iterate through all of the function’s chunks while
+looking for a label. Instead of using a list comprehension,
+(which are incomprehensible to most), let’s just use a straight
+up for-loop.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+      <span class="k">if</span> <span class="n">db</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">has_label</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="4">
+<li>This is easy enough, but there’s a better way using tagging. By
+using tagging, we can keep navigating to functions that we want to
+collect labels in and then aggregate them for later. To grab the
+label, it’s simply a name that we can grab with <a class="reference internal" href="modules/database.html#database.name" title="database.name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.name()</span></code></a>.
+So let’s tag up each label with the key “labels_to_get”.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+      <span class="k">if</span> <span class="n">db</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">has_label</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;labels_to_get&#39;</span><span class="p">,</span> <span class="n">db</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="5">
+<li>So now, we can do this to any function we want and you’ll notice
+that each address with a label now includes a tag as its comment.
+Now we can output something to paste into WinDbg (or actually
+write to a file that we can then use <cite>$$&lt;</cite> to execute).</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="k">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit label </span><span class="si">%s</span><span class="s1">\n\&quot;&quot;&#39;</span><span class="o">%</span><span class="p">(</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">]</span> <span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="6">
+<li>So now we’ve outputted a list of breakpoints to feed into our
+debugger. This will only work if the base address of our database
+matches our image base in our debugger. But…we can actually just
+feed an offset to our debugger instead. This will allow our
+breakpoint to be independent of our base address. To get our module
+name, we can use <code class="xref py py-func docutils literal notranslate"><span class="pre">database.module()</span></code>, and to convert our
+address to an offset, we can use <a class="reference internal" href="modules/database.html#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code></a>.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="k">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%s</span><span class="s1">+</span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit label </span><span class="si">%s</span><span class="s1">\n\&quot;&quot;&#39;</span><span class="o">%</span><span class="p">(</span> <span class="n">db</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">db</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">])</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="7">
+<li>And now we have some breakpoints that output the label they execute.</li>
+</ol>
+</div>
+<div class="section" id="tagging-all-dynamic-calls-in-the-database">
+<span id="tutorials-medium"></span><h2>4.3. Tagging all dynamic calls in the database<a class="headerlink" href="#tagging-all-dynamic-calls-in-the-database" title="Permalink to this headline">¶</a></h2>
+<p>Similar to above, we will use tags to mark all the dynamic calls in
+the database. This is a medium difficulty tutorial that will also
+touch on tag importing an exporting.</p>
+<p>When we’re done, we’ll also remove the tags we’ve created to avoid
+cluttering things up. Let’s pretend we’re looking at Delphi and we
+want to identify all functions that allocate something and tag all
+of the dynamic calls within them.</p>
+<p>First we’ll need to enumerate all the functions that we care
+about. We can do that via <a class="reference internal" href="modules/database.html#database.functions.list" title="database.functions.list"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.functions.list()</span></code></a>
+and then use <a class="reference internal" href="modules/database.html#database.functions.iterate" title="database.functions.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.functions.iterate()</span></code></a> to select
+a subset of them, or we can just iterate through everything in the
+database via <a class="reference internal" href="modules/database.html#database.functions" title="database.functions"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.functions()</span></code></a>.</p>
+<ol class="arabic simple">
+<li>To start out, let’s assume that we have most of the <cite>System</cite> package
+already named. So, let’s look for functions within that package that
+do stuff related to memory.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">db</span><span class="o">.</span><span class="n">functions</span><span class="o">.</span><span class="n">list</span><span class="p">(</span><span class="s1">&#39;System.*Memory*&#39;</span><span class="p">)</span>
+<span class="o">...</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li>We turned up some results, so let’s assume that we like them. Now
+we can use <a class="reference internal" href="modules/database.html#database.functions.iterate" title="database.functions.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.functions.iterate()</span></code></a> to iterate through
+our results and then use <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a> to tag them for
+later.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">functions</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="s1">&#39;System.*Memory*&#39;</span><span class="p">):</span>
+      <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;is-memory-function&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li>Let’s expand our search a little bit by also tagging the callers of
+these functions. This can be done by using <a class="reference internal" href="modules/function.html#function.up" title="function.up"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.up()</span></code></a>.
+Our tag name “is-memory-function” doesn’t make sense, so we’ll tag
+the callers with “calls-memory-function”.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;is-memory-function&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">up</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;calls-memory-function&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="4">
+<li>Now that we have all of our functions tagged with “is-memory-function”,
+or “calls-memory-function. These can both be queried <a class="reference internal" href="modules/database.html#database.select" title="database.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.select()</span></code></a>
+to select them. Since we’re searching for either tag (or), we’ll use
+the <code class="xref py py-data docutils literal notranslate"><span class="pre">Or</span></code> parameter to return any function that has either tag
+assigned.  We plan on iterating through these results, so we’ll need
+to use <a class="reference internal" href="modules/function.html#function.chunks.iterate" title="function.chunks.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.chunks.iterate()</span></code></a> (or really its alias
+<code class="xref py py-func docutils literal notranslate"><span class="pre">function.iterate()</span></code>) to look for our instruction type. To
+test for an indirect call instruction (a call which branches to a
+register or a phrase), we can simply use the <a class="reference internal" href="modules/instruction.html#instruction.is_calli" title="instruction.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_calli()</span></code></a>
+function.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;is-memory-function&#39;</span><span class="p">,</span> <span class="s1">&#39;calls-memory-function&#39;</span><span class="p">)):</span>
+      <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="k">if</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_calli</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;indirect-call&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+          <span class="k">continue</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="5">
+<li>Just to keep our function comments clean, let’s untag both the function
+tags that we applied. Since we tagged the contents of these functions
+with the tag “indirect-call”, querying for this contents tag will end
+up giving us the subset of the results we care about.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;is-memory-function&#39;</span><span class="p">,</span> <span class="s1">&#39;calls-memory-function&#39;</span><span class="p">)):</span>
+      <span class="k">for</span> <span class="n">tagname</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
+          <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tagname</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+          <span class="k">print</span> <span class="s2">&quot;Removing tag </span><span class="si">%s</span><span class="s2"> from function </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tagname</span><span class="p">,</span> <span class="n">ea</span><span class="p">,</span> <span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="6">
+<li>After cleaning up, now we should have the actual dynamic call
+instructions tagged in the contents of our functions. So to continue,
+let’s tag the operand type for each instruction. This way we can
+determine which registers the instructions’ operands are composed
+of. We can do this using <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_type()</span></code> which is
+aliased as <a class="reference internal" href="modules/instruction.html#instruction.opt" title="instruction.opt"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opt()</span></code></a>. Actually, in order to check
+our results, let’s actually store <em>all</em> of the operand types using
+its plural, <a class="reference internal" href="modules/instruction.html#instruction.ops_type" title="instruction.ops_type"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_type()</span></code></a>. As usual, this has an
+abbreviated alias of <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opts()</span></code>. We’ll also keep
+things clean again, by removing the previous tag, “indirect-call”.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;indirect-call&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="k">print</span> <span class="s2">&quot;Tagging address </span><span class="si">%x</span><span class="s2"> with </span><span class="si">%d</span><span class="s2"> operands&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">ops_count</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;call-optypes&#39;</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">opts</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+          <span class="k">print</span> <span class="s2">&quot;Removing old </span><span class="se">\&quot;</span><span class="si">%s</span><span class="se">\&quot;</span><span class="s2"> tag from </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="s1">&#39;indirect-call&#39;</span><span class="p">,</span> <span class="n">ea</span><span class="p">)</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;indirect-call&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="6">
+<li>Just to sanity check things, lets prove that all of the calls that we
+care about really only have one operand. To do this, we’ll output their
+address using the <a class="reference internal" href="modules/database.html#database.disassemble" title="database.disassemble"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.disassemble()</span></code></a> function which is
+aliased as <code class="xref py py-func docutils literal notranslate"><span class="pre">database.disasm()</span></code> and also tag them so we can
+refer to them later. We’ll do this removal by passing the <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>
+parameter to <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a>.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">])</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+              <span class="k">print</span> <span class="s2">&quot;Unknown operand count </span><span class="si">%d</span><span class="s2"> for instruction: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">]),</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;calli-unknown&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+              <span class="k">print</span> <span class="s2">&quot;Removing old tag </span><span class="se">\&quot;</span><span class="si">%s</span><span class="se">\&quot;</span><span class="s2"> from </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">,</span> <span class="n">ea</span><span class="p">)</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;calli-optypes&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+          <span class="k">continue</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="7">
+<li>Now if we want, we can manually go through all of the “calli-unknown”
+contents tags and figure out what is odd about them. But, we’re
+really only interested in the registers for the first operand. To
+decode the first operand, we can use <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_value()</span></code>
+which is aliased as <a class="reference internal" href="modules/instruction.html#instruction.op" title="instruction.op"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op()</span></code></a>. Now operands that are
+composed of registers (or symbols) inherit from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">symbol_t</span></code>
+type. This type has a <code class="xref py py-attr docutils literal notranslate"><span class="pre">symbols</span></code> property which will allow
+one to enumerate the symbols (really registers) belonging to an
+operand. So, let’s go ahead and identify our “call-optypes”
+instructions again, and create a new tag, “call-opregs”. This new
+tag will contain all of the registers we need to resolve the target
+address of the branch instructions that we’ve selected.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="n">op</span> <span class="o">=</span> <span class="n">ins</span><span class="o">.</span><span class="n">op</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+          <span class="n">regnames</span> <span class="o">=</span> <span class="p">[]</span>
+          <span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="n">op</span><span class="o">.</span><span class="n">symbols</span><span class="p">:</span>
+              <span class="n">regnames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">symbol</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+          <span class="k">print</span> <span class="s2">&quot;Tagging </span><span class="si">%x</span><span class="s2"> with </span><span class="si">%s</span><span class="s2"> containing the regs </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;call-opregs&#39;</span><span class="p">,</span> <span class="n">regnames</span><span class="p">)</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;call-opregs&#39;</span><span class="p">,</span> <span class="n">regnames</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="8">
+<li>Tagging these registers for each call instruction is actually going
+to be useful to pass along to a debugger. With this we know which
+register to dump for a call instruction in order to calculate its
+target. Instead of calculating them though, let’s remain hacky and
+just output their results as a breakpoint. In the prior tutorial,
+we chose <a class="reference internal" href="modules/database.html#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code></a> in order to calculate the
+relative address. Instead of doing it that way, there’s a class in
+the <a class="reference internal" href="modules/misc-tools.html#module-tools" title="tools"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code></a> module that we can use to transform an address.
+So let’s use <a class="reference internal" href="modules/misc-tools.html#tools.remote" title="tools.remote"><code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code></a> instead. To construct this,
+we’ll need our remote address.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">R</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">remote_base_address</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span> <span class="n">R</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">h</span><span class="p">())</span> <span class="p">)</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="9">
+<li>Now that we have an instance of <a class="reference internal" href="modules/misc-tools.html#tools.remote" title="tools.remote"><code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code></a>, we can
+select our instructions tagged with “call-opregs” and produce a
+breakpoint for each one. Let’s do that.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;call-opregs&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="n">emit_registers</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+          <span class="k">for</span> <span class="n">regname</span> <span class="ow">in</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;call-opregs&#39;</span><span class="p">]:</span>
+              <span class="n">emit_registers</span> <span class="o">+=</span> <span class="s2">&quot;r @</span><span class="si">%s</span><span class="s2">;&quot;</span><span class="o">%</span> <span class="n">regname</span>
+
+          <span class="c1"># &quot;put&quot; our address into the debugger</span>
+          <span class="n">remote_ea</span> <span class="o">=</span> <span class="n">R</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+          <span class="k">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit call </span><span class="si">%s</span><span class="s1">\n\&quot;;</span><span class="si">%s</span><span class="s1">;g&quot;&#39;</span><span class="o">%</span> <span class="p">(</span><span class="n">remote_ea</span><span class="p">,</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="n">emit_registers</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="10">
+<li>And now we’ve just outputted some breakpoints that we can feed into
+WinDbg which will emit the values of any registers that are required
+to branch via a call instruction. Let’s redo this because we might
+want to save these breakpoints for later. We’ll take the breakpoint
+that we generated for each instruction, and then store is via the
+tag “break-calli”.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;call-opregs&#39;</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
+          <span class="n">emit_registers</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+          <span class="k">for</span> <span class="n">regname</span> <span class="ow">in</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;call-opregs&#39;</span><span class="p">]:</span>
+              <span class="n">emit_registers</span> <span class="o">+=</span> <span class="s2">&quot;r @</span><span class="si">%s</span><span class="s2">;&quot;</span><span class="o">%</span> <span class="n">regname</span>
+          <span class="n">bpstr</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;.printf &quot;Hit call </span><span class="si">%s</span><span class="s1">\n&quot;;</span><span class="si">%s</span><span class="s1">;gc&#39;</span><span class="o">%</span> <span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="n">emit_registers</span><span class="p">)</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;break-calli&#39;</span><span class="p">,</span> <span class="n">bpstr</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="11">
+<li>Now that we have the breakpoints stored, the next time we open this
+database we should be able to generate the breakpoints for WinDbg
+at time that we need them. This data can also be shared with other
+users so that they will also have the access to the same information.
+Just for fun, let’s serialize this data so that we can transport this
+to another user. Rather than writing the queries to do this manually,
+we can utilise one of the functions provided by the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code>
+module. Namely the <code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.export()</span></code>. We only want to give
+them the “break-calli” tags which can be exported via the following code.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">data</span> <span class="o">=</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s1">&#39;break-calli&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">pickle</span><span class="o">,</span> <span class="nn">os.path</span>
+<span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">with</span> <span class="nb">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output</span><span class="p">:</span>
+      <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;Dumped breakpoints to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">filename</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="12">
+<li>If another user wants to import this pickle, again the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code>
+module can help us.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">with</span> <span class="nb">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="nb">input</span><span class="p">:</span>
+      <span class="n">data</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="13">
+<li>Unfortunately, this will overwrite any tags in the current database with
+the name “break-calli”. If the user wants to map these tags to a different
+name, they can provide a tag mapping as another parameter to
+<code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.apply()</span></code>.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s1">&#39;break-calli&#39;</span><span class="p">:</span> <span class="s1">&#39;username.break-calli&#39;</span><span class="p">})</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="marking-all-functions-that-are-leaves">
+<span id="tutorials-hardcore"></span><h2>4.4. Marking all functions that are “leaves”<a class="headerlink" href="#marking-all-functions-that-are-leaves" title="Permalink to this headline">¶</a></h2>
+<p>This tutorial is somewhat “advanced”. Other than using tags as
+described in the prior tutorials, this will also discuss ways to use
+the combinators provided by this plugin.</p>
+<ol class="arabic simple">
+<li>Knowing whether a function is a utility function that doesn’t call anything
+might reduce the time it takes a reverser to determine the complexity of a
+function. This plugin makes it pretty easy to do this thanks to the help
+of functions like <a class="reference internal" href="modules/function.html#function.down" title="function.down"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.down()</span></code></a> or the combination of
+<a class="reference internal" href="modules/function.html#function.chunks.iterate" title="function.chunks.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.chunks.iterate()</span></code></a> and <a class="reference internal" href="modules/instruction.html#instruction.is_call" title="instruction.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_call()</span></code></a>.
+So, let’s use these tools to define a function that returns whether a
+function calls other functions or not.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">has_children</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+      <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">down</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+          <span class="k">return</span> <span class="bp">True</span>
+      <span class="k">return</span> <span class="bp">False</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="n">has_children</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
+<span class="mi">13</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li>One issue with using <a class="reference internal" href="modules/function.html#function.down" title="function.down"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.down()</span></code></a> is since it only returns
+addresses that a function can call, it will still return <code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code>
+if a function makes an indirect call. Let’s improve this via the following
+variation.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">has_children</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+      <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
+      <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="k">if</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+              <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+          <span class="k">continue</span>
+      <span class="k">return</span> <span class="bp">True</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="bp">False</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li>Another way to do this is via the combination of an anonymous function
+(<cite>lambda</cite>) and a list comprehension. This would look like the
+following code.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">has_children</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">ea</span><span class="p">:</span> <span class="bp">True</span> <span class="k">if</span> <span class="nb">len</span><span class="p">([</span><span class="n">ea</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="k">if</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">)])</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="bp">False</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="4">
+<li>Yet another way involves using the functional combinator component of
+this plugin (see <a class="reference internal" href="combinators.html#combinators-intro"><span class="std std-ref">Functional combinators</span></a>). To assist with these types
+of one-liners, this plugin includes a number of combinators that can
+be combined to build the exact same function. If we combine the
+<a class="reference internal" href="combinators.html#fpartial" title="fpartial"><code class="xref py py-func docutils literal notranslate"><span class="pre">fpartial()</span></code></a>, <a class="reference internal" href="combinators.html#ifilter" title="ifilter"><code class="xref py py-func docutils literal notranslate"><span class="pre">ifilter()</span></code></a>, and some operators available
+via Python’s <code class="xref py py-mod docutils literal notranslate"><span class="pre">operator</span></code> module with the <a class="reference internal" href="combinators.html#fcompose" title="fcompose"><code class="xref py py-func docutils literal notranslate"><span class="pre">fcompose()</span></code></a>
+combinator we can implement the prior 2 versions of the
+<code class="xref py py-func docutils literal notranslate"><span class="pre">has_children()</span></code> function with the following code.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;first we need to iterate through all addresses in function&quot;</span>
+<span class="o">&gt;</span> <span class="n">func_iterator</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;now we&#39;ll filter for all call instructions&quot;</span>
+<span class="o">&gt;</span> <span class="n">func_callFilter</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_iterator</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">ifilter</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">))</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;now we&#39;ll convert our ifilter into a list so we can count them&quot;</span>
+<span class="o">&gt;</span> <span class="n">func_callLister</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_callFilter</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;convert our list of call instructions into a count&quot;</span>
+<span class="o">&gt;</span> <span class="n">func_callCounter</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_callLister</span><span class="p">,</span> <span class="nb">len</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;now we want to return true if operator.lt(0, len(list( call_instructions )))&quot;</span>
+<span class="o">&gt;</span> <span class="n">func_callComparison</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_callCounter</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;this will now return true is the number of call instructions is &gt; 0&quot;</span>
+<span class="o">&gt;</span> <span class="n">has_children</span> <span class="o">=</span> <span class="n">func_callComparison</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="s1">&#39;combined we have&#39;</span>
+<span class="o">&gt;</span> <span class="n">has_children</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">ifilter</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">),</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">len</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="5">
+<li>The combination of these primitives can provide some potentially very
+powerful tools if a user chooses to use this method. Nonetheless, it
+is up to the user and their own personal preference. This function that
+we’ve created, <code class="xref py py-func docutils literal notranslate"><span class="pre">has_children()</span></code>, will now be used to tag all
+of the functions that have no children. To start out, however, let’s
+create another function that will tag a function with the tag “function-type”
+and the value “leaf” if <code class="xref py py-func docutils literal notranslate"><span class="pre">has_children()</span></code> returns <code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code>.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">tag_if_leaf</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+      <span class="k">if</span> <span class="n">has_children</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;function-type&#39;</span><span class="p">,</span> <span class="s1">&#39;leaf&#39;</span><span class="p">)</span>
+      <span class="k">return</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="6">
+<li>In the prior tutorials we used the <a class="reference internal" href="modules/database.html#database.functions" title="database.functions"><code class="xref py py-class docutils literal notranslate"><span class="pre">database.functions</span></code></a>
+namespace to enumerate each function. In this case we’ll use another
+useful function in that is provided to us by the <a class="reference internal" href="modules/misc-tools.html#module-tools" title="tools"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code></a>
+module. This functions is <a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a> and takes a callable
+as its first parameter. Normally, this callable will be passed an
+address for each function within the database. This callable will
+then be executed against every function similar to using
+<a class="reference internal" href="modules/database.html#database.functions" title="database.functions"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.functions()</span></code></a>. One thing that is interesting about
+<a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a>, however, is that it has the ability to detect
+the type of callable that is passed to it. If the callable takes
+two parameters, it will assume that the user intended an index, and
+an address to be passed to it. This can be used to detect how far
+along <a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a> has processed. Let’s redefine the above
+<code class="xref py py-func docutils literal notranslate"><span class="pre">tag_if_leaf()</span></code> function again.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">tag_if_leaf</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">ea</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+      <span class="n">total</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">]</span>
+      <span class="k">print</span> <span class="s2">&quot;Percentage complete: </span><span class="si">%f</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">index</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">total</span><span class="p">))</span>
+      <span class="k">if</span> <span class="ow">not</span> <span class="n">has_children</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
+          <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;function-type&#39;</span><span class="p">,</span> <span class="s1">&#39;leaf&#39;</span><span class="p">)</span>
+          <span class="k">return</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
+      <span class="k">return</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="bp">True</span><span class="p">)</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="7">
+<li>Now that we have a callable to pass to <a class="reference internal" href="modules/misc-tools.html#tools.map" title="tools.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">tools.map()</span></code></a>, we
+can simply hand it our callable and proceses the entire database.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">functions</span><span class="p">())</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">tag_if_leaf</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">functions</span><span class="p">()))</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="8">
+<li>Now, not only are all the “leaf” functions tagged, the variable
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">res</span></code> contains a list of tuples containing each function’s
+address, and whether or not it has any children. Let’s convert this
+to a Python <code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code> and tag any functions that contain
+only indirect calls. This way we can distinguish if any of these
+functions are wrappers that use virtual methods.</li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">children_lookup</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">children_lookup</span><span class="p">:</span>
+      <span class="k">if</span> <span class="n">children_lookup</span><span class="p">[</span><span class="n">ea</span><span class="p">]</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">down</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+          <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;function-type&#39;</span><span class="p">,</span> <span class="s1">&#39;virtual-wrapper&#39;</span><span class="p">)</span>
+      <span class="k">continue</span>
+<span class="o">&gt;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="9">
+<li>Now each function containing a call is tagged with “function-type”
+being equivalent to “leaf” or “virtual-wrapper” depending on whether
+no functions are called, or only indirect calls are made.</li>
+</ol>
+</div>
+<div class="section" id="conclusion">
+<span id="tutorials-conclusion"></span><h2>4.5. Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
+<p>There are a variety of different features available in this plugin that
+can allow users to automate different aspects of their reverse-engineering
+project. It is recommended by the author to explore the different modules
+by using Python’s <code class="xref py py-func docutils literal notranslate"><span class="pre">help()</span></code> function to see what is available.</p>
+<p>This plugin was written with the intention of enabling a reverse-engineer
+to automate many issues that one may encounter while reversing without
+investing in too much development effort. The author hopes that these
+examples help demonstrate the flexibility that is provided by this plugin.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div>
+  <h3 class="sidebar">IDA-minsc</h3>
+  <p class="sidebar logo">
+    <a href="index.html">
+      <img class="logo" src="_images/hamster.svg" alt="Logo"/>
+    </a>
+  </p>
+</div>
+  <h3 class="sidebar">Navigation</h3>
+  <p class="topless">
+    Previous topic:
+    <a href="modules/custom-tagfix.html" title="previous chapter">3.3.2. tagfix – Tagfix module</a>
+    <br />
+  </p>
+  <h3 class="sidebar"><a href="index.html">Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">4. Tutorials</a><ul>
+<li><a class="reference internal" href="#disassembling-the-current-address">4.1. Disassembling the current address</a></li>
+<li><a class="reference internal" href="#setting-breakpoints-windbg-on-all-labels-in-a-function">4.2. Setting breakpoints (WinDbg) on all labels in a function</a></li>
+<li><a class="reference internal" href="#tagging-all-dynamic-calls-in-the-database">4.3. Tagging all dynamic calls in the database</a></li>
+<li><a class="reference internal" href="#marking-all-functions-that-are-leaves">4.4. Marking all functions that are “leaves”</a></li>
+<li><a class="reference internal" href="#conclusion">4.5. Conclusion</a></li>
+</ul>
+</li>
+</ul>
+
+<h3 class="sidebar">Search</h3>
+<div class="searchformwrapper">
+  <form class="search" action="search.html" method="get">
+    <input type="text" name="q" />
+    <input type="submit" value="Go" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+<div id="searchbox" role="search">
+  <script type="text/javascript">$('#searchbox').show(0);</script>
+</div><div class="remove-stupid-js-margin">
+ <p>
+   <h3 class="sidebar">Indices</h3>
+   <ul>
+     <li><a href="genindex.html">Index of Functions</a></li>
+     <li><a href="py-modindex.html">Index of Modules</a></li>
+   </ul>
+ </p>
+</div>
+  <div role="note" aria-label="source link">
+    <h3 class="sidebar">This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/tutorials.rst.txt" rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="modules/custom-tagfix.html" title="3.3.2. tagfix – Tagfix module"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">IDA-minsc  documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>

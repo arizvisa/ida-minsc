@@ -38,6 +38,7 @@ Table of Contents
    install
    concepts
    modules
+   tutorials
 
 Index
 =====
