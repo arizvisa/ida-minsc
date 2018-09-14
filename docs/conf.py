@@ -31,7 +31,7 @@ pygments_style = 'sphinx'
 todo_include_todos = False
 
 ## The master toctree document.
-language = None
+language = 'en'
 master_doc = 'index'
 
 ## HTML configuration
@@ -71,10 +71,10 @@ htmlhelp_basename = 'ida-minsc.doc'
 
 ## LaTeX configuration
 latex_elements = {
-    # 'papersize': 'letterpaper',
-    # 'pointsize': '10pt',
-    # 'preamble': '',
-    # 'figure_align': 'htbp',
+    'papersize': 'letterpaper',
+    'pointsize': '10pt',
+    'preamble': '',
+    'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
