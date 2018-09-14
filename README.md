@@ -7,6 +7,7 @@
             <ul>
                 <li>Website: https://github.com/arizisa/ida-minsc</li>
                 <li>Documentation: https://arizvisa.github.io/ida-minsc</li>
+                <li>IRC: <code>#eof</code> on EFnet</li>
             </ul>
         </td>
     </tr>
