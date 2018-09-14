@@ -21,6 +21,7 @@ custom_targets = tags tagfix
 image_path = _images
 static_path = _static
 template_path = _templates
+ghpages_path = _gh-pages
 
 # Save the current branch state
 cwd := $(realpath .)
@@ -79,17 +80,16 @@ source: $(SOURCEDIR)
 	$(info [*] Successfuly built source in $<)
 
 gh-pages: build
-	$(info [*] Checking out branch: $@)
-	@git -C '$(ROOTDIR)' checkout -f '$@' 2>/dev/null
-	@git status --porcelain | grep ^A | tr ' ' ':' | cut -d: -f3 | xargs git -C '$(ROOTDIR)' reset
-	$(info [*] Moving documentation to target directory: $(ROOTDIR))
-	@tar -C '$(BUILDDIR)/html' -cf- . | tar -xvf- -C '$(ROOTDIR)'
-	$(info [*] Creating commit from recent build of documentation)
-	@tar -C '$(BUILDDIR)/html' -cf- . | tar -tf- | xargs git -C '$(ROOTDIR)' add
-	-git commit -m 'gh-pages: built documents from commit $(revision). '
+	$(info [*] Cloning branch $@ into directory: $(ghpages_path))
+	@git clone -b '$@' '$(ROOTDIR)' '$(ghpages_path)'
+	$(info [*] Emptying out the previous commit that is being replaced.)
+	@git -C '$(ghpages_path)' diff-tree --no-commit-id --name-only -r '$@' | xargs git -C '$(ghpages_path)' rm -rf
+	$(info [*] Moving built documentation to target directory: $(ghpages_path))
+	@tar -C '$(BUILDDIR)/html' -cf- . | tar -xvf- -C '$(ghpages_path)'
+	$(info [*] Creating commit from current state of documentation)
+	@tar -C '$(BUILDDIR)/html' -cf- . | tar -tf- | xargs git -C '$(ghpages_path)' add
+	@git -C '$(ghpages_path)' commit -m 'gh-pages: built documents from commit $(revision).'
 	$(info [*] Successfully committed documentation to branch: $@)
-	@git -C '$(ROOTDIR)' checkout -f '$(branch)' 2>/dev/null
-	$(info [*] Restored previous branch: $(branch))
 
 ## targets for auto-building documentation
 _source_targets = $(foreach target,$(base_targets),$(SOURCEDIR)/$(MODULEDIR)/$(target).rst)
