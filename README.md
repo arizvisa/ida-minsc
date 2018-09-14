@@ -1,9 +1,16 @@
 # IDA-minsc
 
-![hamsters for everyone][logo]{:width="20%" align="right"}
-
-* Website: https://github.com/arizisa/ida-minsc
-* Documentation: https://arizvisa.github.io/ida-minsc
+<table>
+    <tr>
+        <td width="10%"><img src="http://arizvisa.github.io/ida-minsc/_images/hamster.svg" height="10%" /></td>
+        <td>
+            <ul>
+                <li>Website: https://github.com/arizisa/ida-minsc</li>
+                <li>Documentation: https://arizvisa.github.io/ida-minsc</li>
+            </ul>
+        </td>
+    </tr>
+</table>
 
 ## General
 
