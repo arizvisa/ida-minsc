@@ -1,6 +1,9 @@
 # IDA-minsc
 
+![hamsters for everyone][logo]{:width="20%" align="right"}
+
 * Website: https://github.com/arizisa/ida-minsc
+* Documentation: https://arizvisa.github.io/ida-minsc
 
 ## General
 
@@ -16,7 +19,7 @@ and annotation issues can be performed with just a few lines of code. This
 should enable a user to write quick, hacky, throwaway code that can be used
 to augment their reversing endeavors.
 
-## Quick Start
+## Installation
 
 Installation should be pretty simple and requires simply cloning the repository
 directly into the user's IDA user directory. On the Windows platform, this is
@@ -47,6 +50,20 @@ IDAPython prompt:
 
 This should then return the number `0` since no database has been loaded.
 
+## Quick Start
+
+After installing the python dependencies, you can do something like the
+following to list all the functions in your database:
+
+    > database.functions.list()
+
+Or to iterate through all the functions in the database, you can try:
+
+    > for ea in database.functions():
+          print hex(ea)
+
+Please refer to the documentation for more details on what you have available.
+
 ## Documentation
 
 Comprehensive documentation is available on Github or can be built via the
@@ -68,3 +85,5 @@ See [CONTRIBUTING.md](https://github.com/arizvisa/ida-minsc/blob/master/CONTRIBU
 
 Thanks to a number of anonymous people have helped the development of this
 plugin throughout the years.
+
+[logo]: http://arizvisa.github.io/ida-minsc/_images/hamster.svg
