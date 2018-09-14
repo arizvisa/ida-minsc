@@ -3,17 +3,28 @@
 Installation of IDA-Minsc
 =========================
 
-To install IDA-Minsc on the various platforms that a user has IDA installed,
-it simply requires a user to clone the repository into their IDA user directory.
-The idea is that IDA-Minsc's ``idapythonrc.py`` file is executed by IDAPython
-when the user starts up IDA. At this point, IDA-Minsc will then empty out the
-default namespace and replace it with the contents of ``__root__.py``. This
-allows a user to use a function such as :py:func:`dir` or :py:func:`help` to
-list all the functions that they have created during their reversing project.
+To install IDA-Minsc on the various platforms that a user has installed
+IDA in, it simply requires a user to clone the repository into their
+IDA user directory. The idea is that IDA-Minsc's ``idapythonrc.py`` file
+is executed by IDAPython when the user starts up IDA. At this point,
+IDA-Minsc will then empty out the default namespace and replace it with
+the contents of ``__root__.py``. This allows a user to use a function
+such as :py:func:`dir` or :py:func:`help` to list all the functions that
+they have created during their reversing project.
 
-----------------------
-Cloning the repository
-----------------------
+---------------------
+Software Requirements
+---------------------
+
+Since this is an IDA plugin, obviously this requires IDA Pro. At the
+present time, only IDA 6.9 up to IDA 7.1.180227 is supported by this
+plugin. The installation steps described in this document also assume
+that you're not using the Python instance that is bundled with IDA and
+that you have it installed separately.
+
+----------------------------
+Installing the actual plugin
+----------------------------
 
 To install the directory, the contents of the repository must be either cloned
 or extracted into IDA's user directory. The repository is located at the
@@ -43,9 +54,8 @@ file in the repository should be executed.
 1. `IDA-Minsc repository -- https://github.com/arizvisa/ida-minsc <https://github.com/arizvisa/ida-minsc>`_
 2. `Git -- Local branching on the cheap -- https://git-scm.com <https://git-scm.com>`_
 
-----------------------------------
-Installing required Python modules
-----------------------------------
+Required Python dependencies
+****************************
 
 This project depends on a small number of required Python modules that the
 user will need to install into their ``site-packages`` directory. These modules
@@ -60,9 +70,8 @@ in the root of the user directory:
 
     $ pip install -r requirements.txt
 
---------------------------------
 Sanity checking the installation
---------------------------------
+********************************
 
 To check that IDA-Minsc has been installed properly, one can simply start
 up their instance of IDA. Once IDAPython has been successfully loaded,

@@ -10,6 +10,8 @@ ROOTDIR := $(realpath $(MAKEDIR)..)
 MODULEDIR := modules
 STATICDIR := static
 IMAGEDIR := images
+TEMPLATEDIR := templates
+HTMLDIR := html
 
 # Various targets used for auto-generation of documentation
 base_targets = database enumeration function instruction segment structure
@@ -18,6 +20,7 @@ custom_targets = tags tagfix
 
 image_path = _images
 static_path = _static
+template_path = _templates
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -73,7 +76,10 @@ _source_targets+= $(foreach target,$(misc_targets),$(SOURCEDIR)/$(MODULEDIR)/mis
 _source_targets+= $(foreach target,$(custom_targets),$(SOURCEDIR)/$(MODULEDIR)/custom-$(target).rst)
 _static_targets = $(foreach target,$(wildcard $(STATICDIR)/*.rst),$(SOURCEDIR)/$(notdir $(target)))
 _image_targets = $(foreach image,$(wildcard $(IMAGEDIR)/*),$(SOURCEDIR)/$(image_path)/$(notdir $(image)))
-$(SOURCEDIR): $(SOURCEDIR)/index.rst $(_source_targets) $(_static_targets) $(_image_targets) | $(SOURCEDIR)/
+_template_targets = $(foreach target,$(wildcard $(TEMPLATEDIR)/*),$(SOURCEDIR)/$(template_path)/$(notdir $(target)))
+_html_targets = $(foreach target,$(wildcard $(HTMLDIR)/*),$(SOURCEDIR)/$(static_path)/$(notdir $(target)))
+
+$(SOURCEDIR): $(SOURCEDIR)/index.rst $(_source_targets) $(_static_targets) $(_image_targets) $(_template_targets) $(_html_targets) | $(SOURCEDIR)/
 	$(info [!] Completed building of documentation)
 
 # base modules (module/$source.rst)
@@ -93,14 +99,21 @@ $(eval $(call require_directory,$(SOURCEDIR)/))
 $(eval $(call require_directory,$(SOURCEDIR)/$(MODULEDIR)/))
 $(eval $(call require_directory,$(SOURCEDIR)/$(image_path)/))
 $(eval $(call require_directory,$(SOURCEDIR)/$(static_path)/))
+$(eval $(call require_directory,$(SOURCEDIR)/$(template_path)/))
 
 # static targets ($source.rst)
 $(foreach source,$(wildcard $(STATICDIR)/*.rst),$(eval $(call copy_target,$(SOURCEDIR)/$(notdir $(source)),$(source))))
 
-# image files
-$(foreach image,$(wildcard $(IMAGEDIR)/*),$(eval $(call copy_target,$(SOURCEDIR)/_images/$(notdir $(image)),$(image))))
+# templates (_templates/$source)
+$(foreach source,$(wildcard $(TEMPLATEDIR)/*),$(eval $(call copy_target,$(SOURCEDIR)/$(template_path)/$(notdir $(source)),$(source))))
 
-# configuration file
+# image files (_images/$image)
+$(foreach image,$(wildcard $(IMAGEDIR)/*),$(eval $(call copy_target,$(SOURCEDIR)/$(image_path)/$(notdir $(image)),$(image))))
+
+# html static files (_static/$image)
+$(foreach source,$(wildcard $(HTMLDIR)/*),$(eval $(call copy_target,$(SOURCEDIR)/$(static_path)/$(notdir $(source)),$(source))))
+
+# configuration file (conf.py)
 $(eval $(call copy_target,$(SOURCEDIR)/conf.py,$(MAKEDIR)conf.py))
 
 # index file

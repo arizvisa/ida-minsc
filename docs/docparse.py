@@ -410,7 +410,6 @@ class restructure(object):
             # extract and procses the description
             descr = next(iterable)
             definition = "{:s} -- {:s}".format(ref.name, descr)
-            res.append('=' * len(definition))
             res.append(definition)
             res.append('=' * len(definition))
 
@@ -778,7 +777,7 @@ class restructure(object):
     def Function(cls, ref):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
         ns = ns[1:] if ref.name == '__new__' else ns[:]
-        name = r'\.'.join(reversed(ns))
+        name = r'\.'.join(reversed(ns[:-1]))
 
         aliases = ref.get('aliases') or {}
         args, params = cls.Arguments(ref)

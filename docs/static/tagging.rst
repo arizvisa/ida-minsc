@@ -394,7 +394,9 @@ Return all of the global functions that have the tag "synopsis", with the
 optional tag "note" applied to it::
 
    > for ea, tags in database.select('synopsis', Or=('note',)):
-         print "Function: %x -- %s (note: %r)"% (ea, tags['synopsis'], tags.get('note', 'no notes found!'))
+         synopsis = tags['synopsis']
+         note = tags.get('note', 'no notes found!')
+         print "Function: %x -- %s (note: %r)"% (ea, synopsis, note)
    >
 
 Return all addresses that have both the required tags "object-name", and "object-size",
