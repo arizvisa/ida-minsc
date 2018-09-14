@@ -22,11 +22,14 @@ image_path = _images
 static_path = _static
 template_path = _templates
 
+# Save the current branch state
+branch := $(shell git symbolic-ref --short HEAD)
+
 # Put it first so that "make" without argument is like "make help".
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-.PHONY: help all configuration source
+.PHONY: help build configuration source gh-pages
 
 ## macros for doing stuff
 
@@ -62,13 +65,23 @@ _sphinx_targets += gettext changes xml pseudoxml linkcheck doctest coverage
 
 $(foreach target,$(_sphinx_targets),$(eval $(call sphinx_target,$(target))))
 
-all: configuration source | html
+all: build
+
+build: configuration source | html
 
 configuration: $(SOURCEDIR)/conf.py
 	$(info [*] Successfuly copied configuration into $<)
 
 source: $(SOURCEDIR)
 	$(info [*] Successfuly build source in $<)
+
+gh-pages: build
+	@git checkout '$@'
+	@( cd '$(ROOTDIR)' && git status --porcelain | grep ^A | tr ' ' ':' | cut -d: -f3 | xargs git reset )
+	@tar -C '$(BUILDDIR)/html' -cf- . | tar -xvf- -C '$(ROOTDIR)'
+	@tar -C '$(BUILDDIR)/html' -cf- . | tar -tf- | ( cd '$(ROOTDIR)' && xargs git add )
+	@git commit -m 'Built documents from $(shell git rev-parse HEAD)'
+	@git checkout -f '$(branch)'
 
 ## targets for auto-building documentation
 _source_targets = $(foreach target,$(base_targets),$(SOURCEDIR)/$(MODULEDIR)/$(target).rst)
