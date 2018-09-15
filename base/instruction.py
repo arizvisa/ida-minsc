@@ -8,32 +8,33 @@ prefixes which can be used to decode the operands for an instruction.
 At the present time, only the Intel, AArch32 (ARM), and MIPS
 architectures are supported.
 
-Although IDA internally uses the `insn_t` and `op_t` to represent
-an instruction and its operands, this module's base argument type
-is typically an address or an operand index. When dealing with an
+Although IDA internally uses the `idaapi.insn_t` and `idaapi.op_t` to
+represent an instruction and its operands, this module's base argument
+type is typically an address or an operand index. When dealing with an
 instruction's operands, the `ops_` prefix represents all of the
 instructions operands and typically will take only an address.
 Likewise when dealing with a single operand, the `op_` prefix
 is used and will take an address and the operand index.
 
-To request the actual IDA types (`insn_t` and `op_t`) there are
-two tools that are provided. The `instruction.at(address)` tool
-will take an address and return an `insn_t`. To get an `op_t`, a
-user can use `instruction.operand(address, opnum)`. This will take
-an address and an index and return the desired `op_t`.
+To request the actual IDA types (`idaapi.insn_t` and `idaapi.op_t`)
+there are two tools that are provided. The `instruction.at(address)`
+tool will take an address and return an `idaapi.insn_t`. To get an
+`idaapi.op_t`, a user can use `instruction.operand(address, opnum)`.
+This will take an address and an index and return the desired
+`idaapi.op_t`.
 
 Some globals are also defined for the given architecture which
 can be used to query or access the registers that are currently
 available. Once IDA has determined the architecture for the database
-the `instruction.register` object is created. This object allows
-one to reference a register that is defined for the architecture.
+the ``register_t`` class is instantiated. This object allows one to
+reference a register that is defined for the architecture.
 
-Another object that is created is the `instruction.architecture`
-object. Searching for a register can be done by index and size
-or simply by its name. This object also allows one to promote
-or demote a register between its various sizes. This allows one
-to navigate between the 8-bit, 16-bit, 32-bit, or 64-bit versions
-of a register available in the architecture.
+Another object that is created is the ``architecture_t`` object.
+Searching for a register can be done by index and size or simply by
+its name. This object also allows one to promote or demote a register
+between its various sizes. This allows one to navigate between the
+8-bit, 16-bit, 32-bit, or 64-bit versions of a register available in
+the architecture.
 """
 
 import six
@@ -618,7 +619,7 @@ op_enum = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_string(opnum):
-    '''Return the string type of operand `opnum` for the current instruction.'''
+    '''Return the string type of operand ``opnum`` for the current instruction.'''
     return op_string(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_string(ea, opnum):
@@ -648,11 +649,11 @@ def op_string(ea, opnum, strtype):
 ## flags
 @utils.multicase(opnum=six.integer_types)
 def op_refs(opnum):
-    '''Returns the `(address, opnum, type)` of all the instructions that reference the operand ``opnum`` for the current instruction.'''
+    '''Returns the ``(address, opnum, type)`` of all the instructions that reference the operand ``opnum`` for the current instruction.'''
     return op_refs(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_refs(ea, opnum):
-    '''Returns the `(address, opnum, type)` of all the instructions that reference the operand ``opnum`` for the instruction at ``ea``.'''
+    '''Returns the ``(address, opnum, type)`` of all the instructions that reference the operand ``opnum`` for the instruction at ``ea``.'''
     fn = idaapi.get_func(ea)
     if fn is None:
         raise LookupError("{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, ea, opnum, ea))
@@ -1117,7 +1118,7 @@ class intelops:
         """
         A tuple representing an address with a segment register attached for Intel.
 
-        Has the format `(segment, offset)` where `segment` is a segment register.
+        Has the format ``(segment, offset)`` where ``segment`` is a segment register.
         """
         _fields = ('segment', 'offset')
         _types = (
@@ -1127,7 +1128,7 @@ class intelops:
 
         @property
         def symbols(self):
-            '''Yield the `segment` register from the tuple if it is defined.'''
+            '''Yield the ``segment`` register from the tuple if it is defined.'''
             s, _ = self
             if s is not None: yield s
     SO = SegmentOffset
@@ -1136,8 +1137,9 @@ class intelops:
         """
         A tuple representing a memory phrase for the Intel architecture.
 
-        Has the format `(segment, offset, base, index, scale)` where `segment`
-        includes the segment register and `base` and `index` are both optional registers.
+        Has the format ``(segment, offset, base, index, scale)`` where
+        ``segment`` includes the segment register and ``base`` and
+        ``index`` are both optional registers.
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
         _types = (
@@ -1150,7 +1152,7 @@ class intelops:
 
         @property
         def symbols(self):
-            '''Yield the `segment`, `base`, and the `index` registers from the tuple if they are defined.'''
+            '''Yield the ``segment``, ``base``, and the ``index`` registers from the tuple if they are defined.'''
             s, _, b, i, _ = self
             if s is not None: yield s
             if b is not None: yield b
@@ -1161,8 +1163,8 @@ class intelops:
         """
         A tuple representing a memory phrase for the Intel architecture.
 
-        Has the format `(offset, base, index, scale)` where both `base` and
-        `index` are both optional registers.
+        Has the format ``(offset, base, index, scale)`` where both
+        ``base`` and ``index`` are both optional registers.
         """
         _fields = ('offset', 'base', 'index', 'scale')
         _types = (
@@ -1174,7 +1176,7 @@ class intelops:
 
         @property
         def symbols(self):
-            '''Yield the `base`, and the `index` registers from the tuple if they are defined.'''
+            '''Yield the ``base``, and the ``index`` registers from the tuple if they are defined.'''
             _, b, i, _ = self
             if b is not None: yield b
             if i is not None: yield i
@@ -1191,7 +1193,7 @@ class armops:
         """
         A tuple representing a flexible operand as available on the ARM architecture.
 
-        Has the format `(Rn, shift, n)` which allows the architecture to apply
+        Has the format ``(Rn, shift, n)`` which allows the architecture to apply
         a binary shift or rotation to the value of a register `Rn`.
         """
         _fields = ('Rn', 'shift', 'n')
@@ -1215,7 +1217,7 @@ class armops:
         """
         A tuple representing a register list on the ARM architecture.
 
-        Has the simple format `(reglist,)` where `reglist` is a set of registers
+        Has the simple format ``(reglist,)`` where ``reglist`` is a set of registers
         that can be explicitly tested for membership.
         """
         _fields = ('reglist', )
@@ -1223,7 +1225,7 @@ class armops:
 
         @property
         def symbols(self):
-            '''Yield any of the registers within the `reglist` field belonging to the tuple.'''
+            '''Yield any of the registers within the ``reglist`` field belonging to the tuple.'''
             res, = self
             for r in res: yield r
 
@@ -1231,7 +1233,7 @@ class armops:
         """
         A tuple representing a memory displacement on the ARM architecture.
 
-        Has the format `(Rn, Offset)` where `Rn` is a register and `Offset` is
+        Has the format ``(Rn, Offset)`` where ``Rn`` is a register and ``Offset`` is
         the integer that is added to the register.
         """
         _fields = ('Rn', 'offset')
@@ -1253,7 +1255,7 @@ class armops:
         """
         A tuple for representing a memory phrase on the ARM architecture
 
-        Has the format `(Rn, Rm)` where both are registers that compose the
+        Has the format ``(Rn, Rm)`` where both are registers that compose the
         phrase.
         """
         _fields = ('Rn', 'Rm')
@@ -1276,8 +1278,8 @@ class armops:
         """
         A tuple for representing a memory operand on the ARM architecture.
 
-        Has the format `(address, value)` where `address` is the actual value
-        stored in the operand and `value` is the value that is dereferenced.
+        Has the format ``(address, value)`` where ``address`` is the actual value
+        stored in the operand and ``value`` is the value that is dereferenced.
         """
         _fields = ('address', 'value')
         _types = (six.integer_types, six.integer_types)
@@ -1299,8 +1301,8 @@ class mipsops:
         """
         A tuple for representing a memory phrase on the MIPS architecture.
 
-        Has the format `(Rn, Offset)` where `Rn` is the register and `Offset`
-        is the immediate that is added to the register.
+        Has the format ``(Rn, Offset)`` where ``Rn`` is the register and
+        ``Offset`` is the immediate that is added to the register.
         """
         _fields = ('Rn', 'Offset')
         _types = (interface.register_t, six.integer_types)
@@ -1319,7 +1321,7 @@ class mipsops:
         """
         A callable that returns a co-processor for the MIPS architecture.
 
-        Takes a `regnum` argument which returns the correct register.
+        Takes a ``regnum`` argument which returns the correct register.
         """
         global register, architecture
         res = {
@@ -1491,7 +1493,7 @@ def __ev_newprc__(pnum, keep_cfg):
 def __newprc__(id):
     """
     Determine the architecture from the current processor and use it to initialize
-    the globals (`architecture` and `register`) within this module.
+    the globals (``architecture`` and ``register``) within this module.
     """
     plfm, m = idaapi.ph.id, __import__('sys').modules[__name__]
     if plfm == idaapi.PLFM_386:     # id == 15
