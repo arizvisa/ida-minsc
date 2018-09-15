@@ -88,7 +88,7 @@ single string as its argument. By default this function will be using the
 :py:data:`like` keyword thus making its argument a glob. Please review the
 related documentation for the full functionality of each matcher instance.
 
-.. py:function:: namespace.list(**type)
+.. py:function:: namespace.list(\*\*type)
 
    This function will list the matched types within the IDA console. Each row
    that is displayed will contain a summary of the type that has matched. This
@@ -98,7 +98,7 @@ related documentation for the full functionality of each matcher instance.
    :param type: a keyword argument representing the type of match to perform and
                 what value to match it against
 
-.. py:function:: namespace.search(**type)
+.. py:function:: namespace.search(\*\*type)
 
    Once a desired type has been determined, this function can then be used to
    return the first result that matches. If more than one result is returned,
@@ -109,7 +109,7 @@ related documentation for the full functionality of each matcher instance.
                 what value to match it against
    :return: the first item that was matched
 
-.. py:function:: namespace.iterate(**type)
+.. py:function:: namespace.iterate(\*\*type)
 
    When a user wishes to enumerate all of the matches of a particular type, they
    will need to use this function. Once given a keyword and value to match with,
