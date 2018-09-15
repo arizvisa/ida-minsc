@@ -552,12 +552,26 @@ side effects. Although any tag names can be used, it's recommended by the
 author to choose consistent names to simplify exchanging knowledge with
 other users. Some recommended names can be:
 
-    - ``synopsis`` -- The potential semantics of a reversed function
-    - ``__color__`` -- The RGB color of an item at a particular address
-    - ``__name__`` -- The name associated with an address
-    - ``note`` -- Any general notes about an address determined the the user
-    - ``marks`` -- A set containing any marks contained within a function
-    - ``mark`` -- A string containing the description for a mark at an address
-    - ``object`` -- The name or address(es) of a related vtable applied to a function that is used to call a method.
-    - ``input`` -- A dictionary mapping register arguments to a function
-    - ``return`` -- A list containing the registers that a result is composed of
++---------------+--------------------------------------------------------+
+| ``synopsis``  | The potential semantics of a reversed function         |
++---------------+--------------------------------------------------------+
+| ``__color__`` | The RGB color of an item at a particular address       |
++---------------+--------------------------------------------------------+
+| ``__name__``  | The name associated with an address                    |
++---------------+--------------------------------------------------------+
+| ``note``      | Any general notes about an address determined by the   |
+|               | user                                                   |
++---------------+--------------------------------------------------------+
+| ``marks``     | A set containing any marks contained within a function |
++---------------+--------------------------------------------------------+
+| ``mark``      | A string containing the description for a mark at an   |
+|               | address                                                |
++---------------+--------------------------------------------------------+
+| ``object``    | The name or address(es) of a related vtable applied to |
+|               | a function that is used to call a method.              |
++---------------+--------------------------------------------------------+
+| ``input``     | A dictionary mapping register arguments to a function  |
++---------------+--------------------------------------------------------+
+| ``return``    | A list containing the registers that a result is       |
+|               | composed of                                            |
++---------------+--------------------------------------------------------+
