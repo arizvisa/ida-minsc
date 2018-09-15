@@ -12,15 +12,15 @@ When listing or enumerating segments there are different types that
 one can use in order to filter or match them. These types are as
 follows:
 
-    `name` - Match according to the exact segment name
-    `like` - Filter the segment names according to a glob
-    `regex` - Filter the function names according to a regular-expression
-    `index` - Match the segment by its index
-    `identifier` - Match the segment by its identifier
-    `selector` - Match the segment by its selector
-    `greater` or `gt` - Filter the segments for any after the specified address
-    `less` or `lt` - Filter the segments for any before the specified address
-    `predicate` - Filter the segments by passing their `idaapi.segment_t` to a callable
+    ``name`` - Match according to the exact segment name
+    ``like`` - Filter the segment names according to a glob
+    ``regex`` - Filter the function names according to a regular-expression
+    ``index`` - Match the segment by its index
+    ``identifier`` - Match the segment by its identifier
+    ``selector`` - Match the segment by its selector
+    ``greater`` or ``gt`` - Filter the segments for any after the specified address
+    ``less`` or ``lt`` - Filter the segments for any before the specified address
+    ``predicate`` - Filter the segments by passing their `idaapi.segment_t` to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -28,6 +28,7 @@ Some examples of using these keywords are as follows::
     > database.segments.list(regex=r'\.r?data')
     > iterable = database.segments.iterate(like='*text*')
     > result = database.segments.search(greater=0x401000)
+
 """
 
 import six
