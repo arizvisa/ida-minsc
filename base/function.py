@@ -408,12 +408,12 @@ class chunks(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the current function that uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Yield each ``(address, opnum, state)`` within the current function that uses ``reg`` or any one of the registers in ``regs``.'''
         return cls.register(ui.current.function(), reg, *regs, **modifiers)
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, func, reg, *regs, **modifiers):
-        """Yield each `(address, opnum, state)` within the function ``func`` that uses ``reg`` or any one of the registers in ``regs``.
+        """Yield each ``(address, opnum, state)`` within the function ``func`` that uses ``reg`` or any one of the registers in ``regs``.
 
         If the keyword ``write`` is True, then only return the result if it's writing to the register.
         """
@@ -1069,24 +1069,24 @@ class block(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the current block that uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Yield each ``(address, opnum, state)`` within the current block that uses ``reg`` or any one of the registers in ``regs``.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the block containing ``ea`` that uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Yield each ``(address, opnum, state)`` within the block containing ``ea`` that uses ``reg`` or any one of the registers in ``regs``.'''
         blk = blocks.at(ea)
         return cls.register(blk, reg, *regs, **modifiers)
     @utils.multicase(bounds=types.TupleType, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
-        '''Yield each `(address, opnum, state)` within the block identified by ``bounds`` that uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Yield each ``(address, opnum, state)`` within the block identified by ``bounds`` that uses ``reg`` or any one of the registers in ``regs``.'''
         bb = cls.at(bounds)
         return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
-        """Yield each `(address, opnum, state)` within the block ``bb`` that uses ``reg`` or any one of the registers in ``regs``.
+        """Yield each ``(address, opnum, state)`` within the block ``bb`` that uses ``reg`` or any one of the registers in ``regs``.
 
         If the keyword ``write`` is true, then only return the result if it's writing to the register.
         """
@@ -1235,7 +1235,7 @@ class frame(object):
         """
         This namespace is for returning information about the arguments
         within a function's frame. By default, this namespace will yield
-        each argument as a tuple containing the `(offset, name, size)`.
+        each argument as a tuple containing the ``(offset, name, size)``.
 
         At the moment, register-based calling conventions are not
         supported.
