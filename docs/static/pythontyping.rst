@@ -88,12 +88,24 @@ retain any kind of state.
 Any one of the following Python types and functions can be used to represent a
 type that will be transformed into IDA's format.
 
-- :py:obj:`int` or :py:obj:`long` - an integer type (``idaapi.FF_BYTE``, ``idaapi.FF_WORD``, ``idaapi.FF_DWORD``, etc.)
-- :py:obj:`chr` or :py:obj:`str` - a character/string type (``idaapi.FF_STRLIT``, etc.)
-- :py:obj:`float` - a floating point type (``idaapi.FF_FLOAT``, ``idaapi.FF_DOUBLE``, etc.)
-- :py:obj:`type` - a pointer type (``idaapi.FF_OFF*``, etc.)
-- :py:obj:`None` - an alignment type (``idaapi.FF_ALIGN``)
-- an instance of a :py:class:`structure_t` - a structure as retrieved by the :py:mod:`structure` module using :py:func:`structure.by` or similar
++-------------------------+----+------------------------------------------------+
+| :py:obj:`int` or        | -- | an integer type that uses types such as        |
+| :py:obj:`long`          |    | ``idaapi.FF_WORD``, ``idaapi.FF_DWORD``, etc   |
++-------------------------+----+------------------------------------------------+
+| :py:obj:`chr` or        | -- | a character/string type that uses types such   |
+| :py:obj:`str`           |    | ``idaapi.FF_STRLIT``, etc                      |
++-------------------------+----+------------------------------------------------+
+| :py:obj:`float`         | -- | a floating point type which uses types such as |
+|                         |    | ``idaapi.FF_FLOAT``, ``idaapi.FF_DOUBLE``, etc |
++-------------------------+----+------------------------------------------------+
+| :py:obj:`type`          | -- | a pointer type which uses ``idaapi.FF_OFF*``   |
++-------------------------+----+------------------------------------------------+
+| :py:obj:`None`          | -- | an alignment type using ``idaapi.FF_ALIGN``    |
++-------------------------+----+------------------------------------------------+
+| :py:class:`structure_t` | -- | a structure as retrieved by the                |
+|                         |    | :py:mod:`structure` module using               |
+|                         |    | :py:func:`structure.by` or similar             |
++-------------------------+----+------------------------------------------------+
 
 Using these common keywords as types allows one to not have to remember or
 search through documentation for the correct flags to apply to IDA. For
@@ -118,22 +130,36 @@ is being represented without having to test any bits within the integer
 representing the type. Some examples of describing an atomic type in this format
 follows.
 
-- ``(int, 4)`` -- A 4 byte sized integer (dword)
-- ``(int, 8)`` -- A 2 byte sized integer (qword)
-- ``(int, 1)`` -- A single byte sized integer (byte)
-- ``(float, 4)`` -- A 4 byte sized floating point number (single)
-- ``chr`` -- A single byte sized character or string
-- ``int`` -- A default sized integer (dword on 32-bit, qword on 64-bit)
-- ``(None, 8)`` -- An alignment to a multiple of 8
-- ``(str, 10)`` or ``(chr, 10)`` -- A 10 character string
-
++------------------+----------------------------------------------------+
+| ``(int, 4)``     | A 4 byte sized integer (dword)                     |
++------------------+----------------------------------------------------+
+| ``(int, 8)``     | A 2 byte sized integer (qword)                     |
++------------------+----------------------------------------------------+
+| ``(int, 1)``     | A single byte sized integer (byte)                 |
++------------------+----------------------------------------------------+
+| ``(float, 4)``   | A 4 byte sized floating point number (single)      |
++------------------+----------------------------------------------------+
+| ``chr``          | A single byte sized character or string            |
++------------------+----------------------------------------------------+
+| ``int``          | A default sized integer (dword on 32-bit, qword on |
+|                  | 64-bit)                                            |
++------------------+----------------------------------------------------+
+| ``(None, 8)``    | An alignment to a multiple of 8                    |
++------------------+----------------------------------------------------+
+| ``(str, 10)`` or | A 10 character string                              |
+| ``(chr, 10)``    |                                                    |
++------------------+----------------------------------------------------+
 
 Some examples of using a list to describe an array of some particular element
-follows as well.
+can be:
 
-- ``[(int, 4), 8]`` -- An 8 element array of 4-byte integers (dwords)
-- ``[float, 32]`` -- A 32 element array of default-sized floats
-- ``[str, 256]`` -- A 256-element string
++-------------------+-------------------------------------------------+
+| ``[(int, 4), 8]`` | An 8 element array of 4-byte integers or dwords |
++-------------------+-------------------------------------------------+
+| ``[float, 32]``   | A 32 element array of default-sized floats      |
++-------------------+-------------------------------------------------+
+| ``[str, 256]``    | A 256-element string                            |
++-------------------+-------------------------------------------------+
 
 If a instance of :py:class:`structure_t` is desired to be used, this can be
 treated as an atomic type. Usage of this, however, does not allow a user to
@@ -141,8 +167,13 @@ size the structure using the "(" and ")" grouping operators. This does, though,
 allow a user to specify a :py:class:`structure_t` as an array such as via
 the following:
 
-- ``[mystruc, 6]`` -- if :py:obj:`mystruc` is an instance of :py:class:`structure_t`, then this would represent a 6 element array.
-- ``[mystruc, 1]`` -- A single element array of :py:obj:`mystruc`
++------------------+----------------------------------------------------+
+| ``[mystruc, 6]`` | if :py:obj:`mystruc` is an instance of             |
+|                  | :py:class:`structure_t`, then this would represent |
+|                  | a 6 element array of that type                     |
++------------------+----------------------------------------------------+
+| ``[mystruc, 1]`` | A single element array of :py:obj:`mystruc`        |
++------------------+----------------------------------------------------+
 
 .. _pythontyping-examples-usage:
 
