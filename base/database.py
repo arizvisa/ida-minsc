@@ -38,6 +38,7 @@ def here():
     return ui.current.address()
 h = utils.alias(here)
 
+@document.aliases('contains')
 @utils.multicase()
 def within():
     '''Should always return true.'''
