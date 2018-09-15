@@ -15,7 +15,7 @@ Some namespaces are also provided for querying the available symbolic
 information that IDA has discovered about a binary. This can be used
 to search and navigate the database. Some of the available namespaces
 that can be used for querying are `functions`, `segments`, `names`,
-`imports`, `exports`, and `marks`.
+`imports`, `entries`, and `marks`.
 """
 
 import six
@@ -189,7 +189,7 @@ class config(object):
 
     @classmethod
     def bounds(cls):
-        '''Return the bounds of the current database as a tuple formatted as `(left, right)`'''
+        '''Return the bounds of the current database as a tuple formatted as ``(left, right)``.'''
         return interface.bounds_t(cls.info.minEA, cls.info.maxEA)
 
     class registers(object):
@@ -232,11 +232,11 @@ class functions(object):
 
     The different types that one can match functions with are the following:
 
-        `address` or `ea` - Match according to the function's address
-        `name` - Match according to the exact name
-        `like` - Filter the function names according to a glob
-        `regex` - Filter the function names according to a regular-expression
-        `predicate` - Filter the functions by passing their `idaapi.func_t` to a callable
+        ``address`` or ``ea`` - Match according to the function's address
+        ``name`` - Match according to the exact name
+        ``like`` - Filter the function names according to a glob
+        ``regex`` - Filter the function names according to a regular-expression
+        ``predicate`` - Filter the functions by passing their `idaapi.func_t` to a callable
 
     Some examples of how to use these keywords are as follows::
 
@@ -404,15 +404,15 @@ class segments(object):
 
     The different types that one can match segments with are the following:
 
-        `name` - Match according to the true segment name
-        `like` - Filter the segment names according to a glob
-        `regex` - Filter the segment names according to a regular-expression
-        `index` - Match the segment by its index
-        `identifier` - Match the segment by its identifier (`idaapi.segment_t.name`)
-        `selector` - Match the segment by its selector (`idaapi.segment_t.sel`)
-        `greater` or `gt` - Filter the segments for any after the specified address
-        `less` or `lt` - Filter the segments for any before the specified address
-        `predicate` - Filter the segments by passing its `idaapi.segment_t` to a callable
+        ``name`` - Match according to the true segment name
+        ``like`` - Filter the segment names according to a glob
+        ``regex`` - Filter the segment names according to a regular-expression
+        ``index`` - Match the segment by its index
+        ``identifier`` - Match the segment by its identifier (`idaapi.segment_t.name`)
+        ``selector`` - Match the segment by its selector (`idaapi.segment_t.sel`)
+        ``greater`` or ``gt`` - Filter the segments for any after the specified address
+        ``less`` or ``lt`` - Filter the segments for any before the specified address
+        ``predicate`` - Filter the segments by passing its `idaapi.segment_t` to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -541,16 +541,16 @@ def write(ea, data, **persist):
 class names(object):
     """
     This namespace is used for listing all the names (or symbols)
-    within the database. By default the `(address, name)` is yielded.
+    within the database. By default the ``(address, name)`` is yielded.
 
     The different types that one can filter the symbols with are the following:
 
-        `address` - Match according to the address of the symbol
-        `name` - Match according to the name of the symbol
-        `like` - Filter the symbol names according to a glob
-        `regex` - Filter the symbol names according to a regular-expression
-        `index` - Match the symbol according to its index
-        `predicate` - Filter the symbols by passing their address to a callable
+        ``address`` - Match according to the address of the symbol
+        ``name`` - Match according to the name of the symbol
+        ``like`` - Filter the symbol names according to a glob
+        ``regex`` - Filter the symbol names according to a regular-expression
+        ``index`` - Match the symbol according to its index
+        ``predicate`` - Filter the symbols by passing their address to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -670,12 +670,12 @@ class search(object):
         `search.by_name`  - Search by the specified name
 
     Each search method has its own options, but all of them take an extra
-    boolean option, `reverse`, which specifies whether to search backwards
+    boolean option, ``reverse``, which specifies whether to search backwards
     from the starting position or forwards.
 
     The `search.iterate` function allows one to iterate through all the results
     discovered in the database. One variation of `search.iterate` takes a 3rd
-    parameter `predicate`. One can provide one of the search methods provided
+    parameter ``predicate``. One can provide one of the search methods provided
     or include their own. This function will then yield each matched search
     result.
     """
@@ -967,14 +967,14 @@ class entries(object):
 
     The different types that one can match entrypoints with are the following:
 
-        `address` or `ea` - Match according to the entrypoint's address
-        `name` - Match according to the exact name
-        `like` - Filter the entrypoint names according to a glob
-        `regex` - Filter the entrypoint names according to a regular-expression
-        `index` - Match according to the entrypoint's index (ordinal)
-        `greater` or `gt` - Filter the entrypoints for any after the specified address
-        `less` or `lt` - Filter the entrypoints for any before the specified address
-        `predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
+        ``address`` or ``ea`` - Match according to the entrypoint's address
+        ``name`` - Match according to the exact name
+        ``like`` - Filter the entrypoint names according to a glob
+        ``regex`` - Filter the entrypoint names according to a regular-expression
+        ``index`` - Match according to the entrypoint's index (ordinal)
+        ``greater`` or ``gt`` - Filter the entrypoints for any after the specified address
+        ``less`` or ``lt`` - Filter the entrypoints for any before the specified address
+        ``predicate`` - Filter the entrypoints by passing its index (ordinal) to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -1305,7 +1305,7 @@ def tag(ea, key, none):
 # FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=basestring)
 def select(tag, *And, **boolean):
-    '''Query all of the global tags in the database for the specified `tag` and any others specified as ``And``.'''
+    '''Query all of the global tags in the database for the specified ``tag`` and any others specified as ``And``.'''
     res = (tag,) + And
     boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())).union(res))
     return select(**boolean)
@@ -1411,23 +1411,23 @@ class imports(object):
     symbols with the binary.
 
     By default a tuple is yielded for each import with the format
-    `(address, (shared-object, name, hint))`. In this tuple,
-    `shared-object` represents the name of the shared object the
-    import is imported from. The `name` is the symbol name to link
-    with, and `hint` is the import ordinal hint which is used to speed
+    ``(address, (shared-object, name, hint))``. In this tuple,
+    ``shared-object`` represents the name of the shared object the
+    import is imported from. The ``name`` is the symbol name to link
+    with, and ``hint`` is the import ordinal hint which is used to speed
     up the linking process.
 
     The different types that one can match imports with are the following:
 
-        `address` or `ea` - Match according to the import's address
-        `name` - Match according to the import's symbol name
-        `module` - Filter the imports according to the specified module name
-        `fullname` - Match according to the full symbol name (module + symbol)
-        `like` - Filter the symbol names of all the imports according to a glob
-        `regex` - Filter the symbol names of all the imports according to a regular-expression
-        `ordinal` - Match according to the import's hint (ordinal)
-        `index` - Match according index of the import
-        `predicate` Filter the imports by passing the above (default) tuple to a callable
+        ``address`` or ``ea`` - Match according to the import's address
+        ``name`` - Match according to the import's symbol name
+        ``module`` - Filter the imports according to the specified module name
+        ``fullname`` - Match according to the full symbol name (module + symbol)
+        ``like`` - Filter the symbol names of all the imports according to a glob
+        ``regex`` - Filter the symbol names of all the imports according to a regular-expression
+        ``ordinal`` - Match according to the import's hint (ordinal)
+        ``index`` - Match according index of the import
+        ``predicate`` Filter the imports by passing the above (default) tuple to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -1461,7 +1461,7 @@ class imports(object):
     def __iterate__(cls):
         """Iterate through all of the imports in the database.
 
-        Yields `(address, (module, name, ordinal))` for each iteration.
+        Yields ``(address, (module, name, ordinal))`` for each iteration.
         """
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
@@ -2778,7 +2778,7 @@ class type(object):
         This namespace is for returning type information about an array
         that is defined within the database. By default this namespace
         will return the array's element size and number of elements as
-        a tuple `(size, count)`.
+        a tuple ``(size, count)``.
 
         Some examples of using this namespace can be::
 
@@ -2790,11 +2790,11 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the array's `(element, length)` at the current address.'''
+            '''Return the array's ``(element, length)`` at the current address.'''
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the array's `(element, length)` at the address specified by ``ea``.'''
+            '''Return the array's ``(element, length)`` at the address specified by ``ea``.'''
             return cls.element(ea), cls.length(ea)
 
         @utils.multicase()
@@ -3210,7 +3210,7 @@ class marks(object):
     """
     This namespace is for interacting with the marks table within the
     database. By default, this namespace is capable of yielding the
-    `(address, description)` of each mark within the database.
+    ``(address, description)`` of each mark within the database.
 
     This allows one to manage the marks. Although it is suggested to
     utilize "tags" as they provide significantly more flexibility.
@@ -3290,7 +3290,7 @@ class marks(object):
 
     @classmethod
     def by_index(cls, index):
-        '''Return the `(address, description)` of the mark at the specified ``index`` in the mark list.'''
+        '''Return the ``(address, description)`` of the mark at the specified ``index`` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.__get_slotaddress(index), cls.__get_description(index))
         raise KeyError("{:s}.by_index({:d}) : The specified mark slot index ({:d}) is out of bounds ({:s}).".format('.'.join((__name__, cls.__name__)), index, index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
@@ -3304,7 +3304,7 @@ class marks(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def by_address(cls, ea):
-        '''Return the `(address, description)` of the mark at the given address ``ea``.'''
+        '''Return the ``(address, description)`` of the mark at the given address ``ea``.'''
         return cls.by_index(cls.__find_slotaddress(ea))
     by = byAddress = utils.alias(by_address, 'marks')
 
@@ -4094,110 +4094,110 @@ class get(object):
         @utils.multicase()
         @classmethod
         def uint8_t(cls, **byteorder):
-            '''Read a `uint8_t` from the current address.'''
+            '''Read a uint8_t from the current address.'''
             return get.unsigned(ui.current.address(), 1, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint8_t(cls, ea, **byteorder):
-            '''Read a `uint8_t` from the address ``ea``.'''
+            '''Read a uint8_t from the address ``ea``.'''
             return get.unsigned(ea, 1, **byteorder)
         @utils.multicase()
         @classmethod
         def sint8_t(cls, **byteorder):
-            '''Read a `sint8_t` from the current address.'''
+            '''Read a sint8_t from the current address.'''
             return get.signed(ui.current.address(), 1, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint8_t(cls, ea, **byteorder):
-            '''Read a `sint8_t` from the address ``ea``.'''
+            '''Read a sint8_t from the address ``ea``.'''
             return get.signed(ea, 1, **byteorder)
         ubyte1, sbyte1 = utils.alias(uint8_t, 'get.integer'), utils.alias(sint8_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
         def uint16_t(cls, **byteorder):
-            '''Read a `uint16_t` from the current address.'''
+            '''Read a uint16_t from the current address.'''
             return get.unsigned(ui.current.address(), 2, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint16_t(cls, ea, **byteorder):
-            '''Read a `uint16_t` from the address ``ea``.'''
+            '''Read a uint16_t from the address ``ea``.'''
             return get.unsigned(ea, 2, **byteorder)
         @utils.multicase()
         @classmethod
         def sint16_t(cls, **byteorder):
-            '''Read a `sint16_t` from the current address.'''
+            '''Read a sint16_t from the current address.'''
             return get.signed(ui.current.address(), 2, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint16_t(cls, ea, **byteorder):
-            '''Read a `sint16_t` from the address ``ea``.'''
+            '''Read a sint16_t from the address ``ea``.'''
             return get.signed(ea, 2, **byteorder)
         uint2, sint2 = utils.alias(uint16_t, 'get.integer'), utils.alias(sint16_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
         def uint32_t(cls, **byteorder):
-            '''Read a `uint32_t` from the current address.'''
+            '''Read a uint32_t from the current address.'''
             return get.unsigned(ui.current.address(), 4, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint32_t(cls, ea, **byteorder):
-            '''Read a `uint32_t` from the address ``ea``.'''
+            '''Read a uint32_t from the address ``ea``.'''
             return get.unsigned(ea, 4, **byteorder)
         @utils.multicase()
         @classmethod
         def sint32_t(cls, **byteorder):
-            '''Read a `sint32_t` from the current address.'''
+            '''Read a sint32_t from the current address.'''
             return get.signed(ui.current.address(), 4, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint32_t(cls, ea, **byteorder):
-            '''Read a `sint32_t` from the address ``ea``.'''
+            '''Read a sint32_t from the address ``ea``.'''
             return get.signed(ea, 4, **byteorder)
         uint4, sint4 = utils.alias(uint32_t, 'get.integer'), utils.alias(sint32_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
         def uint64_t(cls, **byteorder):
-            '''Read a `uint64_t` from the current address.'''
+            '''Read a uint64_t from the current address.'''
             return get.unsigned(ui.current.address(), 8, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint64_t(cls, ea, **byteorder):
-            '''Read a `uint64_t` from the address ``ea``.'''
+            '''Read a uint64_t from the address ``ea``.'''
             return get.unsigned(ea, 8, **byteorder)
         @utils.multicase()
         @classmethod
         def sint64_t(cls, **byteorder):
-            '''Read a `sint64_t` from the current address.'''
+            '''Read a sint64_t from the current address.'''
             return get.signed(ui.current.address(), 8, **byteorder)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint64_t(cls, ea, **byteorder):
-            '''Read a `sint64_t` from the address ``ea``.'''
+            '''Read a sint64_t from the address ``ea``.'''
             return get.signed(ea, 8, **byteorder)
         uint8, sint8 = utils.alias(uint64_t, 'get.integer'), utils.alias(sint64_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
         def uint128_t(cls, **byteorder):
-            '''Read a `uint128_t` from the current address.'''
+            '''Read a uint128_t from the current address.'''
             return get.unsigned(ui.current.address(), 16)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint128_t(cls, ea, **byteorder):
-            '''Read a `uint128_t` from the address ``ea``.'''
+            '''Read a uint128_t from the address ``ea``.'''
             return get.unsigned(ea, 16, **byteorder)
         @utils.multicase()
         @classmethod
         def sint128_t(cls, **byteorder):
-            '''Read a `sint128_t` from the current address.'''
+            '''Read a sint128_t from the current address.'''
             return get.signed(ui.current.address(), 16)
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint128_t(cls, ea, **byteorder):
-            '''Read a `sint128_t` from the address ``ea``.'''
+            '''Read a sint128_t from the address ``ea``.'''
             return get.signed(ea, 16, **byteorder)
 
     i = integer # XXX: ns alias
