@@ -31,7 +31,7 @@ output = sys.stderr
 def fetch_contents(fn):
     """Fetch the reference count for the contents of function ``fn`` in the database.
 
-    Returns the tuple `(func, address, tags)` where the `address` and `tags`
+    Returns the tuple ``(func, address, tags)`` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
     the addresses and tag names. The field `func` contains the address of the
     function.
@@ -84,7 +84,7 @@ def check_global(ea):
 def fetch_globals_functions():
     """Fetch the reference count for the global tags (function) in the database.
 
-    Returns the tuple `(address, tags)` where the `address` and `tags`
+    Returns the tuple ``(address, tags)`` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
     the addresses and tag names.
     """
@@ -104,7 +104,7 @@ def fetch_globals_functions():
 def fetch_globals_data():
     """Fetch the reference count for the global tags (non-function) in the database.
 
-    Returns the tuple `(address, tags)` where the `address` and `tags`
+    Returns the tuple ``(address, tags)`` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
     the addresses and tag names.
     """
@@ -126,7 +126,7 @@ def fetch_globals_data():
 def fetch_globals():
     """Fetch the reference count of all of the global tags for both functions and non-functions.
 
-    Returns the tuple `(address, tags)` where the `address` and `tags`
+    Returns the tuple ``(address, tags)`` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
     the addresses and tag names.
     """
