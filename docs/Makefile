@@ -57,7 +57,7 @@ endef
 
 # generate documentation from a module
 define make_docs
-$(1): $(2) | $$(dir $(1))
+$(1): $(2) docparse.py | $$(dir $(1))
 	@echo [*] Writing documentation for $(2) to $(1)
 	$$(RSTGENERATE) -o '$$@' '$$<' $(3)
 endef
