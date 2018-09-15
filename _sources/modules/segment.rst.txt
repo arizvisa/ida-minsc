@@ -14,15 +14,15 @@ When listing or enumerating segments there are different types that
 one can use in order to filter or match them. These types are as
 follows:
 
-- :py:obj:`name` - Match according to the exact segment name
-- :py:obj:`like` - Filter the segment names according to a glob
-- :py:obj:`regex` - Filter the function names according to a regular-expression
-- :py:obj:`index` - Match the segment by its index
-- :py:obj:`identifier` - Match the segment by its identifier
-- :py:obj:`selector` - Match the segment by its selector
-- :py:obj:`greater` or :py:obj:`gt` - Filter the segments for any after the specified address
-- :py:obj:`less` or :py:obj:`lt` - Filter the segments for any before the specified address
-- :py:obj:`predicate` - Filter the segments by passing their :py:obj:`idaapi.segment_t` to a callable
+- ``name`` - Match according to the exact segment name
+- ``like`` - Filter the segment names according to a glob
+- ``regex`` - Filter the function names according to a regular-expression
+- ``index`` - Match the segment by its index
+- ``identifier`` - Match the segment by its identifier
+- ``selector`` - Match the segment by its selector
+- ``greater`` or ``gt`` - Filter the segments for any after the specified address
+- ``less`` or ``lt`` - Filter the segments for any before the specified address
+- ``predicate`` - Filter the segments by passing their :py:obj:`idaapi.segment_t` to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -45,7 +45,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: bottom(segment)
    
-   Return the bottom address of the segment identified by :py:data:`segment`.
+   Return the bottom address of the segment identified by ``segment``.
    
    :param segment: an identifier used to describe a segment
    
@@ -53,13 +53,13 @@ functions and aliases. For more information on this, please see
    
    Return the bounds of the current segment.
    
-   Aliases: ``segment.range``
+   Aliases: :py:func:`segment.range<bounds>`
    
 .. py:function:: bounds(segment)
    
-   Return the bounds of the segment specified by :py:data:`segment`.
+   Return the bounds of the segment specified by ``segment``.
    
-   Aliases: ``segment.range``
+   Aliases: :py:func:`segment.range<bounds>`
    
    :param segment: an identifier used to describe a segment
    
@@ -72,14 +72,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: by(name)
    
-   Return the segment by its :py:data:`name`.
+   Return the segment by its ``name``.
    
    :param name: the name of the segment to return
    :type name: str
    
 .. py:function:: by(ea)
    
-   Return the segment containing the address :py:data:`ea`.
+   Return the segment containing the address ``ea``.
    
    :param ea: an address belonging to the segment to return
    :type ea: int or long
@@ -90,31 +90,31 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: by(\*\*type)
    
-   Return the segment matching the specified keywords in :py:data:`type`.
+   Return the segment matching the specified keywords in ``type``.
    
    :param \*\*type: any keyword that can be used to match the segment with
    
 .. py:function:: by_address(ea)
    
-   Return the segment that contains the specified :py:data:`ea`.
+   Return the segment that contains the specified ``ea``.
    
-   Aliases: ``segment.byAddress``
+   Aliases: :py:func:`segment.byAddress<by_address>`
    
    :param ea: an address belonging to the segment to return
    
 .. py:function:: by_name(name)
    
-   Return the segment with the given :py:data:`name`.
+   Return the segment with the given ``name``.
    
-   Aliases: ``segment.byName``
+   Aliases: :py:func:`segment.byName<by_name>`
    
    :param name: the name of the segment to return
    
 .. py:function:: by_selector(selector)
    
-   Return the segment associated with :py:data:`selector`.
+   Return the segment associated with ``selector``.
    
-   Aliases: ``segment.bySelector``
+   Aliases: :py:func:`segment.bySelector<by_selector>`
    
    :param selector: the selector belonging to the segment to return
    
@@ -124,7 +124,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: color(segment)
    
-   Return the color of the segment identified by :py:data:`segment`.
+   Return the color of the segment identified by ``segment``.
    
    :param segment: an identifier used to describe a segment
    
@@ -137,7 +137,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: color(segment, none)
    
-   Clear the color of the segment identified by :py:data:`segment`.
+   Clear the color of the segment identified by ``segment``.
    
    :param segment: an identifier used to describe a segment
    :param none: the value :py:obj:`None`
@@ -145,7 +145,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: color(segment, rgb)
    
-   Sets the color of the segment identified by :py:data:`segment` to :py:data:`rgb`.
+   Sets the color of the segment identified by ``segment`` to ``rgb``.
    
    :param segment: an identifier used to describe a segment
    :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
@@ -153,14 +153,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: contains(ea)
    
-   Returns true if the address :py:data:`ea` is contained within the current segment.
+   Returns true if the address ``ea`` is contained within the current segment.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: contains(address, ea)
    
-   Returns true if the address :py:data:`ea` is contained within the segment belonging to the specified :py:data:`address`.
+   Returns true if the address ``ea`` is contained within the segment belonging to the specified ``address``.
    
    :param address: an address belonging to a segment
    :param ea: an address in the database
@@ -168,7 +168,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: contains(name, ea)
    
-   Returns true if the address :py:data:`ea` is contained within the segment with the specified :py:data:`name`.
+   Returns true if the address ``ea`` is contained within the segment with the specified ``name``.
    
    :param name: the name of a segment
    :type name: str
@@ -177,7 +177,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: contains(segment, ea)
    
-   Returns true if the address :py:data:`ea` is contained within the :py:obj:`idaapi.segment_t` specified by :py:data:`segment`.
+   Returns true if the address ``ea`` is contained within the :py:obj:`idaapi.segment_t` specified by ``segment``.
    
    :param segment: an :py:obj:`idaapi.segment_t` to check
    :type segment: idaapi.segment_t
@@ -186,18 +186,18 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: go_offset(offset)
    
-   Go to the :py:data:`offset` of the current segment.
+   Go to the ``offset`` of the current segment.
    
-   Aliases: ``segment.goof``, ``segment. gooffset``, ``segment.gotooffset``
+   Aliases: :py:func:`segment.goof<go_offset>`, :py:func:`segment. gooffset<go_offset>`, :py:func:`segment.gotooffset<go_offset>`
    
    :param offset: an offset into the current segment
    :type offset: int or long
    
 .. py:function:: go_offset(segment, offset)
    
-   Go to the :py:data:`offset` of the specified :py:data:`segment`.
+   Go to the ``offset`` of the specified ``segment``.
    
-   Aliases: ``segment.goof``, ``segment. gooffset``, ``segment.gotooffset``
+   Aliases: :py:func:`segment.goof<go_offset>`, :py:func:`segment. gooffset<go_offset>`, :py:func:`segment.gotooffset<go_offset>`
    
    :param segment: an identifier used to describe a segment
    :param offset: an offset into the segment
@@ -209,54 +209,54 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: iterate(segment)
    
-   Iterate through all of the addresses within the specified :py:data:`segment`.
+   Iterate through all of the addresses within the specified ``segment``.
    
    :param segment: an identifier used to describe a segment
    
 .. py:function:: iterate(segment)
    
-   Iterate through all of the addresses within the :py:obj:`idaapi.segment_t` represented by :py:data:`segment`.
+   Iterate through all of the addresses within the :py:obj:`idaapi.segment_t` represented by ``segment``.
    
    :param segment: an :py:obj:`idaapi.segment_t` to iterate through
    :type segment: idaapi.segment_t
    
 .. py:function:: list(string)
    
-   List all of the segments whose name matches the glob specified by :py:data:`string`.
+   List all of the segments whose name matches the glob specified by ``string``.
    
    :param string: the glob to filter the segment names with
    :type string: str
    
 .. py:function:: list(\*\*type)
    
-   List all of the segments in the database that match the keyword specified by :py:data:`type`.
+   List all of the segments in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter the segments with
    
 .. py:function:: load(filename, ea, size=None, offset=0, \*\*kwds)
    
-   Load the specified :py:data:`filename` to the address :py:data:`ea` as a segment.
+   Load the specified ``filename`` to the address ``ea`` as a segment.
    
-   If :py:data:`size` is not specified, use the length of the file.
-   The keyword :py:data:`offset` represents the offset into the file to use.
-   The keyword :py:data:`name` can be used to name the segment.
+   If ``size`` is not specified, use the length of the file.
+   The keyword ``offset`` represents the offset into the file to use.
+   The keyword ``name`` can be used to name the segment.
    
    :param filename: a filename to read from
    :param ea: the address to map to
    :param size: the number of bytes to map
    :param offset: the offset into the file to read from
-   :param \*\*kwds: if :py:data:`name` is specified as a string, then use it as the name for the new segment
+   :param \*\*kwds: if ``name`` is specified as a string, then use it as the name for the new segment
    
 .. py:function:: map(ea, size, newea, \*\*kwds)
    
-   Map :py:data:`size` bytes of data from :py:data:`ea` into a new segment at :py:data:`newea`.
+   Map ``size`` bytes of data from ``ea`` into a new segment at ``newea``.
    
-   The keyword :py:data:`name` can be used to name the segment.
+   The keyword ``name`` can be used to name the segment.
    
    :param ea: the address of the data to map
    :param size: the number of bytes to map
    :param newea: the target address to map the data to
-   :param \*\*kwds: if :py:data:`name` is specified as a string, then use it as the name for the new segment
+   :param \*\*kwds: if ``name`` is specified as a string, then use it as the name for the new segment
    
 .. py:function:: name()
    
@@ -264,20 +264,20 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(segment)
    
-   Return the name of the segment identified by :py:data:`segment`.
+   Return the name of the segment identified by ``segment``.
    
    :param segment: an identifier used to describe a segment
    
 .. py:function:: new(offset, size, name, \*\*kwds)
    
-   Create a segment at :py:data:`offset` with :py:data:`size` and name it according to :py:data:`name`.
+   Create a segment at ``offset`` with ``size`` and name it according to ``name``.
    
-   The keyword :py:data:`bits` can be used to specify the bit size of the segment
-   The keyword :py:data:`comb` can be used to specify any flags (idaapi.sc\*)
-   The keyword :py:data:`align` can be used to specify paragraph alignment (idaapi.sa\*)
-   The keyword :py:data:`org` specifies the origin of the segment (must be paragraph aligned due to ida)
+   The keyword ``bits`` can be used to specify the bit size of the segment
+   The keyword ``comb`` can be used to specify any flags (idaapi.sc\*)
+   The keyword ``align`` can be used to specify paragraph alignment (idaapi.sa\*)
+   The keyword ``org`` specifies the origin of the segment (must be paragraph aligned due to ida)
    
-   Aliases: ``segment.create``
+   Aliases: :py:func:`segment.create<new>`
    
    :param offset: the offset to create the segment at
    :param size: the size of the segment
@@ -290,14 +290,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: offset(ea)
    
-   Return the offset of the address :py:data:`ea` from the beginning of the current segment.
+   Return the offset of the address ``ea`` from the beginning of the current segment.
    
    :param ea: an address within the current segment
    :type ea: int or long
    
 .. py:function:: offset(segment, ea)
    
-   Return the offset of the address :py:data:`ea` from the beginning of :py:data:`segment`.
+   Return the offset of the address ``ea`` from the beginning of ``segment``.
    
    :param segment: an identifier used to describe a segment
    :param ea: an address within the segment
@@ -307,23 +307,23 @@ functions and aliases. For more information on this, please see
    
    Return the contents of the current segment.
    
-   Aliases: ``segment.string``
+   Aliases: :py:func:`segment.string<read>`
    
 .. py:function:: read(segment)
    
-   Return the contents of the segment identified by :py:data:`segment`.
+   Return the contents of the segment identified by ``segment``.
    
-   Aliases: ``segment.string``
+   Aliases: :py:func:`segment.string<read>`
    
    :param segment: an identifier used to describe a segment
    
 .. py:function:: remove(segment, remove=False)
    
-   Remove the segment identified by :py:data:`segment`.
+   Remove the segment identified by ``segment``.
    
-   If the bool :py:data:`remove` is specified, then remove the content of the segment from the database.
+   If the bool ``remove`` is specified, then remove the content of the segment from the database.
    
-   Aliases: ``segment.delete``
+   Aliases: :py:func:`segment.delete<remove>`
    
    :param segment: an identifier used to describe a segment
    :param remove: whether to remove the contents of the segment from the database
@@ -334,17 +334,17 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: repr(segment)
    
-   Return the specified :py:data:`segment` in a printable form.
+   Return the specified ``segment`` in a printable form.
    
    :param segment: an identifier used to describe a segment
    
 .. py:function:: save(filename, segment, offset=0)
    
-   Export the segment identified by :py:data:`segment` to the file named :py:data:`filename`.
+   Export the segment identified by ``segment`` to the file named ``filename``.
    
-   If the int :py:data:`offset` is specified, then begin writing into the file at the specified offset.
+   If the int ``offset`` is specified, then begin writing into the file at the specified offset.
    
-   Aliases: ``segment.export``
+   Aliases: :py:func:`segment.export<save>`
    
    :param filename: the path to the filename to write the segment to
    :param segment: an identifier used to specify a segment
@@ -352,14 +352,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: search(name)
    
-   Search through all the segments and return the first one matching the glob :py:data:`name`.
+   Search through all the segments and return the first one matching the glob ``name``.
    
    :param name: the glob to match the segment name with
    :type name: str
    
 .. py:function:: search(\*\*type)
    
-   Search through all the segments and return the first one that matches the keyword specified by :py:data:`type`.
+   Search through all the segments and return the first one that matches the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter segments with
    
@@ -369,7 +369,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: size(segment)
    
-   Return the size of the segment specified by :py:data:`segment`.
+   Return the size of the segment specified by ``segment``.
    
    :param segment: an identifier used to describe a segment
    
@@ -379,7 +379,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: top(segment)
    
-   Return the top address of the segment identified by :py:data:`segment`.
+   Return the top address of the segment identified by ``segment``.
    
    :param segment: an identifier used to describe a segment
    
@@ -389,7 +389,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: within(ea)
    
-   Returns true if the address :py:data:`ea` is within any segment.
+   Returns true if the address ``ea`` is within any segment.
    
    :param ea: an address in the database
    :type ea: int or long

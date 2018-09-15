@@ -10,32 +10,33 @@ prefixes which can be used to decode the operands for an instruction.
 At the present time, only the Intel, AArch32 (ARM), and MIPS
 architectures are supported.
 
-Although IDA internally uses the :py:obj:`insn_t` and :py:obj:`op_t` to represent
-an instruction and its operands, this module's base argument type
-is typically an address or an operand index. When dealing with an
+Although IDA internally uses the :py:obj:`idaapi.insn_t` and :py:obj:`idaapi.op_t` to
+represent an instruction and its operands, this module's base argument
+type is typically an address or an operand index. When dealing with an
 instruction's operands, the :py:obj:`ops_` prefix represents all of the
 instructions operands and typically will take only an address.
 Likewise when dealing with a single operand, the :py:obj:`op_` prefix
 is used and will take an address and the operand index.
 
-To request the actual IDA types (:py:obj:`insn_t` and :py:obj:`op_t`) there are
-two tools that are provided. The :py:obj:`instruction.at(address)` tool
-will take an address and return an :py:obj:`insn_t`. To get an :py:obj:`op_t`, a
-user can use :py:obj:`instruction.operand(address, opnum)`. This will take
-an address and an index and return the desired :py:obj:`op_t`.
+To request the actual IDA types (:py:obj:`idaapi.insn_t` and :py:obj:`idaapi.op_t`)
+there are two tools that are provided. The :py:obj:`instruction.at(address)<instruction.at>`
+tool will take an address and return an :py:obj:`idaapi.insn_t`. To get an
+:py:obj:`idaapi.op_t`, a user can use :py:obj:`instruction.operand(address, opnum)<instruction.operand>`.
+This will take an address and an index and return the desired
+:py:obj:`idaapi.op_t`.
 
 Some globals are also defined for the given architecture which
 can be used to query or access the registers that are currently
 available. Once IDA has determined the architecture for the database
-the :py:obj:`instruction.register` object is created. This object allows
-one to reference a register that is defined for the architecture.
+the ``register_t`` class is instantiated. This object allows one to
+reference a register that is defined for the architecture.
 
-Another object that is created is the :py:obj:`instruction.architecture`
-object. Searching for a register can be done by index and size
-or simply by its name. This object also allows one to promote
-or demote a register between its various sizes. This allows one
-to navigate between the 8-bit, 16-bit, 32-bit, or 64-bit versions
-of a register available in the architecture.
+Another object that is created is the ``architecture_t`` object.
+Searching for a register can be done by index and size or simply by
+its name. This object also allows one to promote or demote a register
+between its various sizes. This allows one to navigate between the
+8-bit, 16-bit, 32-bit, or 64-bit versions of a register available in
+the architecture.
 
 -------------
 Function list
@@ -51,7 +52,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: at(ea)
    
-   Returns the :py:obj:`idaapi.insn_t` instance at the address :py:data:`ea`.
+   Returns the :py:obj:`idaapi.insn_t` instance at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -62,7 +63,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: feature(ea)
    
-   Return the feature bitmask for the instruction at the address :py:data:`ea`.
+   Return the feature bitmask for the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -71,13 +72,13 @@ functions and aliases. For more information on this, please see
    
    Returns true if the current instruction is any kind of branch.
    
-   Aliases: ``instruction.isBranch``, ``instruction.branchQ``
+   Aliases: :py:func:`instruction.isBranch<is_branch>`, :py:func:`instruction.branchQ<is_branch>`
    
 .. py:function:: is_branch(ea)
    
-   Returns true if the instruction at :py:data:`ea` is any kind of branch.
+   Returns true if the instruction at ``ea`` is any kind of branch.
    
-   Aliases: ``instruction.isBranch``, ``instruction.branchQ``
+   Aliases: :py:func:`instruction.isBranch<is_branch>`, :py:func:`instruction.branchQ<is_branch>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -86,13 +87,13 @@ functions and aliases. For more information on this, please see
    
    Returns true if the current instruction is a call.
    
-   Aliases: ``instruction.callQ``, ``instruction.isCall``
+   Aliases: :py:func:`instruction.callQ<is_call>`, :py:func:`instruction.isCall<is_call>`
    
 .. py:function:: is_call(ea)
    
-   Returns true if the instruction at :py:data:`ea` is a call.
+   Returns true if the instruction at ``ea`` is a call.
    
-   Aliases: ``instruction.callQ``, ``instruction.isCall``
+   Aliases: :py:func:`instruction.callQ<is_call>`, :py:func:`instruction.isCall<is_call>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -103,7 +104,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: is_calli(ea)
    
-   Returns true if the instruction at :py:data:`ea` is an indirect call.
+   Returns true if the instruction at ``ea`` is an indirect call.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -112,13 +113,13 @@ functions and aliases. For more information on this, please see
    
    Returns true if the current instruction is an immediate and indirect branch.
    
-   Aliases: ``instruction.isJmp``, ``instruction.jmpQ``, ``instruction.JmpQ``
+   Aliases: :py:func:`instruction.isJmp<is_jmp>`, :py:func:`instruction.jmpQ<is_jmp>`, :py:func:`instruction.JmpQ<is_jmp>`
    
 .. py:function:: is_jmp(ea)
    
-   Returns true if the instruction at :py:data:`ea` is an immediate and indrect branch.
+   Returns true if the instruction at ``ea`` is an immediate and indrect branch.
    
-   Aliases: ``instruction.isJmp``, ``instruction.jmpQ``, ``instruction.JmpQ``
+   Aliases: :py:func:`instruction.isJmp<is_jmp>`, :py:func:`instruction.jmpQ<is_jmp>`, :py:func:`instruction.JmpQ<is_jmp>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -127,13 +128,13 @@ functions and aliases. For more information on this, please see
    
    Returns true if the instruction at the current address is an indirect branch.
    
-   Aliases: ``instruction.JmpiQ``, ``instruction.isJmpi``, ``instruction.jmpiQ``
+   Aliases: :py:func:`instruction.JmpiQ<is_jmpi>`, :py:func:`instruction.isJmpi<is_jmpi>`, :py:func:`instruction.jmpiQ<is_jmpi>`
    
 .. py:function:: is_jmpi(ea)
    
-   Returns true if the instruction at :py:data:`ea` is an indirect branch.
+   Returns true if the instruction at ``ea`` is an indirect branch.
    
-   Aliases: ``instruction.JmpiQ``, ``instruction.isJmpi``, ``instruction.jmpiQ``
+   Aliases: :py:func:`instruction.JmpiQ<is_jmpi>`, :py:func:`instruction.isJmpi<is_jmpi>`, :py:func:`instruction.jmpiQ<is_jmpi>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -142,13 +143,13 @@ functions and aliases. For more information on this, please see
    
    Returns true if the current instruction is a conditional branch.
    
-   Aliases: ``instruction.jxxQ``, ``instruction.JxxQ``, ``instruction.isJxx``
+   Aliases: :py:func:`instruction.jxxQ<is_jxx>`, :py:func:`instruction.JxxQ<is_jxx>`, :py:func:`instruction.isJxx<is_jxx>`
    
 .. py:function:: is_jxx(ea)
    
-   Returns true if the instruction at :py:data:`ea` is a conditional branch.
+   Returns true if the instruction at ``ea`` is a conditional branch.
    
-   Aliases: ``instruction.jxxQ``, ``instruction.JxxQ``, ``instruction.isJxx``
+   Aliases: :py:func:`instruction.jxxQ<is_jxx>`, :py:func:`instruction.JxxQ<is_jxx>`, :py:func:`instruction.isJxx<is_jxx>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -157,13 +158,13 @@ functions and aliases. For more information on this, please see
    
    Returns true if the current instruction is a return-type instruction.
    
-   Aliases: ``instruction.returnQ``, ``instruction.isReturn``, ``instruction.retQ``
+   Aliases: :py:func:`instruction.returnQ<is_return>`, :py:func:`instruction.isReturn<is_return>`, :py:func:`instruction.retQ<is_return>`
    
 .. py:function:: is_return(ea)
    
-   Returns true if the instruction at :py:data:`ea` is a return-type instruction.
+   Returns true if the instruction at ``ea`` is a return-type instruction.
    
-   Aliases: ``instruction.returnQ``, ``instruction.isReturn``, ``instruction.retQ``
+   Aliases: :py:func:`instruction.returnQ<is_return>`, :py:func:`instruction.isReturn<is_return>`, :py:func:`instruction.retQ<is_return>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -172,13 +173,13 @@ functions and aliases. For more information on this, please see
    
    Returns true if the current instruction is a bit-shifting instruction.
    
-   Aliases: ``instruction.isShift``, ``instruction.shiftQ``
+   Aliases: :py:func:`instruction.isShift<is_shift>`, :py:func:`instruction.shiftQ<is_shift>`
    
 .. py:function:: is_shift(ea)
    
-   Returns true if the instruction at :py:data:`ea` is a bit-shifting instruction.
+   Returns true if the instruction at ``ea`` is a bit-shifting instruction.
    
-   Aliases: ``instruction.isShift``, ``instruction.shiftQ``
+   Aliases: :py:func:`instruction.isShift<is_shift>`, :py:func:`instruction.shiftQ<is_shift>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -187,31 +188,31 @@ functions and aliases. For more information on this, please see
    
    Returns the mnemonic of the instruction at the current address.
    
-   Aliases: ``instruction.mnem``
+   Aliases: :py:func:`instruction.mnem<mnemonic>`
    
 .. py:function:: mnemonic(ea)
    
-   Returns the mnemonic of the instruction at the address :py:data:`ea`.
+   Returns the mnemonic of the instruction at the address ``ea``.
    
-   Aliases: ``instruction.mnem``
+   Aliases: :py:func:`instruction.mnem<mnemonic>`
    
    :param ea: the address of an instruction
    :type ea: int or long
    
 .. py:function:: op(opnum)
    
-   Decodes the operand :py:data:`opnum` for the current instruction.
+   Decodes the operand ``opnum`` for the current instruction.
    
-   Aliases: ``instruction.op_value``, ``instruction.op_decode``
+   Aliases: :py:func:`instruction.op_value<op>`, :py:func:`instruction.op_decode<op>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op(ea, opnum)
    
-   Decodes the operand :py:data:`opnum` for the instruction at the address :py:data:`ea`.
+   Decodes the operand ``opnum`` for the instruction at the address ``ea``.
    
-   Aliases: ``instruction.op_value``, ``instruction.op_decode``
+   Aliases: :py:func:`instruction.op_value<op>`, :py:func:`instruction.op_decode<op>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -220,14 +221,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_bits(opnum)
    
-   Returns the size (in bits) for the operand :py:data:`opnum` belonging to the current instruction.
+   Returns the size (in bits) for the operand ``opnum`` belonging to the current instruction.
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_bits(ea, opnum)
    
-   Returns the size (in bits) for the operand :py:data:`opnum` belonging to the instruction at the address :py:data:`ea`.
+   Returns the size (in bits) for the operand ``opnum`` belonging to the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -236,18 +237,18 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_enumeration(opnum)
    
-   Return the enumeration id of operand :py:data:`opnum` for the current instruction.
+   Return the enumeration id of operand ``opnum`` for the current instruction.
    
-   Aliases: ``instruction.op_enum``
+   Aliases: :py:func:`instruction.op_enum<op_enumeration>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_enumeration(ea, opnum)
    
-   Return the enumeration id of operand :py:data:`opnum` for the instruction at :py:data:`ea`.
+   Return the enumeration id of operand ``opnum`` for the instruction at ``ea``.
    
-   Aliases: ``instruction.op_enum``
+   Aliases: :py:func:`instruction.op_enum<op_enumeration>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -256,9 +257,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_enumeration(opnum, name)
    
-   Apply the enumeration :py:data:`name` to operand :py:data:`opnum` for the current instruction.
+   Apply the enumeration ``name`` to operand ``opnum`` for the current instruction.
    
-   Aliases: ``instruction.op_enum``
+   Aliases: :py:func:`instruction.op_enum<op_enumeration>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
@@ -267,9 +268,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_enumeration(ea, opnum, name)
    
-   Apply the enumeration :py:data:`name` to operand :py:data:`opnum` for the instruction at :py:data:`ea`.
+   Apply the enumeration ``name`` to operand ``opnum`` for the instruction at ``ea``.
    
-   Aliases: ``instruction.op_enum``
+   Aliases: :py:func:`instruction.op_enum<op_enumeration>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -280,9 +281,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_enumeration(ea, opnum, id)
    
-   Apply the enumeration :py:data:`id` to operand :py:data:`opnum` of the instruction at :py:data:`ea`.
+   Apply the enumeration ``id`` to operand ``opnum`` of the instruction at ``ea``.
    
-   Aliases: ``instruction.op_enum``
+   Aliases: :py:func:`instruction.op_enum<op_enumeration>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -293,18 +294,18 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_refs(opnum)
    
-   Returns the :py:obj:`(address, opnum, type)` of all the instructions that reference the operand :py:data:`opnum` for the current instruction.
+   Returns the ``(address, opnum, type)`` of all the instructions that reference the operand ``opnum`` for the current instruction.
    
-   Aliases: ``instruction.op_ref``
+   Aliases: :py:func:`instruction.op_ref<op_refs>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_refs(ea, opnum)
    
-   Returns the :py:obj:`(address, opnum, type)` of all the instructions that reference the operand :py:data:`opnum` for the instruction at :py:data:`ea`.
+   Returns the ``(address, opnum, type)`` of all the instructions that reference the operand ``opnum`` for the instruction at ``ea``.
    
-   Aliases: ``instruction.op_ref``
+   Aliases: :py:func:`instruction.op_ref<op_refs>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -313,14 +314,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_repr(opnum)
    
-   Returns the representation for the operand :py:data:`opnum` belonging to the instruction at the current address.
+   Returns the representation for the operand ``opnum`` belonging to the instruction at the current address.
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_repr(ea, opnum)
    
-   Returns the representation for the operand :py:data:`opnum` belonging to the instruction at the address :py:data:`ea`.
+   Returns the representation for the operand ``opnum`` belonging to the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -329,14 +330,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_segment(opnum)
    
-   Returns the segment register used by the operand :py:data:`opnum` for the instruction at the current address.
+   Returns the segment register used by the operand ``opnum`` for the instruction at the current address.
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_segment(ea, opnum)
    
-   Returns the segment register used by the operand :py:data:`opnum` for the instruction at the address :py:data:`ea`.
+   Returns the segment register used by the operand ``opnum`` for the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -345,14 +346,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_size(opnum)
    
-   Returns the size for the operand :py:data:`opnum` belonging to the current instruction.
+   Returns the size for the operand ``opnum`` belonging to the current instruction.
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_size(ea, opnum)
    
-   Returns the size for the operand :py:data:`opnum` belonging to the instruction at the address :py:data:`ea`.
+   Returns the size for the operand ``opnum`` belonging to the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -361,14 +362,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_state(opnum)
    
-   Returns the modification state for the operand :py:data:`opnum` belonging to the current instruction.
+   Returns the modification state for the operand ``opnum`` belonging to the current instruction.
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_state(ea, opnum)
    
-   Returns the modification state for the operand :py:data:`opnum` belonging to the instruction at the address :py:data:`ea`.
+   Returns the modification state for the operand ``opnum`` belonging to the instruction at the address ``ea``.
    
    The returned state is a string that can be "r", "w", or "rw" depending on
    whether the operand is being read from, written to, or modified (both).
@@ -380,14 +381,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_string(opnum)
    
-   Return the string type of operand :py:obj:`opnum` for the current instruction.
+   Return the string type of operand ``opnum`` for the current instruction.
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_string(ea, opnum)
    
-   Return the string type (:py:obj:`idaapi.STRTYPE_`) of operand :py:data:`opnum` for the instruction at :py:data:`ea`.
+   Return the string type (:py:obj:`idaapi.STRTYPE_`) of operand ``opnum`` for the instruction at ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -396,7 +397,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_string(ea, opnum, strtype)
    
-   Set the string type used by operand :py:data:`opnum` for the instruction at :py:data:`ea` to :py:data:`strtype`.
+   Set the string type used by operand ``opnum`` for the instruction at ``ea`` to ``strtype``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -407,18 +408,18 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_structure(opnum)
    
-   Return the structure that operand :py:data:`opnum` at the current instruction actually references.
+   Return the structure that operand ``opnum`` at the current instruction actually references.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: op_structure(ea, opnum)
    
-   Return the structure that operand :py:data:`opnum` for instruction :py:data:`ea` actually references.
+   Return the structure that operand ``opnum`` for instruction ``ea`` actually references.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -427,45 +428,45 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_structure(opnum, structure, \*\*delta)
    
-   Apply the specified :py:data:`structure` to the instruction operand :py:data:`opnum` at the current address.
+   Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
    :type structure: structure_t or member_t
-   :param \*\*delta: if :py:data:`delta` is specified as an integer, then offset the structure by it
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: op_structure(opnum, id, \*\*delta)
    
-   Apply the structure identified by :py:data:`id` to the instruction operand :py:data:`opnum` at the current address.
+   Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    :param id: the id of a structure
    :type id: int or long
-   :param \*\*delta: if :py:data:`delta` is specified as an integer, then offset the structure by it
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: op_structure(opnum, path, \*\*delta)
    
-   Apply the structure members in :py:data:`path` to the instruction operand :py:data:`opnum` at the current address.
+   Apply the structure members in ``path`` to the instruction operand ``opnum`` at the current address.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    :param path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
    :type path: tuple or list
-   :param \*\*delta: if :py:data:`delta` is specified as an integer, then offset the structure by it
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: op_structure(ea, opnum, structure, \*\*delta)
    
-   Apply the specified :py:data:`structure` to the instruction operand :py:data:`opnum` at the address :py:data:`ea`.
+   Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -473,15 +474,15 @@ functions and aliases. For more information on this, please see
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
    :type structure: structure_t or member_t
-   :param \*\*delta: if :py:data:`delta` is specified as an integer, then offset the structure by it
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: op_structure(ea, opnum, id, \*\*delta)
    
-   Apply the structure identified by :py:data:`id` to the instruction operand :py:data:`opnum` at the address :py:data:`ea`.
+   Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
    
-   If the offset :py:data:`delta` is specified, shift the structure by that amount.
+   If the offset ``delta`` is specified, shift the structure by that amount.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -489,15 +490,15 @@ functions and aliases. For more information on this, please see
    :type opnum: int or long
    :param id: the id of a structure
    :type id: int or long
-   :param \*\*delta: if :py:data:`delta` is specified as an integer, then offset the structure by it
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: op_structure(ea, opnum, path, \*\*delta)
    
-   Apply the structure members in :py:data:`path` to the instruction operand :py:data:`opnum` at the address :py:data:`ea`.
+   Apply the structure members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
    
-   If the offset :py:data:`delta` is specified, shift the structure by that amount.
+   If the offset ``delta`` is specified, shift the structure by that amount.
    
-   Aliases: ``instruction.op_struct``
+   Aliases: :py:func:`instruction.op_struct<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -505,18 +506,18 @@ functions and aliases. For more information on this, please see
    :type opnum: int or long
    :param path: an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand
    :type path: tuple or list
-   :param \*\*delta: if :py:data:`delta` is specified as an integer, then offset the structure by it
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
 .. py:function:: operand(opnum)
    
-   Returns the :py:obj:`idaapi.op_t` for the operand :py:data:`opnum` belonging to the instruction at the current address.
+   Returns the :py:obj:`idaapi.op_t` for the operand ``opnum`` belonging to the instruction at the current address.
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: operand(ea, opnum)
    
-   Returns the :py:obj:`idaapi.op_t` for the operand :py:data:`opnum` belonging to the instruction at the address :py:data:`ea`.
+   Returns the :py:obj:`idaapi.op_t` for the operand ``opnum`` belonging to the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -529,7 +530,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: operands(ea)
    
-   Returns all of the :py:obj:`idaapi.op_t` instances for the instruction at the address :py:data:`ea`.
+   Returns all of the :py:obj:`idaapi.op_t` instances for the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -538,13 +539,13 @@ functions and aliases. For more information on this, please see
    
    Return the indices of any operands in the current instruction that are constants.
    
-   Aliases: ``instruction.ops_const``
+   Aliases: :py:func:`instruction.ops_const<ops_constant>`
    
 .. py:function:: ops_constant(ea)
    
-   Return the indices of any operands in the instruction at :py:data:`ea` that are constants.
+   Return the indices of any operands in the instruction at ``ea`` that are constants.
    
-   Aliases: ``instruction.ops_const``
+   Aliases: :py:func:`instruction.ops_const<ops_constant>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -555,7 +556,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_count(ea)
    
-   Returns the number of operands of the instruction at the address :py:data:`ea`.
+   Returns the number of operands of the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -566,37 +567,37 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_read(ea)
    
-   Returns the indices of any operands that are being read from by the instruction at the address :py:data:`ea`.
+   Returns the indices of any operands that are being read from by the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
    
 .. py:function:: ops_register(reg, \*regs, \*\*modifiers)
    
-   Yields the index of each operand in the instruction at the current address that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yields the index of each operand in the instruction at the current address that uses ``reg`` or any one of the registers in ``regs``.
    
-   If the keyword :py:data:`write` is true, then only return the result if it's writing to the register.
+   If the keyword ``write`` is true, then only return the result if it's writing to the register.
    
-   Aliases: ``instruction.ops_regs``, ``instruction.ops_reg``
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
    
    :param reg: the register to search the operands for
    :type reg: str or register_t
    :param \*regs: any other registers to include
-   :param \*\*modifiers: if :py:data:`write` is specified, then only return operands that write to the specified registers. if :py:data:`read` is specified then do the same but for operands that read from them.
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to the specified registers. if ``read`` is specified then do the same but for operands that read from them.
    
 .. py:function:: ops_register(ea, reg, \*regs, \*\*modifiers)
    
-   Yields the index of each operand in the instruction at address :py:data:`ea` that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yields the index of each operand in the instruction at address ``ea`` that uses ``reg`` or any one of the registers in ``regs``.
    
-   If the keyword :py:data:`write` is true, then only return the result if it's writing to the register.
+   If the keyword ``write`` is true, then only return the result if it's writing to the register.
    
-   Aliases: ``instruction.ops_regs``, ``instruction.ops_reg``
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
    
    :param ea: the address of an instruction
    :param reg: the register to search the operands for
    :type reg: str or register_t
    :param \*regs: any other registers to include
-   :param \*\*modifiers: if :py:data:`write` is specified, then only return operands that write to the specified registers. if :py:data:`read` is specified then do the same but for operands that read from them.
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to the specified registers. if ``read`` is specified then do the same but for operands that read from them.
    
 .. py:function:: ops_repr()
    
@@ -604,7 +605,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_repr(ea)
    
-   Returns a tuple of the :py:obj:`op_repr` of all the operands for the instruction at the address :py:data:`ea`.
+   Returns a tuple of the :py:obj:`op_repr` of all the operands for the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -615,7 +616,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_size(ea)
    
-   Returns a tuple with all the sizes of each operand for the instruction at the address :py:data:`ea`.
+   Returns a tuple with all the sizes of each operand for the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -626,7 +627,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_state(ea)
    
-   Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address :py:data:`ea`.
+   Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -635,13 +636,13 @@ functions and aliases. For more information on this, please see
    
    Returns a tuple of the types for all the operands in the instruction at the current address.
    
-   Aliases: ``instruction.opts``
+   Aliases: :py:func:`instruction.opts<ops_type>`
    
 .. py:function:: ops_type(ea)
    
-   Returns a tuple of the types for all the operands in the instruction at the address :py:data:`ea`.
+   Returns a tuple of the types for all the operands in the instruction at the address ``ea``.
    
-   Aliases: ``instruction.opts``
+   Aliases: :py:func:`instruction.opts<ops_type>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -650,13 +651,13 @@ functions and aliases. For more information on this, please see
    
    Returns a tuple of all the operands for the instruction at the current address.
    
-   Aliases: ``instruction.ops``
+   Aliases: :py:func:`instruction.ops<ops_value>`
    
 .. py:function:: ops_value(ea)
    
-   Returns a tuple of all the operands for the instruction at the address :py:data:`ea`.
+   Returns a tuple of all the operands for the instruction at the address ``ea``.
    
-   Aliases: ``instruction.ops``
+   Aliases: :py:func:`instruction.ops<ops_value>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -667,27 +668,27 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: ops_write(ea)
    
-   Returns the indices of the operands that are being written to by the instruction at the address :py:data:`ea`.
+   Returns the indices of the operands that are being written to by the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
    
 .. py:function:: opt(opnum)
    
-   Returns the type of the operand :py:data:`opnum` belonging to the current instruction.
+   Returns the type of the operand ``opnum`` belonging to the current instruction.
    
-   Aliases: ``instruction.op_type``
+   Aliases: :py:func:`instruction.op_type<opt>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    
 .. py:function:: opt(ea, opnum)
    
-   Returns the type of the operand :py:data:`opnum` belonging to the instruction at the address :py:data:`ea`.
+   Returns the type of the operand ``opnum`` belonging to the instruction at the address ``ea``.
    
    The types returned are dependant on the architecture.
    
-   Aliases: ``instruction.op_type``
+   Aliases: :py:func:`instruction.op_type<opt>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -700,7 +701,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: size(ea)
    
-   Returns the length of the instruction at the address :py:data:`ea`.
+   Returns the length of the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -715,6 +716,8 @@ concept. Please see :ref:`multicase-namespaces` for more
 information on namespaces. For more information on multicase
 functions or aliases, please see :ref:`multicase-functions` or
 :ref:`multicase-aliases`.
+
+.. _ns-instruction-armops:
 
 ******************
 instruction.armops
@@ -733,7 +736,7 @@ armops.disp
    
    A tuple representing a memory displacement on the ARM architecture.
    
-   Has the format :py:obj:`(Rn, Offset)` where :py:obj:`Rn` is a register and :py:obj:`Offset` is
+   Has the format ``(Rn, Offset)`` where ``Rn`` is a register and ``Offset`` is
    the integer that is added to the register.
    
    .. py:attribute:: symbols
@@ -750,7 +753,7 @@ armops.flex
    
    A tuple representing a flexible operand as available on the ARM architecture.
    
-   Has the format :py:obj:`(Rn, shift, n)` which allows the architecture to apply
+   Has the format ``(Rn, shift, n)`` which allows the architecture to apply
    a binary shift or rotation to the value of a register :py:obj:`Rn`.
    
    .. py:attribute:: symbols
@@ -767,12 +770,12 @@ armops.list
    
    A tuple representing a register list on the ARM architecture.
    
-   Has the simple format :py:obj:`(reglist,)` where :py:obj:`reglist` is a set of registers
+   Has the simple format ``(reglist,)`` where ``reglist`` is a set of registers
    that can be explicitly tested for membership.
    
    .. py:attribute:: symbols
    
-      :param getter: Yield any of the registers within the :py:obj:`reglist` field belonging to the tuple.
+      :param getter: Yield any of the registers within the ``reglist`` field belonging to the tuple.
    
 ^^^^^^^^^^
 armops.mem
@@ -784,8 +787,8 @@ armops.mem
    
    A tuple for representing a memory operand on the ARM architecture.
    
-   Has the format :py:obj:`(address, value)` where :py:obj:`address` is the actual value
-   stored in the operand and :py:obj:`value` is the value that is dereferenced.
+   Has the format ``(address, value)`` where ``address`` is the actual value
+   stored in the operand and ``value`` is the value that is dereferenced.
    
    .. py:attribute:: symbols
    
@@ -801,13 +804,15 @@ armops.phrase
    
    A tuple for representing a memory phrase on the ARM architecture
    
-   Has the format :py:obj:`(Rn, Rm)` where both are registers that compose the
+   Has the format ``(Rn, Rm)`` where both are registers that compose the
    phrase.
    
    .. py:attribute:: symbols
    
       :param getter: Yield the :py:obj:`Rn` and :py:obj:`Rm` registers from the tuple.
    
+.. _ns-instruction-intelops:
+
 ********************
 instruction.intelops
 ********************
@@ -825,12 +830,12 @@ intelops.OffsetBaseIndexScale
    
    A tuple representing a memory phrase for the Intel architecture.
    
-   Has the format :py:obj:`(offset, base, index, scale)` where both :py:obj:`base` and
-   :py:obj:`index` are both optional registers.
+   Has the format ``(offset, base, index, scale)`` where both
+   ``base`` and ``index`` are both optional registers.
    
    .. py:attribute:: symbols
    
-      :param getter: Yield the :py:obj:`base`, and the :py:obj:`index` registers from the tuple if they are defined.
+      :param getter: Yield the ``base``, and the ``index`` registers from the tuple if they are defined.
    
 ^^^^^^^^^^^^^^^^^^^^^^
 intelops.SegmentOffset
@@ -842,11 +847,11 @@ intelops.SegmentOffset
    
    A tuple representing an address with a segment register attached for Intel.
    
-   Has the format :py:obj:`(segment, offset)` where :py:obj:`segment` is a segment register.
+   Has the format ``(segment, offset)`` where ``segment`` is a segment register.
    
    .. py:attribute:: symbols
    
-      :param getter: Yield the :py:obj:`segment` register from the tuple if it is defined.
+      :param getter: Yield the ``segment`` register from the tuple if it is defined.
    
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 intelops.SegmentOffsetBaseIndexScale
@@ -858,13 +863,16 @@ intelops.SegmentOffsetBaseIndexScale
    
    A tuple representing a memory phrase for the Intel architecture.
    
-   Has the format :py:obj:`(segment, offset, base, index, scale)` where :py:obj:`segment`
-   includes the segment register and :py:obj:`base` and :py:obj:`index` are both optional registers.
+   Has the format ``(segment, offset, base, index, scale)`` where
+   ``segment`` includes the segment register and ``base`` and
+   ``index`` are both optional registers.
    
    .. py:attribute:: symbols
    
-      :param getter: Yield the :py:obj:`segment`, :py:obj:`base`, and the :py:obj:`index` registers from the tuple if they are defined.
+      :param getter: Yield the ``segment``, ``base``, and the ``index`` registers from the tuple if they are defined.
    
+.. _ns-instruction-mipsops:
+
 *******************
 instruction.mipsops
 *******************
@@ -882,8 +890,8 @@ mipsops.phrase
    
    A tuple for representing a memory phrase on the MIPS architecture.
    
-   Has the format :py:obj:`(Rn, Offset)` where :py:obj:`Rn` is the register and :py:obj:`Offset`
-   is the immediate that is added to the register.
+   Has the format ``(Rn, Offset)`` where ``Rn`` is the register and
+   ``Offset`` is the immediate that is added to the register.
    
    .. py:attribute:: symbols
    
@@ -893,14 +901,12 @@ mipsops.phrase
 Class list
 ----------
 
-
 Classes provide the definition necessary to instantiate an object.
 In most cases, a class is returned when calling one of the prior
 listed functions and thus have no need to be manually instantiated.
 Classes may also have aliases defined for them. Please refer to the
 documentation for the class to see what is available. For more
 information on aliases, please see :ref:`multicase-aliases`.
-
 
 *******
 AArch32

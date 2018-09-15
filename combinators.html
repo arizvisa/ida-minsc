@@ -2,7 +2,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -92,7 +92,7 @@ string when undefined:</p>
 <dl class="function">
 <dt id="fbox">
 <code class="descname">fbox</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#fbox" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given any number of <code class="xref py py-data docutils literal notranslate"><span class="pre">args</span></code>, box them into a tuple.</p>
+<dd><p>Given any number of <code class="docutils literal notranslate"><span class="pre">args</span></code>, box them into a tuple.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fboxed</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -109,16 +109,16 @@ string when undefined:</p>
 <dl class="function">
 <dt id="funbox">
 <code class="descname">funbox</code><span class="sig-paren">(</span><em>callable</em>, <em>*initial_args</em>, <em>**initial_kwargs)(*boxed_args</em>, <em>**boxed_kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#funbox" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that when called with arguments
-will expand (unbox) them before applying them to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that when called with arguments
+will expand (unbox) them before applying them to the <code class="docutils literal notranslate"><span class="pre">callable</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> (<em>a python callable</em>) – the function whose closure will call</li>
-<li><strong>*initial_args</strong> – any default arguments to initially pass to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**initial_kwargs</strong> – any default keyword arguments to initially pass to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>callable</strong> (<cite>function</cite>) – the function whose closure will call</li>
+<li><strong>*initial_args</strong> – any default arguments to initially pass to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**initial_kwargs</strong> – any default keyword arguments to initially pass to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
 <li><strong>*boxed_args</strong> – any number of arguments which are unboxed and concatenated together</li>
 <li><strong>**boxed_kwargs</strong> – any extra keyword arguments to apply to the callable</li>
 </ul>
@@ -131,14 +131,14 @@ will expand (unbox) them before applying them to the <code class="xref py py-dat
 <dl class="function">
 <dt id="finstance">
 <code class="descname">finstance</code><span class="sig-paren">(</span><em>type)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#finstance" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code>, return a closure that will return true or false
-depending on whether <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code> is an instance of that <code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">type</span></code>, return a closure that will return true or false
+depending on whether <code class="docutils literal notranslate"><span class="pre">object</span></code> is an instance of that <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>type</strong> – any kind of python type</li>
+<li><strong>type</strong> (<cite>type</cite>) – any kind of python type</li>
 <li><strong>object</strong> – any kind of python object to test</li>
 </ul>
 </td>
@@ -150,8 +150,8 @@ depending on whether <code class="xref py py-data docutils literal notranslate">
 <dl class="function">
 <dt id="fhasitem">
 <code class="descname">fhasitem</code><span class="sig-paren">(</span><em>item)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fhasitem" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an <code class="xref py py-data docutils literal notranslate"><span class="pre">item</span></code>, return a closure that will return true or false
-based on whether or not <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code> contains it.</p>
+<dd><p>Given an <code class="docutils literal notranslate"><span class="pre">item</span></code>, return a closure that will return true or false
+based on whether or not <code class="docutils literal notranslate"><span class="pre">object</span></code> contains it.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fitemQ</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -159,7 +159,7 @@ based on whether or not <code class="xref py py-data docutils literal notranslat
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>item</strong> – any kind of python object</li>
-<li><strong>object</strong> – any kind of python object to test</li>
+<li><strong>object</strong> – any kind of python object to test membership with</li>
 </ul>
 </td>
 </tr>
@@ -170,9 +170,9 @@ based on whether or not <code class="xref py py-data docutils literal notranslat
 <dl class="function">
 <dt id="fgetitem">
 <code class="descname">fgetitem</code><span class="sig-paren">(</span><em>item</em>, <em>*default)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fgetitem" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an <code class="xref py py-data docutils literal notranslate"><span class="pre">item</span></code>, return a closure which fetches item from
-<code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code>. If <code class="xref py py-data docutils literal notranslate"><span class="pre">default</span></code> is specified, then if the
-item does not exist in <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code> return it instead.</p>
+<dd><p>Given an <code class="docutils literal notranslate"><span class="pre">item</span></code>, return a closure which fetches item from
+<code class="docutils literal notranslate"><span class="pre">object</span></code>. If <code class="docutils literal notranslate"><span class="pre">default</span></code> is specified, then if the
+item does not exist in <code class="docutils literal notranslate"><span class="pre">object</span></code> return it instead.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fitem</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -181,8 +181,8 @@ item does not exist in <code class="xref py py-data docutils literal notranslate
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>item</strong> – any kind of python object to pass to <code class="xref py py-func docutils literal notranslate"><span class="pre">operator.getitem()</span></code>.</li>
 <li><strong>object</strong> – any kind of python object to return an item from</li>
-<li><strong>*default</strong> – an item returned by default if the <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code>
-does not contain the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">item</span></code></li>
+<li><strong>*default</strong> – an item returned by default if the <code class="docutils literal notranslate"><span class="pre">object</span></code>
+does not contain the specified <code class="docutils literal notranslate"><span class="pre">item</span></code></li>
 </ul>
 </td>
 </tr>
@@ -193,16 +193,16 @@ does not contain the specified <code class="xref py py-data docutils literal not
 <dl class="function">
 <dt id="fhasattr">
 <code class="descname">fhasattr</code><span class="sig-paren">(</span><em>attribute)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fhasattr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an <code class="xref py py-data docutils literal notranslate"><span class="pre">attribute</span></code> as a string, return a closure that will return
-true or false based on whether or not <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code> has the specified
-<code class="xref py py-data docutils literal notranslate"><span class="pre">attribute</span></code>.</p>
+<dd><p>Given an <code class="docutils literal notranslate"><span class="pre">attribute</span></code> as a string, return a closure that will return
+true or false based on whether or not <code class="docutils literal notranslate"><span class="pre">object</span></code> has the specified
+<code class="docutils literal notranslate"><span class="pre">attribute</span></code>.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fattributeQ</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>attribute</strong> (<em>str</em>) – the attribute to check for</li>
+<li><strong>attribute</strong> (<cite>str</cite>) – the attribute to check for</li>
 <li><strong>object</strong> – any kind of python object to test</li>
 </ul>
 </td>
@@ -214,19 +214,19 @@ true or false based on whether or not <code class="xref py py-data docutils lite
 <dl class="function">
 <dt id="fgetattr">
 <code class="descname">fgetattr</code><span class="sig-paren">(</span><em>attribute</em>, <em>*default)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fgetattr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an <code class="xref py py-data docutils literal notranslate"><span class="pre">attribute</span></code>, return a closure which fetches the attribute
-from the <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code>. If <code class="xref py py-data docutils literal notranslate"><span class="pre">default</span></code> is specified, then if the
-attribute does not exist in <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code> return it instead.</p>
+<dd><p>Given an <code class="docutils literal notranslate"><span class="pre">attribute</span></code>, return a closure which fetches the attribute
+from the <code class="docutils literal notranslate"><span class="pre">object</span></code>. If <code class="docutils literal notranslate"><span class="pre">default</span></code> is specified, then if the
+attribute does not exist in <code class="docutils literal notranslate"><span class="pre">object</span></code> return it instead.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fattribute</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>attribute</strong> (<em>str</em>) – an attribute to return from the <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code></li>
+<li><strong>attribute</strong> (<cite>str</cite>) – an attribute to return from the <code class="docutils literal notranslate"><span class="pre">object</span></code></li>
 <li><strong>object</strong> – any kind of python object to return an attribute from</li>
-<li><strong>*default</strong> – an attribute returned by default if the <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code>
-does not contain with specified <code class="xref py py-data docutils literal notranslate"><span class="pre">attribute</span></code></li>
+<li><strong>*default</strong> – an attribute returned by default if the <code class="docutils literal notranslate"><span class="pre">object</span></code>
+does not contain with specified <code class="docutils literal notranslate"><span class="pre">attribute</span></code></li>
 </ul>
 </td>
 </tr>
@@ -237,7 +237,7 @@ does not contain with specified <code class="xref py py-data docutils literal no
 <dl class="function">
 <dt id="fpassthru">
 <code class="descname">fpassthru</code><span class="sig-paren">(</span><em>object</em><span class="sig-paren">)</span><a class="headerlink" href="#fpassthru" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code>, return it. This is the identity function
+<dd><p>Given an <code class="docutils literal notranslate"><span class="pre">object</span></code>, return it. This is the identity function
 and is typically used to ignore transforming an object.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fpass</span></code>, <code class="docutils literal notranslate"><span class="pre">fidentity</span></code>, <code class="docutils literal notranslate"><span class="pre">fid</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -253,8 +253,8 @@ and is typically used to ignore transforming an object.</p>
 <dl class="function">
 <dt id="fdefault">
 <code class="descname">fdefault</code><span class="sig-paren">(</span><em>default)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fdefault" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">default</span></code> object, return a closure that will return it if
-<code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code> is not defined (false-y).</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">default</span></code> object, return a closure that will return it if
+<code class="docutils literal notranslate"><span class="pre">object</span></code> is not defined (false-y).</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -272,7 +272,7 @@ and is typically used to ignore transforming an object.</p>
 <dl class="function">
 <dt id="fcompose">
 <code class="descname">fcompose</code><span class="sig-paren">(</span><em>*callables)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fcompose" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a number of <code class="xref py py-data docutils literal notranslate"><span class="pre">callables</span></code>, return a closure that executes them
+<dd><p>Given a number of <code class="docutils literal notranslate"><span class="pre">callables</span></code>, return a closure that executes them
 in succession whilst returning the result.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -291,7 +291,7 @@ in succession whilst returning the result.</p>
 <dl class="function">
 <dt id="fdiscard">
 <code class="descname">fdiscard</code><span class="sig-paren">(</span><em>callable)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fdiscard" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that will call it with no
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that will call it with no
 parameters whilst discarding any that were passed to it.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -311,11 +311,11 @@ parameters whilst discarding any that were passed to it.</p>
 <dl class="function">
 <dt id="fcondition">
 <code class="descname">fcondition</code><span class="sig-paren">(</span><em>crit)(true</em>, <em>false)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fcondition" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a critiquing function <code class="xref py py-data docutils literal notranslate"><span class="pre">crit</span></code>, return a closure which takes
-parameters for <code class="xref py py-data docutils literal notranslate"><span class="pre">true</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">false</span></code>. This will return
-another closure that when passed an <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code>, will check it via
-the critiquing function (<code class="xref py py-data docutils literal notranslate"><span class="pre">crit</span></code>) and return <code class="xref py py-data docutils literal notranslate"><span class="pre">true</span></code> if
-the function returns a truthy value, or return <code class="xref py py-data docutils literal notranslate"><span class="pre">false</span></code> if it
+<dd><p>Given a critiquing function <code class="docutils literal notranslate"><span class="pre">crit</span></code>, return a closure which takes
+parameters for <code class="docutils literal notranslate"><span class="pre">true</span></code> and <code class="docutils literal notranslate"><span class="pre">false</span></code>. This will return
+another closure that when passed an <code class="docutils literal notranslate"><span class="pre">object</span></code>, will check it via
+the critiquing function (<code class="docutils literal notranslate"><span class="pre">crit</span></code>) and return <code class="docutils literal notranslate"><span class="pre">true</span></code> if
+the function returns a truthy value, or return <code class="docutils literal notranslate"><span class="pre">false</span></code> if it
 returns a false-y value.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fcond</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -323,10 +323,10 @@ returns a false-y value.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>crit</strong> – a callable that takes an argument and returns true or false</li>
-<li><strong>true</strong> – an object or a function to return (or execute) when value is true</li>
-<li><strong>false</strong> – an object or a function to return (or execute) when value is false</li>
-<li><strong>object</strong> – any kind of python object to check</li>
+<li><strong>crit</strong> (<cite>function</cite>) – a callable that takes an argument and returns true or false</li>
+<li><strong>true</strong> (<cite>object</cite> or <cite>function</cite>) – an object or a function to return (or execute) when value is true</li>
+<li><strong>false</strong> (<cite>object</cite> or <cite>function</cite>) – an object or a function to return (or execute) when value is false</li>
+<li><strong>object</strong> – any kind of python object to pass to <code class="docutils literal notranslate"><span class="pre">crit</span></code></li>
 </ul>
 </td>
 </tr>
@@ -337,8 +337,8 @@ returns a false-y value.</p>
 <dl class="function">
 <dt id="fmap">
 <code class="descname">fmap</code><span class="sig-paren">(</span><em>*callables)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fmap" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a number of <code class="xref py py-data docutils literal notranslate"><span class="pre">callables</span></code>, return a closure that executes them
-synchronously against <code class="xref py py-data docutils literal notranslate"><span class="pre">object</span></code> returning a tuple containing the
+<dd><p>Given a number of <code class="docutils literal notranslate"><span class="pre">callables</span></code>, return a closure that executes them
+synchronously against <code class="docutils literal notranslate"><span class="pre">object</span></code> returning a tuple containing the
 result of each callable.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -358,7 +358,7 @@ result returned</li>
 <dl class="function">
 <dt id="fmemo">
 <code class="descname">fmemo</code><span class="sig-paren">(</span><em>callable</em>, <em>*initial_args</em>, <em>**initial_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fmemo" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, and any <code class="xref py py-data docutils literal notranslate"><span class="pre">initial_args</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">initial_kwargs</span></code>,
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, and any <code class="docutils literal notranslate"><span class="pre">initial_args</span></code> and <code class="docutils literal notranslate"><span class="pre">initial_kwargs</span></code>,
 return a closure that caches (memoizes) the result that is returned. The next
 time this closure is called with the same arguments, the cached version will
 be returned instead.</p>
@@ -368,7 +368,7 @@ be returned instead.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – any callable to memoize the results for</li>
+<li><strong>callable</strong> (<cite>function</cite>) – any callable to memoize the results for</li>
 <li><strong>*initial_args</strong> – any initial arguments to prefix to the callable</li>
 <li><strong>**initial_kwargs</strong> – any initial keyword arguments to apply to the callable</li>
 <li><strong>*args</strong> – any arguments to apply to the callable</li>
@@ -383,18 +383,18 @@ be returned instead.</p>
 <dl class="function">
 <dt id="fpartial">
 <code class="descname">fpartial</code><span class="sig-paren">(</span><em>callable</em>, <em>*start_args</em>, <em>**start_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fpartial" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, partially apply the arguments specified in both
-<code class="xref py py-data docutils literal notranslate"><span class="pre">start_args</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">start_kwargs</span></code>. This will return a closure
-that can then be called with any other <code class="xref py py-data docutils literal notranslate"><span class="pre">args</span></code> or keyword arguments
-in <code class="xref py py-data docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, partially apply the arguments specified in both
+<code class="docutils literal notranslate"><span class="pre">start_args</span></code> and <code class="docutils literal notranslate"><span class="pre">start_kwargs</span></code>. This will return a closure
+that can then be called with any other <code class="docutils literal notranslate"><span class="pre">args</span></code> or keyword arguments
+in <code class="docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – any callable to partially apply arguments to</li>
-<li><strong>*start_args</strong> – initial arguments to partially apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**start_kwargs</strong> – initial keyword arguments to partially apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>callable</strong> (<cite>function</cite>) – any callable to partially apply arguments to</li>
+<li><strong>*start_args</strong> – initial arguments to partially apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**start_kwargs</strong> – initial keyword arguments to partially apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
 <li><strong>*args</strong> – arguments to continue to apply to the callable</li>
 <li><strong>**kwargs</strong> – any keyword arguments to continue to apply to the callable</li>
 </ul>
@@ -407,18 +407,18 @@ in <code class="xref py py-data docutils literal notranslate"><span class="pre">
 <dl class="function">
 <dt id="fapply">
 <code class="descname">fapply</code><span class="sig-paren">(</span><em>callable</em>, <em>*initial_args</em>, <em>**initial_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fapply" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that will apply both the arguments
-(<code class="xref py py-data docutils literal notranslate"><span class="pre">args</span></code>) and keyword arguments (<code class="xref py py-data docutils literal notranslate"><span class="pre">kwargs</span></code>) to it.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that will apply both the arguments
+(<code class="docutils literal notranslate"><span class="pre">args</span></code>) and keyword arguments (<code class="docutils literal notranslate"><span class="pre">kwargs</span></code>) to it.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – any callable to apply arguments to</li>
-<li><strong>*args</strong> – the arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**kwargs</strong> – the keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>*initial_args</strong> – any initial arguments to prefix the <code class="xref py py-data docutils literal notranslate"><span class="pre">args</span></code> with</li>
-<li><strong>**initial_kwargs</strong> – any initial keyword args to prefix the <code class="xref py py-data docutils literal notranslate"><span class="pre">kwargs</span></code> with</li>
+<li><strong>callable</strong> (<cite>function</cite>) – any callable to apply arguments to</li>
+<li><strong>*args</strong> – the arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**kwargs</strong> – the keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>*initial_args</strong> – any initial arguments to prefix the <code class="docutils literal notranslate"><span class="pre">args</span></code> with</li>
+<li><strong>**initial_kwargs</strong> – any initial keyword args to prefix the <code class="docutils literal notranslate"><span class="pre">kwargs</span></code> with</li>
 </ul>
 </td>
 </tr>
@@ -429,20 +429,20 @@ in <code class="xref py py-data docutils literal notranslate"><span class="pre">
 <dl class="function">
 <dt id="fcurry">
 <code class="descname">fcurry</code><span class="sig-paren">(</span><em>*default_args</em>, <em>**default_kwargs)(callable</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fcurry" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given <code class="xref py py-data docutils literal notranslate"><span class="pre">default_args</span></code> and <code class="xref py py-data docutils literal notranslate"><span class="pre">default_kwargs</span></code>, return a closure
-that will apply these arguments to its first parameter <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>.
-If <code class="xref py py-data docutils literal notranslate"><span class="pre">args</span></code> or <code class="xref py py-data docutils literal notranslate"><span class="pre">kwargs</span></code> is specified, the append these to the
+<dd><p>Given <code class="docutils literal notranslate"><span class="pre">default_args</span></code> and <code class="docutils literal notranslate"><span class="pre">default_kwargs</span></code>, return a closure
+that will apply these arguments to its first parameter <code class="docutils literal notranslate"><span class="pre">callable</span></code>.
+If <code class="docutils literal notranslate"><span class="pre">args</span></code> or <code class="docutils literal notranslate"><span class="pre">kwargs</span></code> is specified, the append these to the
 default arguments.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>*default_args</strong> – the arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**default_kwargs</strong> – the keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>callable</strong> – the callable to apply the arguments to</li>
-<li><strong>*args</strong> – any extra arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**kwargs</strong> – any extra keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>*default_args</strong> – the arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**default_kwargs</strong> – the keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>callable</strong> (<cite>function</cite>) – the callable to apply the arguments to</li>
+<li><strong>*args</strong> – any extra arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**kwargs</strong> – any extra keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
 </ul>
 </td>
 </tr>
@@ -453,21 +453,21 @@ default arguments.</p>
 <dl class="function">
 <dt id="frpartial">
 <code class="descname">frpartial</code><span class="sig-paren">(</span><em>callable</em>, <em>*reverse_args</em>, <em>**reverse_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#frpartial" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, the arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">reverse_args</span></code>, and
-the keyword arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">reverse_kwargs</span></code>, return a closure that
-will apply these to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code> backwards. If <code class="xref py py-data docutils literal notranslate"><span class="pre">args</span></code>
-or <code class="xref py py-data docutils literal notranslate"><span class="pre">kwargs</span></code> is provided, then apply these to the front of
-the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, the arguments <code class="docutils literal notranslate"><span class="pre">reverse_args</span></code>, and
+the keyword arguments <code class="docutils literal notranslate"><span class="pre">reverse_kwargs</span></code>, return a closure that
+will apply these to the <code class="docutils literal notranslate"><span class="pre">callable</span></code> backwards. If <code class="docutils literal notranslate"><span class="pre">args</span></code>
+or <code class="docutils literal notranslate"><span class="pre">kwargs</span></code> is provided, then apply these to the front of
+the <code class="docutils literal notranslate"><span class="pre">callable</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – the callable to apply the arguments to</li>
-<li><strong>*reverse_args</strong> – the arguments to apply to the end of the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**reverse_kwargs</strong> – the keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>*args</strong> – the arguments to apply to the beginning of the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**kwargs</strong> – any extra keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>callable</strong> (<cite>function</cite>) – the callable to apply the arguments to</li>
+<li><strong>*reverse_args</strong> – the arguments to apply to the end of the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**reverse_kwargs</strong> – the keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>*args</strong> – the arguments to apply to the beginning of the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**kwargs</strong> – any extra keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
 </ul>
 </td>
 </tr>
@@ -478,22 +478,22 @@ the <code class="xref py py-data docutils literal notranslate"><span class="pre"
 <dl class="function">
 <dt id="freversed">
 <code class="descname">freversed</code><span class="sig-paren">(</span><em>callable</em>, <em>*reverse_args</em>, <em>**reverse_kwargs)(*extra_args</em>, <em>**extra_kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#freversed" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, the arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">reverse_args</span></code>, and the
-keyword arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">reverse_kwargs</span></code>, return a closure which applies
-these to the end of the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>. If <code class="xref py py-data docutils literal notranslate"><span class="pre">extra_args</span></code> or
-<code class="xref py py-data docutils literal notranslate"><span class="pre">extra_kwargs</span></code> is provided, then continue to apply these to the
-<code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code> but backwards.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, the arguments <code class="docutils literal notranslate"><span class="pre">reverse_args</span></code>, and the
+keyword arguments <code class="docutils literal notranslate"><span class="pre">reverse_kwargs</span></code>, return a closure which applies
+these to the end of the <code class="docutils literal notranslate"><span class="pre">callable</span></code>. If <code class="docutils literal notranslate"><span class="pre">extra_args</span></code> or
+<code class="docutils literal notranslate"><span class="pre">extra_kwargs</span></code> is provided, then continue to apply these to the
+<code class="docutils literal notranslate"><span class="pre">callable</span></code> but backwards.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">freverse</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – the callable to apply the arguments to</li>
-<li><strong>*reverse_args</strong> – the arguments to apply to the end of <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**reverse_kwargs</strong> – the keyword arguments to apply to <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>*extra_args</strong> – extra arguments to continue to apply to <code class="xref py py-data docutils literal notranslate"><span class="pre">kwargs</span></code></li>
-<li><strong>**extra_kwargs</strong> – any extra keyword arguments to apply to <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>callable</strong> (<cite>function</cite>) – the callable to apply the arguments to</li>
+<li><strong>*reverse_args</strong> – the arguments to apply to the end of <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**reverse_kwargs</strong> – the keyword arguments to apply to <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>*extra_args</strong> – extra arguments to continue to apply to <code class="docutils literal notranslate"><span class="pre">kwargs</span></code></li>
+<li><strong>**extra_kwargs</strong> – any extra keyword arguments to apply to <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
 </ul>
 </td>
 </tr>
@@ -504,10 +504,10 @@ these to the end of the <code class="xref py py-data docutils literal notranslat
 <dl class="function">
 <dt id="fcatch">
 <code class="descname">fcatch</code><span class="sig-paren">(</span><em>callable</em>, <em>*initial_args</em>, <em>**initial_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fcatch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that will call it with the
-arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">initial_args</span></code> combined with <code class="xref py py-data docutils literal notranslate"><span class="pre">args</span></code>, and the
-keyword arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">initial_kwargs</span></code> combined with <code class="xref py py-data docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
-<p>This closure will wrap the result of <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code> so that the
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, return a closure that will call it with the
+arguments <code class="docutils literal notranslate"><span class="pre">initial_args</span></code> combined with <code class="docutils literal notranslate"><span class="pre">args</span></code>, and the
+keyword arguments <code class="docutils literal notranslate"><span class="pre">initial_kwargs</span></code> combined with <code class="docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
+<p>This closure will wrap the result of <code class="docutils literal notranslate"><span class="pre">callable</span></code> so that the
 second element of the tuple will be the result, and the first element will
 be the exception object if one was raised. If one wasn’t raised, then the
 first element will be the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>.</p>
@@ -517,11 +517,11 @@ first element will be the value <code class="xref py py-obj docutils literal not
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – the callable to catch an exception in</li>
-<li><strong>*initial_args</strong> – the initial arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**initial_kwargs</strong> – the initial keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>*args</strong> – the arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**kwargs</strong> – the keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>callable</strong> (<cite>function</cite>) – the callable to catch an exception in</li>
+<li><strong>*initial_args</strong> – the initial arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**initial_kwargs</strong> – the initial keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>*args</strong> – the arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**kwargs</strong> – the keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
 </ul>
 </td>
 </tr>
@@ -532,20 +532,20 @@ first element will be the value <code class="xref py py-obj docutils literal not
 <dl class="function">
 <dt id="fcomplement">
 <code class="descname">fcomplement</code><span class="sig-paren">(</span><em>callable</em>, <em>*initial_args</em>, <em>**initial_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fcomplement" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>, the arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">initial_args</span></code>, and the
-keyword arguments <code class="xref py py-data docutils literal notranslate"><span class="pre">initial_kwargs</span></code>, return a closure that will
-invert the result (<cite>not</cite>) returned from the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code>.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, the arguments <code class="docutils literal notranslate"><span class="pre">initial_args</span></code>, and the
+keyword arguments <code class="docutils literal notranslate"><span class="pre">initial_kwargs</span></code>, return a closure that will
+invert the result (<cite>not</cite>) returned from the <code class="docutils literal notranslate"><span class="pre">callable</span></code>.</p>
 <p>Aliases: <code class="docutils literal notranslate"><span class="pre">fnot</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – the callable to invert the result for</li>
-<li><strong>*initial_args</strong> – the initial arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**initial_args</strong> – the initial keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>*args</strong> – the arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
-<li><strong>**kwargs</strong> – the keyword arguments to apply to the <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>callable</strong> (<cite>function</cite>) – the callable to invert the result for</li>
+<li><strong>*initial_args</strong> – the initial arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**initial_args</strong> – the initial keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>*args</strong> – the arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
+<li><strong>**kwargs</strong> – the keyword arguments to apply to the <code class="docutils literal notranslate"><span class="pre">callable</span></code></li>
 </ul>
 </td>
 </tr>
@@ -556,12 +556,12 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="first">
 <code class="descname">first</code><span class="sig-paren">(</span><em>listable</em><span class="sig-paren">)</span><a class="headerlink" href="#first" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">listable</span></code> python object, return its first element.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">listable</span></code> python object, return its first element.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> – any kind of list-like object</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> (<cite>list</cite> or <cite>tuple</cite>) – any kind of list-like object</td>
 </tr>
 </tbody>
 </table>
@@ -570,12 +570,12 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="second">
 <code class="descname">second</code><span class="sig-paren">(</span><em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#second" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">listable</span></code> python object, return its second element.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">listable</span></code> python object, return its second element.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> – any kind of list-like object</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> (<cite>list</cite> or <cite>tuple</cite>) – any kind of list-like object</td>
 </tr>
 </tbody>
 </table>
@@ -584,12 +584,12 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="third">
 <code class="descname">third</code><span class="sig-paren">(</span><em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#third" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">listable</span></code> python object, return the third element.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">listable</span></code> python object, return the third element.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> – any kind of list-like object</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> (<cite>list</cite> or <cite>tuple</cite>) – any kind of list-like object</td>
 </tr>
 </tbody>
 </table>
@@ -598,12 +598,12 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="last">
 <code class="descname">last</code><span class="sig-paren">(</span><em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#last" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">listable</span></code> python object, return its last element.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">listable</span></code> python object, return its last element.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> – any kind of list-like object</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> (<cite>list</cite> or <cite>tuple</cite>) – any kind of list-like object</td>
 </tr>
 </tbody>
 </table>
@@ -612,7 +612,7 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="ilist">
 <code class="descname">ilist</code><span class="sig-paren">(</span><em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#ilist" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code> python object, return it as a list.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">iterable</span></code> python object, return it as a list.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -626,12 +626,12 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="liter">
 <code class="descname">liter</code><span class="sig-paren">(</span><em>listable</em><span class="sig-paren">)</span><a class="headerlink" href="#liter" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">listable</span></code> python object, return it as an iterable..</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">listable</span></code> python object, return it as an iterable..</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> – any kind of list-like object</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>listable</strong> (<cite>list</cite> or <cite>tuple</cite>) – any kind of list-like object</td>
 </tr>
 </tbody>
 </table>
@@ -640,7 +640,7 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="ituple">
 <code class="descname">ituple</code><span class="sig-paren">(</span><em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#ituple" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code> python object, return it as a tuple.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">iterable</span></code> python object, return it as a tuple.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -654,12 +654,12 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="titer">
 <code class="descname">titer</code><span class="sig-paren">(</span><em>tuple</em><span class="sig-paren">)</span><a class="headerlink" href="#titer" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a <code class="xref py py-data docutils literal notranslate"><span class="pre">tuple</span></code>, return it as an iterator.</p>
+<dd><p>Given a <code class="docutils literal notranslate"><span class="pre">tuple</span></code>, return it as an iterator.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>tuple</strong> (<em>tuple</em>) – any kind of python tuple</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>tuple</strong> (<cite>tuple</cite>) – any kind of python tuple</td>
 </tr>
 </tbody>
 </table>
@@ -668,15 +668,15 @@ invert the result (<cite>not</cite>) returned from the <code class="xref py py-d
 <dl class="function">
 <dt id="itake">
 <code class="descname">itake</code><span class="sig-paren">(</span><em>count)(iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#itake" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an integer <a class="reference internal" href="#count" title="count"><code class="xref py py-data docutils literal notranslate"><span class="pre">count</span></code></a>, return a closure that will consume
-that number of elements from the provided <code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code> and
+<dd><p>Given an integer <code class="docutils literal notranslate"><span class="pre">count</span></code>, return a closure that will consume
+that number of elements from the provided <code class="docutils literal notranslate"><span class="pre">iterable</span></code> and
 return them as a tuple.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>count</strong> (<em>int</em><em> or </em><em>long</em>) – a number of elements to consume</li>
+<li><strong>count</strong> (<cite>int</cite> or <cite>long</cite>) – a number of elements to consume</li>
 <li><strong>iterable</strong> – an iterable to consume</li>
 </ul>
 </td>
@@ -688,15 +688,15 @@ return them as a tuple.</p>
 <dl class="function">
 <dt id="iget">
 <code class="descname">iget</code><span class="sig-paren">(</span><em>count)(iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#iget" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an integer <a class="reference internal" href="#count" title="count"><code class="xref py py-data docutils literal notranslate"><span class="pre">count</span></code></a>, return a closure that will consume
-that number of elements from the provided <code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code> and
+<dd><p>Given an integer <code class="docutils literal notranslate"><span class="pre">count</span></code>, return a closure that will consume
+that number of elements from the provided <code class="docutils literal notranslate"><span class="pre">iterable</span></code> and
 return the last one.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>count</strong> (<em>int</em><em> or </em><em>long</em>) – a number of elements to consume</li>
+<li><strong>count</strong> (<cite>int</cite> or <cite>long</cite>) – a number of elements to consume</li>
 <li><strong>iterable</strong> – an iterable to consume values from</li>
 </ul>
 </td>
@@ -708,15 +708,15 @@ return the last one.</p>
 <dl class="function">
 <dt id="imap">
 <code class="descname">imap</code><span class="sig-paren">(</span><em>callable</em>, <em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#imap" title="Permalink to this definition">¶</a></dt>
-<dd><p>Execute the provided <code class="xref py py-data docutils literal notranslate"><span class="pre">callable</span></code> against all of the elements in
-<code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code> returning an iterator containing the transformed
+<dd><p>Execute the provided <code class="docutils literal notranslate"><span class="pre">callable</span></code> against all of the elements in
+<code class="docutils literal notranslate"><span class="pre">iterable</span></code> returning an iterator containing the transformed
 results. This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">map()</span></code> but for iterables.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – a callable python object that transforms its argument</li>
+<li><strong>callable</strong> (<cite>function</cite>) – a callable python object that transforms its argument</li>
 <li><strong>iterable</strong> – an iterable to transform results from</li>
 </ul>
 </td>
@@ -728,14 +728,14 @@ results. This is similar to <code class="xref py py-func docutils literal notran
 <dl class="function">
 <dt id="ifilter">
 <code class="descname">ifilter</code><span class="sig-paren">(</span><em>crit</em>, <em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#ifilter" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yield each value from <code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code> that the callable <code class="xref py py-data docutils literal notranslate"><span class="pre">crit</span></code>
+<dd><p>Yield each value from <code class="docutils literal notranslate"><span class="pre">iterable</span></code> that the callable <code class="docutils literal notranslate"><span class="pre">crit</span></code>
 returns true for. This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">filter()</span></code> but for iterables.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>crit</strong> – a callable python object that returns true or false based on its
+<li><strong>crit</strong> (<cite>function</cite>) – a callable python object that returns true or false based on its
 argument</li>
 <li><strong>iterable</strong> – an iterable to critique</li>
 </ul>
@@ -748,7 +748,7 @@ argument</li>
 <dl class="function">
 <dt id="ichain">
 <code class="descname">ichain</code><span class="sig-paren">(</span><em>*iterables</em><span class="sig-paren">)</span><a class="headerlink" href="#ichain" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a variable number of <code class="xref py py-data docutils literal notranslate"><span class="pre">iterables</span></code>, combine them all
+<dd><p>Given a variable number of <code class="docutils literal notranslate"><span class="pre">iterables</span></code>, combine them all
 into a single iterator. This is the same as <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.chain()</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -763,7 +763,7 @@ into a single iterator. This is the same as <code class="xref py py-func docutil
 <dl class="function">
 <dt id="izip">
 <code class="descname">izip</code><span class="sig-paren">(</span><em>*iterables</em><span class="sig-paren">)</span><a class="headerlink" href="#izip" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given any number of <code class="xref py py-data docutils literal notranslate"><span class="pre">iterables</span></code>, return them as an iterator that
+<dd><p>Given any number of <code class="docutils literal notranslate"><span class="pre">iterables</span></code>, return them as an iterator that
 yields a tuple for each element that an individual iterator would return.
 This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">zip()</span></code>, and is the same as <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.izip()</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -779,8 +779,8 @@ This is similar to <code class="xref py py-func docutils literal notranslate"><s
 <dl class="function">
 <dt id="count">
 <code class="descname">count</code><span class="sig-paren">(</span><em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#count" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given an <code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code>, return the number of elements that it contains.</p>
-<p>Note: This is done by consuming values from <code class="xref py py-data docutils literal notranslate"><span class="pre">iterable</span></code> which will
+<dd><p>Given an <code class="docutils literal notranslate"><span class="pre">iterable</span></code>, return the number of elements that it contains.</p>
+<p>Note: This is done by consuming values from <code class="docutils literal notranslate"><span class="pre">iterable</span></code> which will
 modify its state. If the state of the iterator wishes to be retained, one
 can either re-create it, or make a copy of it using <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.tee()</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">

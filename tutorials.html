@@ -2,7 +2,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -59,17 +59,17 @@ aliases.</p>
 <li>Most multicased functions have a variation that takes no
 parameters in order to imply the current address. Another
 way to do this, however, is to use <a class="reference internal" href="modules/database.html#database.here" title="database.here"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.here()</span></code></a>
-which is aliased as <code class="xref py py-func docutils literal notranslate"><span class="pre">database.h()</span></code>. This function is
-called so often however, that its been imported into the
-root namespace of this plugin. So we can literally just call
-<code class="xref py py-func docutils literal notranslate"><span class="pre">h()</span></code>.</li>
+which is aliased as <a class="reference internal" href="modules/database.html#database.here" title="database.here"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.h</span></code></a>. This
+function is called so often, however, that its been imported into
+the default namespace of this plugin. So we can literally just call
+<a class="reference internal" href="modules/database.html#database.here" title="database.here"><code class="xref py py-func docutils literal notranslate"><span class="pre">h()</span></code></a>.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
-<li>To disassemble this instruction, we’ll rely on the <code class="xref py py-func docutils literal notranslate"><span class="pre">database.diassemble()</span></code>
-function that is aliased as <code class="xref py py-func docutils literal notranslate"><span class="pre">database.disasm()</span></code>.</li>
+<li>To disassemble this instruction, we’ll rely on the <a class="reference internal" href="modules/database.html#database.disassemble" title="database.disassemble"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.disassemble()</span></code></a>
+function that is aliased as <a class="reference internal" href="modules/database.html#database.disassemble" title="database.disassemble"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.disasm</span></code></a>.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
 </pre></div>
@@ -153,8 +153,9 @@ debugger. This will only work if the base address of our database
 matches our image base in our debugger. But…we can actually just
 feed an offset to our debugger instead. This will allow our
 breakpoint to be independent of our base address. To get our module
-name, we can use <code class="xref py py-func docutils literal notranslate"><span class="pre">database.module()</span></code>, and to convert our
-address to an offset, we can use <a class="reference internal" href="modules/database.html#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code></a>.</li>
+name, we can use <a class="reference internal" href="modules/database.html#database.config.module" title="database.config.module"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.module()</span></code></a>,
+and to convert our address to an offset, we can use
+<a class="reference internal" href="modules/database.html#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code></a>.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
@@ -222,10 +223,10 @@ to select them. Since we’re searching for either tag (or), we’ll use
 the <code class="xref py py-data docutils literal notranslate"><span class="pre">Or</span></code> parameter to return any function that has either tag
 assigned.  We plan on iterating through these results, so we’ll need
 to use <a class="reference internal" href="modules/function.html#function.chunks.iterate" title="function.chunks.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.chunks.iterate()</span></code></a> (or really its alias
-<code class="xref py py-func docutils literal notranslate"><span class="pre">function.iterate()</span></code>) to look for our instruction type. To
-test for an indirect call instruction (a call which branches to a
-register or a phrase), we can simply use the <a class="reference internal" href="modules/instruction.html#instruction.is_calli" title="instruction.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_calli()</span></code></a>
-function.</li>
+<a class="reference internal" href="modules/function.html#function.chunks.iterate" title="function.chunks.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.iterate</span></code></a>) to look for our
+instruction type. To test for an indirect call instruction (a call
+which branches to a register or a phrase), we can simply use the
+<a class="reference internal" href="modules/instruction.html#instruction.is_calli" title="instruction.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_calli()</span></code></a> function.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;is-memory-function&#39;</span><span class="p">,</span> <span class="s1">&#39;calls-memory-function&#39;</span><span class="p">)):</span>
       <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
@@ -255,12 +256,13 @@ up giving us the subset of the results we care about.</li>
 instructions tagged in the contents of our functions. So to continue,
 let’s tag the operand type for each instruction. This way we can
 determine which registers the instructions’ operands are composed
-of. We can do this using <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_type()</span></code> which is
-aliased as <a class="reference internal" href="modules/instruction.html#instruction.opt" title="instruction.opt"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opt()</span></code></a>. Actually, in order to check
-our results, let’s actually store <em>all</em> of the operand types using
-its plural, <a class="reference internal" href="modules/instruction.html#instruction.ops_type" title="instruction.ops_type"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_type()</span></code></a>. As usual, this has an
-abbreviated alias of <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opts()</span></code>. We’ll also keep
-things clean again, by removing the previous tag, “indirect-call”.</li>
+of. We can do this using <a class="reference internal" href="modules/instruction.html#instruction.opt" title="instruction.opt"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_type()</span></code></a>
+which is aliased as <a class="reference internal" href="modules/instruction.html#instruction.opt" title="instruction.opt"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opt</span></code></a>. Actually,
+in order to check our results, let’s actually store <em>all</em> of the operand
+types using its plural, <a class="reference internal" href="modules/instruction.html#instruction.ops_type" title="instruction.ops_type"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_type()</span></code></a>. As usual, this
+has an abbreviated alias of <a class="reference internal" href="modules/instruction.html#instruction.ops_type" title="instruction.ops_type"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opts</span></code></a>.
+We’ll also keep things clean again, by removing the previous tag,
+“indirect-call”.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;indirect-call&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="o">*</span><span class="n">res</span><span class="p">):</span>
@@ -276,9 +278,9 @@ things clean again, by removing the previous tag, “indirect-call”.</li>
 <li>Just to sanity check things, lets prove that all of the calls that we
 care about really only have one operand. To do this, we’ll output their
 address using the <a class="reference internal" href="modules/database.html#database.disassemble" title="database.disassemble"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.disassemble()</span></code></a> function which is
-aliased as <code class="xref py py-func docutils literal notranslate"><span class="pre">database.disasm()</span></code> and also tag them so we can
-refer to them later. We’ll do this removal by passing the <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>
-parameter to <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a>.</li>
+aliased as <a class="reference internal" href="modules/database.html#database.disassemble" title="database.disassemble"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.disasm</span></code></a> and also
+tag them so we can refer to them later. We’ll do this removal by
+passing the <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> parameter to <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a>.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
@@ -326,9 +328,10 @@ target. Instead of calculating them though, let’s remain hacky and
 just output their results as a breakpoint. In the prior tutorial,
 we chose <a class="reference internal" href="modules/database.html#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code></a> in order to calculate the
 relative address. Instead of doing it that way, there’s a class in
-the <a class="reference internal" href="modules/misc-tools.html#module-tools" title="tools"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code></a> module that we can use to transform an address.
-So let’s use <a class="reference internal" href="modules/misc-tools.html#tools.remote" title="tools.remote"><code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code></a> instead. To construct this,
-we’ll need our remote address.</li>
+the <a class="reference internal" href="modules/misc-tools.html#module-tools" title="tools"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code></a> module that we can use to transform an address
+named <a class="reference internal" href="modules/misc-tools.html#tools.remote" title="tools.remote"><code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code></a>. So let’s use this instead. To
+construct this class, we’ll need to pass our remote base address
+as a parameter.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">R</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">remote_base_address</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span> <span class="n">R</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">h</span><span class="p">())</span> <span class="p">)</span>
@@ -378,8 +381,8 @@ at time that we need them. This data can also be shared with other
 users so that they will also have the access to the same information.
 Just for fun, let’s serialize this data so that we can transport this
 to another user. Rather than writing the queries to do this manually,
-we can utilise one of the functions provided by the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code>
-module. Namely the <code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.export()</span></code>. We only want to give
+we can utilise one of the functions provided by the <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a>
+module. Namely the <a class="reference internal" href="modules/custom-tags.html#tags.export" title="tags.export"><code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.export</span></code></a>. We only want to give
 them the “break-calli” tags which can be exported via the following code.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">data</span> <span class="o">=</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="s1">&#39;break-calli&#39;</span><span class="p">)</span>
@@ -393,8 +396,8 @@ them the “break-calli” tags which can be exported via the following code.</l
 </pre></div>
 </div>
 <ol class="arabic simple" start="12">
-<li>If another user wants to import this pickle, again the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code>
-module can help us.</li>
+<li>If another user wants to import this pickled object, we can again use the
+<a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a> to help us.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">with</span> <span class="nb">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="nb">input</span><span class="p">:</span>
@@ -406,8 +409,8 @@ module can help us.</li>
 <ol class="arabic simple" start="13">
 <li>Unfortunately, this will overwrite any tags in the current database with
 the name “break-calli”. If the user wants to map these tags to a different
-name, they can provide a tag mapping as another parameter to
-<code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.apply()</span></code>.</li>
+name, however, they can provide a dictionary of tag mappings as a keyword
+parameter to <a class="reference internal" href="modules/custom-tags.html#tags.apply" title="tags.apply"><code class="xref py py-func docutils literal notranslate"><span class="pre">custom.tags.apply</span></code></a>.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span><span class="s1">&#39;break-calli&#39;</span><span class="p">:</span> <span class="s1">&#39;username.break-calli&#39;</span><span class="p">})</span>
 <span class="o">&gt;</span>
@@ -440,9 +443,9 @@ function calls other functions or not.</li>
 </div>
 <ol class="arabic simple" start="2">
 <li>One issue with using <a class="reference internal" href="modules/function.html#function.down" title="function.down"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.down()</span></code></a> is since it only returns
-addresses that a function can call, it will still return <code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code>
-if a function makes an indirect call. Let’s improve this via the following
-variation.</li>
+addresses that a function is capable of calling, it will still return
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">False</span></code> if the function we apply it to makes an indirect call.
+Let’s improve this by looking for any call via the following variation.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">has_children</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
       <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>
@@ -469,7 +472,7 @@ of one-liners, this plugin includes a number of combinators that can
 be combined to build the exact same function. If we combine the
 <a class="reference internal" href="combinators.html#fpartial" title="fpartial"><code class="xref py py-func docutils literal notranslate"><span class="pre">fpartial()</span></code></a>, <a class="reference internal" href="combinators.html#ifilter" title="ifilter"><code class="xref py py-func docutils literal notranslate"><span class="pre">ifilter()</span></code></a>, and some operators available
 via Python’s <code class="xref py py-mod docutils literal notranslate"><span class="pre">operator</span></code> module with the <a class="reference internal" href="combinators.html#fcompose" title="fcompose"><code class="xref py py-func docutils literal notranslate"><span class="pre">fcompose()</span></code></a>
-combinator we can implement the prior 2 versions of the
+combinator we can implement our prior 2 implementations of the
 <code class="xref py py-func docutils literal notranslate"><span class="pre">has_children()</span></code> function with the following code.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;first we need to iterate through all addresses in function&quot;</span>

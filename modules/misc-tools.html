@@ -2,7 +2,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -71,7 +71,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="tools.above">
 <code class="descclassname">tools.</code><code class="descname">above</code><span class="sig-paren">(</span><em>ea</em>, <em>includeSegment=False</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.above" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return all of the function names and their offset that calls the function at <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return all of the function names and their offset that calls the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -89,7 +89,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="tools.below">
 <code class="descclassname">tools.</code><code class="descname">below</code><span class="sig-paren">(</span><em>ea</em>, <em>includeSegment=False</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.below" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return all of the function names and their offset that are called by the function at <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return all of the function names and their offset that are called by the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -115,8 +115,8 @@ this tool will emit where those backtraces intersect.</p>
 <dl class="function">
 <dt id="tools.collect">
 <code class="descclassname">tools.</code><code class="descname">collect</code><span class="sig-paren">(</span><em>ea</em>, <em>sentinel</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.collect" title="Permalink to this definition">¶</a></dt>
-<dd><p>Collect all the basic blocks starting at address <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code> and recurse until a terminating block is encountered.</p>
-<p>If the set <code class="xref py py-data docutils literal notranslate"><span class="pre">sentinel</span></code> is specified, then its addresses are used as
+<dd><p>Collect all the basic blocks starting at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> and recurse until a terminating block is encountered.</p>
+<p>If the set <code class="docutils literal notranslate"><span class="pre">sentinel</span></code> is specified, then its addresses are used as
 sentinel blocks and collection will terminate when those blocks are
 reached.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -136,8 +136,8 @@ reached.</p>
 <dl class="function">
 <dt id="tools.collectcall">
 <code class="descclassname">tools.</code><code class="descname">collectcall</code><span class="sig-paren">(</span><em>ea</em>, <em>sentinel=set</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.collectcall" title="Permalink to this definition">¶</a></dt>
-<dd><p>Collect all of the function calls starting at function <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code> and recurse until a terminating function is encountered.</p>
-<p>If the set <code class="xref py py-data docutils literal notranslate"><span class="pre">sentinel</span></code> is specified, then its addresses are used as
+<dd><p>Collect all of the function calls starting at function <code class="docutils literal notranslate"><span class="pre">ea</span></code> and recurse until a terminating function is encountered.</p>
+<p>If the set <code class="docutils literal notranslate"><span class="pre">sentinel</span></code> is specified, then its addresses are used as
 sentinel functions and collection will terminate when one of those
 functions are reached.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -156,8 +156,8 @@ functions are reached.</p>
 
 <dl class="function">
 <dt id="tools.colormarks">
-<code class="descclassname">tools.</code><code class="descname">colormarks</code><span class="sig-paren">(</span><em>color=8323199</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.colormarks" title="Permalink to this definition">¶</a></dt>
-<dd><p>Walk through the current list of marks whilst coloring them with the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">color</span></code>.</p>
+<code class="descclassname">tools.</code><code class="descname">colormarks</code><span class="sig-paren">(</span><em>color=0x7f007f</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.colormarks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Walk through the current list of marks whilst coloring them with the specified <code class="docutils literal notranslate"><span class="pre">color</span></code>.</p>
 <p>Each mark’s address is tagged with its description, and if the
 address belongs to a function, the function is also tagged with the
 address of the marks that it contains.</p>
@@ -174,9 +174,9 @@ address of the marks that it contains.</p>
 <dl class="function">
 <dt id="tools.makecall">
 <code class="descclassname">tools.</code><code class="descname">makecall</code><span class="sig-paren">(</span><em>ea=None</em>, <em>target=None</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.makecall" title="Permalink to this definition">¶</a></dt>
-<dd><p>Output the function call at <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code> and its arguments with the address they originated from.</p>
-<p>If <code class="xref py py-data docutils literal notranslate"><span class="pre">target</span></code> is specified, then assume that the instruction is
-calling <code class="xref py py-data docutils literal notranslate"><span class="pre">target</span></code> instead of the target address that the call
+<dd><p>Output the function call at <code class="docutils literal notranslate"><span class="pre">ea</span></code> and its arguments with the address they originated from.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">target</span></code> is specified, then assume that the instruction is
+calling <code class="docutils literal notranslate"><span class="pre">target</span></code> instead of the target address that the call
 is referencing.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -195,10 +195,10 @@ is referencing.</p>
 <dl class="function">
 <dt id="tools.map">
 <code class="descclassname">tools.</code><code class="descname">map</code><span class="sig-paren">(</span><em>F</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.map" title="Permalink to this definition">¶</a></dt>
-<dd><p>Execute the callback <code class="xref py py-data docutils literal notranslate"><span class="pre">F</span></code> on all functions in the database. Synonymous to <code class="xref py py-obj docutils literal notranslate"><span class="pre">map(F,</span> <span class="pre">database.functions())</span></code> but with some extra logging to display the current progress.</p>
-<p>The <code class="xref py py-data docutils literal notranslate"><span class="pre">F</span></code> parameter is defined as a function taking either an
+<dd><p>Execute the callback <code class="docutils literal notranslate"><span class="pre">F</span></code> on all functions in the database. Synonymous to <code class="docutils literal notranslate"><span class="pre">map(F,</span> <span class="pre">database.functions())</span></code> but with some extra logging to display the current progress.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">F</span></code> parameter is defined as a function taking either an
 <code class="xref py py-obj docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">**kwargs)</span></code> or a <code class="xref py py-obj docutils literal notranslate"><span class="pre">(index,</span> <span class="pre">address,</span> <span class="pre">**kwargs)</span></code>. Any
-keyword arguments are passed to <code class="xref py py-data docutils literal notranslate"><span class="pre">F</span></code> unmodified.</p>
+keyword arguments are passed to <code class="docutils literal notranslate"><span class="pre">F</span></code> unmodified.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

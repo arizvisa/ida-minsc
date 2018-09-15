@@ -31,13 +31,13 @@ functions and aliases. For more information on this, please see
    
    Return the entry-point of the current function.
    
-   Aliases: ``function.top``, ``function.addr``
+   Aliases: :py:func:`function.top<address>`, :py:func:`function.addr<address>`
    
 .. py:function:: address(func)
    
-   Return the entry-point of the function identified by :py:data:`func`.
+   Return the entry-point of the function identified by ``func``.
    
-   Aliases: ``function.top``, ``function.addr``
+   Aliases: :py:func:`function.top<address>`, :py:func:`function.addr<address>`
    
    :param func: the function to return the address for
    
@@ -47,7 +47,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: bottom(func)
    
-   Return the exit-points of the function :py:data:`func`.
+   Return the exit-points of the function ``func``.
    
    :param func: the function to return the exit-points for
    
@@ -55,13 +55,13 @@ functions and aliases. For more information on this, please see
    
    Return a tuple containing the bounds of the first chunk of the current function.
    
-   Aliases: ``function.range``
+   Aliases: :py:func:`function.range<bounds>`
    
 .. py:function:: bounds(func)
    
-   Return a tuple containing the bounds of the first chunk of the function :py:data:`func`.
+   Return a tuple containing the bounds of the first chunk of the function ``func``.
    
-   Aliases: ``function.range``
+   Aliases: :py:func:`function.range<bounds>`
    
    :param func: the function to return the bounds for
    
@@ -71,21 +71,21 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: by(func)
    
-   Return the function identified by :py:data:`func`.
+   Return the function identified by ``func``.
    
    :param func: an :py:obj:`idaapi.func_t` to return
    :type func: idaapi.func_t
    
 .. py:function:: by(ea)
    
-   Return the function at the address :py:data:`ea`.
+   Return the function at the address ``ea``.
    
    :param ea: the address of the function to return
    :type ea: int or long
    
 .. py:function:: by(name)
    
-   Return the function with the specified :py:data:`name`.
+   Return the function with the specified ``name``.
    
    :param name: the name of the function to return
    :type name: str
@@ -96,18 +96,18 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: by_address(ea)
    
-   Return the function containing the address :py:data:`ea`.
+   Return the function containing the address ``ea``.
    
-   Aliases: ``function.byAddress``
+   Aliases: :py:func:`function.byAddress<by_address>`
    
    :param ea: the address of the function to return
    :type ea: int or long
    
 .. py:function:: by_name(name)
    
-   Return the function with the specified :py:data:`name`.
+   Return the function with the specified ``name``.
    
-   Aliases: ``function.byName``
+   Aliases: :py:func:`function.byName<by_name>`
    
    :param name: the name of the function to return
    
@@ -117,13 +117,13 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: color(func)
    
-   Return the color of the function :py:data:`func`.
+   Return the color of the function ``func``.
    
    :param func: the function to return the color for
    
 .. py:function:: color(func, none)
    
-   Remove the color for the function :py:data:`func`.
+   Remove the color for the function ``func``.
    
    :param func: the function to remove the color from
    :param none: the value :py:obj:`None`
@@ -131,7 +131,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: color(func, rgb)
    
-   Set the color of the function :py:data:`func` to :py:data:`rgb`.
+   Set the color of the function ``func`` to ``rgb``.
    
    :param func: the function to set the color for
    :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
@@ -152,16 +152,16 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: comment(func, \*\*repeatable)
    
-   Return the comment for the function :py:data:`func`.
+   Return the comment for the function ``func``.
    
-   If the bool :py:data:`repeatable` is specified, then return the repeatable comment.
+   If the bool ``repeatable`` is specified, then return the repeatable comment.
    
    :param func: the function to return the comment for
    :param \*\*repeatable: whether to return a repeatable or non-repeatable comment
    
 .. py:function:: comment(string, \*\*repeatable)
    
-   Set the comment for the current function to :py:data:`string`.
+   Set the comment for the current function to ``string``.
    
    :param string: the comment to apply
    :type string: str
@@ -169,9 +169,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: comment(func, string, \*\*repeatable)
    
-   Set the comment for the function :py:data:`func` to :py:data:`string`.
+   Set the comment for the function ``func`` to ``string``.
    
-   If the bool :py:data:`repeatable` is specified, then modify the repeatable comment.
+   If the bool ``repeatable`` is specified, then modify the repeatable comment.
    
    :param func: the function to assign the comment to
    :param string: the comment to apply
@@ -184,14 +184,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: contains(ea)
    
-   Returns True if the address :py:data:`ea` is contained by the current function.
+   Returns True if the address ``ea`` is contained by the current function.
    
    :param ea: an address in the database to check
    :type ea: int or long
    
 .. py:function:: contains(func, ea)
    
-   Returns True if the address :py:data:`ea` is contained by the function :py:data:`func`.
+   Returns True if the address ``ea`` is contained by the function ``func``.
    
    :param func: the function to check the address against
    :param ea: an address in the database to check
@@ -201,15 +201,15 @@ functions and aliases. For more information on this, please see
    
    Return the calling convention of the current function.
    
-   Aliases: ``function.cc``
+   Aliases: :py:func:`function.cc<convention>`
    
 .. py:function:: convention(func)
    
-   Return the calling convention of the function :py:data:`func`.
+   Return the calling convention of the function ``func``.
    
    The integer returned corresponds to one of the :py:obj:`idaapi.CM_CC_\*` constants.
    
-   Aliases: ``function.cc``
+   Aliases: :py:func:`function.cc<convention>`
    
    :param func: the function to return the calling convention for
    
@@ -219,7 +219,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: down(func)
    
-   Return all the functions that are called by the function :py:data:`func`.
+   Return all the functions that are called by the function ``func``.
    
    :param func: the function to return the references for
    
@@ -229,7 +229,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: marks(func)
    
-   Return all the marks in the function :py:data:`func`.
+   Return all the marks in the function ``func``.
    
    :param func: the function containing the marks to return
    
@@ -239,7 +239,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(func)
    
-   Return the name of the function :py:data:`func`.
+   Return the name of the function ``func``.
    
    :param func: the function to return the name for
    
@@ -252,7 +252,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(string, \*suffix)
    
-   Set the name of the current function to :py:data:`string`.
+   Set the name of the current function to ``string``.
    
    :param string: the name to rename the current function to
    :type string: str
@@ -260,7 +260,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(func, none)
    
-   Remove the custom-name from the function :py:data:`func`.
+   Remove the custom-name from the function ``func``.
    
    :param func: the function to remove the name for
    :param none: the value :py:obj:`None`
@@ -268,7 +268,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(func, string, \*suffix)
    
-   Set the name of the function :py:data:`func` to :py:data:`string`.
+   Set the name of the function ``func`` to ``string``.
    
    :param func: the function to set the name for
    :param string: the name to rename the current function to
@@ -279,19 +279,19 @@ functions and aliases. For more information on this, please see
    
    Make a function at the current address.
    
-   Aliases: ``function.make``, ``function.add``
+   Aliases: :py:func:`function.make<new>`, :py:func:`function.add<new>`
    
 .. py:function:: new(start, \*\*end)
    
-   Make a function at the address :py:data:`start` and return its entrypoint.
+   Make a function at the address ``start`` and return its entrypoint.
    
-   If the address :py:data:`end` is specified, then stop processing the function at its address.
+   If the address ``end`` is specified, then stop processing the function at its address.
    
-   Aliases: ``function.make``, ``function.add``
+   Aliases: :py:func:`function.make<new>`, :py:func:`function.add<new>`
    
    :param start: the starting address of the function to create
    :type start: int or long
-   :param \*\*end: if :py:data:`end` is specified as an address, then use it to determine the end of the created function
+   :param \*\*end: if ``end`` is specified as an address, then use it to determine the end of the created function
    
 .. py:function:: offset()
    
@@ -299,7 +299,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: offset(func)
    
-   Return the offset of the function :py:data:`func` from the base of the database.
+   Return the offset of the function ``func`` from the base of the database.
    
    :param func: anything referring to a function to return the offset for
    
@@ -309,7 +309,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: prototype(func)
    
-   Return the prototype of the function :py:data:`func` if it has one.
+   Return the prototype of the function ``func`` if it has one.
    
    :param func: the function to return the prototype for
    
@@ -319,54 +319,54 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: remove(func)
    
-   Remove the definition of the function :py:data:`func` from the database.
+   Remove the definition of the function ``func`` from the database.
    
    :param func: the function to remove
    
 .. py:function:: select(\*\*boolean)
    
-   Query the contents of the current function for any tags specified by :py:data:`boolean`
+   Query the contents of the current function for any tags specified by ``boolean``
    
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: select(tag, \*And, \*\*boolean)
    
-   Query the contents of the current function for the specified :py:data:`tag` and any others specified as :py:data:`And`.
+   Query the contents of the current function for the specified ``tag`` and any others specified as ``And``.
    
    :param tag: a required tag name to search the contents for
    :type tag: str
    :param \*And: any other required tag names
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: select(func, tag, \*And, \*\*boolean)
    
-   Query the contents of the function :py:data:`func` for the specified :py:data:`tag` and any others specified as :py:data:`And`.
+   Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``And``.
    
    :param func: the function containing the contents tags to select
    :param tag: a required tag name to search the contents for
    :type tag: str
    :param \*And: any other required tag names
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: select(func, tag, \*And, \*\*boolean)
    
-   Query the contents of the function :py:data:`func` for the specified :py:data:`tag` and any others specified as :py:data:`And`.
+   Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``And``.
    
    :param func: the function containing the contents tags to select
    :param tag: a list of tag names to search the contents for
    :type tag: set or list
    :param \*And: any other required tag names
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: select(func, \*\*boolean)
    
-   Query the contents of the function :py:data:`func` for any tags specified by :py:data:`boolean`. Yields each address found along with the matching tags as a dictionary.
+   Query the contents of the function ``func`` for any tags specified by ``boolean``. Yields each address found along with the matching tags as a dictionary.
    
-   If :py:data:`And` contains an iterable then require the returned address contains them.
-   If :py:data:`Or` contains an iterable then include any other tags that are specified.
+   If ``And`` contains an iterable then require the returned address contains them.
+   If ``Or`` contains an iterable then include any other tags that are specified.
    
    :param func: the function containing the contents tags to select
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: switches()
    
@@ -374,7 +374,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: switches(func)
    
-   Yield each switch found in the function identifed by :py:data:`func`.
+   Yield each switch found in the function identifed by ``func``.
    
    :param func: the function to yield all the switches for
    
@@ -384,14 +384,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(key)
    
-   Returns the value of the tag identified by :py:data:`key` for the current function.
+   Returns the value of the tag identified by ``key`` for the current function.
    
    :param key: a string representing the tag name to return
    :type key: str
    
 .. py:function:: tag(key, value)
    
-   Sets the value for the tag :py:data:`key` to :py:data:`value` for the current function.
+   Sets the value for the tag ``key`` to ``value`` for the current function.
    
    :param key: a string representing the tag name
    :type key: str
@@ -399,7 +399,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(func, key)
    
-   Returns the value of the tag identified by :py:data:`key` for the function :py:data:`func`.
+   Returns the value of the tag identified by ``key`` for the function ``func``.
    
    :param func: the function to return the tag for
    :param key: a string representing the tag name to return
@@ -407,13 +407,13 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(func)
    
-   Returns all the tags defined for the function :py:data:`func`.
+   Returns all the tags defined for the function ``func``.
    
    :param func: the function to return all the tags for
    
 .. py:function:: tag(func, key, value)
    
-   Sets the value for the tag :py:data:`key` to :py:data:`value` for the function :py:data:`func`.
+   Sets the value for the tag ``key`` to ``value`` for the function ``func``.
    
    :param func: the function to assign the tag to
    :param key: a string representing the tag name to assign
@@ -422,7 +422,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(key, none)
    
-   Removes the tag identified by :py:data:`key` for the current function.
+   Removes the tag identified by ``key`` for the current function.
    
    :param key: a string representing the tag name to remove
    :type key: str
@@ -431,7 +431,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(func, key, none)
    
-   Removes the tag identified by :py:data:`key` from the function :py:data:`func`.
+   Removes the tag identified by ``key`` from the function ``func``.
    
    :param func: the function to remove the tag from
    :param key: a string representing the tag name to remove
@@ -445,7 +445,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tags(func)
    
-   Returns all the content tags for the function :py:data:`func`.
+   Returns all the content tags for the function ``func``.
    
    :param func: the function to return the tag names for
    
@@ -455,7 +455,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: up(func)
    
-   Return all the functions that call the function :py:data:`func`.
+   Return all the functions that call the function ``func``.
    
    :param func: the function to return the references for
    
@@ -465,7 +465,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: within(ea)
    
-   Return true if the address :py:data:`ea` is within a function.
+   Return true if the address ``ea`` is within a function.
    
    :param ea: the address to check for function membership
    :type ea: int or long
@@ -480,6 +480,8 @@ concept. Please see :ref:`multicase-namespaces` for more
 information on namespaces. For more information on multicase
 functions or aliases, please see :ref:`multicase-functions` or
 :ref:`multicase-aliases`.
+
+.. _ns-function-block:
 
 **************
 function.block
@@ -508,14 +510,14 @@ Some examples of this functionality can be::
    
 .. py:function:: block(ea)
    
-   Returns the boundaries of the basic block at address :py:data:`ea`.
+   Returns the boundaries of the basic block at address ``ea``.
    
    :param ea: the address containing the basic block to return the boundaries for
    :type ea: int or long
    
 .. py:function:: block(func, ea)
    
-   Returns the boundaries of the basic block at address :py:data:`ea` in function :py:data:`func`.
+   Returns the boundaries of the basic block at address ``ea`` in function ``func``.
    
    :param func: the function containing the basic block
    :param ea: the address containing the basic block to return the boundaries for
@@ -523,14 +525,14 @@ Some examples of this functionality can be::
    
 .. py:function:: block(bb)
    
-   Returns the boundaries of the basic block :py:data:`bb`.
+   Returns the boundaries of the basic block ``bb``.
    
    :param bb: the basic block to return the boundaries for
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block(bounds)
    
-   Return the boundaries of the basic block identified by :py:data:`bounds`.
+   Return the boundaries of the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to return the basic block for
    :type bounds: tuple
@@ -539,31 +541,31 @@ Some examples of this functionality can be::
    
    Return the addresses of all the instructions that the current basic block leaves to.
    
-   Aliases: ``function.block.succs``, ``function.block.successors``
+   Aliases: :py:func:`function.block.succs<block\.after>`, :py:func:`function.block.successors<block\.after>`
    
 .. py:function:: block\.after(ea)
    
-   Return the addresses of all the instructions that the basic block at address :py:data:`ea` leaves to.
+   Return the addresses of all the instructions that the basic block at address ``ea`` leaves to.
    
-   Aliases: ``function.block.succs``, ``function.block.successors``
+   Aliases: :py:func:`function.block.succs<block\.after>`, :py:func:`function.block.successors<block\.after>`
    
    :param ea: the address of the basic block to return the successors for
    :type ea: int or long
    
 .. py:function:: block\.after(bounds)
    
-   Return the addresses of all the instructions that branch to the basic block identified by :py:data:`bounds`.
+   Return the addresses of all the instructions that branch to the basic block identified by ``bounds``.
    
-   Aliases: ``function.block.succs``, ``function.block.successors``
+   Aliases: :py:func:`function.block.succs<block\.after>`, :py:func:`function.block.successors<block\.after>`
    
    :param bounds: the boundaries of the basic block to return the successors for
    :type bounds: tuple
    
 .. py:function:: block\.after(bb)
    
-   Return the addresses of all the instructions that branch to the basic block :py:data:`bb`.
+   Return the addresses of all the instructions that branch to the basic block ``bb``.
    
-   Aliases: ``function.block.succs``, ``function.block.successors``
+   Aliases: :py:func:`function.block.succs<block\.after>`, :py:func:`function.block.successors<block\.after>`
    
    :param bb: the basic block to return the successors for
    :type bb: idaapi.BasicBlock
@@ -574,14 +576,14 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.at(ea)
    
-   Return the :py:obj:`idaapi.BasicBlock` of address :py:data:`ea` in the current function.
+   Return the :py:obj:`idaapi.BasicBlock` of address ``ea`` in the current function.
    
    :param ea: the address of the basic block to return
    :type ea: int or long
    
 .. py:function:: block\.at(func, ea)
    
-   Return the :py:obj:`idaapi.BasicBlock` of address :py:data:`ea` in the function :py:data:`func`.
+   Return the :py:obj:`idaapi.BasicBlock` of address ``ea`` in the function ``func``.
    
    :param func: the function containing the basic block
    :param ea: the address of the basic block to return
@@ -589,14 +591,14 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.at(bb)
    
-   Return the :py:obj:`idaapi.BasicBlock` of the basic block :py:data:`bb`.
+   Return the :py:obj:`idaapi.BasicBlock` of the basic block ``bb``.
    
    :param bb: the basic block to return
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block\.at(bounds)
    
-   Return the :py:obj:`idaapi.BasicBlock` identified by :py:data:`bounds`.
+   Return the :py:obj:`idaapi.BasicBlock` identified by ``bounds``.
    
    :param bounds: the bounds of the basic block to return
    :type bounds: tuple
@@ -605,31 +607,31 @@ Some examples of this functionality can be::
    
    Return the addresses of all the instructions that branch to the current basic block.
    
-   Aliases: ``function.block.preds``, ``function.block.predecessors``
+   Aliases: :py:func:`function.block.preds<block\.before>`, :py:func:`function.block.predecessors<block\.before>`
    
 .. py:function:: block\.before(ea)
    
-   Return the addresses of all the instructions that branch to the basic block at address :py:data:`ea`.
+   Return the addresses of all the instructions that branch to the basic block at address ``ea``.
    
-   Aliases: ``function.block.preds``, ``function.block.predecessors``
+   Aliases: :py:func:`function.block.preds<block\.before>`, :py:func:`function.block.predecessors<block\.before>`
    
    :param ea: the address of the basic block to return the predecessors for
    :type ea: int or long
    
 .. py:function:: block\.before(bounds)
    
-   Return the addresses of all the instructions that branch to the basic block identified by :py:data:`bounds`.
+   Return the addresses of all the instructions that branch to the basic block identified by ``bounds``.
    
-   Aliases: ``function.block.preds``, ``function.block.predecessors``
+   Aliases: :py:func:`function.block.preds<block\.before>`, :py:func:`function.block.predecessors<block\.before>`
    
    :param bounds: the boundaries of the basic block to return the predecessors for
    :type bounds: tuple
    
 .. py:function:: block\.before(bb)
    
-   Return the addresses of all the instructions that branch to the basic block :py:data:`bb`.
+   Return the addresses of all the instructions that branch to the basic block ``bb``.
    
-   Aliases: ``function.block.preds``, ``function.block.predecessors``
+   Aliases: :py:func:`function.block.preds<block\.before>`, :py:func:`function.block.predecessors<block\.before>`
    
    :param bb: the basic block to return the predecessors for
    :type bb: idaapi.BasicBlock
@@ -640,21 +642,21 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.bottom(ea)
    
-   Return the bottom address of the basic block at address :py:data:`ea`.
+   Return the bottom address of the basic block at address ``ea``.
    
    :param ea: the address belonging to the basic block to return the bottom address for
    :type ea: int or long
    
 .. py:function:: block\.bottom(bb)
    
-   Return the bottom address of the basic block :py:data:`bb`.
+   Return the bottom address of the basic block ``bb``.
    
    :param bb: the basic block to return the bottom address for
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block\.bottom(bounds)
    
-   Return the bottom address of the basic block identified by :py:data:`bounds`.
+   Return the bottom address of the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to return the bottom address for
    :type bounds: tuple
@@ -672,28 +674,28 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.color(ea)
    
-   Returns the color of the basic block at the address :py:data:`ea`.
+   Returns the color of the basic block at the address ``ea``.
    
    :param ea: the address of the basic block to return the color of
    :type ea: int or long
    
 .. py:function:: block\.color(bb)
    
-   Returns the color of the basic block :py:data:`bb`.
+   Returns the color of the basic block ``bb``.
    
    :param bb: the basic block to return the color of
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block\.color(bounds)
    
-   Returns the color of the basic block identified by :py:data:`bounds`.
+   Returns the color of the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to return the color for
    :type bounds: tuple
    
 .. py:function:: block\.color(ea, none)
    
-   Removes the color of the basic block at the address :py:data:`ea`.
+   Removes the color of the basic block at the address ``ea``.
    
    :param ea: the address of the basic block to remove the color from
    :type ea: int or long
@@ -702,7 +704,7 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.color(bounds, none)
    
-   Removes the color of the basic block identified by :py:data:`bounds`.
+   Removes the color of the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to remove the color from
    :type bounds: tuple
@@ -711,7 +713,7 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.color(bb, none)
    
-   Removes the color of the basic block :py:data:`bb`.
+   Removes the color of the basic block ``bb``.
    
    :param bb: the basic block to remove the color from
    :type bb: idaapi.BasicBlock
@@ -720,35 +722,35 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.color(ea, rgb, \*\*frame)
    
-   Sets the color of the basic block at the address :py:data:`ea` to :py:data:`rgb`.
+   Sets the color of the basic block at the address ``ea`` to ``rgb``.
    
-   If the color :py:data:`frame` is specified, set the frame to the specified color.
+   If the color ``frame`` is specified, set the frame to the specified color.
    
    :param ea: the address belonging to the basic block to set the color for
    :type ea: int or long
    :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
    :type rgb: int or long
-   :param \*\*frame: if :py:data:`frame` is specified, then set the frame of the basic block to this color
+   :param \*\*frame: if ``frame`` is specified, then set the frame of the basic block to this color
    
 .. py:function:: block\.color(bb, rgb, \*\*frame)
    
-   Sets the color of the basic block :py:data:`bb` to :py:data:`rgb`.
+   Sets the color of the basic block ``bb`` to ``rgb``.
    
    :param bb: the basic block to set the color for
    :type bb: idaapi.BasicBlock
    :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
    :type rgb: int or long
-   :param \*\*frame: if :py:data:`frame` is specified, then set the frame of the basic block to this color
+   :param \*\*frame: if ``frame`` is specified, then set the frame of the basic block to this color
    
 .. py:function:: block\.color(bounds, rgb, \*\*frame)
    
-   Sets the color of the basic block identifed by :py:data:`bounds` to :py:data:`rgb`.
+   Sets the color of the basic block identifed by ``bounds`` to ``rgb``.
    
    :param bounds: the boundaries of the basic block to set the color for
    :type bounds: tuple
    :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
    :type rgb: int or long
-   :param \*\*frame: if :py:data:`frame` is specified, then set the frame of the basic block to this color
+   :param \*\*frame: if ``frame`` is specified, then set the frame of the basic block to this color
    
 .. py:function:: block\.decompile()
    
@@ -756,7 +758,7 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.decompile(ea)
    
-   (UNSTABLE) Returns the decompiled code of the basic block at the address :py:data:`ea`.
+   (UNSTABLE) Returns the decompiled code of the basic block at the address ``ea``.
    
    :param ea: the address of the basic block to decompile
    :type ea: int or long
@@ -765,15 +767,15 @@ Some examples of this functionality can be::
    
    Returns the disassembly of the basic block at the current address.
    
-   Aliases: ``function.block.disasm``
+   Aliases: :py:func:`function.block.disasm<block\.disassemble>`
    
    :param \*\*options: any options to pass to :py:obj:`database.disassemble`
    
 .. py:function:: block\.disassemble(ea, \*\*options)
    
-   Returns the disassembly of the basic block at the address :py:data:`ea`.
+   Returns the disassembly of the basic block at the address ``ea``.
    
-   Aliases: ``function.block.disasm``
+   Aliases: :py:func:`function.block.disasm<block\.disassemble>`
    
    :param ea: the address of the basic block to disassemble
    :type ea: int or long
@@ -781,9 +783,9 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.disassemble(bounds, \*\*options)
    
-   Returns the disassembly of the basic block identified by :py:data:`bounds`.
+   Returns the disassembly of the basic block identified by ``bounds``.
    
-   Aliases: ``function.block.disasm``
+   Aliases: :py:func:`function.block.disasm<block\.disassemble>`
    
    :param bounds: the boundaries of the basic block to disassemble
    :type bounds: tuple
@@ -791,9 +793,9 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.disassemble(bb, \*\*options)
    
-   Returns the disassembly of the basic block :py:data:`bb`.
+   Returns the disassembly of the basic block ``bb``.
    
-   Aliases: ``function.block.disasm``
+   Aliases: :py:func:`function.block.disasm<block\.disassemble>`
    
    :param bb: the basic block to disassemble
    :type bb: idaapi.BasicBlock
@@ -805,14 +807,14 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.id(ea)
    
-   Return the block id of address :py:data:`ea` in the current function.
+   Return the block id of address ``ea`` in the current function.
    
    :param ea: the address of the basic block to return the id for
    :type ea: int or long
    
 .. py:function:: block\.id(func, ea)
    
-   Return the block id of address :py:data:`ea` in the function :py:data:`func`.
+   Return the block id of address ``ea`` in the function ``func``.
    
    :param func: the function containing the basic block
    :param ea: the address of the basic block to return the id for
@@ -820,14 +822,14 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.id(bb)
    
-   Return the block id of the basic block :py:data:`bb`.
+   Return the block id of the basic block ``bb``.
    
    :param bb: the basic block to return the id for
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block\.id(bounds)
    
-   Return the block id of the basic block identified by :py:data:`bounds`.
+   Return the block id of the basic block identified by ``bounds``.
    
    :param bounds: the bounds of the basic block to return the id for
    :type bounds: tuple
@@ -838,21 +840,21 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.iterate(ea)
    
-   Yield all the addresses in the basic block at address :py:data:`ea`.
+   Yield all the addresses in the basic block at address ``ea``.
    
    :param ea: the address of the basic block to iterate through
    :type ea: int or long
    
 .. py:function:: block\.iterate(bounds)
    
-   Yield all the addresses in the basic block identified by :py:data:`bounds`.
+   Yield all the addresses in the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to iterate through
    :type bounds: tuple
    
 .. py:function:: block\.iterate(bb)
    
-   Yield all the addresses in the basic block :py:data:`bb`.
+   Yield all the addresses in the basic block ``bb``.
    
    :param bb: the basic block to iterate through
    :type bb: idaapi.BasicBlock
@@ -863,68 +865,68 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.read(ea)
    
-   Return all the bytes contained in the basic block at address :py:data:`ea`.
+   Return all the bytes contained in the basic block at address ``ea``.
    
    :param ea: the address of the basic block to return bytes for
    :type ea: int or long
    
 .. py:function:: block\.read(bounds)
    
-   Return all the bytes contained in the basic block identified by :py:data:`bounds`.
+   Return all the bytes contained in the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to return bytes for
    :type bounds: tuple
    
 .. py:function:: block\.read(bb)
    
-   Return all the bytes contained in the basic block :py:data:`bb`.
+   Return all the bytes contained in the basic block ``bb``.
    
    :param bb: the basic block to return bytes for
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block\.register(reg, \*regs, \*\*modifiers)
    
-   Yield each :py:obj:`(address, opnum, state)` within the current block that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yield each ``(address, opnum, state)`` within the current block that uses ``reg`` or any one of the registers in ``regs``.
    
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: block\.register(ea, reg, \*regs, \*\*modifiers)
    
-   Yield each :py:obj:`(address, opnum, state)` within the block containing :py:data:`ea` that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yield each ``(address, opnum, state)`` within the block containing ``ea`` that uses ``reg`` or any one of the registers in ``regs``.
    
    :param ea: the address belonging to the basic block to identify registers in
    :type ea: int or long
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: block\.register(bounds, reg, \*regs, \*\*modifiers)
    
-   Yield each :py:obj:`(address, opnum, state)` within the block identified by :py:data:`bounds` that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yield each ``(address, opnum, state)`` within the block identified by ``bounds`` that uses ``reg`` or any one of the registers in ``regs``.
    
    :param bounds: the boundaries of the basic block to identify registers in
    :type bounds: tuple
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: block\.register(bb, reg, \*regs, \*\*modifiers)
    
-   Yield each :py:obj:`(address, opnum, state)` within the block :py:data:`bb` that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yield each ``(address, opnum, state)`` within the block ``bb`` that uses ``reg`` or any one of the registers in ``regs``.
    
-   If the keyword :py:data:`write` is true, then only return the result if it's writing to the register.
+   If the keyword ``write`` is true, then only return the result if it's writing to the register.
    
    :param bb: the basic block to identify registers in
    :type bb: idaapi.BasicBlock
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: block\.top()
    
@@ -932,25 +934,27 @@ Some examples of this functionality can be::
    
 .. py:function:: block\.top(ea)
    
-   Return the top address of the basic block at address :py:data:`ea`.
+   Return the top address of the basic block at address ``ea``.
    
    :param ea: the address belonging to the basic block to return the top address for
    :type ea: int or long
    
 .. py:function:: block\.top(bb)
    
-   Return the top address of the basic block :py:data:`bb`.
+   Return the top address of the basic block ``bb``.
    
    :param bb: the basic block to return the top address for
    :type bb: idaapi.BasicBlock
    
 .. py:function:: block\.top(bounds)
    
-   Return the top address of the basic block identified by :py:data:`bounds`.
+   Return the top address of the basic block identified by ``bounds``.
    
    :param bounds: the boundaries of the basic block to return the top address for
    :type bounds: tuple
    
+.. _ns-function-blocks:
+
 ***************
 function.blocks
 ***************
@@ -980,13 +984,13 @@ Some examples of this namespace's usage::
    
 .. py:function:: blocks(func)
    
-   Returns the bounds of each basic block for the function :py:data:`func`.
+   Returns the bounds of each basic block for the function ``func``.
    
    :param func: the function to return the basic blocks for
    
 .. py:function:: blocks(left, right)
    
-   Returns each basic block contained within the addresses :py:data:`left` and :py:data:`right`.
+   Returns each basic block contained within the addresses ``left`` and ``right``.
    
    :param left: the top address of the basic block
    :param right: the bottom address of the basic block
@@ -997,14 +1001,14 @@ Some examples of this namespace's usage::
    
 .. py:function:: blocks\.at(ea)
    
-   Return the :py:obj:`idaapi.BasicBlock` of address :py:data:`ea` in the current function.
+   Return the :py:obj:`idaapi.BasicBlock` of address ``ea`` in the current function.
    
    :param ea: the address of the basic block to return
    :type ea: int or long
    
 .. py:function:: blocks\.at(func, ea)
    
-   Return the :py:obj:`idaapi.BasicBlock` in function :py:data:`func` at address :py:data:`ea`.
+   Return the :py:obj:`idaapi.BasicBlock` in function ``func`` at address ``ea``.
    
    :param func: the function containing the basic block
    :param ea: the address of the basic block to return
@@ -1014,15 +1018,15 @@ Some examples of this namespace's usage::
    
    Return a :py:obj:`networkx.DiGraph` of the function at the current address.
    
-   Aliases: ``function.blocks.graph``, ``function.graph``, ``function.digraph``
+   Aliases: :py:func:`function.blocks.graph<blocks\.digraph>`, :py:func:`function.graph<blocks\.digraph>`, :py:func:`function.digraph<blocks\.digraph>`
    
 .. py:function:: blocks\.digraph(func)
    
-   Return a :py:obj:`networkx.DiGraph` of the function at the address :py:data:`ea`.
+   Return a :py:obj:`networkx.DiGraph` of the function at the address ``ea``.
    
    Requires the :py:obj:`networkx` module in order to build the graph.
    
-   Aliases: ``function.blocks.graph``, ``function.graph``, ``function.digraph``
+   Aliases: :py:func:`function.blocks.graph<blocks\.digraph>`, :py:func:`function.graph<blocks\.digraph>`, :py:func:`function.digraph<blocks\.digraph>`
    
    :param func: the function to return a graph for
    
@@ -1030,13 +1034,13 @@ Some examples of this namespace's usage::
    
    Return an :py:obj:`idaapi.FlowChart` object for the current function.
    
-   Aliases: ``function.flowchart``
+   Aliases: :py:func:`function.flowchart<blocks\.flowchart>`
    
 .. py:function:: blocks\.flowchart(func)
    
-   Return an :py:obj:`idaapi.FlowChart` object for the function :py:data:`func`.
+   Return an :py:obj:`idaapi.FlowChart` object for the function ``func``.
    
-   Aliases: ``function.flowchart``
+   Aliases: :py:func:`function.flowchart<blocks\.flowchart>`
    
    :param func: the function to return the flowchart for
    
@@ -1046,10 +1050,12 @@ Some examples of this namespace's usage::
    
 .. py:function:: blocks\.iterate(func)
    
-   Returns each :py:obj:`idaapi.BasicBlock` for the function :py:data:`func`.
+   Returns each :py:obj:`idaapi.BasicBlock` for the function ``func``.
    
    :param func: the function containing the basic blocks to yield
    
+.. _ns-function-chunk:
+
 **************
 function.chunk
 **************
@@ -1071,16 +1077,16 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk(ea)
    
-   Return a tuple containing the bounds of the function chunk at the address :py:data:`ea`.
+   Return a tuple containing the bounds of the function chunk at the address ``ea``.
    
    :param ea: the address containing the chunk to return
    :type ea: int or long
    
 .. py:function:: chunk\.add(start, end)
    
-   Add the chunk :py:data:`start` to :py:data:`end` to the current function.
+   Add the chunk ``start`` to ``end`` to the current function.
    
-   Aliases: ``function.add_chunk``
+   Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
    :param start: the starting address of the chunk to add to the current function
    :type start: int or long
@@ -1089,9 +1095,9 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.add(func, start, end)
    
-   Add the chunk :py:data:`start` to :py:data:`end` to the function :py:data:`func`.
+   Add the chunk ``start`` to ``end`` to the function ``func``.
    
-   Aliases: ``function.add_chunk``
+   Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
    :param func: the function to add the chunk to
    :param start: the starting address of the chunk to add to the current function
@@ -1101,18 +1107,18 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.assign(ea)
    
-   Assign the chunk at :py:data:`ea` to the current function.
+   Assign the chunk at ``ea`` to the current function.
    
-   Aliases: ``function.assign_chunk``
+   Aliases: :py:func:`function.assign_chunk<chunk\.assign>`
    
    :param ea: the address of the chunk to assign to the current function
    :type ea: int or long
    
 .. py:function:: chunk\.assign(func, ea)
    
-   Assign the chunk at :py:data:`ea` to the function :py:data:`func`.
+   Assign the chunk at ``ea`` to the function ``func``.
    
-   Aliases: ``function.assign_chunk``
+   Aliases: :py:func:`function.assign_chunk<chunk\.assign>`
    
    :param func: the function to assign the chunk to
    :param ea: the address of the chunk to add to the current function
@@ -1124,14 +1130,14 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.at(ea)
    
-   Return a tuple containing the bounds of the function chunk at the address :py:data:`ea`.
+   Return a tuple containing the bounds of the function chunk at the address ``ea``.
    
    :param ea: the address belonging to the chunk to return
    :type ea: int or long
    
 .. py:function:: chunk\.at(func, ea)
    
-   Return a tuple containing the bounds of the function chunk belonging to :py:data:`func` at the address :py:data:`ea`.
+   Return a tuple containing the bounds of the function chunk belonging to ``func`` at the address ``ea``.
    
    :param func: the function containing the chunk
    :param ea: the address belonging to the chunk to return
@@ -1143,29 +1149,29 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.bottom(ea)
    
-   Return the bottom address of the chunk at address :py:data:`ea`.
+   Return the bottom address of the chunk at address ``ea``.
    
    :param ea: the address of the chunk
    :type ea: int or long
    
 .. py:function:: chunk\.remove()
    
-   Aliases: ``function.remove_chunk``
+   Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
    
 .. py:function:: chunk\.remove(ea)
    
-   Remove the chunk at :py:data:`ea` from its function.
+   Remove the chunk at ``ea`` from its function.
    
-   Aliases: ``function.remove_chunk``
+   Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
    
    :param ea: the address belonging to the chunk to remove
    :type ea: int or long
    
 .. py:function:: chunk\.remove(func, ea)
    
-   Remove the chunk at :py:data:`ea` from the function :py:data:`func`.
+   Remove the chunk at ``ea`` from the function ``func``.
    
-   Aliases: ``function.remove_chunk``
+   Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
    
    :param func: the function containing the chunk to remove
    :param ea: the address belonging to the chunk to remove
@@ -1177,11 +1183,13 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.top(ea)
    
-   Return the top address of the chunk at address :py:data:`ea`.
+   Return the top address of the chunk at address ``ea``.
    
    :param ea: the address of the chunk
    :type ea: int or long
    
+.. _ns-function-chunks:
+
 ***************
 function.chunks
 ***************
@@ -1201,7 +1209,7 @@ Some of the ways to use this namespace are::
    
 .. py:function:: chunks(func)
    
-   Yield the bounds of each chunk for the function :py:data:`func`.
+   Yield the bounds of each chunk for the function ``func``.
    
    :param func: the function to yield the chunks for
    
@@ -1211,14 +1219,14 @@ Some of the ways to use this namespace are::
    
 .. py:function:: chunks\.at(ea)
    
-   Return a tuple containing the bounds of the function chunk at the address :py:data:`ea`.
+   Return a tuple containing the bounds of the function chunk at the address ``ea``.
    
    :param ea: the address belonging to the chunk to return
    :type ea: int or long
    
 .. py:function:: chunks\.at(func, ea)
    
-   Return a tuple containing the bounds of the function chunk belonging to :py:data:`func` at the address :py:data:`ea`.
+   Return a tuple containing the bounds of the function chunk belonging to ``func`` at the address ``ea``.
    
    :param func: the function containing the chunk
    :param ea: the address belonging to the chunk to return
@@ -1228,37 +1236,39 @@ Some of the ways to use this namespace are::
    
    Iterate through all the instructions for each chunk in the current function.
    
-   Aliases: ``function.iterate``
+   Aliases: :py:func:`function.iterate<chunks\.iterate>`
    
 .. py:function:: chunks\.iterate(func)
    
-   Iterate through all the instructions for each chunk in the function :py:data:`func`.
+   Iterate through all the instructions for each chunk in the function ``func``.
    
-   Aliases: ``function.iterate``
+   Aliases: :py:func:`function.iterate<chunks\.iterate>`
    
    :param func: the function to iterate through
    
 .. py:function:: chunks\.register(reg, \*regs, \*\*modifiers)
    
-   Yield each :py:obj:`(address, opnum, state)` within the current function that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yield each ``(address, opnum, state)`` within the current function that uses ``reg`` or any one of the registers in ``regs``.
    
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: chunks\.register(func, reg, \*regs, \*\*modifiers)
    
-   Yield each :py:obj:`(address, opnum, state)` within the function :py:data:`func` that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Yield each ``(address, opnum, state)`` within the function ``func`` that uses ``reg`` or any one of the registers in ``regs``.
    
-   If the keyword :py:data:`write` is True, then only return the result if it's writing to the register.
+   If the keyword ``write`` is True, then only return the result if it's writing to the register.
    
    :param func: the function to identify registers in
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
+.. _ns-function-frame:
+
 **************
 function.frame
 **************
@@ -1280,7 +1290,7 @@ Some ways of using this can be::
    
 .. py:function:: frame(func)
    
-   Return the frame of the function :py:data:`func`.
+   Return the frame of the function ``func``.
    
    :param func: the function containing the frame to return
    
@@ -1288,22 +1298,22 @@ Some ways of using this can be::
    
    Returns the stack delta for the current address within its function.
    
-   Aliases: ``function.get_spdelta``
+   Aliases: :py:func:`function.get_spdelta<frame\.delta>`
    
 .. py:function:: frame\.delta(ea)
    
-   Returns the stack delta for the address :py:data:`ea` within its given function.
+   Returns the stack delta for the address ``ea`` within its given function.
    
-   Aliases: ``function.get_spdelta``
+   Aliases: :py:func:`function.get_spdelta<frame\.delta>`
    
    :param ea: the address to return the stack delta for
    :type ea: int or long
    
 .. py:function:: frame\.delta(func, ea)
    
-   Returns the stack delta for the address :py:data:`ea` within the function :py:data:`func`.
+   Returns the stack delta for the address ``ea`` within the function ``func``.
    
-   Aliases: ``function.get_spdelta``
+   Aliases: :py:func:`function.get_spdelta<frame\.delta>`
    
    :param func: the function to get the stack delta from
    :param ea: the address to return the stack delta for
@@ -1313,16 +1323,120 @@ Some ways of using this can be::
    
    Returns the structure id for the current function's frame.
    
-   Aliases: ``function.get_frameid``
+   Aliases: :py:func:`function.get_frameid<frame\.id>`
    
 .. py:function:: frame\.id(func)
    
-   Returns the structure id for the function :py:data:`func`.
+   Returns the structure id for the function ``func``.
    
-   Aliases: ``function.get_frameid``
+   Aliases: :py:func:`function.get_frameid<frame\.id>`
    
    :param func: the function to return the frame id for
    
+.. _ns-function-frame-args:
+
+^^^^^^^^^^^^^^^^^^^
+function.frame.args
+^^^^^^^^^^^^^^^^^^^
+
+Aliases: :ref:`function.frame.arguments<ns-function-frame-args>`
+
+This namespace is for returning information about the arguments
+within a function's frame. By default, this namespace will yield
+each argument as a tuple containing the ``(offset, name, size)``.
+
+At the moment, register-based calling conventions are not
+supported.
+
+Some ways of using this are::
+
+    > print function.frame.args(f)
+    > print function.frame.args.size(ea)
+
+.. py:function:: frame\.args()
+   
+   Yield each argument in the current function.
+   
+.. py:function:: frame\.args(func)
+   
+   Yield each argument for the function ``func`` in order.
+   
+   Each result is of the format (offset, name, size).
+   
+   :param func: the function containing the arguments to yield
+   
+.. py:function:: frame\.args\.size()
+   
+   Returns the size of the arguments for the current function.
+   
+   Aliases: :py:func:`function.get_args_size<frame\.args\.size>`
+   
+.. py:function:: frame\.args\.size(func)
+   
+   Returns the size of the arguments for the function ``func``.
+   
+   Aliases: :py:func:`function.get_args_size<frame\.args\.size>`
+   
+   :param func: the function containing the argument size to return
+   
+.. _ns-function-frame-lvars:
+
+^^^^^^^^^^^^^^^^^^^^
+function.frame.lvars
+^^^^^^^^^^^^^^^^^^^^
+
+Aliases: :ref:`function.frame.vars<ns-function-frame-lvars>`
+
+This namespace provides information about the local variables
+defined within a function's frame.
+
+Some ways to get this information can be::
+
+    > print function.frame.lvars.size()
+
+.. py:function:: frame\.lvars\.size()
+   
+   Returns the size of the local variables for the current function.
+   
+   Aliases: :py:func:`function.get_vars_size<frame\.lvars\.size>`
+   
+.. py:function:: frame\.lvars\.size(func)
+   
+   Returns the size of the local variables for the function ``func``.
+   
+   Aliases: :py:func:`function.get_vars_size<frame\.lvars\.size>`
+   
+   :param func: the function containing the local variable size to return
+   
+.. _ns-function-frame-regs:
+
+^^^^^^^^^^^^^^^^^^^
+function.frame.regs
+^^^^^^^^^^^^^^^^^^^
+
+This namespace provides information about the registers that
+are saved when a function constructs its frame.
+
+An example of using this namespace::
+
+    > print function.frame.regs.size(ea)
+
+.. py:function:: frame\.regs\.size()
+   
+   Returns the number of bytes occupied by the saved registers in the current function.
+   
+   Aliases: :py:func:`function.get_regs_size<frame\.regs\.size>`
+   
+.. py:function:: frame\.regs\.size(func)
+   
+   Returns the number of bytes occupied by the saved registers for the function ``func``.
+   
+   Aliases: :py:func:`function.get_regs_size<frame\.regs\.size>`
+   
+   :param func: the function containing the register size to return
+   
+.. _ns-function-type:
+
 *************
 function.type
 *************
@@ -1341,13 +1455,13 @@ Some simple ways of getting information about a function::
    
    Return true if the current function has a user-defined name.
    
-   Aliases: ``function.type.nameQ``
+   Aliases: :py:func:`function.type.nameQ<type\.has_name>`
    
 .. py:function:: type\.has_name(func)
    
-   Return true if the function :py:data:`func` has a user-defined name.
+   Return true if the function ``func`` has a user-defined name.
    
-   Aliases: ``function.type.nameQ``
+   Aliases: :py:func:`function.type.nameQ<type\.has_name>`
    
    :param func: the function to check
    
@@ -1355,13 +1469,13 @@ Some simple ways of getting information about a function::
    
    Return true if the current function has no frame.
    
-   Aliases: ``function.type.noframeQ``
+   Aliases: :py:func:`function.type.noframeQ<type\.has_noframe>`
    
 .. py:function:: type\.has_noframe(func)
    
-   Return true if the function :py:data:`func` has no frame.
+   Return true if the function ``func`` has no frame.
    
-   Aliases: ``function.type.noframeQ``
+   Aliases: :py:func:`function.type.noframeQ<type\.has_noframe>`
    
    :param func: the function to check
    
@@ -1369,13 +1483,13 @@ Some simple ways of getting information about a function::
    
    Return true if the current function does not return.
    
-   Aliases: ``function.type.noreturnQ``
+   Aliases: :py:func:`function.type.noreturnQ<type\.has_noreturn>`
    
 .. py:function:: type\.has_noreturn(func)
    
-   Return true if the function :py:data:`func` does not return.
+   Return true if the function ``func`` does not return.
    
-   Aliases: ``function.type.noreturnQ``
+   Aliases: :py:func:`function.type.noreturnQ<type\.has_noreturn>`
    
    :param func: the function to check
    
@@ -1383,13 +1497,13 @@ Some simple ways of getting information about a function::
    
    Return true if the current function is considered a library function.
    
-   Aliases: ``function.type.libraryQ``
+   Aliases: :py:func:`function.type.libraryQ<type\.is_library>`
    
 .. py:function:: type\.is_library(func)
    
-   Return true if the function :py:data:`func` is considered a library function.
+   Return true if the function ``func`` is considered a library function.
    
-   Aliases: ``function.type.libraryQ``
+   Aliases: :py:func:`function.type.libraryQ<type\.is_library>`
    
    :param func: the function to check
    
@@ -1397,13 +1511,13 @@ Some simple ways of getting information about a function::
    
    Return true if the current function is considered a code thunk.
    
-   Aliases: ``function.type.thunkQ``
+   Aliases: :py:func:`function.type.thunkQ<type\.is_thunk>`
    
 .. py:function:: type\.is_thunk(func)
    
-   Return true if the function :py:data:`func` is considered a code thunk.
+   Return true if the function ``func`` is considered a code thunk.
    
-   Aliases: ``function.type.thunkQ``
+   Aliases: :py:func:`function.type.thunkQ<type\.is_thunk>`
    
    :param func: the function to check
    

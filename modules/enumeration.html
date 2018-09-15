@@ -2,7 +2,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
   <head>
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -66,18 +66,18 @@ typically an enumeration is simply a constant, each result that is
 returned will either be a value or a name. The identifier for these
 is a <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.uval_t</span></code>.</p>
 <p>To list the different enumerations available in the database, one
-can use <code class="xref py py-obj docutils literal notranslate"><span class="pre">enumeration.list(...)</span></code> specifying their preferred method
+can use <a class="reference internal" href="#enumeration.list" title="enumeration.list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enumeration.list(...)</span></code></a> specifying their preferred method
 of filtering. This will list all of the available enumerations at
 which point the user can then request it by passing an identifier
-to <code class="xref py py-obj docutils literal notranslate"><span class="pre">enumeration.by(...)</span></code>. The types that can be used to filter are
+to <a class="reference internal" href="#enumeration.by" title="enumeration.by"><code class="xref py py-obj docutils literal notranslate"><span class="pre">enumeration.by(...)</span></code></a>. The types that can be used to filter are
 as follows:</p>
 <ul class="simple">
-<li><a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">name</span></code></a> - Match according to the enumeration name</li>
-<li><code class="xref py py-obj docutils literal notranslate"><span class="pre">like</span></code> - Filter the enumeration names according to a glob</li>
-<li><code class="xref py py-obj docutils literal notranslate"><span class="pre">regex</span></code> - Filter the enumeration names according to a regular-expression</li>
-<li><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code> - Match the enumeration by its index</li>
-<li><code class="xref py py-obj docutils literal notranslate"><span class="pre">identifier</span></code> or <code class="xref py py-obj docutils literal notranslate"><span class="pre">id</span></code> - Match the enumeration by its identifier</li>
-<li><code class="xref py py-obj docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the enumerations by passing their identifier to a callable</li>
+<li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match according to the enumeration name</li>
+<li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the enumeration names according to a glob</li>
+<li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the enumeration names according to a regular-expression</li>
+<li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match the enumeration by its index</li>
+<li><code class="docutils literal notranslate"><span class="pre">identifier</span></code> or <code class="docutils literal notranslate"><span class="pre">id</span></code> - Match the enumeration by its identifier</li>
+<li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the enumerations by passing their identifier to a callable</li>
 </ul>
 <div class="section" id="function-list">
 <h2>3.1.2.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
@@ -87,7 +87,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.by">
 <code class="descclassname">enumeration.</code><code class="descname">by</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.by" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the identifier for the enumeration at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<dd><p>Return the identifier for the enumeration at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -101,7 +101,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">by</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the identifier for the enumeration with the specified <a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code></a>.</p>
+<dd><p>Return the identifier for the enumeration with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -115,7 +115,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">by</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the identifier for the first enumeration matching the keyword specified by <code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<dd><p>Return the identifier for the first enumeration matching the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -129,8 +129,8 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.by_index">
 <code class="descclassname">enumeration.</code><code class="descname">by_index</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.by_index" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the identifier for the enumeration at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">enumeration.byIndex</span></code></p>
+<dd><p>Return the identifier for the enumeration at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.by_index" title="enumeration.by_index"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.byIndex</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -144,8 +144,8 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.by_name">
 <code class="descclassname">enumeration.</code><code class="descname">by_name</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.by_name" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the identifier for the enumeration with the given <a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code></a>.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">enumeration.byName</span></code></p>
+<dd><p>Return the identifier for the enumeration with the given <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.by_name" title="enumeration.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.byName</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -159,8 +159,8 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.comment">
 <code class="descclassname">enumeration.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>**repeatable</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.comment" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the comment for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
-<p>If the bool <code class="xref py py-data docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then return the repeatable comment.</p>
+<dd><p>Return the comment for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then return the repeatable comment.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -178,8 +178,8 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>comment</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the comment for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> to <a class="reference internal" href="#enumeration.comment" title="enumeration.comment"><code class="xref py py-data docutils literal notranslate"><span class="pre">comment</span></code></a>.</p>
-<p>If the bool <code class="xref py py-data docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then modify the repeatable comment.</p>
+<dd><p>Set the comment for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to <code class="docutils literal notranslate"><span class="pre">comment</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then modify the repeatable comment.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -204,8 +204,8 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.delete">
 <code class="descclassname">enumeration.</code><code class="descname">delete</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.delete" title="Permalink to this definition">¶</a></dt>
-<dd><p>Delete the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">enumeration.remove</span></code></p>
+<dd><p>Delete the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.delete" title="enumeration.delete"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.remove</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -219,7 +219,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.flags">
 <code class="descclassname">enumeration.</code><code class="descname">flags</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.flags" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the flags for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return the flags for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -233,7 +233,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">flags</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the flags for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> and masked with <a class="reference internal" href="#enumeration.mask" title="enumeration.mask"><code class="xref py py-data docutils literal notranslate"><span class="pre">mask</span></code></a>.</p>
+<dd><p>Return the flags for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> and masked with <code class="docutils literal notranslate"><span class="pre">mask</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -251,7 +251,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.iterate">
 <code class="descclassname">enumeration.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.iterate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Iterate through all of the enumerations in the database that match the keyword specified by <code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<dd><p>Iterate through all of the enumerations in the database that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -279,7 +279,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">list</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>List all of the enumerations within the database that match the keyword specified by <code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<dd><p>List all of the enumerations within the database that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -293,7 +293,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.mask">
 <code class="descclassname">enumeration.</code><code class="descname">mask</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.mask" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the bitmask for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return the bitmask for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -307,7 +307,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.name">
 <code class="descclassname">enumeration.</code><code class="descname">name</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.name" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the name of the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return the name of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -321,7 +321,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">name</code><span class="sig-paren">(</span><em>enum</em>, <em>name</em><span class="sig-paren">)</span></dt>
-<dd><p>Rename the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> to <a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code></a>.</p>
+<dd><p>Rename the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -339,7 +339,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.names">
 <code class="descclassname">enumeration.</code><code class="descname">names</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.names" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a list of all the names belonging to the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a list of all the names belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -353,8 +353,8 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.new">
 <code class="descclassname">enumeration.</code><code class="descname">new</code><span class="sig-paren">(</span><em>name</em>, <em>flags=0</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.new" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create an enumeration with the specified <a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code></a> and <a class="reference internal" href="#enumeration.flags" title="enumeration.flags"><code class="xref py py-data docutils literal notranslate"><span class="pre">flags</span></code></a> using <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.add_enum</span></code>.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">enumeration.create</span></code></p>
+<dd><p>Create an enumeration with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code> and <code class="docutils literal notranslate"><span class="pre">flags</span></code> using <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.add_enum</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.new" title="enumeration.new"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.create</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -372,7 +372,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.repr">
 <code class="descclassname">enumeration.</code><code class="descname">repr</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.repr" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a printable summary of the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a printable summary of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -386,7 +386,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.search">
 <code class="descclassname">enumeration.</code><code class="descname">search</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.search" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the identifier of the first enumeration that matches the glob <code class="xref py py-data docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<dd><p>Return the identifier of the first enumeration that matches the glob <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -400,7 +400,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">search</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the identifier of the first enumeration that matches the keyword specified by <code class="xref py py-data docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<dd><p>Return the identifier of the first enumeration that matches the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -414,7 +414,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.size">
 <code class="descclassname">enumeration.</code><code class="descname">size</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.size" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the number of bits for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return the number of bits for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -428,7 +428,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">enumeration.</code><code class="descname">size</code><span class="sig-paren">(</span><em>enum</em>, <em>width</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the number of bits for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> to <code class="xref py py-data docutils literal notranslate"><span class="pre">width</span></code>.</p>
+<dd><p>Set the number of bits for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to <code class="docutils literal notranslate"><span class="pre">width</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -446,7 +446,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.values">
 <code class="descclassname">enumeration.</code><code class="descname">values</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.values" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a list of all the values belonging to the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a list of all the values belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -466,8 +466,357 @@ concept. Please see <a class="reference internal" href="../multicase.html#multic
 information on namespaces. For more information on multicase
 functions or aliases, please see <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a> or
 <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
+<div class="section" id="enumeration-member">
+<span id="ns-enumeration-member"></span><h3>3.1.2.2.1. enumeration.member<a class="headerlink" href="#enumeration-member" title="Permalink to this headline">¶</a></h3>
+<p>This namespace allows one to interact with a member belonging
+to an enumeration once the enumeration’s id has been determined.
+This allows one to modify the property of any one of an
+enumeration’s members.</p>
+<p>Some examples of how to use this namespace can be:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">eid</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;example_enumeration&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">mid</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">members</span><span class="o">.</span><span class="n">by_value</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="mh">0x1000</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">oldname</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">member</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="s1">&#39;somename&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">member</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="mh">0x100</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">oldcomment</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">member</span><span class="o">.</span><span class="n">comment</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="s1">&#39;This is an example comment&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">member</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="enumeration.member.comment">
+<code class="descclassname">member.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>mid</em>, <em>**repeatable</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.comment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the comment for the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then return the repeatable comment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of an enumeration member to return the comment for</li>
+<li><strong>**repeatable</strong> – whether the returned comment should be repeatable or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the comment for the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to return the comment for</li>
+<li><strong>member</strong> – the member to return the comment for</li>
+<li><strong>**repeatable</strong> – whether the returned comment should be repeatable or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>mid</em>, <em>comment</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the comment for the enumeration member id <code class="docutils literal notranslate"><span class="pre">mid</span></code> to <code class="docutils literal notranslate"><span class="pre">comment</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then set the repeatable comment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of an enumeration containing the member to set the comment for</li>
+<li><strong>comment</strong> (<em>str</em>) – the comment to apply</li>
+<li><strong>**repeatable</strong> – whether the returned comment should be repeatable or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em>, <em>comment</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the comment for the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code> to the string <code class="docutils literal notranslate"><span class="pre">comment</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to set the comment for</li>
+<li><strong>member</strong> – the member to set the comment for</li>
+<li><strong>comment</strong> (<em>str</em>) – the comment to apply</li>
+<li><strong>**repeatable</strong> – whether the returned comment should be repeatable or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.member.mask">
+<code class="descclassname">member.</code><code class="descname">mask</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.mask" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the bitmask for the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of an enumeration member to return the bitmask of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">mask</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the bitmask for the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to return the bitmask for</li>
+<li><strong>member</strong> – the member to return the bitmask for</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.member.name">
+<code class="descclassname">member.</code><code class="descname">name</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the name of the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the member to return the name for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">name</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the name of the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to return the name for</li>
+<li><strong>member</strong> – the member to return the name for</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">name</code><span class="sig-paren">(</span><em>mid</em>, <em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Rename the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code> to <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.member.name" title="enumeration.member.name"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.rename</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of an enumeration member</li>
+<li><strong>name</strong> (<em>str</em><em> or </em><em>tuple</em>) – the name to rename the enumeration member to</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">name</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em>, <em>name</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<dd><p>Rename the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code> to <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.member.name" title="enumeration.member.name"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.rename</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to rename</li>
+<li><strong>member</strong> – the member to rename</li>
+<li><strong>name</strong> (<em>str</em>) – the name to rename the enumeration member to</li>
+<li><strong>*suffix</strong> – any other names to append to the new name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.member.parent">
+<code class="descclassname">member.</code><code class="descname">parent</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the id of the enumeration that owns the member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> – the identifier of the member to return the enumeration for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.member.remove">
+<code class="descclassname">member.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.remove" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the enumeration member with the given <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the member to remove</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the specified <code class="docutils literal notranslate"><span class="pre">member</span></code> of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to remove a member from</li>
+<li><strong>member</strong> – the member to remove</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.member.serial">
+<code class="descclassname">member.</code><code class="descname">serial</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.serial" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the serial of the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of an enumeration member to return the serial for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">serial</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the serial of the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to return the serial for</li>
+<li><strong>member</strong> – the member to return the serial of</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.member.value">
+<code class="descclassname">member.</code><code class="descname">value</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the value of the enumeration member <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of an enumeration member to return the value of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">value</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the value of the specified <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to return the value of</li>
+<li><strong>member</strong> – the member to return the value of</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">value</code><span class="sig-paren">(</span><em>mid</em>, <em>value</em>, <em>**bitmask</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the <code class="docutils literal notranslate"><span class="pre">value</span></code> for the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified, then use it as a bitmask. Otherwise assume all bits are set.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the member to set the value of</li>
+<li><strong>value</strong> (<em>int</em><em> or </em><em>long</em>) – the value to set the member to</li>
+<li><strong>**bitmask</strong> – if <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified as an integer, then use it as the bitmask to assign to the value</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">value</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em>, <em>value</em>, <em>**bitmask</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the <code class="docutils literal notranslate"><span class="pre">value</span></code> for the enumeration <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified, then use it as a bitmask. Otherwise assume all bits are set.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the member to set the value for</li>
+<li><strong>member</strong> – the member to set the value of</li>
+<li><strong>value</strong> (<em>int</em><em> or </em><em>long</em>) – the value to apply</li>
+<li><strong>**bitmask</strong> – if <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified as an integer, then use it as the bitmask to assign to the value</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
 <div class="section" id="enumeration-members">
-<h3>3.1.2.2.1. enumeration.members<a class="headerlink" href="#enumeration-members" title="Permalink to this headline">¶</a></h3>
+<span id="ns-enumeration-members"></span><h3>3.1.2.2.2. enumeration.members<a class="headerlink" href="#enumeration-members" title="Permalink to this headline">¶</a></h3>
 <p>This namespace allows one to interact with the members belonging
 to an enumeration once the enumeration’s id has been determined.
 This allows one to iterate through all of its members or add
@@ -487,7 +836,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members">
 <code class="descclassname">enumeration.</code><code class="descname">members</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yield the name of each member from the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Yield the name of each member from the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -501,9 +850,9 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.add">
 <code class="descclassname">members.</code><code class="descname">add</code><span class="sig-paren">(</span><em>enum</em>, <em>name</em>, <em>value</em>, <em>**bitmask</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.add" title="Permalink to this definition">¶</a></dt>
-<dd><p>Add an enumeration member <a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code></a> with the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">value</span></code> to the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
-<p>If the int, <code class="xref py py-data docutils literal notranslate"><span class="pre">bitmask</span></code>, is specified then used it as the bitmask for the enumeration.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">enumeration.member.new</span></code>, <code class="docutils literal notranslate"><span class="pre">enumeration.member.create</span></code></p>
+<dd><p>Add an enumeration member <code class="docutils literal notranslate"><span class="pre">name</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">value</span></code> to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>If the int, <code class="docutils literal notranslate"><span class="pre">bitmask</span></code>, is specified then used it as the bitmask for the enumeration.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.members.add" title="enumeration.members.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.new</span></code></a>, <a class="reference internal" href="#enumeration.members.add" title="enumeration.members.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.create</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -512,7 +861,7 @@ members of an enumeration.</p>
 <li><strong>enum</strong> – the enumeration to add a member to</li>
 <li><strong>name</strong> – the name of the enumeration member</li>
 <li><strong>value</strong> – the value of the enumeration member</li>
-<li><strong>**bitmask</strong> – if <code class="xref py py-data docutils literal notranslate"><span class="pre">bitmask</span></code> is specified as an integer, then use it as the bitmask for the enumeration</li>
+<li><strong>**bitmask</strong> – if <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> is specified as an integer, then use it as the bitmask for the enumeration</li>
 </ul>
 </td>
 </tr>
@@ -523,7 +872,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.by">
 <code class="descclassname">members.</code><code class="descname">by</code><span class="sig-paren">(</span><em>enum</em>, <em>n</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.by" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the member belonging to <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> identified by its index or id in <code class="xref py py-data docutils literal notranslate"><span class="pre">n</span></code>.</p>
+<dd><p>Return the member belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code> identified by its index or id in <code class="docutils literal notranslate"><span class="pre">n</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -541,7 +890,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">members.</code><code class="descname">by</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the member with the given <a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code></a> belonging to <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return the member with the given <code class="docutils literal notranslate"><span class="pre">name</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -559,7 +908,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.by_identifier">
 <code class="descclassname">members.</code><code class="descname">by_identifier</code><span class="sig-paren">(</span><em>enum</em>, <em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.by_identifier" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the member of the enumeration specified by <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> and its <code class="xref py py-data docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<dd><p>Return the member of the enumeration specified by <code class="docutils literal notranslate"><span class="pre">enum</span></code> and its <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -577,7 +926,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.by_index">
 <code class="descclassname">members.</code><code class="descname">by_index</code><span class="sig-paren">(</span><em>enum</em>, <em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.by_index" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the member identifier for the member of the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> at the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<dd><p>Return the member identifier for the member of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> at the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -595,8 +944,8 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.by_name">
 <code class="descclassname">members.</code><code class="descname">by_name</code><span class="sig-paren">(</span><em>enum</em>, <em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.by_name" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the member identifier for the member of the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> with the specified <a class="reference internal" href="#enumeration.name" title="enumeration.name"><code class="xref py py-data docutils literal notranslate"><span class="pre">name</span></code></a>.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">enumeration.member.byName</span></code></p>
+<dd><p>Return the member identifier for the member of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.members.by_name" title="enumeration.members.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.byName</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -614,8 +963,8 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.by_value">
 <code class="descclassname">members.</code><code class="descname">by_value</code><span class="sig-paren">(</span><em>enum</em>, <em>value</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.by_value" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the member identifier for the member of the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code> with the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">value</span></code>.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">enumeration.member.byValue</span></code></p>
+<dd><p>Return the member identifier for the member of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">value</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.members.by_value" title="enumeration.members.by_value"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.byValue</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -633,7 +982,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.iterate">
 <code class="descclassname">members.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.iterate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Iterate through all ids of each member associated with the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Iterate through all ids of each member associated with the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -647,7 +996,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.list">
 <code class="descclassname">members.</code><code class="descname">list</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.list" title="Permalink to this definition">¶</a></dt>
-<dd><p>List all the members belonging to the enumeration identified by <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>List all the members belonging to the enumeration identified by <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -661,7 +1010,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.mapping">
 <code class="descclassname">members.</code><code class="descname">mapping</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.mapping" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a dictionary mapping all the values values to their names for the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a dictionary mapping all the values values to their names for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -675,7 +1024,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.names">
 <code class="descclassname">members.</code><code class="descname">names</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.names" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a set of all the names belonging to the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a set of all the names belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -689,7 +1038,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.remove">
 <code class="descclassname">members.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.remove" title="Permalink to this definition">¶</a></dt>
-<dd><p>Remove the specified <code class="xref py py-data docutils literal notranslate"><span class="pre">member</span></code> of the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Remove the specified <code class="docutils literal notranslate"><span class="pre">member</span></code> of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -707,7 +1056,7 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members.values">
 <code class="descclassname">members.</code><code class="descname">values</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.values" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a set of all the values belonging to the enumeration <code class="xref py py-data docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a set of all the values belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -749,7 +1098,8 @@ members of an enumeration.</p>
 <li><a class="reference internal" href="#">3.1.2. enumeration – Enumeration module</a><ul>
 <li><a class="reference internal" href="#function-list">3.1.2.1. Function list</a></li>
 <li><a class="reference internal" href="#namespace-list">3.1.2.2. Namespace list</a><ul>
-<li><a class="reference internal" href="#enumeration-members">3.1.2.2.1. enumeration.members</a></li>
+<li><a class="reference internal" href="#enumeration-member">3.1.2.2.1. enumeration.member</a></li>
+<li><a class="reference internal" href="#enumeration-members">3.1.2.2.2. enumeration.members</a></li>
 </ul>
 </li>
 </ul>

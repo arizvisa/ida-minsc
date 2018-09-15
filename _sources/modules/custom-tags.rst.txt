@@ -35,11 +35,11 @@ functions and aliases. For more information on this, please see
 
 .. py:function:: addressToLocation(ea, chunks=None)
    
-   Convert the address :py:data:`ea` to a :py:obj:`(function, id, offset)`.
+   Convert the address ``ea`` to a :py:obj:`(function, id, offset)<>`.
    
    The fields :py:obj:`id` and :py:obj:`offset` represent the chunk index and the
-   offset into the chunk for the function at :py:data:`ea`. If the list
-   :py:data:`chunks` is specified as a parameter, then use it as a tuple
+   offset into the chunk for the function at ``ea``. If the list
+   ``chunks`` is specified as a parameter, then use it as a tuple
    of ranges in order to calculate the correct address.
    
    :param ea: an address to possibly convert to a location
@@ -51,13 +51,13 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: locationToAddress(loc)
    
-   Convert the function location :py:data:`loc` back into an address.
+   Convert the function location ``loc`` back into an address.
    
    :param loc: an address or a location tuple to convert to an address
    
 .. py:function:: lvarNameQ(name)
    
-   Determine whether a :py:data:`name` is something that IDA named automatically.
+   Determine whether a ``name`` is something that IDA named automatically.
    
    :param name: the string to check for an IDA naming scheme
    
@@ -71,6 +71,8 @@ concept. Please see :ref:`multicase-namespaces` for more
 information on namespaces. For more information on multicase
 functions or aliases, please see :ref:`multicase-functions` or
 :ref:`multicase-aliases`.
+
+.. _ns-tags-apply:
 
 **********
 tags.apply
@@ -86,7 +88,7 @@ before actually writing them back into the database.
 
 .. py:function:: apply((Globals,Contents,Frames), \*\*tagmap)
    
-   Apply the tags in the argument :py:obj:`(Globals, Contents, Frames)` back into the database.
+   Apply the tags in the argument :py:obj:`(Globals, Contents, Frames)<>` back into the database.
    
    :param Globals: the globals tags that were read
    :param Contents: the contents tags that were read
@@ -95,21 +97,21 @@ before actually writing them back into the database.
    
 .. py:function:: apply\.content(Contents, \*\*tagmap)
    
-   Apply :py:data:`Contents` back into a function's contents within the database.
+   Apply ``Contents`` back into a function's contents within the database.
    
    :param Contents: the contents tags to apply
    :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
    
 .. py:function:: apply\.contents(Contents, \*\*tagmap)
    
-   Apply the tags in :py:data:`Contents` back into each function within the database.
+   Apply the tags in ``Contents`` back into each function within the database.
    
    :param Contents: the contents tags to apply
    :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
    
 .. py:function:: apply\.everything((Globals,Contents,Frames), \*\*tagmap)
    
-   Apply the tags in the argument :py:obj:`(Globals, Contents, Frames)` back into the database.
+   Apply the tags in the argument :py:obj:`(Globals, Contents, Frames)<>` back into the database.
    
    :param Globals: the globals tags to apply
    :param Contents: the contents tags to apply
@@ -118,7 +120,7 @@ before actually writing them back into the database.
    
 .. py:function:: apply\.frame(ea, frame, \*\*tagmap)
    
-   Apply the fields from :py:data:`frame` back into the function at :py:data:`ea`.
+   Apply the fields from ``frame`` back into the function at ``ea``.
    
    :param ea: the address of the function to apply the frame to
    :param frame: the frame members to apply
@@ -126,18 +128,20 @@ before actually writing them back into the database.
    
 .. py:function:: apply\.frames(Frames, \*\*tagmap)
    
-   Apply the fields from :py:data:`Frames` back into each function's frame.
+   Apply the fields from ``Frames`` back into each function's frame.
    
    :param Frames: the frame members to apply
    :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
    
 .. py:function:: apply\.globals(Globals, \*\*tagmap)
    
-   Apply the tags in :py:data:`Globals` back into the database.
+   Apply the tags in ``Globals`` back into the database.
    
    :param Globals: the globals tags to apply
    :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
    
+.. _ns-tags-export:
+
 ***********
 tags.export
 ***********
@@ -145,7 +149,7 @@ tags.export
 This namespace contains tools that can be used to quickly
 export specific tagss out of the database using the cache.
 
-If :py:data:`location` is specified as true, then read each contents tag
+If ``location`` is specified as true, then read each contents tag
 according to its location rather than an address. This allows one
 to perform a translation of the tags in case the function chunks
 are at different addresses than when the tags were read.
@@ -155,58 +159,60 @@ are at different addresses than when the tags were read.
    Read the specified tags within the database using the cache.
    
    :param \*tags: an iterable of the tags to export
-   :param \*\*location: if :py:data:`location` is true, then export the contents tags as a location instead of an address
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
    
 .. py:function:: export\.content(F, \*tags, \*\*location)
    
-   Iterate through the specified :py:data:`tags` belonging to the contents of the function at :py:data:`ea` using the cache.
+   Iterate through the specified ``tags`` belonging to the contents of the function at ``ea`` using the cache.
    
    :param F: the function to export the content from
    :param \*tags: an iterable of the contents tags to export
-   :param \*\*location: if :py:data:`location` is true, then export the contents tags as a location instead of an address
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
    
 .. py:function:: export\.contents(\*tags, \*\*location)
    
-   Iterate through the specified contents :py:data:`tags` within the database using the cache.
+   Iterate through the specified contents ``tags`` within the database using the cache.
    
-   Each iteration yields a tuple of the format :py:obj:`(location, tags)` where
+   Each iteration yields a tuple of the format :py:obj:`(location, tags)<>` where
    :py:obj:`location` can be either an address or a chunk identifier and offset
-   depending on whether :py:data:`location` was specified as true or not.
+   depending on whether ``location`` was specified as true or not.
    
    :param \*tags: an iterable of the contents tags to export
-   :param \*\*location: if :py:data:`location` is true, then export the contents tags as a location instead of an address
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
    
 .. py:function:: export\.everything(\*tags, \*\*location)
    
-   Read all of the specified :py:data:`tags` within the database using the cache.
+   Read all of the specified ``tags`` within the database using the cache.
    
-   Returns a tuple of the format :py:obj:`(Globals, Contents, Frames)`. Each field
+   Returns a tuple of the format :py:obj:`(Globals, Contents, Frames)<>`. Each field
    is a dictionary keyed by location or offset that retains the tags that
-   were read. If the boolean :py:data:`location` was specified then key each
+   were read. If the boolean ``location`` was specified then key each
    contents tag by location instead of address.
    
    :param \*tags: an iterable of the tags to export
-   :param \*\*location: if :py:data:`location` is true, then export the contents tags as a location instead of an address
+   :param \*\*location: if ``location`` is true, then export the contents tags as a location instead of an address
    
 .. py:function:: export\.frame(F, \*tags)
    
-   Iterate through each field containing the specified :py:data:`tags` within the frame belonging to the function :py:data:`ea`.
+   Iterate through each field containing the specified ``tags`` within the frame belonging to the function ``ea``.
    
    :param F: the function to export the frame members from
    :param \*tags: an iterable of the tags used to select the frame members to export
    
 .. py:function:: export\.frames(\*tags)
    
-   Iterate through the fields in each function's frame containing the specified :py:data:`tags`.
+   Iterate through the fields in each function's frame containing the specified ``tags``.
    
    :param \*tags: an iterable of the tags used to select the frame members to export
    
 .. py:function:: export\.globals(\*tags)
    
-   Iterate through all of the specified global :py:data:`tags` within the database using the cache.
+   Iterate through all of the specified global ``tags`` within the database using the cache.
    
    :param \*tags: an iterable of the global tags to export
    
+.. _ns-tags-read:
+
 *********
 tags.read
 *********
@@ -214,7 +220,7 @@ tags.read
 This namespace contains tools that can be used to manually read
 tags out of the database without using the cache.
 
-If :py:data:`location` is specified as true, then read each contents tag
+If ``location`` is specified as true, then read each contents tag
 according to its location rather than an address. This allows one
 to perform a translation of the tags in case the function chunks
 are at different addresses than when the tags were read.
@@ -227,7 +233,7 @@ are at different addresses than when the tags were read.
    
 .. py:function:: read\.content(ea)
    
-   Iterate through every tag belonging to the contents of the function at :py:data:`ea`.
+   Iterate through every tag belonging to the contents of the function at ``ea``.
    
    :param ea: the address of the function to yield the content for
    
@@ -235,9 +241,9 @@ are at different addresses than when the tags were read.
    
    Iterate through the contents tags for all the functions within the database.
    
-   Each iteration yields a tuple of the format :py:obj:`(location, tags)` where
+   Each iteration yields a tuple of the format :py:obj:`(location, tags)<>` where
    :py:obj:`location` can be either an address or a chunk identifier and offset
-   depending on whether :py:data:`location` was specified as true or not.
+   depending on whether ``location`` was specified as true or not.
    
    :param location: whether to read the contents tags as an address or a location
    
@@ -245,16 +251,16 @@ are at different addresses than when the tags were read.
    
    Read all of the tags defined within the database.
    
-   Returns a tuple of the format :py:obj:`(Globals, Contents, Frames)`. Each field
+   Returns a tuple of the format :py:obj:`(Globals, Contents, Frames)<>`. Each field
    is a dictionary keyed by location or offset that retains the tags that
-   were read. If the boolean :py:data:`location` was specified then key each
+   were read. If the boolean ``location`` was specified then key each
    contents tag by location instead of address.
    
    :param location: whether to read the contents tags as an address or a location
    
 .. py:function:: read\.frame(ea)
    
-   Iterate through each field within the frame belonging to the function :py:data:`ea`.
+   Iterate through each field within the frame belonging to the function ``ea``.
    
    :param ea: the address of the function containing the frame members to yield
    

@@ -24,14 +24,14 @@ functions and aliases. For more information on this, please see
 
 .. py:function:: above(ea, includeSegment=False)
    
-   Return all of the function names and their offset that calls the function at :py:data:`ea`.
+   Return all of the function names and their offset that calls the function at ``ea``.
    
    :param ea: the address of the function to output calls to
    :param includeSegment: whether to include the segment name in the output
    
 .. py:function:: below(ea, includeSegment=False)
    
-   Return all of the function names and their offset that are called by the function at :py:data:`ea`.
+   Return all of the function names and their offset that are called by the function at ``ea``.
    
    :param ea: the address of the function to output calls from
    :param includeSegment: whether to include the segment name in the output
@@ -45,9 +45,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: collect(ea, sentinel)
    
-   Collect all the basic blocks starting at address :py:data:`ea` and recurse until a terminating block is encountered.
+   Collect all the basic blocks starting at address ``ea`` and recurse until a terminating block is encountered.
    
-   If the set :py:data:`sentinel` is specified, then its addresses are used as
+   If the set ``sentinel`` is specified, then its addresses are used as
    sentinel blocks and collection will terminate when those blocks are
    reached.
    
@@ -56,18 +56,18 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: collectcall(ea, sentinel=set)
    
-   Collect all of the function calls starting at function :py:data:`ea` and recurse until a terminating function is encountered.
+   Collect all of the function calls starting at function ``ea`` and recurse until a terminating function is encountered.
    
-   If the set :py:data:`sentinel` is specified, then its addresses are used as
+   If the set ``sentinel`` is specified, then its addresses are used as
    sentinel functions and collection will terminate when one of those
    functions are reached.
    
    :param ea: the address of the function to start at
    :param sentinel: an iterable containing the addresses of any functions to terminate at
    
-.. py:function:: colormarks(color=8323199)
+.. py:function:: colormarks(color=0x7f007f)
    
-   Walk through the current list of marks whilst coloring them with the specified :py:data:`color`.
+   Walk through the current list of marks whilst coloring them with the specified ``color``.
    
    Each mark's address is tagged with its description, and if the
    address belongs to a function, the function is also tagged with the
@@ -77,10 +77,10 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: makecall(ea=None, target=None)
    
-   Output the function call at :py:data:`ea` and its arguments with the address they originated from.
+   Output the function call at ``ea`` and its arguments with the address they originated from.
    
-   If :py:data:`target` is specified, then assume that the instruction is
-   calling :py:data:`target` instead of the target address that the call
+   If ``target`` is specified, then assume that the instruction is
+   calling ``target`` instead of the target address that the call
    is referencing.
    
    :param ea: the address of a call instruction
@@ -88,11 +88,11 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: map(F, \*\*kwargs)
    
-   Execute the callback :py:data:`F` on all functions in the database. Synonymous to :py:obj:`map(F, database.functions())` but with some extra logging to display the current progress.
+   Execute the callback ``F`` on all functions in the database. Synonymous to ``map(F, database.functions())`` but with some extra logging to display the current progress.
    
-   The :py:data:`F` parameter is defined as a function taking either an
-   :py:obj:`(address, \*\*kwargs)` or a :py:obj:`(index, address, \*\*kwargs)`. Any
-   keyword arguments are passed to :py:data:`F` unmodified.
+   The ``F`` parameter is defined as a function taking either an
+   :py:obj:`(address, \*\*kwargs)<>` or a :py:obj:`(index, address, \*\*kwargs)<>`. Any
+   keyword arguments are passed to ``F`` unmodified.
    
    :param F: the callback to execute on each function
    :param \*\*kwargs: any extra arguments to pass to the callback
@@ -108,14 +108,12 @@ functions and aliases. For more information on this, please see
 Class list
 ----------
 
-
 Classes provide the definition necessary to instantiate an object.
 In most cases, a class is returned when calling one of the prior
 listed functions and thus have no need to be manually instantiated.
 Classes may also have aliases defined for them. Please refer to the
 documentation for the class to see what is available. For more
 information on aliases, please see :ref:`multicase-aliases`.
-
 
 ******
 remote

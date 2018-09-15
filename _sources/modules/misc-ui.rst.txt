@@ -41,7 +41,7 @@ functions and aliases. For more information on this, please see
    the value :py:obj:`None`.
    
    :param string: the string to ask the user
-   :param \*\*default: if :py:data:`yes`, :py:data:`no`, or :py:data:`cancel` is set to true, then use that value as the default
+   :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
    
 --------------
 Namespace list
@@ -53,6 +53,8 @@ concept. Please see :ref:`multicase-namespaces` for more
 information on namespaces. For more information on multicase
 functions or aliases, please see :ref:`multicase-functions` or
 :ref:`multicase-aliases`.
+
+.. _ns-ui-appwindow:
 
 ************
 ui.appwindow
@@ -70,6 +72,8 @@ Base namespace used for interacting with the windows provided by IDA.
    
    :param \*args: any options or arguments to pass to the windows open function
    
+.. _ns-ui-clipboard:
+
 ************
 ui.clipboard
 ************
@@ -80,6 +84,8 @@ This namespace is for interacting with the current clipboard state.
    
    Return the current clipboard.
    
+.. _ns-ui-current:
+
 **********
 ui.current
 **********
@@ -129,41 +135,51 @@ segment, clipboard, widget, or even the current window in use.
    
    Return the current window that is being used.
    
+.. _ns-ui-disassembly:
+
 **************
 ui.disassembly
 **************
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Disassembly window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
 .. py:function:: disassembly\.refresh()
    
    Refresh the main IDA disassembly view.
    
+.. _ns-ui-exports:
+
 **********
 ui.exports
 **********
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Exports window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-functions:
 
 ************
 ui.functions
 ************
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Functions window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-imports:
 
 **********
 ui.imports
 **********
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Imports window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-keyboard:
 
 ***********
 ui.keyboard
@@ -177,7 +193,7 @@ Base namespace for interacting with the keyboard input.
    
 .. py:function:: keyboard\.map(key, callable)
    
-   Map a specific :py:data:`key` to a python :py:data:`callable`.
+   Map a specific ``key`` to a python ``callable``.
    
    :param key: the key to map
    :param callable: a python callable to execute when the specified key is pressed
@@ -188,10 +204,12 @@ Base namespace for interacting with the keyboard input.
    
 .. py:function:: keyboard\.unmap(key)
    
-   Unmap the specified :py:data:`key` from its callable.
+   Unmap the specified ``key`` from its callable.
    
    :param key: the key mapping to unmap
    
+.. _ns-ui-menu:
+
 *******
 ui.menu
 *******
@@ -200,7 +218,7 @@ This namespace is for registering items in IDA's menu system.
 
 .. py:function:: menu\.add(path, name, callable, hotkey='', flags=0, args=())
    
-   Register a :py:data:`callable` as a menu item at the specified :py:data:`path` with the provided :py:data:`name`.
+   Register a ``callable`` as a menu item at the specified ``path`` with the provided ``name``.
    
    :param path: the menu path to add the item to
    :param name: the name of the item to add
@@ -215,11 +233,13 @@ This namespace is for registering items in IDA's menu system.
    
 .. py:function:: menu\.rm(path, name)
    
-   Remove the menu item at the specified :py:data:`path` with the provided :py:data:`name`.
+   Remove the menu item at the specified ``path`` with the provided ``name``.
    
    :param path: the menu path containing the item to remove
    :param name: the name of the item to remove
    
+.. _ns-ui-mouse:
+
 ********
 ui.mouse
 ********
@@ -232,31 +252,33 @@ Base namespace for interacting with the mouse input.
    
 .. py:function:: mouse\.position()
    
-   Return the current :py:obj:`(x, y)` position of the cursor.
+   Return the current :py:obj:`(x, y)<>` position of the cursor.
    
+.. _ns-ui-names:
+
 ********
 ui.names
 ********
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Names window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
 .. py:function:: names\.at(index)
    
-   Return the address and the symbol name of the specified :py:data:`index`.
+   Return the address and the symbol name of the specified ``index``.
    
    :param index: the index in the list to return
    
 .. py:function:: names\.contains(ea)
    
-   Return whether the address :py:data:`ea` is referenced in the names list.
+   Return whether the address ``ea`` is referenced in the names list.
    
    :param ea: the address of the symbol to check
    
 .. py:function:: names\.ea(index)
    
-   Return the address at the specified :py:data:`index`.
+   Return the address at the specified ``index``.
    
    :param index: the index in the list to return
    
@@ -266,7 +288,7 @@ This namespace is for interacting with the Names window.
    
 .. py:function:: names\.name(index)
    
-   Return the name at the specified :py:data:`index`.
+   Return the name at the specified ``index``.
    
    :param index: the index in the list to return
    
@@ -276,7 +298,7 @@ This namespace is for interacting with the Names window.
    
 .. py:function:: names\.search(ea)
    
-   Return the index of the address :py:data:`ea` in the names list.
+   Return the index of the address ``ea`` in the names list.
    
    :param ea: the address of the symbol to return the index for
    
@@ -284,6 +306,8 @@ This namespace is for interacting with the Names window.
    
    Return the number of elements in the names list.
    
+.. _ns-ui-navigation:
+
 *************
 ui.navigation
 *************
@@ -296,12 +320,12 @@ This namespace is for updating the state of the colored navigation band.
    
 .. py:function:: navigation\.auto(ea, \*\*type)
    
-   Set the auto-analysis address and type on the navigation bar to :py:data:`ea`.
+   Set the auto-analysis address and type on the navigation bar to ``ea``.
    
-   If :py:data:`type` is specified, then update using the specified auto-analysis type.
+   If ``type`` is specified, then update using the specified auto-analysis type.
    
    :param ea: the address to set the auto-analysis address to on the navigation bar
-   :param \*\*type: if :py:data:`type` is specified as an :py:obj:`idaapi.AU_\*`, then use this as the navigation type
+   :param \*\*type: if ``type`` is specified as an :py:obj:`idaapi.AU_\*`, then use this as the navigation type
    
 .. py:function:: navigation\.code(ea)
    
@@ -317,7 +341,7 @@ This namespace is for updating the state of the colored navigation band.
    
 .. py:function:: navigation\.set(ea)
    
-   Set the auto-analysis address on the navigation bar to :py:data:`ea`.
+   Set the auto-analysis address on the navigation bar to ``ea``.
    
    :param ea: the address to set the navigation bar pointer to
    
@@ -345,13 +369,17 @@ This namespace is for updating the state of the colored navigation band.
    
    :param ea: the address to set the auto-analysis weak address to on the navigation bar
    
+.. _ns-ui-notepad:
+
 **********
 ui.notepad
 **********
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Notepad window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-queue:
 
 ********
 ui.queue
@@ -365,7 +393,7 @@ XXX: This is probably pretty unsafe in IDA, but let's hope.
 
 .. py:function:: queue\.add(callable, \*args, \*\*kwds)
    
-   Add the specified :py:data:`callable` to the execution queue passing to it any extra arguments.
+   Add the specified ``callable`` to the execution queue passing to it any extra arguments.
    
    :param callable: the python callable to execute
    :param \*args: any positional arguments to pass to the callable
@@ -375,13 +403,17 @@ XXX: This is probably pretty unsafe in IDA, but let's hope.
    
    Block until the next available result has been returned.
    
+.. _ns-ui-segments:
+
 ***********
 ui.segments
 ***********
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Segments window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-state:
 
 ********
 ui.state
@@ -408,23 +440,25 @@ being viewed in graph view or not.
    
    Wait until IDA's autoanalysis queues are empty.
    
+.. _ns-ui-strings:
+
 **********
 ui.strings
 **********
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Strings window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
 .. py:function:: strings\.at(index)
    
-   Return the string at the specified :py:data:`index`.
+   Return the string at the specified ``index``.
    
    :param index: the index of the string item to return
    
 .. py:function:: strings\.get(index)
    
-   Return the address and the string at the specified :py:data:`index`.
+   Return the address and the string at the specified ``index``.
    
    :param index: the index of the string to return
    
@@ -440,13 +474,17 @@ This namespace is for interacting with the Strings window.
    
    Return the number of elements in the strings list.
    
+.. _ns-ui-structures:
+
 *************
 ui.structures
 *************
 
-Bases: :py:class:`ui.appwindow`
-
 This namespace is for interacting with the Structures window.
+
+Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
+
+.. _ns-ui-timer:
 
 ********
 ui.timer
@@ -456,7 +494,7 @@ This namespace is for registering a python callable to a timer in IDA.
 
 .. py:function:: timer\.register(id, interval, callable)
    
-   Register the specified :py:data:`callable` with the requested :py:data:`id` to be called at every :py:data:`interval`.
+   Register the specified ``callable`` with the requested ``id`` to be called at every ``interval``.
    
    :param id: a unique id used to refer to the callable being registered in the timer
    :param interval: what interval to execute the callable at
@@ -468,10 +506,12 @@ This namespace is for registering a python callable to a timer in IDA.
    
 .. py:function:: timer\.unregister(id)
    
-   Unregister the specified :py:data:`id`.
+   Unregister the specified ``id``.
    
    :param id: the unique id of the callable to unregister
    
+.. _ns-ui-widget:
+
 *********
 ui.widget
 *********
@@ -480,14 +520,14 @@ This namespace is for selecting a specific or particular widget.
 
 .. py:function:: widget((x,y))
    
-   Return the widget at the specified :py:data:`x` and :py:data:`y` coordinate.
+   Return the widget at the specified ``x`` and ``y`` coordinate.
    
    :param x: the X coordinate of the widget
    :param y: the Y coordinate of the widget
    
 .. py:function:: widget\.at((x,y))
    
-   Return the widget at the specified :py:data:`x` and :py:data:`y` coordinate.
+   Return the widget at the specified ``x`` and ``y`` coordinate.
    
    :param x: the X coordinate of the widget
    :param y: the Y coordinate of the widget
@@ -498,6 +538,8 @@ This namespace is for selecting a specific or particular widget.
    
    :param twidget: the IDA plugin form to convert to a Qt widget
    
+.. _ns-ui-window:
+
 *********
 ui.window
 *********
@@ -512,6 +554,8 @@ This namespace is for selecting a specific or particular window.
    
    Return the current viewer.
    
+.. _ns-ui-windows:
+
 **********
 ui.windows
 **********
@@ -526,14 +570,12 @@ Interact with any or all of the top-level windows for the application.
 Class list
 ----------
 
-
 Classes provide the definition necessary to instantiate an object.
 In most cases, a class is returned when calling one of the prior
 listed functions and thus have no need to be manually instantiated.
 Classes may also have aliases defined for them. Please refer to the
 documentation for the class to see what is available. For more
 information on aliases, please see :ref:`multicase-aliases`.
-
 
 ***************
 ConsoleProgress
@@ -549,7 +591,7 @@ ConsoleProgress
       
    .. py:method:: open(self, width=0.8, height=0.1)
       
-      Open a progress bar with the specified :py:data:`width` and :py:data:`height` relative to the dimensions of IDA's window.
+      Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.
       
       :param width: the percentage of IDA's dimensions to set the width to
       :param height: the percentange of IDA's dimensions to set the height to
@@ -617,7 +659,7 @@ UIProgress
       
    .. py:method:: open(self, width=0.8, height=0.1)
       
-      Open a progress bar with the specified :py:data:`width` and :py:data:`height` relative to the dimensions of IDA's window.
+      Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.
       
       :param width: the percentage of IDA's dimensions to set the width to
       :param height: the percentange of IDA's dimensions to set the height to

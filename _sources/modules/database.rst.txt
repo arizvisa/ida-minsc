@@ -17,7 +17,7 @@ Some namespaces are also provided for querying the available symbolic
 information that IDA has discovered about a binary. This can be used
 to search and navigate the database. Some of the available namespaces
 that can be used for querying are :py:obj:`functions`, :py:obj:`segments`, :py:obj:`names`,
-:py:obj:`imports`, :py:obj:`exports`, and :py:obj:`marks`.
+:py:obj:`imports`, :py:obj:`entries`, and :py:obj:`marks`.
 
 -------------
 Function list
@@ -29,7 +29,7 @@ functions and aliases. For more information on this, please see
 
 .. py:function:: block(start, end)
    
-   Return the block of bytes from address :py:data:`start` to :py:data:`end`.
+   Return the block of bytes from address ``start`` to ``end``.
    
    :param start: starting address
    :param end: ending address
@@ -51,14 +51,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: color(ea)
    
-   Return the rgb color at the address :py:data:`ea`.
+   Return the rgb color at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: color(ea, none)
    
-   Remove the color at the address :py:data:`ea`.
+   Remove the color at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -67,7 +67,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: color(ea, rgb)
    
-   Set the color at address :py:data:`ea` to :py:data:`rgb`.
+   Set the color at address ``ea`` to ``rgb``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -82,9 +82,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: comment(ea, \*\*repeatable)
    
-   Return the comment at the address :py:data:`ea`.
+   Return the comment at the address ``ea``.
    
-   If the bool :py:data:`repeatable` is specified, then return the repeatable comment.
+   If the bool ``repeatable`` is specified, then return the repeatable comment.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -92,7 +92,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: comment(string, \*\*repeatable)
    
-   Set the comment at the current address to :py:data:`string`.
+   Set the comment at the current address to ``string``.
    
    :param string: the comment to apply
    :type string: str
@@ -100,9 +100,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: comment(ea, string, \*\*repeatable)
    
-   Set the comment at address :py:data:`ea` to :py:data:`string`.
+   Set the comment at address ``ea`` to ``string``.
    
-   If the bool :py:data:`repeatable` is specified, then modify the repeatable comment.
+   If the bool ``repeatable`` is specified, then modify the repeatable comment.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -114,20 +114,20 @@ functions and aliases. For more information on this, please see
    
    Disassemble the instructions at the current address.
    
-   :param \*\*options: if :py:data:`count` is specified as an integer, this will specify the number of instructions to disassemble. if :py:data:`comments` is specified as a boolean, this will determine whether comments are included or not.
+   :param \*\*options: if ``count`` is specified as an integer, this will specify the number of instructions to disassemble. if ``comments`` is specified as a boolean, this will determine whether comments are included or not.
    
 .. py:function:: disassemble(ea, \*\*options)
    
-   Disassemble the instructions at the address specified by :py:data:`ea`.
+   Disassemble the instructions at the address specified by ``ea``.
    
-   If the integer :py:data:`count` is specified, then return :py:data:`count` number of instructions.
-   If the bool :py:data:`comments` is true, then return the comments for each instruction as well.
+   If the integer ``count`` is specified, then return ``count`` number of instructions.
+   If the bool ``comments`` is true, then return the comments for each instruction as well.
    
-   Aliases: ``database.disasm``
+   Aliases: :py:func:`database.disasm<disassemble>`
    
    :param ea: an address within the database
    :type ea: int or long
-   :param \*\*options: if :py:data:`count` is specified as an integer, this will specify the number of instructions to disassemble. if :py:data:`comments` is specified as a boolean, this will determine whether comments are included or not.
+   :param \*\*options: if ``count`` is specified as an integer, this will specify the number of instructions to disassemble. if ``comments`` is specified as a boolean, this will determine whether comments are included or not.
    
 .. py:function:: erase()
    
@@ -135,20 +135,20 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: erase(ea)
    
-   Remove all of the defined tags at address :py:data:`ea`.
+   Remove all of the defined tags at address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: go(ea)
    
-   Jump to the specified address at :py:data:`ea`.
+   Jump to the specified address at ``ea``.
    
    :param ea: an address in the database
    
 .. py:function:: go_offset(offset)
    
-   Jump to the specified :py:data:`offset` within the database.
+   Jump to the specified ``offset`` within the database.
    
    :param offset: an offset from the base address
    
@@ -162,7 +162,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: instruction(ea)
    
-   Return the instruction at the address :py:data:`ea` as a string.
+   Return the instruction at the address ``ea`` as a string.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -180,21 +180,21 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: mark(ea)
    
-   Return the mark at the specified address :py:data:`ea`.
+   Return the mark at the specified address ``ea``.
    
    :param ea: an address containing a mark
    :type ea: int or long
    
 .. py:function:: mark(description)
    
-   Set the mark at the current address to the specified :py:data:`description`.
+   Set the mark at the current address to the specified ``description``.
    
    :param description: the description to set the mark with
    :type description: str
    
 .. py:function:: mark(ea, none)
    
-   Erase the mark at address :py:data:`ea`.
+   Erase the mark at address ``ea``.
    
    :param ea: the address of an existing mark
    :type ea: int or long
@@ -203,7 +203,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: mark(ea, description)
    
-   Sets the mark at address :py:data:`ea` to the specified :py:data:`description`.
+   Sets the mark at address ``ea`` to the specified ``description``.
    
    :param ea: the address to set a mark at
    :type ea: int or long
@@ -218,9 +218,9 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(ea, \*\*flags)
    
-   Return the name defined at the address specified by :py:data:`ea`.
+   Return the name defined at the address specified by ``ea``.
    
-   If :py:data:`flags` is specified, then use the specified value as the flags.
+   If ``flags`` is specified, then use the specified value as the flags.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -228,7 +228,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(string, \*suffix, \*\*flags)
    
-   Renames the current address to :py:data:`string`.
+   Renames the current address to ``string``.
    
    :param string: a string to use as the name
    :type string: str
@@ -245,11 +245,11 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(ea, string, \*suffix, \*\*flags)
    
-   Renames the address  specified by :py:data:`ea` to :py:data:`string`.
+   Renames the address  specified by ``ea`` to ``string``.
    
-   If :py:data:`ea` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
-   If :py:data:`flags` is specified, then use the specified value as the flags.
-   If the boolean :py:data:`listed` is specified, then specify whether to add the label to the Names list or not.
+   If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
+   If ``flags`` is specified, then use the specified value as the flags.
+   If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -260,7 +260,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(ea, none, \*\*flags)
    
-   Removes the name defined at the address :py:data:`ea`.
+   Removes the name defined at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -274,7 +274,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: offset(ea)
    
-   Return the address :py:data:`ea` converted to an offset from the base address of the database.
+   Return the address ``ea`` converted to an offset from the base address of the database.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -285,14 +285,14 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: read(size)
    
-   Return :py:data:`size` number of bytes from the current address.
+   Return ``size`` number of bytes from the current address.
    
    :param size: the number of bytes to read
    :type size: int or long
    
 .. py:function:: read(ea, size)
    
-   Return :py:data:`size` number of bytes from address :py:data:`ea`.
+   Return ``size`` number of bytes from address ``ea``.
    
    :param ea: the address to read from
    :type ea: int or long
@@ -301,39 +301,39 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: select(tag, \*And, \*\*boolean)
    
-   Query all of the global tags in the database for the specified :py:obj:`tag` and any others specified as :py:data:`And`.
+   Query all of the global tags in the database for the specified ``tag`` and any others specified as ``And``.
    
    :param tag: a required tag name to search for
    :type tag: str
    :param \*And: any other required tag names
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: select(\*\*boolean)
    
-   Query all the global tags for any tags specified by :py:data:`boolean`. Yields each address found along with the matching tags as a dictionary.
+   Query all the global tags for any tags specified by ``boolean``. Yields each address found along with the matching tags as a dictionary.
    
-   If :py:data:`And` contains an iterable then require the returned address contains them.
-   If :py:data:`Or` contains an iterable then include any other tags that are specified.
+   If ``And`` contains an iterable then require the returned address contains them.
+   If ``Or`` contains an iterable then include any other tags that are specified.
    
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: selectcontents(tag, \*Or, \*\*boolean)
    
-   Query all function contents for the specified :py:data:`tag` or any others specified as :py:data:`Or`.
+   Query all function contents for the specified ``tag`` or any others specified as ``Or``.
    
    :param tag: a required tag name to search for
    :type tag: str
    :param \*Or: any other optional tag names
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: selectcontents(\*\*boolean)
    
-   Query all function contents for any tags specified by :py:data:`boolean`. Yields each function and the tags that match as a set.
+   Query all function contents for any tags specified by ``boolean``. Yields each function and the tags that match as a set.
    
-   If :py:data:`And` contains an iterable then require the returned function contains them.
-   If :py:data:`Or` contains an iterable then include any other tags that are specified.
+   If ``And`` contains an iterable then require the returned function contains them.
+   If ``Or`` contains an iterable then include any other tags that are specified.
    
-   :param \*\*boolean: either :py:data:`And` or :py:data:`Or` which specifies required or optional tags (respectively)
+   :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: tag()
    
@@ -341,21 +341,21 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(ea)
    
-   Return all of the tags defined at address :py:data:`ea`.
+   Return all of the tags defined at address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: tag(key)
    
-   Return the tag identified by :py:data:`key` at the current address.
+   Return the tag identified by ``key`` at the current address.
    
    :param key: a string representing the tag name to return
    :type key: str
    
 .. py:function:: tag(key, value)
    
-   Set the tag identified by :py:data:`key` to :py:data:`value` at the current address.
+   Set the tag identified by ``key`` to ``value`` at the current address.
    
    :param key: a string representing the tag name to assign to
    :type key: str
@@ -363,7 +363,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(ea, key)
    
-   Returns the tag identified by :py:data:`key` from address :py:data:`ea`.
+   Returns the tag identified by ``key`` from address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -372,7 +372,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(ea, key, value)
    
-   Set the tag identified by :py:data:`key` to :py:data:`value` at the address :py:data:`ea`.
+   Set the tag identified by ``key`` to ``value`` at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -382,7 +382,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(key, none)
    
-   Remove the tag identified by :py:data:`key` from the current address.
+   Remove the tag identified by ``key`` from the current address.
    
    :param key: a string representing the tag name to remove
    :type key: str
@@ -391,7 +391,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: tag(ea, key, none)
    
-   Removes the tag identified by :py:data:`key` at the address :py:data:`ea`.
+   Removes the tag identified by ``key`` at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -410,7 +410,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: translate(offset)
    
-   Translate the specified :py:data:`offset` to an address in the database.
+   Translate the specified ``offset`` to an address in the database.
    
    :param offset: an offset from the base address
    
@@ -418,34 +418,36 @@ functions and aliases. For more information on this, please see
    
    Should always return true.
    
+   Aliases: :py:func:`database.contains<within>`
+   
 .. py:function:: within(ea)
    
-   Returns true if address :py:data:`ea` is within the bounds of the database.
+   Returns true if address ``ea`` is within the bounds of the database.
    
-   Aliases: ``database.contains``
+   Aliases: :py:func:`database.contains<within>`
    
    :param ea: an address within the database
    :type ea: int or long
    
 .. py:function:: write(data, \*\*persist)
    
-   Modify the database at the current address with the bytes specified in :py:data:`data`.
+   Modify the database at the current address with the bytes specified in ``data``.
    
    :param data: the data to write
    :type data: bytes
-   :param \*\*persist: if :py:data:`persist` is set to true, then write to the original bytes in the database
+   :param \*\*persist: if ``persist`` is set to true, then write to the original bytes in the database
    
 .. py:function:: write(ea, data, \*\*persist)
    
-   Modify the database at address :py:data:`ea` with the bytes specified in :py:data:`data`
+   Modify the database at address ``ea`` with the bytes specified in ``data``
    
-   If the bool :py:data:`persist` is specified, then modify what IDA considers the original bytes.
+   If the bool ``persist`` is specified, then modify what IDA considers the original bytes.
    
    :param ea: the address to write to
    :type ea: int or long
    :param data: the data to write
    :type data: bytes
-   :param \*\*persist: if :py:data:`persist` is set to true, then write to the original bytes in the database
+   :param \*\*persist: if ``persist`` is set to true, then write to the original bytes in the database
    
 --------------
 Namespace list
@@ -458,9 +460,13 @@ information on namespaces. For more information on multicase
 functions or aliases, please see :ref:`multicase-functions` or
 :ref:`multicase-aliases`.
 
+.. _ns-database-address:
+
 ****************
 database.address
 ****************
+
+Aliases: :ref:`database.a<ns-database-address>`
 
 This namespace is used for translating an address in the database
 to another address according to a number of constraints or types.
@@ -492,14 +498,14 @@ Some examples of using this namespace can be::
 
 .. py:function:: address\.blocks(end)
    
-   Yields the bounds of each block from the current address to :py:data:`end`.
+   Yields the bounds of each block from the current address to ``end``.
    
    :param end: the address to stop at
    :type end: int or long
    
 .. py:function:: address\.blocks(start, end)
    
-   Yields the bounds of each block between the addresses :py:data:`start` and :py:data:`end`.
+   Yields the bounds of each block between the addresses ``start`` and ``end``.
    
    :param start: the address to start at
    :type start: int or long
@@ -512,21 +518,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.head(ea)
    
-   Return the address of the byte at the beginning of the address :py:data:`ea`.
+   Return the address of the byte at the beginning of the address ``ea``.
    
    :param ea: an unaligned address in the database
    :type ea: int or long
    
 .. py:function:: address\.iterate(end)
    
-   Iterate from the current address to :py:data:`end`.
+   Iterate from the current address to ``end``.
    
    :param end: the address to stop iterating at
    :type end: int or long
    
 .. py:function:: address\.iterate(end, step)
    
-   Iterate from the current address to :py:data:`end` using the callable :py:data:`step` to determine the next address.
+   Iterate from the current address to ``end`` using the callable ``step`` to determine the next address.
    
    :param end: the address to stop iterating at
    :type end: int or long
@@ -535,7 +541,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.iterate(start, end)
    
-   Iterate from address :py:data:`start` to :py:data:`end`.
+   Iterate from address ``start`` to ``end``.
    
    :param start: the address to start iterating at
    :type start: int or long
@@ -544,7 +550,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.iterate(start, end, step)
    
-   Iterate from address :py:data:`start` to :py:data:`end` using the callable :py:data:`step` to determine the next address.
+   Iterate from address ``start`` to ``end`` using the callable ``step`` to determine the next address.
    
    :param start: the address to start iterating at
    :type start: int or long
@@ -557,31 +563,31 @@ Some examples of using this namespace can be::
    
    Return the next address from the current address.
    
-   Aliases: ``database.next``
+   Aliases: :py:func:`database.next<address\.next>`
    
 .. py:function:: address\.next(predicate)
    
-   Return the next address from the current address that matches :py:data:`predicate`.
+   Return the next address from the current address that matches ``predicate``.
    
-   Aliases: ``database.next``
+   Aliases: :py:func:`database.next<address\.next>`
    
    :param predicate: a callable used to match addresses
    :type predicate: callable
    
 .. py:function:: address\.next(ea)
    
-   Return the next address from the address :py:data:`ea`.
+   Return the next address from the address ``ea``.
    
-   Aliases: ``database.next``
+   Aliases: :py:func:`database.next<address\.next>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.next(ea, predicate)
    
-   Return the next address from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the next address from the address ``ea`` that matches ``predicate``.
    
-   Aliases: ``database.next``
+   Aliases: :py:func:`database.next<address\.next>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -590,9 +596,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.next(ea, count)
    
-   Return the next :py:data:`count` addresses from the address specified by :py:data:`ea`.
+   Return the next ``count`` addresses from the address specified by ``ea``.
    
-   Aliases: ``database.next``
+   Aliases: :py:func:`database.next<address\.next>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -601,11 +607,11 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.next(ea, predicate, count)
    
-   Return the next address from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the next address from the address ``ea`` that matches ``predicate``.
    
-   Skip :py:data:`count` addresses before returning.
+   Skip ``count`` addresses before returning.
    
-   Aliases: ``database.next``
+   Aliases: :py:func:`database.next<address\.next>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -616,14 +622,14 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextF(predicate)
    
-   Return the next address from the current one that matches :py:data:`predicate`.
+   Return the next address from the current one that matches ``predicate``.
    
    :param predicate: a callable used to match addresses
    :type predicate: callable
    
 .. py:function:: address\.nextF(ea, predicate)
    
-   Return the next address from the address :py:data:`ea`. that matches :py:data:`predicate`.
+   Return the next address from the address ``ea``. that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -632,9 +638,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextF(ea, predicate, count)
    
-   Return the next address from the address :py:data:`ea` that matches :py:data:`predicate`..
+   Return the next address from the address ``ea`` that matches ``predicate``..
    
-   Skip :py:data:`count` addresses before returning.
+   Skip ``count`` addresses before returning.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -649,21 +655,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextbranch(predicate)
    
-   Return the next branch instruction that matches :py:data:`predicate`.
+   Return the next branch instruction that matches ``predicate``.
    
    :param predicate: a callable used to match addresses with branch instructions
    :type predicate: callable
    
 .. py:function:: address\.nextbranch(ea)
    
-   Return the next branch instruction from the address :py:data:`ea`.
+   Return the next branch instruction from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.nextbranch(ea, predicate)
    
-   Return the next branch instruction from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the next branch instruction from the address ``ea`` that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -683,21 +689,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextcall(predicate)
    
-   Return the next call instruction that matches :py:data:`predicate`.
+   Return the next call instruction that matches ``predicate``.
    
    :param predicate: a callable used to match addresses with call instructions
    :type predicate: callable
    
 .. py:function:: address\.nextcall(ea)
    
-   Return the next call instruction from the address :py:data:`ea`.
+   Return the next call instruction from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.nextcall(ea, predicate)
    
-   Return the next call instruction from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the next call instruction from the address ``ea`` that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -715,31 +721,31 @@ Some examples of using this namespace can be::
    
    Returns the next address that has code referencing it.
    
-   Aliases: ``database.address.nextcode``
+   Aliases: :py:func:`database.address.nextcode<address\.nextcref>`
    
 .. py:function:: address\.nextcref(predicate)
    
-   Returns the next address that has code referencing it and matches :py:data:`predicate`.
+   Returns the next address that has code referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.nextcode``
+   Aliases: :py:func:`database.address.nextcode<address\.nextcref>`
    
    :param predicate: a callable used to match addresses with code references
    :type predicate: callable
    
 .. py:function:: address\.nextcref(ea)
    
-   Returns the next address from :py:data:`ea` that has code referencing it.
+   Returns the next address from ``ea`` that has code referencing it.
    
-   Aliases: ``database.address.nextcode``
+   Aliases: :py:func:`database.address.nextcode<address\.nextcref>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.nextcref(ea, predicate)
    
-   Returns the next address from :py:data:`ea` that has code referencing it and matches :py:data:`predicate`.
+   Returns the next address from ``ea`` that has code referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.nextcode``
+   Aliases: :py:func:`database.address.nextcode<address\.nextcref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -748,9 +754,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextcref(ea, count)
    
-   Returns the next :py:data:`count` addresses from :py:data:`ea` that has code referencing it.
+   Returns the next ``count`` addresses from ``ea`` that has code referencing it.
    
-   Aliases: ``database.address.nextcode``
+   Aliases: :py:func:`database.address.nextcode<address\.nextcref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -761,31 +767,31 @@ Some examples of using this namespace can be::
    
    Returns the next address that has data referencing it.
    
-   Aliases: ``database.address.nextdata``
+   Aliases: :py:func:`database.address.nextdata<address\.nextdref>`
    
 .. py:function:: address\.nextdref(predicate)
    
-   Returns the next address that has data referencing it and matches :py:data:`predicate`.
+   Returns the next address that has data referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.nextdata``
+   Aliases: :py:func:`database.address.nextdata<address\.nextdref>`
    
    :param predicate: a callable used to match addresses with data references
    :type predicate: callable
    
 .. py:function:: address\.nextdref(ea)
    
-   Returns the next address from :py:data:`ea` that has data referencing it.
+   Returns the next address from ``ea`` that has data referencing it.
    
-   Aliases: ``database.address.nextdata``
+   Aliases: :py:func:`database.address.nextdata<address\.nextdref>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.nextdref(ea, predicate)
    
-   Returns the next address from :py:data:`ea` that has data referencing it and matches :py:data:`predicate`.
+   Returns the next address from ``ea`` that has data referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.nextdata``
+   Aliases: :py:func:`database.address.nextdata<address\.nextdref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -794,9 +800,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextdref(ea, count)
    
-   Returns the next :py:data:`count` addresses from :py:data:`ea` that has data referencing it.
+   Returns the next ``count`` addresses from ``ea`` that has data referencing it.
    
-   Aliases: ``database.address.nextdata``
+   Aliases: :py:func:`database.address.nextdata<address\.nextdref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -809,21 +815,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextlabel(predicate)
    
-   Return the address of the next label that matches :py:data:`predicate`.
+   Return the address of the next label that matches ``predicate``.
    
    :param predicate: a callable used to match addresses with labels
    :type predicate: callable
    
 .. py:function:: address\.nextlabel(ea)
    
-   Return the address of the next label from the address :py:data:`ea`.
+   Return the address of the next label from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.nextlabel(ea, predicate)
    
-   Return the address of the next label from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the address of the next label from the address ``ea`` that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -841,31 +847,31 @@ Some examples of using this namespace can be::
    
    Returns the next address that has anything referencing it.
    
-   Aliases: ``database.nextref``
+   Aliases: :py:func:`database.nextref<address\.nextref>`
    
 .. py:function:: address\.nextref(predicate)
    
-   Returns the next address that has anything referencing it and matches :py:data:`predicate`.
+   Returns the next address that has anything referencing it and matches ``predicate``.
    
-   Aliases: ``database.nextref``
+   Aliases: :py:func:`database.nextref<address\.nextref>`
    
    :param predicate: a callable used to match addresses with references
    :type predicate: callable
    
 .. py:function:: address\.nextref(ea)
    
-   Returns the next address from :py:data:`ea` that has anything referencing it.
+   Returns the next address from ``ea`` that has anything referencing it.
    
-   Aliases: ``database.nextref``
+   Aliases: :py:func:`database.nextref<address\.nextref>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.nextref(ea, predicate)
    
-   Returns the next address from :py:data:`ea` that has anything referencing it and matches :py:data:`predicate`.
+   Returns the next address from ``ea`` that has anything referencing it and matches ``predicate``.
    
-   Aliases: ``database.nextref``
+   Aliases: :py:func:`database.nextref<address\.nextref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -874,9 +880,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextref(ea, count)
    
-   Returns the next :py:data:`count` addresses from :py:data:`ea` that has anything referencing it.
+   Returns the next ``count`` addresses from ``ea`` that has anything referencing it.
    
-   Aliases: ``database.nextref``
+   Aliases: :py:func:`database.nextref<address\.nextref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -885,46 +891,46 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextreg(reg, \*regs, \*\*modifiers)
    
-   Return the next address containing an instruction that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Return the next address containing an instruction that uses ``reg`` or any one of the registers in ``regs``.
    
-   Aliases: ``database.nextreg``
+   Aliases: :py:func:`database.nextreg<address\.nextreg>`
    
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.nextreg(predicate, reg, \*regs, \*\*modifiers)
    
-   Return the next address containing an instruction that matches :py:data:`predicate` and uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Return the next address containing an instruction that matches ``predicate`` and uses ``reg`` or any one of the registers in ``regs``.
    
-   Aliases: ``database.nextreg``
+   Aliases: :py:func:`database.nextreg<address\.nextreg>`
    
    :param predicate: a callable used to match addresses with instructions
    :type predicate: callable
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.nextreg(ea, reg, \*regs, \*\*modifiers)
    
-   Return the next address from :py:data:`ea` containing an instruction that uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Return the next address from ``ea`` containing an instruction that uses ``reg`` or any one of the registers in ``regs``.
    
-   Aliases: ``database.nextreg``
+   Aliases: :py:func:`database.nextreg<address\.nextreg>`
    
    :param ea: an address in the database
    :type ea: int or long
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.nextreg(ea, predicate, reg, \*regs, \*\*modifiers)
    
-   Return the next address from :py:data:`ea` containing an instruction that matches :py:data:`predicate` and uses :py:data:`reg` or any one of the registers in :py:data:`regs`.
+   Return the next address from ``ea`` containing an instruction that matches ``predicate`` and uses ``reg`` or any one of the registers in ``regs``.
    
-   Aliases: ``database.nextreg``
+   Aliases: :py:func:`database.nextreg<address\.nextreg>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -933,22 +939,22 @@ Some examples of using this namespace can be::
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.nextstack(delta)
    
-   Return the next instruction that is past the sp :py:data:`delta`.
+   Return the next instruction that is past the sp ``delta``.
    
-   Aliases: ``database.address.nextdelta``
+   Aliases: :py:func:`database.address.nextdelta<address\.nextstack>`
    
    :param delta: the stack delta to find the edge of
    :type delta: int or long
    
 .. py:function:: address\.nextstack(ea, delta)
    
-   Return the next instruction from :py:data:`ea` that is past the sp :py:data:`delta`.
+   Return the next instruction from ``ea`` that is past the sp ``delta``.
    
-   Aliases: ``database.address.nextdelta``
+   Aliases: :py:func:`database.address.nextdelta<address\.nextstack>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -959,53 +965,53 @@ Some examples of using this namespace can be::
    
    Return the next address that contains a tag.
    
-   Aliases: ``database.address.nextcomment``
+   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
    
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.nexttag(predicate, \*\*tagname)
    
-   Return the next address that contains a tag and matches :py:data:`predicate`.
+   Return the next address that contains a tag and matches ``predicate``.
    
-   Aliases: ``database.address.nextcomment``
+   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
    
    :param predicate: a callable used to match addresses with a comment or tag
    :type predicate: callable
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.nexttag(ea, \*\*tagname)
    
-   Returns the next address from :py:data:`ea` that contains a tag.
+   Returns the next address from ``ea`` that contains a tag.
    
-   If the string :py:data:`tagname` is specified, then only return the address if the specified tag is defined.
+   If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
    
-   Aliases: ``database.address.nextcomment``
+   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.nexttag(ea, predicate, \*\*tagname)
    
-   Returns the next address from :py:data:`ea` that contains a tag and matches :py:data:`predicate`.
+   Returns the next address from ``ea`` that contains a tag and matches ``predicate``.
    
-   Aliases: ``database.address.nextcomment``
+   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
    
    :param ea: an address in the database
    :type ea: int or long
    :param predicate: a callable used to match addresses with a comment or tag
    :type predicate: callable
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.nexttag(ea, count, \*\*tagname)
    
-   Aliases: ``database.address.nextcomment``
+   Aliases: :py:func:`database.address.nextcomment<address\.nexttag>`
    
    :param ea: an address in the database
    :type ea: int or long
    :param count: the number of instructions to skip
    :type count: int or long
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.nextunknown()
    
@@ -1013,21 +1019,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.nextunknown(predicate)
    
-   Return the next address that is undefined and matches :py:data:`predicate`.
+   Return the next address that is undefined and matches ``predicate``.
    
    :param predicate: a callable used to match unknown addresses
    :type predicate: callable
    
 .. py:function:: address\.nextunknown(ea)
    
-   Return the next address from :py:data:`ea` that is undefined.
+   Return the next address from ``ea`` that is undefined.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.nextunknown(ea, predicate)
    
-   Return the next address from :py:data:`ea` that is undefined and matches :py:data:`predicate`.
+   Return the next address from ``ea`` that is undefined and matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1045,31 +1051,31 @@ Some examples of using this namespace can be::
    
    Return the previous address from the current address.
    
-   Aliases: ``database.prev``
+   Aliases: :py:func:`database.prev<address\.prev>`
    
 .. py:function:: address\.prev(predicate)
    
-   Return the previous address from the current address that matches :py:data:`predicate`.
+   Return the previous address from the current address that matches ``predicate``.
    
-   Aliases: ``database.prev``
+   Aliases: :py:func:`database.prev<address\.prev>`
    
    :param predicate: a callable used to match addresses
    :type predicate: callable
    
 .. py:function:: address\.prev(ea)
    
-   Return the previous address from the address specified by :py:data:`ea`.
+   Return the previous address from the address specified by ``ea``.
    
-   Aliases: ``database.prev``
+   Aliases: :py:func:`database.prev<address\.prev>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prev(ea, predicate)
    
-   Return the previous address from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the previous address from the address ``ea`` that matches ``predicate``.
    
-   Aliases: ``database.prev``
+   Aliases: :py:func:`database.prev<address\.prev>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1078,9 +1084,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prev(ea, count)
    
-   Return the previous :py:data:`count` addresses from the address specified by :py:data:`ea`.
+   Return the previous ``count`` addresses from the address specified by ``ea``.
    
-   Aliases: ``database.prev``
+   Aliases: :py:func:`database.prev<address\.prev>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1089,11 +1095,11 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prev(ea, predicate, count)
    
-   Return the previous address from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the previous address from the address ``ea`` that matches ``predicate``.
    
-   Skip :py:data:`count` addresses before returning.
+   Skip ``count`` addresses before returning.
    
-   Aliases: ``database.prev``
+   Aliases: :py:func:`database.prev<address\.prev>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1104,14 +1110,14 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevF(predicate)
    
-   Return the previous address from the current one that matches :py:data:`predicate`.
+   Return the previous address from the current one that matches ``predicate``.
    
    :param predicate: a callable used to match addresses
    :type predicate: callable
    
 .. py:function:: address\.prevF(ea, predicate)
    
-   Return the previous address from the address :py:data:`ea`. that matches :py:data:`predicate`.
+   Return the previous address from the address ``ea``. that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1120,9 +1126,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevF(ea, predicate, count)
    
-   Return the previous address from the address :py:data:`ea` that matches :py:data:`predicate`..
+   Return the previous address from the address ``ea`` that matches ``predicate``..
    
-   Skip :py:data:`count` addresses before returning.
+   Skip ``count`` addresses before returning.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1137,21 +1143,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevbranch(predicate)
    
-   Return the previous branch instruction that matches :py:data:`predicate`.
+   Return the previous branch instruction that matches ``predicate``.
    
    :param predicate: a callable used to match addresses with branch instructions
    :type predicate: callable
    
 .. py:function:: address\.prevbranch(ea)
    
-   Return the previous branch instruction from the address :py:data:`ea`.
+   Return the previous branch instruction from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prevbranch(ea, predicate)
    
-   Return the previous branch instruction from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the previous branch instruction from the address ``ea`` that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1171,21 +1177,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevcall(predicate)
    
-   Return the previous call instruction that matches :py:data:`predicate`.
+   Return the previous call instruction that matches ``predicate``.
    
    :param predicate: a callable used to match addresses with call instructions
    :type predicate: callable
    
 .. py:function:: address\.prevcall(ea)
    
-   Return the previous call instruction from the address :py:data:`ea`.
+   Return the previous call instruction from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prevcall(ea, predicate)
    
-   Return the previous call instruction from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the previous call instruction from the address ``ea`` that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1203,31 +1209,31 @@ Some examples of using this namespace can be::
    
    Returns the previous address that has code referencing it.
    
-   Aliases: ``database.address.prevcode``
+   Aliases: :py:func:`database.address.prevcode<address\.prevcref>`
    
 .. py:function:: address\.prevcref(predicate)
    
-   Returns the previous address that has code referencing it and matches :py:data:`predicate`.
+   Returns the previous address that has code referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.prevcode``
+   Aliases: :py:func:`database.address.prevcode<address\.prevcref>`
    
    :param predicate: a callable used to match addresses with code references
    :type predicate: callable
    
 .. py:function:: address\.prevcref(ea)
    
-   Returns the previous address from :py:data:`ea` that has code referencing it.
+   Returns the previous address from ``ea`` that has code referencing it.
    
-   Aliases: ``database.address.prevcode``
+   Aliases: :py:func:`database.address.prevcode<address\.prevcref>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prevcref(ea, predicate)
    
-   Returns the previous address from :py:data:`ea` that has code referencing it and matches :py:data:`predicate`.
+   Returns the previous address from ``ea`` that has code referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.prevcode``
+   Aliases: :py:func:`database.address.prevcode<address\.prevcref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1236,9 +1242,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevcref(ea, count)
    
-   Returns the previous :py:data:`count` addresses from :py:data:`ea` that has code referencing it.
+   Returns the previous ``count`` addresses from ``ea`` that has code referencing it.
    
-   Aliases: ``database.address.prevcode``
+   Aliases: :py:func:`database.address.prevcode<address\.prevcref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1249,31 +1255,31 @@ Some examples of using this namespace can be::
    
    Returns the previous address that has data referencing it.
    
-   Aliases: ``database.address.prevdata``
+   Aliases: :py:func:`database.address.prevdata<address\.prevdref>`
    
 .. py:function:: address\.prevdref(predicate)
    
-   Returns the previous address that has data referencing it and matches :py:data:`predicate`.
+   Returns the previous address that has data referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.prevdata``
+   Aliases: :py:func:`database.address.prevdata<address\.prevdref>`
    
    :param predicate: a callable used to match addresses with data references
    :type predicate: callable
    
 .. py:function:: address\.prevdref(ea)
    
-   Returns the previous address from :py:data:`ea` that has data referencing it.
+   Returns the previous address from ``ea`` that has data referencing it.
    
-   Aliases: ``database.address.prevdata``
+   Aliases: :py:func:`database.address.prevdata<address\.prevdref>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prevdref(ea, predicate)
    
-   Returns the previous address from :py:data:`ea` that has data referencing it and matches :py:data:`predicate`.
+   Returns the previous address from ``ea`` that has data referencing it and matches ``predicate``.
    
-   Aliases: ``database.address.prevdata``
+   Aliases: :py:func:`database.address.prevdata<address\.prevdref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1282,9 +1288,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevdref(ea, count)
    
-   Returns the previous :py:data:`count` addresses from :py:data:`ea` that has data referencing it.
+   Returns the previous ``count`` addresses from ``ea`` that has data referencing it.
    
-   Aliases: ``database.address.prevdata``
+   Aliases: :py:func:`database.address.prevdata<address\.prevdref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1297,21 +1303,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevlabel(predicate)
    
-   Return the address of the previous label that matches :py:data:`predicate`.
+   Return the address of the previous label that matches ``predicate``.
    
    :param predicate: a callable used to match addresses with labels
    :type predicate: callable
    
 .. py:function:: address\.prevlabel(ea)
    
-   Return the address of the previous label from the address :py:data:`ea`.
+   Return the address of the previous label from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prevlabel(ea, predicate)
    
-   Return the address of the previous label from the address :py:data:`ea` that matches :py:data:`predicate`.
+   Return the address of the previous label from the address ``ea`` that matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1329,31 +1335,31 @@ Some examples of using this namespace can be::
    
    Returns the previous address that has anything referencing it.
    
-   Aliases: ``database.prevref``
+   Aliases: :py:func:`database.prevref<address\.prevref>`
    
 .. py:function:: address\.prevref(predicate)
    
-   Returns the previous address that has anything referencing it and matches :py:data:`predicate`.
+   Returns the previous address that has anything referencing it and matches ``predicate``.
    
-   Aliases: ``database.prevref``
+   Aliases: :py:func:`database.prevref<address\.prevref>`
    
    :param predicate: a callable used to match addresses with references
    :type predicate: callable
    
 .. py:function:: address\.prevref(ea)
    
-   Returns the previous address from :py:data:`ea` that has anything referencing it.
+   Returns the previous address from ``ea`` that has anything referencing it.
    
-   Aliases: ``database.prevref``
+   Aliases: :py:func:`database.prevref<address\.prevref>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prevref(ea, predicate)
    
-   Returns the previous address from :py:data:`ea` that has anything referencing it and matches :py:data:`predicate`.
+   Returns the previous address from ``ea`` that has anything referencing it and matches ``predicate``.
    
-   Aliases: ``database.prevref``
+   Aliases: :py:func:`database.prevref<address\.prevref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1362,9 +1368,9 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevref(ea, count)
    
-   Returns the previous :py:data:`count` addresses from :py:data:`ea` that has anything referencing it.
+   Returns the previous ``count`` addresses from ``ea`` that has anything referencing it.
    
-   Aliases: ``database.prevref``
+   Aliases: :py:func:`database.prevref<address\.prevref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1373,46 +1379,46 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevreg(reg, \*regs, \*\*modifiers)
    
-   Return the previous address containing an instruction that uses :py:data:`reg` or any one of the specified registers :py:data:`regs`.
+   Return the previous address containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.
    
-   Aliases: ``database.prevreg``
+   Aliases: :py:func:`database.prevreg<address\.prevreg>`
    
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.prevreg(predicate, reg, \*regs, \*\*modifiers)
    
-   Return the previous address containing an instruction that uses :py:data:`reg` or any one of the specified registers :py:data:`regs` and matches :py:data:`predicate`.
+   Return the previous address containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.
    
-   Aliases: ``database.prevreg``
+   Aliases: :py:func:`database.prevreg<address\.prevreg>`
    
    :param predicate: a callable used to match addresses with instructions
    :type predicate: callable
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.prevreg(ea, reg, \*regs, \*\*modifiers)
    
-   Return the previous address from :py:data:`ea` containing an instruction that uses :py:data:`reg` or any one of the specified registers :py:data:`regs`.
+   Return the previous address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.
    
-   Aliases: ``database.prevreg``
+   Aliases: :py:func:`database.prevreg<address\.prevreg>`
    
    :param ea: an address in the datbase
    :type ea: int or long
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.prevreg(ea, predicate, reg, \*regs, \*\*modifiers)
    
-   Return the previous address from :py:data:`ea` containing an instruction that uses :py:data:`reg` or any one of the specified registers :py:data:`regs` and matches :py:data:`predicate`.
+   Return the previous address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.
    
-   Aliases: ``database.prevreg``
+   Aliases: :py:func:`database.prevreg<address\.prevreg>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1421,22 +1427,22 @@ Some examples of using this namespace can be::
    :param reg: a register of some kind
    :type reg: str or register_t
    :param \*regs: any other registers to match for
-   :param \*\*modifiers: if :py:data:`write` or :py:data:`read` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
    
 .. py:function:: address\.prevstack(delta)
    
-   Return the previous instruction that is past the specified sp :py:data:`delta`.
+   Return the previous instruction that is past the specified sp ``delta``.
    
-   Aliases: ``database.address.prevdelta``
+   Aliases: :py:func:`database.address.prevdelta<address\.prevstack>`
    
    :param delta: the stack delta to find the edge of
    :type delta: int or long
    
 .. py:function:: address\.prevstack(ea, delta)
    
-   Return the previous instruction from :py:data:`ea` that is past the specified sp :py:data:`delta`.
+   Return the previous instruction from ``ea`` that is past the specified sp ``delta``.
    
-   Aliases: ``database.address.prevdelta``
+   Aliases: :py:func:`database.address.prevdelta<address\.prevstack>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1447,53 +1453,53 @@ Some examples of using this namespace can be::
    
    Return the previous address that contains a tag.
    
-   Aliases: ``database.address.prevcomment``
+   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
    
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.prevtag(predicate, \*\*tagname)
    
-   Return the previous address that contains a tag and matches :py:data:`predicate`.
+   Return the previous address that contains a tag and matches ``predicate``.
    
-   Aliases: ``database.address.prevcomment``
+   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
    
    :param predicate: a callable used to match addresses with a comment or tag
    :type predicate: callable
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.prevtag(ea, \*\*tagname)
    
-   Returns the previous address from :py:data:`ea` that contains a tag.
+   Returns the previous address from ``ea`` that contains a tag.
    
-   If the string :py:data:`tagname` is specified, then only return the address if the specified tag is defined.
+   If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
    
-   Aliases: ``database.address.prevcomment``
+   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.prevtag(ea, predicate, \*\*tagname)
    
-   Returns the previous address from :py:data:`ea` that contains a tag and matches
+   Returns the previous address from ``ea`` that contains a tag and matches
    
-   Aliases: ``database.address.prevcomment``
+   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
    
    :param ea: an address in the database
    :type ea: int or long
    :param predicate: a callable used to match addresses with a comment or tag
    :type predicate: callable
-   :param \*\*tagname: if :py:data:`tagname` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned as a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.prevtag(ea, count, \*\*tagname)
    
-   Aliases: ``database.address.prevcomment``
+   Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
    
    :param ea: an address in the database
    :type ea: int or long
    :param count: the number of instructions to skip
    :type count: int or long
-   :param \*\*tagname: if :py:data:`tagname` is assigned a string, then only match against the specified tag otherwise look for any kind of comment
+   :param \*\*tagname: if ``tagname`` is assigned a string, then only match against the specified tag otherwise look for any kind of comment
    
 .. py:function:: address\.prevunknown()
    
@@ -1501,21 +1507,21 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevunknown(predicate)
    
-   Return the previous address that is undefined and matches :py:data:`predicate`.
+   Return the previous address that is undefined and matches ``predicate``.
    
    :param predicate: a callable used to match unknown addresses
    :type predicate: callable
    
 .. py:function:: address\.prevunknown(ea)
    
-   Return the previous address from :py:data:`ea` that is undefined.
+   Return the previous address from ``ea`` that is undefined.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: address\.prevunknown(ea, predicate)
    
-   Return the previous address from :py:data:`ea` that is undefined and matches :py:data:`predicate`.
+   Return the previous address from ``ea`` that is undefined and matches ``predicate``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1535,11 +1541,13 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.tail(ea)
    
-   Return the address of the last byte at the end of the address at :py:data:`ea`.
+   Return the address of the last byte at the end of the address at ``ea``.
    
    :param ea: an unaligned address in the database
    :type ea: int or long
    
+.. _ns-database-config:
+
 ***************
 database.config
 ***************
@@ -1553,7 +1561,7 @@ for determining the type of the binary are also included.
    
    Returns the baseaddress of the database.
    
-   Aliases: ``database.baseaddress``, ``database.base``
+   Aliases: :py:func:`database.baseaddress<config\.baseaddress>`, :py:func:`database.base<config\.baseaddress>`
    
 .. py:function:: config\.bits()
    
@@ -1561,9 +1569,9 @@ for determining the type of the binary are also included.
    
 .. py:function:: config\.bounds()
    
-   Return the bounds of the current database as a tuple formatted as :py:obj:`(left, right)`
+   Return the bounds of the current database as a tuple formatted as ``(left, right)``.
    
-   Aliases: ``database.range``, ``database.bounds``
+   Aliases: :py:func:`database.range<config\.bounds>`, :py:func:`database.bounds<config\.bounds>`
    
 .. py:function:: config\.byteorder()
    
@@ -1585,13 +1593,13 @@ for determining the type of the binary are also included.
    
    Returns the filename that the database was built from.
    
-   Aliases: ``database.filename``
+   Aliases: :py:func:`database.filename<config\.filename>`
    
 .. py:function:: config\.idb()
    
    Return the full path to the database.
    
-   Aliases: ``database.idb``
+   Aliases: :py:func:`database.idb<config\.idb>`
    
 .. py:function:: config\.main()
    
@@ -1603,13 +1611,13 @@ for determining the type of the binary are also included.
    
    Return the module name as per the windows loader.
    
-   Aliases: ``database.module``
+   Aliases: :py:func:`database.module<config\.module>`
    
 .. py:function:: config\.path()
    
    Return the full path to the directory containing the database.
    
-   Aliases: ``database.path``
+   Aliases: :py:func:`database.path<config\.path>`
    
 .. py:function:: config\.processor()
    
@@ -1627,7 +1635,7 @@ for determining the type of the binary are also included.
    
    Returns whether the database is a shared-object or not.
    
-   Aliases: ``database.config.sharedQ``, ``database.config.is_sharedobject``
+   Aliases: :py:func:`database.config.sharedQ<config\.sharedobject>`, :py:func:`database.config.is_sharedobject<config\.sharedobject>`
    
 .. py:function:: config\.type(typestr)
    
@@ -1639,6 +1647,8 @@ for determining the type of the binary are also included.
    
    Returns the database version.
    
+.. _ns-database-config-registers:
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 database.config.registers
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1666,9 +1676,13 @@ sizes for the database.
    
    Return the segment register size for the database.
    
+.. _ns-database-entries:
+
 ****************
 database.entries
 ****************
+
+Aliases: :ref:`database.exports<ns-database-entries>`
 
 This namespace can be used to enumerate all of the entry points and
 exports that are defined within the database By default the address
@@ -1678,14 +1692,14 @@ This namespace is also aliased as :py:obj:`database.exports`.
 
 The different types that one can match entrypoints with are the following:
 
-- :py:obj:`address` or :py:obj:`ea` - Match according to the entrypoint's address
-- :py:obj:`name` - Match according to the exact name
-- :py:obj:`like` - Filter the entrypoint names according to a glob
-- :py:obj:`regex` - Filter the entrypoint names according to a regular-expression
-- :py:obj:`index` - Match according to the entrypoint's index (ordinal)
-- :py:obj:`greater` or :py:obj:`gt` - Filter the entrypoints for any after the specified address
-- :py:obj:`less` or :py:obj:`lt` - Filter the entrypoints for any before the specified address
-- :py:obj:`predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
+- ``address`` or ``ea`` - Match according to the entrypoint's address
+- ``name`` - Match according to the exact name
+- ``like`` - Filter the entrypoint names according to a glob
+- ``regex`` - Filter the entrypoint names according to a regular-expression
+- ``index`` - Match according to the entrypoint's index (ordinal)
+- ``greater`` or ``gt`` - Filter the entrypoints for any after the specified address
+- ``less`` or ``lt`` - Filter the entrypoints for any before the specified address
+- ``predicate`` - Filter the entrypoints by passing its index (ordinal) to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -1699,27 +1713,27 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: entries\.iterate(string)
    
-   Iterate through all of the entry points in the database with a glob that matches :py:data:`string`.
+   Iterate through all of the entry points in the database with a glob that matches ``string``.
    
    :param string: the glob to filter the entry points with
    :type string: str
    
 .. py:function:: entries\.iterate(\*\*type)
    
-   Iterate through all of the entry points in the database that match the keyword specified by:py:data:`type`.
+   Iterate through all of the entry points in the database that match the keyword specified by``type``.
    
    :param \*\*type: any keyword that can be used to filter entries with
    
 .. py:function:: entries\.list(string)
    
-   List all of the entry points matching the glob :py:data:`string` against the name.
+   List all of the entry points matching the glob ``string`` against the name.
    
    :param string: the glob to filter the entry points with
    :type string: str
    
 .. py:function:: entries\.list(\*\*type)
    
-   List all of the entry points in the database that match the keyword specified by :py:data:`type`.
+   List all of the entry points in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter entries with
    
@@ -1729,7 +1743,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: entries\.name(ea)
    
-   Returns the name of the entry point at the address :py:data:`ea`.
+   Returns the name of the entry point at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1740,21 +1754,21 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: entries\.new(ea)
    
-   Makes an entry point at the specified address :py:data:`ea`.
+   Makes an entry point at the specified address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: entries\.new(name)
    
-   Adds the current address as an entry point using :py:data:`name` and the next available index as the ordinal.
+   Adds the current address as an entry point using ``name`` and the next available index as the ordinal.
    
    :param name: the name of the entry point
    :type name: str
    
 .. py:function:: entries\.new(ea, name)
    
-   Makes the specified address :py:data:`ea` an entry point having the specified :py:data:`name`.
+   Makes the specified address ``ea`` an entry point having the specified ``name``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1763,7 +1777,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: entries\.new(name, ordinal)
    
-   Adds an entry point with the specified :py:data:`name` to the database using :py:data:`ordinal` as its index.
+   Adds an entry point with the specified ``name`` to the database using ``ordinal`` as its index.
    
    :param name: the name of the entry point
    :type name: str
@@ -1772,7 +1786,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: entries\.new(ea, name, ordinal)
    
-   Adds an entry point at :py:data:`ea` with the specified :py:data:`name` and :py:data:`ordinal`.
+   Adds an entry point at ``ea`` with the specified ``name`` and ``ordinal``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -1787,27 +1801,31 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: entries\.ordinal(ea)
    
-   Returns the ordinal of the entry point at the address :py:data:`ea`.
+   Returns the ordinal of the entry point at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: entries\.search(string)
    
-   Search through all of the entry point names matching the glob :py:data:`string` and return the first result.
+   Search through all of the entry point names matching the glob ``string`` and return the first result.
    
    :param string: the glob to filter the entry points with
    :type string: str
    
 .. py:function:: entries\.search(\*\*type)
    
-   Search through all of the entry points within the database and return the first result matching the keyword specified by :py:data:`type`.
+   Search through all of the entry points within the database and return the first result matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter entries with
    
+.. _ns-database-extra:
+
 **************
 database.extra
 **************
+
+Aliases: :ref:`database.ex<ns-database-extra>`
 
 This namespace is for interacting with IDA's "extra" comments that
 can be associated with an address. This allows one to prefix or
@@ -1825,13 +1843,13 @@ To add extra comments, one can do this like::
    
    Returns true if the item at the current address has extra prefix lines.
    
-   Aliases: ``database.extra.prefixQ``
+   Aliases: :py:func:`database.extra.prefixQ<extra\.has_prefix>`
    
 .. py:function:: extra\.has_prefix(ea)
    
-   Returns true if the item at the address :py:data:`ea` has extra prefix lines.
+   Returns true if the item at the address ``ea`` has extra prefix lines.
    
-   Aliases: ``database.extra.prefixQ``
+   Aliases: :py:func:`database.extra.prefixQ<extra\.has_prefix>`
    
    :param ea: the address to check for a prefix comment
    :type ea: int or long
@@ -1840,20 +1858,20 @@ To add extra comments, one can do this like::
    
    Returns true if the item at the current address has extra suffix lines.
    
-   Aliases: ``database.extra.suffixQ``
+   Aliases: :py:func:`database.extra.suffixQ<extra\.has_suffix>`
    
 .. py:function:: extra\.has_suffix(ea)
    
-   Returns true if the item at the address :py:data:`ea` has extra suffix lines.
+   Returns true if the item at the address ``ea`` has extra suffix lines.
    
-   Aliases: ``database.extra.suffixQ``
+   Aliases: :py:func:`database.extra.suffixQ<extra\.has_suffix>`
    
    :param ea: the address to check for a suffix comment
    :type ea: int or long
    
 .. py:function:: extra\.postappend(ea, count)
    
-   Append :py:data:`count` lines after the item at address :py:data:`ea`.
+   Append ``count`` lines after the item at address ``ea``.
    
    :param ea: the address to append lines into the suffix
    :type ea: int or long
@@ -1862,14 +1880,14 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.postappend(count)
    
-   Append :py:data:`count` lines after the item at the current address.
+   Append ``count`` lines after the item at the current address.
    
    :param count: the number of lines
    :type count: int or long
    
 .. py:function:: extra\.postinsert(ea, count)
    
-   Insert :py:data:`count` lines after the item at address :py:data:`ea`.
+   Insert ``count`` lines after the item at address ``ea``.
    
    :param ea: the address to insert lines into the suffix
    :type ea: int or long
@@ -1878,16 +1896,16 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.postinsert(count)
    
-   Insert :py:data:`count` lines after the item at the current address.
+   Insert ``count`` lines after the item at the current address.
    
    :param count: the number of lines
    :type count: int or long
    
 .. py:function:: extra\.preappend(ea, count)
    
-   Append :py:data:`count` lines in front of the item at address :py:data:`ea`.
+   Append ``count`` lines in front of the item at address ``ea``.
    
-   Aliases: ``database.extra.append``
+   Aliases: :py:func:`database.extra.append<extra\.preappend>`
    
    :param ea: the address to append newlines lines to the prefix
    :type ea: int or long
@@ -1896,9 +1914,9 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.preappend(count)
    
-   Append :py:data:`count` lines in front of the item at the current address.
+   Append ``count`` lines in front of the item at the current address.
    
-   Aliases: ``database.extra.append``
+   Aliases: :py:func:`database.extra.append<extra\.preappend>`
    
    :param count: the number of lines
    :type count: int or long
@@ -1909,7 +1927,7 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.prefix(string)
    
-   Set the prefixed comment at the current address to the specified :py:data:`string`.
+   Set the prefixed comment at the current address to the specified ``string``.
    
    :param string: the comment to insert
    :type string: str
@@ -1923,14 +1941,14 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.prefix(ea)
    
-   Return the prefixed comment at address :py:data:`ea`.
+   Return the prefixed comment at address ``ea``.
    
    :param ea: the address containing a prefix comment
    :type ea: int or long
    
 .. py:function:: extra\.prefix(ea, string)
    
-   Set the prefixed comment at address :py:data:`ea` to the specified :py:data:`string`.
+   Set the prefixed comment at address ``ea`` to the specified ``string``.
    
    :param ea: the address to set the prefix comment at
    :type ea: int or long
@@ -1939,7 +1957,7 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.prefix(ea, none)
    
-   Delete the prefixed comment at address :py:data:`ea`.
+   Delete the prefixed comment at address ``ea``.
    
    :param ea: the address containing a prefix comment
    :type ea: int or long
@@ -1948,9 +1966,9 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.preinsert(ea, count)
    
-   Insert :py:data:`count` lines in front of the item at address :py:data:`ea`.
+   Insert ``count`` lines in front of the item at address ``ea``.
    
-   Aliases: ``database.extra.insert``
+   Aliases: :py:func:`database.extra.insert<extra\.preinsert>`
    
    :param ea: the address to insert lines into the prefix
    :type ea: int or long
@@ -1959,9 +1977,9 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.preinsert(count)
    
-   Insert :py:data:`count` lines in front of the item at the current address.
+   Insert ``count`` lines in front of the item at the current address.
    
-   Aliases: ``database.extra.insert``
+   Aliases: :py:func:`database.extra.insert<extra\.preinsert>`
    
    :param count: the number of lines
    :type count: int or long
@@ -1972,7 +1990,7 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.suffix(string)
    
-   Set the suffixed comment at the current address to the specified :py:data:`string`.
+   Set the suffixed comment at the current address to the specified ``string``.
    
    :param string: the comment to append
    :type string: str
@@ -1986,14 +2004,14 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.suffix(ea)
    
-   Return the suffixed comment at address :py:data:`ea`.
+   Return the suffixed comment at address ``ea``.
    
    :param ea: the address containing a suffix comment
    :type ea: int or long
    
 .. py:function:: extra\.suffix(ea, string)
    
-   Set the suffixed comment at address :py:data:`ea` to the specified :py:data:`string`.
+   Set the suffixed comment at address ``ea`` to the specified ``string``.
    
    :param ea: the address to set the suffix comment at
    :type ea: int or long
@@ -2002,13 +2020,15 @@ To add extra comments, one can do this like::
    
 .. py:function:: extra\.suffix(ea, none)
    
-   Delete the suffixed comment at address :py:data:`ea`.
+   Delete the suffixed comment at address ``ea``.
    
    :param ea: the address containing a suffix comment
    :type ea: int or long
    :param none: the value :py:obj:`None`
    :type none: None
    
+.. _ns-database-functions:
+
 ******************
 database.functions
 ******************
@@ -2019,11 +2039,11 @@ each function.
 
 The different types that one can match functions with are the following:
 
-- :py:obj:`address` or :py:obj:`ea` - Match according to the function's address
-- :py:obj:`name` - Match according to the exact name
-- :py:obj:`like` - Filter the function names according to a glob
-- :py:obj:`regex` - Filter the function names according to a regular-expression
-- :py:obj:`predicate` - Filter the functions by passing their :py:obj:`idaapi.func_t` to a callable
+- ``address`` or ``ea`` - Match according to the function's address
+- ``name`` - Match according to the exact name
+- ``like`` - Filter the function names according to a glob
+- ``regex`` - Filter the function names according to a regular-expression
+- ``predicate`` - Filter the functions by passing their :py:obj:`idaapi.func_t` to a callable
 
 Some examples of how to use these keywords are as follows::
 
@@ -2038,43 +2058,45 @@ Some examples of how to use these keywords are as follows::
    
 .. py:function:: functions\.iterate(string)
    
-   Iterate through all of the functions in the database with a glob that matches :py:data:`string`.
+   Iterate through all of the functions in the database with a glob that matches ``string``.
    
    :param string: the glob to filter the function names with
    :type string: str
    
 .. py:function:: functions\.iterate(\*\*type)
    
-   Iterate through all of the functions in the database that match the keyword specified by :py:data:`type`.
+   Iterate through all of the functions in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter functions with
    
 .. py:function:: functions\.list(string)
    
-   List all of the functions in the database with a glob that matches :py:data:`string`.
+   List all of the functions in the database with a glob that matches ``string``.
    
    :param string: the glob to filter the function names with
    :type string: str
    
 .. py:function:: functions\.list(\*\*type)
    
-   List all of the functions in the database that match the keyword specified by :py:data:`type`.
+   List all of the functions in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter the functions with
    
 .. py:function:: functions\.search(string)
    
-   Search through all of the functions matching the glob :py:data:`string` and return the first result.
+   Search through all of the functions matching the glob ``string`` and return the first result.
    
    :param string: the glob to filter the function names with
    :type string: str
    
 .. py:function:: functions\.search(\*\*type)
    
-   Search through all of the functions within the database and return the first result matching the keyword specified by :py:data:`type`.
+   Search through all of the functions within the database and return the first result matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter the functions with
    
+.. _ns-database-get:
+
 ************
 database.get
 ************
@@ -2100,45 +2122,45 @@ following examples can be used::
    
    Return the values of the array at the current address.
    
-   :param \*\*length: if :py:data:`length` is specified, then use it as the length of the array instead of determining it automatically
+   :param \*\*length: if ``length`` is specified, then use it as the length of the array instead of determining it automatically
    
 .. py:function:: get\.array(ea, \*\*length)
    
-   Return the values of the array at the address specified by :py:data:`ea`.
+   Return the values of the array at the address specified by ``ea``.
    
-   If the int :py:data:`length` is defined, then use it as the number of elements for the array.
+   If the int ``length`` is defined, then use it as the number of elements for the array.
    
    :param ea: the address of an array in the database
    :type ea: int or long
-   :param \*\*length: if :py:data:`length` is specified, then use it as the length of the array instead of determining it automatically
+   :param \*\*length: if ``length`` is specified, then use it as the length of the array instead of determining it automatically
    
 .. py:function:: get\.signed(\*\*byteorder)
    
    Read a signed integer from the current address.
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.signed(ea, \*\*byteorder)
    
-   Read a signed integer from the address :py:data:`ea` using the size defined in the database.
+   Read a signed integer from the address ``ea`` using the size defined in the database.
    
    :param ea: an address in the database
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.signed(ea, size, \*\*byteorder)
    
-   Read a signed integer from the address :py:data:`ea` with the specified :py:data:`size`.
+   Read a signed integer from the address ``ea`` with the specified ``size``.
    
-   If :py:data:`byteorder` is 'big' then read in big-endian form.
-   If :py:data:`byteorder` is 'little' then read in little-endian form.
+   If ``byteorder`` is 'big' then read in big-endian form.
+   If ``byteorder`` is 'little' then read in little-endian form.
    
-   The default value of :py:data:`byteorder` is the same as specified by the database architecture.
+   The default value of ``byteorder`` is the same as specified by the database architecture.
    
    :param ea: an address in the database
    :type ea: int or long
    :param size: the size of the integer (in bytes)
    :type size: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.structure()
    
@@ -2146,45 +2168,49 @@ following examples can be used::
    
 .. py:function:: get\.structure(ea, \*\*structure)
    
-   Return the :py:obj:`structure_t` at address :py:data:`ea` as a dict of ctypes.
+   Return the :py:obj:`structure_t` at address ``ea`` as a dict of ctypes.
    
-   If the :py:data:`structure` argument is specified, then use that specific structure type.
+   If the ``structure`` argument is specified, then use that specific structure type.
    
    :param ea: the address of a structure in the database
    :type ea: int or long
-   :param \*\*structure: if :py:data:`structure` contains a :py:obj:`structure_t` then cast the address to it
+   :param \*\*structure: if ``structure`` contains a :py:obj:`structure_t` then cast the address to it
    
 .. py:function:: get\.unsigned(\*\*byteorder)
    
    Read an unsigned integer from the current address.
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.unsigned(ea, \*\*byteorder)
    
-   Read an unsigned integer from the address :py:data:`ea` using the size defined in the database.
+   Read an unsigned integer from the address ``ea`` using the size defined in the database.
    
    :param ea: an address in the database
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.unsigned(ea, size, \*\*byteorder)
    
-   Read an unsigned integer from the address :py:data:`ea` with the specified :py:data:`size`.
+   Read an unsigned integer from the address ``ea`` with the specified ``size``.
    
-   If :py:data:`byteorder` is 'big' then read in big-endian form.
-   If :py:data:`byteorder` is 'little' then read in little-endian form.
+   If ``byteorder`` is 'big' then read in big-endian form.
+   If ``byteorder`` is 'little' then read in little-endian form.
    
-   The default value of :py:data:`byteorder` is the same as specified by the database architecture.
+   The default value of ``byteorder`` is the same as specified by the database architecture.
    
    :param ea: an address in the database
    :type ea: int or long
    :param size: the size of the integer (in bytes)
    :type size: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
+.. _ns-database-get-integer:
+
 ^^^^^^^^^^^^^^^^^^^^
 database.get.integer
 ^^^^^^^^^^^^^^^^^^^^
+
+Aliases: :ref:`database.get.i<ns-database-get-integer>`
 
 This namespace contains the different ISO standard integer types that
 can be used to read integers out of the database.
@@ -2198,13 +2224,13 @@ like in the following examples::
 
 .. py:function:: get\.integer(\*\*byteorder)
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer(ea, \*\*byteorder)
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer(ea, size, \*\*byteorder)
    
@@ -2212,180 +2238,182 @@ like in the following examples::
    :type ea: int or long
    :param size: the size of the integer (in bytes)
    :type size: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint128_t(\*\*byteorder)
    
-   Read a :py:obj:`sint128_t` from the current address.
+   Read a sint128_t from the current address.
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint128_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`sint128_t` from the address :py:data:`ea`.
+   Read a sint128_t from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint16_t(\*\*byteorder)
    
-   Read a :py:obj:`sint16_t` from the current address.
+   Read a sint16_t from the current address.
    
-   Aliases: ``database.get.sint2``
+   Aliases: :py:func:`database.get.sint2<get\.integer\.sint16_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint16_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`sint16_t` from the address :py:data:`ea`.
+   Read a sint16_t from the address ``ea``.
    
-   Aliases: ``database.get.sint2``
+   Aliases: :py:func:`database.get.sint2<get\.integer\.sint16_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint32_t(\*\*byteorder)
    
-   Read a :py:obj:`sint32_t` from the current address.
+   Read a sint32_t from the current address.
    
-   Aliases: ``database.get.sint4``
+   Aliases: :py:func:`database.get.sint4<get\.integer\.sint32_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint32_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`sint32_t` from the address :py:data:`ea`.
+   Read a sint32_t from the address ``ea``.
    
-   Aliases: ``database.get.sint4``
+   Aliases: :py:func:`database.get.sint4<get\.integer\.sint32_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint64_t(\*\*byteorder)
    
-   Read a :py:obj:`sint64_t` from the current address.
+   Read a sint64_t from the current address.
    
-   Aliases: ``database.get.sint8``
+   Aliases: :py:func:`database.get.sint8<get\.integer\.sint64_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint64_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`sint64_t` from the address :py:data:`ea`.
+   Read a sint64_t from the address ``ea``.
    
-   Aliases: ``database.get.sint8``
+   Aliases: :py:func:`database.get.sint8<get\.integer\.sint64_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint8_t(\*\*byteorder)
    
-   Read a :py:obj:`sint8_t` from the current address.
+   Read a sint8_t from the current address.
    
-   Aliases: ``database.get.sbyte1``
+   Aliases: :py:func:`database.get.sbyte1<get\.integer\.sint8_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.sint8_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`sint8_t` from the address :py:data:`ea`.
+   Read a sint8_t from the address ``ea``.
    
-   Aliases: ``database.get.sbyte1``
+   Aliases: :py:func:`database.get.sbyte1<get\.integer\.sint8_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint128_t(\*\*byteorder)
    
-   Read a :py:obj:`uint128_t` from the current address.
+   Read a uint128_t from the current address.
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint128_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`uint128_t` from the address :py:data:`ea`.
+   Read a uint128_t from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint16_t(\*\*byteorder)
    
-   Read a :py:obj:`uint16_t` from the current address.
+   Read a uint16_t from the current address.
    
-   Aliases: ``database.get.uint2``
+   Aliases: :py:func:`database.get.uint2<get\.integer\.uint16_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint16_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`uint16_t` from the address :py:data:`ea`.
+   Read a uint16_t from the address ``ea``.
    
-   Aliases: ``database.get.uint2``
+   Aliases: :py:func:`database.get.uint2<get\.integer\.uint16_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint32_t(\*\*byteorder)
    
-   Read a :py:obj:`uint32_t` from the current address.
+   Read a uint32_t from the current address.
    
-   Aliases: ``database.get.uint4``
+   Aliases: :py:func:`database.get.uint4<get\.integer\.uint32_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint32_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`uint32_t` from the address :py:data:`ea`.
+   Read a uint32_t from the address ``ea``.
    
-   Aliases: ``database.get.uint4``
+   Aliases: :py:func:`database.get.uint4<get\.integer\.uint32_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint64_t(\*\*byteorder)
    
-   Read a :py:obj:`uint64_t` from the current address.
+   Read a uint64_t from the current address.
    
-   Aliases: ``database.get.uint8``
+   Aliases: :py:func:`database.get.uint8<get\.integer\.uint64_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint64_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`uint64_t` from the address :py:data:`ea`.
+   Read a uint64_t from the address ``ea``.
    
-   Aliases: ``database.get.uint8``
+   Aliases: :py:func:`database.get.uint8<get\.integer\.uint64_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint8_t(\*\*byteorder)
    
-   Read a :py:obj:`uint8_t` from the current address.
+   Read a uint8_t from the current address.
    
-   Aliases: ``database.get.ubyte1``
+   Aliases: :py:func:`database.get.ubyte1<get\.integer\.uint8_t>`
    
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
 .. py:function:: get\.integer\.uint8_t(ea, \*\*byteorder)
    
-   Read a :py:obj:`uint8_t` from the address :py:data:`ea`.
+   Read a uint8_t from the address ``ea``.
    
-   Aliases: ``database.get.ubyte1``
+   Aliases: :py:func:`database.get.ubyte1<get\.integer\.uint8_t>`
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if :py:data:`byteorder` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
    
+.. _ns-database-get-switch:
+
 ^^^^^^^^^^^^^^^^^^^
 database.get.switch
 ^^^^^^^^^^^^^^^^^^^
@@ -2407,11 +2435,13 @@ This namespace can be used as in the following example::
    
 .. py:function:: get\.switch(ea)
    
-   Return the switch at the address :py:data:`ea`.
+   Return the switch at the address ``ea``.
    
    :param ea: the address of anything pertaining to a particular switch within the database
    :type ea: int or long
    
+.. _ns-database-imports:
+
 ****************
 database.imports
 ****************
@@ -2422,23 +2452,23 @@ naming information that is required to dynamically link external
 symbols with the binary.
 
 By default a tuple is yielded for each import with the format
-:py:obj:`(address, (shared-object, name, hint))`. In this tuple,
-:py:obj:`shared-object` represents the name of the shared object the
-import is imported from. The :py:obj:`name` is the symbol name to link
-with, and :py:obj:`hint` is the import ordinal hint which is used to speed
+``(address, (shared-object, name, hint))``. In this tuple,
+``shared-object`` represents the name of the shared object the
+import is imported from. The ``name`` is the symbol name to link
+with, and ``hint`` is the import ordinal hint which is used to speed
 up the linking process.
 
 The different types that one can match imports with are the following:
 
-- :py:obj:`address` or :py:obj:`ea` - Match according to the import's address
-- :py:obj:`name` - Match according to the import's symbol name
-- :py:obj:`module` - Filter the imports according to the specified module name
-- :py:obj:`fullname` - Match according to the full symbol name (module + symbol)
-- :py:obj:`like` - Filter the symbol names of all the imports according to a glob
-- :py:obj:`regex` - Filter the symbol names of all the imports according to a regular-expression
-- :py:obj:`ordinal` - Match according to the import's hint (ordinal)
-- :py:obj:`index` - Match according index of the import
-- :py:obj:`predicate` Filter the imports by passing the above (default) tuple to a callable
+- ``address`` or ``ea`` - Match according to the import's address
+- ``name`` - Match according to the import's symbol name
+- ``module`` - Filter the imports according to the specified module name
+- ``fullname`` - Match according to the full symbol name (module + symbol)
+- ``like`` - Filter the symbol names of all the imports according to a glob
+- ``regex`` - Filter the symbol names of all the imports according to a regular-expression
+- ``ordinal`` - Match according to the import's hint (ordinal)
+- ``index`` - Match according index of the import
+- ``predicate`` Filter the imports by passing the above (default) tuple to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -2454,7 +2484,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: imports\.at(ea)
    
-   Return the import at the address :py:data:`ea`.
+   Return the import at the address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -2465,37 +2495,37 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: imports\.fullname(ea)
    
-   Return the full name of the import at address :py:data:`ea`.
+   Return the full name of the import at address ``ea``.
    
    :param ea: an address within the database
    
 .. py:function:: imports\.iterate(string)
    
-   Iterate through all of the imports in the database with a glob that matches :py:data:`string`.
+   Iterate through all of the imports in the database with a glob that matches ``string``.
    
    :param string: the glob to filter the imports with
    :type string: str
    
 .. py:function:: imports\.iterate(\*\*type)
    
-   Iterate through all of the imports in the database that match the keyword specified by :py:data:`type`.
+   Iterate through all of the imports in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter imports with
    
 .. py:function:: imports\.list(string)
    
-   List all of the imports matching the glob :py:data:`string` against the fullname.
+   List all of the imports matching the glob ``string`` against the fullname.
    
-   Aliases: ``database.getImports``
+   Aliases: :py:func:`database.getImports<imports\.list>`
    
    :param string: the glob to filter the imports with
    :type string: str
    
 .. py:function:: imports\.list(\*\*type)
    
-   List all of the imports in the database that match the keyword specified by :py:data:`type`.
+   List all of the imports in the database that match the keyword specified by ``type``.
    
-   Aliases: ``database.getImports``
+   Aliases: :py:func:`database.getImports<imports\.list>`
    
    :param \*\*type: any keyword that can be used to filter imports with
    
@@ -2505,7 +2535,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: imports\.module(ea)
    
-   Return the import module at the specified address :py:data:`ea`.
+   Return the import module at the specified address ``ea``.
    
    :param ea: an address within the database
    :type ea: int or long
@@ -2514,7 +2544,7 @@ Some examples of using these keywords are as follows::
    
    Return all of the import modules defined in the database.
    
-   Aliases: ``database.getImportModules``
+   Aliases: :py:func:`database.getImportModules<imports\.modules>`
    
 .. py:function:: imports\.name()
    
@@ -2522,7 +2552,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: imports\.name(ea)
    
-   Return the name of the import at address :py:data:`ea`.
+   Return the name of the import at address ``ea``.
    
    :param ea: an address within the database
    
@@ -2532,30 +2562,32 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: imports\.ordinal(ea)
    
-   Return the ordinal of the import at the address :py:data:`ea`.
+   Return the ordinal of the import at the address ``ea``.
    
    :param ea: an address within the database
    
 .. py:function:: imports\.search(string)
    
-   Search through all of the imports matching the fullname glob :py:data:`string`.
+   Search through all of the imports matching the fullname glob ``string``.
    
    :param string: the glob to filter the imports with
    :type string: str
    
 .. py:function:: imports\.search(\*\*type)
    
-   Search through all of the imports within the database and return the first result matching the keyword specified by :py:data:`type`.
+   Search through all of the imports within the database and return the first result matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter imports with
    
+.. _ns-database-marks:
+
 **************
 database.marks
 **************
 
 This namespace is for interacting with the marks table within the
 database. By default, this namespace is capable of yielding the
-:py:obj:`(address, description)` of each mark within the database.
+``(address, description)`` of each mark within the database.
 
 This allows one to manage the marks. Although it is suggested to
 utilize "tags" as they provide significantly more flexibility.
@@ -2577,22 +2609,22 @@ The functions in this namespace can be used like::
    
    Return the mark at the current address.
    
-   Aliases: ``database.marks.by``
+   Aliases: :py:func:`database.marks.by<marks\.by_address>`
    
 .. py:function:: marks\.by_address(ea)
    
-   Return the :py:obj:`(address, description)` of the mark at the given address :py:data:`ea`.
+   Return the ``(address, description)`` of the mark at the given address ``ea``.
    
-   Aliases: ``database.marks.by``
+   Aliases: :py:func:`database.marks.by<marks\.by_address>`
    
    :param ea: the address of a mark
    :type ea: int or long
    
 .. py:function:: marks\.by_index(index)
    
-   Return the :py:obj:`(address, description)` of the mark at the specified :py:data:`index` in the mark list.
+   Return the ``(address, description)`` of the mark at the specified ``index`` in the mark list.
    
-   Aliases: ``database.marks.byIndex``
+   Aliases: :py:func:`database.marks.byIndex<marks\.by_index>`
    
    :param index: the index of a mark
    
@@ -2606,20 +2638,20 @@ The functions in this namespace can be used like::
    
 .. py:function:: marks\.new(description)
    
-   Create a mark at the current address with the given :py:data:`description`.
+   Create a mark at the current address with the given ``description``.
    
    :param description: the description associated with the mark
    :type description: str
    
 .. py:function:: marks\.new(ea, description, \*\*extra)
    
-   Create a mark at the address :py:data:`ea` with the given :py:data:`description` and return its index.
+   Create a mark at the address ``ea`` with the given ``description`` and return its index.
    
    :param ea: the address to set the mark at
    :type ea: int or long
    :param description: the description associated with the mark
    :type description: str
-   :param \*\*extra: allows you to assign the :py:data:`x`, :py:data:`y`, or :py:data:`lnnum` fields of the mark
+   :param \*\*extra: allows you to assign the ``x``, ``y``, or ``lnnum`` fields of the mark
    
 .. py:function:: marks\.remove()
    
@@ -2627,26 +2659,28 @@ The functions in this namespace can be used like::
    
 .. py:function:: marks\.remove(ea)
    
-   Remove the mark at the specified address :py:data:`ea` returning the previous description.
+   Remove the mark at the specified address ``ea`` returning the previous description.
    
    :param ea: the address containing a mark
    :type ea: int or long
    
+.. _ns-database-names:
+
 **************
 database.names
 **************
 
 This namespace is used for listing all the names (or symbols)
-within the database. By default the :py:obj:`(address, name)` is yielded.
+within the database. By default the ``(address, name)`` is yielded.
 
 The different types that one can filter the symbols with are the following:
 
-- :py:obj:`address` - Match according to the address of the symbol
-- :py:obj:`name` - Match according to the name of the symbol
-- :py:obj:`like` - Filter the symbol names according to a glob
-- :py:obj:`regex` - Filter the symbol names according to a regular-expression
-- :py:obj:`index` - Match the symbol according to its index
-- :py:obj:`predicate` - Filter the symbols by passing their address to a callable
+- ``address`` - Match according to the address of the symbol
+- ``name`` - Match according to the name of the symbol
+- ``like`` - Filter the symbol names according to a glob
+- ``regex`` - Filter the symbol names according to a regular-expression
+- ``index`` - Match the symbol according to its index
+- ``predicate`` - Filter the symbols by passing their address to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -2659,7 +2693,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: names\.address(index)
    
-   Return the address of the string at :py:data:`index`.
+   Return the address of the string at ``index``.
    
    :param index: the index of the symbol in the names list
    
@@ -2669,49 +2703,51 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: names\.iterate(string)
    
-   Iterate through all of the names in the database with a glob that matches :py:data:`string`.
+   Iterate through all of the names in the database with a glob that matches ``string``.
    
    :param string: the glob to filter the symbol names with
    :type string: str
    
 .. py:function:: names\.iterate(\*\*type)
    
-   Iterate through all of the names in the database that match the keyword specified by:py:data:`type`.
+   Iterate through all of the names in the database that match the keyword specified by``type``.
    
    :param \*\*type: any keyword that can be used to filter symbols with
    
 .. py:function:: names\.list(string)
    
-   List all of the names in the database with a glob that matches :py:data:`string`.
+   List all of the names in the database with a glob that matches ``string``.
    
    :param string: the glob to filter the symbol names with
    :type string: str
    
 .. py:function:: names\.list(\*\*type)
    
-   List all of the names in the database that match the keyword specified by :py:data:`type`.
+   List all of the names in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter symbols with
    
 .. py:function:: names\.name(ea)
    
-   Return the symbol name of the string at address :py:data:`ea`.
+   Return the symbol name of the string at address ``ea``.
    
    :param ea: the address of a symbol
    
 .. py:function:: names\.search(string)
    
-   Search through all of the names matching the glob :py:data:`string` and return the first result.
+   Search through all of the names matching the glob ``string`` and return the first result.
    
    :param string: the glob to filter the symbol names with
    :type string: str
    
 .. py:function:: names\.search(\*\*type)
    
-   Search through all of the names within the database and return the first result matching the keyword specified by :py:data:`type`.
+   Search through all of the names within the database and return the first result matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter symbols with
    
+.. _ns-database-search:
+
 ***************
 database.search
 ***************
@@ -2727,59 +2763,59 @@ that are available. The methods that are provided are:
 - :py:obj:`search.by_name`  - Search by the specified name
 
 Each search method has its own options, but all of them take an extra
-boolean option, :py:obj:`reverse`, which specifies whether to search backwards
+boolean option, ``reverse``, which specifies whether to search backwards
 from the starting position or forwards.
 
 The :py:obj:`search.iterate` function allows one to iterate through all the results
 discovered in the database. One variation of :py:obj:`search.iterate` takes a 3rd
-parameter :py:obj:`predicate`. One can provide one of the search methods provided
+parameter ``predicate``. One can provide one of the search methods provided
 or include their own. This function will then yield each matched search
 result.
 
 .. py:function:: search(string)
    
-   Search through the database for the specified :py:data:`string`.
+   Search through the database for the specified ``string``.
    
    :param string: the string to search for
    
 .. py:function:: search\.by_bytes(string, \*\*direction)
    
-   Search through the database at the current address for the bytes specified by :py:data:`string`.
+   Search through the database at the current address for the bytes specified by ``string``.
    
-   Aliases: ``database.search.byBytes``
+   Aliases: :py:func:`database.search.byBytes<search\.by_bytes>`
    
    :param string: the bytes to search for
    :type string: bytes
-   :param \*\*direction: if :py:data:`reverse` is specified as true then search backwards
+   :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
 .. py:function:: search\.by_bytes(ea, string, \*\*direction)
    
-   Search through the database at address :py:data:`ea` for the bytes specified by :py:data:`string`.
+   Search through the database at address ``ea`` for the bytes specified by ``string``.
    
-   If :py:data:`reverse` is specified as a bool, then search backwards from the given address.
+   If ``reverse`` is specified as a bool, then search backwards from the given address.
    
-   Aliases: ``database.search.byBytes``
+   Aliases: :py:func:`database.search.byBytes<search\.by_bytes>`
    
    :param ea: the starting address to search from
    :type ea: int or long
    :param string: the bytes to search for
    :type string: bytes
-   :param \*\*direction: if :py:data:`reverse` is specified as true then search backwards
+   :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
 .. py:function:: search\.by_name(name)
    
-   Search through the database at the current address for the symbol :py:data:`name`.
+   Search through the database at the current address for the symbol ``name``.
    
-   Aliases: ``database.search.byName``
+   Aliases: :py:func:`database.search.byName<search\.by_name>`
    
    :param name: the name to search for
    :type name: str
    
 .. py:function:: search\.by_name(ea, name)
    
-   Search through the database at address :py:data:`ea` for the symbol :py:data:`name`.
+   Search through the database at address ``ea`` for the symbol ``name``.
    
-   Aliases: ``database.search.byName``
+   Aliases: :py:func:`database.search.byName<search\.by_name>`
    
    :param ea: the starting address to search from
    :type ea: int or long
@@ -2788,39 +2824,39 @@ result.
    
 .. py:function:: search\.by_regex(string, \*\*options)
    
-   Search through the database at the current address for the regex matched by :py:data:`string`.
+   Search through the database at the current address for the regex matched by ``string``.
    
-   Aliases: ``database.search.byRegex``
+   Aliases: :py:func:`database.search.byRegex<search\.by_regex>`
    
    :param string: the regex to search for
    :type string: str
-   :param \*\*options: if :py:data:`reverse` is specified as true then search backwards. if :py:data:`sensitive` is true, then search with regards to the case.
+   :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
 .. py:function:: search\.by_regex(ea, string, \*\*options)
    
-   Search the database at address :py:data:`ea` for the regex matched by :py:data:`string`.
+   Search the database at address ``ea`` for the regex matched by ``string``.
    
-   If :py:data:`reverse` is specified as a bool, then search backwards from the given address.
-   If :py:data:`sensitive` is specified as bool, then perform a case-sensitive search.
+   If ``reverse`` is specified as a bool, then search backwards from the given address.
+   If ``sensitive`` is specified as bool, then perform a case-sensitive search.
    
-   Aliases: ``database.search.byRegex``
+   Aliases: :py:func:`database.search.byRegex<search\.by_regex>`
    
    :param ea: the starting address to search from
    :type ea: int or long
    :param string: the regex to search for
    :type string: str
-   :param \*\*options: if :py:data:`reverse` is specified as true then search backwards. if :py:data:`sensitive` is true, then search with regards to the case.
+   :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
 .. py:function:: search\.iterate(string)
    
-   Iterate through all results that match the bytes :py:data:`string` starting at the current address.
+   Iterate through all results that match the bytes ``string`` starting at the current address.
    
    :param string: the bytes to search for
    :type string: str
    
 .. py:function:: search\.iterate(start, string)
    
-   Iterate through all results that match the bytes :py:data:`string` starting at address :py:data:`start`.
+   Iterate through all results that match the bytes ``string`` starting at address ``start``.
    
    :param start: the starting address to search from
    :type start: int or long
@@ -2829,7 +2865,7 @@ result.
    
 .. py:function:: search\.iterate(start, string, predicate)
    
-   Iterate through all searches matched by the function :py:data:`predicate` and :py:data:`string` starting at address :py:data:`start`.
+   Iterate through all searches matched by the function ``predicate`` and ``string`` starting at address ``start``.
    
    :param start: the starting address to search from
    :type start: int or long
@@ -2837,6 +2873,8 @@ result.
    :type string: str
    :param predicate: the callable to search with
    
+.. _ns-database-segments:
+
 *****************
 database.segments
 *****************
@@ -2846,15 +2884,15 @@ database. By default each segment's boundaries are yielded.
 
 The different types that one can match segments with are the following:
 
-- :py:obj:`name` - Match according to the true segment name
-- :py:obj:`like` - Filter the segment names according to a glob
-- :py:obj:`regex` - Filter the segment names according to a regular-expression
-- :py:obj:`index` - Match the segment by its index
-- :py:obj:`identifier` - Match the segment by its identifier (:py:obj:`idaapi.segment_t.name`)
-- :py:obj:`selector` - Match the segment by its selector (:py:obj:`idaapi.segment_t.sel`)
-- :py:obj:`greater` or :py:obj:`gt` - Filter the segments for any after the specified address
-- :py:obj:`less` or :py:obj:`lt` - Filter the segments for any before the specified address
-- :py:obj:`predicate` - Filter the segments by passing its :py:obj:`idaapi.segment_t` to a callable
+- ``name`` - Match according to the true segment name
+- ``like`` - Filter the segment names according to a glob
+- ``regex`` - Filter the segment names according to a regular-expression
+- ``index`` - Match the segment by its index
+- ``identifier`` - Match the segment by its identifier (:py:obj:`idaapi.segment_t.name`)
+- ``selector`` - Match the segment by its selector (:py:obj:`idaapi.segment_t.sel`)
+- ``greater`` or ``gt`` - Filter the segments for any after the specified address
+- ``less`` or ``lt`` - Filter the segments for any before the specified address
+- ``predicate`` - Filter the segments by passing its :py:obj:`idaapi.segment_t` to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -2869,43 +2907,45 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: segments\.iterate(name)
    
-   List all of the segments defined in the database that match the glob :py:data:`name`.
+   List all of the segments defined in the database that match the glob ``name``.
    
    :param name: the glob to filter the segment names with
    :type name: str
    
 .. py:function:: segments\.iterate(name)
    
-   Iterate through all of the segments in the database with a glob that matches :py:data:`name`.
+   Iterate through all of the segments in the database with a glob that matches ``name``.
    
    :param name: the glob to filter the segment names with
    :type name: str
    
 .. py:function:: segments\.iterate(\*\*type)
    
-   Iterate through all the segments defined in the database matching the keyword specified by:py:data:`type`.
+   Iterate through all the segments defined in the database matching the keyword specified by``type``.
    
    :param \*\*type: any keyword that can be used to filter segments with
    
 .. py:function:: segments\.list(\*\*type)
    
-   List all of the segments in the database that match the keyword specified by :py:data:`type`.
+   List all of the segments in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter the segments with
    
 .. py:function:: segments\.search(name)
    
-   Search through all of the segments matching the glob :py:data:`name` and return the first result.
+   Search through all of the segments matching the glob ``name`` and return the first result.
    
    :param name: the glob to filter the segment names with
    :type name: str
    
 .. py:function:: segments\.search(\*\*type)
    
-   Search through all of the segments within the database and return the first result matching the keyword specified by :py:data:`type`.
+   Search through all of the segments within the database and return the first result matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter the segments with
    
+.. _ns-database-set:
+
 ************
 database.set
 ************
@@ -2924,20 +2964,20 @@ This can be used as in the following examples::
 
 .. py:function:: set\.alignment(\*\*alignment)
    
-   Set the data at the current address as aligned with the specified :py:data:`alignment`.
+   Set the data at the current address as aligned with the specified ``alignment``.
    
-   Aliases: ``database.set.align``, ``database.set.aligned``
+   Aliases: :py:func:`database.set.align<set\.alignment>`, :py:func:`database.set.aligned<set\.alignment>`
    
    :param \*\*alignment: the number of bytes to align with
    
 .. py:function:: set\.alignment(ea, \*\*alignment)
    
-   Set the data at address :py:data:`ea` as aligned.
+   Set the data at address ``ea`` as aligned.
    
-   If :py:data:`alignment` is specified, then use it as the default alignment.
-   If :py:data:`size` is specified, then align that number of bytes.
+   If ``alignment`` is specified, then use it as the default alignment.
+   If ``size`` is specified, then align that number of bytes.
    
-   Aliases: ``database.set.align``, ``database.set.aligned``
+   Aliases: :py:func:`database.set.align<set\.alignment>`, :py:func:`database.set.aligned<set\.alignment>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2967,71 +3007,71 @@ This can be used as in the following examples::
    
 .. py:function:: set\.code(ea)
    
-   Set the data at address :py:data:`ea` to code.
+   Set the data at address ``ea`` to code.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: set\.data(size, \*\*type)
    
-   Set the data at the current address to have the specified :py:data:`size` and :py:data:`type`.
+   Set the data at the current address to have the specified ``size`` and ``type``.
    
    :param size: the amount of bytes to set
    :type size: int or long
-   :param \*\*type: if :py:data:`type` is specified as an IDA type (:py:obj:`idaapi.FF_\*`) or a :py:obj:`structure_t` then apply it to the given address
+   :param \*\*type: if ``type`` is specified as an IDA type (:py:obj:`idaapi.FF_\*`) or a :py:obj:`structure_t` then apply it to the given address
    
 .. py:function:: set\.data(ea, size, \*\*type)
    
-   Set the data at address :py:data:`ea` to have the specified :py:data:`size` and :py:data:`type`.
+   Set the data at address ``ea`` to have the specified ``size`` and ``type``.
    
-   If :py:data:`type` is not specified, then choose the correct type based on the size.
+   If ``type`` is not specified, then choose the correct type based on the size.
    
    :param ea: an address in the database
    :type ea: int or long
    :param size: the amount of bytes to set
    :type size: int or long
-   :param \*\*type: if :py:data:`type` is specified then as an IDA type (:py:obj:`idaapi.FF_\*`) or a :py:obj:`structure_t` then apply it to the given address
+   :param \*\*type: if ``type`` is specified then as an IDA type (:py:obj:`idaapi.FF_\*`) or a :py:obj:`structure_t` then apply it to the given address
    
 .. py:function:: set\.string(\*\*type)
    
-   Set the data at the current address to a string with the specified :py:data:`type`.
+   Set the data at the current address to a string with the specified ``type``.
    
-   :param \*\*type: if :py:data:`type` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
+   :param \*\*type: if ``type`` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
    
 .. py:function:: set\.string(ea, \*\*type)
    
-   Set the data at address :py:data:`ea` to a string with the specified :py:data:`type`.
+   Set the data at address ``ea`` to a string with the specified ``type``.
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*type: if :py:data:`type` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
+   :param \*\*type: if ``type`` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
    
 .. py:function:: set\.string(ea, size, \*\*type)
    
-   Set the data at address :py:data:`ea` to a string with the specified :py:data:`size`.
+   Set the data at address ``ea`` to a string with the specified ``size``.
    
-   If :py:data:`type` is specified, use a string of the specified type.
+   If ``type`` is specified, use a string of the specified type.
    
    :param ea: an address in the database
    :type ea: int or long
    :param size: the length of the string
    :type size: int or long
-   :param \*\*type: if :py:data:`type` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
+   :param \*\*type: if ``type`` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
    
 .. py:function:: set\.structure(type)
    
-   Set the data at the current address to the structure_t specified by :py:data:`type`.
+   Set the data at the current address to the structure_t specified by ``type``.
    
-   Aliases: ``database.set.struc``, ``database.set.struct``
+   Aliases: :py:func:`database.set.struc<set\.structure>`, :py:func:`database.set.struct<set\.structure>`
    
    :param type: a :py:obj:`structure_t` containing the structure to apply
    :type type: structure_t
    
 .. py:function:: set\.structure(ea, type)
    
-   Set the data at address :py:data:`ea` to the structure_t specified by :py:data:`type`.
+   Set the data at address ``ea`` to the structure_t specified by ``type``.
    
-   Aliases: ``database.set.struc``, ``database.set.struct``
+   Aliases: :py:func:`database.set.struc<set\.structure>`, :py:func:`database.set.struct<set\.structure>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3042,31 +3082,35 @@ This can be used as in the following examples::
    
    Set the data at the current address to undefined.
    
-   Aliases: ``database.set.undef``, ``database.set.undefined``
+   Aliases: :py:func:`database.set.undef<set\.unknown>`, :py:func:`database.set.undefined<set\.unknown>`
    
 .. py:function:: set\.unknown(ea)
    
-   Set the data at address :py:data:`ea` to undefined.
+   Set the data at address ``ea`` to undefined.
    
-   Aliases: ``database.set.undef``, ``database.set.undefined``
+   Aliases: :py:func:`database.set.undef<set\.unknown>`, :py:func:`database.set.undefined<set\.unknown>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: set\.unknown(ea, size)
    
-   Set the data at address :py:data:`ea` to undefined.
+   Set the data at address ``ea`` to undefined.
    
-   Aliases: ``database.set.undef``, ``database.set.undefined``
+   Aliases: :py:func:`database.set.undef<set\.unknown>`, :py:func:`database.set.undefined<set\.unknown>`
    
    :param ea: an address in the database
    :type ea: int or long
    :param size: the amount of bytes to set
    :type size: int or long
    
+.. _ns-database-set-integer:
+
 ^^^^^^^^^^^^^^^^^^^^
 database.set.integer
 ^^^^^^^^^^^^^^^^^^^^
+
+Aliases: :ref:`database.set.i<ns-database-set-integer>`
 
 This namespace used for applying various sized integer types to
 a particular address.
@@ -3083,7 +3127,7 @@ as follows::
    
 .. py:function:: set\.integer\.byte(ea)
    
-   Set the data at address :py:data:`ea` to a byte.
+   Set the data at address ``ea`` to a byte.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3094,7 +3138,7 @@ as follows::
    
 .. py:function:: set\.integer\.dword(ea)
    
-   Set the data at address :py:data:`ea` to a double-word.
+   Set the data at address ``ea`` to a double-word.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3105,7 +3149,7 @@ as follows::
    
 .. py:function:: set\.integer\.oword(ea)
    
-   Set the data at address :py:data:`ea` to an octal-word.
+   Set the data at address ``ea`` to an octal-word.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3116,7 +3160,7 @@ as follows::
    
 .. py:function:: set\.integer\.qword(ea)
    
-   Set the data at address :py:data:`ea` to a quad-word.
+   Set the data at address ``ea`` to a quad-word.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3127,14 +3171,18 @@ as follows::
    
 .. py:function:: set\.integer\.word(ea)
    
-   Set the data at address :py:data:`ea` to a word.
+   Set the data at address ``ea`` to a word.
    
    :param ea: an address in the database
    :type ea: int or long
    
+.. _ns-database-type:
+
 *************
 database.type
 *************
+
+Aliases: :ref:`database.t<ns-database-type>`
 
 This namespace is for fetching type information from the different
 addresses defined within the database. The functions within this
@@ -3158,13 +3206,13 @@ Some examples of using this namespace can be::
    
    Return the type at the address specified at the current address.
    
-   Aliases: ``database.getType``, ``database.get_type``
+   Aliases: :py:func:`database.getType<type>`, :py:func:`database.get_type<type>`
    
 .. py:function:: type(ea)
    
-   Return the type at the address specified by :py:data:`ea`.
+   Return the type at the address specified by ``ea``.
    
-   Aliases: ``database.getType``, ``database.get_type``
+   Aliases: :py:func:`database.getType<type>`, :py:func:`database.get_type<type>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3175,14 +3223,14 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.flags(ea)
    
-   Returns the flags of the item at the address :py:data:`ea`.
+   Returns the flags of the item at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: type\.flags(ea, mask)
    
-   Returns the flags at the address :py:data:`ea` masked with :py:data:`mask`.
+   Returns the flags at the address ``ea`` masked with ``mask``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3191,7 +3239,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.flags(ea, mask, value)
    
-   Sets the flags at the address :py:data:`ea` masked with :py:data:`mask` set to :py:data:`value`.
+   Sets the flags at the address ``ea`` masked with ``mask`` set to ``value``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3204,13 +3252,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is automatically named.
    
-   Aliases: ``database.type.autonameQ``
+   Aliases: :py:func:`database.type.autonameQ<type\.has_autoname>`
    
 .. py:function:: type\.has_autoname(ea)
    
-   Return true if the address :py:data:`ea` is automatically named.
+   Return true if the address ``ea`` is automatically named.
    
-   Aliases: ``database.type.autonameQ``
+   Aliases: :py:func:`database.type.autonameQ<type\.has_autoname>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3219,13 +3267,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is commented.
    
-   Aliases: ``database.type.commentQ``
+   Aliases: :py:func:`database.type.commentQ<type\.has_comment>`
    
 .. py:function:: type\.has_comment(ea)
    
-   Return true if the address at :py:data:`ea` is commented.
+   Return true if the address at ``ea`` is commented.
    
-   Aliases: ``database.type.commentQ``
+   Aliases: :py:func:`database.type.commentQ<type\.has_comment>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3234,13 +3282,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a custom-name.
    
-   Aliases: ``database.type.customnameQ``
+   Aliases: :py:func:`database.type.customnameQ<type\.has_customname>`
    
 .. py:function:: type\.has_customname(ea)
    
-   Return true if the address at :py:data:`ea` has a custom-name.
+   Return true if the address at ``ea`` has a custom-name.
    
-   Aliases: ``database.type.customnameQ``
+   Aliases: :py:func:`database.type.customnameQ<type\.has_customname>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3249,13 +3297,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a dummy-name.
    
-   Aliases: ``database.type.dummynameQ``
+   Aliases: :py:func:`database.type.dummynameQ<type\.has_dummyname>`
    
 .. py:function:: type\.has_dummyname(ea)
    
-   Return true if the address at :py:data:`ea` has a dummy-name.
+   Return true if the address at ``ea`` has a dummy-name.
    
-   Aliases: ``database.type.dummynameQ``
+   Aliases: :py:func:`database.type.dummynameQ<type\.has_dummyname>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3264,13 +3312,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a label.
    
-   Aliases: ``database.type.labelQ``
+   Aliases: :py:func:`database.type.labelQ<type\.has_label>`
    
 .. py:function:: type\.has_label(ea)
    
-   Return true if the address at :py:data:`ea` has a label.
+   Return true if the address at ``ea`` has a label.
    
-   Aliases: ``database.type.labelQ``
+   Aliases: :py:func:`database.type.labelQ<type\.has_label>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3279,13 +3327,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a name that is listed.
    
-   Aliases: ``database.type.listednameQ``
+   Aliases: :py:func:`database.type.listednameQ<type\.has_listedname>`
    
 .. py:function:: type\.has_listedname(ea)
    
-   Return true if the address at :py:data:`ea` has a name that is listed.
+   Return true if the address at ``ea`` has a name that is listed.
    
-   Aliases: ``database.type.listednameQ``
+   Aliases: :py:func:`database.type.listednameQ<type\.has_listedname>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3294,13 +3342,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a public name.
    
-   Aliases: ``database.type.publicnameQ``
+   Aliases: :py:func:`database.type.publicnameQ<type\.has_publicname>`
    
 .. py:function:: type\.has_publicname(ea)
    
-   Return true if the address at :py:data:`ea` has a public name.
+   Return true if the address at ``ea`` has a public name.
    
-   Aliases: ``database.type.publicnameQ``
+   Aliases: :py:func:`database.type.publicnameQ<type\.has_publicname>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3309,13 +3357,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a reference.
    
-   Aliases: ``database.type.referenceQ``
+   Aliases: :py:func:`database.type.referenceQ<type\.has_reference>`
    
 .. py:function:: type\.has_reference(ea)
    
-   Return true if the address at :py:data:`ea` has a reference.
+   Return true if the address at ``ea`` has a reference.
    
-   Aliases: ``database.type.referenceQ``
+   Aliases: :py:func:`database.type.referenceQ<type\.has_reference>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3324,13 +3372,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a weakly-typed name.
    
-   Aliases: ``database.type.weaknameQ``
+   Aliases: :py:func:`database.type.weaknameQ<type\.has_weakname>`
    
 .. py:function:: type\.has_weakname(ea)
    
-   Return true if the address at :py:data:`ea` has a weakly-typed name.
+   Return true if the address at ``ea`` has a weakly-typed name.
    
-   Aliases: ``database.type.weaknameQ``
+   Aliases: :py:func:`database.type.weaknameQ<type\.has_weakname>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3339,13 +3387,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is defined as an alignment.
    
-   Aliases: ``database.type.alignQ``, ``database.is_align``
+   Aliases: :py:func:`database.type.alignQ<type\.is_align>`, :py:func:`database.is_align<type\.is_align>`
    
 .. py:function:: type\.is_align(ea)
    
-   Return true if the address at :py:data:`ea` is defined as an alignment.
+   Return true if the address at ``ea`` is defined as an alignment.
    
-   Aliases: ``database.type.alignQ``, ``database.is_align``
+   Aliases: :py:func:`database.type.alignQ<type\.is_align>`, :py:func:`database.is_align<type\.is_align>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3354,13 +3402,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is marked as code.
    
-   Aliases: ``database.is_code``, ``database.type.codeQ``
+   Aliases: :py:func:`database.is_code<type\.is_code>`, :py:func:`database.type.codeQ<type\.is_code>`
    
 .. py:function:: type\.is_code(ea)
    
-   Return true if the address specified by :py:data:`ea` is marked as code.
+   Return true if the address specified by ``ea`` is marked as code.
    
-   Aliases: ``database.is_code``, ``database.type.codeQ``
+   Aliases: :py:func:`database.is_code<type\.is_code>`, :py:func:`database.type.codeQ<type\.is_code>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3369,13 +3417,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is marked as data.
    
-   Aliases: ``database.is_data``, ``database.type.dataQ``
+   Aliases: :py:func:`database.is_data<type\.is_data>`, :py:func:`database.type.dataQ<type\.is_data>`
    
 .. py:function:: type\.is_data(ea)
    
-   Return true if the address specified by :py:data:`ea` is marked as data.
+   Return true if the address specified by ``ea`` is marked as data.
    
-   Aliases: ``database.is_data``, ``database.type.dataQ``
+   Aliases: :py:func:`database.is_data<type\.is_data>`, :py:func:`database.type.dataQ<type\.is_data>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3384,13 +3432,13 @@ Some examples of using this namespace can be::
    
    Returns true if the instruction at the current address references a global.
    
-   Aliases: ``database.type.isGlobalRef``, ``database.type.globalrefQ``
+   Aliases: :py:func:`database.type.isGlobalRef<type\.is_globalref>`, :py:func:`database.type.globalrefQ<type\.is_globalref>`
    
 .. py:function:: type\.is_globalref(ea)
    
-   Returns true if the instruction at :py:data:`ea` references a global.
+   Returns true if the instruction at ``ea`` references a global.
    
-   Aliases: ``database.type.isGlobalRef``, ``database.type.globalrefQ``
+   Aliases: :py:func:`database.type.isGlobalRef<type\.is_globalref>`, :py:func:`database.type.globalrefQ<type\.is_globalref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3399,13 +3447,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is aligned to a definition in the database.
    
-   Aliases: ``database.is_head``, ``database.type.headQ``
+   Aliases: :py:func:`database.is_head<type\.is_head>`, :py:func:`database.type.headQ<type\.is_head>`
    
 .. py:function:: type\.is_head(ea)
    
-   Return true if the address :py:data:`ea` is aligned to a definition in the database.
+   Return true if the address ``ea`` is aligned to a definition in the database.
    
-   Aliases: ``database.is_head``, ``database.type.headQ``
+   Aliases: :py:func:`database.is_head<type\.is_head>`, :py:func:`database.type.headQ<type\.is_head>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3414,13 +3462,13 @@ Some examples of using this namespace can be::
    
    Returns true if the instruction at the current address references an import.
    
-   Aliases: ``database.type.isImportRef``, ``database.type.importrefQ``
+   Aliases: :py:func:`database.type.isImportRef<type\.is_importref>`, :py:func:`database.type.importrefQ<type\.is_importref>`
    
 .. py:function:: type\.is_importref(ea)
    
-   Returns true if the instruction at :py:data:`ea` references an import.
+   Returns true if the instruction at ``ea`` references an import.
    
-   Aliases: ``database.type.isImportRef``, ``database.type.importrefQ``
+   Aliases: :py:func:`database.type.isImportRef<type\.is_importref>`, :py:func:`database.type.importrefQ<type\.is_importref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3429,13 +3477,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is initialized.
    
-   Aliases: ``database.type.initializedQ``
+   Aliases: :py:func:`database.type.initializedQ<type\.is_initialized>`
    
 .. py:function:: type\.is_initialized(ea)
    
-   Return true if the address specified by :py:data:`ea` is initialized.
+   Return true if the address specified by ``ea`` is initialized.
    
-   Aliases: ``database.type.initializedQ``
+   Aliases: :py:func:`database.type.initializedQ<type\.is_initialized>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3444,13 +3492,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has a label.
    
-   Aliases: ``database.type.labelQ``
+   Aliases: :py:func:`database.type.labelQ<type\.is_label>`
    
 .. py:function:: type\.is_label(ea)
    
-   Return true if the address at :py:data:`ea` has a label.
+   Return true if the address at ``ea`` has a label.
    
-   Aliases: ``database.type.labelQ``
+   Aliases: :py:func:`database.type.labelQ<type\.is_label>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3459,13 +3507,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is not-aligned to a definition in the database.
    
-   Aliases: ``database.is_tail``, ``database.type.tailQ``
+   Aliases: :py:func:`database.is_tail<type\.is_tail>`, :py:func:`database.type.tailQ<type\.is_tail>`
    
 .. py:function:: type\.is_tail(ea)
    
-   Return true if the address :py:data:`ea` is not-aligned to a definition in the database.
+   Return true if the address ``ea`` is not-aligned to a definition in the database.
    
-   Aliases: ``database.is_tail``, ``database.type.tailQ``
+   Aliases: :py:func:`database.is_tail<type\.is_tail>`, :py:func:`database.type.tailQ<type\.is_tail>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3474,13 +3522,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address is undefined.
    
-   Aliases: ``database.is_unknown``, ``database.type.unknownQ``
+   Aliases: :py:func:`database.is_unknown<type\.is_unknown>`, :py:func:`database.type.unknownQ<type\.is_unknown>`
    
 .. py:function:: type\.is_unknown(ea)
    
-   Return true if the address specified by :py:data:`ea` is undefined.
+   Return true if the address specified by ``ea`` is undefined.
    
-   Aliases: ``database.is_unknown``, ``database.type.unknownQ``
+   Aliases: :py:func:`database.is_unknown<type\.is_unknown>`, :py:func:`database.type.unknownQ<type\.is_unknown>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3489,13 +3537,13 @@ Some examples of using this namespace can be::
    
    Returns the size of the item at the current address.
    
-   Aliases: ``database.size``
+   Aliases: :py:func:`database.size<type\.size>`
    
 .. py:function:: type\.size(ea)
    
-   Returns the size of the item at the address :py:data:`ea`.
+   Returns the size of the item at the address ``ea``.
    
-   Aliases: ``database.size``
+   Aliases: :py:func:`database.size<type\.size>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3506,11 +3554,13 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.switch(ea)
    
-   Return the switch_t at the address :py:data:`ea`.
+   Return the switch_t at the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    
+.. _ns-database-type-array:
+
 ^^^^^^^^^^^^^^^^^^^
 database.type.array
 ^^^^^^^^^^^^^^^^^^^
@@ -3518,7 +3568,7 @@ database.type.array
 This namespace is for returning type information about an array
 that is defined within the database. By default this namespace
 will return the array's element size and number of elements as
-a tuple :py:obj:`(size, count)`.
+a tuple ``(size, count)``.
 
 Some examples of using this namespace can be::
 
@@ -3529,11 +3579,11 @@ Some examples of using this namespace can be::
 
 .. py:function:: type\.array()
    
-   Return the array's :py:obj:`(element, length)` at the current address.
+   Return the array's ``(element, length)`` at the current address.
    
 .. py:function:: type\.array(ea)
    
-   Return the array's :py:obj:`(element, length)` at the address specified by :py:data:`ea`.
+   Return the array's ``(element, length)`` at the address specified by ``ea``.
    
    :param ea: an address in the database containing an array
    :type ea: int or long
@@ -3542,13 +3592,13 @@ Some examples of using this namespace can be::
    
    Return the size of an element in the array at the current address.
    
-   Aliases: ``database.getSize``, ``database.get_size``
+   Aliases: :py:func:`database.getSize<type\.array\.element>`, :py:func:`database.get_size<type\.array\.element>`
    
 .. py:function:: type\.array\.element(ea)
    
-   Return the size of an element in the array at address :py:data:`ea`.
+   Return the size of an element in the array at address ``ea``.
    
-   Aliases: ``database.getSize``, ``database.get_size``
+   Aliases: :py:func:`database.getSize<type\.array\.element>`, :py:func:`database.get_size<type\.array\.element>`
    
    :param ea: an address in the database containing an array
    :type ea: int or long
@@ -3557,13 +3607,13 @@ Some examples of using this namespace can be::
    
    Return the number of elements of the array at the current address.
    
-   Aliases: ``database.get_arraylength``, ``database.getArrayLength``
+   Aliases: :py:func:`database.get_arraylength<type\.array\.length>`, :py:func:`database.getArrayLength<type\.array\.length>`
    
 .. py:function:: type\.array\.length(ea)
    
-   Return the number of elements in the array at address :py:data:`ea`.
+   Return the number of elements in the array at address ``ea``.
    
-   Aliases: ``database.get_arraylength``, ``database.getArrayLength``
+   Aliases: :py:func:`database.get_arraylength<type\.array\.length>`, :py:func:`database.getArrayLength<type\.array\.length>`
    
    :param ea: an address in the database containing an array
    :type ea: int or long
@@ -3574,14 +3624,18 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.array\.size(ea)
    
-   Return the total size of the array at address :py:data:`ea`.
+   Return the total size of the array at address ``ea``.
    
    :param ea: an address in the database containing an array
    :type ea: int or long
    
+.. _ns-database-type-structure:
+
 ^^^^^^^^^^^^^^^^^^^^^^^
 database.type.structure
 ^^^^^^^^^^^^^^^^^^^^^^^
+
+Aliases: :ref:`database.type.struc<ns-database-type-structure>`
 
 This namespace for returning type information about a structure
 that is defined within the database. By default this namespace
@@ -3599,7 +3653,7 @@ Some of the ways to use this namespace are::
    
 .. py:function:: type\.structure(ea)
    
-   Return the structure type at address :py:data:`ea`.
+   Return the structure type at address ``ea``.
    
    :param ea: an address in the database containing a structure
    :type ea: int or long
@@ -3608,13 +3662,13 @@ Some of the ways to use this namespace are::
    
    Return the identifier of the structure at the current address.
    
-   Aliases: ``database.get_structureid``, ``database.get_strucid``, ``database.getStructureId``
+   Aliases: :py:func:`database.get_structureid<type\.structure\.id>`, :py:func:`database.get_strucid<type\.structure\.id>`, :py:func:`database.getStructureId<type\.structure\.id>`
    
 .. py:function:: type\.structure\.id(ea)
    
-   Return the identifier of the structure at address :py:data:`ea`.
+   Return the identifier of the structure at address ``ea``.
    
-   Aliases: ``database.get_structureid``, ``database.get_strucid``, ``database.getStructureId``
+   Aliases: :py:func:`database.get_structureid<type\.structure\.id>`, :py:func:`database.get_strucid<type\.structure\.id>`, :py:func:`database.getStructureId<type\.structure\.id>`
    
    :param ea: an address in the database containing a structure
    :type ea: int or long
@@ -3625,14 +3679,18 @@ Some of the ways to use this namespace are::
    
 .. py:function:: type\.structure\.size(ea)
    
-   Return the total size of the structure at address :py:data:`ea`.
+   Return the total size of the structure at address ``ea``.
    
    :param ea: an address in the database containing a structure
    :type ea: int or long
    
+.. _ns-database-xref:
+
 *************
 database.xref
 *************
+
+Aliases: :ref:`database.x<ns-database-xref>`
 
 This namespace is for navigating the cross-references (xrefs)
 associated with an address in the database. This lets one identify
@@ -3663,80 +3721,80 @@ Some ways to utilize this namespace can be::
 
 .. py:function:: xref\.add_code(target, \*\*reftype)
    
-   Add a code reference from the current address to :py:data:`target`.
+   Add a code reference from the current address to ``target``.
    
-   Aliases: ``database.xref.ac``
+   Aliases: :py:func:`database.xref.ac<xref\.add_code>`
    
    :param target: the target address to add a code reference to
    :type target: int or long
-   :param \*\*reftype: if :py:data:`call` is set to true, this specify that this reference is a function call
+   :param \*\*reftype: if ``call`` is set to true, this specify that this reference is a function call
    
 .. py:function:: xref\.add_code(ea, target, \*\*reftype)
    
-   Add a code reference from address :py:data:`ea` to :py:data:`target`.
+   Add a code reference from address ``ea`` to ``target``.
    
-   If the reftype :py:data:`call` is true, then specify this ref as a function call.
+   If the reftype ``call`` is true, then specify this ref as a function call.
    
-   Aliases: ``database.xref.ac``
+   Aliases: :py:func:`database.xref.ac<xref\.add_code>`
    
    :param ea: an address in the database
    :param target: the target address to add a code reference to
    :type target: int or long
-   :param \*\*reftype: if :py:data:`call` is set to true, this specify that this reference is a function call
+   :param \*\*reftype: if ``call`` is set to true, this specify that this reference is a function call
    
 .. py:function:: xref\.add_data(target, \*\*reftype)
    
-   Add a data reference from the current address to :py:data:`target`.
+   Add a data reference from the current address to ``target``.
    
-   Aliases: ``database.xref.ad``
+   Aliases: :py:func:`database.xref.ad<xref\.add_data>`
    
    :param target: the target address to add a data reference to
    :type target: int or long
-   :param \*\*reftype: if :py:data:`write` is set to true, then specify that this reference writes to its target
+   :param \*\*reftype: if ``write`` is set to true, then specify that this reference writes to its target
    
 .. py:function:: xref\.add_data(ea, target, \*\*reftype)
    
-   Add a data reference from the address :py:data:`ea` to :py:data:`target`.
+   Add a data reference from the address ``ea`` to ``target``.
    
-   If the reftype :py:data:`write` is true, then specify that this ref is writing to the target.
+   If the reftype ``write`` is true, then specify that this ref is writing to the target.
    
-   Aliases: ``database.xref.ad``
+   Aliases: :py:func:`database.xref.ad<xref\.add_data>`
    
    :param ea: an address in the database
    :type ea: int or long
    :param target: the target address to add a data reference to
    :type target: int or long
-   :param \*\*reftype: if :py:data:`write` is set to true, then specify that this reference writes to its target
+   :param \*\*reftype: if ``write`` is set to true, then specify that this reference writes to its target
    
 .. py:function:: xref\.code()
    
    Return all of the code xrefs that refer to the current address.
    
-   Aliases: ``database.crefs``
+   Aliases: :py:func:`database.crefs<xref\.code>`
    
 .. py:function:: xref\.code(descend)
    
-   Aliases: ``database.crefs``, ``database.xref.c``
+   Aliases: :py:func:`database.crefs<xref\.code>`, :py:func:`database.xref.c<xref\.code>`
    
    :param descend: a boolean that specifies to only return references that are referred by the current address
    :type descend: bool
    
 .. py:function:: xref\.code(ea)
    
-   Return all of the code xrefs that refer to the address :py:data:`ea`.
+   Return all of the code xrefs that refer to the address ``ea``.
    
-   Aliases: ``database.crefs``, ``database.xref.c``
+   Aliases: :py:func:`database.crefs<xref\.code>`, :py:func:`database.xref.c<xref\.code>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: xref\.code(ea, descend)
    
-   Return all of the code xrefs that refer to the address :py:data:`ea`.
+   Return all of the code xrefs that refer to the address ``ea``.
    
-   If the bool :py:data:`descend` is defined, then return only code refs that are referred by the specified address.
+   If the bool ``descend`` is defined, then return only code refs that are referred by the specified address.
    
-   Aliases: ``database.crefs``, ``database.xref.c``
+   Aliases: :py:func:`database.crefs<xref\.code>`, :py:func:`database.xref.c<xref\.code>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3747,13 +3805,13 @@ Some ways to utilize this namespace can be::
    
    Return all of the code xrefs that are referenced by the current address.
    
-   Aliases: ``database.cxdown``, ``database.xref.cd``
+   Aliases: :py:func:`database.cxdown<xref\.code_down>`, :py:func:`database.xref.cd<xref\.code_down>`
    
 .. py:function:: xref\.code_down(ea)
    
-   Return all of the code xrefs that are referenced by the address :py:data:`ea`.
+   Return all of the code xrefs that are referenced by the address ``ea``.
    
-   Aliases: ``database.cxdown``, ``database.xref.cd``
+   Aliases: :py:func:`database.cxdown<xref\.code_down>`, :py:func:`database.xref.cd<xref\.code_down>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3762,13 +3820,13 @@ Some ways to utilize this namespace can be::
    
    Return all of the code xrefs that are referenced by the current address.
    
-   Aliases: ``database.xref.cu``, ``database.cxup``
+   Aliases: :py:func:`database.xref.cu<xref\.code_up>`, :py:func:`database.cxup<xref\.code_up>`
    
 .. py:function:: xref\.code_up(ea)
    
-   Return all of the code xrefs that refer to the address :py:data:`ea`.
+   Return all of the code xrefs that refer to the address ``ea``.
    
-   Aliases: ``database.xref.cu``, ``database.cxup``
+   Aliases: :py:func:`database.xref.cu<xref\.code_up>`, :py:func:`database.cxup<xref\.code_up>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3777,31 +3835,31 @@ Some ways to utilize this namespace can be::
    
    Return all of the data xrefs that refer to the current address.
    
-   Aliases: ``database.xref.d``, ``database.drefs``
+   Aliases: :py:func:`database.xref.d<xref\.data>`, :py:func:`database.drefs<xref\.data>`
    
 .. py:function:: xref\.data(descend)
    
-   Aliases: ``database.xref.d``, ``database.drefs``
+   Aliases: :py:func:`database.xref.d<xref\.data>`, :py:func:`database.drefs<xref\.data>`
    
    :param descend: a boolean that specifies to only return references that are referred by the current address
    :type descend: bool
    
 .. py:function:: xref\.data(ea)
    
-   Return all of the data xrefs that refer to the address :py:data:`ea`.
+   Return all of the data xrefs that refer to the address ``ea``.
    
-   Aliases: ``database.xref.d``, ``database.drefs``
+   Aliases: :py:func:`database.xref.d<xref\.data>`, :py:func:`database.drefs<xref\.data>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: xref\.data(ea, descend)
    
-   Return all of the data xrefs that refer to the address :py:data:`ea`.
+   Return all of the data xrefs that refer to the address ``ea``.
    
-   If the bool :py:data:`descend` is defined, then return only the data refs that are referred by the specified address.
+   If the bool ``descend`` is defined, then return only the data refs that are referred by the specified address.
    
-   Aliases: ``database.xref.d``, ``database.drefs``
+   Aliases: :py:func:`database.xref.d<xref\.data>`, :py:func:`database.drefs<xref\.data>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3812,13 +3870,13 @@ Some ways to utilize this namespace can be::
    
    Return all of the data xrefs that are referenced by the current address.
    
-   Aliases: ``database.xref.dd``, ``database.dxdown``
+   Aliases: :py:func:`database.xref.dd<xref\.data_down>`, :py:func:`database.dxdown<xref\.data_down>`
    
 .. py:function:: xref\.data_down(ea)
    
-   Return all of the data xrefs that are referenced by the address :py:data:`ea`.
+   Return all of the data xrefs that are referenced by the address ``ea``.
    
-   Aliases: ``database.xref.dd``, ``database.dxdown``
+   Aliases: :py:func:`database.xref.dd<xref\.data_down>`, :py:func:`database.dxdown<xref\.data_down>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3827,27 +3885,27 @@ Some ways to utilize this namespace can be::
    
    Return all of the data xrefs that refer to the current address.
    
-   Aliases: ``database.xref.du``, ``database.dxup``
+   Aliases: :py:func:`database.xref.du<xref\.data_up>`, :py:func:`database.dxup<xref\.data_up>`
    
 .. py:function:: xref\.data_up(ea)
    
-   Return all of the data xrefs that refer to the address :py:data:`ea`.
+   Return all of the data xrefs that refer to the address ``ea``.
    
-   Aliases: ``database.xref.du``, ``database.dxup``
+   Aliases: :py:func:`database.xref.du<xref\.data_up>`, :py:func:`database.dxup<xref\.data_up>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: xref\.del_code(ea)
    
-   Delete _all_ the code references at :py:data:`ea`.
+   Delete _all_ the code references at ``ea``.
    
    :param ea: an address containing a code reference
    :type ea: int or long
    
 .. py:function:: xref\.del_code(ea, target)
    
-   Delete any code references at :py:data:`ea` that point to address :py:data:`target`.
+   Delete any code references at ``ea`` that point to address ``target``.
    
    :param ea: an address containing a code reference
    :type ea: int or long
@@ -3856,14 +3914,14 @@ Some ways to utilize this namespace can be::
    
 .. py:function:: xref\.del_data(ea)
    
-   Delete _all_ the data references at :py:data:`ea`.
+   Delete _all_ the data references at ``ea``.
    
    :param ea: an address containing a data reference
    :type ea: int or long
    
 .. py:function:: xref\.del_data(ea, target)
    
-   Delete any data references at :py:data:`ea` that point to address :py:data:`target`.
+   Delete any data references at ``ea`` that point to address ``target``.
    
    :param ea: an address containing a data reference
    :type ea: int or long
@@ -3874,20 +3932,20 @@ Some ways to utilize this namespace can be::
    
    Return all of the references that are referred by the current address.
    
-   Aliases: ``database.down``, ``database.xref.d``
+   Aliases: :py:func:`database.down<xref\.down>`, :py:func:`database.xref.d<xref\.down>`
    
 .. py:function:: xref\.down(ea)
    
-   Return all of the references that are referred by the address :py:data:`ea`.
+   Return all of the references that are referred by the address ``ea``.
    
-   Aliases: ``database.down``, ``database.xref.d``
+   Aliases: :py:func:`database.down<xref\.down>`, :py:func:`database.xref.d<xref\.down>`
    
    :param ea: an address in the database
    :type ea: int or long
    
 .. py:function:: xref\.erase(ea)
    
-   Clear all references at the address :py:data:`ea`.
+   Clear all references at the address ``ea``.
    
    :param ea: an address containing an references
    
@@ -3895,13 +3953,13 @@ Some ways to utilize this namespace can be::
    
    Return all of the references that refer to the current address.
    
-   Aliases: ``database.xref.u``, ``database.up``
+   Aliases: :py:func:`database.xref.u<xref\.up>`, :py:func:`database.up<xref\.up>`
    
 .. py:function:: xref\.up(ea)
    
-   Return all of the references that refer to the address :py:data:`ea`.
+   Return all of the references that refer to the address ``ea``.
    
-   Aliases: ``database.xref.u``, ``database.up``
+   Aliases: :py:func:`database.xref.u<xref\.up>`, :py:func:`database.up<xref\.up>`
    
    :param ea: an address in the database
    :type ea: int or long
