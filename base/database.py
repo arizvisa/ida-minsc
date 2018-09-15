@@ -1191,6 +1191,7 @@ def comment(ea, string, **repeatable):
         raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_cmt({:#x}, \"{:s}\", {!s})`.".format(__name__, ea, string, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.escape(string, '"'), repeatable.get('repeatable', False)))
     return res
 
+@document.aliases('exports')
 @document.namespace
 class entries(object):
     """
@@ -1923,6 +1924,7 @@ getImportModules = utils.alias(imports.modules, 'imports')
 getImports = utils.alias(imports.list, 'imports')
 
 ###
+@document.aliases('a', 'addr')
 @document.namespace
 class address(object):
     """
@@ -2995,6 +2997,7 @@ prev, next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'ad
 prevref, nextref = utils.alias(address.prevref, 'address'), utils.alias(address.nextref, 'address')
 prevreg, nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.nextreg, 'address')
 
+@document.aliases('t')
 @document.namespace
 class type(object):
     """
@@ -3431,6 +3434,7 @@ class type(object):
             '''Return the total size of the array at the address specified by `ea`.'''
             return type.size(ea)
 
+    @document.aliases('type.struc', 'type.struct')
     @document.namespace
     class structure(object):
         """
@@ -3560,6 +3564,7 @@ getArrayLength = get_arraylength = utils.alias(type.array.length, 'type.array')
 # structures
 getStructureId = get_strucid = get_structureid = utils.alias(type.structure.id, 'type.structure')
 
+@document.aliases('x')
 @document.namespace
 class xref(object):
     """
@@ -4152,6 +4157,7 @@ def mark(ea, description):
     '''Sets the mark at address `ea` to the specified `description`.'''
     return marks.new(ea, description)
 
+@document.aliases('ex')
 @document.namespace
 class extra(object):
     r"""
@@ -4724,6 +4730,7 @@ class set(object):
             raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
 
+    @document.aliases('set.i')
     @document.namespace
     class integer(object):
         """
@@ -4978,6 +4985,7 @@ class get(object):
         res = cls.unsigned(ea, size, **byteorder)
         return (res - (2**bits)) if res&sf else res
 
+    @document.aliases('get.i')
     @document.namespace
     class integer(object):
         """
