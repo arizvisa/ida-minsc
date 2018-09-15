@@ -21,12 +21,12 @@ which point the user can then request it by passing an identifier
 to `enumeration.by(...)`. The types that can be used to filter are
 as follows:
 
-    `name` - Match according to the enumeration name
-    `like` - Filter the enumeration names according to a glob
-    `regex` - Filter the enumeration names according to a regular-expression
-    `index` - Match the enumeration by its index
-    `identifier` or `id` - Match the enumeration by its identifier
-    `predicate` - Filter the enumerations by passing their identifier to a callable
+    ``name`` - Match according to the enumeration name
+    ``like`` - Filter the enumeration names according to a glob
+    ``regex`` - Filter the enumeration names according to a regular-expression
+    ``index`` - Match the enumeration by its index
+    ``identifier`` or ``id`` - Match the enumeration by its identifier
+    ``predicate`` - Filter the enumerations by passing their identifier to a callable
 
 """
 
