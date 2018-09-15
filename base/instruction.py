@@ -51,6 +51,7 @@ from internal import utils, interface, exceptions as E, document
 import idaapi
 
 ## operand types
+@document.hidden
 class __optype__(object):
     """
     This namespace is a registration table for all the different operand
