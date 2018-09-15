@@ -563,6 +563,13 @@ class restructure(object):
         res.append(sectionchar[depth] * len(name))
         res.append('')
 
+        # namespace aliases
+        if ref.has('aliases'):
+            aliases = map(stringify, ref.get('aliases'))
+            aliases = map(functools.partial("{:s}.{:s}".format, ns[-1]), aliases)
+            res.append("Aliases: {:s}".format(', '.join(map(lambda s: ":ref:`{:s}<ns-{:s}>`".format(s, name.replace('.', '-')), aliases))))
+            res.append('')
+
         # namespace documentation
         if ref.comment:
             res.extend(cls.nsDocstringToList(ref.comment))
@@ -819,7 +826,8 @@ class restructure(object):
             res.extend(cls.functionDocstringToList(ref.comment) + [''])
         if aliases:
             f = functools.partial(":py:func:`{:s}.{:s}<{ref:s}>`".format, ns[-1], ref=name)
-            res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
+            res.append("Aliases: {:s}".format(', '.join(map(f, aliases))))
+            res.append('')
 
         for n, descr, ty in params[1:]:
             res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
@@ -852,7 +860,8 @@ class restructure(object):
             res.extend(cls.functionDocstringToList(ref.comment) + [''])
         if aliases:
             f = functools.partial(":py:func:`{:s}.{:s}<{ref:s}>`".format, ns[-1], ref=name)
-            res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
+            res.append("Aliases: {:s}".format(', '.join(map(f, aliases))))
+            res.append('')
 
         for n, descr, ty in params:
             res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
@@ -1141,6 +1150,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
         attributes = decorators.attributes(node)
         details = [details[0] for n, details, _, _, _ in decorators.functions(node) if n == 'document.details']
         bases = [b[0] for b in map(grammar.reduce, node.bases) if b[0] != 'object']
+        aliases = [a[0] for n, a, _, _, _ in decorators.functions(node) if n == 'document.aliases']
 
         try:
             docstring = ast.get_docstring(node) or ''
@@ -1150,6 +1160,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
         # construct the namespace
         res = Namespace(node=node, name=node.name, namespace=self._ref, docstring=docstring)
         if bases: res.set(bases=bases)
+        if aliases: res.set(aliases=aliases)
         if attributes: res.set(attributes=attributes)
         if details: res.set(details='\n'.join(details))
         return res
