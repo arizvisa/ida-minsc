@@ -384,7 +384,7 @@ class restructure(object):
         yield ref
     @classmethod
     def docstringToList(cls, cmt):
-        L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
+        L = backticklexer(":py:obj:`{:s}`".format, "``{:s}``".format)
         formatted = L.lex(cmt)
 
         res = []
@@ -393,7 +393,7 @@ class restructure(object):
         return res
     @classmethod
     def paramDescriptionToRst(cls, descr):
-        L = backticklexer(":py:obj:`{:s}`".format, ":py:data:`{:s}`".format)
+        L = backticklexer(":py:obj:`{:s}`".format, "``{:s}``".format)
         return cls.escape(L.lex(descr))
 
     ## Reference type converters
