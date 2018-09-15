@@ -19,12 +19,12 @@ list all of the available structures at which point the user can then
 request it by passing an identifer to `structure.by(...)`. The
 chosen methods of filtering are:
 
-    `name` - Match the structures to a structure name
-    `like` - Filter the structure names according to a glob
-    `regex` - Filter the structure names according to a regular-expression
-    `index` - Match the structures by its index
-    `identifier` or `id` - Match the structure by its id which is a `uval_t`
-    `predicate` - Filter the structures by passing the id (`uval_t`) to a callable
+    ``name`` - Match the structures to a structure name
+    ``like`` - Filter the structure names according to a glob
+    ``regex`` - Filter the structure names according to a regular-expression
+    ``index`` - Match the structures by its index
+    ``identifier`` or ``id`` - Match the structure by its id which is a `idaapi.uval_t`
+    ``predicate`` - Filter the structures by passing the id (`idaapi.uval_t`) to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -102,7 +102,7 @@ def iterate(**type):
 
 @utils.multicase(string=basestring)
 def list(string):
-    '''List any structures that match the glob in `string`.'''
+    '''List any structures that match the glob in ``string``.'''
     return list(like=string)
 @utils.multicase()
 def list(**type):
@@ -282,10 +282,10 @@ class structure_t(object):
         return refs
 
     def refs(self):
-        """Return the `(address, opnum, type)` of all the code and data references within the database that reference this structure.
+        """Return the ``(address, opnum, type)`` of all the code and data references within the database that reference this structure.
 
-        If `opnum` is `None`, then the returned `address` has the structure applied to it.
-        If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
+        If ``opnum`` is `None`, then the returned ``address`` has the structure applied to it.
+        If ``opnum`` is defined, then the instruction at the returned ``address`` references a field that contains the specified structure.
         """
         x, sid = idaapi.xrefblk_t(), self.id
 
@@ -567,7 +567,7 @@ def members(structure):
 def members(id):
     """Yield each member of the structure identified by ``id``.
 
-    Each iteration yields the `((offset, size), (name, comment, repeatable-comment))` of each member.
+    Each iteration yields the ``((offset, size), (name, comment, repeatable-comment))`` of each member.
     """
 
     st = idaapi.get_struc(id)
@@ -605,10 +605,10 @@ def fragment(id, offset, size):
     certain fragments of a structure which can then be used to export
     to other programs or applications.
 
-        `((offset, size), (name, comment, repeatable))`
+    ``((offset, size), (name, comment, repeatable))``
 
-    In this tuple, the field `comment` represents the non-repeatable
-    comment whereas `repeatable` contains the member's `repeatable`
+    In this tuple, the field ``comment`` represents the non-repeatable
+    comment whereas ``repeatable`` contains the member's ``repeatable``
     comment.
     """
     member = members(id)
@@ -670,17 +670,17 @@ class members_t(object):
     that they specified. The keywords that are available to filter
     members are:
 
-        `name` - Match the structure member by a name
-        `offset` - Match the structure member by its offset
-        `like` - Filter the structure members according to a glob
-        `regex` - Filter the structure members according to a regular-expression
-        `index` - Match the structure member by its index
-        `fullname` - Filter the structure members by matching its full name according to a glob
-        `comment` or `comments` - Filter the structure members by applying a glob to its comment
-        `identifier` or `id` - Match the structure member by its identifier
-        `greater` or `gt` - Filter the structure members for any after the specified offset
-        `less` or `lt` - Filter the structure members for any before the specified offset
-        `predicate` - Filter the structure members by passing the `member_t` to a callable
+        ``name`` - Match the structure member by a name
+        ``offset`` - Match the structure member by its offset
+        ``like`` - Filter the structure members according to a glob
+        ``regex`` - Filter the structure members according to a regular-expression
+        ``index`` - Match the structure member by its index
+        ``fullname`` - Filter the structure members by matching its full name according to a glob
+        ``comment`` or ``comments` - Filter the structure members by applying a glob to its comment
+        ``identifier`` or ``id`` - Match the structure member by its identifier
+        ``greater`` or ``gt`` - Filter the structure members for any after the specified offset
+        ``less`` or ``lt`` - Filter the structure members for any before the specified offset
+        ``predicate`` - Filter the structure members by passing the `member_t` to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -776,7 +776,7 @@ class members_t(object):
 
     @utils.multicase(string=basestring)
     def list(self, string):
-        '''List any members that match the glob in `string`.'''
+        '''List any members that match the glob in ``string``.'''
         return self.list(like=string)
     @utils.multicase()
     def list(self, **type):
@@ -968,11 +968,11 @@ class member_t(object):
     This object is an abstraction around a single member belonging to
     a structure. A member within a structue contains a number of
     properties which this object will expose. Some of these properties
-    allow for a user to modify the member such as when the user needs
-    to modify the `type` or `name` of a member. Some methods are also
-    provided to allow for a user to `tag` the member with an
-    annotation, or enumerate all the addresses that reference the
-    member.
+    allow for a user to modify the member's `type` or `name`. The
+    `tag` method is also provided to allow for a user to annotate the
+    member similar to the database or a function's contents. Another
+    method, `refs` will allow one to enumerate everything in the
+    database that references said member.
     """
     __slots__ = ('__owner', '__index')
 
@@ -1202,7 +1202,7 @@ class member_t(object):
         return "{:s}\n[{:d}] {:-#x}:{:+#x} \'{:s}\' {:s}{:s}".format(self.__class__, self.index, self.offset, self.size, name, typ, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
 
     def refs(self):
-        '''Return the `(address, opnum, type)` of all the references to this member within the database.'''
+        '''Return the ``(address, opnum, type)`` of all the references to this member within the database.'''
         mid = self.id
 
         # calculate the high-byte which is used to determine an address from a structure
