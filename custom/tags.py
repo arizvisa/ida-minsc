@@ -76,6 +76,7 @@ def addressToLocation(ea, chunks=None):
     cid, base = next((i, l) for i, (l, r) in enumerate(chunks) if l <= ea < r)
     return func.top(F), cid, ea - base
 
+@document.hidden
 class dummy(object):
     """
     A dummy object that is guaranteed to return False whenever it is compared
