@@ -38,15 +38,22 @@ execute the following at the IDAPython prompt to output the correct path:
 
     > print idaapi.get_user_idadir()
 
-To then clone the repository, one can use Git [:ref:`2<install-clone-references>`]
-to clone the repository in the following manner:
+To then clone the repository, one can use Git [:ref:`2<install-clone-references>`].
+When cloning, the directory containing the plugin's repository should replace the
+contents of the IDA user directory. If there are any files that the user
+currently has in their IDA user directory, the user can simply move these files
+into the repository's directory. This is done so that IDAPython will execute the
+``idapythonrc.py`` file belonging to IDA-minsc. To clone the repository, one can
+use Git [:ref:`2<install-clone-references>`] at their shell's command line:
 
 .. code-block:: sh
 
     $ git clone https://github.com/arizvisa/ida-minsc $IDA_USERDIR
 
-Once this has been correctly done, then when IDA starts up the ``idapythonrc.py``
-file in the repository should be executed.
+Once this has been correctly done and the Python dependencies are installed,
+then when IDA starts up, the ``idapythonrc.py`` file in the repository should be
+executed and IDAPython's namespace replaced with the namespace belonging to the
+plugin.
 
 .. _install-clone-references:
 .. rubric:: References
