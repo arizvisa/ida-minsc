@@ -380,14 +380,17 @@ class structure_t(object):
 
         return res
 
+    @document.details('The identifier for this `structure_t`.')
     @property
     def id(self):
         '''Return the identifier of the structure.'''
         return self.__id__
+    @document.details('The ``idaapi.struc_t`` that this `structure_t` wraps.')
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.struc_t``.'''
         return idaapi.get_struc(self.id)
+    @document.details('The `members_t` for accessing the structure members.')
     @property
     def members(self):
         '''Return the members belonging to the structure.'''
@@ -423,6 +426,7 @@ class structure_t(object):
         self.__members__ = members
         return
 
+    @document.details('The name of the `structure_t`.')
     @property
     def name(self):
         '''Return the name of the structure.'''
@@ -449,6 +453,7 @@ class structure_t(object):
         # now we can set the name of the structure
         return idaapi.set_struc_name(self.id, ida_string)
 
+    @document.details('The comment belonging to the `structure_t`.')
     @property
     def comment(self):
         '''Return the repeatable comment for the structure.'''
@@ -508,6 +513,7 @@ class structure_t(object):
         ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
 
+    @document.details('The total size of the `structure_t`.')
     @property
     def size(self):
         '''Return the size of the structure.'''
@@ -522,6 +528,7 @@ class structure_t(object):
             logging.fatal(u"{:s}.instance({!r}).size : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format(__name__, self.name, utils.string.escape(self.name, '"'), res, size))
         return res
 
+    @document.details('The base offset of the `structure_t`.')
     @property
     def offset(self):
         '''Return the base offset of the structure.'''
@@ -532,6 +539,7 @@ class structure_t(object):
         '''Set the base offset of the structure to `offset`.'''
         res, self.members.baseoffset = self.members.baseoffset, offset
         return res
+    @document.details('''The index of this `structure_t` within the IDA's structure list.''')
     @property
     def index(self):
         '''Return the index of the structure.'''
@@ -822,10 +830,12 @@ class members_t(object):
     __slots__ = ('__owner', 'baseoffset')
 
     # members state
+    @document.details('The `structure_t` that owns this `members_t`.')
     @property
     def owner(self):
         '''Return the ``structure_t`` that owns this ``members_t``.'''
         return self.__owner
+    @document.details('The ``idaapi.member_t`` that this `members_t` wraps.')
     @property
     def ptr(self):
         '''Return the pointer to the ``idaapi.member_t`` that contains all the members.'''
@@ -1235,32 +1245,39 @@ class member_t(object):
         return
 
     # read-only properties
+    @document.details('The ``idaapi.member_t`` that this `member_t` wraps.')
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.member_t``.'''
         return self.__owner.ptr.get_member(self.__index)
+    @document.details('The member identifier for this `member_t`.')
     @property
     def id(self):
         '''Return the identifier of the member.'''
         return self.ptr.id
+    @document.details('The size of this `member_t`.')
     @property
     def size(self):
         '''Return the size of the member.'''
         return idaapi.get_member_size(self.ptr)
+    @document.details('The offset of this `member_t`.')
     @property
     def offset(self):
         '''Return the offset of the member.'''
         return self.ptr.get_soff() + self.__owner.members.baseoffset
+    @document.details('The flags for this specific `member_t`.')
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
         m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
         return 0 if m is None else m.flag
+    @document.details('''The full name for this `member_t` including its structure's name.''')
     @property
     def fullname(self):
         '''Return the fullname of the member.'''
         res = idaapi.get_member_fullname(self.id)
         return utils.string.of(res)
+    @document.details('The type identifier for this `member_t`.')
     @property
     def typeid(self):
         '''Return the identifier of the type of the member.'''
@@ -1271,24 +1288,29 @@ class member_t(object):
         else:
             res = idaapi.retrieve_member_info(opinfo, self.ptr)
         return None if opinfo.tid == idaapi.BADADDR else opinfo.tid
+    @document.details('The index of this `member_t` into its structure.')
     @property
     def index(self):
         '''Return the index of the member.'''
         return self.__index
+    @document.details('The starting offset of the `member_t`.')
     @property
     def left(self):
         '''Return the beginning offset of the member.'''
         return self.ptr.soff
+    @document.details('The ending offset of the `member_t` (starting offset plus its size).')
     @property
     def right(self):
         '''Return the ending offset of the member.'''
         return self.ptr.eoff
+    @document.details('The `structure_t` that owns this `member_t`.')
     @property
     def owner(self):
         '''Return the structure_t that owns the member.'''
         return self.__owner
 
     # read/write properties
+    @document.details('The name of this `member_t`.')
     @property
     def name(self):
         '''Return the name of the member.'''
@@ -1315,6 +1337,7 @@ class member_t(object):
         # now we can set the name of the member at the specified offset
         return idaapi.set_member_name(self.__owner.ptr, self.offset - self.__owner.members.baseoffset, ida_string)
 
+    @document.details('The comment of this `member_t`.')
     @property
     @document.parameters(repeatable='whether the comment should be repeatable or not')
     def comment(self, repeatable=True):
@@ -1378,6 +1401,7 @@ class member_t(object):
         ok = idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
 
+    @document.details('The ``.dt_type`` attribute of the ``idaapi.member_t`` that is wrapped by this `member_t`.')
     @property
     def dt_type(self):
         '''Return the `dt_type` attribute of the member.'''
@@ -1389,6 +1413,7 @@ class member_t(object):
         # idaapi(swig) and python have different definitions of what constant values are
         max = (sys.maxint+1)*2
         return (max+flag) if flag < 0 else (flag-max) if flag > max else flag
+    @document.details('The pythonic type of this `member_t`.')
     @property
     def type(self):
         '''Return the type of the member in its pythonic form.'''
