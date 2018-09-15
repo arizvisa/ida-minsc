@@ -29,12 +29,13 @@ class typemap:
 
     The syntax for types is fairly straight forward if one is familiar
     with the names that python exposes. Essentially the base type is
-    a tuple of the format `(type, size)`. If `size` is not specified,
+    a tuple of the format ``(type, size)``. If ``size`` is not specified,
     then the size will be assumed to be the default word size for the
-    current database. The `type` field is then any one of the python
+    current database. The ``type`` field is then any one of the python
     types such as `int`, `chr`, `str, `float`, `type`, or `None`.
 
     These types have the following meanings:
+
         `int` or `long` - an integral
         `chr` - a character
         `str` or `unicode` - a string or a character
@@ -45,21 +46,21 @@ class typemap:
     This can result in the describing of an IDA type and its size
     using a much simpler interface. Some examples can be:
 
-        `int` - An integer with the default size
-        `(int, 2)` - a 16-bit integer
-        `(chr, 3)` - a 3-byte string
-        `(type, 4)` - a 32-bit pointer
-        `(float, 4)` - a 16-bit floating point (ieee754 single)
-        `(None, 16)` - aligned to 16 bytes
+        ``int`` - An integer with the default size
+        ``(int, 2)`` - a 16-bit integer
+        ``(chr, 3)`` - a 3-byte string
+        ``(type, 4)`` - a 32-bit pointer
+        ``(float, 4)`` - a 16-bit floating point (ieee754 single)
+        ``(None, 16)`` - aligned to 16 bytes
 
     If an array needs to be represented, then one can simply wrap
     their type within a list. A few examples of this follows:
 
-        `[int, 4]` - a 4 element array of default sized integers
-        `[chr, 9]` - a 4 element array of characters
-        `[(int, 2), 3]` - a 3 element array of 16-bit integers
-        `[(float, 8), 4]` - a 4 element array of 64-bit floating point numbers.
-        `[type, 6]` - a 6 element array of pointers
+        ``[int, 4]`` - a 4 element array of default sized integers
+        ``[chr, 9]`` - a 4 element array of characters
+        ``[(int, 2), 3]`` - a 3 element array of 16-bit integers
+        ``[(float, 8), 4]`` - a 4 element array of 64-bit floating point numbers.
+        ``[type, 6]`` - a 6 element array of pointers
 
     These types are commonly associated with members of structures
     and thus can be used to quickly read or apply a type to a
@@ -161,7 +162,7 @@ class typemap:
 
     @classmethod
     def resolve(cls, pythonType):
-        '''Convert the provided ``pythonType`` to IDA's `(flag, typeid, size)`.'''
+        '''Convert the provided `pythonic-type` to IDA's ``(flag, typeid, size)``.'''
         sz, count = None, 1
         # FIXME: figure out how to fix this recursive module dependency
 
@@ -879,7 +880,7 @@ class ref_t(set):
 class AddressOpnumReftype(namedtypedtuple):
     """
     This tuple is used to represent references that include an operand number
-    and has the format `(address, opnum, ref_t)`. The operand number is
+    and has the format ``(address, opnum, ref_t)``. The operand number is
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
@@ -996,8 +997,9 @@ def xiterate(ea, start, next):
 def addressOfRuntimeOrStatic(func):
     """Used to determine if ``func`` is a statically linked address or a runtime-linked address.
 
-    This returns a tuple of the format `(runtimeQ, address)` where `runtimeQ` is
-    a boolean determining if it's linked during runtime.
+    This returns a tuple of the format ``(runtimeQ, address)`` where
+    ``runtimeQ`` is a boolean returning true if the symbol is linked
+    during runtime.
     """
     import function
     try:
@@ -1088,7 +1090,7 @@ class architecture_t(object):
         """Instantiate an `architecture_t` object which represents the registers available to an architecture.
 
         If ``cache`` is defined, then use the specified dictionary to map
-        an IDA register's `(name, dtype)` to a string containing the
+        an IDA register's ``(name, dtype)`` to a string containing the
         more commonly recognized register name.
         """
         self.__register__, self.__cache__ = map_t(), cache.get('cache', {})
@@ -1192,7 +1194,7 @@ class architecture_t(object):
 class bounds_t(namedtypedtuple):
     """
     This tuple is used to represent references that describe a bounds
-    and has the format `(left, right)`.
+    and has the format ``(left, right)``.
     """
     _fields = ('left', 'right')
     _types = (six.integer_types, six.integer_types)
