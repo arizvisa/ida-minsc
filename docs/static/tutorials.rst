@@ -18,17 +18,17 @@ aliases.
 1. Most multicased functions have a variation that takes no
    parameters in order to imply the current address. Another
    way to do this, however, is to use :py:func:`database.here`
-   which is aliased as :py:func:`database.h`. This function is
-   called so often however, that its been imported into the
-   root namespace of this plugin. So we can literally just call
-   :py:func:`h`.
+   which is aliased as :py:func:`database.h<database.here>`. This
+   function is called so often, however, that its been imported into
+   the default namespace of this plugin. So we can literally just call
+   :py:func:`h()<database.here>`.
 
 .. code-block:: python
 
    > print hex(h())
 
-2. To disassemble this instruction, we'll rely on the :py:func:`database.diassemble`
-   function that is aliased as :py:func:`database.disasm`.
+2. To disassemble this instruction, we'll rely on the :py:func:`database.disassemble`
+   function that is aliased as :py:func:`database.disasm<database.disassemble>`.
 
 .. code-block:: python
 
@@ -114,8 +114,9 @@ can be imported into WinDbg.
    matches our image base in our debugger. But...we can actually just
    feed an offset to our debugger instead. This will allow our
    breakpoint to be independent of our base address. To get our module
-   name, we can use :py:func:`database.module`, and to convert our
-   address to an offset, we can use :py:func:`database.offset`.
+   name, we can use :py:func:`database.module()<database.config.module>`,
+   and to convert our address to an offset, we can use
+   :py:func:`database.offset`.
 
 .. code-block:: python
 
@@ -188,10 +189,10 @@ database via :py:func:`database.functions`.
    the :py:data:`Or` parameter to return any function that has either tag
    assigned.  We plan on iterating through these results, so we'll need
    to use :py:func:`function.chunks.iterate` (or really its alias
-   :py:func:`function.iterate`) to look for our instruction type. To
-   test for an indirect call instruction (a call which branches to a
-   register or a phrase), we can simply use the :py:func:`instruction.is_calli`
-   function.
+   :py:func:`function.iterate<function.chunks.iterate>`) to look for our
+   instruction type. To test for an indirect call instruction (a call
+   which branches to a register or a phrase), we can simply use the
+   :py:func:`instruction.is_calli` function.
 
 .. code-block:: python
 
@@ -221,12 +222,13 @@ database via :py:func:`database.functions`.
    instructions tagged in the contents of our functions. So to continue,
    let's tag the operand type for each instruction. This way we can
    determine which registers the instructions' operands are composed
-   of. We can do this using :py:func:`instruction.op_type` which is
-   aliased as :py:func:`instruction.opt`. Actually, in order to check
-   our results, let's actually store *all* of the operand types using
-   its plural, :py:func:`instruction.ops_type`. As usual, this has an
-   abbreviated alias of :py:func:`instruction.opts`. We'll also keep
-   things clean again, by removing the previous tag, "indirect-call".
+   of. We can do this using :py:func:`instruction.op_type()<instruction.opt>`
+   which is aliased as :py:func:`instruction.opt<instruction.opt>`. Actually,
+   in order to check our results, let's actually store *all* of the operand
+   types using its plural, :py:func:`instruction.ops_type`. As usual, this
+   has an abbreviated alias of :py:func:`instruction.opts<instruction.ops_type>`.
+   We'll also keep things clean again, by removing the previous tag,
+   "indirect-call".
 
 .. code-block:: python
 
@@ -242,9 +244,9 @@ database via :py:func:`database.functions`.
 6. Just to sanity check things, lets prove that all of the calls that we
    care about really only have one operand. To do this, we'll output their
    address using the :py:func:`database.disassemble` function which is
-   aliased as :py:func:`database.disasm` and also tag them so we can
-   refer to them later. We'll do this removal by passing the :py:obj:`None`
-   parameter to :py:func:`database.tag`.
+   aliased as :py:func:`database.disasm<database.disassemble>` and also
+   tag them so we can refer to them later. We'll do this removal by
+   passing the :py:obj:`None` parameter to :py:func:`database.tag`.
 
 .. code-block:: python
 
@@ -292,9 +294,10 @@ database via :py:func:`database.functions`.
    just output their results as a breakpoint. In the prior tutorial,
    we chose :py:func:`database.offset` in order to calculate the
    relative address. Instead of doing it that way, there's a class in
-   the :py:mod:`tools` module that we can use to transform an address.
-   So let's use :py:class:`tools.remote` instead. To construct this,
-   we'll need our remote address.
+   the :py:mod:`tools` module that we can use to transform an address
+   named :py:class:`tools.remote`. So let's use this instead. To
+   construct this class, we'll need to pass our remote base address
+   as a parameter.
 
 .. code-block:: python
 
@@ -345,8 +348,8 @@ database via :py:func:`database.functions`.
     users so that they will also have the access to the same information.
     Just for fun, let's serialize this data so that we can transport this
     to another user. Rather than writing the queries to do this manually,
-    we can utilise one of the functions provided by the :py:mod:`custom.tags`
-    module. Namely the :py:func:`custom.tags.export`. We only want to give
+    we can utilise one of the functions provided by the :py:mod:`custom.tags<tags>`
+    module. Namely the :py:func:`custom.tags.export<tags.export>`. We only want to give
     them the "break-calli" tags which can be exported via the following code.
 
 .. code-block:: python
@@ -360,8 +363,8 @@ database via :py:func:`database.functions`.
    >
    > print "Dumped breakpoints to %s"% filename
 
-12. If another user wants to import this pickle, again the :py:mod:`custom.tags`
-    module can help us.
+12. If another user wants to import this pickled object, we can again use the
+    :py:mod:`custom.tags<tags>` to help us.
 
 .. code-block:: python
 
@@ -373,8 +376,8 @@ database via :py:func:`database.functions`.
 
 13. Unfortunately, this will overwrite any tags in the current database with
     the name "break-calli". If the user wants to map these tags to a different
-    name, they can provide a tag mapping as another parameter to
-    :py:func:`custom.tags.apply`.
+    name, however, they can provide a dictionary of tag mappings as a keyword
+    parameter to :py:func:`custom.tags.apply<tags.apply>`.
 
 .. code-block:: python
 
@@ -411,9 +414,9 @@ the combinators provided by this plugin.
    >
 
 2. One issue with using :py:func:`function.down` is since it only returns
-   addresses that a function can call, it will still return :py:obj:`False`
-   if a function makes an indirect call. Let's improve this via the following
-   variation.
+   addresses that a function is capable of calling, it will still return
+   :py:obj:`False` if the function we apply it to makes an indirect call.
+   Let's improve this by looking for any call via the following variation.
 
 .. code-block:: python
 
@@ -440,7 +443,7 @@ the combinators provided by this plugin.
    be combined to build the exact same function. If we combine the
    :py:func:`fpartial`, :py:func:`ifilter`, and some operators available
    via Python's :py:mod:`operator` module with the :py:func:`fcompose`
-   combinator we can implement the prior 2 versions of the
+   combinator we can implement our prior 2 implementations of the
    :py:func:`has_children` function with the following code.
 
 .. code-block:: python
