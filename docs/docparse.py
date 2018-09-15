@@ -383,8 +383,57 @@ class restructure(object):
             ref = ref.get(field)
         yield ref
     @classmethod
-    def docstringToList(cls, cmt):
-        L = backticklexer(":py:obj:`{:s}`".format, "``{:s}``".format)
+    def __objectOrReference(cls, string, invalid='()', type='obj'):
+        invalid = '()'
+        idx = -1
+        for ch in itertools.ifilter(functools.partial(operator.contains, string), iter(invalid)):
+            res = string.find(ch)
+            if idx < 0 or res > 0 and res < idx:
+                idx = res
+            continue
+
+        fmt = ":py:{:s}:".format(type)
+        f = (fmt + "`{:s}`").format if idx < 0 else functools.partial((fmt + "`{:s}<{ref:s}>`").format, ref=string[:idx])
+        return f(string)
+    @classmethod
+    def moduleDocstringToList(cls, cmt):
+        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
+        formatted = L.lex(cmt)
+
+        res = []
+        for line in formatted.strip().split('\n'):
+            res.append("- {:s}".format(cls.escape(line.strip())) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else cls.escape(line.strip()))
+        return res
+    @classmethod
+    def nsDocstringToList(cls, cmt):
+        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
+        formatted = L.lex(cmt)
+
+        res = []
+        for line in formatted.strip().split('\n'):
+            res.append("- {:s}".format(cls.escape(line.strip())) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else cls.escape(line.strip()))
+        return res
+    @classmethod
+    def classDocstringToList(cls, cmt):
+        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
+        formatted = L.lex(cmt)
+
+        res = []
+        for line in formatted.strip().split('\n'):
+            res.append("- {:s}".format(cls.escape(line.strip())) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else cls.escape(line.strip()))
+        return res
+    @classmethod
+    def methodDocstringToList(cls, cmt):
+        L = backticklexer(functools.partial(cls.__objectOrReference, type='class'), "``{:s}``".format)
+        formatted = L.lex(cmt)
+
+        res = []
+        for line in formatted.strip().split('\n'):
+            res.append("- {:s}".format(cls.escape(line.strip())) if line.startswith(' ') and not line.strip().startswith('>') else line if line.strip().startswith('>') else cls.escape(line.strip()))
+        return res
+    @classmethod
+    def functionDocstringToList(cls, cmt):
+        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
         formatted = L.lex(cmt)
 
         res = []
@@ -393,7 +442,7 @@ class restructure(object):
         return res
     @classmethod
     def paramDescriptionToRst(cls, descr):
-        L = backticklexer(":py:obj:`{:s}`".format, "``{:s}``".format)
+        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
         return cls.escape(L.lex(descr))
 
     ## Reference type converters
@@ -405,7 +454,7 @@ class restructure(object):
         if ref.comment:
             res.append('')
 
-            iterable = iter(cls.docstringToList(ref.comment))
+            iterable = iter(cls.moduleDocstringToList(ref.comment))
 
             # extract and procses the description
             descr = next(iterable)
@@ -486,7 +535,7 @@ class restructure(object):
             Classes may also have aliases defined for them. Please refer to the
             documentation for the class to see what is available. For more
             information on aliases, please see :ref:`multicase-aliases`.
-            """.split('\n')))
+            """.strip().split('\n')))
             res.append('')
 
             for ch in sorted(classes, key=operator.attrgetter('name')):
@@ -504,26 +553,30 @@ class restructure(object):
 
         res, sectionchar = [], '*^*'
 
+        # namespace reference
+        res.append(".. _ns-{:s}:".format(name.replace('.', '-')))
+        res.append('')
+
         # namespace header
         if depth <= 1: res.append(sectionchar[depth] * len(name))
         res.append(cls.escape(name))
         res.append(sectionchar[depth] * len(name))
         res.append('')
 
+        # namespace documentation
+        if ref.comment:
+            res.extend(cls.nsDocstringToList(ref.comment))
+            res.append('')
+
+        if ref.has('details'):
+            res.extend(cls.nsDocstringToList(ref.get('details')))
+            res.append('')
+
         # namespace bases
         if ref.has('bases'):
             bases = map(stringify, ref.get('bases'))
             bases = map(functools.partial("{:s}.{:s}".format, ns[-1]), bases)
-            res.append("Bases: {:s}".format(', '.join(map(":py:class:`{:s}`".format, bases))))
-            res.append('')
-
-        # namespace documentation
-        if ref.comment:
-            res.extend(cls.docstringToList(ref.comment))
-            res.append('')
-
-        if ref.has('details'):
-            res.extend(cls.docstringToList(ref.get('details')))
+            res.append("Bases: {:s}".format(', '.join(map(lambda s: ":ref:`{:s}<ns-{:s}>`".format(s, s.replace('.', '-')), bases))))
             res.append('')
 
         # split up the member into separate lists
@@ -578,11 +631,11 @@ class restructure(object):
         # class documentation
         res.append('')
         if ref.comment:
-            res.extend(cls.docstringToList(ref.comment))
+            res.extend(cls.classDocstringToList(ref.comment))
             res.append('')
 
         if ref.has('details'):
-            res.extend(cls.docstringToList(ref.get('details')))
+            res.extend(cls.classDocstringToList(ref.get('details')))
             res.append('')
 
         # split up the properties from the methods
@@ -601,6 +654,8 @@ class restructure(object):
                 ch.owner.set(getter=ch)
             elif ch.get('property') == 'setter':
                 ch.owner.set(setter=ch)
+            if ch.has('details'):
+                ch.owner.set(details=ch.get('details'))
             continue
 
         # process properties
@@ -671,7 +726,9 @@ class restructure(object):
                 res.append((n, '()'))
             elif isinstance(df, tuple):
                 res.append((n, '|'.join(map(stringify, df))))
-            elif isinstance(df, (six.integer_types, float)):
+            elif isinstance(df, six.integer_types):
+                res.append((n, ("{!s}" if df < 0x100 else "{:#x}").format(df)))
+            elif isinstance(df, float):
                 res.append((n, "{!s}".format(df)))
             elif isinstance(df, basestring):
                 res.append((n, df))
@@ -715,6 +772,9 @@ class restructure(object):
         res = []
         res.append('')
 
+        if ref.has('details'):
+            res.extend(cls.methodDocstringToList(ref.get('details')))
+
         attrs = []
         if ref.has('getter'): attrs.append(('getter', ref.get('getter')))
         else: attrs.append(('getter', ref))
@@ -723,7 +783,7 @@ class restructure(object):
         props = []
         for n, r in attrs:
             fmt = ":param {name:s}: {comment:s}"
-            props.append(fmt.format(name=n, comment=' '.join(cls.docstringToList(r.comment))))
+            props.append(fmt.format(name=n, comment=' '.join(cls.functionDocstringToList(r.comment))))
 
             _, pparams = cls.Arguments(r)
 
@@ -756,9 +816,9 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment:
-            res.extend(cls.docstringToList(ref.comment) + [''])
+            res.extend(cls.functionDocstringToList(ref.comment) + [''])
         if aliases:
-            f = functools.partial("``{:s}.{:s}``".format, ns[-1])
+            f = functools.partial(":py:func:`{:s}.{:s}<{ref:s}>`".format, ns[-1], ref=name)
             res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
 
         for n, descr, ty in params[1:]:
@@ -789,9 +849,9 @@ class restructure(object):
         res = []
         res.append('')
         if ref.comment:
-            res.extend(cls.docstringToList(ref.comment) + [''])
+            res.extend(cls.functionDocstringToList(ref.comment) + [''])
         if aliases:
-            f = functools.partial("``{:s}.{:s}``".format, ns[-1])
+            f = functools.partial(":py:func:`{:s}.{:s}<{ref:s}>`".format, ns[-1], ref=name)
             res.extend(["Aliases: {:s}".format(', '.join(map(f, aliases)))] + [''])
 
         for n, descr, ty in params:
@@ -944,6 +1004,7 @@ class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
         multicase = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == u'utils.multicase')
         aliases = (a for n, a, _, _, _ in decorators.functions(node) if n == 'document.aliases')
         params = (dict(kw) for n, _, kw, _, _ in decorators.functions(node) if n == 'document.parameters')
+        details = [details[0] for n, details, _, _, _ in decorators.functions(node) if n == 'document.details']
 
         # if it's hidden, then don't bother adding it
         if 'document.hidden' in methodtypes:
@@ -963,6 +1024,8 @@ class FunctionVisitor(ast.NodeVisitor, FullNameMixin):
         # construct the function
         res = F(node=node, name=node.name, namespace=self._ref, multicase=next(multicase, {}), docstring=docstring or '', arguments=[], defaults=defs, parameters=next(params, {}), aliases=set(next(aliases, {})))
         self._ref.add(res)
+
+        if details: res.set(details='\n'.join(details))
 
         # check to see if there's a new name for it
         newnames = [a[0] for n, a, _, _, _ in decorators.functions(node) if n == 'document.rename']
@@ -1059,7 +1122,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
 
     def append_classdef(self, node):
         attributes = decorators.attributes(node)
-        details = [details for n, (details,), _, _, _ in decorators.functions(node) if n == 'document.details']
+        details = [details[0] for n, details, _, _, _ in decorators.functions(node) if n == 'document.details']
         bases = [b[0] for b in map(grammar.reduce, node.bases) if b[0] != 'object']
 
         try:
@@ -1071,12 +1134,12 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
         res = Class(node=node, name=node.name, namespace=self._ref, docstring=docstring)
         if bases: res.set(bases=bases)
         if attributes: res.set(attributes=attributes)
-        if details: res.set(details=details)
+        if details: res.set(details='\n'.join(details))
         return res
 
     def append_namespace(self, node):
         attributes = decorators.attributes(node)
-        details = [details for n, (details,), _, _, _ in decorators.functions(node) if n == 'document.details']
+        details = [details[0] for n, details, _, _, _ in decorators.functions(node) if n == 'document.details']
         bases = [b[0] for b in map(grammar.reduce, node.bases) if b[0] != 'object']
 
         try:
@@ -1088,7 +1151,7 @@ class NamespaceVisitor(ast.NodeVisitor, FullNameMixin):
         res = Namespace(node=node, name=node.name, namespace=self._ref, docstring=docstring)
         if bases: res.set(bases=bases)
         if attributes: res.set(attributes=attributes)
-        if details: res.set(details=details)
+        if details: res.set(details='\n'.join(details))
         return res
 
 ### Visitor entrypoints
