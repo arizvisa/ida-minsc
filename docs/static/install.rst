@@ -101,10 +101,19 @@ As mentioned, this can allow a user to define functions that they use often
 or add aliases to some of the longer ones. By default the following functions
 are aliased in the root namespace:
 
-- :py:func:`h` -- Aliased from :py:func:`database.here` which will return the current address
-- :py:func:`top` -- Aliased from :py:func:`function.top` which will return the top address of the current function chunk
-- :py:func:`go` -- Aliased from :py:func:`database.go` which will navigate to the provided address
-- :py:func:`goof` -- Aliased from :py:func:`datbase.go_offset` which will navigate to the specified offset from the lowest address in the database
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`h`    | -- | Aliased from :py:func:`database.here` which will return the     |
+|                 |    | current address                                                 |
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`top`  | -- | Aliased from :py:func:`function.top` which will return the      |
+|                 |    | top address of the current function chunk                       |
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`go`   | -- | Aliased from :py:func:`database.go` which will navigate to      |
+|                 |    | the provided address                                            |
++-----------------+----+-----------------------------------------------------------------+
+| :py:func:`goof` | -- | Aliased from :py:func:`datbase.go_offset` which will navigate   |
+|                 |    | to the specified offset from the lowest address in the database |
++-----------------+----+-----------------------------------------------------------------+
 
 There are also a number of combinators that are exposed to the user via the
 default namespace. Please see :doc:`combinators` for more information on
@@ -113,18 +122,32 @@ how these can be used.
 Some of the base types that can be used for checking inheritance is also
 included in the root namespace:
 
-- :py:class:`register_t` -- The base type that registers are inherited from
-- :py:class:`symbol_t` -- A type that is used to represent objects that are composed of some number of symbols. This can be used to enumerate through all the registers returned from an operand (:py:func:`instruction.op_value`), or any object that contains an unresolvable symbol.
++------------------------+----+------------------------------------------------------+
+| :py:class:`register_t` | -- | The base type that registers are inherited from      +
++------------------------+----+------------------------------------------------------+
+| :py:class:`symbol_t`   | -- | A type that is used to represent objects that are    |
+|                        |    | composed of some number of symbols. This can be used |
+|                        |    | to enumerate through all the registers returned from |
+|                        |    | an operand such as :py:func:`instruction.op_value`,  |
+|                        |    | or any object that contains an unresolvable symbol.  |
++------------------------+----+------------------------------------------------------+
 
 There are a number of modules that are aliased to shorten the typing required
 to access their members. Some of these are:
 
-- :py:mod:`database` -- Aliased as ``db``
-- :py:mod:`function` -- Aliased as ``func``
-- :py:mod:`instruction` -- Aliased as ``ins``
-- :py:mod:`structure` -- Aliased as ``struc``
-- :py:mod:`enumeration` -- Aliased as ``enum``
-- :py:mod:`segment` -- Aliased as ``seg``
++-----------------------+----+----------------------+
+| :py:mod:`database`    | -- | Aliased as ``db``    |
++-----------------------+----+----------------------+
+| :py:mod:`function`    | -- | Aliased as ``func``  |
++-----------------------+----+----------------------+
+| :py:mod:`instruction` | -- | Aliased as ``ins``   |
++-----------------------+----+----------------------+
+| :py:mod:`structure`   | -- | Aliased as ``struc`` |
++-----------------------+----+----------------------+
+| :py:mod:`enumeration` | -- | Aliased as ``enum``  |
++-----------------------+----+----------------------+
+| :py:mod:`segment`     | -- | Aliased as ``seg``   |
++-----------------------+----+----------------------+
 
 Through these aliases, it is hoped for by the author that the user is enabled
 to write very quick and hacky code that will assist them to get the work they
