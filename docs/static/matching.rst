@@ -23,11 +23,19 @@ to the user.
 
 Some examples of the common keyword arguments that are provided are:
 
-- :py:data:`address` - Match according to an address.
-- :py:data:`name` - Match according to the exact name specified.
-- :py:data:`like` - Filter according to a glob being applied to a name.
-- :py:data:`regex` - Filter according to a regular-expression being applied to a name.
-- :py:data:`predicate` - Filtering according to a callable that critiques the type returning true or false.
++----------------------+----+----------------------------------------------------+
+| :py:data:`address`   | -- | Match according to an address.                     |
++----------------------+----+----------------------------------------------------+
+| :py:data:`name`      | -- | Match according to the exact name specified.       |
++----------------------+----+----------------------------------------------------+
+| :py:data:`like`      | -- | Filter according to a glob being applied to a name |
++----------------------+----+----------------------------------------------------+
+| :py:data:`regex`     | -- | Filter according to a regular-expression being     |
+|                      |    | applied to a name.                                 |
++----------------------+----+----------------------------------------------------+
+| :py:data:`predicate` | -- | Filtering according to a callable that critiques   |
+|                      |    | the type returning true or false.                  |
++----------------------+----+----------------------------------------------------+
 
 These keywords are then exposed to users via 3 general function styles. Each
 matcher will typically provide functionality similar to the :py:func:`namespace.list`,
