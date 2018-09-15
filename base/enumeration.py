@@ -473,6 +473,7 @@ class members(object):
              six.print_(u"[{:d}] 0x{:>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
         return
 
+@document.namespace
 class member(object):
     """
     This namespace allows one to interact with a member belonging
