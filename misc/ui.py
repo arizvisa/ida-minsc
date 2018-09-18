@@ -19,7 +19,7 @@ window that they wish to expose to the user.
 """
 
 import six
-import sys, os
+import sys, os, time
 import logging
 
 import idaapi, internal
@@ -582,19 +582,38 @@ try:
         def open(self, width=0.8, height=0.1):
             '''Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.'''
             global window
+            cls = self.__class__
 
-            # XXX: spin until main is defined because IDA seems to be racy..
-            main = None
-            while main is None:
+            # XXX: spin for a second until main is defined because IDA seems to be racy with this api
+            ts, main = time.time(), None
+            while time.time() - ts < 1 and main is None:
                 main = window.main()
 
+            if main is None:
+                logging.warn("{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join((__name__, cls.__name__)), width, height))
+
+            # figure out the dimensions of the window
+            if main is None:
+                # if there's no window, then assume some screen dimensions
+                w, h = 1024, 768
+            else:
+                w, h = main.width(), main.height()
+
             # now we can calculate the dimensions of the progress bar
-            w, h = main.width() * width, main.height() * height
-            self.object.setFixedWidth(w), self.object.setFixedHeight(h)
+            logging.info("{:s}.open({!s}, {!s}) : Using dimensions ({:d}, {:d}) for progress bar.".format('.'.join((__name__, cls.__name__)), width, height, int(w*width), int(h*height)))
+            self.object.setFixedWidth(w * width), self.object.setFixedHeight(h * height)
+
+            # calculate the center
+            if main is None:
+                # no window, so use the center of the screen
+                cx, cy = w * 0.5, h * 0.5
+            else:
+                center = main.geometry().center()
+                cx, cy = center.x(), center.y()
 
             # ...and center it.
-            center = main.geometry().center()
-            x, y = center.x() - (w * 0.5), center.y() - (h * 1.0)
+            x, y = cx - (w * width * 0.5), cy - (h * height * 1.0)
+            logging.info("{:s}.open({!s}, {!s}) : Centering progress bar at ({:d}, {:d}).".format('.'.join((__name__, cls.__name__)), width, height, int(x), int(y)))
             self.object.move(x, y)
 
             # now everything should look good.
@@ -733,7 +752,7 @@ class queue(object):
     @classmethod
     def __start_ida__(cls):
         if hasattr(cls, 'execute') and not cls.execute.dead:
-            logging.warn("{:s}.start : Skipping re-instantiation of execution queue {!r}.".format('.'.join((__name__, cls.__name__)), cls.execute))
+            logging.warn("{:s}.start() : Skipping re-instantiation of execution queue {!r}.".format('.'.join((__name__, cls.__name__)), cls.execute))
             return
         cls.execute = internal.utils.execution()
         return
@@ -741,7 +760,7 @@ class queue(object):
     @classmethod
     def __stop_ida__(cls):
         if not hasattr(cls, 'execute'):
-            logging.warn("{:s}.stop : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
+            logging.warn("{:s}.stop() : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
             return
         return cls.execute.release()
 
@@ -781,55 +800,66 @@ class InputBox(idaapi.PluginForm):
     def Show(self, caption, options=0):
         return super(InputBox, self).Show(caption, options)
 
-### figure out which progress-bar to define as `Progress`.
-# if a UIProgress one was successfully defined, then use that one.
-if 'UIProgress' in locals():
-    class Progress(UIProgress):
-        '''The default progress bar with which to show progress.'''
+### Console-only progress bar
+class ConsoleProgress(object):
+    """
+    Helper class used to simplify the showing of a progress bar in IDA's console.
+    """
+    def __init__(self, blocking=True):
+        self.__path__ = "{:s}/{:s}".format(_database.config.path(), _database.config.filename())
+        self.__value__ = 0
+        self.__min__, self.__max__ = 0, 0
+        return
 
-# otherwise we just fall-back to the console-only one.
-else:
-    logging.warn("{:s} : Using console-only implementation of the ui.Progress class.".format(__name__))
-    class ConsoleProgress(object):
-        """
-        Helper class used to simplify the showing of a progress bar in IDA's console.
-        """
-        def __init__(self, blocking=True):
-            self.__path__ = "{:s}/{:s}".format(_database.config.path(), _database.config.filename())
-            self.__value__ = 0
-            self.__min__, self.__max__ = 0, 0
-            return
+    canceled = property(fget=lambda s: False, fset=lambda s, v: None)
+    maximum = property(fget=lambda s: self.__max__)
+    minimum = property(fget=lambda s: self.__min__)
+    current = property(fget=lambda s: self.__value__)
 
-        canceled = property(fget=lambda s: False, fset=lambda s, v: None)
-        maximum = property(fget=lambda s: self.__max__)
-        minimum = property(fget=lambda s: self.__min__)
-        current = property(fget=lambda s: self.__value__)
+    def open(self, width=0.8, height=0.1):
+        '''Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.'''
+        return
 
-        def open(self, width=0.8, height=0.1):
-            '''Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.'''
-            return
+    def close(self):
+        '''Close the current progress bar.'''
+        return
 
-        def close(self):
-            '''Close the current progress bar.'''
-            return
+    def update(self, **options):
+        '''Update the current state of the progress bar.'''
+        minimum, maximum = options.get('min', None), options.get('max', None)
+        text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
 
-        def update(self, **options):
-            '''Update the current state of the progress bar.'''
-            minimum, maximum = options.get('min', None), options.get('max', None)
-            text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
+        if minimum is not None:
+            self.__min__ = minimum
+        if maximum is not None:
+            self.__max__ = maximum
 
-            if minimum is not None:
-                self.__min__ = minimum
-            if maximum is not None:
-                self.__max__ = maximum
+        if 'current' in options:
+            self.__value__ = options['current']
+        if 'value' in options:
+            self.__value__ = options['value']
 
-            if 'current' in options:
-                self.__value__ = options['current']
-            if 'value' in options:
-                self.__value__ = options['value']
-
+        if text is not None:
             logging.info(text)
-            return self.__value__
 
-    class Progress(ConsoleProgress):
-        '''The default progress bar with which to show progress.'''
+        return self.__value__
+
+### Fake progress bar class that instantiates whichever one is available
+class Progress(object):
+    '''The default progress bar with which to show progress.'''
+    def __new__(cls, *args, **kwargs):
+        if 'UIProgress' not in globals():
+            logging.warn("{:s}(...) : Using console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
+            return ConsoleProgress(*args, **kwargs)
+
+        # XXX: spin for a second looking for the application window as IDA seems to be racy with this for some reason
+        ts, main = time.time(), None
+        while time.time() - ts < 1 and main is None:
+            main = window.main()
+
+        # If no main window was found, then fall back to the console-only progress bar
+        if main is None:
+            logging.warn("{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
+            return ConsoleProgress(*args, **kwargs)
+
+        return UIProgress(*args, **kwargs)
