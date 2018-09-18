@@ -810,14 +810,12 @@ class restructure(object):
     @classmethod
     def Method(cls, ref):
         ns = [r.name for r in cls.walk(ref, 'namespace')]
-        ns = ns[1:] if ref.name == '__new__' else ns[:]
-        name = r'\.'.join(reversed(ns)) if ref.name == '__new__' else ref.name
 
         aliases = ref.get('aliases') or {}
         args, params = cls.Arguments(ref)
 
         # now we can make the definition
-        definition = ".. py:method:: {name:s}({arguments:s})".format(name=name, arguments=', '.join(cls.escape(n) if isinstance(df, undefined) else "{:s}={!s}".format(cls.escape(n), df) for n, df in args))
+        definition = ".. py:method:: {name:s}({arguments:s})".format(name=ref.name, arguments=', '.join(cls.escape(n) if isinstance(df, undefined) else "{:s}={!s}".format(cls.escape(n), df) for n, df in itertools.chain([('cls', undefined())] if ref.name == '__new__' else [], args)))
 
         # populate the contents of the function
         res = []
@@ -825,12 +823,12 @@ class restructure(object):
         if ref.comment:
             res.extend(cls.functionDocstringToList(ref.comment) + [''])
         if aliases:
-            f = functools.partial(":py:func:`{:s}.{:s}<{ref:s}>`".format, ns[-1], ref=name)
+            f = functools.partial(":py:func:`{:s}.{:s}<{ref:s}>`".format, ns[-1], ref=ref.name)
             res.append("Aliases: {:s}".format(', '.join(map(f, aliases))))
             res.append('')
 
-        for n, descr, ty in params[1:]:
-            res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
+        for n, descr, ty in params[:] if ref.name == '__new__' else params[1:]:
+            res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr.strip())))
             if not isinstance(ty, undefined):
                 res.append(":type {name:s}: {types:s}".format(name=cls.escape(n), types=' or '.join(map(cls.escape, ty)) if isinstance(ty, tuple) else cls.escape(ty)))
             continue
@@ -864,7 +862,7 @@ class restructure(object):
             res.append('')
 
         for n, descr, ty in params:
-            res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr)))
+            res.append(":param {name:s}:".format(name=cls.escape(n)) if isinstance(descr, undefined) else ":param {name:s}: {description:s}".format(name=cls.escape(n), description=cls.paramDescriptionToRst(descr.strip())))
             if not isinstance(ty, undefined):
                 res.append(":type {name:s}: {types:s}".format(name=cls.escape(n), types=' or '.join(map(cls.escape, ty)) if isinstance(ty, tuple) else cls.escape(ty)))
             continue
