@@ -45,6 +45,28 @@ review is greatly simplified.
 
 1. [Eko7-2011] -- `Portnoy, Aaron, and Ali Rizvi-Santiago. Experiments Using IDA Pro as a Data Store. Ekoparty, 21 Sep. 2011, www.youtube.com/watch?v=A4yXdir_59E <https://www.youtube.com/watch?v=A4yXdir_59E>`_
 
+.. _tagging-build:
+
+----------------------
+Building the tag-cache
+----------------------
+
+When creating an IDA database, this plugin will hook IDA in order to determine
+when the auto-analysis queue is empty. When this happens, this plugin will
+proceed to build the tag cache. When building the tag cache, the plugin will
+output the number of functions completed relative to the total number of
+defined functions. This will be in the form of a progress bar that looks like
+the following.
+
+.. image:: _images/tagging-progress.png
+   :alt: image of progress bar
+   :align: center
+
+Once producing the tag cache, the database is ready to be queried. If the
+user wants to rebuild the tag cache, or to build a cache for a database that
+has previously been built. Please see :ref:`tagging-modules-tagfix` for
+more information.
+
 .. _tagging-types:
 
 ---------
@@ -356,7 +378,7 @@ Tag modules -- tagfix
 
 The custom :py:mod:`tagfix` module allows for one to rebuild the tag cache if
 the cache somehow gets corrupted in some way (due to IDA crashing whilst trying
-to write a netnode) or if a database did not complete it's initial creation of
+to write a netnode) or if a database did not complete its initial creation of
 the tag cache.
 
 This module exposes a number of functions that can be used to rebuild the tag
@@ -550,7 +572,7 @@ When using tag names within a database, any tag name can be used. Tags that
 are wrapped with double-underscores ("__") may also have additional useful
 side effects. Although any tag names can be used, it's recommended by the
 author to choose consistent names to simplify exchanging knowledge with
-other users. Some recommended names can be:
+other users. Some recommended names are:
 
 +---------------+--------------------------------------------------------+
 | ``synopsis``  | The potential semantics of a reversed function         |
