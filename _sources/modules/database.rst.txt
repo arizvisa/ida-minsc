@@ -2138,14 +2138,14 @@ following examples can be used::
    
    Read a signed integer from the current address.
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.signed(ea, \*\*byteorder)
    
    Read a signed integer from the address ``ea`` using the size defined in the database.
    
    :param ea: an address in the database
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.signed(ea, size, \*\*byteorder)
    
@@ -2160,7 +2160,7 @@ following examples can be used::
    :type ea: int or long
    :param size: the size of the integer (in bytes)
    :type size: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.structure()
    
@@ -2180,14 +2180,14 @@ following examples can be used::
    
    Read an unsigned integer from the current address.
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.unsigned(ea, \*\*byteorder)
    
    Read an unsigned integer from the address ``ea`` using the size defined in the database.
    
    :param ea: an address in the database
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.unsigned(ea, size, \*\*byteorder)
    
@@ -2202,7 +2202,7 @@ following examples can be used::
    :type ea: int or long
    :param size: the size of the integer (in bytes)
    :type size: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. _ns-database-get-integer:
 
@@ -2224,13 +2224,13 @@ like in the following examples::
 
 .. py:function:: get\.integer(\*\*byteorder)
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer(ea, \*\*byteorder)
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer(ea, size, \*\*byteorder)
    
@@ -2238,13 +2238,13 @@ like in the following examples::
    :type ea: int or long
    :param size: the size of the integer (in bytes)
    :type size: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint128_t(\*\*byteorder)
    
    Read a sint128_t from the current address.
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint128_t(ea, \*\*byteorder)
    
@@ -2252,7 +2252,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint16_t(\*\*byteorder)
    
@@ -2260,7 +2260,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.sint2<get\.integer\.sint16_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint16_t(ea, \*\*byteorder)
    
@@ -2270,7 +2270,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint32_t(\*\*byteorder)
    
@@ -2278,7 +2278,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.sint4<get\.integer\.sint32_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint32_t(ea, \*\*byteorder)
    
@@ -2288,7 +2288,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint64_t(\*\*byteorder)
    
@@ -2296,7 +2296,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.sint8<get\.integer\.sint64_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint64_t(ea, \*\*byteorder)
    
@@ -2306,7 +2306,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint8_t(\*\*byteorder)
    
@@ -2314,7 +2314,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.sbyte1<get\.integer\.sint8_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint8_t(ea, \*\*byteorder)
    
@@ -2324,13 +2324,13 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint128_t(\*\*byteorder)
    
    Read a uint128_t from the current address.
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint128_t(ea, \*\*byteorder)
    
@@ -2338,7 +2338,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint16_t(\*\*byteorder)
    
@@ -2346,7 +2346,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.uint2<get\.integer\.uint16_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint16_t(ea, \*\*byteorder)
    
@@ -2356,7 +2356,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint32_t(\*\*byteorder)
    
@@ -2364,7 +2364,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.uint4<get\.integer\.uint32_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint32_t(ea, \*\*byteorder)
    
@@ -2374,7 +2374,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint64_t(\*\*byteorder)
    
@@ -2382,7 +2382,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.uint8<get\.integer\.uint64_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint64_t(ea, \*\*byteorder)
    
@@ -2392,7 +2392,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint8_t(\*\*byteorder)
    
@@ -2400,7 +2400,7 @@ like in the following examples::
    
    Aliases: :py:func:`database.get.ubyte1<get\.integer\.uint8_t>`
    
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint8_t(ea, \*\*byteorder)
    
@@ -2410,7 +2410,7 @@ like in the following examples::
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer 
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. _ns-database-get-switch:
 

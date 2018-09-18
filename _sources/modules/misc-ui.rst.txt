@@ -600,15 +600,13 @@ ConsoleProgress
       
       Update the current state of the progress bar.
       
-      :param \*\*options:  The options to update the progress bar with. Some of these options are:
+      :param \*\*options: The options to update the progress bar with. Some of these options are:
    
-               :py:obj:`minimum` - the minimum value on the progress bar
-               :py:obj:`maximum` - the maximum value on the progress bar
-               :py:obj:`text` - the current text to display
-               :py:obj:`title` - the title of the progress bar
-               :py:obj:`tooltip` - what to emit when the user hovers over the progress ar
-   
-           
+               - ``minimum`` - the minimum value on the progress bar
+               - ``maximum`` - the maximum value on the progress bar
+               - ``text`` - the current text to display
+               - ``title`` - the title of the progress bar
+               - ``tooltip`` - what to emit when the user hovers over the progress bar
       
 ********
 InputBox
@@ -623,13 +621,19 @@ InputBox
    
    .. py:method:: OnClose(self, form)
       
-      :param form:
+      A method to overload to be notified when the plugin form is destroyed.
+      
+      :param form: an :py:obj:`idaapi.PluginForm` that is created
       
    .. py:method:: OnCreate(self, form)
       
-      :param form:
+      A method to overload to be notified when the plugin form is created.
+      
+      :param form: an :py:obj:`idaapi.PluginForm` that is created
       
    .. py:method:: Show(self, caption, options=0)
+      
+      Show the form with the specified ``caption`` and ``options``.
       
       :param caption: the title of the form to show
       :param options: any flags to show the form with
@@ -644,11 +648,12 @@ Progress
    automatically determine which progress bar (Console or UI) to instantiate
    based on what is presently available.
    
-   .. py:method:: ui\.Progress(\*args, \*\*kwargs)
+   .. py:method:: __new__(cls, \*args, \*\*kwargs)
       
       Figure out which progress bar to use and instantiate it with the provided parameters ``args`` and ``kwargs``.
       
-      :param \*\*kwargs:
+      :param \*args: any variable arguments to pass to the determined progress bar
+      :param \*\*kwargs: any keyword arguments to pass to the determined progress bar
       
 **********
 UIProgress
@@ -673,13 +678,11 @@ UIProgress
       
       Update the current state of the progress bar.
       
-      :param \*\*options:  The options to update the progress bar with. Some of these options are:
+      :param \*\*options: The options to update the progress bar with. Some of these options are:
    
-                   :py:obj:`minimum` - the minimum value on the progress bar
-                   :py:obj:`maximum` - the maximum value on the progress bar
-                   :py:obj:`text` - the current text to display
-                   :py:obj:`title` - the title of the progress bar
-                   :py:obj:`tooltip` - what to emit when the user hovers over the progress ar
-   
-               
+                   - ``minimum`` - the minimum value on the progress bar
+                   - ``maximum`` - the maximum value on the progress bar
+                   - ``text`` - the current text to display
+                   - ``title`` - the title of the progress bar
+                   - ``tooltip`` - what to emit when the user hovers over the progress bar
       

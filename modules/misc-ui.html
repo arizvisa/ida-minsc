@@ -910,11 +910,13 @@ information on aliases, please see <a class="reference internal" href="../multic
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**options</strong> – <p>The options to update the progress bar with. Some of these options are:</p>
-<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">minimum</span></code> - the minimum value on the progress bar
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum</span></code> - the maximum value on the progress bar
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">text</span></code> - the current text to display
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">title</span></code> - the title of the progress bar
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">tooltip</span></code> - what to emit when the user hovers over the progress ar</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">minimum</span></code> - the minimum value on the progress bar</li>
+<li><code class="docutils literal notranslate"><span class="pre">maximum</span></code> - the maximum value on the progress bar</li>
+<li><code class="docutils literal notranslate"><span class="pre">text</span></code> - the current text to display</li>
+<li><code class="docutils literal notranslate"><span class="pre">title</span></code> - the title of the progress bar</li>
+<li><code class="docutils literal notranslate"><span class="pre">tooltip</span></code> - what to emit when the user hovers over the progress bar</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -935,11 +937,12 @@ to interact with the user.</p>
 <dl class="method">
 <dt id="ui.InputBox.OnClose">
 <code class="descname">OnClose</code><span class="sig-paren">(</span><em>self</em>, <em>form</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.InputBox.OnClose" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>A method to overload to be notified when the plugin form is destroyed.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>form</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>form</strong> – an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.PluginForm</span></code> that is created</td>
 </tr>
 </tbody>
 </table>
@@ -948,11 +951,12 @@ to interact with the user.</p>
 <dl class="method">
 <dt id="ui.InputBox.OnCreate">
 <code class="descname">OnCreate</code><span class="sig-paren">(</span><em>self</em>, <em>form</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.InputBox.OnCreate" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>A method to overload to be notified when the plugin form is created.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>form</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>form</strong> – an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.PluginForm</span></code> that is created</td>
 </tr>
 </tbody>
 </table>
@@ -961,7 +965,8 @@ to interact with the user.</p>
 <dl class="method">
 <dt id="ui.InputBox.Show">
 <code class="descname">Show</code><span class="sig-paren">(</span><em>self</em>, <em>caption</em>, <em>options=0</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.InputBox.Show" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>Show the form with the specified <code class="docutils literal notranslate"><span class="pre">caption</span></code> and <code class="docutils literal notranslate"><span class="pre">options</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
@@ -987,14 +992,18 @@ to interact with the user.</p>
 automatically determine which progress bar (Console or UI) to instantiate
 based on what is presently available.</p>
 <dl class="method">
-<dt id="ui.Progress.ui.Progress">
-<code class="descclassname">ui.</code><code class="descname">Progress</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.Progress.ui.Progress" title="Permalink to this definition">¶</a></dt>
+<dt id="ui.Progress.__new__">
+<code class="descname">__new__</code><span class="sig-paren">(</span><em>cls</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.Progress.__new__" title="Permalink to this definition">¶</a></dt>
 <dd><p>Figure out which progress bar to use and instantiate it with the provided parameters <code class="docutils literal notranslate"><span class="pre">args</span></code> and <code class="docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>*args</strong> – any variable arguments to pass to the determined progress bar</li>
+<li><strong>**kwargs</strong> – any keyword arguments to pass to the determined progress bar</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -1042,11 +1051,13 @@ based on what is presently available.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**options</strong> – <p>The options to update the progress bar with. Some of these options are:</p>
-<p><code class="xref py py-obj docutils literal notranslate"><span class="pre">minimum</span></code> - the minimum value on the progress bar
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum</span></code> - the maximum value on the progress bar
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">text</span></code> - the current text to display
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">title</span></code> - the title of the progress bar
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">tooltip</span></code> - what to emit when the user hovers over the progress ar</p>
+<ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">minimum</span></code> - the minimum value on the progress bar</li>
+<li><code class="docutils literal notranslate"><span class="pre">maximum</span></code> - the maximum value on the progress bar</li>
+<li><code class="docutils literal notranslate"><span class="pre">text</span></code> - the current text to display</li>
+<li><code class="docutils literal notranslate"><span class="pre">title</span></code> - the title of the progress bar</li>
+<li><code class="docutils literal notranslate"><span class="pre">tooltip</span></code> - what to emit when the user hovers over the progress bar</li>
+</ul>
 </td>
 </tr>
 </tbody>
