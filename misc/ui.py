@@ -705,13 +705,14 @@ try:
             self.object.close()
 
         @document.parameters(
-            options=""" The options to update the progress bar with. Some of these options are:
+            options="""
+            The options to update the progress bar with. Some of these options are:
 
-                `minimum` - the minimum value on the progress bar
-                `maximum` - the maximum value on the progress bar
-                `text` - the current text to display
-                `title` - the title of the progress bar
-                `tooltip` - what to emit when the user hovers over the progress ar
+                - ``minimum`` - the minimum value on the progress bar
+                - ``maximum`` - the maximum value on the progress bar
+                - ``text`` - the current text to display
+                - ``title`` - the title of the progress bar
+                - ``tooltip`` - what to emit when the user hovers over the progress bar
 
             """
         )
@@ -896,10 +897,12 @@ class InputBox(idaapi.PluginForm):
     A class designed to be inherited from that can be used
     to interact with the user.
     """
+    @document.parameters(form='an `idaapi.PluginForm` that is created')
     def OnCreate(self, form):
         '''A method to overload to be notified when the plugin form is created.'''
         self.parent = self.FormToPyQtWidget(form)
 
+    @document.parameters(form='an `idaapi.PluginForm` that is created')
     def OnClose(self, form):
         '''A method to overload to be notified when the plugin form is destroyed.'''
         pass
@@ -937,13 +940,14 @@ class ConsoleProgress(object):
         return
 
     @document.parameters(
-        options=""" The options to update the progress bar with. Some of these options are:
+        options="""
+        The options to update the progress bar with. Some of these options are:
 
-            `minimum` - the minimum value on the progress bar
-            `maximum` - the maximum value on the progress bar
-            `text` - the current text to display
-            `title` - the title of the progress bar
-            `tooltip` - what to emit when the user hovers over the progress ar
+            - ``minimum`` - the minimum value on the progress bar
+            - ``maximum`` - the maximum value on the progress bar
+            - ``text`` - the current text to display
+            - ``title`` - the title of the progress bar
+            - ``tooltip`` - what to emit when the user hovers over the progress bar
 
         """
     )
@@ -979,6 +983,7 @@ class Progress(object):
 
     timeout = 5.0
 
+    @document.parameters(args='any variable arguments to pass to the determined progress bar', kwargs='any keyword arguments to pass to the determined progress bar')
     def __new__(cls, *args, **kwargs):
         '''Figure out which progress bar to use and instantiate it with the provided parameters `args` and `kwargs`.'''
         if 'UIProgress' not in globals():
