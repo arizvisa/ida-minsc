@@ -564,6 +564,8 @@ try:
         """
         Helper class used to simplify the showing of a progress bar in IDA's UI.
         """
+        timeout = 5.0
+
         def __init__(self, blocking=True):
             self.object = res = PyQt5.Qt.QProgressDialog()
             res.setVisible(False)
@@ -585,8 +587,8 @@ try:
             cls = self.__class__
 
             # XXX: spin for a second until main is defined because IDA seems to be racy with this api
-            ts, main = time.time(), None
-            while time.time() - ts < 1 and main is None:
+            ts, main = time.time(), getattr(self, '__appwindow__', None)
+            while time.time() - ts < self.timeout and main is None:
                 main = window.main()
 
             if main is None:
@@ -855,15 +857,17 @@ class Progress(object):
     based on what is presently available.
     """
 
+    timeout = 5.0
+
     def __new__(cls, *args, **kwargs):
         '''Figure out which progress bar to use and instantiate it with the provided parameters ``args`` and ``kwargs``.'''
         if 'UIProgress' not in globals():
             logging.warn("{:s}(...) : Using console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
             return ConsoleProgress(*args, **kwargs)
 
-        # XXX: spin for a second looking for the application window as IDA seems to be racy with this for some reason
-        ts, main = time.time(), None
-        while time.time() - ts < 1 and main is None:
+        # XXX: spin for a bit looking for the application window as IDA seems to be racy with this for some reason
+        ts, main = time.time(), getattr(cls, '__appwindow__', None)
+        while time.time() - ts < cls.timeout and main is None:
             main = window.main()
 
         # If no main window was found, then fall back to the console-only progress bar
@@ -871,4 +875,5 @@ class Progress(object):
             logging.warn("{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
             return ConsoleProgress(*args, **kwargs)
 
+        cls.__appwindow__ = main
         return UIProgress(*args, **kwargs)
