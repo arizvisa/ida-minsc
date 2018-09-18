@@ -63,7 +63,7 @@ import segment as seg
 ## default log setting for notifying the user
 # FIXME: actually use the logging module properly instead of assuming
 #        control of the root logger.
-__import__('logging').root.level = __import__('logging').INFO
+#__import__('logging').root.setLevel(__import__('logging').INFO)
 
 ## shortcuts
 h, top, go, goof = database.h, func.top, database.go, database.go_offset
