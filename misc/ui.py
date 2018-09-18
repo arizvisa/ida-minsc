@@ -792,12 +792,15 @@ class InputBox(idaapi.PluginForm):
     to interact with the user.
     """
     def OnCreate(self, form):
+        '''A method to overload to be notified when the plugin form is created.'''
         self.parent = self.FormToPyQtWidget(form)
 
     def OnClose(self, form):
+        '''A method to overload to be notified when the plugin form is destroyed.'''
         pass
 
     def Show(self, caption, options=0):
+        '''Show the form with the specified ``caption`` and ``options``.'''
         return super(InputBox, self).Show(caption, options)
 
 ### Console-only progress bar
@@ -846,8 +849,14 @@ class ConsoleProgress(object):
 
 ### Fake progress bar class that instantiates whichever one is available
 class Progress(object):
-    '''The default progress bar with which to show progress.'''
+    """
+    The default progress bar in with which to show progress. This class will
+    automatically determine which progress bar (Console or UI) to instantiate
+    based on what is presently available.
+    """
+
     def __new__(cls, *args, **kwargs):
+        '''Figure out which progress bar to use and instantiate it with the provided parameters ``args`` and ``kwargs``.'''
         if 'UIProgress' not in globals():
             logging.warn("{:s}(...) : Using console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
             return ConsoleProgress(*args, **kwargs)
