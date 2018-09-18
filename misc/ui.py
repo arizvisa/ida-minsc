@@ -638,7 +638,7 @@ try:
             return ns.FormToPyQtWidget(twidget)
 
 except ImportError:
-    logging.warn("{:s} : Unable to locate PyQt5.Qt module.".format(__name__))
+    logging.info("{:s}:Unable to locate PyQt5.Qt module.".format(__name__))
 
 ### PySide-specific functions and namespaces
 try:
@@ -681,7 +681,7 @@ try:
             return ns.FormToPySideWidget(twidget)
 
 except ImportError:
-    logging.warn("{:s} : Unable to locate PySide module.".format(__name__))
+    logging.info("{:s}:Unable to locate PySide module.".format(__name__))
 
 ### wrapper that uses a priorityhook around IDA's hooking capabilities.
 class hook(object):
