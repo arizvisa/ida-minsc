@@ -521,7 +521,7 @@ class contents(tagging):
             try:
                 ok = cls._write_header(target, ea, None)
                 if not ok:
-                    logging.info("{:s}._write : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), key))
+                    logging.debug("{:s}._write : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), key))
             finally:
                 return internal.netnode.blob.remove(key, cls.btag)
 
