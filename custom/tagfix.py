@@ -111,7 +111,7 @@ def fetch_globals_data():
     addr, tags = {}, {}
     left, right = db.range()
     print >>output, 'globals: fetching tags from data'
-    for ea in db.iterate(left, right):
+    for ea in db.address.iterate(left, right):
         if func.within(ea): continue
         ui.navigation.auto(ea)
 
@@ -220,7 +220,7 @@ def customnames():
     '''Iterate through all of the custom names defined in the database and update the cache with their reference counts.'''
     # FIXME: first delete all the custom names '__name__' tag
     left, right = db.range()
-    for ea in db.iterate(left, right):
+    for ea in db.address.iterate(left, right):
         ctx = internal.comment.globals if not func.within(ea) or func.address(ea) == ea else internal.comment.contents
         if db.type.has_customname(ea):
             ctx.inc(ea, '__name__')
@@ -230,7 +230,7 @@ def customnames():
 def extracomments():
     '''Iterate through all of the extra comments defined in the database and update the cache with their reference counts.'''
     left, right = db.range()
-    for ea in db.iterate(left, right):
+    for ea in db.address.iterate(left, right):
         ctx = internal.comment.contents if func.within(ea) else internal.comment.globals
 
         count = db.extra.__count__(ea, idaapi.E_PREV)
