@@ -16,11 +16,10 @@ they have created during their reversing project.
 Software Requirements
 ---------------------
 
-Since this is an IDA plugin, obviously this requires IDA Pro. At the
-present time, only IDA 6.9 up to IDA 7.1.180227 is supported by this
-plugin. The installation steps described in this document also assume
-that you're not using the Python instance that is bundled with IDA and
-that you have it installed separately.
+This plugin requires IDA Pro to be installed along with the IDAPython plugin.
+IDA versions 6.9 up to 7.1.180227 are supported. The installation steps
+described within this document assume that you're not using the bundled Python
+instance and have instead installed a Python interpreter separately.
 
 ----------------------------
 Installing the actual plugin
@@ -30,8 +29,8 @@ To install the directory, the contents of the repository must be either cloned
 or extracted into IDA's user directory. The repository is located at the
 referenced github url [:ref:`1<install-clone-references>`]. On the windows
 platform, IDA's user directory is located at ``%APPDATA%/Roaming/Hex-Rays/IDA Pro``
-whereas on the Linux platform it can be found at ``$HOME/.idapro``. If the user
-is not sure of the path that IDA's user directory is located at, they can simply
+whereas on Linux or MacOS it can be found at ``$HOME/.idapro``. If the user is
+not sure of the path that IDA's user directory is located at, they can simply
 execute the following at the IDAPython prompt to output the correct path:
 
 .. code-block:: python

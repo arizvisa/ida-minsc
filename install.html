@@ -63,11 +63,10 @@ such as <code class="xref py py-func docutils literal notranslate"><span class="
 they have created during their reversing project.</p>
 <div class="section" id="software-requirements">
 <h2>1.1. Software Requirements<a class="headerlink" href="#software-requirements" title="Permalink to this headline">¶</a></h2>
-<p>Since this is an IDA plugin, obviously this requires IDA Pro. At the
-present time, only IDA 6.9 up to IDA 7.1.180227 is supported by this
-plugin. The installation steps described in this document also assume
-that you’re not using the Python instance that is bundled with IDA and
-that you have it installed separately.</p>
+<p>This plugin requires IDA Pro to be installed along with the IDAPython plugin.
+IDA versions 6.9 up to 7.1.180227 are supported. The installation steps
+described within this document assume that you’re not using the bundled Python
+instance and have instead installed a Python interpreter separately.</p>
 </div>
 <div class="section" id="installing-the-actual-plugin">
 <h2>1.2. Installing the actual plugin<a class="headerlink" href="#installing-the-actual-plugin" title="Permalink to this headline">¶</a></h2>
@@ -75,8 +74,8 @@ that you have it installed separately.</p>
 or extracted into IDA’s user directory. The repository is located at the
 referenced github url [<a class="reference internal" href="#install-clone-references"><span class="std std-ref">1</span></a>]. On the windows
 platform, IDA’s user directory is located at <code class="docutils literal notranslate"><span class="pre">%APPDATA%/Roaming/Hex-Rays/IDA</span> <span class="pre">Pro</span></code>
-whereas on the Linux platform it can be found at <code class="docutils literal notranslate"><span class="pre">$HOME/.idapro</span></code>. If the user
-is not sure of the path that IDA’s user directory is located at, they can simply
+whereas on Linux or MacOS it can be found at <code class="docutils literal notranslate"><span class="pre">$HOME/.idapro</span></code>. If the user is
+not sure of the path that IDA’s user directory is located at, they can simply
 execute the following at the IDAPython prompt to output the correct path:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">idaapi</span><span class="o">.</span><span class="n">get_user_idadir</span><span class="p">()</span>
 </pre></div>

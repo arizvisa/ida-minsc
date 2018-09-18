@@ -25,7 +25,9 @@ and annotation issues can be performed with just a few lines of code. This
 should enable a user to write quick, hacky, throwaway code that can be used
 to augment their reversing endeavors.
 
-At the present time, only IDA 6.9 up to IDA 7.1.180227 is supported.
+This plugin supports all the different platforms that IDA supports which
+includes Windows, Linux, and MacOS. At the present time, only IDA 6.9 up
+till IDA 7.1.180227 are supported.
 
 Table of Contents
 =================
