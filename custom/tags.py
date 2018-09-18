@@ -405,7 +405,7 @@ class apply(object):
 
             # warn the user if this address is not within a function
             if not func.within(ea):
-                logging.warn("{:s}.contents(...{:s}) : Address {:#x} is not within a function. Using a global tag.".format('.'.join((__name__, cls.__name__))))
+                logging.warn("{:s}.contents(...{:s}) : Address {:#x} is not within a function. Using a global tag.".format('.'.join((__name__, cls.__name__)), tagmap_output, ea))
 
             # grab the current (old) tag state
             state = db.tag(ea)
