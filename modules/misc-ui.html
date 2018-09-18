@@ -983,9 +983,23 @@ to interact with the user.</p>
 <dl class="class">
 <dt id="ui.Progress">
 <em class="property">class </em><code class="descclassname">ui.</code><code class="descname">Progress</code><a class="headerlink" href="#ui.Progress" title="Permalink to this definition">¶</a></dt>
-<dd><p>The default progress bar in with which to show progress.</p>
-<p>This is one of <a class="reference internal" href="#ui.ConsoleProgress" title="ui.ConsoleProgress"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ConsoleProgress</span></code></a> or <a class="reference internal" href="#ui.UIProgress" title="ui.UIProgress"><code class="xref py py-obj docutils literal notranslate"><span class="pre">UIProgress</span></code></a> based on whether or not
-the console or graphical user interface was detected.</p>
+<dd><p>The default progress bar in with which to show progress. This class will
+automatically determine which progress bar (Console or UI) to instantiate
+based on what is presently available.</p>
+<dl class="method">
+<dt id="ui.Progress.ui.Progress">
+<code class="descclassname">ui.</code><code class="descname">Progress</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.Progress.ui.Progress" title="Permalink to this definition">¶</a></dt>
+<dd><p>Figure out which progress bar to use and instantiate it with the provided parameters <code class="docutils literal notranslate"><span class="pre">args</span></code> and <code class="docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </dd></dl>
 
 </div>
