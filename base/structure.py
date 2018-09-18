@@ -90,7 +90,7 @@ def __iterate__():
 @utils.multicase(string=basestring)
 def iterate(string):
     '''Iterate through all of the structures in the database with a glob that matches ``string``.'''
-    return cls.iterate(like=string)
+    return iterate(like=string)
 @utils.multicase()
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by ``type``.'''
