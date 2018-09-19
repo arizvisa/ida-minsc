@@ -301,7 +301,7 @@ def color(func, none):
     fn.color = 0xffffffff
     return bool(idaapi.update_func(fn))
 @utils.multicase(rgb=six.integer_types)
-@document.parameters(func='the function to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)')
+@document.parameters(func='the function to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)')
 def color(func, rgb):
     '''Set the color of the function `func` to `rgb`.'''
     r, b = (rgb&0xff0000)>>16, rgb&0x0000ff
@@ -1084,7 +1084,7 @@ class block(object):
         return res
     @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
     @classmethod
-    @document.parameters(ea='the address belonging to the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
+    @document.parameters(ea='the address belonging to the basic block to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     def color(cls, ea, rgb, **frame):
         """Sets the color of the basic block at the address `ea` to `rgb`.
 
@@ -1114,7 +1114,7 @@ class block(object):
         return res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
-    @document.parameters(bb='the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
+    @document.parameters(bb='the basic block to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     def color(cls, bb, rgb, **frame):
         '''Sets the color of the basic block `bb` to `rgb`.'''
         res, fn, n = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
@@ -1140,7 +1140,7 @@ class block(object):
         return res
     @utils.multicase(bounds=types.TupleType, rgb=six.integer_types)
     @classmethod
-    @document.parameters(bounds='the boundaries of the basic block to set the color for', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
+    @document.parameters(bounds='the boundaries of the basic block to set the color for', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)', frame='if ``frame`` is specified, then set the frame of the basic block to this color')
     def color(cls, bounds, rgb, **frame):
         '''Sets the color of the basic block identifed by `bounds` to `rgb`.'''
         bb = cls.at(bounds)
