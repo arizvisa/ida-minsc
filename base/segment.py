@@ -365,7 +365,7 @@ def color(segment, none):
     seg.color = 0xffffffff
     return bool(seg.update())
 @utils.multicase(rgb=six.integer_types)
-@document.parameters(segment='an identifier used to describe a segment', rgb='the color as a red, green, and blue integer (`0x00RRGGBB`)')
+@document.parameters(segment='an identifier used to describe a segment', rgb='the color as a red, green, and blue integer (``0x00RRGGBB``)')
 def color(segment, rgb):
     '''Sets the color of the segment identified by `segment` to `rgb`.'''
     r,b = (rgb&0xff0000) >> 16, rgb&0x0000ff
