@@ -134,7 +134,7 @@ functions and aliases. For more information on this, please see
    Set the color of the function ``func`` to ``rgb``.
    
    :param func: the function to set the color for
-   :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
+   :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    
 .. py:function:: color(none)
@@ -728,7 +728,7 @@ Some examples of this functionality can be::
    
    :param ea: the address belonging to the basic block to set the color for
    :type ea: int or long
-   :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
+   :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    :param \*\*frame: if ``frame`` is specified, then set the frame of the basic block to this color
    
@@ -738,7 +738,7 @@ Some examples of this functionality can be::
    
    :param bb: the basic block to set the color for
    :type bb: idaapi.BasicBlock
-   :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
+   :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    :param \*\*frame: if ``frame`` is specified, then set the frame of the basic block to this color
    
@@ -748,7 +748,7 @@ Some examples of this functionality can be::
    
    :param bounds: the boundaries of the basic block to set the color for
    :type bounds: tuple
-   :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
+   :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    :param \*\*frame: if ``frame`` is specified, then set the frame of the basic block to this color
    

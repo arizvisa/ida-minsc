@@ -148,7 +148,7 @@ functions and aliases. For more information on this, please see
    Sets the color of the segment identified by ``segment`` to ``rgb``.
    
    :param segment: an identifier used to describe a segment
-   :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
+   :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    
 .. py:function:: contains(ea)

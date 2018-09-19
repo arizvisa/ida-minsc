@@ -71,7 +71,7 @@ functions and aliases. For more information on this, please see
    
    :param ea: an address in the database
    :type ea: int or long
-   :param rgb: the color as a red, green, and blue integer (:py:obj:`0x00RRGGBB`)
+   :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    
 .. py:function:: comment(\*\*repeatable)
@@ -2755,11 +2755,12 @@ database.search
 This namespace used for searching the database using IDA's find
 functionality.
 
-By default the name is used, however there are 3 search methods
+By default the name is used, however there are 4 search methods
 that are available. The methods that are provided are:
 
 - :py:obj:`search.by_bytes` - Search by the specified hex bytes
 - :py:obj:`search.by_regex` - Search by the specified regex
+- :py:obj:`search.by_text`  - Search by the specified text
 - :py:obj:`search.by_name`  - Search by the specified name
 
 Each search method has its own options, but all of them take an extra
@@ -2793,6 +2794,7 @@ result.
    Search through the database at address ``ea`` for the bytes specified by ``string``.
    
    If ``reverse`` is specified as a bool, then search backwards from the given address.
+   If ``radix`` is specified, then use it as the number radix for describing the bytes.
    
    Aliases: :py:func:`database.search.byBytes<search\.by_bytes>`
    
@@ -2802,25 +2804,30 @@ result.
    :type string: bytes
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
-.. py:function:: search\.by_name(name)
+.. py:function:: search\.by_name(name, \*\*options)
    
    Search through the database at the current address for the symbol ``name``.
    
    Aliases: :py:func:`database.search.byName<search\.by_name>`
    
-   :param name: the name to search for
+   :param name: the identifier to search for
    :type name: str
+   :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
-.. py:function:: search\.by_name(ea, name)
+.. py:function:: search\.by_name(ea, name, \*\*options)
    
    Search through the database at address ``ea`` for the symbol ``name``.
+   
+   If ``reverse`` is specified as a bool, then search backwards from the given address.
+   If ``sensitive`` is specified as bool, then perform a case-sensitive search.
    
    Aliases: :py:func:`database.search.byName<search\.by_name>`
    
    :param ea: the starting address to search from
    :type ea: int or long
-   :param name: the name to search for
+   :param name: the identifier to search for
    :type name: str
+   :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
 .. py:function:: search\.by_regex(string, \*\*options)
    
@@ -2847,31 +2854,70 @@ result.
    :type string: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
-.. py:function:: search\.iterate(string)
+.. py:function:: search\.by_text(string, \*\*options)
    
-   Iterate through all results that match the bytes ``string`` starting at the current address.
+   Search through the database at the current address for the text matched by ``string``.
+   
+   Aliases: :py:func:`database.search.byText<search\.by_text>`
+   
+   :param string: the text string to search for
+   :type string: str
+   :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
+   
+.. py:function:: search\.by_text(ea, string, \*\*options)
+   
+   Search the database at address ``ea`` for the text matched by ``string``.
+   
+   If ``reverse`` is specified as a bool, then search backwards from the given address.
+   If ``sensitive`` is specified as bool, then perform a case-sensitive search.
+   
+   Aliases: :py:func:`database.search.byText<search\.by_text>`
+   
+   :param ea: the starting address to search from
+   :type ea: int or long
+   :param string: the text string to search for
+   :type string: str
+   :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
+   
+.. py:function:: search\.iterate(string, \*\*options)
+   
+   Iterate through all search results that match the bytes ``string`` starting at the current address.
    
    :param string: the bytes to search for
    :type string: str
+   :param \*\*options: any options to pass to the ``predicate``
    
-.. py:function:: search\.iterate(start, string)
+.. py:function:: search\.iterate(string, predicate, \*\*options)
    
-   Iterate through all results that match the bytes ``string`` starting at address ``start``.
+   Iterate through all search results matched by the function ``predicate`` with the specified ``string`` starting at the current address.
    
-   :param start: the starting address to search from
-   :type start: int or long
-   :param string: the bytes to search for
-   :type string: str
-   
-.. py:function:: search\.iterate(start, string, predicate)
-   
-   Iterate through all searches matched by the function ``predicate`` and ``string`` starting at address ``start``.
-   
-   :param start: the starting address to search from
-   :type start: int or long
-   :param string: the bytes to search for
+   :param string: the string to pass to the ``predicate``
    :type string: str
    :param predicate: the callable to search with
+   :type predicate: callable
+   :param \*\*options: any options to pass to the ``predicate``
+   
+.. py:function:: search\.iterate(start, string, \*\*options)
+   
+   Iterate through all search results that match the bytes ``string`` starting at address ``start``.
+   
+   :param start: the starting address to search from
+   :type start: int or long
+   :param string: the bytes to search for
+   :type string: str
+   :param \*\*options: any options to search with
+   
+.. py:function:: search\.iterate(start, string, predicate, \*\*options)
+   
+   Iterate through all search results matched by the function ``predicate`` with the specified ``string`` starting at address ``start``.
+   
+   :param start: the starting address to search from
+   :type start: int or long
+   :param string: the string to pass to the predicate
+   :type string: str
+   :param predicate: the callable to search with
+   :type predicate: callable
+   :param \*\*options: any options to pass to the ``predicate``
    
 .. _ns-database-segments:
 
