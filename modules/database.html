@@ -5227,7 +5227,7 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <dl class="function">
 <dt id="database.set.array">
 <code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>type</em>, <em>length</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.array" title="Permalink to this definition">¶</a></dt>
-<dd><p>Unimplemented.</p>
+<dd><p>Set the data at the current address to an array with the specified <code class="docutils literal notranslate"><span class="pre">length</span></code> and <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5245,7 +5245,7 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <dl class="function">
 <dt>
 <code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em>, <em>type</em>, <em>length</em><span class="sig-paren">)</span></dt>
-<dd><p>Unimplemented.</p>
+<dd><p>Set the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an array with the specified <code class="docutils literal notranslate"><span class="pre">length</span></code> and <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6120,11 +6120,12 @@ specified address.</p>
 <span id="ns-database-type-array"></span><h4>3.1.1.2.13.1. database.type.array<a class="headerlink" href="#database-type-array" title="Permalink to this headline">¶</a></h4>
 <p>This namespace is for returning type information about an array
 that is defined within the database. By default this namespace
-will return the array’s element size and number of elements as
-a tuple <code class="docutils literal notranslate"><span class="pre">(size,</span> <span class="pre">count)</span></code>.</p>
+will return the array’s element type and its number of elements
+as a list <code class="docutils literal notranslate"><span class="pre">[size,</span> <span class="pre">count]</span></code>.</p>
 <p>Some examples of using this namespace can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">cb</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="n">databaes</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">type</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="n">databaes</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">element</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
@@ -6132,13 +6133,13 @@ a tuple <code class="docutils literal notranslate"><span class="pre">(size,</spa
 <dl class="function">
 <dt id="database.type.array">
 <code class="descclassname">type.</code><code class="descname">array</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the array’s <code class="docutils literal notranslate"><span class="pre">(element,</span> <span class="pre">length)</span></code> at the current address.</p>
+<dd><p>Return the <code class="docutils literal notranslate"><span class="pre">[type,</span> <span class="pre">length]</span></code> of the array at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the array’s <code class="docutils literal notranslate"><span class="pre">(element,</span> <span class="pre">length)</span></code> at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the <code class="docutils literal notranslate"><span class="pre">[type,</span> <span class="pre">length]</span></code> of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6152,14 +6153,14 @@ a tuple <code class="docutils literal notranslate"><span class="pre">(size,</spa
 <dl class="function">
 <dt id="database.type.array.element">
 <code class="descclassname">type.array.</code><code class="descname">element</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.element" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the size of an element in the array at the current address.</p>
+<dd><p>Return the size of the element in the array at the current address.</p>
 <p>Aliases: <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getSize</span></code></a>, <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_size</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.array.</code><code class="descname">element</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the size of an element in the array at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the size of the element in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getSize</span></code></a>, <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_size</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -6181,7 +6182,7 @@ a tuple <code class="docutils literal notranslate"><span class="pre">(size,</spa
 <dl class="function">
 <dt>
 <code class="descclassname">type.array.</code><code class="descname">length</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the number of elements in the array at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the number of elements of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.type.array.length" title="database.type.array.length"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_arraylength</span></code></a>, <a class="reference internal" href="#database.type.array.length" title="database.type.array.length"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getArrayLength</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -6202,7 +6203,27 @@ a tuple <code class="docutils literal notranslate"><span class="pre">(size,</spa
 <dl class="function">
 <dt>
 <code class="descclassname">type.array.</code><code class="descname">size</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the total size of the array at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the total size of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing an array</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.type.array.type">
+<code class="descclassname">type.array.</code><code class="descname">type</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.type" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type of the element in the array at the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.array.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type of the element in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

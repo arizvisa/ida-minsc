@@ -285,25 +285,25 @@ function itself. This is demonstrated at <a class="reference internal" href="#ta
 belonging to a function’s contents or a global, whereas <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>
 is used to tag the function itself. This is demonstrated at <a class="reference internal" href="#tagging-examples"><span class="std std-ref">Examples – Application or Retrieval</span></a>.</p>
 <p>When executing either of these tag functions, there are 4 variations of each
-of them. The first variations is when only a tag name is provided. This
-variation will return the value of the tag at a given address and is thus used
-for reading a particular tag from an address. This looks like the following
-for <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">value</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;mytagname&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>The next variation takes a tag name and its value and is thus used to write
-a value with the specified tag name at an address within the database. If a
-tag is being overwritten, this variation will return the original value
-of the tag that was overwritten. Some examples of how this can look like for
-for the <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a> function:</p>
+of them that depend on the number and types of arguments that one passes to
+them. The first variation takes a tag name and a value and is thus used for
+writing a particular tag to the database. If a tag is being overwritten, this
+variation will return the original value. Some examples of what this can
+look like for <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;synopsis&#39;</span><span class="p">,</span> <span class="s1">&#39;this function is recursive&#39;</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="n">oldvalue</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;object&#39;</span><span class="p">,</span> <span class="s1">&#39;TList&#39;</span><span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;marks&#39;</span><span class="p">,</span> <span class="p">[</span><span class="mh">0x51b0102</span><span class="p">,</span> <span class="mh">0x51b0208</span><span class="p">,</span> <span class="mh">0x51b021f</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>The next variartion occurs when only the tag name is provided. This variation
+will return the value of the tag at a given address and is thus used for
+reading a particular tag from the databasee. This looks like the following for
+<a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">value</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;mytagname&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The third variation is responsible for removing a tag at a given address.
@@ -456,7 +456,7 @@ include any “note” tags:</p>
 </div>
 <p>To list all of the contents tags that have been used in the database:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">():</span>
-      <span class="k">print</span> <span class="s2">&quot;Function </span><span class="si">%x</span><span class="s2"> has the tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">res</span><span class="p">)</span>
+      <span class="k">print</span> <span class="s2">&quot;Function </span><span class="si">%x</span><span class="s2"> has the tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
