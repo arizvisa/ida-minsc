@@ -4019,17 +4019,29 @@ class set(object):
         return cls.data(ea, type.size, type=type)
     struc = struct = utils.alias(structure, 'set')
 
-    # FIXME: implement these with either pythonic types, or array.array
     @utils.multicase(length=six.integer_types)
     @classmethod
     def array(cls, type, length):
-        '''Unimplemented.'''
-        raise NotImplementedError
+        '''Set the data at the current address to an array with the specified ``length`` and ``type``.'''
+        return cls.array(ui.current.address(), type, length)
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
-        '''Unimplemented.'''
-        raise NotImplementedError
+        '''Set the data at the address ``ea`` to an array with the specified ``length`` and ``type``.'''
+
+        # if the type is already specifying a list, then combine it with
+        # the specified length
+        if isinstance(type, list):
+            t, l = type
+            realtype = [t, l * length]
+
+        # otherwise, promote it into an array
+        else:
+            realtype = [type, length]
+
+        # now we can figure out its IDA type
+        flags, typeid, nbytes = interface.typemap.resolve(realtype)
+        return idaapi.create_data(ea, flags, nbytes, typeid)
 
 class get(object):
     """
