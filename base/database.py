@@ -4290,7 +4290,7 @@ class get(object):
     def array(cls, ea, **length):
         """Return the values of the array at the address specified by ``ea``.
 
-        If the int ``length`` is defined, then use it as the number of elements for the array.
+        If the integer ``length`` is defined, then use it as the number of elements for the array.
         """
         ea = interface.address.within(ea)
         numerics = {
@@ -4356,6 +4356,22 @@ class get(object):
         if len(res) != count:
             logging.warn("{:s}.get({:#x}) : The decoded array length {:d} is not the same as the expected length {:d}.".format('.'.join((__name__, cls.__name__)), ea, len(res), count))
         return res
+
+    @utils.multicase()
+    @classmethod
+    def string(cls, **length):
+        '''Return the array at the current address as a string.'''
+        res = cls.array(ui.current.address(), **length)
+        return res.tostring()
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def string(cls, ea, **length):
+        """Return the array at the address specified by ``ea`` as a string.
+
+        If the integer ``length`` is defined, then use it as the length of the array.
+        """
+        res = cls.array(ea, **length)
+        return res.tostring()
 
     @utils.multicase()
     @classmethod
