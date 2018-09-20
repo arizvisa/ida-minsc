@@ -2813,35 +2813,65 @@ class type(object):
         """
         This namespace is for returning type information about an array
         that is defined within the database. By default this namespace
-        will return the array's element size and number of elements as
-        a tuple ``(size, count)``.
+        will return the array's element type and its number of elements
+        as a list ``[size, count]``.
 
         Some examples of using this namespace can be::
 
-            > cb, length = databaes.t.array()
+            > type, length = databaes.t.array()
             > print database.t.array.size(ea)
+            > print database.t.array.type(ea)
             > print database.t.array.element(ea)
             > print database.t.array.length(ea)
 
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the array's ``(element, length)`` at the current address.'''
+            '''Return the ``[type, length]`` of the array at the current address.'''
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the array's ``(element, length)`` at the address specified by ``ea``.'''
-            return cls.element(ea), cls.length(ea)
+            '''Return the ``[type, length]`` of the array at the address specified by ``ea``.'''
+            F, op, cb = type.flags(ea), idaapi.opinfo_t(), idaapi.get_item_size(ea)
+
+            # get the opinfo at the current address
+            ok = idaapi.get_opinfo(op, ea, 0, F)
+            if not ok:
+                raise TypeError("{:s}.array({:#x}) : Address {:#x} does not contain an array.".format('.'.join((__name__, cls.__name__)), ea, ea))
+
+            # convert it to a pythonic type
+            res = interface.typemap.dissolve(F, op.tid, cb)
+
+            # if it's a list, then validate the result and return it
+            if isinstance(res, list):
+                element, length = res
+                return [element, length]
+
+            # this shouldn't ever happen, but if it does then it's a
+            # single element array
+            return [res, 1]
+
+        @utils.multicase()
+        @classmethod
+        def type(cls):
+            '''Return the type of the element in the array at the current address.'''
+            return cls.type(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def type(cls, ea):
+            '''Return the type of the element in the array at the address specified by ``ea``.'''
+            res, _ = cls(ea)
+            return res
 
         @utils.multicase()
         @classmethod
         def element(cls):
-            '''Return the size of an element in the array at the current address.'''
+            '''Return the size of the element in the array at the current address.'''
             return cls.element(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def element(cls, ea):
-            '''Return the size of an element in the array at address ``ea``.'''
+            '''Return the size of the element in the array at the address specified by ``ea``.'''
             ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
             return _structure.size(type.structure.id(ea)) if T == idaapi.FF_STRU else idaapi.get_full_data_elsize(ea, F)
 
@@ -2853,7 +2883,7 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def length(cls, ea):
-            '''Return the number of elements in the array at address ``ea``.'''
+            '''Return the number of elements of the array at the address specified by ``ea``.'''
             ea, F = interface.address.within(ea), type.flags(ea)
             sz,ele = idaapi.get_item_size(ea),idaapi.get_full_data_elsize(ea, F)
             return sz // ele
@@ -2866,7 +2896,7 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def size(cls, ea):
-            '''Return the total size of the array at address ``ea``.'''
+            '''Return the total size of the array at the address specified by ``ea``.'''
             return type.size(ea)
 
     class structure(object):
