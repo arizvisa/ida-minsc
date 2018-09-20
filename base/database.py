@@ -3379,7 +3379,6 @@ class type(object):
             # single element array
             return [res, 1]
 
-        @document.aliases('getSize', 'get_size')
         @utils.multicase()
         @classmethod
         def type(cls):
@@ -3387,11 +3386,13 @@ class type(object):
             return cls.type(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
+        @document.parameters(ea='an address in the database containing an array')
         def type(cls, ea):
             '''Return the type of the element in the array at the address specified by `ea`.'''
             res, _ = cls(ea)
             return res
 
+        @document.aliases('getSize', 'get_size')
         @utils.multicase()
         @classmethod
         def element(cls):
