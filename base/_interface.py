@@ -900,6 +900,9 @@ class switch_t(object):
     """
     def __init__(self, switch_info_ex):
         self.object = switch_info_ex
+    def __len__(self):
+        '''Return the total number of cases (including any default) handled by the switch.'''
+        return len(self.range)
     @property
     def ea(self):
         '''Return the address at the beginning of the switch.'''
