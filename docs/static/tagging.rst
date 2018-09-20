@@ -296,26 +296,26 @@ belonging to a function's contents or a global, whereas :py:func:`function.tag`
 is used to tag the function itself. This is demonstrated at :ref:`tagging-examples`.
 
 When executing either of these tag functions, there are 4 variations of each
-of them. The first variations is when only a tag name is provided. This
-variation will return the value of the tag at a given address and is thus used
-for reading a particular tag from an address. This looks like the following
-for :py:func:`database.tag`::
+of them that depend on the number and types of arguments that one passes to
+them. The first variation takes a tag name and a value and is thus used for
+writing a particular tag to the database. If a tag is being overwritten, this
+variation will return the original value. Some examples of what this can
+look like for :py:func:`function.tag`::
 
-   > value = database.tag(ea, 'mytagname')
-   > print type(value)
+    > oldvalue = function.tag(ea, 'synopsis', 'this function is recursive')
+    > print oldvalue
+    >
+    > oldvalue = function.tag('object', 'TList')
+    >
+    > oldvalue = function.tag('marks', [0x51b0102, 0x51b0208, 0x51b021f])
 
-The next variation takes a tag name and its value and is thus used to write
-a value with the specified tag name at an address within the database. If a
-tag is being overwritten, this variation will return the original value
-of the tag that was overwritten. Some examples of how this can look like for
-for the :py:func:`function.tag` function::
+The next variartion occurs when only the tag name is provided. This variation
+will return the value of the tag at a given address and is thus used for
+reading a particular tag from the databasee. This looks like the following for
+:py:func:`database.tag`::
 
-   > oldvalue = function.tag(ea, 'synopsis', 'this function is recursive')
-   > print oldvalue
-   >
-   > oldvalue = function.tag('object', 'TList')
-   >
-   > oldvalue = function.tag('marks', [0x51b0102, 0x51b0208, 0x51b021f])
+    > value = database.tag(ea, 'mytagname')
+    > print type(value)
 
 The third variation is responsible for removing a tag at a given address.
 This is done by providing a tag name along with the python type :py:obj:`None`.
@@ -489,7 +489,7 @@ include any "note" tags::
 To list all of the contents tags that have been used in the database::
 
     > for ea, res in db.selectcontents():
-          print "Function %x has the tags: %r"% (res)
+          print "Function %x has the tags: %r"% (ea, res)
     >
 
 This same functionality is also provided within the :py:mod:`tags` module
