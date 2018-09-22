@@ -11,9 +11,9 @@ import six
 import sys, logging
 import functools, operator, itertools, types
 
-import database,function,ui
+import database, function, ui
 import internal
-from internal import comment,utils
+from internal import comment, utils, exceptions as E
 
 import idaapi
 
@@ -84,19 +84,19 @@ class address(comment):
     def _event(cls):
         while True:
             # cmt_changing event
-            ea,rpt,new = (yield)
+            ea, rpt, new = (yield)
             old = idaapi.get_cmt(ea, rpt)
-            f,o,n = idaapi.get_func(ea),internal.comment.decode(old),internal.comment.decode(new)
+            f, o, n = idaapi.get_func(ea), internal.comment.decode(old), internal.comment.decode(new)
 
             # update references before we update the comment
             cls._update_refs(ea, o, n)
 
             # wait for cmt_changed event
-            newea,nrpt,none = (yield)
+            newea, nrpt, none = (yield)
 
             # now fix the comment the user typed
-            if (newea,nrpt,none) == (ea,rpt,None):
-                ncmt,repeatable = idaapi.get_cmt(ea, rpt), cls._is_repeatable(ea)
+            if (newea, nrpt, none) == (ea, rpt, None):
+                ncmt, repeatable = idaapi.get_cmt(ea, rpt), cls._is_repeatable(ea)
 
                 if (ncmt or '') != new:
                     logging.warn("internal.{:s}.event() : Comment from event is different from database : {:#x} : {!r} != {!r}".format('.'.join((__name__, cls.__name__)), ea, new, ncmt))
@@ -183,19 +183,19 @@ class globals(comment):
     def _event(cls):
         while True:
             # cmt_changing event
-            ea,rpt,new = (yield)
+            ea, rpt, new = (yield)
             fn = idaapi.get_func(ea)
             old = idaapi.get_func_cmt(fn, rpt)
-            o,n = internal.comment.decode(old),internal.comment.decode(new)
+            o, n = internal.comment.decode(old), internal.comment.decode(new)
 
             # update references before we update the comment
             cls._update_refs(fn, o, n)
 
             # wait for cmt_changed event
-            newea,nrpt,none = (yield)
+            newea, nrpt, none = (yield)
 
             # now we can fix the user's new coment
-            if (newea,nrpt,none) == (ea,rpt,None):
+            if (newea, nrpt, none) == (ea, rpt, None):
                 ncmt = idaapi.get_func_cmt(fn, rpt)
 
                 if (ncmt or '') != new:
@@ -380,7 +380,7 @@ def rebase(info):
         res = [n for n in functions if info[si].to <= n < info[si].to + info[si].size]
         for i, fn in __rebase_function(info[si]._from, info[si].to, info[si].size, res):
             text = "Function {:d} of {:d} : {:#x}".format(i + fcount, len(functions), fn)
-            p.update(value=sum((fcount,gcount,i)), text=text)
+            p.update(value=sum((fcount, gcount, i)), text=text)
             ui.navigation.procedure(fn)
         fcount += len(res)
 
@@ -388,7 +388,7 @@ def rebase(info):
         res = [(ea, count) for ea, count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
         for i, ea in __rebase_globals(info[si]._from, info[si].to, info[si].size, res):
             text = "Global {:d} of {:d} : {:#x}".format(i + gcount, len(globals), ea)
-            p.update(value=sum((fcount,gcount,i)), text=text)
+            p.update(value=sum((fcount, gcount, i)), text=text)
             ui.navigation.analyze(ea)
         gcount += len(res)
     p.close()
@@ -401,7 +401,7 @@ def __rebase_function(old, new, size, iterable):
         # grab the contents dictionary
         try:
             state = internal.comment.contents._read(None, fn)
-        except LookupError:
+        except E.FunctionNotFoundError:
             logging.fatal("{:s}.rebase(...) : Address {:#x} -> {:#x} is not a function : {:#x} -> {:#x}".format(__name__, fn - new + old, fn, old, new))
             state = None
         if state is None: continue

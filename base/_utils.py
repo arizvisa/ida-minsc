@@ -174,14 +174,14 @@ class multicase(object):
 
             # calculate the priority by trying to match the most first
             argtuple = s_args, args, defaults, (star, starstar)
-            priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i,a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for _ in filter(None, (star, starstar)))
+            priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i, a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for _ in filter(None, (star, starstar)))
 
             # check to see if our func is already in the cache
-            current = tuple(t_args.get(_,None) for _ in args),(star,starstar)
+            current = tuple(t_args.get(_, None) for _ in args), (star, starstar)
             for i, (p, (_, t, a)) in enumerate(cache):
                 if p != priority: continue
                 # verify that it actually matches the entry
-                if current == (tuple(t.get(_,None) for _ in a[1]), a[3]):
+                if current == (tuple(t.get(_, None) for _ in a[1]), a[3]):
                     # yuuup, update it.
                     cache[i] = (priority, (func, t_args, argtuple))
                     res.__doc__ = cls.document(func.__name__, [n for _, n in cache])
@@ -198,7 +198,7 @@ class multicase(object):
             return cons(res)
 
         if len(other) > 1:
-            raise SyntaxError("{:s} : More than one callable was specified ({!r}). Not sure which callable to clone original state from.".format('.'.join((__name__, cls.__name__)), other))
+            raise SyntaxError("{:s} : More than one callable was specified ({!r}). Not sure which callable to clone original state from.".format('.'.join(('internal', __name__, cls.__name__)), other))
         return result
 
     @classmethod
@@ -264,15 +264,15 @@ class multicase(object):
 
         error_arguments = (n.__class__.__name__ for n in args)
         error_keywords = ("{:s}={:s}".format(n, kwds[n].__class__.__name__) for n in kwds)
-        raise LookupError("@multicase.call({:s}, The type {{{:s}}}) does not match any of the available prototypes. The prototypes that are available are {:s}.".format(', '.join(error_arguments) if args else '*()', ', '.join(error_keywords), ', '.join(cls.prototype(f,t) for f,t,_ in heap)))
+        raise LookupError("@multicase.call({:s}, The type {{{!s}}}) does not match any of the available prototypes. The prototypes that are available are {:s}.".format(', '.join(error_arguments) if args else '*()', ', '.join(error_keywords), ', '.join(cls.prototype(f, t) for f, t, _ in heap)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
         '''Create a new wrapper that will determine the correct function to call.'''
         # define the wrapper...
         def F(*arguments, **keywords):
-            heap = [res for _,res in heapq.nsmallest(len(cache), cache)]
-            f, (a, w, k) = cls.match((arguments[:],keywords), heap)
+            heap = [res for _, res in heapq.nsmallest(len(cache), cache)]
+            f, (a, w, k) = cls.match((arguments[:], keywords), heap)
             return f(*arguments, **keywords)
             #return f(*(arguments + tuple(w)), **keywords)
 
@@ -302,7 +302,7 @@ class multicase(object):
         elif isinstance(object, types.CodeType):
             res, = (n for n in gc.get_referrers(c) if n.func_name == c.co_name and isinstance(n, types.FunctionType))
             return res
-        elif isinstance(object, (staticmethod,classmethod)):
+        elif isinstance(object, (staticmethod, classmethod)):
             return object.__func__
         raise TypeError, object
 
@@ -313,11 +313,11 @@ class multicase(object):
             return lambda f: f
         if isinstance(n, types.MethodType):
             return lambda f: types.MethodType(f, n.im_self, n.im_class)
-        if isinstance(n, (staticmethod,classmethod)):
+        if isinstance(n, (staticmethod, classmethod)):
             return lambda f: type(n)(f)
         if isinstance(n, types.InstanceType):
             return lambda f: types.InstanceType(type(n), dict(f.__dict__))
-        if isinstance(n, (types.TypeType,types.ClassType)):
+        if isinstance(n, (types.TypeType, types.ClassType)):
             return lambda f: type(n)(n.__name__, n.__bases__, dict(f.__dict__))
         raise NotImplementedError, type(func)
 
@@ -327,7 +327,7 @@ class multicase(object):
         c = f.func_code
         varnames_count, varnames_iter = c.co_argcount, iter(c.co_varnames)
         args = tuple(itertools.islice(varnames_iter, varnames_count))
-        res = { a : v for v,a in zip(reversed(f.func_defaults or []), reversed(args)) }
+        res = { a : v for v, a in zip(reversed(f.func_defaults or []), reversed(args)) }
         try: starargs = next(varnames_iter) if c.co_flags & cls.CO_VARARGS else ""
         except StopIteration: starargs = ""
         try: kwdargs = next(varnames_iter) if c.co_flags & cls.CO_VARKEYWORDS else ""
@@ -361,7 +361,7 @@ class alias(object):
         return res
 
 ### asynchronous process monitor
-import sys,os,threading,weakref,subprocess,time,itertools,operator
+import sys, os, threading, weakref, subprocess, time, itertools, operator
 
 # monitoring an external process' i/o via threads/queues
 class process(object):
@@ -371,7 +371,7 @@ class process(object):
     program -- subprocess.Popen instance
     commandline -- subprocess.Popen commandline
     eventWorking -- threading.Event() instance for signalling task status to monitor threads
-    stdout,stderr -- callables that are used to process available work in the taskQueue
+    stdout, stderr -- callables that are used to process available work in the taskQueue
 
     properties:
     id -- subprocess pid
@@ -420,7 +420,7 @@ class process(object):
         self.stderr = kwds.pop('stderr')
 
         # start the process
-        not kwds.get('paused',False) and self.start(command)
+        not kwds.get('paused', False) and self.start(command)
 
     def start(self, command=None, **options):
         '''Start the specified ``command`` with the requested ``options``.'''
@@ -437,14 +437,14 @@ class process(object):
         cwd = kwds.get('cwd', os.getcwd())
         newlines = kwds.get('newlines', True)
         shell = kwds.get('shell', False)
-        stdout,stderr = options.pop('stdout',self.stdout),options.pop('stderr',self.stderr)
+        stdout, stderr = options.pop('stdout', self.stdout), options.pop('stderr', self.stderr)
         self.program = process.subprocess(command, cwd, env, newlines, joined=(stderr is None) or stdout == stderr, shell=shell, show=kwds.get('show', False))
         self.commandline = command
         self.eventWorking.clear()
 
         # monitor program's i/o
         self.__start_monitoring(stdout, stderr)
-        self.__start_updater(timeout=kwds.get('timeout',-1))
+        self.__start_updater(timeout=kwds.get('timeout', -1))
 
         # start monitoring
         self.eventWorking.set()
@@ -454,19 +454,19 @@ class process(object):
         '''Start the updater thread. **used internally**'''
         import Queue
         def task_exec(emit, data):
-            if hasattr(emit,'send'):
+            if hasattr(emit, 'send'):
                 res = emit.send(data)
                 res and P.write(res)
             else: emit(data)
 
         def task_get_timeout(P, timeout):
             try:
-                emit,data = P.taskQueue.get(block=True, timeout=timeout)
+                emit, data = P.taskQueue.get(block=True, timeout=timeout)
             except Queue.Empty:
-                _,_,tb = sys.exc_info()
-                P.exceptionQueue.put(StopIteration,StopIteration(),tb)
+                _, _, tb = sys.exc_info()
+                P.exceptionQueue.put(StopIteration, StopIteration(), tb)
                 return ()
-            return emit,data
+            return emit, data
 
         def task_get_notimeout(P, timeout):
             return P.taskQueue.get(block=True)
@@ -478,10 +478,10 @@ class process(object):
             while P.eventWorking.is_set():
                 res = task_get(P, timeout)
                 if not res: continue
-                emit,data = res
+                emit, data = res
 
                 try:
-                    task_exec(emit,data)
+                    task_exec(emit, data)
                 except StopIteration:
                     P.eventWorking.clear()
                 except:
@@ -491,7 +491,7 @@ class process(object):
                 continue
             return
 
-        self.__updater = updater = threading.Thread(target=update, name="thread-%x.update"% self.id, args=(self,timeout))
+        self.__updater = updater = threading.Thread(target=update, name="thread-%x.update"% self.id, args=(self, timeout))
         updater.daemon = daemon
         updater.start()
         return updater
@@ -503,14 +503,14 @@ class process(object):
 
         # create monitoring threads + coroutines
         if stderr:
-            res = process.monitorPipe(self.taskQueue, (stdout,program.stdout),(stderr,program.stderr), name=name)
+            res = process.monitorPipe(self.taskQueue, (stdout, program.stdout), (stderr, program.stderr), name=name)
         else:
-            res = process.monitorPipe(self.taskQueue, (stdout,program.stdout), name=name)
+            res = process.monitorPipe(self.taskQueue, (stdout, program.stdout), name=name)
 
         res = map(None, res)
         # attach a method for injecting data into a monitor
-        for t,q in res: t.send = q.send
-        threads,senders = zip(*res)
+        for t, q in res: t.send = q.send
+        threads, senders = zip(*res)
 
         # update threads for destruction later
         self.__threads.update(threads)
@@ -531,18 +531,18 @@ class process(object):
         return subprocess.Popen(program, universal_newlines=newlines, shell=shell, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, close_fds=True, cwd=cwd, env=environment)
 
     @staticmethod
-    def monitorPipe(q, (id,pipe), *more, **options):
+    def monitorPipe(q, (id, pipe), *more, **options):
         """Attach a coroutine to a monitoring thread for stuffing queue `q` with data read from `pipe`
 
-        Yields a list of (thread,coro) tuples given the arguments provided.
+        Yields a list of (thread, coro) tuples given the arguments provided.
         Each thread will read from `pipe`, and stuff the value combined with `id` into `q`.
         """
-        def stuff(q,*key):
-            while True: q.put(key+((yield),))
+        def stuff(q, *key):
+            while True: q.put(key + ((yield),))
 
-        for id,pipe in itertools.chain([(id,pipe)],more):
-            res,name = stuff(q,id), "{:s}<{!r}>".format(options.get('name',''),id)
-            yield process.monitor(res.next() or res.send, pipe, name=name),res
+        for id, pipe in itertools.chain([(id, pipe)], more):
+            res, name = stuff(q, id), "{:s}<{!r}>".format(options.get('name', ''), id)
+            yield process.monitor(res.next() or res.send, pipe, name=name), res
         return
 
     @staticmethod
@@ -562,12 +562,12 @@ class process(object):
                     # determine why (cause...y'know..python), stop dancing so
                     # the parent will actually be able to terminate us
                     break
-                map(send,data)
+                map(send, data)
             return
         if name:
-            monitorThread = threading.Thread(target=shuffle, name=name, args=(send,pipe))
+            monitorThread = threading.Thread(target=shuffle, name=name, args=(send, pipe))
         else:
-            monitorThread = threading.Thread(target=shuffle, args=(send,pipe))
+            monitorThread = threading.Thread(target=shuffle, args=(send, pipe))
         monitorThread.daemon = daemon
         return monitorThread
 
@@ -618,7 +618,7 @@ class process(object):
             while self.running and self.eventWorking.is_set() and time.time() - t < timeout:        # spin cpu until we timeout
                 if not self.exceptionQueue.empty():
                     res = self.exception()
-                    raise res[0],res[1],res[2]
+                    raise res[0], res[1], res[2]
                 continue
             return program.returncode if self.eventWorking.is_set() else self.__terminate()
 
@@ -628,7 +628,7 @@ class process(object):
         while self.running and self.eventWorking.is_set():
             if not self.exceptionQueue.empty():
                 res = self.exception()
-                raise res[0],res[1],res[2]
+                raise res[0], res[1], res[2]
             continue    # ugh...poll-forever/kill-cpu until program terminates...
 
         if not self.eventWorking.is_set():
@@ -649,7 +649,7 @@ class process(object):
             return self.program.returncode
 
         res = self.exception()
-        raise res[0],res[1],res[2]
+        raise res[0], res[1], res[2]
 
     def __stop_monitoring(self):
         '''Cleanup monitoring threads.'''
@@ -662,7 +662,7 @@ class process(object):
 
         # forcefully close pipes that still open, this should terminate the monitor threads
         #   also, this fixes a resource leak since python doesn't do this on subprocess death
-        for p in (P.stdin,P.stdout,P.stderr):
+        for p in (P.stdin, P.stdout, P.stderr):
             while p and not p.closed:
                 try: p.close()
                 except: pass
@@ -692,7 +692,7 @@ class process(object):
             ('updater', 0 if self.updater is None else self.updater.is_alive()),
             ('input/output', len(self.threads))
         ]
-        return "<process {:s}{:s} threads{{{:s}}}>".format(state, (' !exception!' if not ok else ''), ' '.join("{:s}:{:d}".format(n,v) for n,v in threads))
+        return "<process {:s}{:s} threads{{{:s}}}>".format(state, (' !exception!' if not ok else ''), ' '.join("{:s}:{:d}".format(n, v) for n, v in threads))
 
 ## interface for wrapping the process class
 def spawn(stdout, command, **options):
@@ -706,10 +706,10 @@ def spawn(stdout, command, **options):
     daemon = options.pop('daemon', True)
 
     # empty out the first generator result if a coroutine is passed
-    if hasattr(stdout,'send'):
+    if hasattr(stdout, 'send'):
         res = stdout.next()
         res and P.write(res)
-    if hasattr(stderr,'send'):
+    if hasattr(stderr, 'send'):
         res = stderr.next()
         res and P.write(res)
 
@@ -718,8 +718,8 @@ def spawn(stdout, command, **options):
 
 ### scheduler
 class execution(object):
-    __slots__ = ('queue','state','result','ev_unpaused','ev_terminating')
-    __slots__+= ('thread','lock')
+    __slots__ = ('queue', 'state', 'result', 'ev_unpaused', 'ev_terminating')
+    __slots__+= ('thread', 'lock')
 
     def __init__(self):
         '''Execute a function asynchronously in another thread.'''
@@ -764,14 +764,14 @@ class execution(object):
         if not self.thread.is_alive():
             state = 'dead'
         res = tuple(self.state)
-        return "<class '{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal',__name__,cls.__name__)), state, len(res), self.result.unfinished_tasks)
+        return "<class '{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal', __name__, cls.__name__)), state, len(res), self.result.unfinished_tasks)
 
     running = property(fget=lambda s: s.thread.is_alive() and s.ev_unpaused.is_set() and not s.ev_terminating.is_set())
     dead = property(fget=lambda s: s.thread.is_alive())
 
     def notify(self):
         '''Notify the execution queue that it should process anything that is queued.'''
-        logging.debug("{:s}.notify : Waking up execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
+        logging.debug("{:s}.notify : Waking up execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
         self.queue.acquire()
         self.queue.notify()
         self.queue.release()
@@ -789,17 +789,17 @@ class execution(object):
 
     def __start(self):
         cls = self.__class__
-        logging.debug("{:s}.start : Starting execution queue thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.debug("{:s}.start : Starting execution queue thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         self.ev_terminating.clear(), self.ev_unpaused.set()
         self.thread.daemon = True
         return self.thread.start()
 
     def __stop(self):
         cls = self.__class__
-        logging.debug("{:s}.stop : Terminating execution queue thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.debug("{:s}.stop : Terminating execution queue thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         if not self.thread.is_alive():
             cls = self.__class__
-            logging.warn("{:s}.stop : Execution queue has already been terminated as {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.warn("{:s}.stop : Execution queue has already been terminated as {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return
         self.ev_unpaused.set(), self.ev_terminating.set()
         self.queue.acquire()
@@ -811,9 +811,9 @@ class execution(object):
         '''Start to dispatch callables in the execution queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.start : Unable to resume an already terminated execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.fatal("{:s}.start : Unable to resume an already terminated execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return False
-        logging.info("{:s}.start : Resuming the execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.info("{:s}.start : Resuming the execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.set()
         self.queue.acquire()
         self.queue.notify_all()
@@ -824,9 +824,9 @@ class execution(object):
         '''Pause the execution queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.stop : Unable to pause the execution queue {!r} as it has already been terminated.".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.fatal("{:s}.stop : Unable to pause the execution queue {!r} as it has already been terminated.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return False
-        logging.info("{:s}.stop : Pausing execution queue thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.info("{:s}.stop : Pausing execution queue thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.clear()
         self.queue.acquire()
         self.queue.notify_all()
@@ -839,7 +839,7 @@ class execution(object):
         res = functools.partial(F, *args, **kwds)
 
         cls = self.__class__
-        logging.debug("{:s}.push : Adding the callable {!r} to the execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), F, self))
+        logging.debug("{:s}.push : Adding the callable {!r} to the execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), F, self))
         # shove it down a multiprocessing.Queue
         self.queue.acquire()
         self.state.append(res)
@@ -851,10 +851,10 @@ class execution(object):
         '''Pop a result off of the result queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.pop : Refusing to wait for a result when execution queue has already terminated. Execution queue is {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
+            logging.fatal("{:s}.pop : Refusing to wait for a result when execution queue has already terminated. Execution queue is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             raise Queue.Empty
 
-        logging.debug("{:s}.pop : Popping result off of the execution queue {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self))
+        logging.debug("{:s}.pop : Popping result off of the execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
         try:
             _, res, err = self.result.get(block=0)
             if err != (None, None, None):
@@ -893,14 +893,14 @@ class execution(object):
         consumer = self.__consume(self.ev_terminating, self.queue, self.state)
         executor = self.__dispatch(self.lock); next(executor)
 
-        logging.debug("{:s}.running : The execution queue is now running with thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+        logging.debug("{:s}.running : The execution queue is now running with thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         while not self.ev_terminating.is_set():
             # check if we're allowed to execute
             if not self.ev_unpaused.is_set():
                 self.ev_unpaused.wait()
 
             # pull a callable out of the queue
-            logging.debug("{:s}.running : Waiting for an item on thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), self.thread))
+            logging.debug("{:s}.running : Waiting for an item on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
             self.queue.acquire()
             item = next(consumer)
             self.queue.release()
@@ -912,12 +912,12 @@ class execution(object):
             if self.ev_terminating.is_set(): break
 
             # now we can execute it
-            logging.debug("{:s}.running : Executing {!r} asynchronously with thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), item, self.thread))
+            logging.debug("{:s}.running : Executing {!r} asynchronously with thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), item, self.thread))
             res, err = executor.send(item)
 
             # and stash our result
-            logging.debug("{:s}.running : Received result {!r} from {!r} on thread {!r}.".format('.'.join(('internal',__name__,cls.__name__)), (res,err), item, self.thread))
-            self.result.put((item,res,err))
+            logging.debug("{:s}.running : Received result {!r} from {!r} on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), (res, err), item, self.thread))
+            self.result.put((item, res, err))
         return
 
 # FIXME: figure out how to match against a bounds in a non-hacky way
@@ -931,7 +931,7 @@ class matcher(object):
     def __attrib__(self, *attribute):
         if not attribute:
             return lambda n: n
-        res = [(operator.attrgetter(a) if isinstance(a,basestring) else a) for a in attribute]
+        res = [(operator.attrgetter(a) if isinstance(a, basestring) else a) for a in attribute]
         return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)

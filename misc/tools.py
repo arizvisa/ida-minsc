@@ -96,8 +96,11 @@ def colormarks(color=0x7f007f):
         database.tag(ea, 'mark', m)
         if database.color(ea) is None:
             database.color(ea, color)
-        try: f.add(func.top(ea))
-        except (LookupError, ValueError): pass
+        try:
+            f.add(func.top(ea))
+        except internal.exceptions.FunctionNotFoundError:
+            pass
+        continue
 
     # tag the functions too
     for ea in list(f):
@@ -157,7 +160,7 @@ def checkmarks():
     for a, m in database.marks():
         try:
             res.append((func.top(a), a, m))
-        except ValueError:
+        except internal.exceptions.FunctionNotFoundError:
             pass
         continue
 
@@ -283,8 +286,8 @@ def makecall(ea=None, target=None):
             left = database.address.prevstack(ea, offset+database.config.bits()/8)
             # FIXME: if left is not an assignment or a push, find last assignment
             result.append((name, left))
-    except LookupError:
-        raise LookupError("{:s}.makecall({!r}, {!r}) : Unable to get arguments for target function.".format(__name__, ea, target))
+    except internal.exceptions.OutOfBoundsError:
+        raise internal.exceptions.OutOfBoundserror("{:s}.makecall({!r}, {!r}) : Unable to get arguments for target function.".format(__name__, ea, target))
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
 #    result = ["{:s}={:s}".format(name, instruction.op_repr(ea, 0)) for name, ea in result]

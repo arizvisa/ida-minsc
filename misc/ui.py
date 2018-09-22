@@ -34,7 +34,7 @@ import database as _database
 
 def application():
     '''Return the current instance of the IDA Application.'''
-    raise NotImplementedError
+    raise internal.exceptions.MissingMethodError
 
 def ask(string, **default):
     """Ask the user a question providing the option to choose "yes", "no", or "cancel".
@@ -77,7 +77,7 @@ class current(object):
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
-            raise StandardError("{:s}.function() : Not currently inside a function.".format('.'.join((__name__, cls.__name__))))
+            raise internal.exceptions.FunctionNotFoundError("{:s}.function() : Unable to locate the current function.".format('.'.join((__name__, cls.__name__))))
         return res
     @classmethod
     def segment(cls):
@@ -87,7 +87,7 @@ class current(object):
     @classmethod
     def status(cls):
         '''Return the IDA status.'''
-        raise NotImplementedError
+        raise internal.exceptions.UnsupportedCapability("{:s}.status() : Unable to return the current status of IDA.".format('.'.join((__name__, cls.__name__))))
     @classmethod
     def symbol(cls):
         '''Return the current highlighted symbol name.'''
@@ -99,7 +99,7 @@ class current(object):
         left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
         ok = idaapi.read_selection(view, left, right)
         if not ok:
-            raise StandardError("{:s}.selection() : Unable to read selection.".format('.'.join((__name__, cls.__name__))))
+            raise internal.exceptions.DisassemblerError("{:s}.selection() : Unable to read the current selection.".format('.'.join((__name__, cls.__name__))))
         pl_l, pl_r = left.place(view), right.place(view)
         return _database.address.head(pl_l.ea), _database.address.tail(pl_r.ea)
     @classmethod
@@ -265,7 +265,7 @@ class strings(appwindow):
     @classmethod
     def __on_openidb__(cls, code, is_old_database):
         if code != idaapi.NW_OPENIDB or is_old_database:
-            raise RuntimeError
+            raise internal.exceptions.InvalidParameterError("{:s}.__on_openidb__({:#x}, {:b}) : Hook was called with an unexpected code or an old database.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
         config = idaapi.strwinsetup_t()
         config.minlen = 3
         config.ea1, config.ea2 = idaapi.cvar.inf.minEA, idaapi.cvar.inf.maxEA
@@ -295,7 +295,7 @@ class strings(appwindow):
         string = idaapi.string_info_t()
         res = idaapi.get_strlist_item(index, string)
         if not res:
-            raise RuntimeError("{:s}.at({:d}) : The call to idaapi.get_strlist_item({:d}) returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
+            raise internal.exceptions.DisassemblerError("{:s}.at({:d}) : The call to idaapi.get_strlist_item({:d}) returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
         return string
     @classmethod
     def get(cls, index):
@@ -341,7 +341,7 @@ class timer(object):
     @classmethod
     def unregister(cls, id):
         '''Unregister the specified ``id``.'''
-        raise NotImplementedError("{:s}.unregister({!s}) : A lock or a signal s needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
+        raise internal.exceptions.UnsupportedCapability("{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
         idaapi.unregister_timer(cls.clock[id])
         del(cls.clock[id])
     @classmethod
@@ -470,7 +470,7 @@ class widget(object):
     @classmethod
     def form(cls, twidget):
         '''Return an IDA plugin form as a UI widget.'''
-        raise NotImplementedError
+        raise internal.exceptions.MissingMethodError
 
 class clipboard(object):
     """
@@ -496,7 +496,7 @@ class mouse(object):
     @classmethod
     def position(cls):
         '''Return the current `(x, y)` position of the cursor.'''
-        raise NotImplementedError
+        raise internal.exceptions.MissingMethodError
 
 class keyboard(object):
     """
@@ -527,7 +527,7 @@ class keyboard(object):
     @classmethod
     def input(cls):
         '''Return the current keyboard input context.'''
-        raise NotImplementedError
+        raise internal.exceptions.MissingMethodError
 
 ### PyQt5-specific functions and namespaces
 ## these can overwrite any of the classes defined above
@@ -558,7 +558,7 @@ try:
         @classmethod
         def input(cls):
             '''Return the current keyboard input context.'''
-            raise NotImplementedError
+            raise internal.exceptions.MissingMethodError
 
     class UIProgress(object):
         """

@@ -108,9 +108,9 @@ class utils(object):
     def range(cls):
         this = netnode.new()
         ok, start = netnode.start(this), netnode.index(this)
-        if not ok: raise StandardError("{:s}.range : Unable to find first node.".format('.'.join((__name__,cls.__name__))))
+        if not ok: raise LookupError("{:s}.range : Unable to find first node.".format('.'.join(('internal', __name__, cls.__name__))))
         ok, end = netnode.end(this), netnode.index(this)
-        if not ok: raise StandardError("{:s}.range : Unable to find last node.".format('.'.join((__name__,cls.__name__))))
+        if not ok: raise LookupError("{:s}.range : Unable to find last node.".format('.'.join(('internal', __name__, cls.__name__))))
         return start, end
 
     @classmethod
@@ -324,15 +324,15 @@ class blob(object):
         if cls.size(nodeidx, tag) == 0:
             raise ValueError("Node {:x}({:s}) has no blob.".format(nodeidx, tag))
         res = cls.get(nodeidx, tag)
-        return repr(res)
+        return "{!r}".format(res)
 
 ### node iteration
 def riter():
-    for nodeidx,_ in utils.renumerate():
+    for nodeidx, _ in utils.renumerate():
         yield nodeidx
     return
 def fiter():
-    for nodeidx,_ in utils.fenumerate():
+    for nodeidx, _ in utils.fenumerate():
         yield nodeidx
     return
 
@@ -357,15 +357,15 @@ class alt(object):
     @classmethod
     def fiter(cls, nodeidx):
         node = netnode.new(nodeidx)
-        for idx,val in utils.falt(node):
-            yield idx,val
+        for idx, val in utils.falt(node):
+            yield idx, val
         return
 
     @classmethod
     def riter(cls, nodeidx):
         node = netnode.new(nodeidx)
-        for idx,val in utils.ralt(node):
-            yield idx,val
+        for idx, val in utils.ralt(node):
+            yield idx, val
         return
 
     @classmethod
@@ -380,6 +380,8 @@ class alt(object):
 ### node sup iteration
 class sup(object):
     '''Sparse array[int] of 1024b strings'''
+
+    MAX_SIZE = 0x400
 
     @classmethod
     def get(cls, nodeidx, idx, type=None):
@@ -403,14 +405,14 @@ class sup(object):
     @classmethod
     def fiter(cls, nodeidx):
         node = netnode.new(nodeidx)
-        for idx,_ in utils.fsup(node):
+        for idx, _ in utils.fsup(node):
             yield idx
         return
 
     @classmethod
     def riter(cls, nodeidx):
         node = netnode.new(nodeidx)
-        for idx,_ in utils.rsup(node):
+        for idx, _ in utils.rsup(node):
             yield idx
         return
 
@@ -460,14 +462,14 @@ class hash(object):
     @classmethod
     def fiter(cls, nodeidx):
         node = netnode.new(nodeidx)
-        for key,_ in utils.fhash(node):
+        for key, _ in utils.fhash(node):
             yield key
         return
 
     @classmethod
     def riter(cls, nodeidx):
         node = netnode.new(nodeidx)
-        for key,_ in utils.rhash(node):
+        for key, _ in utils.rhash(node):
             yield key
         return
 
@@ -476,12 +478,12 @@ class hash(object):
         res = []
         try:
             l1 = max(len(key or '') for key in cls.fiter(nodeidx))
-            l2 = max(len(repr(cls.get(nodeidx, key))) for key in cls.fiter(nodeidx))
+            l2 = max(len("{!r}".format(cls.get(nodeidx, key))) for key in cls.fiter(nodeidx))
         except ValueError:
             l1, l2 = 0, 2
 
         for i, key in enumerate(cls.fiter(nodeidx)):
-            val = "{:<{:d}s} : str=\"{:s}\", buffer={!r}, int={:#x}({:d})".format(repr(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, str), cls.get(nodeidx, key, buffer), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
+            val = "{:<{:d}s} : str=\"{:s}\", buffer={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, str), cls.get(nodeidx, key, buffer), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
             res.append("[{:d}] {:<{:d}s} -> {:s}".format(i, key, l1, val))
         if not res:
             raise ValueError("Node {:x} has no hashes.".format(nodeidx))

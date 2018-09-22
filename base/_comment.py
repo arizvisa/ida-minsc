@@ -57,11 +57,11 @@ character is prefixed with a backslash, it will decode into a character
 that is prefixed with a backslash.
 """
 
-import itertools,functools,operator
-import collections,heapq,string
-import six,logging
+import itertools, functools, operator
+import collections, heapq, string
+import six, logging
 
-import internal,idaapi
+import internal, idaapi
 import codecs
 
 class trie(dict):
@@ -157,7 +157,7 @@ class cache(object):
                 type = next(t for t in cls.state if issubclass(type, t))
             res = next(enc for enc in cls.state[type] if enc.type(instance))
         except StopIteration:
-            raise LookupError("{:s}.by({!s}) : Unable to find an encoder for the serialization of the specified type.".format( '.'.join(('internal', __name__, cls.__name__)), type))
+            raise internal.exceptions.SerializationError("{:s}.by({!s}) : Unable to find an encoder for the serialization of the specified type {!s}.".format('.'.join(('internal', __name__, cls.__name__)), type, type))
         return res
 
     @classmethod
@@ -273,8 +273,8 @@ class _dict(default):
         return isinstance(instance, dict)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
-        return '{' + ', '.join("{:s} : {!r}".format(f(n), instance[n]) for n in instance) + '}'
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
+        return '{' + ', '.join("{:s} : {!r}".format(f(key), instance[key]) for key in instance) + '}'
 
 @cache.register(list, trie.star(' \t'), '[')
 class _list(default):
@@ -294,7 +294,7 @@ class _tuple(default):
     @classmethod
     def encode(cls, instance):
         f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
-        return '(' + ', '.join(map(f,instance)) + (',' if len(instance) == 1 else '') + ')'
+        return '(' + ', '.join(map(f, instance)) + (', ' if len(instance) == 1 else '') + ')'
 
 @cache.register(set, trie.star(' \t'), *'set([')
 class _set(default):
@@ -304,7 +304,7 @@ class _set(default):
     @classmethod
     def encode(cls, instance):
         f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
-        return 'set([' + ', '.join(map(f,instance)) + '])'
+        return 'set([' + ', '.join(map(f, instance)) + '])'
 
 ### parsing functions
 def key_escape(iterable, sentinel):
@@ -320,11 +320,12 @@ def key_escape(iterable, sentinel):
                 return
             yield ch
     except StopIteration: pass
-    raise KeyError
+    raise internal.exceptions.InvalidFormatError("{:s}.key_escape({!s}, {!r}) : Input is not properly terminated with the specified sentinel {!r}.".format('.'.join(('internal', __name__)), iterable, sentinel, sentinel))
 
 def parse_line(iterable):
     ch = next(iterable)
-    if ch != '[': raise KeyError
+    if ch != '[':
+        raise internal.exceptions.InvalidFormatError("{:s}.parse_line({!s}) : Input does not begin with the proper character {!r} and instead starts with {!r}.".format('.'.join(('internal', __name__)), iterable, '[', ch))
     res = key_escape(iterable, ']')
     key = ''.join(res)
 
@@ -333,12 +334,14 @@ def parse_line(iterable):
         t = cache.match(value)
     except KeyError:
         return key, _str.decode(value)
+
     try:
         res = t.decode(value)
     except:
-        res = _str.decode(value)
-        logging.debug("{:s}.parse_line : Assuming tag {!r} is of type _str with the value {!r}.".format( '.'.join(('internal', __name__)), key, value))
-        #raise ValueError("Unable to decode data with {!r} : {!r}".format(t, value))
+        t = _str
+        logging.debug("{:s}.parse_line({!s}) : Assuming tag {!r} is of type {!s} with the value {!r}.".format('.'.join(('internal', __name__)), iterable, key, t, value))
+        res = t.decode(value)
+        #raise internal.exceptions.SerializationError("Unable to decode data with {!r} : {!r}".format(t, value))
     return key, res
 
 def emit_line(key, value):
@@ -384,14 +387,14 @@ def decode(data, default=''):
 def encode(dict):
     res = []
     for k, v in six.iteritems(dict or {}):
-        res.append(emit_line(k,v))
+        res.append(emit_line(k, v))
     return '\n'.join(res)
 
 def check(data):
     res = map(iter, (data or '').split('\n'))
     try:
         map(parse_line, res)
-    except (KeyError,StopIteration):
+    except (KeyError, StopIteration):
         return False
     return True
 
@@ -406,7 +409,7 @@ class tagging(object):
     @classmethod
     def __init_tagcache__(cls, idp_modname):
         cls.node()
-        logging.debug("{:s}.init_tagcache : Initialized tagcache with netnode {!r} and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), cls.__node__, cls.__nodeid__))
+        logging.debug("{:s}.init_tagcache({!r}) : Initialized tagcache with netnode {!r} and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), idp_modname, cls.__node__, cls.__nodeid__))
 
     @classmethod
     def node(cls):
@@ -422,7 +425,7 @@ class contents(tagging):
     '''Tagging for an address within a function (contents)'''
 
     ## for each function's content
-    # netnode.blob[fn.startEA, btag] = marshal.dumps({'name','address'})
+    # netnode.blob[fn.startEA, btag] = marshal.dumps({'name', 'address'})
     # netnode.sup[fn.startEA] = marshal.dumps({tagnames})
 
     #btag = idaapi.stag         # XXX: apparently 'S' is used for comments
@@ -438,30 +441,30 @@ class contents(tagging):
     def _read_header(cls, target, ea):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}._read_header : Unable to find a function for {:#x} at {:#x}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea))
+            raise internal.exceptions.FunctionNotFoundError("{:s}._read_header({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
 
         encdata = internal.netnode.sup.get(node, key)
         if encdata is None:
             return None
 
         try:
-            data,sz = cls.codec.decode(encdata)
+            data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise ValueError((sz,len(encdata)))
+                raise internal.exceptions.SizeMismatchError((sz, len(encdata)))
         except:
-            raise IOError("{:s}._read_header : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea, encdata))
+            raise internal.exceptions.SerializationError("{:s}._read_header({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
         except:
-            raise IOError("{:s}._read_header : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea, data))
+            raise internal.exceptions.SerializationError("{:s}._read_header({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
         return result
 
     @classmethod
     def _write_header(cls, target, ea, value):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}._write_header : Unable to find a function for {:#x} at {:#x}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea))
+            raise internal.exceptions.FunctionNotFoundError("{:s}._write_header({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
 
         if not value:
             ok = internal.netnode.sup.remove(node, key)
@@ -470,17 +473,17 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(value)
         except:
-            raise IOError("{:s}._write_header : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea, value))
+            raise internal.exceptions.SerializationError("{:s}._write_header({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, value))
 
         try:
-            encdata,sz = cls.codec.encode(data)
+            encdata, sz = cls.codec.encode(data)
             if sz != len(data):
-                raise ValueError((value,sz,len(data)))
+                raise internal.exceptions.SizeMismatchError((value, sz, len(data)))
         except:
-            raise IOError("{:s}._write_header : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format( '.'.join(('internal', __name__, cls__name__)), key, ea, data))
+            raise internal.exceptions.SerializationError("{:s}._write_header({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls__name__)), target, ea, value, key, ea, data))
 
-        if len(encdata) > 1024:
-            logging.warn("{:s}._write_header : Too many tags within function. The size ({:#x}) must be < 0x400. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), len(encdata)))
+        if len(encdata) > internal.netnode.sup.MAX_SIZE:
+            logging.warn("{:s}._write_header({!r}, {:#x}, {!r}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, len(encdata), internal.netnode.sup.MAX_SIZE))
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
@@ -490,23 +493,23 @@ class contents(tagging):
         '''Reads a dictionary from the specific object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}._read : Unable to find a function for {:#x} at {:#x}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea))
+            raise internal.exceptions.FunctionNotFoundError("{:s}._read({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
 
         encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
             return None
 
         try:
-            data,sz = cls.codec.decode(encdata)
+            data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise ValueError((sz,len(encdata)))
+                raise internal.exceptions.SizeMismatchError((sz, len(encdata)))
         except:
-            raise IOError("{:s}._read : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea, encdata))
+            raise internal.exceptions.SerializationError("{:s}._read({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
         except:
-            raise IOError("{:s}._read : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea, data))
+            raise internal.exceptions.SerializationError("{:s}._read({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
         return result
 
     @classmethod
@@ -514,14 +517,14 @@ class contents(tagging):
         '''Writes a dictionary to the specified object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise LookupError("{:s}._write : Unable to find a function for {:#x} at {:#x}.".format( '.'.join(('internal', __name__, cls.__name__)), key, ea))
+            raise internal.exceptions.FunctionNotFoundError("{:s}._write({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
 
         # erase cache and blob if no data is specified
         if not value:
             try:
                 ok = cls._write_header(target, ea, None)
                 if not ok:
-                    logging.debug("{:s}._write : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), key))
+                    logging.debug("{:s}._write({!r}, {:#x}, {!r}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
             finally:
                 return internal.netnode.blob.remove(key, cls.btag)
 
@@ -530,46 +533,47 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(res)
         except:
-            raise IOError("{:s}._write : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join((__name__, cls.__name__)), key, ea, res))
+            raise internal.exceptions.SerializationError("{:s}._write({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, res))
 
         try:
-            encdata,sz = cls.codec.encode(data)
+            encdata, sz = cls.codec.encode(data)
         except:
-            raise IOError("{:s}._write : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join((__name__, cls.__name__)), key, ea, data))
+            raise internal.exceptions.SerializationError("{:s}._write({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, data))
+
         if sz != len(data):
-            raise ValueError((res,sz,len(data)))
+            raise internal.exceptions.SizeMismatchError((res, sz, len(data)))
 
         # write blob
         try:
             ok = internal.netnode.blob.set(key, cls.btag, encdata)
-            assert ok
+            if not ok: raise AssertionError
         except:
-            raise IOError("{:s}._write : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join((__name__, cls.__name__)), key, ea, encdata))
+            raise internal.exceptions.DisassemblerError("{:s}._write({!r}, {:#x}, {!r}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, encdata))
 
         # update sup cache with keys
         res = set(value.viewkeys())
         try:
             ok = cls._write_header(target, ea, res)
-            assert ok
+            if not ok: raise AssertionError
         except:
-            logging.fatal("{:s}._write : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), key))
+            logging.fatal("{:s}._write({!r}, {:#x}, {!r}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
         return ok
 
     @classmethod
     def iterate(cls):
         node = tagging.node()
-        for ea in internal.netnode.sup.fiter(tagging.node()):
+        for ea in internal.netnode.sup.fiter(node):
             encdata = internal.netnode.sup.get(node, ea)
-            data,sz = cls.codec.decode(encdata)
-            if sz != len(encdata):
-                logging.warn("{:s}.iterate : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
+            data, sz = cls.codec.decode(encdata)
+            if len(encdata) != sz:
+                logging.warn("{:s}.iterate() : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
             res = cls.marshaller.loads(data)
             yield ea, res
         return
 
     @classmethod
     def inc(cls, address, name, **target):
-        res = cls._read(target.get('target',None), address) or {}
+        res = cls._read(target.get('target', None), address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         state[name] = refs = state.get(name, 0) + 1
@@ -581,12 +585,12 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: del res[cls.__address__]
 
-        cls._write(target.get('target',None), address, res)
+        cls._write(target.get('target', None), address, res)
         return refs
 
     @classmethod
     def dec(cls, address, name, **target):
-        res = cls._read(target.get('target',None), address) or {}
+        res = cls._read(target.get('target', None), address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         refs, count = state.pop(name, 0) - 1, cache.pop(address, 0) - 1
@@ -602,26 +606,26 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: res.pop(cls.__address__, None)
 
-        cls._write(target.get('target',None), address, res)
+        cls._write(target.get('target', None), address, res)
         return refs
 
     @classmethod
     def name(cls, address, **target):
         '''Return all the tag names for the specified function'''
-        res = cls._read(target.get('target',None), address) or {}
+        res = cls._read(target.get('target', None), address) or {}
         res = res.get(cls.__tags__, {})
         return set(res.viewkeys())
 
     @classmethod
     def address(cls, address, **target):
         '''Return all the tag address for the specified function'''
-        res = cls._read(target.get('target',None), address) or {}
+        res = cls._read(target.get('target', None), address) or {}
         res = res.get(cls.__address__, {})
         return sorted(res.viewkeys())
 
     @classmethod
     def set_name(cls, address, name, count, **target):
-        state = cls._read(target.get('target',None), address) or {}
+        state = cls._read(target.get('target', None), address) or {}
 
         res = state.get(cls.__tags__, {})
         if count > 0:
@@ -634,15 +638,16 @@ class contents(tagging):
         else:
             state.pop(cls.__tags__, None)
 
-        ok = cls._write(target.get('target',None), address, state)
-        assert ok
-        return state
+        ok = cls._write(target.get('target', None), address, state)
+        if ok:
+            return state
+        raise internal.exceptions.ReadOrWriteError("{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
 
     @classmethod
     def set_address(cls, address, count, **target):
-        state = cls._read(target.get('target',None), address) or {}
+        state = cls._read(target.get('target', None), address) or {}
 
-        res = state.get(cls.__address__,{})
+        res = state.get(cls.__address__, {})
         if count > 0:
             res[address] = count
         else:
@@ -653,9 +658,10 @@ class contents(tagging):
         else:
             state.pop(cls.__address__, None)
 
-        ok = cls._write(target.get('target',None), address, state)
-        assert ok
-        return state
+        ok = cls._write(target.get('target', None), address, state)
+        if ok:
+            return state
+        raise internal.exceptions.ReadOrWriteError("{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
 
 class globals(tagging):
     '''Tagging for a function-tag or a global'''
@@ -708,13 +714,15 @@ class globals(tagging):
 
     @classmethod
     def set_name(cls, name, count):
-        res = internal.netnode.hash.get(tagging.node(), name, type=int)
-        internal.netnode.hash.set(tagging.node(), name, count)
+        node = tagging.node()
+        res = internal.netnode.hash.get(node, name, type=int)
+        internal.netnode.hash.set(node, name, count)
         return res
 
     @classmethod
     def set_address(cls, address, count):
-        res = internal.netnode.alt.get(tagging.node(), address)
-        internal.netnode.alt.set(tagging.node(), address, count)
+        node = tagging.node()
+        res = internal.netnode.alt.get(node, address)
+        internal.netnode.alt.set(node, address, count)
         return res
 
