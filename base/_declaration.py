@@ -8,15 +8,15 @@ TODO: Implement parsers for some of the C++ symbol manglers in order to
       query them for specific attributes or type information.
 """
 
-import function as fn,database as db
-import idaapi
+import function as fn, database as db
+import internal, idaapi
 
 ### c declaration stuff
 def function(ea):
     '''Returns the C function declaration at the address ``ea``.'''
     result = idaapi.idc_get_type(ea)
     if result is None:
-        raise ValueError("The function {:x} does not have a declaration.".format(ea))
+        raise internal.exceptions.MissingTypeOrAttribute("The function {:x} does not have a declaration.".format(ea))
     return result
 
 def arguments(ea):
@@ -37,8 +37,8 @@ def size(string):
         result = idaapi.idc_parse_decl(idaapi.cvar.idati, string if string.endswith(';') else string+';', 0)
 
     if result is None:
-        raise TypeError("Unable to parse the C declaration {!r}.".format(string))
-    _,type,_ = result
+        raise internal.exceptions.DisassemblerError("Unable to parse the specified C declaration ({!r}).".format(string))
+    _, type, _ = result
     return idaapi.get_type_size0(idaapi.cvar.idati, type)
 
 def demangle(string):
@@ -82,26 +82,26 @@ class extract:
     @staticmethod
     def fullname(string):
         result = extract.declaration(string)
-        return result[:result.find('(')].split(' ',3)[-1] if any(n in result for n in ('(',' ')) else result
+        return result[:result.find('(')].split(' ', 3)[-1] if any(n in result for n in ('(', ' ')) else result
 
     @staticmethod
     def name(string):
         result = extract.fullname(string)
-        return result.rsplit(':',2)[-1] if ':' in result else result
+        return result.rsplit(':', 2)[-1] if ':' in result else result
 
     @staticmethod
     def arguments(string):
         result = extract.declaration(string)
-        return map(str.strip,result[result.index('(')+1:result.find(')')].split(',')) if '(' in result else []
+        return map(str.strip, result[result.index('(')+1:result.find(')')].split(',')) if '(' in result else []
 
     @staticmethod
     def result(string):
         result = extract.declaration(string)
-        result = result[:result.find('(')].rsplit(' ',1)[0]
-        return result.split(':',1)[1].strip() if ':' in result else result.strip()
+        result = result[:result.find('(')].rsplit(' ', 1)[0]
+        return result.split(':', 1)[1].strip() if ':' in result else result.strip()
 
     @staticmethod
     def scope(string):
         result = extract.declaration(string)
-        result = result[:result.find('(')].rsplit(' ',1)[0]
-        return result.split(':',1)[0].strip() if ':' in result else ''
+        result = result[:result.find('(')].rsplit(' ', 1)[0]
+        return result.split(':', 1)[0].strip() if ':' in result else ''
