@@ -19,11 +19,13 @@ just any number of things.
 Examples
 --------
 
-To create a closure that will return the type if the second element of
+To create a closure that will return the type of the second element of
 a structure::
 
    > f = fcompose( fgetitem(1), fattribute('type') )
-   > print f(object)
+   >
+   > st = struc.by('MyStructName')
+   > print f(st)
 
 To create a closure which will try and call :py:func:`__repr__` whilst
 falling back to formatting as a string if not possible::

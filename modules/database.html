@@ -3702,7 +3702,7 @@ following examples can be used:</p>
 <dt>
 <code class="descclassname">get.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em>, <em>**length</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the values of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>If the int <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it as the number of elements for the array.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it as the number of elements for the array.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -3764,6 +3764,39 @@ If <code class="docutils literal notranslate"><span class="pre">byteorder</span>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the size of the integer (in bytes)</li>
 <li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the integer</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.get.string">
+<code class="descclassname">get.</code><code class="descname">string</code><span class="sig-paren">(</span><em>**length</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.string" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the array at the current address as a string.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**length</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">string</code><span class="sig-paren">(</span><em>ea</em>, <em>**length</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> as a string.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it as the length of the array.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>**length</strong> – </li>
 </ul>
 </td>
 </tr>

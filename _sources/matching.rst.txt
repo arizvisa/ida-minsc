@@ -74,7 +74,7 @@ To iterate through all the structure members that match a regex to
 search for unnamed fields::
 
    > st = struc.by(...)
-   > for m in st.iterate(regex='field_.\*$')
+   > for m in st.iterate(regex='field_.*$')
 
 .. _matching-functions:
 

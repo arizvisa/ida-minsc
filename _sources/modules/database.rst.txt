@@ -2128,7 +2128,7 @@ following examples can be used::
    
    Return the values of the array at the address specified by ``ea``.
    
-   If the int ``length`` is defined, then use it as the number of elements for the array.
+   If the integer ``length`` is defined, then use it as the number of elements for the array.
    
    :param ea: the address of an array in the database
    :type ea: int or long
@@ -2161,6 +2161,22 @@ following examples can be used::
    :param size: the size of the integer (in bytes)
    :type size: int or long
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
+   
+.. py:function:: get\.string(\*\*length)
+   
+   Return the array at the current address as a string.
+   
+   :param \*\*length:
+   
+.. py:function:: get\.string(ea, \*\*length)
+   
+   Return the array at the address specified by ``ea`` as a string.
+   
+   If the integer ``length`` is defined, then use it as the length of the array.
+   
+   :param ea:
+   :type ea: int or long
+   :param \*\*length:
    
 .. py:function:: get\.structure()
    

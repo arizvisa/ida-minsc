@@ -65,10 +65,12 @@ constructing a function that will consume or test its input, or really
 just any number of things.</p>
 <div class="section" id="examples">
 <span id="combinators-examples"></span><h2>2.4.1. Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h2>
-<p>To create a closure that will return the type if the second element of
+<p>To create a closure that will return the type of the second element of
 a structure:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">f</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span> <span class="n">fgetitem</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">fattribute</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span> <span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">f</span><span class="p">(</span><span class="nb">object</span><span class="p">)</span>
+<span class="o">&gt;</span>
+<span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">struc</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;MyStructName&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="n">f</span><span class="p">(</span><span class="n">st</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>To create a closure which will try and call <code class="xref py py-func docutils literal notranslate"><span class="pre">__repr__()</span></code> whilst

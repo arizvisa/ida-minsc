@@ -367,8 +367,8 @@ to match up to another database, etc. These modules are available via the
 Tag modules -- tags
 *******************
 
-The custom :py:mod:`tags` module allows for one to export or import all of the
-tags within a database. Please review the documentation for :py:mod:`tags` for
+The :py:mod:`custom.tags<tags>` module allows for one to export or import all of the
+tags within a database. Please review the documentation for :py:mod:`custom.tags<tags>` for
 more about the capabilities of this module.
 
 .. _tagging-modules-tagfix:
@@ -376,13 +376,13 @@ more about the capabilities of this module.
 Tag modules -- tagfix
 *********************
 
-The custom :py:mod:`tagfix` module allows for one to rebuild the tag cache if
+The :py:mod:`custom.tagfix<tagfix>` module allows for one to rebuild the tag cache if
 the cache somehow gets corrupted in some way (due to IDA crashing whilst trying
 to write a netnode) or if a database did not complete its initial creation of
 the tag cache.
 
 This module exposes a number of functions that can be used to rebuild the tag
-cache entirely. Please review the documentation for :py:mod:`tagfix` for more
+cache entirely. Please review the documentation for :py:mod:`custom.tagfix<tagfix>` for more
 information on how to do this.
 
 .. _tagging-examples-querying:
@@ -448,7 +448,7 @@ Examples -- Querying "Contents" tags
 Return all of the contents tags defined within the current function::
 
    > for ea, tags in func.select():
-         print "Ea: %x Tags: %r".format(ea, tags)
+         print "Ea: %x Tags: %r"% (ea, tags)
    >
 
 Return any instances of the "note" tag defined with a particular function at :py:data:`ea`::
@@ -470,7 +470,7 @@ Another way to perform the above due to the result returned from :py:func:`datab
 being the same as the input to :py:func:`function.select`::
 
    > for res in db.selectcontents('mark'):
-         for ea, res in func.select(*res):
+         for ea, tags in func.select(*res):
              print "Mark found at %x: %s"% (ea, tags['mark'])
          continue
    >
@@ -524,7 +524,7 @@ To export all of the tags for anything tagged "synopsis" in the database::
 
    > res = {}
    > for ea, tags in db.select('synopsis'):
-         res[ea] = db.tag(ea)
+         res[ea] = func.tag(ea)
    >
 
 To rename all of the "empty" tags in a function to "comment"::
@@ -550,8 +550,13 @@ To prefix all tags with the current username using the cache::
    > print "transforming global tags"
    > for ea, res in db.select():
          for k, v in res.iteritems():
-             db.tag(ea, k, None)
-             db.tag(ea, "%s.%s"% (username, k), res[k])
+             if func.within(ea):
+                 func.tag(ea, k, None)
+                 func.tag(ea, "%s.%s"% (username, k), res[k])
+             else:
+                 db.tag(ea, k, None)
+                 db.tag(ea, "%s.%s"% (username, k), res[k])
+             continue
          continue
    >
    > print "transforming contents tags"
