@@ -127,7 +127,7 @@ class read(object):
 
             # if it's a structure, then the type is the structure name
             if isinstance(member.type, struc.structure_t):
-                logging.info("{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!s}.".format('.'.join((__name__, cls.__name__)), ea, member.offset, member.type))
+                logging.debug("{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!s}.".format('.'.join((__name__, cls.__name__)), ea, member.offset, member.type))
                 type = member.type.name
 
             # otherwise, the type is a tuple that we can serializer
