@@ -127,7 +127,7 @@ class read(object):
 
             # if it's a structure, then the type is the structure name
             if isinstance(member.type, struc.structure_t):
-                logging.info("{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!r}.".format('.'.join((__name__, cls.__name__)), ea, member.offset, member.type))
+                logging.info("{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!s}.".format('.'.join((__name__, cls.__name__)), ea, member.offset, member.type))
                 type = member.type.name
 
             # otherwise, the type is a tuple that we can serializer
@@ -190,7 +190,7 @@ class read(object):
 
             # otherwise, try the next address till we hit a sentinel value
             try: ea = db.a.next(ea)
-            except StandardError: ea = sentinel
+            except internal.exceptions.OutOfBoundsError: ea = sentinel
         return
 
     ## reading the contents from the entire database
@@ -263,7 +263,7 @@ class apply(object):
         for offset, (name, type, comment) in six.iteritems(frame):
             try:
                 member = F.by_offset(offset)
-            except LookupError:
+            except internal.exceptions.MemberNotFoundError:
                 logging.warn("{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Skipping application of the name ({!r}), type ({!r}), and comment ({!r}) to it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, name, type, comment))
                 continue
 
@@ -300,7 +300,7 @@ class apply(object):
             if isinstance(type, basestring):
                 try:
                     member.type = struc.by(type)
-                except LookupError:
+                except internal.exceptions.StructureNotFoundError:
                     logging.warn("{:s}.frame({:#x}, ...{:s}): Unable to find structure {!r} for member at {:+#x}. Skipping it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, type, offset))
 
             # otherwise, it's a pythonic tuple that we can just assign
