@@ -151,7 +151,7 @@ def contents(ea):
     '''Re-build the cache for the contents of the function ``ea``.'''
     try:
         func.address(ea)
-    except LookupError:
+    except internal.exceptions.FunctionNotFoundError:
         return {}, {}
 
     # read addresses and tags from contents
