@@ -696,7 +696,10 @@ class search(object):
         """
         reverseQ = builtins.next((direction[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in direction), False)
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
-        return idaapi.find_binary(ea, idaapi.BADADDR, ' '.join("{:d}".format(six.byte2int(ch)) for ch in string), direction.get('radix', 16), idaapi.SEARCH_CASE | flags)
+        res = idaapi.find_binary(ea, idaapi.BADADDR, ' '.join("{:d}".format(six.byte2int(ch)) for ch in string), direction.get('radix', 16), idaapi.SEARCH_CASE | flags)
+        if res == idaapi.BADADDR:
+            raise E.SearchResultsError("{:s}.by_bytes({:#x}, {!r}{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(direction))) if direction else '', res))
+        return res
     byBytes = by_bytes
 
     @utils.multicase(string=basestring)
@@ -716,7 +719,10 @@ class search(object):
         flags = idaapi.SEARCH_REGEX
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        return idaapi.find_text(ea, 0, 0, string, flags)
+        res = idaapi.find_text(ea, 0, 0, string, flags)
+        if res == idaapi.BADADDR:
+            raise E.SearchResultsError("{:s}.by_regex({:#x}, {!r}{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+        return res
     byRegex = by_regex
 
     @utils.multicase(string=basestring)
@@ -736,7 +742,10 @@ class search(object):
         flags = 0
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        return idaapi.find_text(ea, 0, 0, string, flags)
+        res = idaapi.find_text(ea, 0, 0, string, flags)
+        if res == idaapi.BADADDR:
+            raise E.SearchResultsError("{:s}.by_text({:#x}, {!r}{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+        return res
     byText = utils.alias(by_text, 'search')
 
     @utils.multicase(name=basestring)
@@ -756,7 +765,10 @@ class search(object):
         flags = idaapi.SEARCH_IDENT
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        return idaapi.find_text(ea, 0, 0, name, flags)
+        res = idaapi.find_text(ea, 0, 0, name, flags)
+        if res == idaapi.BADADDR:
+            raise E.SearchResultsError("{:s}.by_name({:#x}, {!r}{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+        return res
     byName = utils.alias(by_name, 'search')
 
     @utils.multicase(string=basestring)
