@@ -930,7 +930,7 @@ def name(ea, string, *suffix, **flags):
     # validate the name
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
-        logging.warn("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
+        logging.info("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
         string = res
 
     # set the name and use the value of 'flags' if it was explicit
@@ -1243,7 +1243,7 @@ def tag(ea):
 
     # check to see if they're not overwriting each other
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another due to the keys {:s}. Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info("{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
@@ -1440,7 +1440,7 @@ def selectcontents(**boolean):
         if builtins.set(d.viewkeys()) != res:
             # FIXME: include query in warning
             q = ', '.join("{:s}={!r}".format(k, v) for k, v in boolean.iteritems())
-            logging.warn("{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of supval.".format(__name__, q, ea))
+            logging.warn("{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
 
         # now start aggregating the keys that the user is looking for
         res, d = builtins.set(), internal.comment.contents.name(ea)
@@ -4433,7 +4433,7 @@ class get(object):
         count = length.get('length', type.array.length(ea))
         res = array.array(t, read(ea, count * cb))
         if len(res) != count:
-            logging.warn("{:s}.get({:#x}) : The decoded array length {:d} is not the same as the expected length {:d}.".format('.'.join((__name__, cls.__name__)), ea, len(res), count))
+            logging.warn("{:s}.get({:#x}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, len(res), count))
         return res
 
     @utils.multicase()
