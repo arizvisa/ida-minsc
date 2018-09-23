@@ -532,7 +532,7 @@ def op_structure(ea, opnum, path, **delta):
         res.append(path[len(res)])
 
     if len(res) < len(path):
-        logging.warn("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Cropping path down to {:d} elements due to invalid types being used to specify the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
+        logging.warn("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
     path = res[:]
 
     # if the delta is in the path, move it into the delta kwarg
@@ -683,7 +683,7 @@ def op_refs(ea, opnum):
             member, stkofs = idaapi.get_stkvar(inst, op, res)
 
         if stkofs != stkofs_:
-            logging.warn("{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was calculated ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
+            logging.warn("{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
