@@ -4015,7 +4015,11 @@ class set(object):
         @classmethod
         def byte(cls, ea):
             '''Set the data at address ``ea`` to a byte.'''
-            return set.data(ea, 1, type=idaapi.FF_BYTE)
+            ok = set.data(ea, 1, type=idaapi.FF_BYTE)
+            if not ok:
+                raise E.DisassemblerError("{:s}.byte({:#x}) : Unable to assign a byte to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+            return get.unsigned(ea, 1)
+        uint8_t = utils.alias(byte, 'set.integer')
 
         @utils.multicase()
         @classmethod
@@ -4026,7 +4030,11 @@ class set(object):
         @classmethod
         def word(cls, ea):
             '''Set the data at address ``ea`` to a word.'''
-            return set.data(ea, 2, type=idaapi.FF_WORD)
+            ok = set.data(ea, 2, type=idaapi.FF_WORD)
+            if not ok:
+                raise E.DisassemblerError("{:s}.word({:#x}) : Unable to assign a word to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+            return get.unsigned(ea, 2)
+        uint16_t = utils.alias(word, 'set.integer')
 
         @utils.multicase()
         @classmethod
@@ -4037,7 +4045,11 @@ class set(object):
         @classmethod
         def dword(cls, ea):
             '''Set the data at address ``ea`` to a double-word.'''
-            return set.data(ea, 4, type=idaapi.FF_DWRD)
+            ok = set.data(ea, 4, type=idaapi.FF_DWRD)
+            if not ok:
+                raise E.DisassemblerError("{:s}.dword({:#x}) : Unable to assign a dword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+            return get.unsigned(ea, 4)
+        uint32_t = utils.alias(word, 'set.integer')
 
         @utils.multicase()
         @classmethod
@@ -4048,7 +4060,11 @@ class set(object):
         @classmethod
         def qword(cls, ea):
             '''Set the data at address ``ea`` to a quad-word.'''
-            return set.data(ea, 8, type=idaapi.FF_QWRD)
+            ok = set.data(ea, 8, type=idaapi.FF_QWRD)
+            if not ok:
+                raise E.DisassemblerError("{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+            return get.unsigned(ea, 8)
+        uint64_t = utils.alias(word, 'set.integer')
 
         @utils.multicase()
         @classmethod
@@ -4059,7 +4075,12 @@ class set(object):
         @classmethod
         def oword(cls, ea):
             '''Set the data at address ``ea`` to an octal-word.'''
-            return set.data(ea, 16, type=idaapi.FF_OWRD)
+            ok = set.data(ea, 16, type=idaapi.FF_OWRD)
+            if not ok:
+                raise E.DisassemblerError("{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+            return get.unsigned(ea, 16)
+        uint128_t = utils.alias(word, 'set.integer')
+
     i = integer # XXX: ns alias
 
     @utils.multicase(type=_structure.structure_t)
