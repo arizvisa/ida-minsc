@@ -4745,11 +4745,13 @@ class set(object):
             > database.set.i.qword(ea)
 
         """
+        @document.aliases('set.integer.uint8_t')
         @utils.multicase()
         @classmethod
         def byte(cls):
             '''Set the data at the current address to a byte.'''
             return cls.byte(ui.current.address())
+        @document.aliases('set.integer.uint8_t')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database')
@@ -4765,11 +4767,13 @@ class set(object):
             return get.unsigned(ea, 1)
         uint8_t = utils.alias(byte, 'set.integer')
 
+        @document.aliases('set.integer.uint16_t')
         @utils.multicase()
         @classmethod
         def word(cls):
             '''Set the data at the current address to a word.'''
             return cls.word(ui.current.address())
+        @document.aliases('set.integer.uint16_t')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database')
@@ -4785,11 +4789,13 @@ class set(object):
             return get.unsigned(ea, 2)
         uint16_t = utils.alias(word, 'set.integer')
 
+        @document.aliases('set.integer.uint32_t')
         @utils.multicase()
         @classmethod
         def dword(cls):
             '''Set the data at the current address to a double-word.'''
             return cls.dword(ui.current.address())
+        @document.aliases('set.integer.uint32_t')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database')
@@ -4805,11 +4811,13 @@ class set(object):
             return get.unsigned(ea, 4)
         uint32_t = utils.alias(word, 'set.integer')
 
+        @document.aliases('set.integer.uint64_t')
         @utils.multicase()
         @classmethod
         def qword(cls):
             '''Set the data at the current address to a quad-word.'''
             return cls.qword(ui.current.address())
+        @document.aliases('set.integer.uint64_t')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database')
@@ -4825,11 +4833,13 @@ class set(object):
             return get.unsigned(ea, 8)
         uint64_t = utils.alias(word, 'set.integer')
 
+        @document.aliases('set.integer.uint128_t')
         @utils.multicase()
         @classmethod
         def oword(cls):
             '''Set the data at the current address to an octal-word.'''
             return cls.owrd(ui.current.address())
+        @document.aliases('set.integer.uint128_t')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database')
@@ -5014,28 +5024,28 @@ class get(object):
         def __new__(cls, ea, size, **byteorder):
             return get.unsigned(ea, size, **byteorder)
 
-        @document.aliases('get.ubyte1')
+        @document.aliases('get.integer.ubyte1')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint8_t(cls, **byteorder):
             '''Read a uint8_t from the current address.'''
             return get.unsigned(ui.current.address(), 1, **byteorder)
-        @document.aliases('get.ubyte1')
+        @document.aliases('get.integer.ubyte1')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint8_t(cls, ea, **byteorder):
             '''Read a uint8_t from the address `ea`.'''
             return get.unsigned(ea, 1, **byteorder)
-        @document.aliases('get.sbyte1')
+        @document.aliases('get.integer.sbyte1')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def sint8_t(cls, **byteorder):
             '''Read a sint8_t from the current address.'''
             return get.signed(ui.current.address(), 1, **byteorder)
-        @document.aliases('get.sbyte1')
+        @document.aliases('get.integer.sbyte1')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
@@ -5044,28 +5054,28 @@ class get(object):
             return get.signed(ea, 1, **byteorder)
         ubyte1, sbyte1 = utils.alias(uint8_t, 'get.integer'), utils.alias(sint8_t, 'get.integer')
 
-        @document.aliases('get.uint2')
+        @document.aliases('get.integer.uint2')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint16_t(cls, **byteorder):
             '''Read a uint16_t from the current address.'''
             return get.unsigned(ui.current.address(), 2, **byteorder)
-        @document.aliases('get.uint2')
+        @document.aliases('get.integer.uint2')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint16_t(cls, ea, **byteorder):
             '''Read a uint16_t from the address `ea`.'''
             return get.unsigned(ea, 2, **byteorder)
-        @document.aliases('get.sint2')
+        @document.aliases('get.integer.sint2')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def sint16_t(cls, **byteorder):
             '''Read a sint16_t from the current address.'''
             return get.signed(ui.current.address(), 2, **byteorder)
-        @document.aliases('get.sint2')
+        @document.aliases('get.integer.sint2')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
@@ -5074,28 +5084,28 @@ class get(object):
             return get.signed(ea, 2, **byteorder)
         uint2, sint2 = utils.alias(uint16_t, 'get.integer'), utils.alias(sint16_t, 'get.integer')
 
-        @document.aliases('get.uint4')
+        @document.aliases('get.integer.uint4')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint32_t(cls, **byteorder):
             '''Read a uint32_t from the current address.'''
             return get.unsigned(ui.current.address(), 4, **byteorder)
-        @document.aliases('get.uint4')
+        @document.aliases('get.integer.uint4')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint32_t(cls, ea, **byteorder):
             '''Read a uint32_t from the address `ea`.'''
             return get.unsigned(ea, 4, **byteorder)
-        @document.aliases('get.sint4')
+        @document.aliases('get.integer.sint4')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def sint32_t(cls, **byteorder):
             '''Read a sint32_t from the current address.'''
             return get.signed(ui.current.address(), 4, **byteorder)
-        @document.aliases('get.sint4')
+        @document.aliases('get.integer.sint4')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
@@ -5104,28 +5114,28 @@ class get(object):
             return get.signed(ea, 4, **byteorder)
         uint4, sint4 = utils.alias(uint32_t, 'get.integer'), utils.alias(sint32_t, 'get.integer')
 
-        @document.aliases('get.uint8')
+        @document.aliases('get.integer.uint8')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint64_t(cls, **byteorder):
             '''Read a uint64_t from the current address.'''
             return get.unsigned(ui.current.address(), 8, **byteorder)
-        @document.aliases('get.uint8')
+        @document.aliases('get.integer.uint8')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def uint64_t(cls, ea, **byteorder):
             '''Read a uint64_t from the address `ea`.'''
             return get.unsigned(ea, 8, **byteorder)
-        @document.aliases('get.sint8')
+        @document.aliases('get.integer.sint8')
         @utils.multicase()
         @classmethod
         @document.parameters(byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
         def sint64_t(cls, **byteorder):
             '''Read a sint64_t from the current address.'''
             return get.signed(ui.current.address(), 8, **byteorder)
-        @document.aliases('get.sint8')
+        @document.aliases('get.integer.sint8')
         @utils.multicase(ea=six.integer_types)
         @classmethod
         @document.parameters(ea='an address in the database', byteorder='if ``byteorder`` is provided, use it to determine the byteorder of the integer ')
