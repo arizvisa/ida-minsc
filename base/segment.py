@@ -410,19 +410,17 @@ def new(offset, size, name, **kwds):
     The keyword ``align`` can be used to specify paragraph alignment (idaapi.sa*)
     The keyword ``org`` specifies the origin of the segment (must be paragraph aligned due to ida)
     """
-    s = idaapi.get_segm_by_name(name)
-    if s is not None:
-        logging.fatal("{:s}.new({:#x}, {:+#x}, {!r}, {!r}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name, kwds, name))
-        return None
+    seg = idaapi.get_segm_by_name(name)
+    if seg is not None:
+        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', name))
 
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits()) # FIXME: use disassembler default bit length instead of 32
 
     ## create a selector with the requested origin
     if bits == 16:
         org = kwds.get('org',0)
-        if org&0xf > 0:
-            logging.fatal("{:s}.new({:#x}, {:+#x}, {!r}, {!r}) : The origin ({:#x}) is not aligned to the size of a paragraph (0x10).".format(__name__, offset, size, name, kwds, org))
-            return None
+        if org & 0xf > 0:
+            raise E.InvalidTypeOrValueError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : The specified origin ({:#x}) is not aligned to the size of a paragraph (0x10).".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', org))
 
         para = offset/16
         sel = idaapi.allocate_selector(para)
@@ -447,21 +445,22 @@ def new(offset, size, name, **kwds):
         idaapi.set_selector(sel, 1)
 
     # create segment. ripped from idc
-    s = idaapi.segment_t()
-    s.startEA = offset
-    s.endEA = offset+size
-    s.sel = sel
-    s.bitness = {16:0,32:1,64:2}[bits]
-    s.comb = kwds.get('comb', idaapi.scPub)       # public
-    s.align = kwds.get('align', idaapi.saRelByte)  # paragraphs
+    seg = idaapi.segment_t()
+    seg.startEA = offset
+    seg.endEA = offset+size
+    seg.sel = sel
+    seg.bitness = {16:0,32:1,64:2}[bits]
+    seg.comb = kwds.get('comb', idaapi.scPub)       # public
+    seg.align = kwds.get('align', idaapi.saRelByte)  # paragraphs
 
-    res = idaapi.add_segm_ex(s, name, "", idaapi.ADDSEG_NOSREG|idaapi.ADDSEG_SPARSE)
-    if res == 0:
-        logging.warn("{:s}.new({:#x}, {:+#x}, {!r}, {!r}) : Unable to add a new segment.".format(__name__, offset, size, name, kwds))
-        res = idaapi.del_selector(sel)
-        #assert res != 0
-        return None
-    return s
+    ok = idaapi.add_segm_ex(seg, name, "", idaapi.ADDSEG_NOSREG|idaapi.ADDSEG_SPARSE)
+    if not ok:
+        ok = idaapi.del_selector(sel)
+        if not ok:
+            logging.warn("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', sel))
+
+        raise E.DisassemblerError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to add a new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else ''))
+    return seg
 create = utils.alias(new)
 
 def remove(segment, remove=False):
@@ -472,9 +471,11 @@ def remove(segment, remove=False):
     if not isinstance(segment, idaapi.segment_t):
         cls = idaapi.segment_t
         raise E.InvalidParameterError("{:s}.remove({!r}) : Expected a {!s}, but received a {!s}.".format(__name__, segment, cls, type(segment)))
+
     res = idaapi.del_selector(segment.sel)
     if res == 0:
         logging.warn("{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
+
     res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL if remove else idaapi.SEGMOD_KEEP)
     if res == 0:
         logging.warn("{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
