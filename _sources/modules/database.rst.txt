@@ -2274,7 +2274,7 @@ like in the following examples::
    
    Read a sint16_t from the current address.
    
-   Aliases: :py:func:`database.get.sint2<get\.integer\.sint16_t>`
+   Aliases: :py:func:`database.get.integer.sint2<get\.integer\.sint16_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2282,7 +2282,7 @@ like in the following examples::
    
    Read a sint16_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.sint2<get\.integer\.sint16_t>`
+   Aliases: :py:func:`database.get.integer.sint2<get\.integer\.sint16_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2292,7 +2292,7 @@ like in the following examples::
    
    Read a sint32_t from the current address.
    
-   Aliases: :py:func:`database.get.sint4<get\.integer\.sint32_t>`
+   Aliases: :py:func:`database.get.integer.sint4<get\.integer\.sint32_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2300,7 +2300,7 @@ like in the following examples::
    
    Read a sint32_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.sint4<get\.integer\.sint32_t>`
+   Aliases: :py:func:`database.get.integer.sint4<get\.integer\.sint32_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2310,7 +2310,7 @@ like in the following examples::
    
    Read a sint64_t from the current address.
    
-   Aliases: :py:func:`database.get.sint8<get\.integer\.sint64_t>`
+   Aliases: :py:func:`database.get.integer.sint8<get\.integer\.sint64_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2318,7 +2318,7 @@ like in the following examples::
    
    Read a sint64_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.sint8<get\.integer\.sint64_t>`
+   Aliases: :py:func:`database.get.integer.sint8<get\.integer\.sint64_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2328,7 +2328,7 @@ like in the following examples::
    
    Read a sint8_t from the current address.
    
-   Aliases: :py:func:`database.get.sbyte1<get\.integer\.sint8_t>`
+   Aliases: :py:func:`database.get.integer.sbyte1<get\.integer\.sint8_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2336,7 +2336,7 @@ like in the following examples::
    
    Read a sint8_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.sbyte1<get\.integer\.sint8_t>`
+   Aliases: :py:func:`database.get.integer.sbyte1<get\.integer\.sint8_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2360,7 +2360,7 @@ like in the following examples::
    
    Read a uint16_t from the current address.
    
-   Aliases: :py:func:`database.get.uint2<get\.integer\.uint16_t>`
+   Aliases: :py:func:`database.get.integer.uint2<get\.integer\.uint16_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2368,7 +2368,7 @@ like in the following examples::
    
    Read a uint16_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.uint2<get\.integer\.uint16_t>`
+   Aliases: :py:func:`database.get.integer.uint2<get\.integer\.uint16_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2378,7 +2378,7 @@ like in the following examples::
    
    Read a uint32_t from the current address.
    
-   Aliases: :py:func:`database.get.uint4<get\.integer\.uint32_t>`
+   Aliases: :py:func:`database.get.integer.uint4<get\.integer\.uint32_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2386,7 +2386,7 @@ like in the following examples::
    
    Read a uint32_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.uint4<get\.integer\.uint32_t>`
+   Aliases: :py:func:`database.get.integer.uint4<get\.integer\.uint32_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2396,7 +2396,7 @@ like in the following examples::
    
    Read a uint64_t from the current address.
    
-   Aliases: :py:func:`database.get.uint8<get\.integer\.uint64_t>`
+   Aliases: :py:func:`database.get.integer.uint8<get\.integer\.uint64_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2404,7 +2404,7 @@ like in the following examples::
    
    Read a uint64_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.uint8<get\.integer\.uint64_t>`
+   Aliases: :py:func:`database.get.integer.uint8<get\.integer\.uint64_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2414,7 +2414,7 @@ like in the following examples::
    
    Read a uint8_t from the current address.
    
-   Aliases: :py:func:`database.get.ubyte1<get\.integer\.uint8_t>`
+   Aliases: :py:func:`database.get.integer.ubyte1<get\.integer\.uint8_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2422,7 +2422,7 @@ like in the following examples::
    
    Read a uint8_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.ubyte1<get\.integer\.uint8_t>`
+   Aliases: :py:func:`database.get.integer.ubyte1<get\.integer\.uint8_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3187,9 +3187,13 @@ as follows::
    
    Set the data at the current address to a byte.
    
+   Aliases: :py:func:`database.set.integer.uint8_t<set\.integer\.byte>`
+   
 .. py:function:: set\.integer\.byte(ea)
    
    Set the data at address ``ea`` to a byte.
+   
+   Aliases: :py:func:`database.set.integer.uint8_t<set\.integer\.byte>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3198,9 +3202,13 @@ as follows::
    
    Set the data at the current address to a double-word.
    
+   Aliases: :py:func:`database.set.integer.uint32_t<set\.integer\.dword>`
+   
 .. py:function:: set\.integer\.dword(ea)
    
    Set the data at address ``ea`` to a double-word.
+   
+   Aliases: :py:func:`database.set.integer.uint32_t<set\.integer\.dword>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3209,9 +3217,13 @@ as follows::
    
    Set the data at the current address to an octal-word.
    
+   Aliases: :py:func:`database.set.integer.uint128_t<set\.integer\.oword>`
+   
 .. py:function:: set\.integer\.oword(ea)
    
    Set the data at address ``ea`` to an octal-word.
+   
+   Aliases: :py:func:`database.set.integer.uint128_t<set\.integer\.oword>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3220,9 +3232,13 @@ as follows::
    
    Set the data at the current address to a quad-word.
    
+   Aliases: :py:func:`database.set.integer.uint64_t<set\.integer\.qword>`
+   
 .. py:function:: set\.integer\.qword(ea)
    
    Set the data at address ``ea`` to a quad-word.
+   
+   Aliases: :py:func:`database.set.integer.uint64_t<set\.integer\.qword>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3231,9 +3247,13 @@ as follows::
    
    Set the data at the current address to a word.
    
+   Aliases: :py:func:`database.set.integer.uint16_t<set\.integer\.word>`
+   
 .. py:function:: set\.integer\.word(ea)
    
    Set the data at address ``ea`` to a word.
+   
+   Aliases: :py:func:`database.set.integer.uint16_t<set\.integer\.word>`
    
    :param ea: an address in the database
    :type ea: int or long
