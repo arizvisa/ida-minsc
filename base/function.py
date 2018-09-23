@@ -167,7 +167,7 @@ def name(func, string, *suffix):
     # filter out invalid characters
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
-        logging.warn("{:s}.name({:#x}, {!r}) : Stripped the invalid chars from the function name resulting in {!r}.".format(__name__, ea, string, res))
+        logging.info("{:s}.name({:#x}, {!r}) : Stripped the invalid chars from the function name resulting in {!r}.".format(__name__, ea, string, res))
         string = res
 
     # now we can assign the name
@@ -1406,7 +1406,7 @@ def tag(func):
     d2 = internal.comment.decode(res)
 
     if d1.viewkeys() & d2.viewkeys():
-        logging.warn("{:s}.tag({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another due to the keys {:s}. Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info("{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     res = {}
     map(res.update, (d1, d2) if repeatable else (d2, d1))
@@ -1581,7 +1581,7 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.is_call(ea):
-                    logging.warn("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
+                    logging.info("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
                     #resultCode.append((ea, 0))
                 continue
             resultData.extend( (ea, x) for x in database.xref.data_down(ea) )
