@@ -358,7 +358,7 @@ class structure_t(object):
         name, (cmtt, cmtf), members = state
         identifier = idaapi.get_struc_id(name)
         if identifier == idaapi.BADADDR:
-            logging.warn("{:s}.structure_t.__setstate__ : Creating structure {:s} with {:d} fields and the comment {!r}.".format(__name__, name, len(members), cmtf or cmtt or ''))
+            logging.info("{:s}.structure_t.__setstate__ : Creating structure {:s} with {:d} fields and the comment {!r}.".format(__name__, name, len(members), cmtf or cmtt or ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, name)
         idaapi.set_struc_cmt(identifier, cmtt, True)
         idaapi.set_struc_cmt(identifier, cmtf, False)
@@ -379,7 +379,7 @@ class structure_t(object):
         res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
         if string and string != res:
             cls = self.__class__
-            logging.warn("{:s}.name : Stripping invalid chars from structure name {!r} resulted in {!r}.".format( '.'.join((__name__, cls.__name__)), string, res))
+            logging.info("{:s}.name : Stripping invalid chars from structure name {!r} resulted in {!r}.".format( '.'.join((__name__, cls.__name__)), string, res))
             string = res
         return idaapi.set_struc_name(self.id, string)
 
@@ -406,7 +406,7 @@ class structure_t(object):
         # check for duplicate keys
         if d1.viewkeys() & d2.viewkeys():
             cls = self.__class__
-            logging.warn("{:s}.comment({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another due to the keys {:s}. Giving the {:s} comment priority.".format('.'.join((__name__,cls.__name__)), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info("{:s}.comment({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format('.'.join((__name__,cls.__name__)), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
         res = {}
@@ -502,7 +502,7 @@ def name(id, string, *suffix):
 
     res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
     if string and string != res:
-        logging.warn("{:s}.name : Stripping invalid chars from the structure name {!r} resulted in {!r}.".format(__name__, string, res))
+        logging.info("{:s}.name : Stripping invalid chars from the structure name {!r} resulted in {!r}.".format(__name__, string, res))
         string = res
     return idaapi.set_struc_name(id, string)
 @utils.multicase(structure=structure_t, string=basestring)
@@ -993,7 +993,7 @@ class member_t(object):
 
         identifier = idaapi.get_struc_id(ownername)
         if identifier == idaapi.BADADDR:
-            logging.warn("{:s}.instance({:s}).member_t : Creating member for structure {:s} at offset {:+#x} named {!r} with the comment {!r}.".format(__name__, ownername, ownername, ofs, name, cmtt or cmtf or ''))
+            logging.info("{:s}.instance({:s}).member_t : Creating member for structure {:s} at offset {:+#x} named {!r} with the comment {!r}.".format(__name__, ownername, ownername, ofs, name, cmtt or cmtf or ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
         self.__owner = owner = __instance__(identifier, offset=0)
 
@@ -1100,7 +1100,7 @@ class member_t(object):
         res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
         if string and string != res:
             cls = self.__class__
-            logging.warn("{:s}.name : Stripping invalid chars from structure member {:s}[{:d}] name {!r} resulted in {!r}.".format( '.'.join((__name__, cls.__name__)), self.__owner.name, self.__index, string, res))
+            logging.info("{:s}.name : Stripping invalid chars from structure member {:s}[{:d}] name {!r} resulted in {!r}.".format( '.'.join((__name__, cls.__name__)), self.__owner.name, self.__index, string, res))
             string = res
         return idaapi.set_member_name(self.__owner.ptr, self.offset - self.__owner.members.baseoffset, string)
 
@@ -1127,7 +1127,7 @@ class member_t(object):
         # check for duplicate keys
         if d1.viewkeys() & d2.viewkeys():
             cls = self.__class__
-            logging.warn("{:s}.comment({:#x}) : Contents of both repeatable and non-repeatable comments conflict with one another due to the keys {:s}. Giving the {:s} comment priority.".format('.'.join((__name__,cls.__name__)), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info("{:s}.comment({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format('.'.join((__name__,cls.__name__)), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
         res = {}
