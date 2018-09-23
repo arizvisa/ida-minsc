@@ -3859,15 +3859,13 @@ class set(object):
         '''Set the data at address ``ea`` to undefined.'''
         cb = idaapi.get_item_size(ea)
         ok = idaapi.do_unknown_range(ea, cb, idaapi.DOUNK_SIMPLE)
-        return cb
+        return cb if ok else 0
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unknown(cls, ea, size):
         '''Set the data at address ``ea`` to undefined.'''
-        cb = idaapi.get_item_size(ea)
         ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
-        # FIXME: check the result, and return the calculated size
-        return size
+        return size if ok else 0
     undef = undefine = undefined = utils.alias(unknown, 'set')
 
     @utils.multicase()
@@ -3980,9 +3978,11 @@ class set(object):
     @classmethod
     def string(cls, ea, **type):
         '''Set the data at address ``ea`` to a string with the specified ``type``.'''
-        type = type.get('type', idaapi.ASCSTR_LAST)
-        ok = idaapi.make_ascii_string(ea, 0, type)
-        return idaapi.get_item_size(ea) if ok else 0
+        strtype = type.get('type', idaapi.ASCSTR_LAST)
+        ok = idaapi.make_ascii_string(ea, 0, strtype)
+        if not ok:
+            raise E.DisassemblerError("{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())) if type else ''))
+        return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def string(cls, ea, size, **type):
@@ -3990,9 +3990,15 @@ class set(object):
 
         If ``type`` is specified, use a string of the specified type.
         """
-        type = type.get('type', idaapi.ASCSTR_LAST)
-        ok = idaapi.make_ascii_string(ea, size, type)
-        return idaapi.get_item_size(ea) if ok else 0
+        strtype = type.get('type', idaapi.ASCSTR_LAST)
+        cb = cls.unknown(ea, size)
+        if cb != size:
+            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())) if type else '', size))
+
+        ok = idaapi.make_ascii_string(ea, size, strtype)
+        if not ok:
+            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())) if type else ''))
+        return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
 
     class integer(object):
         """
@@ -4015,6 +4021,10 @@ class set(object):
         @classmethod
         def byte(cls, ea):
             '''Set the data at address ``ea`` to a byte.'''
+            cb = set.unknown(ea, 1)
+            if cb != 1:
+                raise E.DisassemblerError("{:s}.byte({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
+
             ok = set.data(ea, 1, type=idaapi.FF_BYTE)
             if not ok:
                 raise E.DisassemblerError("{:s}.byte({:#x}) : Unable to assign a byte to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
@@ -4030,6 +4040,10 @@ class set(object):
         @classmethod
         def word(cls, ea):
             '''Set the data at address ``ea`` to a word.'''
+            cb = set.unknown(ea, 2)
+            if cb != 2:
+                raise E.DisassemblerError("{:s}.word({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+
             ok = set.data(ea, 2, type=idaapi.FF_WORD)
             if not ok:
                 raise E.DisassemblerError("{:s}.word({:#x}) : Unable to assign a word to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
@@ -4045,6 +4059,10 @@ class set(object):
         @classmethod
         def dword(cls, ea):
             '''Set the data at address ``ea`` to a double-word.'''
+            cb = set.unknown(ea, 4)
+            if cb != 4:
+                raise E.DisassemblerError("{:s}.dword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
+
             ok = set.data(ea, 4, type=idaapi.FF_DWRD)
             if not ok:
                 raise E.DisassemblerError("{:s}.dword({:#x}) : Unable to assign a dword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
@@ -4060,6 +4078,10 @@ class set(object):
         @classmethod
         def qword(cls, ea):
             '''Set the data at address ``ea`` to a quad-word.'''
+            cb = set.unknown(ea, 8)
+            if cb != 8:
+                raise E.DisassemblerError("{:s}.qword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
+
             ok = set.data(ea, 8, type=idaapi.FF_QWRD)
             if not ok:
                 raise E.DisassemblerError("{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
@@ -4075,6 +4097,10 @@ class set(object):
         @classmethod
         def oword(cls, ea):
             '''Set the data at address ``ea`` to an octal-word.'''
+            cb = set.unknown(ea, 16)
+            if cb != 16:
+                raise E.DisassemblerError("{:s}.oword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
+
             ok = set.data(ea, 16, type=idaapi.FF_OWRD)
             if not ok:
                 raise E.DisassemblerError("{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
@@ -4092,7 +4118,11 @@ class set(object):
     @classmethod
     def structure(cls, ea, type):
         '''Set the data at address ``ea`` to the structure_t specified by ``type``.'''
-        return cls.data(ea, type.size, type=type)
+        ok = cls.data(ea, type.size, type=type)
+        if not ok:
+            raise E.DisassemblerError("{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join((__name__, cls.__name__)), ea, type))
+        return get.structure(ea, structure=type)
+
     struc = struct = utils.alias(structure, 'set')
 
     @utils.multicase(length=six.integer_types)
@@ -4117,7 +4147,10 @@ class set(object):
 
         # now we can figure out its IDA type
         flags, typeid, nbytes = interface.typemap.resolve(realtype)
-        return idaapi.create_data(ea, flags, nbytes, typeid)
+        ok = idaapi.create_data(ea, flags, nbytes, typeid)
+        if not ok:
+            raise E.DisassemblerError("{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join((__name__, cls.__name__)), ea, type, length))
+        return get.array(ea, length=length)
 
 class get(object):
     """
