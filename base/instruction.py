@@ -490,11 +490,11 @@ def op_structure(ea, opnum, id, **delta):
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
         raise E.InvalidTypeOrValueError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
-    # FIXME: allow one to specify more than one field for tid_array
 
-    sptr, name = idaapi.get_struc(id), idaapi.get_member_fullname(id)
+    offset, sptr, name = 0, idaapi.get_struc(id), idaapi.get_member_fullname(id)
     if sptr is not None:
-        sid, mptr = sptr.id, idaapi.get_member(sptr, 0)
+        offset = idaapi.get_struc_first_offset(sptr)
+        sid, mptr = sptr.id, idaapi.get_member(sptr, offset)
         if mptr is None:
             raise E.DisassemblerError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
         mid = mptr.id
@@ -504,6 +504,11 @@ def op_structure(ea, opnum, id, **delta):
         sid, mid = sptr.id, id
     else:
         raise E.InvalidParameterError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
+
+    # if an offset was specified such as if the first member of the structure
+    # is not at offset 0, then adjust the delta by its value
+    if offset:
+        delta['delta'] = delta.get('delta', 0) - offset
 
     st = structure.by(sid)
     m = st.by_identifier(mid)
