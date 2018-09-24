@@ -489,18 +489,21 @@ def op_structure(ea, opnum, id, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError("{:s}.op_structure({:#x}, {:#x}, {:#x}, delta={:d}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+        raise E.InvalidTypeOrValueError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
     # FIXME: allow one to specify more than one field for tid_array
 
     sptr, name = idaapi.get_struc(id), idaapi.get_member_fullname(id)
     if sptr is not None:
-        sid, mid = sptr.id, 0
+        sid, mptr = sptr.id, idaapi.get_member(sptr, 0)
+        if mptr is None:
+            raise E.DisassemblerError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
+        mid = mptr.id
     elif name is not None:
         fn = idaapi.get_member_fullname(id)
         sptr = idaapi.get_member_struc(name)
         sid, mid = sptr.id, id
     else:
-        raise E.InvalidParameterError("{:s}.op_structure({:#x}, {:#x}, {:#x}, delta={:d}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, delta.get('delta', 0)))
+        raise E.InvalidParameterError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
 
     st = structure.by(sid)
     m = st.by_identifier(mid)
@@ -577,12 +580,15 @@ def op_structure(ea, opnum, path, **delta):
     # value = operand(ea, opnum).value if opt(ea, opnum) == 'immediate' else operand(ea, opnum).addr
     ofs = moff + delta.get('delta', 0)
 
+    # grab the base offset to factor it into the calculation of the struct member
+    baseoffset = path[0].members.baseoffset
+
     # now we can finally apply the path to the specified operand
-    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, ofs)
+    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, ofs - baseoffset)
     #ok = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, moff - ofs)
 
-    return ok
-op_struct = utils.alias(op_structure)
+    return True if ok else False
+op_struct = op_struc = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_enumeration(opnum):
@@ -644,7 +650,7 @@ def op_string(ea, opnum, strtype):
     ok = idaapi.set_opinfo(ea, opnum, fl, res)
 
     # FIXME: verify that set_opinfo was actually applied by checking via get_opinfo
-    return ok
+    return True if ok else False
 
 ## flags
 @utils.multicase(opnum=six.integer_types)
