@@ -58,7 +58,7 @@ def __instance__(identifier, **options):
         return __instance__(identifier, **options)
 
     # try and fetch the structure from the cache
-    res = cache.setdefault((identifier, options.get('offset', 0)), structure_t(identifier, **options))
+    res = cache.setdefault(identifier, structure_t(identifier, **options))
     if 'offset' in options:
         res.offset = options['offset']
     return res
