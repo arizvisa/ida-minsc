@@ -1202,8 +1202,7 @@ class frame(object):
         res = idaapi.get_frame(fn.startEA)
         if res is not None:
             return structure.by_identifier(res.id, offset=-fn.frsize)
-        logging.warn("{:s}.frame({:#x}) : Function {:s} does not have a frame.".format(__name__, fn.startEA, name(fn.startEA)))
-        return structure.by_identifier(idaapi.BADADDR)
+        raise E.MissingTypeOrAttribute("{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
 
     @utils.multicase()
     @classmethod
@@ -1286,11 +1285,11 @@ class frame(object):
             # grab from structure
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute("{:s}.arguments({:#x}) : Unable to get the function frame.".format(__name__, fn.startEA))
+                raise E.MissingTypeOrAttribute("{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.debug("{:s}.arguments({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format(__name__, fn.startEA, cc))
+                logging.debug("{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, cc))
 
             base = get_vars_size(fn)+get_regs_size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, get_args_size(fn)):
@@ -1356,7 +1355,8 @@ class frame(object):
         def size(cls, func):
             '''Returns the number of bytes occupied by the saved registers for the function ``func``.'''
             fn = by(func)
-            return fn.frregs + database.config.bits()/8   # +wordsize for the pc because ida doesn't count it
+            # include the size of a word for the pc because ida doesn't count it
+            return fn.frregs + database.config.bits() / 8
 
 get_frameid = utils.alias(frame.id, 'frame')
 get_args_size = utils.alias(frame.args.size, 'frame.args')
