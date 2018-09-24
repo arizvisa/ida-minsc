@@ -854,9 +854,14 @@ class members_t(object):
 
     def by_identifier(self, id):
         '''Return the member in the structure that has the specified ``id``.'''
-        mem, fn, st = idaapi.get_member_by_id(id)
-        if mem is None:
+        res = idaapi.get_member_by_id(id)
+        if res is None:
             raise E.MemberNotFoundError("{:s}.instance({:s}).members.by_id : Unable to find member with id {:#x}.".format(__name__, self.owner.name, id))
+
+        # unpack the member out of the result
+        mem, fn, st = res
+
+        # search through our members for the specified member
         index = self.index(mem)
         return self[index]
     by_id = byId = byIdentifier = utils.alias(by_identifier, 'members_t')
