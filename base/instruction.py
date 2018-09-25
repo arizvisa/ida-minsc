@@ -477,13 +477,13 @@ def op_segment(ea, opnum):
     return None
 # FIXME: maybe use idaapi.op_seg(*args) to apply a segment to an operand?
 
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types)
 @document.parameters(opnum='the operand number of the current instruction')
 def op_structure(opnum):
     '''Return the structure that operand `opnum` at the current instruction actually references.'''
     return op_structure(ui.current.address(), opnum)
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 @document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction')
 def op_structure(ea, opnum):
@@ -536,31 +536,31 @@ def op_structure(ea, opnum):
 
     ofs = delta - moff + value
     return tuple(res + [ofs]) if ofs != 0 else tuple(res)
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 @document.parameters(opnum='the operand number of the current instruction', structure='the `structure_t` to apply', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, [structure], **delta)
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types, id=six.integer_types)
 @document.parameters(opnum='the operand number of the current instruction', id='the id of a structure', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(opnum, id, **delta):
     '''Apply the structure identified by `id` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, id, **delta)
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(opnum=six.integer_types, path=(types.TupleType, types.ListType))
 @document.parameters(opnum='the operand number of the current instruction', path='an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 @document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', structure='the `structure_t` to apply', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(ea, opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the address `ea`.'''
     return op_structure(ea, opnum, structure.id, **delta)
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
 @document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', id='the id of a structure', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(ea, opnum, id, **delta):
@@ -594,7 +594,7 @@ def op_structure(ea, opnum, id, **delta):
     st = structure.by(sid)
     m = st.by_identifier(mid)
     return op_structure(ea, opnum, [st, m], **delta)
-@document.aliases('op_struct')
+@document.aliases('op_struc', 'op_struct')
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(types.TupleType, types.ListType))
 @document.parameters(ea='the address of an instruction', opnum='the operand number of the instruction', path='an iterable containing structures, members, or integers that is used to calculate the offset into the structure to apply to the operand', delta='if ``delta`` is specified as an integer, then offset the structure by it')
 def op_structure(ea, opnum, path, **delta):
