@@ -410,7 +410,7 @@ functions and aliases. For more information on this, please see
    
    Return the structure that operand ``opnum`` at the current instruction actually references.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
@@ -419,7 +419,7 @@ functions and aliases. For more information on this, please see
    
    Return the structure that operand ``opnum`` for instruction ``ea`` actually references.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -430,7 +430,7 @@ functions and aliases. For more information on this, please see
    
    Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
@@ -442,7 +442,7 @@ functions and aliases. For more information on this, please see
    
    Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
@@ -454,7 +454,7 @@ functions and aliases. For more information on this, please see
    
    Apply the structure members in ``path`` to the instruction operand ``opnum`` at the current address.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
@@ -466,7 +466,7 @@ functions and aliases. For more information on this, please see
    
    Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -482,7 +482,7 @@ functions and aliases. For more information on this, please see
    
    If the offset ``delta`` is specified, shift the structure by that amount.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -498,7 +498,7 @@ functions and aliases. For more information on this, please see
    
    If the offset ``delta`` is specified, shift the structure by that amount.
    
-   Aliases: :py:func:`instruction.op_struct<op_structure>`
+   Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -531,6 +531,21 @@ functions and aliases. For more information on this, please see
 .. py:function:: operands(ea)
    
    Returns all of the :py:obj:`idaapi.op_t` instances for the instruction at the address ``ea``.
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: ops()
+   
+   Returns a tuple of all the operands for the instruction at the current address.
+   
+   Aliases: :py:func:`instruction.ops_value<ops>`
+   
+.. py:function:: ops(ea)
+   
+   Returns a tuple of all the operands for the instruction at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.ops_value<ops>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -632,36 +647,6 @@ functions and aliases. For more information on this, please see
    :param ea: the address of an instruction
    :type ea: int or long
    
-.. py:function:: ops_type()
-   
-   Returns a tuple of the types for all the operands in the instruction at the current address.
-   
-   Aliases: :py:func:`instruction.opts<ops_type>`
-   
-.. py:function:: ops_type(ea)
-   
-   Returns a tuple of the types for all the operands in the instruction at the address ``ea``.
-   
-   Aliases: :py:func:`instruction.opts<ops_type>`
-   
-   :param ea: the address of an instruction
-   :type ea: int or long
-   
-.. py:function:: ops_value()
-   
-   Returns a tuple of all the operands for the instruction at the current address.
-   
-   Aliases: :py:func:`instruction.ops<ops_value>`
-   
-.. py:function:: ops_value(ea)
-   
-   Returns a tuple of all the operands for the instruction at the address ``ea``.
-   
-   Aliases: :py:func:`instruction.ops<ops_value>`
-   
-   :param ea: the address of an instruction
-   :type ea: int or long
-   
 .. py:function:: ops_write()
    
    Returns the indices of the operands that are being written to by the instruction at the current address.
@@ -694,6 +679,21 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param opnum: the operand number of the instruction
    :type opnum: int or long
+   
+.. py:function:: opts()
+   
+   Returns a tuple of the types for all the operands in the instruction at the current address.
+   
+   Aliases: :py:func:`instruction.ops_type<opts>`
+   
+.. py:function:: opts(ea)
+   
+   Returns a tuple of the types for all the operands in the instruction at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.ops_type<opts>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
    
 .. py:function:: size()
    
