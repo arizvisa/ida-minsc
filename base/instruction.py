@@ -202,16 +202,16 @@ def ops_repr(ea):
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
 @utils.multicase()
-def ops_value():
+def ops():
     '''Returns a tuple of all the operands for the instruction at the current address.'''
-    return ops_value(ui.current.address())
+    return ops(ui.current.address())
 @utils.multicase(ea=six.integer_types)
-def ops_value(ea):
+def ops(ea):
     '''Returns a tuple of all the operands for the instruction at the address ``ea``.'''
     ea = interface.address.inside(ea)
     f = functools.partial(op, ea)
     return tuple(map(f, six.moves.range(ops_count(ea))))
-ops = utils.alias(ops_value)
+ops_value = utils.alias(ops)
 
 @utils.multicase()
 def ops_size():
@@ -225,16 +225,16 @@ def ops_size(ea):
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
 @utils.multicase()
-def ops_type():
+def opts():
     '''Returns a tuple of the types for all the operands in the instruction at the current address.'''
     return ops_type(ui.current.address())
 @utils.multicase(ea=six.integer_types)
-def ops_type(ea):
+def opts(ea):
     '''Returns a tuple of the types for all the operands in the instruction at the address ``ea``.'''
     ea = interface.address.inside(ea)
     f = functools.partial(opt, ea)
     return tuple(map(f, six.moves.range(ops_count(ea))))
-opts = utils.alias(ops_type)
+ops_type = utils.alias(opts)
 
 @utils.multicase()
 def ops_state():
@@ -593,7 +593,7 @@ def op_structure(ea, opnum, path, **delta):
     #ok = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, moff - ofs)
 
     return True if ok else False
-op_struct = op_struc = utils.alias(op_structure)
+op_struc = op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_enumeration(opnum):
@@ -626,7 +626,7 @@ def op_enumeration(ea, opnum, name):
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration ``id`` to operand ``opnum`` of the instruction at ``ea``.'''
     return idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
-op_enum = utils.alias(op_structure)
+op_enum = utils.alias(op_enumeration)
 
 @utils.multicase(opnum=six.integer_types)
 def op_string(opnum):
