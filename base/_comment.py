@@ -371,9 +371,9 @@ def emit_line(key, value):
 
 ### Encoding and decoding of a comment
 def decode(data, default=''):
-    """Decode all the ``(key, value)`` pairs from the string ``data`` delimited by newlines.
+    """Decode all the `(key, value)` pairs from the string `data` delimited by newlines.
 
-    If unable to decode the key and value from a line in ``data``, then use ``default`` as the key name.
+    If unable to decode the key and value from a line in `data`, then use `default` as the key name.
     """
     res = {}
     try:
