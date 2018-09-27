@@ -397,7 +397,7 @@ class restructure(object):
         return f(string)
     @classmethod
     def moduleDocstringToList(cls, cmt):
-        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
+        L = backticklexer("``{:s}``".format, cls.__objectOrReference)
         formatted = L.lex(cmt)
 
         res = []
@@ -406,7 +406,7 @@ class restructure(object):
         return res
     @classmethod
     def nsDocstringToList(cls, cmt):
-        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
+        L = backticklexer("``{:s}``".format, cls.__objectOrReference)
         formatted = L.lex(cmt)
 
         res = []
@@ -415,7 +415,7 @@ class restructure(object):
         return res
     @classmethod
     def classDocstringToList(cls, cmt):
-        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
+        L = backticklexer("``{:s}``".format, cls.__objectOrReference)
         formatted = L.lex(cmt)
 
         res = []
@@ -424,7 +424,7 @@ class restructure(object):
         return res
     @classmethod
     def methodDocstringToList(cls, cmt):
-        L = backticklexer(functools.partial(cls.__objectOrReference, type='class'), "``{:s}``".format)
+        L = backticklexer("``{:s}``".format, functools.partial(cls.__objectOrReference, type='class'))
         formatted = L.lex(cmt)
 
         res = []
@@ -433,7 +433,7 @@ class restructure(object):
         return res
     @classmethod
     def functionDocstringToList(cls, cmt):
-        L = backticklexer(cls.__objectOrReference, "``{:s}``".format)
+        L = backticklexer("``{:s}``".format, cls.__objectOrReference)
         formatted = L.lex(cmt)
 
         res = []
