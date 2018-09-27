@@ -91,7 +91,7 @@ functions and aliases. For more information on this, please see
    Execute the callback ``F`` on all functions in the database. Synonymous to ``map(F, database.functions())`` but with some extra logging to display the current progress.
    
    The ``F`` parameter is defined as a function taking either an
-   :py:obj:`(address, \*\*kwargs)<>` or a :py:obj:`(index, address, \*\*kwargs)<>`. Any
+   ``(address, \*\*kwargs)`` or a ``(index, address, \*\*kwargs)``. Any
    keyword arguments are passed to ``F`` unmodified.
    
    :param F: the callback to execute on each function

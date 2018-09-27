@@ -83,8 +83,8 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="tags.addressToLocation">
 <code class="descclassname">tags.</code><code class="descname">addressToLocation</code><span class="sig-paren">(</span><em>ea</em>, <em>chunks=None</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.addressToLocation" title="Permalink to this definition">¶</a></dt>
-<dd><p>Convert the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a <code class="xref py py-obj docutils literal notranslate"><span class="pre">(function,</span> <span class="pre">id,</span> <span class="pre">offset)</span></code>.</p>
-<p>The fields <code class="xref py py-obj docutils literal notranslate"><span class="pre">id</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">offset</span></code> represent the chunk index and the
+<dd><p>Convert the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a <code class="docutils literal notranslate"><span class="pre">(function,</span> <span class="pre">id,</span> <span class="pre">offset)</span></code>.</p>
+<p>The fields <code class="docutils literal notranslate"><span class="pre">id</span></code> and <code class="docutils literal notranslate"><span class="pre">offset</span></code> represent the chunk index and the
 offset into the chunk for the function at <code class="docutils literal notranslate"><span class="pre">ea</span></code>. If the list
 <code class="docutils literal notranslate"><span class="pre">chunks</span></code> is specified as a parameter, then use it as a tuple
 of ranges in order to calculate the correct address.</p>
@@ -156,7 +156,7 @@ before actually writing them back into the database.</p>
 <dl class="function">
 <dt id="tags.apply">
 <code class="descclassname">tags.</code><code class="descname">apply</code><span class="sig-paren">(</span><em>(Globals</em>, <em>Contents</em>, <em>Frames)</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply" title="Permalink to this definition">¶</a></dt>
-<dd><p>Apply the tags in the argument <code class="xref py py-obj docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> back into the database.</p>
+<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> back into the database.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -212,7 +212,7 @@ before actually writing them back into the database.</p>
 <dl class="function">
 <dt id="tags.apply.everything">
 <code class="descclassname">apply.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>(Globals</em>, <em>Contents</em>, <em>Frames)</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.everything" title="Permalink to this definition">¶</a></dt>
-<dd><p>Apply the tags in the argument <code class="xref py py-obj docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> back into the database.</p>
+<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> back into the database.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -334,8 +334,8 @@ are at different addresses than when the tags were read.</p>
 <dt id="tags.export.contents">
 <code class="descclassname">export.</code><code class="descname">contents</code><span class="sig-paren">(</span><em>*tags</em>, <em>**location</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.contents" title="Permalink to this definition">¶</a></dt>
 <dd><p>Iterate through the specified contents <code class="docutils literal notranslate"><span class="pre">tags</span></code> within the database using the cache.</p>
-<p>Each iteration yields a tuple of the format <code class="xref py py-obj docutils literal notranslate"><span class="pre">(location,</span> <span class="pre">tags)</span></code> where
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">location</span></code> can be either an address or a chunk identifier and offset
+<p>Each iteration yields a tuple of the format <code class="docutils literal notranslate"><span class="pre">(location,</span> <span class="pre">tags)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">location</span></code> can be either an address or a chunk identifier and offset
 depending on whether <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified as true or not.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -355,7 +355,7 @@ depending on whether <code class="docutils literal notranslate"><span class="pre
 <dt id="tags.export.everything">
 <code class="descclassname">export.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>*tags</em>, <em>**location</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.export.everything" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read all of the specified <code class="docutils literal notranslate"><span class="pre">tags</span></code> within the database using the cache.</p>
-<p>Returns a tuple of the format <code class="xref py py-obj docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code>. Each field
+<p>Returns a tuple of the format <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code>. Each field
 is a dictionary keyed by location or offset that retains the tags that
 were read. If the boolean <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified then key each
 contents tag by location instead of address.</p>
@@ -460,8 +460,8 @@ are at different addresses than when the tags were read.</p>
 <dt id="tags.read.contents">
 <code class="descclassname">read.</code><code class="descname">contents</code><span class="sig-paren">(</span><em>location=False</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.contents" title="Permalink to this definition">¶</a></dt>
 <dd><p>Iterate through the contents tags for all the functions within the database.</p>
-<p>Each iteration yields a tuple of the format <code class="xref py py-obj docutils literal notranslate"><span class="pre">(location,</span> <span class="pre">tags)</span></code> where
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">location</span></code> can be either an address or a chunk identifier and offset
+<p>Each iteration yields a tuple of the format <code class="docutils literal notranslate"><span class="pre">(location,</span> <span class="pre">tags)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">location</span></code> can be either an address or a chunk identifier and offset
 depending on whether <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified as true or not.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -477,7 +477,7 @@ depending on whether <code class="docutils literal notranslate"><span class="pre
 <dt id="tags.read.everything">
 <code class="descclassname">read.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>location=False</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.read.everything" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read all of the tags defined within the database.</p>
-<p>Returns a tuple of the format <code class="xref py py-obj docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code>. Each field
+<p>Returns a tuple of the format <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code>. Each field
 is a dictionary keyed by location or offset that retains the tags that
 were read. If the boolean <code class="docutils literal notranslate"><span class="pre">location</span></code> was specified then key each
 contents tag by location instead of address.</p>

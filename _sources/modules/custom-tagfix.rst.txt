@@ -77,9 +77,9 @@ functions and aliases. For more information on this, please see
    
    Fetch the reference count for the contents of function ``fn`` in the database.
    
-   Returns the tuple ``(func, address, tags)`` where the :py:obj:`address` and :py:obj:`tags`
-   fields are both dictionaries containing the reference count for
-   the addresses and tag names. The field :py:obj:`func` contains the address of the
+   Returns the tuple ``(func, address, tags)`` where the ``address`` and
+   ``tags`` fields are both dictionaries containing the reference count for
+   the addresses and tag names. The field ``func`` contains the address of the
    function.
    
    :param fn: the function to fetch the contents tags from
@@ -88,7 +88,7 @@ functions and aliases. For more information on this, please see
    
    Fetch the reference count of all of the global tags for both functions and non-functions.
    
-   Returns the tuple ``(address, tags)`` where the :py:obj:`address` and :py:obj:`tags`
+   Returns the tuple ``(address, tags)`` where the ``address`` and ``tags``
    fields are both dictionaries containing the reference count for
    the addresses and tag names.
    
@@ -96,7 +96,7 @@ functions and aliases. For more information on this, please see
    
    Fetch the reference count for the global tags (non-function) in the database.
    
-   Returns the tuple ``(address, tags)`` where the :py:obj:`address` and :py:obj:`tags`
+   Returns the tuple ``(address, tags)`` where the ``address`` and ``tags``
    fields are both dictionaries containing the reference count for
    the addresses and tag names.
    
@@ -104,7 +104,7 @@ functions and aliases. For more information on this, please see
    
    Fetch the reference count for the global tags (function) in the database.
    
-   Returns the tuple ``(address, tags)`` where the :py:obj:`address` and :py:obj:`tags`
+   Returns the tuple ``(address, tags)`` where the ``address`` and ``tags``
    fields are both dictionaries containing the reference count for
    the addresses and tag names.
    

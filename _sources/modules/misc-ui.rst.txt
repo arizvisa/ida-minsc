@@ -38,7 +38,7 @@ functions and aliases. For more information on this, please see
    If any of the options are specified as a boolean, then it is
    assumed that this option will be the default. If the user
    chooses "cancel", then this value will be returned instead of
-   the value :py:obj:`None`.
+   the value ``None``.
    
    :param string: the string to ask the user
    :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
@@ -252,7 +252,7 @@ Base namespace for interacting with the mouse input.
    
 .. py:function:: mouse\.position()
    
-   Return the current :py:obj:`(x, y)<>` position of the cursor.
+   Return the current ``(x, y)`` position of the cursor.
    
 .. _ns-ui-names:
 

@@ -197,7 +197,7 @@ is referencing.</p>
 <code class="descclassname">tools.</code><code class="descname">map</code><span class="sig-paren">(</span><em>F</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#tools.map" title="Permalink to this definition">¶</a></dt>
 <dd><p>Execute the callback <code class="docutils literal notranslate"><span class="pre">F</span></code> on all functions in the database. Synonymous to <code class="docutils literal notranslate"><span class="pre">map(F,</span> <span class="pre">database.functions())</span></code> but with some extra logging to display the current progress.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">F</span></code> parameter is defined as a function taking either an
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">**kwargs)</span></code> or a <code class="xref py py-obj docutils literal notranslate"><span class="pre">(index,</span> <span class="pre">address,</span> <span class="pre">**kwargs)</span></code>. Any
+<code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">\*\*kwargs)</span></code> or a <code class="docutils literal notranslate"><span class="pre">(index,</span> <span class="pre">address,</span> <span class="pre">\*\*kwargs)</span></code>. Any
 keyword arguments are passed to <code class="docutils literal notranslate"><span class="pre">F</span></code> unmodified.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />

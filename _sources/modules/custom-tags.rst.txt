@@ -35,9 +35,9 @@ functions and aliases. For more information on this, please see
 
 .. py:function:: addressToLocation(ea, chunks=None)
    
-   Convert the address ``ea`` to a :py:obj:`(function, id, offset)<>`.
+   Convert the address ``ea`` to a ``(function, id, offset)``.
    
-   The fields :py:obj:`id` and :py:obj:`offset` represent the chunk index and the
+   The fields ``id`` and ``offset`` represent the chunk index and the
    offset into the chunk for the function at ``ea``. If the list
    ``chunks`` is specified as a parameter, then use it as a tuple
    of ranges in order to calculate the correct address.
@@ -88,7 +88,7 @@ before actually writing them back into the database.
 
 .. py:function:: apply((Globals,Contents,Frames), \*\*tagmap)
    
-   Apply the tags in the argument :py:obj:`(Globals, Contents, Frames)<>` back into the database.
+   Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.
    
    :param Globals: the globals tags that were read
    :param Contents: the contents tags that were read
@@ -111,7 +111,7 @@ before actually writing them back into the database.
    
 .. py:function:: apply\.everything((Globals,Contents,Frames), \*\*tagmap)
    
-   Apply the tags in the argument :py:obj:`(Globals, Contents, Frames)<>` back into the database.
+   Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.
    
    :param Globals: the globals tags to apply
    :param Contents: the contents tags to apply
@@ -173,8 +173,8 @@ are at different addresses than when the tags were read.
    
    Iterate through the specified contents ``tags`` within the database using the cache.
    
-   Each iteration yields a tuple of the format :py:obj:`(location, tags)<>` where
-   :py:obj:`location` can be either an address or a chunk identifier and offset
+   Each iteration yields a tuple of the format ``(location, tags)`` where
+   ``location`` can be either an address or a chunk identifier and offset
    depending on whether ``location`` was specified as true or not.
    
    :param \*tags: an iterable of the contents tags to export
@@ -184,7 +184,7 @@ are at different addresses than when the tags were read.
    
    Read all of the specified ``tags`` within the database using the cache.
    
-   Returns a tuple of the format :py:obj:`(Globals, Contents, Frames)<>`. Each field
+   Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
    is a dictionary keyed by location or offset that retains the tags that
    were read. If the boolean ``location`` was specified then key each
    contents tag by location instead of address.
@@ -241,8 +241,8 @@ are at different addresses than when the tags were read.
    
    Iterate through the contents tags for all the functions within the database.
    
-   Each iteration yields a tuple of the format :py:obj:`(location, tags)<>` where
-   :py:obj:`location` can be either an address or a chunk identifier and offset
+   Each iteration yields a tuple of the format ``(location, tags)`` where
+   ``location`` can be either an address or a chunk identifier and offset
    depending on whether ``location`` was specified as true or not.
    
    :param location: whether to read the contents tags as an address or a location
@@ -251,7 +251,7 @@ are at different addresses than when the tags were read.
    
    Read all of the tags defined within the database.
    
-   Returns a tuple of the format :py:obj:`(Globals, Contents, Frames)<>`. Each field
+   Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
    is a dictionary keyed by location or offset that retains the tags that
    were read. If the boolean ``location`` was specified then key each
    contents tag by location instead of address.
