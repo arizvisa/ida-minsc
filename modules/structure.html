@@ -61,14 +61,14 @@ a simpler interface that can be used to perform various operations
 against a structure such as renaming or enumerating the structure’s
 members.</p>
 <p>The base argument type for getting a <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> can be either a name,
-an identifier, or an index. Typically one will call <a class="reference internal" href="#structure.by" title="structure.by"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.by(...)</span></code></a>
+an identifier, or an index. Typically one will call <a class="reference internal" href="#structure.by" title="structure.by"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.by</span></code></a>
 with either identifier type which will then return an instance of their
 <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a>.</p>
 <p>To list the different structures available in the database, one can use
-<a class="reference internal" href="#structure.list" title="structure.list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.list(...)</span></code></a> with their chosen method of filtering. This will
+<a class="reference internal" href="#structure.list" title="structure.list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.list</span></code></a> with their chosen method of filtering. This will
 list all of the available structures at which point the user can then
-request it by passing an identifer to <a class="reference internal" href="#structure.by" title="structure.by"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.by(...)</span></code></a>. The
-chosen methods of filtering are:</p>
+request it by passing an identifer to <a class="reference internal" href="#structure.by" title="structure.by"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.by</span></code></a>. The chosen
+methods of filtering are:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match the structures to a structure name</li>
 <li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the structure names according to a glob</li>
@@ -515,7 +515,7 @@ comment.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">structure.</code><code class="descname">name</code><span class="sig-paren">(</span><em>structure</em>, <em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the name of the structure_t <code class="docutils literal notranslate"><span class="pre">structure</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<dd><p>Set the name of the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -693,7 +693,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The comment of this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The comment of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -720,12 +720,12 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The <code class="docutils literal notranslate"><span class="pre">.dt_type</span></code> attribute of the <code class="docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> that is wrapped by this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The <code class="xref py py-class docutils literal notranslate"><span class="pre">dt_type</span></code> attribute of the <code class="xref py py-class docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> that is wrapped by this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the <a class="reference internal" href="#structure.member_t.dt_type" title="structure.member_t.dt_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dt_type</span></code></a> attribute of the member.</td>
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the <code class="docutils literal notranslate"><span class="pre">dt_type</span></code> attribute of the member.</td>
 </tr>
 </tbody>
 </table>
@@ -737,12 +737,12 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The flags for this specific <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The flags for this specific <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the <a class="reference internal" href="#structure.member_t.flag" title="structure.member_t.flag"><code class="xref py py-obj docutils literal notranslate"><span class="pre">flag</span></code></a> attribute of the member.</td>
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the “flag” attribute of the member.</td>
 </tr>
 </tbody>
 </table>
@@ -754,7 +754,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The full name for this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a> including its structure’s name.</dt>
+<dt>The full name for this <code class="docutils literal notranslate"><span class="pre">member_t</span></code> including its structure’s name.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -771,12 +771,12 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The member identifier for this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The member identifier for this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the <a class="reference internal" href="#structure.member_t.id" title="structure.member_t.id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">id</span></code></a> attribute of the member.</td>
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the identifier of the member.</td>
 </tr>
 </tbody>
 </table>
@@ -788,7 +788,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The index of this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a> into its structure.</dt>
+<dt>The index of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code> into its structure.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -805,7 +805,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The starting offset of the <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The starting offset of the <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -822,7 +822,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The name of this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The name of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -843,7 +843,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The offset of this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The offset of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -860,7 +860,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a> that owns this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The <code class="docutils literal notranslate"><span class="pre">structure_t</span></code> that owns this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -877,7 +877,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The <code class="docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> that this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a> wraps.</dt>
+<dt>The <code class="xref py py-class docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> that this <code class="docutils literal notranslate"><span class="pre">member_t</span></code> wraps.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -894,7 +894,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The ending offset of the <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a> (starting offset plus its size).</dt>
+<dt>The ending offset of the <code class="docutils literal notranslate"><span class="pre">member_t</span></code> (starting offset plus its size).</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -911,7 +911,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The size of this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The size of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -928,7 +928,7 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The pythonic type of this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The pythonic type of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -949,12 +949,12 @@ database that references said member.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The type identifier for this <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">member_t</span></code></a>.</dt>
+<dt>The type identifier for this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">tid</span></code> attribute of the type of the member.</td>
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the identifier of the type of the member.</td>
 </tr>
 </tbody>
 </table>
@@ -1036,10 +1036,9 @@ a specific IDA structure. This object is implicitly part of a
 by its index as well as create new members and remove existing ones
 from the structure.</p>
 <p>To list the different members available in the structure, one can
-use <a class="reference internal" href="#structure.list" title="structure.list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.list(...)</span></code></a> with a chosen method of filtering. This
-will list all of the available members that match the keyword
-that they specified. The keywords that are available to filter
-members are:</p>
+use <a class="reference internal" href="#structure.list" title="structure.list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure.list</span></code></a> with a chosen method of filtering. This will
+list all of the available members that match the keyword that they
+specified. The keywords that are available to filter members are:</p>
 <ul class="simple">
 <li><code class="docutils literal notranslate"><span class="pre">name</span></code> - Match the structure member by a name</li>
 <li><code class="docutils literal notranslate"><span class="pre">offset</span></code> - Match the structure member by its offset</li>
@@ -1047,7 +1046,7 @@ members are:</p>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the structure members according to a regular-expression</li>
 <li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match the structure member by its index</li>
 <li><code class="docutils literal notranslate"><span class="pre">fullname</span></code> - Filter the structure members by matching its full name according to a glob</li>
-<li><code class="docutils literal notranslate"><span class="pre">comment</span></code> or <code class="docutils literal notranslate"><span class="pre">comments</span></code>- Filter the structure members by applying a glob to its comment</li>
+<li><code class="docutils literal notranslate"><span class="pre">comment</span></code> or <code class="docutils literal notranslate"><span class="pre">comments</span></code> - Filter the structure members by applying a glob to its comment</li>
 <li><code class="docutils literal notranslate"><span class="pre">identifier</span></code> or <code class="docutils literal notranslate"><span class="pre">id</span></code> - Match the structure member by its identifier</li>
 <li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the structure members for any after the specified offset</li>
 <li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the structure members for any before the specified offset</li>
@@ -1065,7 +1064,7 @@ members are:</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a> that owns this <a class="reference internal" href="#structure.members_t" title="structure.members_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">members_t</span></code></a>.</dt>
+<dt>The <code class="docutils literal notranslate"><span class="pre">structure_t</span></code> that owns this <code class="docutils literal notranslate"><span class="pre">members_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1082,7 +1081,7 @@ members are:</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The <code class="docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> that this <a class="reference internal" href="#structure.members_t" title="structure.members_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">members_t</span></code></a> wraps.</dt>
+<dt>The <code class="xref py py-class docutils literal notranslate"><span class="pre">idaapi.member_t</span></code> that this <code class="docutils literal notranslate"><span class="pre">members_t</span></code> wraps.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1387,7 +1386,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The comment belonging to the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a>.</dt>
+<dt>The comment belonging to the <code class="docutils literal notranslate"><span class="pre">structure_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1411,7 +1410,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The identifier for this <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a>.</dt>
+<dt>The identifier for this <code class="docutils literal notranslate"><span class="pre">structure_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1428,7 +1427,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The index of this <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a> within the IDA’s structure list.</dt>
+<dt>The index of this <code class="docutils literal notranslate"><span class="pre">structure_t</span></code> within the IDA’s structure list.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1449,7 +1448,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The <a class="reference internal" href="#structure.members_t" title="structure.members_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">members_t</span></code></a> for accessing the structure members.</dt>
+<dt>The <code class="docutils literal notranslate"><span class="pre">members_t</span></code> for accessing the structure members.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1466,7 +1465,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The name of the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a>.</dt>
+<dt>The name of the <code class="docutils literal notranslate"><span class="pre">structure_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1487,7 +1486,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The base offset of the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a>.</dt>
+<dt>The base offset of the <code class="docutils literal notranslate"><span class="pre">structure_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1508,7 +1507,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The <code class="docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> that this <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a> wraps.</dt>
+<dt>The <code class="xref py py-class docutils literal notranslate"><span class="pre">idaapi.struc_t</span></code> that this <code class="docutils literal notranslate"><span class="pre">structure_t</span></code> wraps.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1525,7 +1524,7 @@ already existing one.</p>
 <dd></dd></dl>
 
 <dl class="docutils">
-<dt>The total size of the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-class docutils literal notranslate"><span class="pre">structure_t</span></code></a>.</dt>
+<dt>The total size of the <code class="docutils literal notranslate"><span class="pre">structure_t</span></code>.</dt>
 <dd><table class="first last docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

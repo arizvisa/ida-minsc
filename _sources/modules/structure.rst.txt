@@ -11,15 +11,15 @@ against a structure such as renaming or enumerating the structure's
 members.
 
 The base argument type for getting a :py:obj:`structure_t` can be either a name,
-an identifier, or an index. Typically one will call :py:obj:`structure.by(...)<structure.by>`
+an identifier, or an index. Typically one will call :py:obj:`structure.by`
 with either identifier type which will then return an instance of their
 :py:obj:`structure_t`.
 
 To list the different structures available in the database, one can use
-:py:obj:`structure.list(...)<structure.list>` with their chosen method of filtering. This will
+:py:obj:`structure.list` with their chosen method of filtering. This will
 list all of the available structures at which point the user can then
-request it by passing an identifer to :py:obj:`structure.by(...)<structure.by>`. The
-chosen methods of filtering are:
+request it by passing an identifer to :py:obj:`structure.by`. The chosen
+methods of filtering are:
 
 - ``name`` - Match the structures to a structure name
 - ``like`` - Filter the structure names according to a glob
@@ -260,7 +260,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(structure, string, \*suffix)
    
-   Set the name of the structure_t ``structure`` to ``string``.
+   Set the name of the specified ``structure`` to ``string``.
    
    :param structure: the :py:obj:`structure_t` to rename
    :type structure: structure_t
@@ -367,7 +367,7 @@ member_t
    
    .. py:attribute:: comment
    
-   The comment of this :py:class:`member_t`.
+   The comment of this ``member_t``.
       :param getter: Return the repeatable comment of the member.
       :param repeatable: whether the comment should be repeatable or not
       :param setter: Set the repeatable comment of the member to ``value``.
@@ -376,77 +376,77 @@ member_t
    
    .. py:attribute:: dt_type
    
-   The ``.dt_type`` attribute of the ``idaapi.member_t`` that is wrapped by this :py:class:`member_t`.
-      :param getter: Return the :py:obj:`.dt_type` attribute of the member.
+   The :py:class:`.dt_type` attribute of the :py:class:`idaapi.member_t` that is wrapped by this ``member_t``.
+      :param getter: Return the ``dt_type`` attribute of the member.
    
    .. py:attribute:: flag
    
-   The flags for this specific :py:class:`member_t`.
-      :param getter: Return the :py:obj:`.flag` attribute of the member.
+   The flags for this specific ``member_t``.
+      :param getter: Return the "flag" attribute of the member.
    
    .. py:attribute:: fullname
    
-   The full name for this :py:class:`member_t` including its structure's name.
+   The full name for this ``member_t`` including its structure's name.
       :param getter: Return the fullname of the member.
    
    .. py:attribute:: id
    
-   The member identifier for this :py:class:`member_t`.
-      :param getter: Return the :py:obj:`.id` attribute of the member.
+   The member identifier for this ``member_t``.
+      :param getter: Return the identifier of the member.
    
    .. py:attribute:: index
    
-   The index of this :py:class:`member_t` into its structure.
+   The index of this ``member_t`` into its structure.
       :param getter: Return the index of the member.
    
    .. py:attribute:: left
    
-   The starting offset of the :py:class:`member_t`.
+   The starting offset of the ``member_t``.
       :param getter: Return the beginning offset of the member.
    
    .. py:attribute:: name
    
-   The name of this :py:class:`member_t`.
+   The name of this ``member_t``.
       :param getter: Return the name of the member.
       :param setter: Set the name of the member to ``string``.
       :param string: the new name to rename the member to
    
    .. py:attribute:: offset
    
-   The offset of this :py:class:`member_t`.
+   The offset of this ``member_t``.
       :param getter: Return the offset of the member.
    
    .. py:attribute:: owner
    
-   The :py:class:`structure_t` that owns this :py:class:`member_t`.
+   The ``structure_t`` that owns this ``member_t``.
       :param getter: Return the structure_t that owns the member.
    
    .. py:attribute:: ptr
    
-   The ``idaapi.member_t`` that this :py:class:`member_t` wraps.
+   The :py:class:`idaapi.member_t` that this ``member_t`` wraps.
       :param getter: Return the pointer of the :py:obj:`idaapi.member_t`.
    
    .. py:attribute:: right
    
-   The ending offset of the :py:class:`member_t` (starting offset plus its size).
+   The ending offset of the ``member_t`` (starting offset plus its size).
       :param getter: Return the ending offset of the member.
    
    .. py:attribute:: size
    
-   The size of this :py:class:`member_t`.
+   The size of this ``member_t``.
       :param getter: Return the size of the member.
    
    .. py:attribute:: type
    
-   The pythonic type of this :py:class:`member_t`.
+   The pythonic type of this ``member_t``.
       :param getter: Return the type info of the member.
       :param setter: Set the type of the member.
       :param type: the pythonic type to set the member type to
    
    .. py:attribute:: typeid
    
-   The type identifier for this :py:class:`member_t`.
-      :param getter: Return the :py:obj:`.tid` attribute of the type of the member.
+   The type identifier for this ``member_t``.
+      :param getter: Return the identifier of the type of the member.
    
    .. py:method:: refs(self)
       
@@ -493,10 +493,9 @@ members_t
    from the structure.
    
    To list the different members available in the structure, one can
-   use :py:obj:`structure.list(...)<structure.list>` with a chosen method of filtering. This
-   will list all of the available members that match the keyword
-   that they specified. The keywords that are available to filter
-   members are:
+   use :py:obj:`structure.list` with a chosen method of filtering. This will
+   list all of the available members that match the keyword that they
+   specified. The keywords that are available to filter members are:
    
    - ``name`` - Match the structure member by a name
    - ``offset`` - Match the structure member by its offset
@@ -504,7 +503,7 @@ members_t
    - ``regex`` - Filter the structure members according to a regular-expression
    - ``index`` - Match the structure member by its index
    - ``fullname`` - Filter the structure members by matching its full name according to a glob
-   - ``comment`` or ``comments``- Filter the structure members by applying a glob to its comment
+   - ``comment`` or ``comments`` - Filter the structure members by applying a glob to its comment
    - ``identifier`` or ``id`` - Match the structure member by its identifier
    - ``greater`` or ``gt`` - Filter the structure members for any after the specified offset
    - ``less`` or ``lt`` - Filter the structure members for any before the specified offset
@@ -518,12 +517,12 @@ members_t
    
    .. py:attribute:: owner
    
-   The :py:class:`structure_t` that owns this :py:class:`members_t`.
+   The ``structure_t`` that owns this ``members_t``.
       :param getter: Return the :py:obj:`structure_t` that owns this :py:obj:`members_t`.
    
    .. py:attribute:: ptr
    
-   The ``idaapi.member_t`` that this :py:class:`members_t` wraps.
+   The :py:class:`idaapi.member_t` that this ``members_t`` wraps.
       :param getter: Return the pointer to the :py:obj:`idaapi.member_t` that contains all the members.
    
    .. py:method:: add(self, name)
@@ -676,7 +675,7 @@ structure_t
    
    .. py:attribute:: comment
    
-   The comment belonging to the :py:class:`structure_t`.
+   The comment belonging to the ``structure_t``.
       :param getter: Return the repeatable comment for the structure.
       :param setter: Set the repeatable comment for the structure to ``value``.
       :param value: a string repesenting the comment to apply
@@ -684,43 +683,43 @@ structure_t
    
    .. py:attribute:: id
    
-   The identifier for this :py:class:`structure_t`.
+   The identifier for this ``structure_t``.
       :param getter: Return the identifier of the structure.
    
    .. py:attribute:: index
    
-   The index of this :py:class:`structure_t` within the IDA's structure list.
+   The index of this ``structure_t`` within the IDA's structure list.
       :param getter: Return the index of the structure.
       :param setter: Set the index of the structure to ``idx``.
       :param idx: the new index to move the structure to
    
    .. py:attribute:: members
    
-   The :py:class:`members_t` for accessing the structure members.
+   The ``members_t`` for accessing the structure members.
       :param getter: Return the members belonging to the structure.
    
    .. py:attribute:: name
    
-   The name of the :py:class:`structure_t`.
+   The name of the ``structure_t``.
       :param getter: Return the name of the structure.
       :param setter: Set the name of the structure to ``string``.
       :param string: a string representing the new name of the structure
    
    .. py:attribute:: offset
    
-   The base offset of the :py:class:`structure_t`.
+   The base offset of the ``structure_t``.
       :param getter: Return the base offset of the structure.
       :param setter: Set the base offset of the structure to ``offset``.
       :param offset: the new base offset to assign to the structure
    
    .. py:attribute:: ptr
    
-   The ``idaapi.struc_t`` that this :py:class:`structure_t` wraps.
+   The :py:class:`idaapi.struc_t` that this ``structure_t`` wraps.
       :param getter: Return the pointer of the :py:obj:`idaapi.struc_t`.
    
    .. py:attribute:: size
    
-   The total size of the :py:class:`structure_t`.
+   The total size of the ``structure_t``.
       :param getter: Return the size of the structure.
       :param setter: Expand the structure to the new ``size`` that is specified.
       :param size: an integer representing the new size to expand the structure to

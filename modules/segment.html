@@ -57,8 +57,9 @@
 <p>This module provides a number of tools that can be used to enumerate
 or work with segments within a database.</p>
 <p>The base argument type for some of the utilities within this module
-is the <code class="xref py py-obj docutils literal notranslate"><span class="pre">segment_t</span></code>. This type is interchangeable with the address
-or the segment name and so either can be used to identify a segment.</p>
+is the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.segment_t</span></code>. This type is interchangeable with the
+address or the segment name and so either can be used to identify a
+segment.</p>
 <p>When listing or enumerating segments there are different types that
 one can use in order to filter or match them. These types are as
 follows:</p>
@@ -620,9 +621,9 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 
 <dl class="function">
 <dt id="segment.remove">
-<code class="descclassname">segment.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>segment</em>, <em>remove=False</em><span class="sig-paren">)</span><a class="headerlink" href="#segment.remove" title="Permalink to this definition">¶</a></dt>
-<dd><p>Remove the segment identified by <code class="docutils literal notranslate"><span class="pre">segment</span></code>.</p>
-<p>If the bool <code class="docutils literal notranslate"><span class="pre">remove</span></code> is specified, then remove the content of the segment from the database.</p>
+<code class="descclassname">segment.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>segment</em>, <em>contents=False</em><span class="sig-paren">)</span><a class="headerlink" href="#segment.remove" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the specified <code class="docutils literal notranslate"><span class="pre">segment</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">contents</span></code> is specified, then remove the contents of the segment from the database.</p>
 <p>Aliases: <a class="reference internal" href="#segment.remove" title="segment.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">segment.delete</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -630,7 +631,7 @@ The keyword <code class="docutils literal notranslate"><span class="pre">org</sp
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>segment</strong> – an identifier used to describe a segment</li>
-<li><strong>remove</strong> – whether to remove the contents of the segment from the database</li>
+<li><strong>contents</strong> – whether to remove the contents of the segment from the database</li>
 </ul>
 </td>
 </tr>

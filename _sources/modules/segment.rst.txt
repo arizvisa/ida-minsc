@@ -7,8 +7,9 @@ This module provides a number of tools that can be used to enumerate
 or work with segments within a database.
 
 The base argument type for some of the utilities within this module
-is the :py:obj:`segment_t`. This type is interchangeable with the address
-or the segment name and so either can be used to identify a segment.
+is the :py:obj:`idaapi.segment_t`. This type is interchangeable with the
+address or the segment name and so either can be used to identify a
+segment.
 
 When listing or enumerating segments there are different types that
 one can use in order to filter or match them. These types are as
@@ -317,16 +318,16 @@ functions and aliases. For more information on this, please see
    
    :param segment: an identifier used to describe a segment
    
-.. py:function:: remove(segment, remove=False)
+.. py:function:: remove(segment, contents=False)
    
-   Remove the segment identified by ``segment``.
+   Remove the specified ``segment``.
    
-   If the bool ``remove`` is specified, then remove the content of the segment from the database.
+   If the bool ``contents`` is specified, then remove the contents of the segment from the database.
    
    Aliases: :py:func:`segment.delete<remove>`
    
    :param segment: an identifier used to describe a segment
-   :param remove: whether to remove the contents of the segment from the database
+   :param contents: whether to remove the contents of the segment from the database
    
 .. py:function:: repr()
    

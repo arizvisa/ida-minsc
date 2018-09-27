@@ -60,25 +60,25 @@ of tools within this module and each can be distinguished by their
 prefixes which can be used to decode the operands for an instruction.
 At the present time, only the Intel, AArch32 (ARM), and MIPS
 architectures are supported.</p>
-<p>Although IDA internally uses the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.insn_t</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.op_t</span></code> to
-represent an instruction and its operands, this module’s base argument
-type is typically an address or an operand index. When dealing with an
-instruction’s operands, the <code class="xref py py-obj docutils literal notranslate"><span class="pre">ops_</span></code> prefix represents all of the
-instructions operands and typically will take only an address.
-Likewise when dealing with a single operand, the <code class="xref py py-obj docutils literal notranslate"><span class="pre">op_</span></code> prefix
-is used and will take an address and the operand index.</p>
+<p>Although IDA internally uses the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.insn_t</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.op_t</span></code>
+to represent an instruction and its operands, this module’s base
+argument type is typically an address or an operand index. When
+dealing with an instruction’s operands, the <code class="xref py py-obj docutils literal notranslate"><span class="pre">ops_</span></code> prefix represents
+all of the instructions operands and typically will take only an
+address.  Likewise when dealing with a single operand, the <code class="xref py py-obj docutils literal notranslate"><span class="pre">op_</span></code>
+prefix is used and will take an address and the operand index.</p>
 <p>To request the actual IDA types (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.insn_t</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.op_t</span></code>)
-there are two tools that are provided. The <a class="reference internal" href="#instruction.at" title="instruction.at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.at(address)</span></code></a>
-tool will take an address and return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.insn_t</span></code>. To get an
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.op_t</span></code>, a user can use <a class="reference internal" href="#instruction.operand" title="instruction.operand"><code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.operand(address,</span> <span class="pre">opnum)</span></code></a>.
-This will take an address and an index and return the desired
-<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.op_t</span></code>.</p>
+there are two tools that are provided. The <a class="reference internal" href="#instruction.at" title="instruction.at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.at</span></code></a> tool will
+take an address and return an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.insn_t</span></code>. To get an operand type
+(<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.op_t</span></code>), a user can use <a class="reference internal" href="#instruction.operand" title="instruction.operand"><code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.operand</span></code></a>.  This will
+take an address and an operand index and return the desired type.</p>
 <p>Some globals are also defined for the given architecture which
 can be used to query or access the registers that are currently
 available. Once IDA has determined the architecture for the database
-the <code class="docutils literal notranslate"><span class="pre">register_t</span></code> class is instantiated. This object allows one to
-reference a register that is defined for the architecture.</p>
-<p>Another object that is created is the <code class="docutils literal notranslate"><span class="pre">architecture_t</span></code> object.
+the <code class="xref py py-obj docutils literal notranslate"><span class="pre">register_t</span></code> class is instantiated for each available register.
+This object allows one to reference any register that is defined for
+the architecture.</p>
+<p>Another object that is created is the <code class="xref py py-obj docutils literal notranslate"><span class="pre">architecture_t</span></code> object.
 Searching for a register can be done by index and size or simply by
 its name. This object also allows one to promote or demote a register
 between its various sizes. This allows one to navigate between the
@@ -1223,7 +1223,7 @@ the integer that is added to the register.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="xref py py-obj docutils literal notranslate"><span class="pre">Rn</span></code> register from the tuple.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="docutils literal notranslate"><span class="pre">Rn</span></code> register from the tuple.</td>
 </tr>
 </tbody>
 </table>
@@ -1240,7 +1240,7 @@ the integer that is added to the register.</p>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
 <p>A tuple representing a flexible operand as available on the ARM architecture.</p>
 <p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">shift,</span> <span class="pre">n)</span></code> which allows the architecture to apply
-a binary shift or rotation to the value of a register <code class="xref py py-obj docutils literal notranslate"><span class="pre">Rn</span></code>.</p>
+a binary shift or rotation to the value of a register <code class="docutils literal notranslate"><span class="pre">Rn</span></code>.</p>
 <dl class="attribute">
 <dt id="instruction.armops.flex.symbols">
 <code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.flex.symbols" title="Permalink to this definition">¶</a></dt>
@@ -1248,7 +1248,7 @@ a binary shift or rotation to the value of a register <code class="xref py py-ob
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="xref py py-obj docutils literal notranslate"><span class="pre">Rn</span></code> register from the tuple.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="docutils literal notranslate"><span class="pre">Rn</span></code> register from the tuple.</td>
 </tr>
 </tbody>
 </table>
@@ -1323,7 +1323,7 @@ phrase.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="xref py py-obj docutils literal notranslate"><span class="pre">Rn</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">Rm</span></code> registers from the tuple.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="docutils literal notranslate"><span class="pre">Rn</span></code> and <code class="docutils literal notranslate"><span class="pre">Rm</span></code> registers from the tuple.</td>
 </tr>
 </tbody>
 </table>
@@ -1433,7 +1433,7 @@ can be returned for the MIPS architecture.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="xref py py-obj docutils literal notranslate"><span class="pre">Rn</span></code> register from this tuple.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="docutils literal notranslate"><span class="pre">Rn</span></code> register from this tuple.</td>
 </tr>
 </tbody>
 </table>

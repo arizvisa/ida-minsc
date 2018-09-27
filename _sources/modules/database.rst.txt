@@ -16,8 +16,8 @@ exist at an address.
 Some namespaces are also provided for querying the available symbolic
 information that IDA has discovered about a binary. This can be used
 to search and navigate the database. Some of the available namespaces
-that can be used for querying are :py:obj:`functions`, :py:obj:`segments`, :py:obj:`names`,
-:py:obj:`imports`, :py:obj:`entries`, and :py:obj:`marks`.
+that can be used for querying are :py:obj:`functions`, :py:obj:`segments`,
+:py:obj:`names`, :py:obj:`imports`, :py:obj:`entries`, and :py:obj:`marks`.
 
 -------------
 Function list
@@ -1126,7 +1126,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevF(ea, predicate, count)
    
-   Return the previous address from the address ``ea`` that matches ``predicate``..
+   Return the previous address from the address ``ea`` that matches ``predicate``.
    
    Skip ``count`` addresses before returning.
    
@@ -1481,7 +1481,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.prevtag(ea, predicate, \*\*tagname)
    
-   Returns the previous address from ``ea`` that contains a tag and matches
+   Returns the previous address from ``ea`` that contains a tag and matches ``predicate``.
    
    Aliases: :py:func:`database.address.prevcomment<address\.prevtag>`
    
@@ -1720,7 +1720,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: entries\.iterate(\*\*type)
    
-   Iterate through all of the entry points in the database that match the keyword specified by``type``.
+   Iterate through all of the entry points in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter entries with
    
@@ -2726,7 +2726,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: names\.iterate(\*\*type)
    
-   Iterate through all of the names in the database that match the keyword specified by``type``.
+   Iterate through all of the names in the database that match the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter symbols with
    
@@ -2983,7 +2983,7 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: segments\.iterate(\*\*type)
    
-   Iterate through all the segments defined in the database matching the keyword specified by``type``.
+   Iterate through all the segments defined in the database matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter segments with
    

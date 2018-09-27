@@ -38,7 +38,7 @@ functions and aliases. For more information on this, please see
    If any of the options are specified as a boolean, then it is
    assumed that this option will be the default. If the user
    chooses "cancel", then this value will be returned instead of
-   the value ``None``.
+   the value :py:obj:`None`.
    
    :param string: the string to ask the user
    :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default

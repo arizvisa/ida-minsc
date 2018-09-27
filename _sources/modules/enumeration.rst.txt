@@ -128,7 +128,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: list(string)
    
-   List any enumerations that match the glob in :py:obj:`string`.
+   List any enumerations that match the glob in ``string``.
    
    :param string: the glob to filter the enumeration names with
    :type string: str

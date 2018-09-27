@@ -10,28 +10,28 @@ prefixes which can be used to decode the operands for an instruction.
 At the present time, only the Intel, AArch32 (ARM), and MIPS
 architectures are supported.
 
-Although IDA internally uses the :py:obj:`idaapi.insn_t` and :py:obj:`idaapi.op_t` to
-represent an instruction and its operands, this module's base argument
-type is typically an address or an operand index. When dealing with an
-instruction's operands, the :py:obj:`ops_` prefix represents all of the
-instructions operands and typically will take only an address.
-Likewise when dealing with a single operand, the :py:obj:`op_` prefix
-is used and will take an address and the operand index.
+Although IDA internally uses the :py:obj:`idaapi.insn_t` and :py:obj:`idaapi.op_t`
+to represent an instruction and its operands, this module's base
+argument type is typically an address or an operand index. When
+dealing with an instruction's operands, the :py:obj:`ops_` prefix represents
+all of the instructions operands and typically will take only an
+address.  Likewise when dealing with a single operand, the :py:obj:`op_`
+prefix is used and will take an address and the operand index.
 
 To request the actual IDA types (:py:obj:`idaapi.insn_t` and :py:obj:`idaapi.op_t`)
-there are two tools that are provided. The :py:obj:`instruction.at(address)<instruction.at>`
-tool will take an address and return an :py:obj:`idaapi.insn_t`. To get an
-:py:obj:`idaapi.op_t`, a user can use :py:obj:`instruction.operand(address, opnum)<instruction.operand>`.
-This will take an address and an index and return the desired
-:py:obj:`idaapi.op_t`.
+there are two tools that are provided. The :py:obj:`instruction.at` tool will
+take an address and return an :py:obj:`idaapi.insn_t`. To get an operand type
+(:py:obj:`idaapi.op_t`), a user can use :py:obj:`instruction.operand`.  This will
+take an address and an operand index and return the desired type.
 
 Some globals are also defined for the given architecture which
 can be used to query or access the registers that are currently
 available. Once IDA has determined the architecture for the database
-the ``register_t`` class is instantiated. This object allows one to
-reference a register that is defined for the architecture.
+the :py:obj:`register_t` class is instantiated for each available register.
+This object allows one to reference any register that is defined for
+the architecture.
 
-Another object that is created is the ``architecture_t`` object.
+Another object that is created is the :py:obj:`architecture_t` object.
 Searching for a register can be done by index and size or simply by
 its name. This object also allows one to promote or demote a register
 between its various sizes. This allows one to navigate between the
@@ -741,7 +741,7 @@ armops.disp
    
    .. py:attribute:: symbols
    
-      :param getter: Yield the :py:obj:`Rn` register from the tuple.
+      :param getter: Yield the ``Rn`` register from the tuple.
    
 ^^^^^^^^^^^
 armops.flex
@@ -754,11 +754,11 @@ armops.flex
    A tuple representing a flexible operand as available on the ARM architecture.
    
    Has the format ``(Rn, shift, n)`` which allows the architecture to apply
-   a binary shift or rotation to the value of a register :py:obj:`Rn`.
+   a binary shift or rotation to the value of a register ``Rn``.
    
    .. py:attribute:: symbols
    
-      :param getter: Yield the :py:obj:`Rn` register from the tuple.
+      :param getter: Yield the ``Rn`` register from the tuple.
    
 ^^^^^^^^^^^
 armops.list
@@ -809,7 +809,7 @@ armops.phrase
    
    .. py:attribute:: symbols
    
-      :param getter: Yield the :py:obj:`Rn` and :py:obj:`Rm` registers from the tuple.
+      :param getter: Yield the ``Rn`` and ``Rm`` registers from the tuple.
    
 .. _ns-instruction-intelops:
 
@@ -895,7 +895,7 @@ mipsops.phrase
    
    .. py:attribute:: symbols
    
-      :param getter: Yield the :py:obj:`Rn` register from this tuple.
+      :param getter: Yield the ``Rn`` register from this tuple.
    
 ----------
 Class list

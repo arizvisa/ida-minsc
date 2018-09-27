@@ -65,8 +65,8 @@ exist at an address.</p>
 <p>Some namespaces are also provided for querying the available symbolic
 information that IDA has discovered about a binary. This can be used
 to search and navigate the database. Some of the available namespaces
-that can be used for querying are <a class="reference internal" href="#database.functions" title="database.functions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">functions</span></code></a>, <a class="reference internal" href="#database.segments" title="database.segments"><code class="xref py py-obj docutils literal notranslate"><span class="pre">segments</span></code></a>, <a class="reference internal" href="#database.names" title="database.names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">names</span></code></a>,
-<a class="reference internal" href="#database.imports" title="database.imports"><code class="xref py py-obj docutils literal notranslate"><span class="pre">imports</span></code></a>, <a class="reference internal" href="#database.entries" title="database.entries"><code class="xref py py-obj docutils literal notranslate"><span class="pre">entries</span></code></a>, and <a class="reference internal" href="#database.marks" title="database.marks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">marks</span></code></a>.</p>
+that can be used for querying are <a class="reference internal" href="#database.functions" title="database.functions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">functions</span></code></a>, <a class="reference internal" href="#database.segments" title="database.segments"><code class="xref py py-obj docutils literal notranslate"><span class="pre">segments</span></code></a>,
+<a class="reference internal" href="#database.names" title="database.names"><code class="xref py py-obj docutils literal notranslate"><span class="pre">names</span></code></a>, <a class="reference internal" href="#database.imports" title="database.imports"><code class="xref py py-obj docutils literal notranslate"><span class="pre">imports</span></code></a>, <a class="reference internal" href="#database.entries" title="database.entries"><code class="xref py py-obj docutils literal notranslate"><span class="pre">entries</span></code></a>, and <a class="reference internal" href="#database.marks" title="database.marks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">marks</span></code></a>.</p>
 <div class="section" id="function-list">
 <h2>3.1.1.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
 <p>The functions that are available in this module use multicased
@@ -2032,7 +2032,7 @@ determining the next valid address. These are:</p>
 <dl class="function">
 <dt>
 <code class="descclassname">address.</code><code class="descname">prevF</code><span class="sig-paren">(</span><em>ea</em>, <em>predicate</em>, <em>count</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the previous address from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> that matches <code class="docutils literal notranslate"><span class="pre">predicate</span></code>..</p>
+<dd><p>Return the previous address from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> that matches <code class="docutils literal notranslate"><span class="pre">predicate</span></code>.</p>
 <p>Skip <code class="docutils literal notranslate"><span class="pre">count</span></code> addresses before returning.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -2656,7 +2656,7 @@ determining the next valid address. These are:</p>
 <dl class="function">
 <dt>
 <code class="descclassname">address.</code><code class="descname">prevtag</code><span class="sig-paren">(</span><em>ea</em>, <em>predicate</em>, <em>**tagname</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns the previous address from <code class="docutils literal notranslate"><span class="pre">ea</span></code> that contains a tag and matches</p>
+<dd><p>Returns the previous address from <code class="docutils literal notranslate"><span class="pre">ea</span></code> that contains a tag and matches <code class="docutils literal notranslate"><span class="pre">predicate</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#database.address.prevtag" title="database.address.prevtag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.prevcomment</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -2999,7 +2999,7 @@ of each entrypoint will be yielded.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">entries.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>Iterate through all of the entry points in the database that match the keyword specified by``type``.</p>
+<dd><p>Iterate through all of the entry points in the database that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4737,7 +4737,7 @@ within the database. By default the <code class="docutils literal notranslate"><
 <dl class="function">
 <dt>
 <code class="descclassname">names.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>Iterate through all of the names in the database that match the keyword specified by``type``.</p>
+<dd><p>Iterate through all of the names in the database that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5154,7 +5154,7 @@ database. By default each segment’s boundaries are yielded.</p>
 <dl class="function">
 <dt>
 <code class="descclassname">segments.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>Iterate through all the segments defined in the database matching the keyword specified by``type``.</p>
+<dd><p>Iterate through all the segments defined in the database matching the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
