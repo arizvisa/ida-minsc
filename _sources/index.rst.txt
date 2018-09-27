@@ -22,12 +22,12 @@ Welcome to IDA-Minsc
 A number of concepts are introduced such as a tagging system, support for
 multicased functions, and filtering with the intention that most search
 and annotation issues can be performed with just a few lines of code. This
-should enable a user to write quick, hacky, throwaway code that can be used
-to augment their reversing endeavors.
+should enable a user to write quick, hacky, temporary code that can be used
+to augment their reversing endeavors without distraction.
 
 This plugin supports all the different platforms that IDA supports which
 includes Windows, Linux, and MacOS. At the present time, only IDA 6.9 up
-till IDA 7.1.180227 are supported.
+till IDA 7.1.180227 are currently supported.
 
 Table of Contents
 =================
