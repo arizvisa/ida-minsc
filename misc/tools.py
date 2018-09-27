@@ -119,8 +119,8 @@ def recovermarks():
     for fn, l in database.select('marks'):
         m = set( (l['marks']) if hasattr(l['marks'], '__iter__') else [int(x, 16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
         res = [(ea, d['mark']) for ea, d in func.select(fn, 'mark')]
-        if m != set(a for a, _ in res):
-            logging.warning("{:#x}: ignoring cached version of marks due to being out-of-sync with real values : {!r} : {!r}".format(fn, builtins.map(hex, m), builtins.map(hex, set(a for a, _ in res))))
+        if m != { a for a, _ in res }:
+            logging.warning("{:s} : Ignoring the function tag \"{:s}\" for function {:#x} due to its value being out-of-sync with the contents values ({!s} <> {!s}).".format('.'.join((__name__, 'recovermarks')), fn, builtins.map(hex, m), builtins.map(hex, set(a for a, _ in res))))
         result.extend(res)
     result.sort(cmp=lambda x, y: cmp(x[1], y[1]))
 
