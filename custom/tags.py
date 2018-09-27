@@ -40,7 +40,7 @@ def list():
 
 ### internal utility functions and classes
 def lvarNameQ(name):
-    '''Determine whether a ``name`` is something that IDA named automatically.'''
+    '''Determine whether a `name` is something that IDA named automatically.'''
     if any(name.startswith(n) for n in ('arg_', 'var_')):
         res = name.split('_', 2)[-1]
         return all(n in string.hexdigits for n in res)
@@ -49,7 +49,7 @@ def lvarNameQ(name):
     return False
 
 def locationToAddress(loc):
-    '''Convert the function location ``loc`` back into an address.'''
+    '''Convert the function location `loc` back into an address.'''
 
     ## if location is a tuple, then convert it to an address
     if isinstance(loc, tuple):
@@ -61,11 +61,11 @@ def locationToAddress(loc):
     return loc
 
 def addressToLocation(ea, chunks=None):
-    """Convert the address ``ea`` to a ``(function, id, offset)``.
+    """Convert the address `ea` to a `(function, id, offset)`.
 
-    The fields ``id`` and ``offset`` represent the chunk index and the
-    offset into the chunk for the function at ``ea``. If the list
-    ``chunks`` is specified as a parameter, then use it as a tuple
+    The fields `id` and `offset` represent the chunk index and the
+    offset into the chunk for the function at `ea`. If the list
+    `chunks` is specified as a parameter, then use it as a tuple
     of ranges in order to calculate the correct address.
     """
     F, chunks = func.by(ea), chunks or [ch for ch in func.chunks(ea)]
@@ -87,7 +87,7 @@ class read(object):
     This namespace contains tools that can be used to manually read
     tags out of the database without using the cache.
 
-    If ``location`` is specified as true, then read each contents tag
+    If `location` is specified as true, then read each contents tag
     according to its location rather than an address. This allows one
     to perform a translation of the tags in case the function chunks
     are at different addresses than when the tags were read.
@@ -100,7 +100,7 @@ class read(object):
     ## reading the content from a function
     @classmethod
     def content(cls, ea):
-        '''Iterate through every tag belonging to the contents of the function at ``ea``.'''
+        '''Iterate through every tag belonging to the contents of the function at `ea`.'''
         F = func.by(ea)
 
         # iterate through every address in the function
@@ -115,7 +115,7 @@ class read(object):
     ## reading the tags from a frame
     @classmethod
     def frame(cls, ea):
-        '''Iterate through each field within the frame belonging to the function ``ea``.'''
+        '''Iterate through each field within the frame belonging to the function `ea`.'''
         F = func.by(ea)
 
         # iterate through all of the frame's members
@@ -143,9 +143,9 @@ class read(object):
     def everything(cls, location=False):
         """Read all of the tags defined within the database.
 
-        Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
+        Returns a tuple of the format `(Globals, Contents, Frames)`. Each field
         is a dictionary keyed by location or offset that retains the tags that
-        were read. If the boolean ``location`` was specified then key each
+        were read. If the boolean `location` was specified then key each
         contents tag by location instead of address.
         """
         global read
@@ -198,9 +198,9 @@ class read(object):
     def contents(location=False):
         """Iterate through the contents tags for all the functions within the database.
 
-        Each iteration yields a tuple of the format ``(location, tags)`` where
-        ``location`` can be either an address or a chunk identifier and offset
-        depending on whether ``location`` was specified as true or not.
+        Each iteration yields a tuple of the format `(location, tags)` where
+        `location` can be either an address or a chunk identifier and offset
+        depending on whether `location` was specified as true or not.
         """
         global read
 
@@ -242,21 +242,21 @@ class apply(object):
     """
 
     def __new__(cls, (Globals, Contents, Frames), **tagmap):
-        '''Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.'''
+        '''Apply the tags in the argument `(Globals, Contents, Frames)` back into the database.'''
         res = Globals, Contents, Frames
         return cls.everything(res, **tagmap)
 
     ## applying the content to a function
     @classmethod
     def content(cls, Contents, **tagmap):
-        '''Apply ``Contents`` back into a function's contents within the database.'''
+        '''Apply `Contents` back into a function's contents within the database.'''
         global apply
         return apply.contents(Contents, **tagmap)
 
     ## applying a frame to a function
     @classmethod
     def frame(cls, ea, frame, **tagmap):
-        '''Apply the fields from ``frame`` back into the function at ``ea``.'''
+        '''Apply the fields from `frame` back into the function at `ea`.'''
         tagmap_output = ", {:s}".format(', '.join("{:s}={:s}".format(k, v) for k, v in six.iteritems(tagmap))) if tagmap else ''
 
         F = func.frame(ea)
@@ -312,12 +312,12 @@ class apply(object):
     ## apply everything to the entire database
     @classmethod
     def everything(cls, (Globals, Contents, Frames), **tagmap):
-        '''Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.'''
+        '''Apply the tags in the argument `(Globals, Contents, Frames)` back into the database.'''
         global apply
 
         ## convert a sorted list keyed by an address into something that updates ida's navigation pointer
         def update_navigation(xs, setter):
-            '''Call ``setter`` on ea for each iteration of list ``xs``.'''
+            '''Call `setter` on ea for each iteration of list `xs`.'''
             for x in xs:
                 ea, _ = x
                 setter(ea)
@@ -326,7 +326,7 @@ class apply(object):
 
         ## convert a sorted list keyed by a location into something that updates ida's navigation pointer
         def update_navigation_contents(xs, setter):
-            '''Call ``setter`` on location for each iteration of list ``xs``.'''
+            '''Call `setter` on location for each iteration of list `xs`.'''
             for x in xs:
                 loc, _ = x
                 ea = locationToAddress(loc)
@@ -357,7 +357,7 @@ class apply(object):
     ## applying tags to the globals
     @staticmethod
     def globals(Globals, **tagmap):
-        '''Apply the tags in ``Globals`` back into the database.'''
+        '''Apply the tags in `Globals` back into the database.'''
         global apply
         cls, tagmap_output = apply.__class__, ", {:s}".format(', '.join("{:s}={:s}".format(oldtag, newtag) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
 
@@ -395,7 +395,7 @@ class apply(object):
     ## applying contents tags to all the functions
     @staticmethod
     def contents(Contents, **tagmap):
-        '''Apply the tags in ``Contents`` back into each function within the database.'''
+        '''Apply the tags in `Contents` back into each function within the database.'''
         global apply
         cls, tagmap_output = apply.__class__, ", {:s}".format(', '.join("{:s}={:s}".format(oldtag, newtag) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
 
@@ -437,7 +437,7 @@ class apply(object):
     ## applying frames to all the functions
     @staticmethod
     def frames(Frames, **tagmap):
-        '''Apply the fields from ``Frames`` back into each function's frame.'''
+        '''Apply the fields from `Frames` back into each function's frame.'''
         global apply
         cls, tagmap_output = apply.__class__, ", {:s}".format(', '.join("{:s}={:s}".format(oldtag, newtag) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
 
@@ -458,7 +458,7 @@ class export(object):
     This namespace contains tools that can be used to quickly
     export specific tagss out of the database using the cache.
 
-    If ``location`` is specified as true, then read each contents tag
+    If `location` is specified as true, then read each contents tag
     according to its location rather than an address. This allows one
     to perform a translation of the tags in case the function chunks
     are at different addresses than when the tags were read.
@@ -471,7 +471,7 @@ class export(object):
     ## query the content from a function
     @classmethod
     def content(cls, F, *tags, **location):
-        '''Iterate through the specified ``tags`` belonging to the contents of the function at ``ea`` using the cache.'''
+        '''Iterate through the specified `tags` belonging to the contents of the function at `ea` using the cache.'''
         identity = lambda res: res
         translate = addressToLocation if location.get('location', False) else identity
 
@@ -484,7 +484,7 @@ class export(object):
     ## query the frame from a function
     @classmethod
     def frame(cls, F, *tags):
-        '''Iterate through each field containing the specified ``tags`` within the frame belonging to the function ``ea``.'''
+        '''Iterate through each field containing the specified `tags` within the frame belonging to the function `ea`.'''
         global read, internal
         tags_ = { tag for tag in tags }
 
@@ -507,11 +507,11 @@ class export(object):
     ## query the entire database for the specified tags
     @classmethod
     def everything(cls, *tags, **location):
-        """Read all of the specified ``tags`` within the database using the cache.
+        """Read all of the specified `tags` within the database using the cache.
 
-        Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
+        Returns a tuple of the format `(Globals, Contents, Frames)`. Each field
         is a dictionary keyed by location or offset that retains the tags that
-        were read. If the boolean ``location`` was specified then key each
+        were read. If the boolean `location` was specified then key each
         contents tag by location instead of address.
         """
         global export
@@ -538,7 +538,7 @@ class export(object):
     ## query all the globals matching the specified tags
     @staticmethod
     def globals(*tags):
-        '''Iterate through all of the specified global ``tags`` within the database using the cache.'''
+        '''Iterate through all of the specified global `tags` within the database using the cache.'''
         iterable = db.select(Or=tags) if tags else db.select()
         for ea, res in iterable:
             ui.navigation.auto(ea)
@@ -548,11 +548,11 @@ class export(object):
     ## query all the contents in each function that match the specified tags
     @staticmethod
     def contents(*tags, **location):
-        """Iterate through the specified contents ``tags`` within the database using the cache.
+        """Iterate through the specified contents `tags` within the database using the cache.
 
-        Each iteration yields a tuple of the format ``(location, tags)`` where
-        ``location`` can be either an address or a chunk identifier and offset
-        depending on whether ``location`` was specified as true or not.
+        Each iteration yields a tuple of the format `(location, tags)` where
+        `location` can be either an address or a chunk identifier and offset
+        depending on whether `location` was specified as true or not.
         """
         global export
         location = location.get('location', False)
@@ -567,7 +567,7 @@ class export(object):
     ## query all the frames that match the specified tags
     @staticmethod
     def frames(*tags):
-        '''Iterate through the fields in each function's frame containing the specified ``tags``.'''
+        '''Iterate through the fields in each function's frame containing the specified `tags`.'''
         global export
         tags_ = {x for x in tags}
 
