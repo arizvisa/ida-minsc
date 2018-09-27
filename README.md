@@ -7,8 +7,10 @@
         </td>
         <td>
             <ul>
-                <li>Website: https://github.com/arizisa/ida-minsc</li>
+                <li>Website: https://github.com/arizvisa/ida-minsc</li>
                 <li>Documentation: https://arizvisa.github.io/ida-minsc</li>
+                <li>Mantras: https://github.com/arizvisa/ida-minsc/wiki/Mantras</li>
+                <li>Wiki: https://github.com/arizvisa/ida-minsc/wiki</li>
                 <li>IRC: <code>#eof</code> on EFnet</li>
             </ul>
         </td>
@@ -26,8 +28,8 @@ investment.
 A number of concepts are introduced such as a tagging system, support for
 multicased functions, and filtering with the intention that most search
 and annotation issues can be performed with just a few lines of code. This
-should enable a user to write quick, hacky, throwaway code that can be used
-to augment their reversing endeavors.
+should enable a user to write quick, hacky, temporary code that can be used
+to augment their reversing endeavors without distraction.
 
 ## Installation
 
@@ -75,35 +77,38 @@ Or to iterate through all the functions in the database, you can try:
     > for ea in database.functions():
           print hex(ea)
 
-Please refer to the documentation for more details on what this plugin
-makes available to you.
+Please refer to the documentation for more details on what this plugin makes
+available to you.
 
 ## Documentation
 
-Comprehensive documentation is available at [Github](https://arizvisa.github.io/ida-minsc).
-or can be built locally via the "docs" branch.
+Comprehensive documentation is available at the project page on
+[github.io](https://arizvisa.github.io/ida-minsc), or can be built locally via
+the "[docs](https://github.com/arizvisa/ida-minsc/tree/docs)" branch.
 
-If the user wishes to build documentation for local use, they will
-first need the [Sphinx](http://www.sphinx-doc.org/en/master/usage/installation.html)
-package to be installed. Afterwards, the entirety of the documentation
-resides in the "docs" branch. Simply check out the "docs" branch,
-change the directory to "docs", and then run GNU make as:
+If the user wishes to build documentation for local use, they will first need
+to install the [Sphinx](http://www.sphinx-doc.org/en/master/usage/installation.html)
+package. Afterwards, the entirety of the documentation resides within in the
+"[docs](https://github.com/arizvisa/ida-minsc/tree/docs)" branch. Simply
+checkout the branch, change the directory to "docs", and then run GNU make as:
 
     $ make html
 
-This will result in the generated documentation being built in the
-current directory under the `_build` path. Documentation can be
-generated for a number of different formats. To list the available
-formats, type in `make help` at your command prompt.
+This will result in the build system parsing the available modules and then
+rendering all of the documentation into the `_build` directory relative to the
+`docs/Makefile`. Documentation can be generated for a number of different
+formats. To list all of the available formats, type in `make help` at the
+command prompt.
 
 ## Contributing
 
 See [CONTRIBUTING.md](https://github.com/arizvisa/ida-minsc/blob/master/CONTRIBUTING.md)
-for best practices on adding functionality to IDA-minsc.
+for best practices on reporting issues or for adding functionality to this
+project.
 
 ## Thanks
 
-Thanks to a number of anonymous people have helped the development of
-this plugin throughout the years.
+Thanks to a number of anonymous and non-anonymous people whom have helped the
+development of this plugin over the years.
 
 [logo]: http://arizvisa.github.io/ida-minsc/_images/hamster.svg
