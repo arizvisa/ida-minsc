@@ -13,21 +13,21 @@ import internal, idaapi
 
 ### c declaration stuff
 def function(ea):
-    '''Returns the C function declaration at the address ``ea``.'''
+    '''Returns the C function declaration at the address `ea`.'''
     result = idaapi.idc_get_type(ea)
     if result is None:
         raise internal.exceptions.MissingTypeOrAttribute("The function {:x} does not have a declaration.".format(ea))
     return result
 
 def arguments(ea):
-    '''Returns an array of all of the arguments within the prototype of the function at ``ea``.'''
+    '''Returns an array of all of the arguments within the prototype of the function at `ea`.'''
     decl = function(ea)
     args = decl[ decl.index('(')+1: decl.rindex(')') ]
     result = [ x.strip() for x in args.split(',')]
     return result
 
 def size(string):
-    '''Returns the size of a type described by a C declaration in ``string``.'''
+    '''Returns the size of a type described by a C declaration in `string`.'''
     string = string.strip()
     if string.lower() == 'void':
         return 0
@@ -42,11 +42,11 @@ def size(string):
     return idaapi.get_type_size0(idaapi.cvar.idati, type)
 
 def demangle(string):
-    '''Given a mangled C++ ``string``, demangle it back into a human-readable symbol.'''
+    '''Given a mangled C++ `string`, demangle it back into a human-readable symbol.'''
     return extract.declaration(string)
 
 def mangledQ(string):
-    '''Return true if the provided ``string`` has been mangled.'''
+    '''Return true if the provided `string` has been mangled.'''
     return any(string.startswith(n) for n in ('?', '__'))
 
 ## examples to test below code with
