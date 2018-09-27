@@ -11,7 +11,7 @@
                 <li>Documentation: https://arizvisa.github.io/ida-minsc</li>
                 <li>Mantras: https://github.com/arizvisa/ida-minsc/wiki/Mantras</li>
                 <li>Wiki: https://github.com/arizvisa/ida-minsc/wiki</li>
-                <li>IRC: <code>#eof</code> on EFnet</li>
+                <li>IRC: <code>#eof</code> on <a href="http://chat.efnet.org:9090/?nick=user-.&channels=eof&prompt=1">EFnet</a></li>
             </ul>
         </td>
     </tr>
