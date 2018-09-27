@@ -4,29 +4,29 @@ Enumeration module
 This module exposes a number of tools that can be used to interact
 with the enumerations or their members defined within the database.
 The base argument type for interacting with an enumeration is the
-enumeration identifier `idaapi.enum_t`. This is an opaque integer
+enumeration identifier ``idaapi.enum_t``. This is an opaque integer
 that will need to be passed to the different tools in order to
 reference the enumeration that the user is referring to.
 
-There are a number of tools within the `member` namespace that can
+There are a number of tools within the ``member`` namespace that can
 be used to enumerate or locate the members of an enumeration. As
 typically an enumeration is simply a constant, each result that is
 returned will either be a value or a name. The identifier for these
-is a `idaapi.uval_t`.
+is a ``idaapi.uval_t``.
 
 To list the different enumerations available in the database, one
-can use `enumeration.list(...)` specifying their preferred method
+can use ``enumeration.list(...)`` specifying their preferred method
 of filtering. This will list all of the available enumerations at
 which point the user can then request it by passing an identifier
-to `enumeration.by(...)`. The types that can be used to filter are
+to ``enumeration.by(...)``. The types that can be used to filter are
 as follows:
 
-    ``name`` - Match according to the enumeration name
-    ``like`` - Filter the enumeration names according to a glob
-    ``regex`` - Filter the enumeration names according to a regular-expression
-    ``index`` - Match the enumeration by its index
-    ``identifier`` or ``id`` - Match the enumeration by its identifier
-    ``predicate`` - Filter the enumerations by passing their identifier to a callable
+    `name` - Match according to the enumeration name
+    `like` - Filter the enumeration names according to a glob
+    `regex` - Filter the enumeration names according to a regular-expression
+    `index` - Match the enumeration by its index
+    `identifier` or `id` - Match the enumeration by its identifier
+    `predicate` - Filter the enumerations by passing their identifier to a callable
 
 """
 
@@ -53,17 +53,17 @@ def count():
 
 @utils.multicase()
 def flags(enum):
-    '''Return the flags for the enumeration ``enum``.'''
+    '''Return the flags for the enumeration `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_flag(eid)
 @utils.multicase(mask=six.integer_types)
 def flags(enum, mask):
-    '''Return the flags for the enumeration ``enum`` and masked with ``mask``.'''
+    '''Return the flags for the enumeration `enum` and masked with `mask`.'''
     eid = by(enum)
     return idaapi.get_enum_flag(eid) & mask
 
 def by_name(name):
-    '''Return the identifier for the enumeration with the given ``name``.'''
+    '''Return the identifier for the enumeration with the given `name`.'''
     res = idaapi.get_enum(name)
     if res == idaapi.BADADDR:
         raise E.EnumerationNotFoundError("{:s}.by_name({!r}) : Unable to locate enumeration by the name {!r}.".format(__name__, name, name))
@@ -71,7 +71,7 @@ def by_name(name):
 byName = utils.alias(by_name)
 
 def by_index(index):
-    '''Return the identifier for the enumeration at the specified ``index``.'''
+    '''Return the identifier for the enumeration at the specified `index`.'''
     res = idaapi.getn_enum(index)
     if res == idaapi.BADADDR:
         raise E.EnumerationNotFoundError("{:s}.by_index({:#x}) : Unable to locate enumeration by the index {:d}.".format(__name__, index, index))
@@ -80,7 +80,7 @@ byIndex = utils.alias(by_index)
 
 @utils.multicase(index=six.integer_types)
 def by(index):
-    '''Return the identifier for the enumeration at the specified ``index``.'''
+    '''Return the identifier for the enumeration at the specified `index`.'''
     bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
     highbyte = 0xff << (bits-8)
     if index & highbyte == highbyte:
@@ -88,11 +88,11 @@ def by(index):
     return by_index(index)
 @utils.multicase(name=basestring)
 def by(name):
-    '''Return the identifier for the enumeration with the specified ``name``.'''
+    '''Return the identifier for the enumeration with the specified `name`.'''
     return by_name(name)
 @utils.multicase()
 def by(**type):
-    '''Return the identifier for the first enumeration matching the keyword specified by ``type``.'''
+    '''Return the identifier for the first enumeration matching the keyword specified by `type`.'''
     searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
     res = builtins.list(iterate(**type))
@@ -107,25 +107,25 @@ def by(**type):
 
 @utils.multicase(string=basestring)
 def search(string):
-    '''Return the identifier of the first enumeration that matches the glob ``string``.'''
+    '''Return the identifier of the first enumeration that matches the glob `string`.'''
     return by(like=string)
 @utils.multicase()
 def search(**type):
-    '''Return the identifier of the first enumeration that matches the keyword specified by ``type``.'''
+    '''Return the identifier of the first enumeration that matches the keyword specified by `type`.'''
     return by(**type)
 
 def names(enum):
-    '''Return a list of all the names belonging to the enumeration ``enum``.'''
+    '''Return a list of all the names belonging to the enumeration `enum`.'''
     return [member.name(n) for n in members.iterate(enum)]
 keys = utils.alias(names)
 
 def values(enum):
-    '''Return a list of all the values belonging to the enumeration ``enum``.'''
+    '''Return a list of all the values belonging to the enumeration `enum`.'''
     return [member.value(n) for n in members.iterate(enum)]
 
 ## creation/deletion
 def new(name, flags=0):
-    '''Create an enumeration with the specified ``name`` and ``flags`` using `idaapi.add_enum`.'''
+    '''Create an enumeration with the specified `name` and `flags` using ``idaapi.add_enum``.'''
     idx = count()
     res = idaapi.add_enum(idx, name, flags)
     if res == idaapi.BADADDR:
@@ -133,7 +133,7 @@ def new(name, flags=0):
     return res
 
 def delete(enum):
-    '''Delete the enumeration ``enum``.'''
+    '''Delete the enumeration `enum`.'''
     eid = by(enum)
     return idaapi.del_enum(eid)
 create, remove = utils.alias(new), utils.alias(delete)
@@ -141,53 +141,53 @@ create, remove = utils.alias(new), utils.alias(delete)
 ## setting enum options
 @utils.multicase()
 def name(enum):
-    '''Return the name of the enumeration ``enum``.'''
+    '''Return the name of the enumeration `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_name(eid)
 @utils.multicase(name=basestring)
 def name(enum, name):
-    '''Rename the enumeration ``enum`` to ``name``.'''
+    '''Rename the enumeration `enum` to `name`.'''
     eid = by(enum)
     return idaapi.set_enum_name(eid, name)
 
 @utils.multicase()
 def comment(enum, **repeatable):
-    """Return the comment for the enumeration ``enum``.
+    """Return the comment for the enumeration `enum`.
 
-    If the bool ``repeatable`` is specified, then return the repeatable comment.
+    If the bool `repeatable` is specified, then return the repeatable comment.
     """
     eid = by(enum)
     return idaapi.get_enum_cmt(eid, repeatable.get('repeatable', True))
 @utils.multicase(comment=basestring)
 def comment(enum, comment, **repeatable):
-    """Set the comment for the enumeration ``enum`` to ``comment``.
+    """Set the comment for the enumeration `enum` to `comment`.
 
-    If the bool ``repeatable`` is specified, then modify the repeatable comment.
+    If the bool `repeatable` is specified, then modify the repeatable comment.
     """
     eid = by(enum)
     return idaapi.set_enum_cmt(eid, comment, repeatable.get('repeatable', True))
 
 @utils.multicase()
 def size(enum):
-    '''Return the number of bits for the enumeration ``enum``.'''
+    '''Return the number of bits for the enumeration `enum`.'''
     eid = by(enum)
     res = idaapi.get_enum_width(eid)
     return res * 8
 @utils.multicase(width=six.integer_types)
 def size(enum, width):
-    '''Set the number of bits for the enumeration ``enum`` to ``width``.'''
+    '''Set the number of bits for the enumeration `enum` to `width`.'''
     eid = by(enum)
     res = math.trunc(math.ceil(width / 8.0))
     return idaapi.set_enum_width(eid, int(res))
 
 def mask(enum):
-    '''Return the bitmask for the enumeration ``enum``.'''
+    '''Return the bitmask for the enumeration `enum`.'''
     eid = by(enum)
     res = size(eid)
     return 2**res-1 if res > 0 else idaapi.BADADDR
 
 def repr(enum):
-    '''Return a printable summary of the enumeration ``enum``.'''
+    '''Return a printable summary of the enumeration `enum`.'''
     eid = by(enum)
     w = size(eid)*2
     result = [(member.name(n), member.value(n), member.mask(n), member.comment(n)) for n in members.iterate(eid)]
@@ -211,7 +211,7 @@ def __iterate__():
     return
 
 def iterate(**type):
-    '''Iterate through all of the enumerations in the database that match the keyword specified by ``type``.'''
+    '''Iterate through all of the enumerations in the database that match the keyword specified by `type`.'''
     if not type: type = {'predicate':lambda n: True}
     res = builtins.list(__iterate__())
     for key, value in six.iteritems(type):
@@ -224,7 +224,7 @@ def list(string):
     return list(like=string)
 @utils.multicase()
 def list(**type):
-    '''List all of the enumerations within the database that match the keyword specified by ``type``.'''
+    '''List all of the enumerations within the database that match the keyword specified by `type`.'''
     res = builtins.list(iterate(**type))
 
     maxindex = max(builtins.map(idaapi.get_enum_idx, res) or [1])
@@ -262,7 +262,7 @@ class members(object):
     """
 
     def __new__(cls, enum):
-        '''Yield the name of each member from the enumeration ``enum``.'''
+        '''Yield the name of each member from the enumeration `enum`.'''
         eid = by(enum)
         for mid in cls.iterate(eid):
             yield member.name(mid)
@@ -271,9 +271,9 @@ class members(object):
     ## scope
     @classmethod
     def add(cls, enum, name, value, **bitmask):
-        """Add an enumeration member ``name`` with the specified ``value`` to the enumeration ``enum``.
+        """Add an enumeration member `name` with the specified `value` to the enumeration `enum`.
 
-        If the int, ``bitmask``, is specified then used it as the bitmask for the enumeration.
+        If the int, `bitmask`, is specified then used it as the bitmask for the enumeration.
         """
         eid = by(enum)
         bmask = bitmask.get('bitmask', idaapi.BADADDR & mask(eid))
@@ -289,7 +289,7 @@ class members(object):
 
     @classmethod
     def remove(cls, enum, member):
-        '''Remove the specified ``member`` of the enumeration ``enum``.'''
+        '''Remove the specified `member` of the enumeration `enum`.'''
         eid = by(enum)
         mid = cls.by(eid, member)
         return member.remove(mid)
@@ -298,26 +298,26 @@ class members(object):
     ## aggregations
     @classmethod
     def names(cls, enum):
-        '''Return a set of all the names belonging to the enumeration ``enum``.'''
+        '''Return a set of all the names belonging to the enumeration `enum`.'''
         eid = by(enum)
         return { member.name(mid) for mid in cls.iterate(eid) }
 
     @classmethod
     def values(cls, enum):
-        '''Return a set of all the values belonging to the enumeration ``enum``.'''
+        '''Return a set of all the values belonging to the enumeration `enum`.'''
         eid = by(enum)
         return { member.value(mid) for mid in cls.iterate(eid) }
 
     @classmethod
     def mapping(cls, enum):
-        '''Return a dictionary mapping all the values values to their names for the enumeration ``enum``.'''
+        '''Return a dictionary mapping all the values values to their names for the enumeration `enum`.'''
         eid = by(enum)
         return { member.value(mid) : member.name(mid) for mid in cls.iterate(eid) }
 
     ## searching
     @classmethod
     def by_index(cls, enum, index):
-        '''Return the member identifier for the member of the enumeration ``enum`` at the specified ``index``.'''
+        '''Return the member identifier for the member of the enumeration `enum` at the specified `index`.'''
         eid = by(enum)
         try: return next(mid for i, mid in enumerate(cls.iterate(eid)) if i == index)
         except StopIteration: pass
@@ -325,7 +325,7 @@ class members(object):
 
     @classmethod
     def by_identifier(cls, enum, mid):
-        '''Return the member of the enumeration specified by ``enum`` and its ``mid``.'''
+        '''Return the member of the enumeration specified by `enum` and its `mid`.'''
         eid = by(enum)
         if member.parent(mid) != eid:
             raise E.MemberNotFoundError("{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__, cls.__name__)), eid, index))
@@ -333,7 +333,7 @@ class members(object):
 
     @classmethod
     def by_value(cls, enum, value):
-        '''Return the member identifier for the member of the enumeration ``enum`` with the specified ``value``.'''
+        '''Return the member identifier for the member of the enumeration `enum` with the specified `value`.'''
         eid = by(enum)
         bmask = idaapi.BADADDR & mask(eid)
         res, _ = idaapi.get_first_serial_enum_member(eid, value, bmask)
@@ -344,7 +344,7 @@ class members(object):
 
     @classmethod
     def by_name(cls, enum, name):
-        '''Return the member identifier for the member of the enumeration ``enum`` with the specified ``name``.'''
+        '''Return the member identifier for the member of the enumeration `enum` with the specified `name`.'''
         eid = by(enum)
         for mid in cls.iterate(eid):
             if name == member.name(mid):
@@ -356,7 +356,7 @@ class members(object):
     @utils.multicase(n=six.integer_types)
     @classmethod
     def by(cls, enum, n):
-        '''Return the member belonging to ``enum`` identified by its index or id in ``n``.'''
+        '''Return the member belonging to `enum` identified by its index or id in `n`.'''
         bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
         highbyte = 0xff << (bits-8)
         if n & highbyte == highbyte:
@@ -365,7 +365,7 @@ class members(object):
     @utils.multicase(member=basestring)
     @classmethod
     def by(cls, enum, member):
-        '''Return the member with the given ``name`` belonging to ``enum``.'''
+        '''Return the member with the given `name` belonging to `enum`.'''
         return cls.by_name(enum, member)
 
     # FIXME: Implement a matcher class for enumeration members that can be used with .iterate and .list below.
@@ -373,7 +373,7 @@ class members(object):
 
     @classmethod
     def __iterate__(cls, eid):
-        '''Iterate through all the members of the enumeration identified by ``eid``.'''
+        '''Iterate through all the members of the enumeration identified by `eid`.'''
         bmask = idaapi.BADADDR & mask(eid)
 
         res = idaapi.get_first_enum_member(eid, bmask)
@@ -388,7 +388,7 @@ class members(object):
 
     @classmethod
     def iterate(cls, enum):
-        '''Iterate through all ids of each member associated with the enumeration ``enum``.'''
+        '''Iterate through all ids of each member associated with the enumeration `enum`.'''
         eid = by(enum)
         bmask = idaapi.BADADDR & mask(eid)
         for value in cls.__iterate__(eid):
@@ -399,7 +399,7 @@ class members(object):
 
     @classmethod
     def list(cls, enum):
-        '''List all the members belonging to the enumeration identified by ``enum``.'''
+        '''List all the members belonging to the enumeration identified by `enum`.'''
         # FIXME: make this consistent with every other .list using the matcher class
         eid = by(enum)
         res = builtins.list(cls.iterate(eid))
@@ -428,13 +428,13 @@ class member(object):
     """
     @classmethod
     def parent(cls, mid):
-        '''Return the id of the enumeration that owns the member ``mid``.'''
+        '''Return the id of the enumeration that owns the member `mid`.'''
         return idaapi.get_enum_member_enum(mid)
 
     @utils.multicase(mid=six.integer_types)
     @classmethod
     def remove(cls, mid):
-        '''Remove the enumeration member with the given ``mid``.'''
+        '''Remove the enumeration member with the given `mid`.'''
         eid, value = cls.parent(mid), cls.value(mid)
         # XXX: is a serial of 0 valid?
         res = idaapi.del_enum_member(eid, value, 0, idaapi.BADADDR & cls.mask(mid))
@@ -444,7 +444,7 @@ class member(object):
     @utils.multicase()
     @classmethod
     def remove(cls, enum, member):
-        '''Remove the specified ``member`` of the enumeration ``enum``.'''
+        '''Remove the specified `member` of the enumeration `enum`.'''
         eid = by(enum)
         mid = cls.by(eid, member)
         return cls.remove(mid)
@@ -453,25 +453,25 @@ class member(object):
     @utils.multicase(mid=six.integer_types)
     @classmethod
     def name(cls, mid):
-        '''Return the name of the enumeration member ``mid``.'''
+        '''Return the name of the enumeration member `mid`.'''
         return idaapi.get_enum_member_name(mid)
     @utils.multicase()
     @classmethod
     def name(cls, enum, member):
-        '''Return the name of the enumeration ``member`` belonging to ``enum``.'''
+        '''Return the name of the enumeration `member` belonging to `enum`.'''
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.name(mid)
     @utils.multicase(mid=six.integer_types, name=(basestring, tuple))
     @classmethod
     def name(cls, mid, name):
-        '''Rename the enumeration member ``mid`` to ``name``.'''
+        '''Rename the enumeration member `mid` to `name`.'''
         res = interface.tuplename(*name) if isinstance(name, tuple) else name
         return idaapi.set_enum_member_name(mid, res)
     @utils.multicase(name=basestring)
     @classmethod
     def name(cls, enum, member, name, *suffix):
-        '''Rename the enumeration ``member`` belonging to ``enum`` to ``name``.'''
+        '''Rename the enumeration `member` belonging to `enum` to `name`.'''
         eid = by(enum)
         mid = members.by(member)
         res = (name,) + suffix
@@ -480,30 +480,30 @@ class member(object):
     @utils.multicase(mid=six.integer_types)
     @classmethod
     def comment(cls, mid, **repeatable):
-        """Return the comment for the enumeration member ``mid``.
+        """Return the comment for the enumeration member `mid`.
 
-        If the bool ``repeatable`` is specified, then return the repeatable comment.
+        If the bool `repeatable` is specified, then return the repeatable comment.
         """
         return idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True))
     @utils.multicase()
     @classmethod
     def comment(cls, enum, member, **repeatable):
-        '''Return the comment for the enumeration ``member`` belonging to ``enum``.'''
+        '''Return the comment for the enumeration `member` belonging to `enum`.'''
         eid = by(enum)
         mid = members.by(eid, name)
         return cls.comment(mid, **repeatable)
     @utils.multicase(mid=six.integer_types, comment=basestring)
     @classmethod
     def comment(cls, mid, comment, **repeatable):
-        """Set the comment for the enumeration member id ``mid`` to ``comment``.
+        """Set the comment for the enumeration member id `mid` to `comment`.
 
-        If the bool ``repeatable`` is specified, then set the repeatable comment.
+        If the bool `repeatable` is specified, then set the repeatable comment.
         """
         return idaapi.set_enum_member_cmt(mid, comment, kwds.get('repeatable', True))
     @utils.multicase(comment=basestring)
     @classmethod
     def comment(cls, enum, member, comment, **repeatable):
-        '''Set the comment for the enumeration ``member`` belonging to ``enum`` to the string ``comment``.'''
+        '''Set the comment for the enumeration `member` belonging to `enum` to the string `comment`.'''
         eid = by(enum)
         mid = members.by(eid, name)
         return cls.comment(mid, comment, **repeatable)
@@ -511,30 +511,30 @@ class member(object):
     @utils.multicase(mid=six.integer_types)
     @classmethod
     def value(cls, mid):
-        '''Return the value of the enumeration member ``mid``.'''
+        '''Return the value of the enumeration member `mid`.'''
         return idaapi.get_enum_member_value(mid)
     @utils.multicase()
     @classmethod
     def value(cls, enum, member):
-        '''Return the value of the specified ``member`` belonging to the enumeration ``enum``.'''
+        '''Return the value of the specified `member` belonging to the enumeration `enum`.'''
         eid = by(enum)
         mid = members.by(member)
         return cls.value(mid)
     @utils.multicase(mid=six.integer_types, value=six.integer_types)
     @classmethod
     def value(cls, mid, value, **bitmask):
-        """Set the ``value`` for the enumeration ``member`` belonging to ``enum``.
+        """Set the `value` for the enumeration `member` belonging to `enum`.
 
-        If the integer ``bitmask`` is specified, then use it as a bitmask. Otherwise assume all bits are set.
+        If the integer `bitmask` is specified, then use it as a bitmask. Otherwise assume all bits are set.
         """
         bmask = bitmask.get('bitmask', idaapi.BADADDR & cls.mask(mid))
         return idaapi.set_enum_member_value(mid, value, bmask)
     @utils.multicase(value=six.integer_types)
     @classmethod
     def value(cls, enum, member, value, **bitmask):
-        """Set the ``value`` for the enumeration ``member`` belonging to ``enum``.
+        """Set the `value` for the enumeration `member` belonging to `enum`.
 
-        If the integer ``bitmask`` is specified, then use it as a bitmask. Otherwise assume all bits are set.
+        If the integer `bitmask` is specified, then use it as a bitmask. Otherwise assume all bits are set.
         """
         eid = by(enum)
         mid = members.by(enum, member)
@@ -543,12 +543,12 @@ class member(object):
     @utils.multicase(mid=six.integer_types)
     @classmethod
     def serial(cls, mid):
-        '''Return the serial of the enumeration member ``mid``.'''
+        '''Return the serial of the enumeration member `mid`.'''
         return idaapi.get_enum_member_serial(mid)
     @utils.multicase()
     @classmethod
     def serial(cls, enum, member):
-        '''Return the serial of the enumeration ``member`` belonging to ``enum``.'''
+        '''Return the serial of the enumeration `member` belonging to `enum`.'''
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.serial(mid)
@@ -556,12 +556,12 @@ class member(object):
     @utils.multicase(mid=six.integer_types)
     @classmethod
     def mask(cls, mid):
-        '''Return the bitmask for the enumeration member ``mid``.'''
+        '''Return the bitmask for the enumeration member `mid`.'''
         return idaapi.get_enum_member_bmask(mid)
     @utils.multicase()
     @classmethod
     def mask(cls, enum, member):
-        '''Return the bitmask for the enumeration ``member`` belonging to ``enum``.'''
+        '''Return the bitmask for the enumeration `member` belonging to `enum`.'''
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.mask(mid)

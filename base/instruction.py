@@ -8,26 +8,26 @@ prefixes which can be used to decode the operands for an instruction.
 At the present time, only the Intel, AArch32 (ARM), and MIPS
 architectures are supported.
 
-Although IDA internally uses the `idaapi.insn_t` and `idaapi.op_t` to
-represent an instruction and its operands, this module's base argument
-type is typically an address or an operand index. When dealing with an
-instruction's operands, the `ops_` prefix represents all of the
-instructions operands and typically will take only an address.
-Likewise when dealing with a single operand, the `op_` prefix
-is used and will take an address and the operand index.
+Although IDA internally uses the ``idaapi.insn_t`` and ``idaapi.op_t``
+to represent an instruction and its operands, this module's base
+argument type is typically an address or an operand index. When
+dealing with an instruction's operands, the ``ops_`` prefix represents
+all of the instructions operands and typically will take only an
+address.  Likewise when dealing with a single operand, the ``op_``
+prefix is used and will take an address and the operand index.
 
-To request the actual IDA types (`idaapi.insn_t` and `idaapi.op_t`)
-there are two tools that are provided. The `instruction.at(address)`
-tool will take an address and return an `idaapi.insn_t`. To get an
-`idaapi.op_t`, a user can use `instruction.operand(address, opnum)`.
-This will take an address and an index and return the desired
-`idaapi.op_t`.
+To request the actual IDA types (``idaapi.insn_t`` and ``idaapi.op_t``)
+there are two tools that are provided. The ``instruction.at`` tool will
+take an address and return an ``idaapi.insn_t``. To get an operand type
+(``idaapi.op_t``), a user can use ``instruction.operand``.  This will
+take an address and an operand index and return the desired type.
 
 Some globals are also defined for the given architecture which
 can be used to query or access the registers that are currently
 available. Once IDA has determined the architecture for the database
-the ``register_t`` class is instantiated. This object allows one to
-reference a register that is defined for the architecture.
+the ``register_t`` class is instantiated for each available register.
+This object allows one to reference any register that is defined for
+the architecture.
 
 Another object that is created is the ``architecture_t`` object.
 Searching for a register can be done by index and size or simply by
@@ -61,7 +61,7 @@ class __optype__(object):
     cache = {}
     @classmethod
     def define(cls, processor, type):
-        '''Register the operand decoder for the specfied ``processor`` an ``type``'''
+        '''Register the operand decoder for the specfied `processor` an `type`'''
         def decorator(fn):
             res = processor, type
             return cls.cache.setdefault(res, fn)
@@ -69,35 +69,35 @@ class __optype__(object):
 
     @classmethod
     def lookup(cls, type, processor=None):
-        '''Lookup the operand decoder for a specific ``type`` and ``processor``.'''
+        '''Lookup the operand decoder for a specific `type` and `processor`.'''
         try: return cls.cache[processor or idaapi.ph.id, type]
         except KeyError: return cls.cache[0, type]
 
     @classmethod
     def decode(cls, ea, op, processor=None):
-        '''Using the specified ``processor``, decode the operand ``op`` at the specified address ``ea``.'''
+        '''Using the specified `processor`, decode the operand `op` at the specified address `ea`.'''
         res = cls.lookup(op.type, processor=processor)
         return res(ea, op)
 
     @classmethod
     def type(cls, op, processor=None):
-        '''Return the operand type's name for the specified ``processor`` and ``op``.'''
+        '''Return the operand type's name for the specified `processor` and `op`.'''
         res = cls.lookup(op.type, processor=processor)
         return res.__name__
 
     @classmethod
     def size(cls, op, processor=None):
-        '''Return the size of the operand identified by ``op`` for the specified ``processor``.'''
+        '''Return the size of the operand identified by `op` for the specified `processor`.'''
         return idaapi.get_dtyp_size(op.dtyp)
 
 ## general functions
 @utils.multicase()
 def at():
-    '''Returns the `idaapi.insn_t` instance at the current address.'''
+    '''Returns the ``idaapi.insn_t`` instance at the current address.'''
     return at(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def at(ea):
-    '''Returns the `idaapi.insn_t` instance at the address ``ea``.'''
+    '''Returns the ``idaapi.insn_t`` instance at the address `ea`.'''
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
         raise E.InvalidTypeOrValueError("{:s}.at({:#x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
@@ -115,7 +115,7 @@ def size():
     return size(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def size(ea):
-    '''Returns the length of the instruction at the address ``ea``.'''
+    '''Returns the length of the instruction at the address `ea`.'''
     return at(ea).size
 
 @utils.multicase()
@@ -124,7 +124,7 @@ def feature():
     return feature(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def feature(ea):
-    '''Return the feature bitmask for the instruction at the address ``ea``.'''
+    '''Return the feature bitmask for the instruction at the address `ea`.'''
     if database.is_code(ea):
         return at(ea).get_canon_feature()
     return None
@@ -135,19 +135,19 @@ def mnemonic():
     return mnemonic(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def mnemonic(ea):
-    '''Returns the mnemonic of the instruction at the address ``ea``.'''
+    '''Returns the mnemonic of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     return (idaapi.ua_mnem(ea) or '').lower()
 mnem = utils.alias(mnemonic)
 
-## functions that return an `idaapi.op_t` for an operand
+## functions that return an ``idaapi.op_t`` for an operand
 @utils.multicase()
 def operands():
-    '''Returns all of the `idaapi.op_t` instances for the instruction at the current address.'''
+    '''Returns all of the ``idaapi.op_t`` instances for the instruction at the current address.'''
     return operands(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def operands(ea):
-    '''Returns all of the `idaapi.op_t` instances for the instruction at the address ``ea``.'''
+    '''Returns all of the ``idaapi.op_t`` instances for the instruction at the address `ea`.'''
     insn = at(ea)
 
     # take operands until we encounter an idaapi.o_void
@@ -163,11 +163,11 @@ def operands(ea):
 
 @utils.multicase(opnum=six.integer_types)
 def operand(opnum):
-    '''Returns the `idaapi.op_t` for the operand ``opnum`` belonging to the instruction at the current address.'''
+    '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the current address.'''
     return operand(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def operand(ea, opnum):
-    '''Returns the `idaapi.op_t` for the operand ``opnum`` belonging to the instruction at the address ``ea``.'''
+    '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn = at(ea)
 
     # IDA < 7.0 means we can just call .copy() to duplicate it
@@ -186,17 +186,17 @@ def ops_count():
     return ops_count(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_count(ea):
-    '''Returns the number of operands of the instruction at the address ``ea``.'''
+    '''Returns the number of operands of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     return len(operands(ea))
 
 @utils.multicase()
 def ops_repr():
-    '''Returns a tuple of the `op_repr` of all the operands for the instruction at the current address.'''
+    '''Returns a tuple of the ``op_repr`` of all the operands for the instruction at the current address.'''
     return ops_repr(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_repr(ea):
-    '''Returns a tuple of the `op_repr` of all the operands for the instruction at the address ``ea``.'''
+    '''Returns a tuple of the ``op_repr`` of all the operands for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(op_repr, ea)
     return tuple(map(f, six.moves.range(ops_count(ea))))
@@ -207,7 +207,7 @@ def ops():
     return ops(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops(ea):
-    '''Returns a tuple of all the operands for the instruction at the address ``ea``.'''
+    '''Returns a tuple of all the operands for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(op, ea)
     return tuple(map(f, six.moves.range(ops_count(ea))))
@@ -219,7 +219,7 @@ def ops_size():
     return ops_size(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_size(ea):
-    '''Returns a tuple with all the sizes of each operand for the instruction at the address ``ea``.'''
+    '''Returns a tuple with all the sizes of each operand for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = utils.fcompose(functools.partial(operand, ea), operator.attrgetter('dtyp'), idaapi.get_dtyp_size, int)
     return tuple(map(f, six.moves.range(ops_count(ea))))
@@ -230,7 +230,7 @@ def opts():
     return ops_type(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def opts(ea):
-    '''Returns a tuple of the types for all the operands in the instruction at the address ``ea``.'''
+    '''Returns a tuple of the types for all the operands in the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(opt, ea)
     return tuple(map(f, six.moves.range(ops_count(ea))))
@@ -242,7 +242,7 @@ def ops_state():
     return ops_state(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_state(ea):
-    '''Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address ``ea``.'''
+    '''Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address `ea`.'''
     ea = interface.address.inside(ea)
     f = feature(ea)
     res = ( ((f&ops_state.read[i]), (f&ops_state.write[i])) for i in six.moves.range(ops_count(ea)) )
@@ -257,7 +257,7 @@ def ops_read():
     return ops_read(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_read(ea):
-    '''Returns the indices of any operands that are being read from by the instruction at the address ``ea``.'''
+    '''Returns the indices of any operands that are being read from by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, state in enumerate(ops_state(ea)) if 'r' in state)
 
@@ -267,7 +267,7 @@ def ops_write():
     return ops_write(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_write(ea):
-    '''Returns the indices of the operands that are being written to by the instruction at the address ``ea``.'''
+    '''Returns the indices of the operands that are being written to by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, state in enumerate(ops_state(ea)) if 'w' in state)
 
@@ -277,23 +277,23 @@ def ops_constant():
     return ops_constant(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def ops_constant(ea):
-    '''Return the indices of any operands in the instruction at ``ea`` that are constants.'''
+    '''Return the indices of any operands in the instruction at `ea` that are constants.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, value in enumerate(ops_value(ea)) if isinstance(value, six.integer_types))
 ops_const = utils.alias(ops_constant)
 
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(reg, *regs, **modifiers):
-    """Yields the index of each operand in the instruction at the current address that uses ``reg`` or any one of the registers in ``regs``.
+    """Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.
 
-    If the keyword ``write`` is true, then only return the result if it's writing to the register.
+    If the keyword `write` is true, then only return the result if it's writing to the register.
     """
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(ea, reg, *regs, **modifiers):
-    """Yields the index of each operand in the instruction at address ``ea`` that uses ``reg`` or any one of the registers in ``regs``.
+    """Yields the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
 
-    If the keyword ``write`` is true, then only return the result if it's writing to the register.
+    If the keyword `write` is true, then only return the result if it's writing to the register.
     """
     ea = interface.address.inside(ea)
     iterops = interface.regmatch.modifier(**modifiers)
@@ -304,11 +304,11 @@ ops_reg = ops_regs = utils.alias(ops_register)
 ## functions vs a specific operand of an insn
 @utils.multicase(opnum=six.integer_types)
 def op_repr(opnum):
-    '''Returns the representation for the operand ``opnum`` belonging to the instruction at the current address.'''
+    '''Returns the representation for the operand `opnum` belonging to the instruction at the current address.'''
     return op_repr(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_repr(ea, opnum):
-    '''Returns the representation for the operand ``opnum`` belonging to the instruction at the address ``ea``.'''
+    '''Returns the representation for the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn = at(ea)
     oppr = idaapi.ua_outop2 if idaapi.__version__ < 7.0 else idaapi.print_operand
     outop = utils.fcompose(idaapi.ua_outop2, idaapi.tag_remove) if idaapi.__version__ < 7.0 else utils.fcompose(idaapi.print_operand, idaapi.tag_remove)
@@ -321,11 +321,11 @@ def op_repr(ea, opnum):
 
 @utils.multicase(opnum=six.integer_types)
 def op_state(opnum):
-    '''Returns the modification state for the operand ``opnum`` belonging to the current instruction.'''
+    '''Returns the modification state for the operand `opnum` belonging to the current instruction.'''
     return op_state(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_state(ea, opnum):
-    """Returns the modification state for the operand ``opnum`` belonging to the instruction at the address ``ea``.
+    """Returns the modification state for the operand `opnum` belonging to the instruction at the address `ea`.
 
     The returned state is a string that can be "r", "w", or "rw" depending on
     whether the operand is being read from, written to, or modified (both).
@@ -336,29 +336,29 @@ def op_state(ea, opnum):
 
 @utils.multicase(opnum=six.integer_types)
 def op_size(opnum):
-    '''Returns the size for the operand ``opnum`` belonging to the current instruction.'''
+    '''Returns the size for the operand `opnum` belonging to the current instruction.'''
     return op_size(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_size(ea, opnum):
-    '''Returns the size for the operand ``opnum`` belonging to the instruction at the address ``ea``.'''
+    '''Returns the size for the operand `opnum` belonging to the instruction at the address `ea`.'''
     res = operand(ea, opnum)
     return 0 if res.type == idaapi.o_void else idaapi.get_dtyp_size(res.dtyp)
 @utils.multicase(opnum=six.integer_types)
 def op_bits(opnum):
-    '''Returns the size (in bits) for the operand ``opnum`` belonging to the current instruction.'''
+    '''Returns the size (in bits) for the operand `opnum` belonging to the current instruction.'''
     return 8 * op_size(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_bits(ea, opnum):
-    '''Returns the size (in bits) for the operand ``opnum`` belonging to the instruction at the address ``ea``.'''
+    '''Returns the size (in bits) for the operand `opnum` belonging to the instruction at the address `ea`.'''
     return 8 * op_size(ea, opnum)
 
 @utils.multicase(opnum=six.integer_types)
 def opt(opnum):
-    '''Returns the type of the operand ``opnum`` belonging to the current instruction.'''
+    '''Returns the type of the operand `opnum` belonging to the current instruction.'''
     return opt(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def opt(ea, opnum):
-    """Returns the type of the operand ``opnum`` belonging to the instruction at the address ``ea``.
+    """Returns the type of the operand `opnum` belonging to the instruction at the address `ea`.
 
     The types returned are dependant on the architecture.
     """
@@ -368,20 +368,20 @@ op_type = utils.alias(opt)
 
 #@utils.multicase(opnum=six.integer_types)
 #def op_decode(opnum):
-#    '''Returns the value of the operand ``opnum`` in byte form belonging to the current instruction (if possible).'''
+#    '''Returns the value of the operand `opnum` in byte form belonging to the current instruction (if possible).'''
 #    raise NotImplementedError
 #@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 #def op_decode(ea, opnum):
-#    '''Returns the value of the operand ``opnum`` in byte form belonging to the instruction at address ``ea``.'''
+#    '''Returns the value of the operand `opnum` in byte form belonging to the instruction at address `ea`.'''
 #    raise NotImplementedError
 
 @utils.multicase(opnum=six.integer_types)
 def op(opnum):
-    '''Decodes the operand ``opnum`` for the current instruction.'''
+    '''Decodes the operand `opnum` for the current instruction.'''
     return op(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op(ea, opnum):
-    '''Decodes the operand ``opnum`` for the instruction at the address ``ea``.'''
+    '''Decodes the operand `opnum` for the instruction at the address `ea`.'''
     res = operand(ea, opnum)
     return __optype__.decode(ea, res)
 op_value = op_decode = utils.alias(op)
@@ -412,11 +412,11 @@ op_value = op_decode = utils.alias(op)
 ## XXX: deprecate this, and somehow associate the segment register with the operand for the intel arch
 @utils.multicase(opnum=six.integer_types)
 def op_segment(opnum):
-    '''Returns the segment register used by the operand ``opnum`` for the instruction at the current address.'''
+    '''Returns the segment register used by the operand `opnum` for the instruction at the current address.'''
     return op_segment(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_segment(ea, opnum):
-    '''Returns the segment register used by the operand ``opnum`` for the instruction at the address ``ea``.'''
+    '''Returns the segment register used by the operand `opnum` for the instruction at the address `ea`.'''
     op = operand(ea, opnum)
     segment  = (op.specval & 0xffff0000) >> 16
     selector = (op.specval & 0x0000ffff) >> 0
@@ -429,11 +429,11 @@ def op_segment(ea, opnum):
 
 @utils.multicase(opnum=six.integer_types)
 def op_structure(opnum):
-    '''Return the structure that operand ``opnum`` at the current instruction actually references.'''
+    '''Return the structure that operand `opnum` at the current instruction actually references.'''
     return op_structure(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
-    '''Return the structure that operand ``opnum`` for instruction ``ea`` actually references.'''
+    '''Return the structure that operand `opnum` for instruction `ea` actually references.'''
     ti, fl, op = idaapi.opinfo_t(), database.type.flags(ea), operand(ea, opnum)
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise E.MissingTypeOrAttribute("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
@@ -467,25 +467,25 @@ def op_structure(ea, opnum):
     return tuple(res + [ofs]) if ofs > 0 else tuple(res)
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
-    '''Apply the specified ``structure`` to the instruction operand ``opnum`` at the current address.'''
+    '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, [structure], **delta)
 @utils.multicase(opnum=six.integer_types, id=six.integer_types)
 def op_structure(opnum, id, **delta):
-    '''Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.'''
+    '''Apply the structure identified by `id` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, id, **delta)
 @utils.multicase(opnum=six.integer_types, path=(types.TupleType, types.ListType))
 def op_structure(opnum, path, **delta):
-    '''Apply the structure members in ``path`` to the instruction operand ``opnum`` at the current address.'''
+    '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(ea, opnum, structure, **delta):
-    '''Apply the specified ``structure`` to the instruction operand ``opnum`` at the address ``ea``.'''
+    '''Apply the specified `structure` to the instruction operand `opnum` at the address `ea`.'''
     return op_structure(ea, opnum, structure.id, **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
 def op_structure(ea, opnum, id, **delta):
-    """Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
+    """Apply the structure identified by `id` to the instruction operand `opnum` at the address `ea`.
 
-    If the offset ``delta`` is specified, shift the structure by that amount.
+    If the offset `delta` is specified, shift the structure by that amount.
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
@@ -515,9 +515,9 @@ def op_structure(ea, opnum, id, **delta):
     return op_structure(ea, opnum, [st, m], **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(types.TupleType, types.ListType))
 def op_structure(ea, opnum, path, **delta):
-    """Apply the structure members in ``path`` to the instruction operand ``opnum`` at the address ``ea``.
+    """Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.
 
-    If the offset ``delta`` is specified, shift the structure by that amount.
+    If the offset `delta` is specified, shift the structure by that amount.
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
@@ -597,11 +597,11 @@ op_struc = op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_enumeration(opnum):
-    '''Return the enumeration id of operand ``opnum`` for the current instruction.'''
+    '''Return the enumeration id of operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_enumeration(ea, opnum):
-    '''Return the enumeration id of operand ``opnum`` for the instruction at ``ea``.'''
+    '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
         raise E.MissingTypeOrAttribute("{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
@@ -616,25 +616,25 @@ def op_enumeration(ea, opnum):
     return enumeration.by(res.ec.tid), res.ec.serial if res.ec.serial > 0 else enumeration.by(res.ec.tid)
 @utils.multicase(opnum=six.integer_types, name=basestring)
 def op_enumeration(opnum, name):
-    '''Apply the enumeration ``name`` to operand ``opnum`` for the current instruction.'''
+    '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=basestring)
 def op_enumeration(ea, opnum, name):
-    '''Apply the enumeration ``name`` to operand ``opnum`` for the instruction at ``ea``.'''
+    '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
     return op_enumeration(ea, opnum, enumeration.by(name))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types+(types.TupleType,))
 def op_enumeration(ea, opnum, id):
-    '''Apply the enumeration ``id`` to operand ``opnum`` of the instruction at ``ea``.'''
+    '''Apply the enumeration `id` to operand `opnum` of the instruction at `ea`.'''
     return idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
 op_enum = utils.alias(op_enumeration)
 
 @utils.multicase(opnum=six.integer_types)
 def op_string(opnum):
-    '''Return the string type of operand ``opnum`` for the current instruction.'''
+    '''Return the string type of operand `opnum` for the current instruction.'''
     return op_string(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_string(ea, opnum):
-    '''Return the string type (`idaapi.STRTYPE_`) of operand ``opnum`` for the instruction at ``ea``.'''
+    '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
     if fl & idaapi.STRLIT == 0:
         raise E.MissingTypeOrAttribute("{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
@@ -646,7 +646,7 @@ def op_string(ea, opnum):
     return res.strtype
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
 def op_string(ea, opnum, strtype):
-    '''Set the string type used by operand ``opnum`` for the instruction at ``ea`` to ``strtype``.'''
+    '''Set the string type used by operand `opnum` for the instruction at `ea` to `strtype`.'''
     res, fl = idaapi.opinfo_t(), database.type.flags(ea)
 
     fl |= idaapi.FF_STRLIT
@@ -660,11 +660,11 @@ def op_string(ea, opnum, strtype):
 ## flags
 @utils.multicase(opnum=six.integer_types)
 def op_refs(opnum):
-    '''Returns the ``(address, opnum, type)`` of all the instructions that reference the operand ``opnum`` for the current instruction.'''
+    '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the current instruction.'''
     return op_refs(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_refs(ea, opnum):
-    '''Returns the ``(address, opnum, type)`` of all the instructions that reference the operand ``opnum`` for the instruction at ``ea``.'''
+    '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
     inst = at(ea)
 
     # sanity: returns whether the operand has a local or global xref
@@ -793,7 +793,7 @@ def is_return():
     return is_return(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_return(ea):
-    '''Returns true if the instruction at ``ea`` is a return-type instruction.'''
+    '''Returns true if the instruction at `ea` is a return-type instruction.'''
     ea = interface.address.inside(ea)
     returnQ = lambda ea: feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
 
@@ -811,7 +811,7 @@ def is_shift():
     return is_shift(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_shift(ea):
-    '''Returns true if the instruction at ``ea`` is a bit-shifting instruction.'''
+    '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
     ea = interface.address.inside(ea)
     return database.is_code(ea) and feature(ea) & idaapi.CF_SHFT == idaapi.CF_SHFT
 isShift = shiftQ = utils.alias(is_shift)
@@ -822,7 +822,7 @@ def is_branch():
     return is_branch(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_branch(ea):
-    '''Returns true if the instruction at ``ea`` is any kind of branch.'''
+    '''Returns true if the instruction at `ea` is any kind of branch.'''
     ea = interface.address.inside(ea)
     return database.is_code(ea) and is_jmp(ea) or is_jxx(ea) or is_jmpi(ea)
 isBranch = branchQ = utils.alias(is_branch)
@@ -833,7 +833,7 @@ def is_jmp():
     return is_jmp(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_jmp(ea):
-    '''Returns true if the instruction at ``ea`` is an immediate and indrect branch.'''
+    '''Returns true if the instruction at `ea` is an immediate and indrect branch.'''
     ea = interface.address.inside(ea)
 
     F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
@@ -846,7 +846,7 @@ def is_jxx():
     return is_jxx(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_jxx(ea):
-    '''Returns true if the instruction at ``ea`` is a conditional branch.'''
+    '''Returns true if the instruction at `ea` is a conditional branch.'''
     ea = interface.address.inside(ea)
 
     F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
@@ -859,7 +859,7 @@ def is_jmpi():
     return is_jmpi(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_jmpi(ea):
-    '''Returns true if the instruction at ``ea`` is an indirect branch.'''
+    '''Returns true if the instruction at `ea` is an indirect branch.'''
     ea = interface.address.inside(ea)
     F = feature(ea)
     return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_JUMP == idaapi.CF_JUMP)
@@ -871,7 +871,7 @@ def is_call():
     return is_call(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_call(ea):
-    '''Returns true if the instruction at ``ea`` is a call.'''
+    '''Returns true if the instruction at `ea` is a call.'''
     ea = interface.address.inside(ea)
     if hasattr(idaapi, 'is_call_insn'):
         idaapi.decode_insn(ea)
@@ -887,7 +887,7 @@ def is_calli():
     return is_calli(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def is_calli(ea):
-    '''Returns true if the instruction at ``ea`` is an indirect call.'''
+    '''Returns true if the instruction at `ea` is an indirect call.'''
     ea = interface.address.inside(ea)
     F = feature(ea)
     return is_call(ea) and all(F&x == x for x in {idaapi.CF_CALL, idaapi.CF_JUMP})
@@ -897,21 +897,21 @@ def is_calli(ea):
 class operand_types:
     """
     This internal namespace is responsible for registering the operand
-    type handlers for each architecture inside `__optype__` and is
+    type handlers for each architecture inside ``__optype__`` and is
     deleted after they are registered.
     """
     @__optype__.define(idaapi.PLFM_386, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_void)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_void)
     def void(ea, op):
-        '''Operand type decoder for `idaapi.o_void`.'''
+        '''Operand type decoder for ``idaapi.o_void``.'''
         return ()
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_reg)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_reg)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg)
     def register(ea, op):
-        '''Operand type decoder for `idaapi.o_reg` which returns a `register_t`.'''
+        '''Operand type decoder for ``idaapi.o_reg`` which returns a ``register_t``.'''
         global architecture
         dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         if op.type in {idaapi.o_reg}:
@@ -924,7 +924,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
     def immediate(ea, op):
-        '''Operand type decoder for `idaapi.o_imm` which returns an integer.'''
+        '''Operand type decoder for ``idaapi.o_imm`` which returns an integer.'''
         if op.type in {idaapi.o_imm, idaapi.o_phrase}:
             bits = idaapi.get_dtyp_size(op.dtyp) * 8
 
@@ -950,28 +950,28 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(ea, op):
-        '''Operand type decoder for Intel's `idaapi.o_idpspec0` which returns a trap register.'''
+        '''Operand type decoder for Intel's ``idaapi.o_idpspec0`` which returns a trap register.'''
         raise E.UnsupportedCapability("{:s}.trregister({:#x}, ...) : Trap registers (trX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
     def dbregister(ea, op):
-        '''Operand type decoder for Intel's `idaapi.o_idpspec1` which returns a db register.'''
+        '''Operand type decoder for Intel's ``idaapi.o_idpspec1`` which returns a db register.'''
         raise E.UnsupportedCapability("{:s}.dbregister({:#x}, ...) : Db registers (dbX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
     def crregister(ea, op):
-        '''Operand type decoder for Intel's `idaapi.o_idpspec2` which returns a control reigster.'''
+        '''Operand type decoder for Intel's ``idaapi.o_idpspec2`` which returns a control reigster.'''
         raise E.UnsupportedCapability("{:s}.crregister({:#x}, ...) : Cr registers (crX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
         return getattr(reg, "cr{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
     def fpregister(ea, op):
-        '''Operand type decoder for Intel's `idaapi.o_idpspec3` which returns an fpu register.'''
+        '''Operand type decoder for Intel's ``idaapi.o_idpspec3`` which returns an fpu register.'''
         return getattr(reg, "st{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
     def mmxregister(ea, op):
-        '''Operand type decoder for Intel's `idaapi.o_idpspec4` which returns an mmx register.'''
+        '''Operand type decoder for Intel's ``idaapi.o_idpspec4`` which returns an mmx register.'''
         return getattr(reg, "mmx{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
     def xmmregister(ea, op):
-        '''Operand type decoder for Intel's `idaapi.o_idpspec5` which returns an xmm register.'''
+        '''Operand type decoder for Intel's ``idaapi.o_idpspec5`` which returns an xmm register.'''
         return getattr(reg, "xmm{:d}".format(op.reg)).id
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
@@ -1131,7 +1131,7 @@ class intelops:
         """
         A tuple representing an address with a segment register attached for Intel.
 
-        Has the format ``(segment, offset)`` where ``segment`` is a segment register.
+        Has the format `(segment, offset)` where `segment` is a segment register.
         """
         _fields = ('segment', 'offset')
         _types = (
@@ -1141,7 +1141,7 @@ class intelops:
 
         @property
         def symbols(self):
-            '''Yield the ``segment`` register from the tuple if it is defined.'''
+            '''Yield the `segment` register from the tuple if it is defined.'''
             s, _ = self
             if s is not None: yield s
     SO = SegmentOffset
@@ -1150,9 +1150,9 @@ class intelops:
         """
         A tuple representing a memory phrase for the Intel architecture.
 
-        Has the format ``(segment, offset, base, index, scale)`` where
-        ``segment`` includes the segment register and ``base`` and
-        ``index`` are both optional registers.
+        Has the format `(segment, offset, base, index, scale)` where
+        `segment` includes the segment register and `base` and
+        `index` are both optional registers.
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
         _types = (
@@ -1165,7 +1165,7 @@ class intelops:
 
         @property
         def symbols(self):
-            '''Yield the ``segment``, ``base``, and the ``index`` registers from the tuple if they are defined.'''
+            '''Yield the `segment`, `base`, and the `index` registers from the tuple if they are defined.'''
             s, _, b, i, _ = self
             if s is not None: yield s
             if b is not None: yield b
@@ -1176,8 +1176,8 @@ class intelops:
         """
         A tuple representing a memory phrase for the Intel architecture.
 
-        Has the format ``(offset, base, index, scale)`` where both
-        ``base`` and ``index`` are both optional registers.
+        Has the format `(offset, base, index, scale)` where both
+        `base` and `index` are both optional registers.
         """
         _fields = ('offset', 'base', 'index', 'scale')
         _types = (
@@ -1189,7 +1189,7 @@ class intelops:
 
         @property
         def symbols(self):
-            '''Yield the ``base``, and the ``index`` registers from the tuple if they are defined.'''
+            '''Yield the `base`, and the `index` registers from the tuple if they are defined.'''
             _, b, i, _ = self
             if b is not None: yield b
             if i is not None: yield i
@@ -1206,7 +1206,7 @@ class armops:
         """
         A tuple representing a flexible operand as available on the ARM architecture.
 
-        Has the format ``(Rn, shift, n)`` which allows the architecture to apply
+        Has the format `(Rn, shift, n)` which allows the architecture to apply
         a binary shift or rotation to the value of a register `Rn`.
         """
         _fields = ('Rn', 'shift', 'n')
@@ -1230,7 +1230,7 @@ class armops:
         """
         A tuple representing a register list on the ARM architecture.
 
-        Has the simple format ``(reglist,)`` where ``reglist`` is a set of registers
+        Has the simple format `(reglist,)` where `reglist` is a set of registers
         that can be explicitly tested for membership.
         """
         _fields = ('reglist', )
@@ -1238,7 +1238,7 @@ class armops:
 
         @property
         def symbols(self):
-            '''Yield any of the registers within the ``reglist`` field belonging to the tuple.'''
+            '''Yield any of the registers within the `reglist` field belonging to the tuple.'''
             res, = self
             for r in res: yield r
 
@@ -1246,7 +1246,7 @@ class armops:
         """
         A tuple representing a memory displacement on the ARM architecture.
 
-        Has the format ``(Rn, Offset)`` where ``Rn`` is a register and ``Offset`` is
+        Has the format `(Rn, Offset)` where `Rn` is a register and `Offset` is
         the integer that is added to the register.
         """
         _fields = ('Rn', 'offset')
@@ -1268,7 +1268,7 @@ class armops:
         """
         A tuple for representing a memory phrase on the ARM architecture
 
-        Has the format ``(Rn, Rm)`` where both are registers that compose the
+        Has the format `(Rn, Rm)` where both are registers that compose the
         phrase.
         """
         _fields = ('Rn', 'Rm')
@@ -1291,8 +1291,8 @@ class armops:
         """
         A tuple for representing a memory operand on the ARM architecture.
 
-        Has the format ``(address, value)`` where ``address`` is the actual value
-        stored in the operand and ``value`` is the value that is dereferenced.
+        Has the format `(address, value)` where `address` is the actual value
+        stored in the operand and `value` is the value that is dereferenced.
         """
         _fields = ('address', 'value')
         _types = (six.integer_types, six.integer_types)
@@ -1314,8 +1314,8 @@ class mipsops:
         """
         A tuple for representing a memory phrase on the MIPS architecture.
 
-        Has the format ``(Rn, Offset)`` where ``Rn`` is the register and
-        ``Offset`` is the immediate that is added to the register.
+        Has the format `(Rn, Offset)` where `Rn` is the register and
+        `Offset` is the immediate that is added to the register.
         """
         _fields = ('Rn', 'Offset')
         _types = (interface.register_t, six.integer_types)
@@ -1334,7 +1334,7 @@ class mipsops:
         """
         A callable that returns a co-processor for the MIPS architecture.
 
-        Takes a ``regnum`` argument which returns the correct register.
+        Takes a `regnum` argument which returns the correct register.
         """
         global register, architecture
         res = {
@@ -1356,8 +1356,8 @@ class Intel(interface.architecture_t):
     This keeps track of the relationships between registers to allow one to
     promote or demote a register to the different sizes that are available.
 
-    An instance of this class can be accessed as `instruction.architecture`
-    (or `instruction.arch`) when the current architecture of the database is Intel.
+    An instance of this class can be accessed as ``instruction.architecture``
+    (or ``instruction.arch``) when the current architecture of the database is Intel.
     """
     prefix = ''
     def __init__(self):
@@ -1414,8 +1414,8 @@ class AArch32(interface.architecture_t):
 
     This is used to locate or manage the different registers that are available.
 
-    An instance of this class can be accessed as `instruction.architecture`
-    (or `instruction.arch`) when the current architecture of the database is ARM.
+    An instance of this class can be accessed as ``instruction.architecture``
+    (or ``instruction.arch``) when the current architecture of the database is ARM.
     """
     prefix = '%'
     def __init__(self):
@@ -1444,8 +1444,8 @@ class Mips(interface.architecture_t):
     This includes the different co-processor registers that are also available
     but are treated as special instructions by IDA.
 
-    An instance of this class can be accessed as `instruction.architecture`
-    (or `instruction.arch`) when the current architecture of the database is MIPS.
+    An instance of this class can be accessed as ``instruction.architecture``
+    (or ``instruction.arch``) when the current architecture of the database is MIPS.
     """
     prefix = '$'
     def __init__(self):

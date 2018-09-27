@@ -14,8 +14,8 @@ exist at an address.
 Some namespaces are also provided for querying the available symbolic
 information that IDA has discovered about a binary. This can be used
 to search and navigate the database. Some of the available namespaces
-that can be used for querying are `functions`, `segments`, `names`,
-`imports`, `entries`, and `marks`.
+that can be used for querying are ``functions``, ``segments``,
+``names``, ``imports``, ``entries``, and ``marks``.
 """
 
 import six
@@ -44,7 +44,7 @@ def within():
     return within(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def within(ea):
-    '''Returns true if address ``ea`` is within the bounds of the database.'''
+    '''Returns true if address `ea` is within the bounds of the database.'''
     l, r = config.bounds()
     return l <= ea < r
 contains = utils.alias(within)
@@ -189,7 +189,7 @@ class config(object):
 
     @classmethod
     def bounds(cls):
-        '''Return the bounds of the current database as a tuple formatted as ``(left, right)``.'''
+        '''Return the bounds of the current database as a tuple formatted as `(left, right)`.'''
         return interface.bounds_t(cls.info.minEA, cls.info.maxEA)
 
     class registers(object):
@@ -232,11 +232,11 @@ class functions(object):
 
     The different types that one can match functions with are the following:
 
-        ``address`` or ``ea`` - Match according to the function's address
-        ``name`` - Match according to the exact name
-        ``like`` - Filter the function names according to a glob
-        ``regex`` - Filter the function names according to a regular-expression
-        ``predicate`` - Filter the functions by passing their `idaapi.func_t` to a callable
+        `address` or `ea` - Match according to the function's address
+        `name` - Match according to the exact name
+        `like` - Filter the function names according to a glob
+        `regex` - Filter the function names according to a regular-expression
+        `predicate` - Filter the functions by passing their ``idaapi.func_t`` to a callable
 
     Some examples of how to use these keywords are as follows::
 
@@ -298,12 +298,12 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     def iterate(cls, string):
-        '''Iterate through all of the functions in the database with a glob that matches ``string``.'''
+        '''Iterate through all of the functions in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the functions in the database that match the keyword specified by ``type``.'''
+        '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
         if not type:
             #type = {'predicate':lambda n: True}
             for n in cls():
@@ -317,12 +317,12 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     def list(cls, string):
-        '''List all of the functions in the database with a glob that matches ``string``.'''
+        '''List all of the functions in the database with a glob that matches `string`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the functions in the database that match the keyword specified by ``type``.'''
+        '''List all of the functions in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
 
         flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
@@ -378,12 +378,12 @@ class functions(object):
     @utils.multicase(string=basestring)
     @classmethod
     def search(cls, string):
-        '''Search through all of the functions matching the glob ``string`` and return the first result.'''
+        '''Search through all of the functions matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the functions within the database and return the first result matching the keyword specified by ``type``.'''
+        '''Search through all of the functions within the database and return the first result matching the keyword specified by `type`.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
@@ -404,15 +404,15 @@ class segments(object):
 
     The different types that one can match segments with are the following:
 
-        ``name`` - Match according to the true segment name
-        ``like`` - Filter the segment names according to a glob
-        ``regex`` - Filter the segment names according to a regular-expression
-        ``index`` - Match the segment by its index
-        ``identifier`` - Match the segment by its identifier (`idaapi.segment_t.name`)
-        ``selector`` - Match the segment by its selector (`idaapi.segment_t.sel`)
-        ``greater`` or ``gt`` - Filter the segments for any after the specified address
-        ``less`` or ``lt`` - Filter the segments for any before the specified address
-        ``predicate`` - Filter the segments by passing its `idaapi.segment_t` to a callable
+        `name` - Match according to the true segment name
+        `like` - Filter the segment names according to a glob
+        `regex` - Filter the segment names according to a regular-expression
+        `index` - Match the segment by its index
+        `identifier` - Match the segment by its identifier (``idaapi.segment_t.name``)
+        `selector` - Match the segment by its selector (``idaapi.segment_t.sel``)
+        `greater` or `gt` - Filter the segments for any after the specified address
+        `less` or `lt` - Filter the segments for any before the specified address
+        `predicate` - Filter the segments by passing its ``idaapi.segment_t`` to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -432,34 +432,34 @@ class segments(object):
     @utils.multicase(name=basestring)
     @classmethod
     def iterate(cls, name):
-        '''List all of the segments defined in the database that match the glob ``name``.'''
+        '''List all of the segments defined in the database that match the glob `name`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the segments in the database that match the keyword specified by ``type``.'''
+        '''List all of the segments in the database that match the keyword specified by `type`.'''
         return segment.list(**type)
 
     @utils.multicase(name=basestring)
     @classmethod
     def iterate(cls, name):
-        '''Iterate through all of the segments in the database with a glob that matches ``name``.'''
+        '''Iterate through all of the segments in the database with a glob that matches `name`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all the segments defined in the database matching the keyword specified by``type``.'''
+        '''Iterate through all the segments defined in the database matching the keyword specified by `type`.'''
         return segment.__iterate__(**type)
 
     @utils.multicase(name=basestring)
     @classmethod
     def search(cls, name):
-        '''Search through all of the segments matching the glob ``name`` and return the first result.'''
+        '''Search through all of the segments matching the glob `name` and return the first result.'''
         return cls.search(like=name)
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the segments within the database and return the first result matching the keyword specified by ``type``.'''
+        '''Search through all of the segments within the database and return the first result matching the keyword specified by `type`.'''
         return segment.search(**type)
 
 @utils.multicase()
@@ -468,7 +468,7 @@ def instruction():
     return instruction(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def instruction(ea):
-    '''Return the instruction at the address ``ea`` as a string.'''
+    '''Return the instruction at the address `ea` as a string.'''
     insn = idaapi.generate_disasm_line(interface.address.inside(ea))
     unformatted = idaapi.tag_remove(insn)
     comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
@@ -481,10 +481,10 @@ def disassemble(**options):
     return disassemble(ui.current.address(), **options)
 @utils.multicase(ea=six.integer_types)
 def disassemble(ea, **options):
-    """Disassemble the instructions at the address specified by ``ea``.
+    """Disassemble the instructions at the address specified by `ea`.
 
-    If the integer ``count`` is specified, then return ``count`` number of instructions.
-    If the bool ``comments`` is true, then return the comments for each instruction as well.
+    If the integer `count` is specified, then return `count` number of instructions.
+    If the bool `comments` is true, then return the comments for each instruction as well.
     """
     ea = interface.address.inside(ea)
     commentQ = builtins.next((options[k] for k in ('comment', 'comments') if k in options), False)
@@ -502,7 +502,7 @@ def disassemble(ea, **options):
 disasm = utils.alias(disassemble)
 
 def block(start, end):
-    '''Return the block of bytes from address ``start`` to ``end``.'''
+    '''Return the block of bytes from address `start` to `end`.'''
     if start > end:
         start, end = end, start
     start, end = interface.address.within(start, end)
@@ -516,23 +516,23 @@ def read():
     return read(res, type.size(res))
 @utils.multicase(size=six.integer_types)
 def read(size):
-    '''Return ``size`` number of bytes from the current address.'''
+    '''Return `size` number of bytes from the current address.'''
     return read(ui.current.address(), size)
 @utils.multicase(ea=six.integer_types, size=six.integer_types)
 def read(ea, size):
-    '''Return ``size`` number of bytes from address ``ea``.'''
+    '''Return `size` number of bytes from address `ea`.'''
     start, end = interface.address.within(ea, ea+size)
     return idaapi.get_many_bytes(ea, end-start) or ''
 
 @utils.multicase(data=bytes)
 def write(data, **persist):
-    '''Modify the database at the current address with the bytes specified in ``data``.'''
+    '''Modify the database at the current address with the bytes specified in `data`.'''
     return write(ui.current.address(), data, **persist)
 @utils.multicase(ea=six.integer_types, data=bytes)
 def write(ea, data, **persist):
-    """Modify the database at address ``ea`` with the bytes specified in ``data``
+    """Modify the database at address `ea` with the bytes specified in `data`
 
-    If the bool ``persist`` is specified, then modify what IDA considers the original bytes.
+    If the bool `persist` is specified, then modify what IDA considers the original bytes.
     """
     ea, _ = interface.address.within(ea, ea + len(data))
     originalQ = builtins.next((persist[k] for k in ('original', 'persist', 'store', 'save') if k in persist), False)
@@ -541,16 +541,16 @@ def write(ea, data, **persist):
 class names(object):
     """
     This namespace is used for listing all the names (or symbols)
-    within the database. By default the ``(address, name)`` is yielded.
+    within the database. By default the `(address, name)` is yielded.
 
     The different types that one can filter the symbols with are the following:
 
-        ``address`` - Match according to the address of the symbol
-        ``name`` - Match according to the name of the symbol
-        ``like`` - Filter the symbol names according to a glob
-        ``regex`` - Filter the symbol names according to a regular-expression
-        ``index`` - Match the symbol according to its index
-        ``predicate`` - Filter the symbols by passing their address to a callable
+        `address` - Match according to the address of the symbol
+        `name` - Match according to the name of the symbol
+        `like` - Filter the symbol names according to a glob
+        `regex` - Filter the symbol names according to a regular-expression
+        `index` - Match the symbol according to its index
+        `predicate` - Filter the symbols by passing their address to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -591,12 +591,12 @@ class names(object):
     @utils.multicase(string=basestring)
     @classmethod
     def iterate(cls, string):
-        '''Iterate through all of the names in the database with a glob that matches ``string``.'''
+        '''Iterate through all of the names in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the names in the database that match the keyword specified by``type``.'''
+        '''Iterate through all of the names in the database that match the keyword specified by `type`.'''
         for idx in cls.__iterate__(**type):
             yield idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
         return
@@ -604,12 +604,12 @@ class names(object):
     @utils.multicase(string=basestring)
     @classmethod
     def list(cls, string):
-        '''List all of the names in the database with a glob that matches ``string``.'''
+        '''List all of the names in the database with a glob that matches `string`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the names in the database that match the keyword specified by ``type``.'''
+        '''List all of the names in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.__iterate__(**type))
 
         maxindex = max(res or [1])
@@ -624,12 +624,12 @@ class names(object):
     @utils.multicase(string=basestring)
     @classmethod
     def search(cls, string):
-        '''Search through all of the names matching the glob ``string`` and return the first result.'''
+        '''Search through all of the names matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the names within the database and return the first result matching the keyword specified by ``type``.'''
+        '''Search through all of the names within the database and return the first result matching the keyword specified by `type`.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -645,12 +645,12 @@ class names(object):
 
     @classmethod
     def name(cls, ea):
-        '''Return the symbol name of the string at address ``ea``.'''
+        '''Return the symbol name of the string at address `ea`.'''
         res = idaapi.get_nlist_idx(ea)
         return idaapi.get_nlist_name(res)
     @classmethod
     def address(cls, index):
-        '''Return the address of the string at ``index``.'''
+        '''Return the address of the string at `index`.'''
         return idaapi.get_nlist_ea(index)
     @classmethod
     def at(cls, ea):
@@ -665,18 +665,18 @@ class search(object):
     By default the name is used, however there are 4 search methods
     that are available. The methods that are provided are:
 
-        `search.by_bytes` - Search by the specified hex bytes
-        `search.by_regex` - Search by the specified regex
-        `search.by_text`  - Search by the specified text
-        `search.by_name`  - Search by the specified name
+        ``search.by_bytes`` - Search by the specified hex bytes
+        ``search.by_regex`` - Search by the specified regex
+        ``search.by_text``  - Search by the specified text
+        ``search.by_name``  - Search by the specified name
 
     Each search method has its own options, but all of them take an extra
-    boolean option, ``reverse``, which specifies whether to search backwards
+    boolean option, `reverse`, which specifies whether to search backwards
     from the starting position or forwards.
 
-    The `search.iterate` function allows one to iterate through all the results
-    discovered in the database. One variation of `search.iterate` takes a 3rd
-    parameter ``predicate``. One can provide one of the search methods provided
+    The ``search.iterate`` function allows one to iterate through all the results
+    discovered in the database. One variation of ``search.iterate`` takes a 3rd
+    parameter `predicate`. One can provide one of the search methods provided
     or include their own. This function will then yield each matched search
     result.
     """
@@ -684,15 +684,15 @@ class search(object):
     @utils.multicase(string=bytes)
     @staticmethod
     def by_bytes(string, **direction):
-        '''Search through the database at the current address for the bytes specified by ``string``.'''
+        '''Search through the database at the current address for the bytes specified by `string`.'''
         return search.by_bytes(ui.current.address(), string, **direction)
     @utils.multicase(ea=six.integer_types, string=bytes, reverse=bool)
     @staticmethod
     def by_bytes(ea, string, **direction):
-        """Search through the database at address ``ea`` for the bytes specified by ``string``.
+        """Search through the database at address `ea` for the bytes specified by `string`.
 
-        If ``reverse`` is specified as a bool, then search backwards from the given address.
-        If ``radix`` is specified, then use it as the number radix for describing the bytes.
+        If `reverse` is specified as a bool, then search backwards from the given address.
+        If `radix` is specified, then use it as the number radix for describing the bytes.
         """
         reverseQ = builtins.next((direction[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in direction), False)
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
@@ -705,15 +705,15 @@ class search(object):
     @utils.multicase(string=basestring)
     @staticmethod
     def by_regex(string, **options):
-        '''Search through the database at the current address for the regex matched by ``string``.'''
+        '''Search through the database at the current address for the regex matched by `string`.'''
         return search.by_regex(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @staticmethod
     def by_regex(ea, string, **options):
-        """Search the database at address ``ea`` for the regex matched by ``string``.
+        """Search the database at address `ea` for the regex matched by `string`.
 
-        If ``reverse`` is specified as a bool, then search backwards from the given address.
-        If ``sensitive`` is specified as bool, then perform a case-sensitive search.
+        If `reverse` is specified as a bool, then search backwards from the given address.
+        If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
         reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
         flags = idaapi.SEARCH_REGEX
@@ -728,15 +728,15 @@ class search(object):
     @utils.multicase(string=basestring)
     @staticmethod
     def by_text(string, **options):
-        '''Search through the database at the current address for the text matched by ``string``.'''
+        '''Search through the database at the current address for the text matched by `string`.'''
         return search.by_text(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @staticmethod
     def by_text(ea, string, **options):
-        """Search the database at address ``ea`` for the text matched by ``string``.
+        """Search the database at address `ea` for the text matched by `string`.
 
-        If ``reverse`` is specified as a bool, then search backwards from the given address.
-        If ``sensitive`` is specified as bool, then perform a case-sensitive search.
+        If `reverse` is specified as a bool, then search backwards from the given address.
+        If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
         reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
         flags = 0
@@ -751,15 +751,15 @@ class search(object):
     @utils.multicase(name=basestring)
     @staticmethod
     def by_name(name, **options):
-        '''Search through the database at the current address for the symbol ``name``.'''
+        '''Search through the database at the current address for the symbol `name`.'''
         return search.by_name(ui.current.address(), name, **options)
     @utils.multicase(ea=six.integer_types, name=basestring)
     @staticmethod
     def by_name(ea, name, **options):
-        """Search through the database at address ``ea`` for the symbol ``name``.
+        """Search through the database at address `ea` for the symbol `name`.
 
-        If ``reverse`` is specified as a bool, then search backwards from the given address.
-        If ``sensitive`` is specified as bool, then perform a case-sensitive search.
+        If `reverse` is specified as a bool, then search backwards from the given address.
+        If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
         reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
         flags = idaapi.SEARCH_IDENT
@@ -774,22 +774,22 @@ class search(object):
     @utils.multicase(string=basestring)
     @staticmethod
     def iterate(string, **options):
-        '''Iterate through all search results that match the bytes ``string`` starting at the current address.'''
+        '''Iterate through all search results that match the bytes `string` starting at the current address.'''
         return search.iterate(ui.current.address(), string, search.by_bytes, **options)
     @utils.multicase(string=basestring, predicate=callable)
     @staticmethod
     def iterate(string, predicate, **options):
-        '''Iterate through all search results matched by the function ``predicate`` with the specified ``string`` starting at the current address.'''
+        '''Iterate through all search results matched by the function `predicate` with the specified `string` starting at the current address.'''
         return search.iterate(ui.current.address(), string, predicate, **options)
     @utils.multicase(start=six.integer_types, string=basestring)
     @staticmethod
     def iterate(start, string, **options):
-        '''Iterate through all search results that match the bytes ``string`` starting at address ``start``.'''
+        '''Iterate through all search results that match the bytes `string` starting at address `start`.'''
         return search.iterate(start, string, search.by_bytes, **options)
     @utils.multicase(start=six.integer_types, string=basestring, predicate=callable)
     @staticmethod
     def iterate(start, string, predicate, **options):
-        '''Iterate through all search results matched by the function ``predicate`` with the specified ``string`` starting at address ``start``.'''
+        '''Iterate through all search results matched by the function `predicate` with the specified `string` starting at address `start`.'''
         ea = predicate(start, string, **options)
         while ea != idaapi.BADADDR:
             yield ea
@@ -797,13 +797,13 @@ class search(object):
         return
 
     def __new__(cls, string):
-        '''Search through the database for the specified ``string``.'''
+        '''Search through the database for the specified `string`.'''
         return cls.by_name(ui.current.address(), string)
 
 byName = by_name = utils.alias(search.by_name, 'search')
 
 def go(ea):
-    '''Jump to the specified address at ``ea``.'''
+    '''Jump to the specified address at `ea`.'''
     if isinstance(ea, basestring):
         ea = search.by_name(None, ea)
     idaapi.jumpto(interface.address.inside(ea))
@@ -816,17 +816,17 @@ def offset():
     return offset(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def offset(ea):
-    '''Return the address ``ea`` converted to an offset from the base address of the database.'''
+    '''Return the address `ea` converted to an offset from the base address of the database.'''
     return interface.address.inside(ea) - config.baseaddress()
 getoffset = getOffset = o = utils.alias(offset)
 
 def translate(offset):
-    '''Translate the specified ``offset`` to an address in the database.'''
+    '''Translate the specified `offset` to an address in the database.'''
     return config.baseaddress() + offset
 coof = convert_offset = convertOffset = utils.alias(translate)
 
 def go_offset(offset):
-    '''Jump to the specified ``offset`` within the database.'''
+    '''Jump to the specified `offset` within the database.'''
     res = ui.current.address() - config.baseaddress()
     ea = coof(offset)
     idaapi.jumpto(interface.address.inside(ea))
@@ -839,9 +839,9 @@ def name(**flags):
     return name(ui.current.address(), **flags)
 @utils.multicase(ea=six.integer_types)
 def name(ea, **flags):
-    """Return the name defined at the address specified by ``ea``.
+    """Return the name defined at the address specified by `ea`.
 
-    If ``flags`` is specified, then use the specified value as the flags.
+    If `flags` is specified, then use the specified value as the flags.
     """
     ea = interface.address.inside(ea)
 
@@ -862,7 +862,7 @@ def name(ea, **flags):
     return aname or None
 @utils.multicase(string=basestring)
 def name(string, *suffix, **flags):
-    '''Renames the current address to ``string``.'''
+    '''Renames the current address to `string`.'''
     return name(ui.current.address(), string, *suffix, **flags)
 @utils.multicase(none=types.NoneType)
 def name(none, **flags):
@@ -870,11 +870,11 @@ def name(none, **flags):
     return name(ui.current.address(), '', **flags)
 @utils.multicase(ea=six.integer_types, string=basestring)
 def name(ea, string, *suffix, **flags):
-    """Renames the address  specified by ``ea`` to ``string``.
+    """Renames the address  specified by `ea` to `string`.
 
-    If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
-    If ``flags`` is specified, then use the specified value as the flags.
-    If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
+    If `ea` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
+    If `flags` is specified, then use the specified value as the flags.
+    If the boolean `listed` is specified, then specify whether to add the label to the Names list or not.
     """
     # combine name with its suffix
     res = (string,) + suffix
@@ -907,7 +907,7 @@ def name(ea, string, *suffix, **flags):
     if not function.within(ea) and 'listed' not in flags:
         fl &= ~idaapi.SN_NOLIST
 
-    # if the bool ``listed`` is True, then ensure that it's added to the name list.
+    # if the bool `listed` is True, then ensure that it's added to the name list.
     if 'listed' in flags:
         fl = (fl & ~idaapi.SN_NOLIST) if flags.get('listed', False) else (fl | idaapi.SN_NOLIST)
 
@@ -941,7 +941,7 @@ def name(ea, string, *suffix, **flags):
     return res
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
-    '''Removes the name defined at the address ``ea``.'''
+    '''Removes the name defined at the address `ea`.'''
     return name(ea, '', **flags)
 
 @utils.multicase()
@@ -950,7 +950,7 @@ def erase():
     return erase(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def erase(ea):
-    '''Remove all of the defined tags at address ``ea``.'''
+    '''Remove all of the defined tags at address `ea`.'''
     ea = interface.address.inside(ea)
     for k in tag(ea): tag(ea, k, None)
     color(ea, None)
@@ -965,17 +965,17 @@ def color(none):
     return color(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types)
 def color(ea):
-    '''Return the rgb color at the address ``ea``.'''
+    '''Return the rgb color at the address `ea`.'''
     res = idaapi.get_item_color(interface.address.inside(ea))
     b, r = (res&0xff0000)>>16, res&0x0000ff
     return None if res == 0xffffffff else (r<<16)|(res&0x00ff00)|b
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def color(ea, none):
-    '''Remove the color at the address ``ea``.'''
+    '''Remove the color at the address `ea`.'''
     return idaapi.set_item_color(interface.address.inside(ea), 0xffffffff)
 @utils.multicase(ea=six.integer_types, rgb=six.integer_types)
 def color(ea, rgb):
-    '''Set the color at address ``ea`` to ``rgb``.'''
+    '''Set the color at address `ea` to `rgb`.'''
     r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
     return idaapi.set_item_color(interface.address.inside(ea), (b<<16)|(rgb&0x00ff00)|r)
 
@@ -985,20 +985,20 @@ def comment(**repeatable):
     return comment(ui.current.address(), **repeatable)
 @utils.multicase(ea=six.integer_types)
 def comment(ea, **repeatable):
-    """Return the comment at the address ``ea``.
+    """Return the comment at the address `ea`.
 
-    If the bool ``repeatable`` is specified, then return the repeatable comment.
+    If the bool `repeatable` is specified, then return the repeatable comment.
     """
     return idaapi.get_cmt(interface.address.inside(ea), repeatable.get('repeatable', False))
 @utils.multicase(string=basestring)
 def comment(string, **repeatable):
-    '''Set the comment at the current address to ``string``.'''
+    '''Set the comment at the current address to `string`.'''
     return comment(ui.current.address(), string, **repeatable)
 @utils.multicase(ea=six.integer_types, string=basestring)
 def comment(ea, string, **repeatable):
-    """Set the comment at address ``ea`` to ``string``.
+    """Set the comment at address `ea` to `string`.
 
-    If the bool ``repeatable`` is specified, then modify the repeatable comment.
+    If the bool `repeatable` is specified, then modify the repeatable comment.
     """
     res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), string, repeatable.get('repeatable', False))
     if not ok:
@@ -1011,18 +1011,18 @@ class entries(object):
     exports that are defined within the database By default the address
     of each entrypoint will be yielded.
 
-    This namespace is also aliased as `database.exports`.
+    This namespace is also aliased as ``database.exports``.
 
     The different types that one can match entrypoints with are the following:
 
-        ``address`` or ``ea`` - Match according to the entrypoint's address
-        ``name`` - Match according to the exact name
-        ``like`` - Filter the entrypoint names according to a glob
-        ``regex`` - Filter the entrypoint names according to a regular-expression
-        ``index`` - Match according to the entrypoint's index (ordinal)
-        ``greater`` or ``gt`` - Filter the entrypoints for any after the specified address
-        ``less`` or ``lt`` - Filter the entrypoints for any before the specified address
-        ``predicate`` - Filter the entrypoints by passing its index (ordinal) to a callable
+        `address` or `ea` - Match according to the entrypoint's address
+        `name` - Match according to the exact name
+        `like` - Filter the entrypoint names according to a glob
+        `regex` - Filter the entrypoint names according to a regular-expression
+        `index` - Match according to the entrypoint's index (ordinal)
+        `greater` or `gt` - Filter the entrypoints for any after the specified address
+        `less` or `lt` - Filter the entrypoints for any before the specified address
+        `predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -1066,18 +1066,18 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     def iterate(cls, string):
-        '''Iterate through all of the entry points in the database with a glob that matches ``string``.'''
+        '''Iterate through all of the entry points in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the entry points in the database that match the keyword specified by``type``.'''
+        '''Iterate through all of the entry points in the database that match the keyword specified by `type`.'''
         res = itertools.imap(cls.__address__, cls.__iterate__(**type))
         for ea in res: yield ea
 
     @classmethod
     def __index__(cls, ea):
-        '''Returns the index of the entry point at the specified ``address``.'''
+        '''Returns the index of the entry point at the specified `address`.'''
         f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
         iterable = itertools.imap(utils.fcompose(utils.fmap(f, lambda n:n), builtins.tuple), six.moves.range(idaapi.get_entry_qty()))
         filterable = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), iterable)
@@ -1086,14 +1086,14 @@ class entries(object):
 
     @classmethod
     def __address__(cls, index):
-        '''Returns the address of the entry point at the specified ``index``.'''
+        '''Returns the address of the entry point at the specified `index`.'''
         res = cls.__entryordinal__(index)
         res = idaapi.get_entry(res)
         return None if res == idaapi.BADADDR else res
 
-    # Returns the name of the entry point at the specified ``index``.
+    # Returns the name of the entry point at the specified `index`.
     __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
-    # Returns the ordinal of the entry point at the specified ``index``.
+    # Returns the ordinal of the entry point at the specified `index`.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
     @utils.multicase()
@@ -1104,7 +1104,7 @@ class entries(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def ordinal(cls, ea):
-        '''Returns the ordinal of the entry point at the address ``ea``.'''
+        '''Returns the ordinal of the entry point at the address `ea`.'''
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryordinal__(res)
@@ -1118,7 +1118,7 @@ class entries(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def name(cls, ea):
-        '''Returns the name of the entry point at the address ``ea``.'''
+        '''Returns the name of the entry point at the address `ea`.'''
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryname__(res)
@@ -1127,12 +1127,12 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     def list(cls, string):
-        '''List all of the entry points matching the glob ``string`` against the name.'''
+        '''List all of the entry points matching the glob `string` against the name.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the entry points in the database that match the keyword specified by ``type``.'''
+        '''List all of the entry points in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.__iterate__(**type))
 
         to_address = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
@@ -1152,12 +1152,12 @@ class entries(object):
     @utils.multicase(string=basestring)
     @classmethod
     def search(cls, string):
-        '''Search through all of the entry point names matching the glob ``string`` and return the first result.'''
+        '''Search through all of the entry point names matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the entry points within the database and return the first result matching the keyword specified by ``type``.'''
+        '''Search through all of the entry points within the database and return the first result matching the keyword specified by `type`.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.__iterate__(**type))
@@ -1182,7 +1182,7 @@ class entries(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def new(cls, ea):
-        '''Makes an entry point at the specified address ``ea``.'''
+        '''Makes an entry point at the specified address `ea`.'''
         entryname, ordinal = name(ea) or function.name(ea), idaapi.get_entry_qty()
         if entryname is None:
             raise E.MissingTypeOrAttribute("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
@@ -1190,23 +1190,23 @@ class entries(object):
     @utils.multicase(name=basestring)
     @classmethod
     def new(cls, name):
-        '''Adds the current address as an entry point using ``name`` and the next available index as the ordinal.'''
+        '''Adds the current address as an entry point using `name` and the next available index as the ordinal.'''
         return cls.new(ui.current.address(), name, idaapi.get_entry_qty())
     @utils.multicase(ea=six.integer_types, name=basestring)
     @classmethod
     def new(cls, ea, name):
-        '''Makes the specified address ``ea`` an entry point having the specified ``name``.'''
+        '''Makes the specified address `ea` an entry point having the specified `name`.'''
         ordinal = idaapi.get_entry_qty()
         return cls.new(ea, name, ordinal)
     @utils.multicase(name=basestring, ordinal=six.integer_types)
     @classmethod
     def new(cls, name, ordinal):
-        '''Adds an entry point with the specified ``name`` to the database using ``ordinal`` as its index.'''
+        '''Adds an entry point with the specified `name` to the database using `ordinal` as its index.'''
         return cls.new(ui.current.address(), name, ordinal)
     @utils.multicase(ea=six.integer_types, name=basestring, ordinal=six.integer_types)
     @classmethod
     def new(cls, ea, name, ordinal):
-        '''Adds an entry point at ``ea`` with the specified ``name`` and ``ordinal``.'''
+        '''Adds an entry point at `ea` with the specified `name` and `ordinal`.'''
         res = idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
         ui.state.wait()
         return res
@@ -1224,7 +1224,7 @@ def tag():
     return tag(ui.current.address())
 @utils.multicase(ea=six.integer_types)
 def tag(ea):
-    '''Return all of the tags defined at address ``ea``.'''
+    '''Return all of the tags defined at address `ea`.'''
     ea = interface.address.inside(ea)
 
     # if not within a function, then use a repeatable comment
@@ -1263,22 +1263,22 @@ def tag(ea):
     return res
 @utils.multicase(key=basestring)
 def tag(key):
-    '''Return the tag identified by ``key`` at the current address.'''
+    '''Return the tag identified by `key` at the current address.'''
     return tag(ui.current.address(), key)
 @utils.multicase(key=basestring)
 def tag(key, value):
-    '''Set the tag identified by ``key`` to ``value`` at the current address.'''
+    '''Set the tag identified by `key` to `value` at the current address.'''
     return tag(ui.current.address(), key, value)
 @utils.multicase(ea=six.integer_types, key=basestring)
 def tag(ea, key):
-    '''Returns the tag identified by ``key`` from address ``ea``.'''
+    '''Returns the tag identified by `key` from address `ea`.'''
     res = tag(ea)
     if key in res:
         return res[key]
     raise E.MissingTagError("{:s}.tag({:#x}, {!r}) : Unable to read tag {!r} from address.".format(__name__, ea, key, key))
 @utils.multicase(ea=six.integer_types, key=basestring)
 def tag(ea, key, value):
-    '''Set the tag identified by ``key`` to ``value`` at the address ``ea``.'''
+    '''Set the tag identified by `key` to `value` at the address `ea`.'''
     if value is None:
         raise E.InvalidParameterError("{:s}.tag({:#x}, {!r}, {!r}) : Tried to set tag {!r} to an invalid value {!r}.".format(__name__, ea, key, value, key, value))
 
@@ -1318,11 +1318,11 @@ def tag(ea, key, value):
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag(key, none):
-    '''Remove the tag identified by ``key`` from the current address.'''
+    '''Remove the tag identified by `key` from the current address.'''
     return tag(ui.current.address(), key, none)
 @utils.multicase(ea=six.integer_types, key=basestring, none=types.NoneType)
 def tag(ea, key, none):
-    '''Removes the tag identified by ``key`` at the address ``ea``.'''
+    '''Removes the tag identified by `key` at the address `ea`.'''
     ea = interface.address.inside(ea)
 
     # if the '__name__' is being cleared, then really remove it.
@@ -1363,16 +1363,16 @@ def tag(ea, key, none):
 # FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=basestring)
 def select(tag, *And, **boolean):
-    '''Query all of the global tags in the database for the specified ``tag`` and any others specified as ``And``.'''
+    '''Query all of the global tags in the database for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
     boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())).union(res))
     return select(**boolean)
 @utils.multicase()
 def select(**boolean):
-    """Query all the global tags for any tags specified by ``boolean``. Yields each address found along with the matching tags as a dictionary.
+    """Query all the global tags for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
 
-    If ``And`` contains an iterable then require the returned address contains them.
-    If ``Or`` contains an iterable then include any other tags that are specified.
+    If `And` contains an iterable then require the returned address contains them.
+    If `Or` contains an iterable then include any other tags that are specified.
     """
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
@@ -1409,16 +1409,16 @@ def select(**boolean):
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
 def selectcontents(tag, *Or, **boolean):
-    '''Query all function contents for the specified ``tag`` or any others specified as ``Or``.'''
+    '''Query all function contents for the specified `tag` or any others specified as `Or`.'''
     res = (tag,) + Or
     boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())).union(res))
     return selectcontents(**boolean)
 @utils.multicase()
 def selectcontents(**boolean):
-    """Query all function contents for any tags specified by ``boolean``. Yields each function and the tags that match as a set.
+    """Query all function contents for any tags specified by `boolean`. Yields each function and the tags that match as a set.
 
-    If ``And`` contains an iterable then require the returned function contains them.
-    If ``Or`` contains an iterable then include any other tags that are specified.
+    If `And` contains an iterable then require the returned function contains them.
+    If `Or` contains an iterable then include any other tags that are specified.
     """
     containers = (builtins.tuple, builtins.set, builtins.list)
     boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
@@ -1470,23 +1470,23 @@ class imports(object):
     symbols with the binary.
 
     By default a tuple is yielded for each import with the format
-    ``(address, (shared-object, name, hint))``. In this tuple,
-    ``shared-object`` represents the name of the shared object the
-    import is imported from. The ``name`` is the symbol name to link
-    with, and ``hint`` is the import ordinal hint which is used to speed
+    `(address, (shared-object, name, hint))`. In this tuple,
+    `shared-object` represents the name of the shared object the
+    import is imported from. The `name` is the symbol name to link
+    with, and `hint` is the import ordinal hint which is used to speed
     up the linking process.
 
     The different types that one can match imports with are the following:
 
-        ``address`` or ``ea`` - Match according to the import's address
-        ``name`` - Match according to the import's symbol name
-        ``module`` - Filter the imports according to the specified module name
-        ``fullname`` - Match according to the full symbol name (module + symbol)
-        ``like`` - Filter the symbol names of all the imports according to a glob
-        ``regex`` - Filter the symbol names of all the imports according to a regular-expression
-        ``ordinal`` - Match according to the import's hint (ordinal)
-        ``index`` - Match according index of the import
-        ``predicate`` Filter the imports by passing the above (default) tuple to a callable
+        `address` or `ea` - Match according to the import's address
+        `name` - Match according to the import's symbol name
+        `module` - Filter the imports according to the specified module name
+        `fullname` - Match according to the full symbol name (module + symbol)
+        `like` - Filter the symbol names of all the imports according to a glob
+        `regex` - Filter the symbol names of all the imports according to a regular-expression
+        `ordinal` - Match according to the import's hint (ordinal)
+        `index` - Match according index of the import
+        `predicate` Filter the imports by passing the above (default) tuple to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -1520,7 +1520,7 @@ class imports(object):
     def __iterate__(cls):
         """Iterate through all of the imports in the database.
 
-        Yields ``(address, (module, name, ordinal))`` for each iteration.
+        Yields `(address, (module, name, ordinal))` for each iteration.
         """
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
@@ -1534,12 +1534,12 @@ class imports(object):
     @utils.multicase(string=basestring)
     @classmethod
     def iterate(cls, string):
-        '''Iterate through all of the imports in the database with a glob that matches ``string``.'''
+        '''Iterate through all of the imports in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
     def iterate(cls, **type):
-        '''Iterate through all of the imports in the database that match the keyword specified by ``type``.'''
+        '''Iterate through all of the imports in the database that match the keyword specified by `type`.'''
         if not type: type = {'predicate':lambda n: True}
         res = builtins.list(cls.__iterate__())
         for key, value in six.iteritems(type):
@@ -1555,7 +1555,7 @@ class imports(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea):
-        '''Return the import at the address ``ea``.'''
+        '''Return the import at the address `ea`.'''
         ea = interface.address.inside(ea)
         res = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
         try:
@@ -1572,7 +1572,7 @@ class imports(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def module(cls, ea):
-        '''Return the import module at the specified address ``ea``.'''
+        '''Return the import module at the specified address `ea`.'''
         ea = interface.address.inside(ea)
         for addr, (module, _, _) in cls.__iterate__():
             if addr == ea:
@@ -1589,7 +1589,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def fullname(cls, ea):
-        '''Return the full name of the import at address ``ea``.'''
+        '''Return the full name of the import at address `ea`.'''
         return cls.__formatl__(cls.at(ea))
 
     @utils.multicase()
@@ -1600,7 +1600,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def name(cls, ea):
-        '''Return the name of the import at address ``ea``.'''
+        '''Return the name of the import at address `ea`.'''
         return cls.__formats__(cls.at(ea))
 
     @utils.multicase()
@@ -1611,7 +1611,7 @@ class imports(object):
     @utils.multicase()
     @classmethod
     def ordinal(cls, ea):
-        '''Return the ordinal of the import at the address ``ea``.'''
+        '''Return the ordinal of the import at the address `ea`.'''
         _, _, ordinal = cls.at(ea)
         return ordinal
 
@@ -1624,12 +1624,12 @@ class imports(object):
     @utils.multicase(string=basestring)
     @classmethod
     def list(cls, string):
-        '''List all of the imports matching the glob ``string`` against the fullname.'''
+        '''List all of the imports matching the glob `string` against the fullname.'''
         return cls.list(fullname=string)
     @utils.multicase()
     @classmethod
     def list(cls, **type):
-        '''List all of the imports in the database that match the keyword specified by ``type``.'''
+        '''List all of the imports in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
 
         maxaddr = max(builtins.map(utils.first, res) or [idaapi.BADADDR])
@@ -1644,12 +1644,12 @@ class imports(object):
     @utils.multicase(string=basestring)
     @classmethod
     def search(cls, string):
-        '''Search through all of the imports matching the fullname glob ``string``.'''
+        '''Search through all of the imports matching the fullname glob `string`.'''
         return cls.search(fullname=string)
     @utils.multicase()
     @classmethod
     def search(cls, **type):
-        '''Search through all of the imports within the database and return the first result matching the keyword specified by ``type``.'''
+        '''Search through all of the imports within the database and return the first result matching the keyword specified by `type`.'''
         query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(cls.iterate(**type))
@@ -1677,18 +1677,18 @@ class address(object):
     data references, or even to navigate to unknown (undefined)
     addresses.
 
-    This namespace is also aliased as `database.a`.
+    This namespace is also aliased as ``database.a``.
 
     Some of the more common functions are used so often that they're also
     aliased as globals. Each of these can be used for navigation or for
     determining the next valid address. These are:
 
-        `database.next` - Return the "next" defined address
-        `database.prev` - Return the "previous" defined address
-        `database.nextref` - Return the "next" address with a reference.
-        `database.prevref` - Return the "previous" address with a reference
-        `database.nextreg` - Return the "next" address using a register
-        `database.prevreg` - Return the "previous" address using a register
+        ``database.next`` - Return the "next" defined address
+        ``database.prev`` - Return the "previous" defined address
+        ``database.nextref`` - Return the "next" address with a reference.
+        ``database.prevref`` - Return the "previous" address with a reference
+        ``database.nextreg`` - Return the "next" address using a register
+        ``database.prevreg`` - Return the "previous" address using a register
 
     Some examples of using this namespace can be::
 
@@ -1701,7 +1701,7 @@ class address(object):
 
     @staticmethod
     def __walk__(ea, next, match):
-        '''Return the first address from ``ea`` using ``next`` for stepping until the provided callable doesn't ``match``.'''
+        '''Return the first address from `ea` using `next` for stepping until the provided callable doesn't `match`.'''
         res = interface.address.inside(ea)
         while res not in {None, idaapi.BADADDR} and match(res):
             res = next(res)
@@ -1710,24 +1710,24 @@ class address(object):
     @utils.multicase(end=six.integer_types)
     @classmethod
     def iterate(cls, end):
-        '''Iterate from the current address to ``end``.'''
+        '''Iterate from the current address to `end`.'''
         return cls.iterate(ui.current.address(), end)
     @utils.multicase(end=six.integer_types, step=callable)
     @classmethod
     def iterate(cls, end, step):
-        '''Iterate from the current address to ``end`` using the callable ``step`` to determine the next address.'''
+        '''Iterate from the current address to `end` using the callable `step` to determine the next address.'''
         return cls.iterate(ui.current.address(), end, step)
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
     def iterate(cls, start, end):
-        '''Iterate from address ``start`` to ``end``.'''
+        '''Iterate from address `start` to `end`.'''
         start, end = builtins.map(interface.address.head, (start, end))
         step = cls.prev if start > end else cls.next
         return cls.iterate(start, end, step)
     @utils.multicase(start=six.integer_types, end=six.integer_types, step=callable)
     @classmethod
     def iterate(cls, start, end, step):
-        '''Iterate from address ``start`` to ``end`` using the callable ``step`` to determine the next address.'''
+        '''Iterate from address `start` to `end` using the callable `step` to determine the next address.'''
         start, end = builtins.map(interface.address.head, (start, end))
         left, right = config.bounds()
         right = idaapi.prev_not_tail(right)
@@ -1744,12 +1744,12 @@ class address(object):
     @classmethod
     @utils.multicase(end=six.integer_types)
     def blocks(cls, end):
-        '''Yields the bounds of each block from the current address to ``end``.'''
+        '''Yields the bounds of each block from the current address to `end`.'''
         return cls.blocks(ui.current.address(), end)
     @classmethod
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     def blocks(cls, start, end):
-        '''Yields the bounds of each block between the addresses ``start`` and ``end``.'''
+        '''Yields the bounds of each block between the addresses `start` and `end`.'''
         block, _ = start, end = interface.address.head(start), address.tail(end) + 1
         for ea in cls.iterate(start, end):
             nextea = cls.next(ea)
@@ -1790,7 +1790,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def head(cls, ea):
-        '''Return the address of the byte at the beginning of the address ``ea``.'''
+        '''Return the address of the byte at the beginning of the address `ea`.'''
         ea = interface.address.within(ea)
         return idaapi.get_item_head(ea)
 
@@ -1802,7 +1802,7 @@ class address(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def tail(cls, ea):
-        '''Return the address of the last byte at the end of the address at ``ea``.'''
+        '''Return the address of the last byte at the end of the address at `ea`.'''
         ea = interface.address.within(ea)
         return idaapi.get_item_end(ea)-1
 
@@ -1814,29 +1814,29 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prev(cls, predicate):
-        '''Return the previous address from the current address that matches ``predicate``.'''
+        '''Return the previous address from the current address that matches `predicate`.'''
         return cls.prev(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prev(cls, ea):
-        '''Return the previous address from the address specified by ``ea``.'''
+        '''Return the previous address from the address specified by `ea`.'''
         return cls.prev(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prev(cls, ea, predicate):
-        '''Return the previous address from the address ``ea`` that matches ``predicate``.'''
+        '''Return the previous address from the address `ea` that matches `predicate`.'''
         return cls.prevF(ea, predicate, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prev(cls, ea, count):
-        '''Return the previous ``count`` addresses from the address specified by ``ea``.'''
+        '''Return the previous `count` addresses from the address specified by `ea`.'''
         return cls.prevF(ea, utils.fidentity, count)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def prev(cls, ea, predicate, count):
-        """Return the previous address from the address ``ea`` that matches ``predicate``.
+        """Return the previous address from the address `ea` that matches `predicate`.
 
-        Skip ``count`` addresses before returning.
+        Skip `count` addresses before returning.
         """
         return cls.prevF(ea, predicate, count)
 
@@ -1848,53 +1848,53 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def next(cls, predicate):
-        '''Return the next address from the current address that matches ``predicate``.'''
+        '''Return the next address from the current address that matches `predicate`.'''
         return cls.next(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def next(cls, ea):
-        '''Return the next address from the address ``ea``.'''
+        '''Return the next address from the address `ea`.'''
         return cls.next(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def next(cls, ea, predicate):
-        '''Return the next address from the address ``ea`` that matches ``predicate``.'''
+        '''Return the next address from the address `ea` that matches `predicate`.'''
         return cls.nextF(ea, predicate, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def next(cls, ea, count):
-        '''Return the next ``count`` addresses from the address specified by ``ea``.'''
+        '''Return the next `count` addresses from the address specified by `ea`.'''
         return cls.nextF(ea, utils.fidentity, count)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def next(cls, ea, predicate, count):
-        """Return the next address from the address ``ea`` that matches ``predicate``.
+        """Return the next address from the address `ea` that matches `predicate`.
 
-        Skip ``count`` addresses before returning.
+        Skip `count` addresses before returning.
         """
         return cls.nextF(ea, predicate, count)
 
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevF(cls, predicate):
-        '''Return the previous address from the current one that matches ``predicate``.'''
+        '''Return the previous address from the current one that matches `predicate`.'''
         return cls.prevF(ui.current.address(), predicate, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevF(cls, ea, predicate):
-        '''Return the previous address from the address ``ea``. that matches ``predicate``.'''
+        '''Return the previous address from the address `ea`. that matches `predicate`.'''
         return cls.prevF(ea, predicate, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def prevF(cls, ea, predicate, count):
-        """Return the previous address from the address ``ea`` that matches ``predicate``..
+        """Return the previous address from the address `ea` that matches `predicate`.
 
-        Skip ``count`` addresses before returning.
+        Skip `count` addresses before returning.
         """
         Fprev, Finverse = utils.fcompose(interface.address.within, idaapi.prev_not_tail), utils.fcompose(predicate, operator.not_)
 
         # if we're at the very bottom address of the database
-        # then skip the `interface.address.within` check.
+        # then skip the ``interface.address.within`` check.
         if ea == config.bounds()[1]:
             Fprev = idaapi.prev_not_tail
 
@@ -1907,19 +1907,19 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextF(cls, predicate):
-        '''Return the next address from the current one that matches ``predicate``.'''
+        '''Return the next address from the current one that matches `predicate`.'''
         return cls.nextF(ui.current.address(), predicate, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextF(cls, ea, predicate):
-        '''Return the next address from the address ``ea``. that matches ``predicate``.'''
+        '''Return the next address from the address `ea`. that matches `predicate`.'''
         return cls.nextF(ea, predicate, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, count=six.integer_types)
     @classmethod
     def nextF(cls, ea, predicate, count):
-        """Return the next address from the address ``ea`` that matches ``predicate``..
+        """Return the next address from the address `ea` that matches `predicate`..
 
-        Skip ``count`` addresses before returning.
+        Skip `count` addresses before returning.
         """
         Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
         if Fnext(ea) == idaapi.BADADDR:
@@ -1935,24 +1935,24 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevref(cls, predicate):
-        '''Returns the previous address that has anything referencing it and matches ``predicate``.'''
+        '''Returns the previous address that has anything referencing it and matches `predicate`.'''
         return cls.prevref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevref(cls, ea):
-        '''Returns the previous address from ``ea`` that has anything referencing it.'''
+        '''Returns the previous address from `ea` that has anything referencing it.'''
         return cls.prevref(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevref(cls, ea, predicate):
-        '''Returns the previous address from ``ea`` that has anything referencing it and matches ``predicate``.'''
+        '''Returns the previous address from `ea` that has anything referencing it and matches `predicate`.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fxref, predicate), builtins.all)
         return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevref(cls, ea, count):
-        '''Returns the previous ``count`` addresses from ``ea`` that has anything referencing it.'''
+        '''Returns the previous `count` addresses from `ea` that has anything referencing it.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fxref, count)
 
@@ -1964,24 +1964,24 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextref(cls, predicate):
-        '''Returns the next address that has anything referencing it and matches ``predicate``.'''
+        '''Returns the next address that has anything referencing it and matches `predicate`.'''
         return cls.nextref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextref(cls, ea):
-        '''Returns the next address from ``ea`` that has anything referencing it.'''
+        '''Returns the next address from `ea` that has anything referencing it.'''
         return cls.nextref(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextref(cls, ea, predicate):
-        '''Returns the next address from ``ea`` that has anything referencing it and matches ``predicate``.'''
+        '''Returns the next address from `ea` that has anything referencing it and matches `predicate`.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fxref, predicate), builtins.all)
         return cls.nextF(ea, Fxref, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextref(cls, ea, count):
-        '''Returns the next ``count`` addresses from ``ea`` that has anything referencing it.'''
+        '''Returns the next `count` addresses from `ea` that has anything referencing it.'''
         Fxref = utils.fcompose(xref.up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fxref, count)
 
@@ -1993,24 +1993,24 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevdref(cls, predicate):
-        '''Returns the previous address that has data referencing it and matches ``predicate``.'''
+        '''Returns the previous address that has data referencing it and matches `predicate`.'''
         return cls.prevdref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevdref(cls, ea):
-        '''Returns the previous address from ``ea`` that has data referencing it.'''
+        '''Returns the previous address from `ea` that has data referencing it.'''
         return cls.prevdref(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevdref(cls, ea, predicate):
-        '''Returns the previous address from ``ea`` that has data referencing it and matches ``predicate``.'''
+        '''Returns the previous address from `ea` that has data referencing it and matches `predicate`.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fdref, predicate), builtins.all)
         return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevdref(cls, ea, count):
-        '''Returns the previous ``count`` addresses from ``ea`` that has data referencing it.'''
+        '''Returns the previous `count` addresses from `ea` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fdref, count)
 
@@ -2022,24 +2022,24 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextdref(cls, predicate):
-        '''Returns the next address that has data referencing it and matches ``predicate``.'''
+        '''Returns the next address that has data referencing it and matches `predicate`.'''
         return cls.nextdref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextdref(cls, ea):
-        '''Returns the next address from ``ea`` that has data referencing it.'''
+        '''Returns the next address from `ea` that has data referencing it.'''
         return cls.nextdref(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextdref(cls, ea, predicate):
-        '''Returns the next address from ``ea`` that has data referencing it and matches ``predicate``.'''
+        '''Returns the next address from `ea` that has data referencing it and matches `predicate`.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fdref, predicate), builtins.all)
         return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextdref(cls, ea, count):
-        '''Returns the next ``count`` addresses from ``ea`` that has data referencing it.'''
+        '''Returns the next `count` addresses from `ea` that has data referencing it.'''
         Fdref = utils.fcompose(xref.data_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fdref, count)
     prevdata, nextdata = utils.alias(prevdref, 'address'), utils.alias(nextdref, 'address')
@@ -2052,24 +2052,24 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevcref(cls, predicate):
-        '''Returns the previous address that has code referencing it and matches ``predicate``.'''
+        '''Returns the previous address that has code referencing it and matches `predicate`.'''
         return cls.prevcref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevcref(cls, ea):
-        '''Returns the previous address from ``ea`` that has code referencing it.'''
+        '''Returns the previous address from `ea` that has code referencing it.'''
         return cls.prevcref(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevcref(cls, ea, predicate):
-        '''Returns the previous address from ``ea`` that has code referencing it and matches ``predicate``.'''
+        '''Returns the previous address from `ea` that has code referencing it and matches `predicate`.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
         return cls.prevF(ea, Fcref, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevcref(cls, ea, count):
-        '''Returns the previous ``count`` addresses from ``ea`` that has code referencing it.'''
+        '''Returns the previous `count` addresses from `ea` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.prevF(ea, Fcref, count)
 
@@ -2081,24 +2081,24 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextcref(cls, predicate):
-        '''Returns the next address that has code referencing it and matches ``predicate``.'''
+        '''Returns the next address that has code referencing it and matches `predicate`.'''
         return cls.nextcref(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextcref(cls, ea):
-        '''Returns the next address from ``ea`` that has code referencing it.'''
+        '''Returns the next address from `ea` that has code referencing it.'''
         return cls.nextcref(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextcref(cls, ea, predicate):
-        '''Returns the next address from ``ea`` that has code referencing it and matches ``predicate``.'''
+        '''Returns the next address from `ea` that has code referencing it and matches `predicate`.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         F = utils.fcompose(utils.fmap(Fcref, predicate), builtins.all)
         return cls.nextF(ea, Fcref, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextcref(cls, ea, count):
-        '''Returns the next ``count`` addresses from ``ea`` that has code referencing it.'''
+        '''Returns the next `count` addresses from `ea` that has code referencing it.'''
         Fcref = utils.fcompose(xref.code_up, len, functools.partial(operator.lt, 0))
         return cls.nextF(ea, Fcref, count)
     prevcode, nextcode = utils.alias(prevcref, 'address'), utils.alias(nextcref, 'address')
@@ -2106,22 +2106,22 @@ class address(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, reg, *regs, **modifiers):
-        '''Return the previous address containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
+        '''Return the previous address containing an instruction that uses `reg` or any one of the specified registers `regs`.'''
         return cls.prevreg(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, predicate, reg, *regs, **modifiers):
-        '''Return the previous address containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the previous address containing an instruction that uses `reg` or any one of the specified registers `regs` and matches `predicate`.'''
         return cls.prevreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, ea, reg, *regs, **modifiers):
-        '''Return the previous address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs``.'''
+        '''Return the previous address from `ea` containing an instruction that uses `reg` or any one of the specified registers `regs`.'''
         return cls.prevreg(ea, utils.fconst(True), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def prevreg(cls, ea, predicate, reg, *regs, **modifiers):
-        '''Return the previous address from ``ea`` containing an instruction that uses ``reg`` or any one of the specified registers ``regs`` and matches ``predicate``.'''
+        '''Return the previous address from `ea` containing an instruction that uses `reg` or any one of the specified registers `regs` and matches `predicate`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
         args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), modifiers.items()))
@@ -2167,22 +2167,22 @@ class address(object):
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Return the next address containing an instruction that uses `reg` or any one of the registers in `regs`.'''
         return cls.nextreg(ui.current.address(), reg, *regs, **modifiers)
     @utils.multicase(predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, predicate, reg, *regs, **modifiers):
-        '''Return the next address containing an instruction that matches ``predicate`` and uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Return the next address containing an instruction that matches `predicate` and uses `reg` or any one of the registers in `regs`.'''
         return cls.nextreg(ui.current.address(), predicate, reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, ea, reg, *regs, **modifiers):
-        '''Return the next address from ``ea`` containing an instruction that uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Return the next address from `ea` containing an instruction that uses `reg` or any one of the registers in `regs`.'''
         return cls.nextreg(ea, utils.fconst(True), reg, *regs, **modifiers)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable, reg=(basestring, interface.register_t))
     @classmethod
     def nextreg(cls, ea, predicate, reg, *regs, **modifiers):
-        '''Return the next address from ``ea`` containing an instruction that matches ``predicate`` and uses ``reg`` or any one of the registers in ``regs``.'''
+        '''Return the next address from `ea` containing an instruction that matches `predicate` and uses `reg` or any one of the registers in `regs`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
         args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), modifiers.items()))
@@ -2229,12 +2229,12 @@ class address(object):
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def prevstack(cls, delta):
-        '''Return the previous instruction that is past the specified sp ``delta``.'''
+        '''Return the previous instruction that is past the specified sp `delta`.'''
         return cls.prevstack(ui.current.address(), delta)
     @utils.multicase(ea=six.integer_types, delta=six.integer_types)
     @classmethod
     def prevstack(cls, ea, delta):
-        '''Return the previous instruction from ``ea`` that is past the specified sp ``delta``.'''
+        '''Return the previous instruction from `ea` that is past the specified sp `delta`.'''
         logging.warn("{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
@@ -2247,12 +2247,12 @@ class address(object):
     @utils.multicase(delta=six.integer_types)
     @classmethod
     def nextstack(cls, delta):
-        '''Return the next instruction that is past the sp ``delta``.'''
+        '''Return the next instruction that is past the sp `delta`.'''
         return cls.nextstack(ui.current.address(), delta)
     @utils.multicase(ea=six.integer_types, delta=six.integer_types)
     @classmethod
     def nextstack(cls, ea, delta):
-        '''Return the next instruction from ``ea`` that is past the sp ``delta``.'''
+        '''Return the next instruction from `ea` that is past the sp `delta`.'''
         logging.warn("{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join((__name__, cls.__name__)), ea, delta))
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
@@ -2270,17 +2270,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevcall(cls, predicate):
-        '''Return the previous call instruction that matches ``predicate``.'''
+        '''Return the previous call instruction that matches `predicate`.'''
         return cls.prevcall(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevcall(cls, ea):
-        '''Return the previous call instruction from the address ``ea``.'''
+        '''Return the previous call instruction from the address `ea`.'''
         return cls.prevcall(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevcall(cls, ea, predicate):
-        '''Return the previous call instruction from the address ``ea`` that matches ``predicate``.'''
+        '''Return the previous call instruction from the address `ea` that matches `predicate`.'''
         F = utils.fcompose(utils.fmap(_instruction.is_call, predicate), builtins.all)
         return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
@@ -2296,17 +2296,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextcall(cls, predicate):
-        '''Return the next call instruction that matches ``predicate``.'''
+        '''Return the next call instruction that matches `predicate`.'''
         return cls.nextcall(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextcall(cls, ea):
-        '''Return the next call instruction from the address ``ea``.'''
+        '''Return the next call instruction from the address `ea`.'''
         return cls.nextcall(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextcall(cls, ea, predicate):
-        '''Return the next call instruction from the address ``ea`` that matches ``predicate``.'''
+        '''Return the next call instruction from the address `ea` that matches `predicate`.'''
         F = utils.fcompose(utils.fmap(_instruction.is_call, predicate), builtins.all)
         return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
@@ -2322,17 +2322,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevbranch(cls, predicate):
-        '''Return the previous branch instruction that matches ``predicate``.'''
+        '''Return the previous branch instruction that matches `predicate`.'''
         return cls.prevbranch(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevbranch(cls, ea):
-        '''Return the previous branch instruction from the address ``ea``.'''
+        '''Return the previous branch instruction from the address `ea`.'''
         return cls.prevbranch(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevbranch(cls, ea, predicate):
-        '''Return the previous branch instruction from the address ``ea`` that matches ``predicate``.'''
+        '''Return the previous branch instruction from the address `ea` that matches `predicate`.'''
         Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
         Fbranch = _instruction.is_branch
         Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
@@ -2354,17 +2354,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextbranch(cls, predicate):
-        '''Return the next branch instruction that matches ``predicate``.'''
+        '''Return the next branch instruction that matches `predicate`.'''
         return cls.nextbranch(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextbranch(cls, ea):
-        '''Return the next branch instruction from the address ``ea``.'''
+        '''Return the next branch instruction from the address `ea`.'''
         return cls.nextbranch(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextbranch(cls, ea, predicate):
-        '''Return the next branch instruction from the address ``ea`` that matches ``predicate``.'''
+        '''Return the next branch instruction from the address `ea` that matches `predicate`.'''
         Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
         Fbranch = _instruction.is_branch
         Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
@@ -2386,17 +2386,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevlabel(cls, predicate):
-        '''Return the address of the previous label that matches ``predicate``.'''
+        '''Return the address of the previous label that matches `predicate`.'''
         return cls.prevlabel(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevlabel(cls, ea):
-        '''Return the address of the previous label from the address ``ea``.'''
+        '''Return the address of the previous label from the address `ea`.'''
         return cls.prevlabel(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevlabel(cls, ea, predicate):
-        '''Return the address of the previous label from the address ``ea`` that matches ``predicate``.'''
+        '''Return the address of the previous label from the address `ea` that matches `predicate`.'''
         Flabel = type.has_label
         F = utils.fcompose(utils.fmap(Flabel, predicate), builtins.all)
         return cls.prevF(ea, F, 1)
@@ -2413,17 +2413,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextlabel(cls, predicate):
-        '''Return the address of the next label that matches ``predicate``.'''
+        '''Return the address of the next label that matches `predicate`.'''
         return cls.nextlabel(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextlabel(cls, ea):
-        '''Return the address of the next label from the address ``ea``.'''
+        '''Return the address of the next label from the address `ea`.'''
         return cls.nextlabel(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextlabel(cls, ea, predicate):
-        '''Return the address of the next label from the address ``ea`` that matches ``predicate``.'''
+        '''Return the address of the next label from the address `ea` that matches `predicate`.'''
         Flabel = type.has_label
         F = utils.fcompose(utils.fmap(Flabel, predicate), builtins.all)
         return cls.nextF(ea, F, 1)
@@ -2440,20 +2440,20 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevtag(cls, predicate, **tagname):
-        '''Return the previous address that contains a tag and matches ``predicate``.'''
+        '''Return the previous address that contains a tag and matches `predicate`.'''
         return cls.prevtag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevtag(cls, ea, **tagname):
-        """Returns the previous address from ``ea`` that contains a tag.
+        """Returns the previous address from `ea` that contains a tag.
 
-        If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
+        If the string `tagname` is specified, then only return the address if the specified tag is defined.
         """
         return cls.prevtag(ea, 1, **tagname)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevtag(cls, ea, predicate, **tagname):
-        '''Returns the previous address from ``ea`` that contains a tag and matches ``predicate.'''
+        '''Returns the previous address from `ea` that contains a tag and matches `predicate`.'''
         tagname = tagname.get('tagname', None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
@@ -2473,20 +2473,20 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nexttag(cls, predicate, **tagname):
-        '''Return the next address that contains a tag and matches ``predicate``.'''
+        '''Return the next address that contains a tag and matches `predicate`.'''
         return cls.nexttag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nexttag(cls, ea, **tagname):
-        """Returns the next address from ``ea`` that contains a tag.
+        """Returns the next address from `ea` that contains a tag.
 
-        If the string ``tagname`` is specified, then only return the address if the specified tag is defined.
+        If the string `tagname` is specified, then only return the address if the specified tag is defined.
         """
         return cls.nexttag(ea, 1, **tagname)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nexttag(cls, ea, predicate, **tagname):
-        '''Returns the next address from ``ea`` that contains a tag and matches ``predicate``.'''
+        '''Returns the next address from `ea` that contains a tag and matches `predicate`.'''
         tagname = tagname.get('tagname', None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
         F = utils.fcompose(utils.fmap(Ftag, predicate), builtins.all)
@@ -2507,17 +2507,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def prevunknown(cls, predicate):
-        '''Return the previous address that is undefined and matches ``predicate``.'''
+        '''Return the previous address that is undefined and matches `predicate`.'''
         return cls.prevunknown(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prevunknown(cls, ea):
-        '''Return the previous address from ``ea`` that is undefined.'''
+        '''Return the previous address from `ea` that is undefined.'''
         return cls.prevunknown(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def prevunknown(cls, ea, predicate):
-        '''Return the previous address from ``ea`` that is undefined and matches ``predicate``.'''
+        '''Return the previous address from `ea` that is undefined and matches `predicate`.'''
         return cls.prevF(ea, type.is_unknown, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
@@ -2532,17 +2532,17 @@ class address(object):
     @utils.multicase(predicate=builtins.callable)
     @classmethod
     def nextunknown(cls, predicate):
-        '''Return the next address that is undefined and matches ``predicate``.'''
+        '''Return the next address that is undefined and matches `predicate`.'''
         return cls.nextunknown(ui.current.address(), predicate)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def nextunknown(cls, ea):
-        '''Return the next address from ``ea`` that is undefined.'''
+        '''Return the next address from `ea` that is undefined.'''
         return cls.nextunknown(ea, 1)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
     def nextunknown(cls, ea, predicate):
-        '''Return the next address from ``ea`` that is undefined and matches ``predicate``.'''
+        '''Return the next address from `ea` that is undefined and matches `predicate`.'''
         return cls.nextF(ea, type.is_unknown, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
@@ -2562,9 +2562,9 @@ class type(object):
     namespace allow one to extract various type information from the
     different locations within the database.
 
-    This namespace is also aliased as `database.t`.
+    This namespace is also aliased as ``database.t``.
 
-    By default, this namespace will return the `idaapi.DT_TYPE` of the
+    By default, this namespace will return the ``idaapi.DT_TYPE`` of the
     specified address.
 
     Some examples of using this namespace can be::
@@ -2584,7 +2584,7 @@ class type(object):
         return cls(ea)
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
-        '''Return the type at the address specified by ``ea``.'''
+        '''Return the type at the address specified by `ea`.'''
         return cls.flags(ea, idaapi.DT_TYPE)
 
     @utils.multicase()
@@ -2595,7 +2595,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def size(cls, ea):
-        '''Returns the size of the item at the address ``ea``.'''
+        '''Returns the size of the item at the address `ea`.'''
         ea = interface.address.within(ea)
         return idaapi.get_item_size(ea)
 
@@ -2607,19 +2607,19 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def flags(cls, ea):
-        '''Returns the flags of the item at the address ``ea``.'''
+        '''Returns the flags of the item at the address `ea`.'''
         getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
         return getflags(interface.address.within(ea))
     @utils.multicase(ea=six.integer_types, mask=six.integer_types)
     @classmethod
     def flags(cls, ea, mask):
-        '''Returns the flags at the address ``ea`` masked with ``mask``.'''
+        '''Returns the flags at the address `ea` masked with `mask`.'''
         getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
         return getflags(interface.address.within(ea)) & mask
     @utils.multicase(ea=six.integer_types, mask=six.integer_types, value=six.integer_types)
     @classmethod
     def flags(cls, ea, mask, value):
-        '''Sets the flags at the address ``ea`` masked with ``mask`` set to ``value``.'''
+        '''Sets the flags at the address `ea` masked with `mask` set to `value`.'''
         if idaapi.__version__ < 7.0:
             ea = interface.address.within(ea)
             res = idaapi.getFlags(ea)
@@ -2635,7 +2635,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_initialized(ea):
-        '''Return true if the address specified by ``ea`` is initialized.'''
+        '''Return true if the address specified by `ea` is initialized.'''
         return type.flags(interface.address.within(ea), idaapi.FF_IVL) == idaapi.FF_IVL
     initializedQ = utils.alias(is_initialized, 'type')
 
@@ -2647,7 +2647,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_code(ea):
-        '''Return true if the address specified by ``ea`` is marked as code.'''
+        '''Return true if the address specified by `ea` is marked as code.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE
     codeQ = utils.alias(is_code, 'type')
 
@@ -2659,7 +2659,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_data(ea):
-        '''Return true if the address specified by ``ea`` is marked as data.'''
+        '''Return true if the address specified by `ea` is marked as data.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_DATA
     dataQ = utils.alias(is_data, 'type')
 
@@ -2672,7 +2672,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_unknown(ea):
-        '''Return true if the address specified by ``ea`` is undefined.'''
+        '''Return true if the address specified by `ea` is undefined.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
     unknownQ = undefined = utils.alias(is_unknown, 'type')
 
@@ -2684,7 +2684,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_head(ea):
-        '''Return true if the address ``ea`` is aligned to a definition in the database.'''
+        '''Return true if the address `ea` is aligned to a definition in the database.'''
         return type.flags(interface.address.within(ea), idaapi.FF_DATA) != 0
     headQ = utils.alias(is_head, 'type')
 
@@ -2696,7 +2696,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_tail(ea):
-        '''Return true if the address ``ea`` is not-aligned to a definition in the database.'''
+        '''Return true if the address `ea` is not-aligned to a definition in the database.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_TAIL
     tailQ = utils.alias(is_tail, 'type')
 
@@ -2708,7 +2708,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_align(ea):
-        '''Return true if the address at ``ea`` is defined as an alignment.'''
+        '''Return true if the address at `ea` is defined as an alignment.'''
         return idaapi.isAlign(type.flags(ea))
     alignQ = utils.alias(is_align, 'type')
 
@@ -2720,7 +2720,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_comment(ea):
-        '''Return true if the address at ``ea`` is commented.'''
+        '''Return true if the address at `ea` is commented.'''
         return type.flags(interface.address.within(ea), idaapi.FF_COMM) == idaapi.FF_COMM
     commentQ = utils.alias(has_comment, 'type')
 
@@ -2732,7 +2732,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_reference(ea):
-        '''Return true if the address at ``ea`` has a reference.'''
+        '''Return true if the address at `ea` has a reference.'''
         return type.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF
     referenceQ = refQ = utils.alias(has_reference, 'type')
 
@@ -2744,7 +2744,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_label(ea):
-        '''Return true if the address at ``ea`` has a label.'''
+        '''Return true if the address at `ea` has a label.'''
         return idaapi.has_any_name(type.flags(ea))
     labelQ = nameQ = has_name = utils.alias(has_label, 'type')
 
@@ -2756,7 +2756,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_customname(ea):
-        '''Return true if the address at ``ea`` has a custom-name.'''
+        '''Return true if the address at `ea` has a custom-name.'''
         return type.flags(interface.address.within(ea), idaapi.FF_NAME) == idaapi.FF_NAME
     customnameQ = utils.alias(has_customname, 'type')
 
@@ -2768,7 +2768,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_dummyname(ea):
-        '''Return true if the address at ``ea`` has a dummy-name.'''
+        '''Return true if the address at `ea` has a dummy-name.'''
         return type.flags(ea, idaapi.FF_LABL) == idaapi.FF_LABL
     dummynameQ = utils.alias(has_dummyname, 'type')
 
@@ -2780,7 +2780,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_autoname(ea):
-        '''Return true if the address ``ea`` is automatically named.'''
+        '''Return true if the address `ea` is automatically named.'''
         return idaapi.has_auto_name(type.flags(ea))
     autonameQ = utils.alias(has_autoname, 'type')
 
@@ -2792,7 +2792,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_publicname(ea):
-        '''Return true if the address at ``ea`` has a public name.'''
+        '''Return true if the address at `ea` has a public name.'''
         return idaapi.is_public_name(interface.address.within(ea))
     publicnameQ = utils.alias(has_publicname, 'type')
 
@@ -2804,7 +2804,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_weakname(ea):
-        '''Return true if the address at ``ea`` has a weakly-typed name.'''
+        '''Return true if the address at `ea` has a weakly-typed name.'''
         return idaapi.is_weak_name(interface.address.within(ea))
     weaknameQ = utils.alias(has_weakname, 'type')
 
@@ -2816,7 +2816,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_listedname(ea):
-        '''Return true if the address at ``ea`` has a name that is listed.'''
+        '''Return true if the address at `ea` has a name that is listed.'''
         return idaapi.is_in_nlist(interface.address.within(ea))
     listednameQ = utils.alias(has_listedname, 'type')
 
@@ -2828,7 +2828,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_label(ea):
-        '''Return true if the address at ``ea`` has a label.'''
+        '''Return true if the address at `ea` has a label.'''
         return type.has_dummyname(ea) or type.has_customname(ea)
     labelQ = utils.alias(is_label, 'type')
 
@@ -2837,7 +2837,7 @@ class type(object):
         This namespace is for returning type information about an array
         that is defined within the database. By default this namespace
         will return the array's element type and its number of elements
-        as a list ``[size, count]``.
+        as a list `[size, count]`.
 
         Some examples of using this namespace can be::
 
@@ -2850,11 +2850,11 @@ class type(object):
         """
         @utils.multicase()
         def __new__(cls):
-            '''Return the ``[type, length]`` of the array at the current address.'''
+            '''Return the `[type, length]` of the array at the current address.'''
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the ``[type, length]`` of the array at the address specified by ``ea``.'''
+            '''Return the `[type, length]` of the array at the address specified by `ea`.'''
             F, op, cb = type.flags(ea), idaapi.opinfo_t(), idaapi.get_item_size(ea)
 
             # get the opinfo at the current address
@@ -2882,7 +2882,7 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def type(cls, ea):
-            '''Return the type of the element in the array at the address specified by ``ea``.'''
+            '''Return the type of the element in the array at the address specified by `ea`.'''
             res, _ = cls(ea)
             return res
 
@@ -2894,7 +2894,7 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def element(cls, ea):
-            '''Return the size of the element in the array at the address specified by ``ea``.'''
+            '''Return the size of the element in the array at the address specified by `ea`.'''
             ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
             return _structure.size(type.structure.id(ea)) if T == idaapi.FF_STRU else idaapi.get_full_data_elsize(ea, F)
 
@@ -2906,7 +2906,7 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def length(cls, ea):
-            '''Return the number of elements of the array at the address specified by ``ea``.'''
+            '''Return the number of elements of the array at the address specified by `ea`.'''
             ea, F = interface.address.within(ea), type.flags(ea)
             sz, ele = idaapi.get_item_size(ea), idaapi.get_full_data_elsize(ea, F)
             return sz // ele
@@ -2919,14 +2919,14 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def size(cls, ea):
-            '''Return the total size of the array at the address specified by ``ea``.'''
+            '''Return the total size of the array at the address specified by `ea`.'''
             return type.size(ea)
 
     class structure(object):
         """
         This namespace for returning type information about a structure
         that is defined within the database. By default this namespace
-        will return the `structure_t` at the given address.
+        will return the ``structure_t`` at the given address.
 
         Some of the ways to use this namespace are::
 
@@ -2941,7 +2941,7 @@ class type(object):
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the structure type at address ``ea``.'''
+            '''Return the structure type at address `ea`.'''
             res = cls.id(ea)
             return _structure.by(res)
 
@@ -2953,7 +2953,7 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def id(cls, ea):
-            '''Return the identifier of the structure at address ``ea``.'''
+            '''Return the identifier of the structure at address `ea`.'''
             ea = interface.address.within(ea)
 
             res = type.flags(ea, idaapi.DT_TYPE)
@@ -2974,7 +2974,7 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def size(cls, ea):
-            '''Return the total size of the structure at address ``ea``.'''
+            '''Return the total size of the structure at address `ea`.'''
             return type.size(ea)
     struc = struct = structure  # ns alias
 
@@ -2986,7 +2986,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def switch(cls, ea):
-        '''Return the switch_t at the address ``ea``.'''
+        '''Return the switch_t at the address `ea`.'''
         return get.switch(ea)
 
     @utils.multicase()
@@ -2997,7 +2997,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_importref(ea):
-        '''Returns true if the instruction at ``ea`` references an import.'''
+        '''Returns true if the instruction at `ea` references an import.'''
         ea = interface.address.inside(ea)
 
         # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
@@ -3012,7 +3012,7 @@ class type(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_globalref(ea):
-        '''Returns true if the instruction at ``ea`` references a global.'''
+        '''Returns true if the instruction at `ea` references a global.'''
         ea = interface.address.inside(ea)
 
         # FIXME: this doesn't seem like the right way to determine this...
@@ -3045,19 +3045,19 @@ class xref(object):
     code xrefs from data xrefs and even allows one to add or remove
     xrefs as they see fit.
 
-    This namespace is also aliased as `database.x`.
+    This namespace is also aliased as ``database.x``.
 
     Some of the more common functions are used so often that they're
     also aliased as globals. Some of these are:
 
-        `database.up` - Return all addresses that reference an address
-        `database.down` - Return all addresses that an address references
-        `database.drefs` - Return all the data references for an address
-        `database.crefs` - Return all the code references for an address
-        `database.dxup` - Return all the data references that reference an address
-        `database.dxdown` - Return all the data references that an address references
-        `database.cxup` - Return all the code references that reference an address
-        `database.cxdown` - Return all the code references that an address references
+        ``database.up`` - Return all addresses that reference an address
+        ``database.down`` - Return all addresses that an address references
+        ``database.drefs`` - Return all the data references for an address
+        ``database.crefs`` - Return all the code references for an address
+        ``database.dxup`` - Return all the data references that reference an address
+        ``database.dxdown`` - Return all the data references that an address references
+        ``database.cxup`` - Return all the code references that reference an address
+        ``database.cxdown`` - Return all the code references that an address references
 
     Some ways to utilize this namespace can be::
 
@@ -3081,14 +3081,14 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def code(ea):
-        '''Return all of the code xrefs that refer to the address ``ea``.'''
+        '''Return all of the code xrefs that refer to the address `ea`.'''
         return xref.code(ea, False)
     @utils.multicase(ea=six.integer_types, descend=bool)
     @staticmethod
     def code(ea, descend):
-        """Return all of the code xrefs that refer to the address ``ea``.
+        """Return all of the code xrefs that refer to the address `ea`.
 
-        If the bool ``descend`` is defined, then return only code refs that are referred by the specified address.
+        If the bool `descend` is defined, then return only code refs that are referred by the specified address.
         """
         if descend:
             start, next = idaapi.get_first_cref_from, idaapi.get_next_cref_from
@@ -3113,14 +3113,14 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def data(ea):
-        '''Return all of the data xrefs that refer to the address ``ea``.'''
+        '''Return all of the data xrefs that refer to the address `ea`.'''
         return xref.data(ea, False)
     @utils.multicase(ea=six.integer_types, descend=bool)
     @staticmethod
     def data(ea, descend):
-        """Return all of the data xrefs that refer to the address ``ea``.
+        """Return all of the data xrefs that refer to the address `ea`.
 
-        If the bool ``descend`` is defined, then return only the data refs that are referred by the specified address.
+        If the bool `descend` is defined, then return only the data refs that are referred by the specified address.
         """
         if descend:
             start, next = idaapi.get_first_dref_from, idaapi.get_next_dref_from
@@ -3141,7 +3141,7 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def data_down(ea):
-        '''Return all of the data xrefs that are referenced by the address ``ea``.'''
+        '''Return all of the data xrefs that are referenced by the address `ea`.'''
         return sorted(xref.data(ea, True))
     dd = utils.alias(data_down, 'xref')
 
@@ -3153,7 +3153,7 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def data_up(ea):
-        '''Return all of the data xrefs that refer to the address ``ea``.'''
+        '''Return all of the data xrefs that refer to the address `ea`.'''
         return sorted(xref.data(ea, False))
     du = utils.alias(data_up, 'xref')
 
@@ -3165,7 +3165,7 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def code_down(ea):
-        '''Return all of the code xrefs that are referenced by the address ``ea``.'''
+        '''Return all of the code xrefs that are referenced by the address `ea`.'''
         result = builtins.set(xref.code(ea, True))
         result.discard(address.next(ea))
         return sorted(result)
@@ -3179,7 +3179,7 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def code_up(ea):
-        '''Return all of the code xrefs that refer to the address ``ea``.'''
+        '''Return all of the code xrefs that refer to the address `ea`.'''
         result = builtins.set(xref.code(ea, False))
         result.discard(address.prev(ea))
         return sorted(result)
@@ -3193,7 +3193,7 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def up(ea):
-        '''Return all of the references that refer to the address ``ea``.'''
+        '''Return all of the references that refer to the address `ea`.'''
         return sorted(builtins.set(xref.data_up(ea) + xref.code_up(ea)))
     u = utils.alias(up, 'xref')
 
@@ -3206,21 +3206,21 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def down(ea):
-        '''Return all of the references that are referred by the address ``ea``.'''
+        '''Return all of the references that are referred by the address `ea`.'''
         return sorted(builtins.set(xref.data_down(ea) + xref.code_down(ea)))
     d = utils.alias(down, 'xref')
 
     @utils.multicase(target=six.integer_types)
     @staticmethod
     def add_code(target, **reftype):
-        '''Add a code reference from the current address to ``target``.'''
+        '''Add a code reference from the current address to `target`.'''
         return xref.add_code(ui.current.address(), target, **reftype)
     @utils.multicase(six=six.integer_types, target=six.integer_types)
     @staticmethod
     def add_code(ea, target, **reftype):
-        """Add a code reference from address ``ea`` to ``target``.
+        """Add a code reference from address `ea` to `target`.
 
-        If the reftype ``call`` is true, then specify this ref as a function call.
+        If the reftype `call` is true, then specify this ref as a function call.
         """
         ea, target = interface.address.inside(ea, target)
 
@@ -3236,14 +3236,14 @@ class xref(object):
     @utils.multicase(target=six.integer_types)
     @staticmethod
     def add_data(target, **reftype):
-        '''Add a data reference from the current address to ``target``.'''
+        '''Add a data reference from the current address to `target`.'''
         return xref.add_data(ui.current.address(), target, **reftype)
     @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
     def add_data(ea, target, **reftype):
-        """Add a data reference from the address ``ea`` to ``target``.
+        """Add a data reference from the address `ea` to `target`.
 
-        If the reftype ``write`` is true, then specify that this ref is writing to the target.
+        If the reftype `write` is true, then specify that this ref is writing to the target.
         """
         ea, target = interface.address.inside(ea, target)
         isWrite = reftype.get('write', False)
@@ -3255,14 +3255,14 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def del_code(ea):
-        '''Delete _all_ the code references at ``ea``.'''
+        '''Delete _all_ the code references at `ea`.'''
         ea = interface.address.inside(ea)
         [ idaapi.del_cref(ea, target, 0) for target in xref.code_down(ea) ]
         return False if len(xref.code_down(ea)) > 0 else True
     @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
     def del_code(ea, target):
-        '''Delete any code references at ``ea`` that point to address ``target``.'''
+        '''Delete any code references at `ea` that point to address `target`.'''
         ea = interface.address.inside(ea)
         idaapi.del_cref(ea, target, 0)
         return target not in xref.code_down(ea)
@@ -3270,21 +3270,21 @@ class xref(object):
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def del_data(ea):
-        '''Delete _all_ the data references at ``ea``.'''
+        '''Delete _all_ the data references at `ea`.'''
         ea = interface.address.inside(ea)
         [ idaapi.del_dref(ea, target) for target in xref.data_down(ea) ]
         return False if len(xref.data_down(ea)) > 0 else True
     @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
     def del_data(ea, target):
-        '''Delete any data references at ``ea`` that point to address ``target``.'''
+        '''Delete any data references at `ea` that point to address `target`.'''
         ea = interface.address.inside(ea)
         idaapi.del_dref(ea, target)
         return target not in xref.data_down(ea)
 
     @staticmethod
     def erase(ea):
-        '''Clear all references at the address ``ea``.'''
+        '''Clear all references at the address `ea`.'''
         ea = interface.address.inside(ea)
         return all(ok for ok in (xref.del_code(ea), xref.del_data(ea)))
 x = xref    # XXX: ns alias
@@ -3299,7 +3299,7 @@ class marks(object):
     """
     This namespace is for interacting with the marks table within the
     database. By default, this namespace is capable of yielding the
-    ``(address, description)`` of each mark within the database.
+    `(address, description)` of each mark within the database.
 
     This allows one to manage the marks. Although it is suggested to
     utilize "tags" as they provide significantly more flexibility.
@@ -3328,12 +3328,12 @@ class marks(object):
     @utils.multicase(description=basestring)
     @classmethod
     def new(cls, description):
-        '''Create a mark at the current address with the given ``description``.'''
+        '''Create a mark at the current address with the given `description`.'''
         return cls.new(ui.current.address(), description)
     @utils.multicase(ea=six.integer_types, description=basestring)
     @classmethod
     def new(cls, ea, description, **extra):
-        '''Create a mark at the address ``ea`` with the given ``description`` and return its index.'''
+        '''Create a mark at the address `ea` with the given `description` and return its index.'''
         ea = interface.address.inside(ea)
         try:
             idx = cls.__find_slotaddress(ea)
@@ -3353,7 +3353,7 @@ class marks(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, ea):
-        '''Remove the mark at the specified address ``ea`` returning the previous description.'''
+        '''Remove the mark at the specified address `ea` returning the previous description.'''
         ea = interface.address.inside(ea)
         idx = cls.__find_slotaddress(ea)
         descr = cls.__get_description(idx)
@@ -3379,7 +3379,7 @@ class marks(object):
 
     @classmethod
     def by_index(cls, index):
-        '''Return the ``(address, description)`` of the mark at the specified ``index`` in the mark list.'''
+        '''Return the `(address, description)` of the mark at the specified `index` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.__get_slotaddress(index), cls.__get_description(index))
         raise E.IndexOutOfBoundsError("{:s}.by_index({:d}) : The specified mark slot index ({:d}) is out of bounds ({:s}).".format('.'.join((__name__, cls.__name__)), index, index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
@@ -3393,7 +3393,7 @@ class marks(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def by_address(cls, ea):
-        '''Return the ``(address, description)`` of the mark at the given address ``ea``.'''
+        '''Return the `(address, description)` of the mark at the given address `ea`.'''
         return cls.by_index(cls.__find_slotaddress(ea))
     by = byAddress = utils.alias(by_address, 'marks')
 
@@ -3408,7 +3408,7 @@ class marks(object):
 
         @classmethod
         def __set_description(cls, index, ea, description, **extra):
-            '''Modify the mark at ``index`` to point to the address ``ea`` with the specified ``description``.'''
+            '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
             res = cls.__location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
             title, descr = description, description
             res.mark(index, title, descr)
@@ -3417,12 +3417,12 @@ class marks(object):
 
         @classmethod
         def __get_description(cls, index):
-            '''Return the description of the mark at the specified ``index``.'''
+            '''Return the description of the mark at the specified `index`.'''
             return cls.__location().markdesc(index)
 
         @classmethod
         def __find_slotaddress(cls, ea):
-            '''Return the index of the mark at the specified address ``ea``.'''
+            '''Return the index of the mark at the specified address `ea`.'''
             # FIXME: figure out how to fail if this address isn't found
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
             res, iterable = itertools.tee(itertools.imap(cls.__get_slotaddress, res))
@@ -3442,7 +3442,7 @@ class marks(object):
 
         @classmethod
         def __get_slotaddress(cls, index):
-            '''Return the address of the mark at the specified ``index``.'''
+            '''Return the address of the mark at the specified `index`.'''
             loc = cls.__location()
             intp = idaapi.int_pointer()
             intp.assign(index)
@@ -3455,19 +3455,19 @@ class marks(object):
     else:
         @classmethod
         def __set_description(cls, index, ea, description, **extra):
-            '''Modify the mark at ``index`` to point to the address ``ea`` with the specified ``description``.'''
+            '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
             idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, description)
             #raise E.AddressNotFoundError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
             return index
 
         @classmethod
         def __get_description(cls, index):
-            '''Return the description of the mark at the specified ``index``.'''
+            '''Return the description of the mark at the specified `index`.'''
             return idaapi.get_mark_comment(index)
 
         @classmethod
         def __find_slotaddress(cls, ea):
-            '''Return the index of the mark at the specified address ``ea``.'''
+            '''Return the index of the mark at the specified address `ea`.'''
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
             res, iterable = itertools.tee(itertools.imap(cls.__get_slotaddress, res))
             try:
@@ -3489,7 +3489,7 @@ class marks(object):
 
         @classmethod
         def __get_slotaddress(cls, index):
-            '''Get the address of the mark at index ``index``.'''
+            '''Get the address of the mark at index `index`.'''
             res = idaapi.get_marked_pos(index)
             if res == idaapi.BADADDR:
                 raise E.AddressNotFoundError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index))
@@ -3506,16 +3506,16 @@ def mark(none):
     return mark(ui.current.address(), None)
 @utils.multicase(ea=six.integer_types)
 def mark(ea):
-    '''Return the mark at the specified address ``ea``.'''
+    '''Return the mark at the specified address `ea`.'''
     _, res = marks.by_address(ea)
     return res
 @utils.multicase(description=basestring)
 def mark(description):
-    '''Set the mark at the current address to the specified ``description``.'''
+    '''Set the mark at the current address to the specified `description`.'''
     return mark(ui.current.address(), description)
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def mark(ea, none):
-    '''Erase the mark at address ``ea``.'''
+    '''Erase the mark at address `ea`.'''
     try:
         tag(ea, 'mark', None)
     except E.MissingTagError:
@@ -3524,7 +3524,7 @@ def mark(ea, none):
     return marks.remove(ea)
 @utils.multicase(ea=six.integer_types, description=basestring)
 def mark(ea, description):
-    '''Sets the mark at address ``ea`` to the specified ``description``.'''
+    '''Sets the mark at address `ea` to the specified `description`.'''
     return marks.new(ea, description)
 
 class extra(object):
@@ -3564,12 +3564,12 @@ class extra(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def has_prefix(cls, ea):
-        '''Returns true if the item at the address ``ea`` has extra prefix lines.'''
+        '''Returns true if the item at the address `ea` has extra prefix lines.'''
         return cls.__has_extra__(ea, idaapi.E_PREV)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def has_suffix(cls, ea):
-        '''Returns true if the item at the address ``ea`` has extra suffix lines.'''
+        '''Returns true if the item at the address `ea` has extra suffix lines.'''
         return cls.__has_extra__(ea, idaapi.E_NEXT)
     prefixQ, suffixQ = utils.alias(has_prefix, 'extra'), utils.alias(has_suffix, 'extra')
 
@@ -3640,26 +3640,26 @@ class extra(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def __get_prefix__(cls, ea):
-        '''Return the prefixed comment at address ``ea``.'''
+        '''Return the prefixed comment at address `ea`.'''
         return cls.__get__(ea, idaapi.E_PREV)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def __get_suffix__(cls, ea):
-        '''Return the suffixed comment at address ``ea``.'''
+        '''Return the suffixed comment at address `ea`.'''
         return cls.__get__(ea, idaapi.E_NEXT)
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def __del_prefix__(cls, ea):
-        '''Delete the prefixed comment at address ``ea``.'''
+        '''Delete the prefixed comment at address `ea`.'''
         res = cls.__get__(ea, idaapi.E_PREV)
         cls.__del__(ea, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def __del_suffix__(cls, ea):
-        '''Delete the suffixed comment at address ``ea``.'''
+        '''Delete the suffixed comment at address `ea`.'''
         res = cls.__get__(ea, idaapi.E_NEXT)
         cls.__del__(ea, idaapi.E_NEXT)
         return res
@@ -3667,14 +3667,14 @@ class extra(object):
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def __set_prefix__(cls, ea, string):
-        '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
+        '''Set the prefixed comment at address `ea` to the specified `string`.'''
         res, ok = cls.__del_prefix__(ea), cls.__set__(ea, string, idaapi.E_PREV)
         ok = cls.__set__(ea, string, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def __set_suffix__(cls, ea, string):
-        '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
+        '''Set the suffixed comment at address `ea` to the specified `string`.'''
         res, ok = cls.__del_suffix__(ea), cls.__set__(ea, string, idaapi.E_NEXT)
         return res
 
@@ -3701,12 +3701,12 @@ class extra(object):
     @utils.multicase(string=basestring)
     @classmethod
     def __set_prefix__(cls, string):
-        '''Set the prefixed comment at the current address to the specified ``string``.'''
+        '''Set the prefixed comment at the current address to the specified `string`.'''
         return cls.__set_prefix__(ui.current.address(), string)
     @utils.multicase(string=basestring)
     @classmethod
     def __set_suffix__(cls, string):
-        '''Set the suffixed comment at the current address to the specified ``string``.'''
+        '''Set the suffixed comment at the current address to the specified `string`.'''
         return cls.__set_suffix__(ui.current.address(), string)
 
     @utils.multicase()
@@ -3717,7 +3717,7 @@ class extra(object):
     @utils.multicase(string=basestring)
     @classmethod
     def prefix(cls, string):
-        '''Set the prefixed comment at the current address to the specified ``string``.'''
+        '''Set the prefixed comment at the current address to the specified `string`.'''
         return cls.__set_prefix__(ui.current.address(), string)
     @utils.multicase(none=types.NoneType)
     @classmethod
@@ -3727,17 +3727,17 @@ class extra(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prefix(cls, ea):
-        '''Return the prefixed comment at address ``ea``.'''
+        '''Return the prefixed comment at address `ea`.'''
         return cls.__get_prefix__(ea)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def prefix(cls, ea, string):
-        '''Set the prefixed comment at address ``ea`` to the specified ``string``.'''
+        '''Set the prefixed comment at address `ea` to the specified `string`.'''
         return cls.__set_prefix__(ea, string)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
     def prefix(cls, ea, none):
-        '''Delete the prefixed comment at address ``ea``.'''
+        '''Delete the prefixed comment at address `ea`.'''
         return cls.__del_prefix__(ea)
 
     @utils.multicase()
@@ -3748,7 +3748,7 @@ class extra(object):
     @utils.multicase(string=basestring)
     @classmethod
     def suffix(cls, string):
-        '''Set the suffixed comment at the current address to the specified ``string``.'''
+        '''Set the suffixed comment at the current address to the specified `string`.'''
         return cls.__set_suffix__(ui.current.address(), string)
     @utils.multicase(none=types.NoneType)
     @classmethod
@@ -3758,17 +3758,17 @@ class extra(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def suffix(cls, ea):
-        '''Return the suffixed comment at address ``ea``.'''
+        '''Return the suffixed comment at address `ea`.'''
         return cls.__get_suffix__(ea)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def suffix(cls, ea, string):
-        '''Set the suffixed comment at address ``ea`` to the specified ``string``.'''
+        '''Set the suffixed comment at address `ea` to the specified `string`.'''
         return cls.__set_suffix__(ea, string)
     @utils.multicase(ea=six.integer_types, none=types.NoneType)
     @classmethod
     def suffix(cls, ea, none):
-        '''Delete the suffixed comment at address ``ea``.'''
+        '''Delete the suffixed comment at address `ea`.'''
         return cls.__del_suffix__(ea)
 
     @classmethod
@@ -3785,49 +3785,49 @@ class extra(object):
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def preinsert(cls, ea, count):
-        '''Insert ``count`` lines in front of the item at address ``ea``.'''
+        '''Insert `count` lines in front of the item at address `ea`.'''
         res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def preappend(cls, ea, count):
-        '''Append ``count`` lines in front of the item at address ``ea``.'''
+        '''Append `count` lines in front of the item at address `ea`.'''
         res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postinsert(cls, ea, count):
-        '''Insert ``count`` lines after the item at address ``ea``.'''
+        '''Insert `count` lines after the item at address `ea`.'''
         res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postappend(cls, ea, count):
-        '''Append ``count`` lines after the item at address ``ea``.'''
+        '''Append `count` lines after the item at address `ea`.'''
         res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(count=six.integer_types)
     @classmethod
     def preinsert(cls, count):
-        '''Insert ``count`` lines in front of the item at the current address.'''
+        '''Insert `count` lines in front of the item at the current address.'''
         return cls.preinsert(ui.current.address(), count)
     @utils.multicase(count=six.integer_types)
     @classmethod
     def preappend(cls, count):
-        '''Append ``count`` lines in front of the item at the current address.'''
+        '''Append `count` lines in front of the item at the current address.'''
         return cls.preappend(ui.current.address(), count)
 
     @utils.multicase(count=six.integer_types)
     @classmethod
     def postinsert(cls, count):
-        '''Insert ``count`` lines after the item at the current address.'''
+        '''Insert `count` lines after the item at the current address.'''
         return cls.postinsert(ui.current.address(), count)
     @utils.multicase(count=six.integer_types)
     @classmethod
     def postappend(cls, count):
-        '''Append ``count`` lines after the item at the current address.'''
+        '''Append `count` lines after the item at the current address.'''
         return cls.postappend(ui.current.address(), count)
 
     insert, append = utils.alias(preinsert, 'extra'), utils.alias(preappend, 'extra')
@@ -3856,14 +3856,14 @@ class set(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def unknown(cls, ea):
-        '''Set the data at address ``ea`` to undefined.'''
+        '''Set the data at address `ea` to undefined.'''
         cb = idaapi.get_item_size(ea)
         ok = idaapi.do_unknown_range(ea, cb, idaapi.DOUNK_SIMPLE)
         return cb if ok else 0
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unknown(cls, ea, size):
-        '''Set the data at address ``ea`` to undefined.'''
+        '''Set the data at address `ea` to undefined.'''
         ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         return size if ok else 0
     undef = undefine = undefined = utils.alias(unknown, 'set')
@@ -3876,20 +3876,20 @@ class set(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def code(cls, ea):
-        '''Set the data at address ``ea`` to code.'''
+        '''Set the data at address `ea` to code.'''
         return idaapi.create_insn(ea)
 
     @utils.multicase(size=six.integer_types)
     @classmethod
     def data(cls, size, **type):
-        '''Set the data at the current address to have the specified ``size`` and ``type``.'''
+        '''Set the data at the current address to have the specified `size` and `type`.'''
         return cls.data(ui.current.address(), size, **type)
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def data(cls, ea, size, **type):
-        """Set the data at address ``ea`` to have the specified ``size`` and ``type``.
+        """Set the data at address `ea` to have the specified `size` and `type`.
 
-        If ``type`` is not specified, then choose the correct type based on the size.
+        If `type` is not specified, then choose the correct type based on the size.
         """
         lookup = {
             1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWRD,
@@ -3914,15 +3914,15 @@ class set(object):
     @utils.multicase()
     @classmethod
     def alignment(cls, **alignment):
-        '''Set the data at the current address as aligned with the specified ``alignment``.'''
+        '''Set the data at the current address as aligned with the specified `alignment`.'''
         return cls.align(ui.current.address(), **alignment)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def alignment(cls, ea, **alignment):
-        """Set the data at address ``ea`` as aligned.
+        """Set the data at address `ea` as aligned.
 
-        If ``alignment`` is specified, then use it as the default alignment.
-        If ``size`` is specified, then align that number of bytes.
+        If `alignment` is specified, then use it as the default alignment.
+        If `size` is specified, then align that number of bytes.
         """
         if not type.is_unknown(ea):
             raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), alignment.items()))) if alignment else ''))
@@ -3972,12 +3972,12 @@ class set(object):
     @utils.multicase()
     @classmethod
     def string(cls, **type):
-        '''Set the data at the current address to a string with the specified ``type``.'''
+        '''Set the data at the current address to a string with the specified `type`.'''
         return cls.string(ui.current.address(), **type)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def string(cls, ea, **type):
-        '''Set the data at address ``ea`` to a string with the specified ``type``.'''
+        '''Set the data at address `ea` to a string with the specified `type`.'''
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         ok = idaapi.make_ascii_string(ea, 0, strtype)
         if not ok:
@@ -3986,9 +3986,9 @@ class set(object):
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def string(cls, ea, size, **type):
-        """Set the data at address ``ea`` to a string with the specified ``size``.
+        """Set the data at address `ea` to a string with the specified `size`.
 
-        If ``type`` is specified, use a string of the specified type.
+        If `type` is specified, use a string of the specified type.
         """
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         cb = cls.unknown(ea, size)
@@ -4005,7 +4005,7 @@ class set(object):
         This namespace used for applying various sized integer types to
         a particular address.
 
-        This namespace is also aliased as `database.set.i` and can be used
+        This namespace is also aliased as ``database.set.i`` and can be used
         as follows::
 
             > database.set.i.byte(ea)
@@ -4020,7 +4020,7 @@ class set(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def byte(cls, ea):
-            '''Set the data at address ``ea`` to a byte.'''
+            '''Set the data at address `ea` to a byte.'''
             cb = set.unknown(ea, 1)
             if cb != 1:
                 raise E.DisassemblerError("{:s}.byte({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
@@ -4039,7 +4039,7 @@ class set(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def word(cls, ea):
-            '''Set the data at address ``ea`` to a word.'''
+            '''Set the data at address `ea` to a word.'''
             cb = set.unknown(ea, 2)
             if cb != 2:
                 raise E.DisassemblerError("{:s}.word({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
@@ -4058,7 +4058,7 @@ class set(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def dword(cls, ea):
-            '''Set the data at address ``ea`` to a double-word.'''
+            '''Set the data at address `ea` to a double-word.'''
             cb = set.unknown(ea, 4)
             if cb != 4:
                 raise E.DisassemblerError("{:s}.dword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
@@ -4077,7 +4077,7 @@ class set(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def qword(cls, ea):
-            '''Set the data at address ``ea`` to a quad-word.'''
+            '''Set the data at address `ea` to a quad-word.'''
             cb = set.unknown(ea, 8)
             if cb != 8:
                 raise E.DisassemblerError("{:s}.qword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
@@ -4096,7 +4096,7 @@ class set(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def oword(cls, ea):
-            '''Set the data at address ``ea`` to an octal-word.'''
+            '''Set the data at address `ea` to an octal-word.'''
             cb = set.unknown(ea, 16)
             if cb != 16:
                 raise E.DisassemblerError("{:s}.oword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
@@ -4112,12 +4112,12 @@ class set(object):
     @utils.multicase(type=_structure.structure_t)
     @classmethod
     def structure(cls, type):
-        '''Set the data at the current address to the structure_t specified by ``type``.'''
+        '''Set the data at the current address to the structure_t specified by `type`.'''
         return cls.structure(ui.current.address(), type)
     @utils.multicase(ea=six.integer_types, type=_structure.structure_t)
     @classmethod
     def structure(cls, ea, type):
-        '''Set the data at address ``ea`` to the structure_t specified by ``type``.'''
+        '''Set the data at address `ea` to the structure_t specified by `type`.'''
         ok = cls.data(ea, type.size, type=type)
         if not ok:
             raise E.DisassemblerError("{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join((__name__, cls.__name__)), ea, type))
@@ -4128,12 +4128,12 @@ class set(object):
     @utils.multicase(length=six.integer_types)
     @classmethod
     def array(cls, type, length):
-        '''Set the data at the current address to an array with the specified ``length`` and ``type``.'''
+        '''Set the data at the current address to an array with the specified `length` and `type`.'''
         return cls.array(ui.current.address(), type, length)
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
-        '''Set the data at the address ``ea`` to an array with the specified ``length`` and ``type``.'''
+        '''Set the data at the address `ea` to an array with the specified `length` and `type`.'''
 
         # if the type is already specifying a list, then combine it with
         # the specified length
@@ -4181,17 +4181,17 @@ class get(object):
     @utils.multicase(size=six.integer_types)
     @classmethod
     def unsigned(cls, ea, **byteorder):
-        '''Read an unsigned integer from the address ``ea`` using the size defined in the database.'''
+        '''Read an unsigned integer from the address `ea` using the size defined in the database.'''
         return cls.unsigned(ea, type.size(ea), **byteorder)
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unsigned(cls, ea, size, **byteorder):
-        """Read an unsigned integer from the address ``ea`` with the specified ``size``.
+        """Read an unsigned integer from the address `ea` with the specified `size`.
 
-        If ``byteorder`` is 'big' then read in big-endian form.
-        If ``byteorder`` is 'little' then read in little-endian form.
+        If `byteorder` is 'big' then read in big-endian form.
+        If `byteorder` is 'little' then read in little-endian form.
 
-        The default value of ``byteorder`` is the same as specified by the database architecture.
+        The default value of `byteorder` is the same as specified by the database architecture.
         """
         data = read(ea, size)
         endian = byteorder.get('order', None) or byteorder.get('byteorder', config.byteorder())
@@ -4208,17 +4208,17 @@ class get(object):
     @utils.multicase(size=six.integer_types)
     @classmethod
     def signed(cls, ea, **byteorder):
-        '''Read a signed integer from the address ``ea`` using the size defined in the database.'''
+        '''Read a signed integer from the address `ea` using the size defined in the database.'''
         return cls.signed(ea, type.size(ea), **byteorder)
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def signed(cls, ea, size, **byteorder):
-        """Read a signed integer from the address ``ea`` with the specified ``size``.
+        """Read a signed integer from the address `ea` with the specified `size`.
 
-        If ``byteorder`` is 'big' then read in big-endian form.
-        If ``byteorder`` is 'little' then read in little-endian form.
+        If `byteorder` is 'big' then read in big-endian form.
+        If `byteorder` is 'little' then read in little-endian form.
 
-        The default value of ``byteorder`` is the same as specified by the database architecture.
+        The default value of `byteorder` is the same as specified by the database architecture.
         """
         bits = size*8
         sf = (2**bits)>>1
@@ -4230,7 +4230,7 @@ class get(object):
         This namespace contains the different ISO standard integer types that
         can be used to read integers out of the database.
 
-        This namespace is also aliased as `database.get.i` and can be used
+        This namespace is also aliased as ``database.get.i`` and can be used
         like in the following examples::
 
             > res = database.get.i.uint32_t()
@@ -4256,7 +4256,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint8_t(cls, ea, **byteorder):
-            '''Read a uint8_t from the address ``ea``.'''
+            '''Read a uint8_t from the address `ea`.'''
             return get.unsigned(ea, 1, **byteorder)
         @utils.multicase()
         @classmethod
@@ -4266,7 +4266,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint8_t(cls, ea, **byteorder):
-            '''Read a sint8_t from the address ``ea``.'''
+            '''Read a sint8_t from the address `ea`.'''
             return get.signed(ea, 1, **byteorder)
         ubyte1, sbyte1 = utils.alias(uint8_t, 'get.integer'), utils.alias(sint8_t, 'get.integer')
 
@@ -4278,7 +4278,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint16_t(cls, ea, **byteorder):
-            '''Read a uint16_t from the address ``ea``.'''
+            '''Read a uint16_t from the address `ea`.'''
             return get.unsigned(ea, 2, **byteorder)
         @utils.multicase()
         @classmethod
@@ -4288,7 +4288,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint16_t(cls, ea, **byteorder):
-            '''Read a sint16_t from the address ``ea``.'''
+            '''Read a sint16_t from the address `ea`.'''
             return get.signed(ea, 2, **byteorder)
         uint2, sint2 = utils.alias(uint16_t, 'get.integer'), utils.alias(sint16_t, 'get.integer')
 
@@ -4300,7 +4300,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint32_t(cls, ea, **byteorder):
-            '''Read a uint32_t from the address ``ea``.'''
+            '''Read a uint32_t from the address `ea`.'''
             return get.unsigned(ea, 4, **byteorder)
         @utils.multicase()
         @classmethod
@@ -4310,7 +4310,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint32_t(cls, ea, **byteorder):
-            '''Read a sint32_t from the address ``ea``.'''
+            '''Read a sint32_t from the address `ea`.'''
             return get.signed(ea, 4, **byteorder)
         uint4, sint4 = utils.alias(uint32_t, 'get.integer'), utils.alias(sint32_t, 'get.integer')
 
@@ -4322,7 +4322,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint64_t(cls, ea, **byteorder):
-            '''Read a uint64_t from the address ``ea``.'''
+            '''Read a uint64_t from the address `ea`.'''
             return get.unsigned(ea, 8, **byteorder)
         @utils.multicase()
         @classmethod
@@ -4332,7 +4332,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint64_t(cls, ea, **byteorder):
-            '''Read a sint64_t from the address ``ea``.'''
+            '''Read a sint64_t from the address `ea`.'''
             return get.signed(ea, 8, **byteorder)
         uint8, sint8 = utils.alias(uint64_t, 'get.integer'), utils.alias(sint64_t, 'get.integer')
 
@@ -4344,7 +4344,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def uint128_t(cls, ea, **byteorder):
-            '''Read a uint128_t from the address ``ea``.'''
+            '''Read a uint128_t from the address `ea`.'''
             return get.unsigned(ea, 16, **byteorder)
         @utils.multicase()
         @classmethod
@@ -4354,7 +4354,7 @@ class get(object):
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def sint128_t(cls, ea, **byteorder):
-            '''Read a sint128_t from the address ``ea``.'''
+            '''Read a sint128_t from the address `ea`.'''
             return get.signed(ea, 16, **byteorder)
 
     i = integer # XXX: ns alias
@@ -4367,9 +4367,9 @@ class get(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, **length):
-        """Return the values of the array at the address specified by ``ea``.
+        """Return the values of the array at the address specified by `ea`.
 
-        If the integer ``length`` is defined, then use it as the number of elements for the array.
+        If the integer `length` is defined, then use it as the number of elements for the array.
         """
         ea = interface.address.within(ea)
         numerics = {
@@ -4445,9 +4445,9 @@ class get(object):
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def string(cls, ea, **length):
-        """Return the array at the address specified by ``ea`` as a string.
+        """Return the array at the address specified by `ea` as a string.
 
-        If the integer ``length`` is defined, then use it as the length of the array.
+        If the integer `length` is defined, then use it as the length of the array.
         """
         res = cls.array(ea, **length)
         return res.tostring()
@@ -4455,14 +4455,14 @@ class get(object):
     @utils.multicase()
     @classmethod
     def structure(cls):
-        '''Return the `structure_t` at the current address.'''
+        '''Return the ``structure_t`` at the current address.'''
         return cls.structure(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def structure(cls, ea, **structure):
-        """Return the `structure_t` at address ``ea`` as a dict of ctypes.
+        """Return the ``structure_t`` at address `ea` as a dict of ctypes.
 
-        If the ``structure`` argument is specified, then use that specific structure type.
+        If the `structure` argument is specified, then use that specific structure type.
         """
         ea = interface.address.within(ea)
 
@@ -4505,11 +4505,11 @@ class get(object):
 
     class switch(object):
         """
-        Function for fetching an instance of a `switch_t` from a given address.
+        Function for fetching an instance of a ``switch_t`` from a given address.
         Despite this being a namespace, by default it is intended to be used
         as a function against any known component of a switch. It will then
         return a class that allows one to query the different attributes of
-        an `idaapi.switch_info_t`.
+        an ``idaapi.switch_info_t``.
 
         This namespace can be used as in the following example::
 
@@ -4557,7 +4557,7 @@ class get(object):
             return cls(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
-            '''Return the switch at the address ``ea``.'''
+            '''Return the switch at the address `ea`.'''
             ea = interface.address.within(ea)
             try:
                 return cls.__getinsn(ea)

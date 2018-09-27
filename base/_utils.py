@@ -24,19 +24,19 @@ __all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fgetitem','
 
 # box any specified arguments
 fbox = fboxed = lambda *a: a
-# return a closure that executes ``f`` with the arguments unboxed.
+# return a closure that executes `f` with the arguments unboxed.
 funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **builtins.dict(k.items() + kp.items()))
-# return a closure that will check that ``object`` is an instance of ``type``.
+# return a closure that will check that `object` is an instance of `type`.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
-# return a closure that will check if its argument has an item ``key``.
+# return a closure that will check if its argument has an item `key`.
 fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), iter, next, fpartial(operator.eq, None))
 # return a closure that will get a particular element from an object
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
-# return a closure that will check if its argument has an ``attribute``.
+# return a closure that will check if its argument has an `attribute`.
 fhasattr = fattributeQ = lambda attribute: frpartial(hasattr, attribute)
 # return a closure that will get a particular attribute from an object
 fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(object, attribute, *default)
-# return a closure that always returns ``object``.
+# return a closure that always returns `object`.
 fconstant = fconst = falways = lambda object: lambda *a, **k: object
 # a closure that returns its argument always
 fpassthru = fpass = fidentity = fid = lambda object: object
@@ -46,9 +46,9 @@ fdefault = lambda default: lambda object: object or default
 first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right
 fcompose = lambda *f: builtins.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), builtins.reversed(f))
-# return a closure that executes function ``f`` whilst discarding any extra arguments
+# return a closure that executes function `f` whilst discarding any extra arguments
 fdiscard = lambda f: lambda *a, **k: f()
-# return a closure that executes function ``crit`` and then returns/executes ``f`` or ``t`` based on whether or not it's successful.
+# return a closure that executes function `crit` and then returns/executes `f` or `t` based on whether or not it's successful.
 fcondition = fcond = lambda crit: lambda t, f: \
     lambda *a, **k: (t(*a, **k) if builtins.callable(t) else t) if crit(*a, **k) else (f(*a, **k) if builtins.callable(f) else f)
 # return a closure that takes a list of functions to execute with the provided arguments
@@ -65,15 +65,15 @@ def flazy(f, *a, **k):
 fmemo = flazy
 # return a closure with the function's arglist partially applied
 fpartial = functools.partial
-# return a closure that applies the provided arguments to the function ``f``.
+# return a closure that applies the provided arguments to the function `f`.
 fapply = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **builtins.dict(k.items() + kp.items()))
 # return a closure that will use the specified arguments to call the provided function.
 fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a+ap), **builtins.dict(k.items() + kp.items()))
-# return a closure that applies the initial arglist to the end of function ``f``.
+# return a closure that applies the initial arglist to the end of function `f`.
 frpartial = lambda f, *a, **k: lambda *ap, **kp: f(*(ap + builtins.tuple(builtins.reversed(a))), **builtins.dict(k.items() + kp.items()))
-# return a closure that applies the arglist to function ``f`` in reverse.
+# return a closure that applies the arglist to function `f` in reverse.
 freversed = freverse = lambda f, *a, **k: lambda *ap, **kp: f(*builtins.reversed(a + ap), **builtins.dict(k.items() + kp.items()))
-# return a closure that executes function ``f`` and includes the caught exception (or None) as the first element in the boxed result.
+# return a closure that executes function `f` and includes the caught exception (or None) as the first element in the boxed result.
 def fcatch(f, *a, **k):
     def fcatch(*a, **k):
         try: return builtins.None, f(*a, **k)
@@ -86,9 +86,9 @@ fcomplement = fnot = frpartial(fcompose, operator.not_)
 ilist, liter = fcompose(builtins.list, builtins.iter), fcompose(builtins.iter, builtins.list)
 # converts a tuple to an iterator, or an iterator to a tuple
 ituple, titer = fcompose(builtins.tuple, builtins.iter), fcompose(builtins.iter, builtins.tuple)
-# take ``count`` number of elements from an iterator
+# take `count` number of elements from an iterator
 itake = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*count), builtins.tuple)
-# get the ``nth`` element from an iterator
+# get the `nth` element from an iterator
 iget = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*(count)), builtins.tuple, operator.itemgetter(-1))
 # copy from itertools
 imap, ifilter, ichain, izip = itertools.imap, itertools.ifilter, itertools.chain, itertools.izip
@@ -225,7 +225,7 @@ class multicase(object):
 
     @classmethod
     def match(cls, (args, kwds), heap):
-        '''Given the specified ``args`` and ``kwds``, find the correct function according to its types.'''
+        '''Given the specified `args` and `kwds`, find the correct function according to its types.'''
         # FIXME: yep, done in O(n) time.
         for f, ts, (sa, af, defaults, (argname, kwdname)) in heap:
             # populate our arguments
@@ -336,7 +336,7 @@ class multicase(object):
 
     @classmethod
     def generatorQ(cls, func):
-        '''Returns true if ``func`` is a generator.'''
+        '''Returns true if `func` is a generator.'''
         func = cls.ex_function(func)
         return bool(func.func_code.co_flags & CO_VARGEN)
 
@@ -394,7 +394,7 @@ class process(object):
     exceptionQueue = property(fget=lambda s: s.__exceptionQueue)
 
     def __init__(self, command, **kwds):
-        """Creates a new instance that monitors subprocess.Popen(``command``), the created process starts in a paused state.
+        """Creates a new instance that monitors subprocess.Popen(`command`), the created process starts in a paused state.
 
         Keyword options:
         env<dict> = os.environ -- environment to execute program with
@@ -423,7 +423,7 @@ class process(object):
         not kwds.get('paused', False) and self.start(command)
 
     def start(self, command=None, **options):
-        '''Start the specified ``command`` with the requested ``options``.'''
+        '''Start the specified `command` with the requested `options`.'''
         if self.running:
             raise OSError("Process {:d} is still running.".format(self.id))
         if self.updater or len(self.threads):
@@ -834,7 +834,7 @@ class execution(object):
         return res
 
     def push(self, F, *args, **kwds):
-        '''Push ``F`` with the provided ``args`` and ``kwds`` onto the execution queue.'''
+        '''Push `F` with the provided `args` and `kwds` onto the execution queue.'''
         # package it all into a single function
         res = functools.partial(F, *args, **kwds)
 

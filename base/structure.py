@@ -8,23 +8,23 @@ a simpler interface that can be used to perform various operations
 against a structure such as renaming or enumerating the structure's
 members.
 
-The base argument type for getting a `structure_t` can be either a name,
-an identifier, or an index. Typically one will call `structure.by(...)`
+The base argument type for getting a ``structure_t`` can be either a name,
+an identifier, or an index. Typically one will call ``structure.by``
 with either identifier type which will then return an instance of their
-`structure_t`.
+``structure_t``.
 
 To list the different structures available in the database, one can use
-`structure.list(...)` with their chosen method of filtering. This will
+``structure.list`` with their chosen method of filtering. This will
 list all of the available structures at which point the user can then
-request it by passing an identifer to `structure.by(...)`. The
-chosen methods of filtering are:
+request it by passing an identifer to ``structure.by``. The chosen
+methods of filtering are:
 
-    ``name`` - Match the structures to a structure name
-    ``like`` - Filter the structure names according to a glob
-    ``regex`` - Filter the structure names according to a regular-expression
-    ``index`` - Match the structures by its index
-    ``identifier`` or ``id`` - Match the structure by its id which is a `idaapi.uval_t`
-    ``predicate`` - Filter the structures by passing the id (`idaapi.uval_t`) to a callable
+    `name` - Match the structures to a structure name
+    `like` - Filter the structure names according to a glob
+    `regex` - Filter the structure names according to a regular-expression
+    `index` - Match the structures by its index
+    `identifier` or `id` - Match the structure by its id which is a ``idaapi.uval_t``
+    `predicate` - Filter the structures by passing the id (``idaapi.uval_t``) to a callable
 
 Some examples of using these keywords are as follows::
 
@@ -48,7 +48,7 @@ from internal import utils, interface, exceptions as E
 import idaapi
 
 def __instance__(identifier, **options):
-    '''Create a new instance of the structure identified by ``identifier``.'''
+    '''Create a new instance of the structure identified by `identifier`.'''
     # check to see if the structure cache has been initialized
     try:
         cache = __instance__.cache
@@ -89,11 +89,11 @@ def __iterate__():
 
 @utils.multicase(string=basestring)
 def iterate(string):
-    '''Iterate through all of the structures in the database with a glob that matches ``string``.'''
+    '''Iterate through all of the structures in the database with a glob that matches `string`.'''
     return iterate(like=string)
 @utils.multicase()
 def iterate(**type):
-    '''Iterate through all of the structures that match the keyword specified by ``type``.'''
+    '''Iterate through all of the structures that match the keyword specified by `type`.'''
     if not type: type = {'predicate':lambda n: True}
     res = builtins.list(__iterate__())
     for key, value in six.iteritems(type):
@@ -102,11 +102,11 @@ def iterate(**type):
 
 @utils.multicase(string=basestring)
 def list(string):
-    '''List any structures that match the glob in ``string``.'''
+    '''List any structures that match the glob in `string`.'''
     return list(like=string)
 @utils.multicase()
 def list(**type):
-    '''List all the structures within the database that match the keyword specified by ``type``.'''
+    '''List all the structures within the database that match the keyword specified by `type`.'''
     res = builtins.list(iterate(**type))
 
     maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
@@ -119,11 +119,11 @@ def list(**type):
 
 @utils.multicase(name=basestring)
 def new(name):
-    '''Returns a new structure ``name``.'''
+    '''Returns a new structure `name`.'''
     return new(name, 0)
 @utils.multicase(name=basestring, offset=six.integer_types)
 def new(name, offset):
-    '''Returns a new structure ``name`` using ``offset`` as its base offset.'''
+    '''Returns a new structure `name` using `offset` as its base offset.'''
     id = idaapi.add_struc(idaapi.BADADDR, name)
     assert id != idaapi.BADADDR
     # FIXME: we should probably move the new structure to the end of the list via set_struc_idx
@@ -144,7 +144,7 @@ def by(id, **options):
     return by_index(res, **options)
 @utils.multicase()
 def by(**type):
-    '''Return the structure matching the keyword specified by ``type``.'''
+    '''Return the structure matching the keyword specified by `type`.'''
 
     searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
@@ -179,7 +179,7 @@ def by_index(index, **options):
 byIndex = utils.alias(by_index)
 
 def by_identifier(identifier, **options):
-    '''Return the structure identified by ``identifier``.'''
+    '''Return the structure identified by `identifier`.'''
     return __instance__(identifier, **options)
 
 by_id = byIdentifier = byId = utils.alias(by_identifier)
@@ -196,7 +196,7 @@ class structure_t(object):
     certain attributes of the structure.
 
     To access the members belonging to the structure, one can use the
-    `.members` property. This property is intended to be treated as an
+    ``.members`` property. This property is intended to be treated as an
     array in order to access the different elements available. This
     property also allows a user to create a new member or remove an
     already existing one.
@@ -282,10 +282,10 @@ class structure_t(object):
         return refs
 
     def refs(self):
-        """Return the ``(address, opnum, type)`` of all the code and data references within the database that reference this structure.
+        """Return the `(address, opnum, type)` of all the code and data references within the database that reference this structure.
 
-        If ``opnum`` is `None`, then the returned ``address`` has the structure applied to it.
-        If ``opnum`` is defined, then the instruction at the returned ``address`` references a field that contains the specified structure.
+        If `opnum` is ``None``, then the returned `address` has the structure applied to it.
+        If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
         """
         x, sid = idaapi.xrefblk_t(), self.id
 
@@ -343,7 +343,7 @@ class structure_t(object):
         return self.__id__
     @property
     def ptr(self):
-        '''Return the pointer of the `idaapi.struc_t`.'''
+        '''Return the pointer of the ``idaapi.struc_t``.'''
         return idaapi.get_struc(self.id)
     @property
     def members(self):
@@ -372,7 +372,7 @@ class structure_t(object):
         return idaapi.get_struc_name(self.id)
     @name.setter
     def name(self, string):
-        '''Set the name of the structure to ``string``.'''
+        '''Set the name of the structure to `string`.'''
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
@@ -389,7 +389,7 @@ class structure_t(object):
         return idaapi.get_struc_cmt(self.id, repeatable) or idaapi.get_struc_cmt(self.id, not repeatable)
     @comment.setter
     def comment(self, value, repeatable=True):
-        '''Set the repeatable comment for the structure to ``value``.'''
+        '''Set the repeatable comment for the structure to `value`.'''
         return idaapi.set_struc_cmt(self.id, value, repeatable)
 
     @utils.multicase()
@@ -414,19 +414,19 @@ class structure_t(object):
         return res
     @utils.multicase(key=basestring)
     def tag(self, key):
-        '''Return the tag identified by ``key`` belonging to the structure.'''
+        '''Return the tag identified by `key` belonging to the structure.'''
         res = self.tag()
         return res[key]
     @utils.multicase(key=basestring)
     def tag(self, key, value):
-        '''Set the tag identified by ``key`` to ``value`` for the structure.'''
+        '''Set the tag identified by `key` to `value` for the structure.'''
         state = self.tag()
         repeatable, res, state[key] = True, state.get(key, None), value
         ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
         return res
     @utils.multicase(key=basestring, none=types.NoneType)
     def tag(self, key, none):
-        '''Removes the tag specified by ``key`` from the structure.'''
+        '''Removes the tag specified by `key` from the structure.'''
         state = self.tag()
         repeatable, res = True, state.pop(key)
         ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
@@ -438,7 +438,7 @@ class structure_t(object):
         return idaapi.get_struc_size(self.ptr)
     @size.setter
     def size(self, size):
-        '''Expand the structure to the new ``size`` that is specified.'''
+        '''Expand the structure to the new `size` that is specified.'''
         res = idaapi.get_struc_size(self.ptr)
         ok = idaapi.expand_struc(self.ptr, 0, size - res, True)
         if not ok:
@@ -451,7 +451,7 @@ class structure_t(object):
         return self.members.baseoffset
     @offset.setter
     def offset(self, offset):
-        '''Set the base offset of the structure to ``offset``.'''
+        '''Set the base offset of the structure to `offset`.'''
         res, self.members.baseoffset = self.members.baseoffset, offset
         return res
     @property
@@ -460,7 +460,7 @@ class structure_t(object):
         return idaapi.get_struc_idx(self.id)
     @index.setter
     def index(self, idx):
-        '''Set the index of the structure to ``idx``.'''
+        '''Set the index of the structure to `idx`.'''
         return idaapi.set_struc_idx(self.ptr, idx)
 
     def destroy(self):
@@ -476,7 +476,7 @@ class structure_t(object):
         return self.members.by_offset(offset + self.members.baseoffset)
 
     def copy(self, name):
-        '''Copy members into the structure ``name``.'''
+        '''Copy members into the structure `name`.'''
         raise NotImplementedError
 
     def __getattr__(self, name):
@@ -489,14 +489,14 @@ class structure_t(object):
 
 @utils.multicase()
 def name(id):
-    '''Return the name of the structure identified by ``id``.'''
+    '''Return the name of the structure identified by `id`.'''
     return idaapi.get_struc_name(id)
 @utils.multicase(structure=structure_t)
 def name(structure):
     return name(structure.id)
 @utils.multicase(string=basestring)
 def name(id, string, *suffix):
-    '''Set the name of the structure identified by ``id`` to ``string``.'''
+    '''Set the name of the structure identified by `id` to `string`.'''
     res = (string,) + suffix
     string = interface.tuplename(*res)
 
@@ -507,67 +507,67 @@ def name(id, string, *suffix):
     return idaapi.set_struc_name(id, string)
 @utils.multicase(structure=structure_t, string=basestring)
 def name(structure, string, *suffix):
-    '''Set the name of the structure_t ``structure`` to ``string``.'''
+    '''Set the name of the specified `structure` to `string`.'''
     return name(structure.id, string, *suffix)
 
 @utils.multicase(id=six.integer_types)
 def comment(id, **repeatable):
-    """Return the comment of the structure identified by ``id``.
+    """Return the comment of the structure identified by `id`.
 
-    If the bool ``repeatable`` is specified, return the repeatable comment.
+    If the bool `repeatable` is specified, return the repeatable comment.
     """
     return idaapi.get_struc_cmt(id, repeatable.get('repeatable', True))
 @utils.multicase(structure=structure_t)
 def comment(structure, **repeatable):
-    '''Return the comment for the specified ``structure``.'''
+    '''Return the comment for the specified `structure`.'''
     return comment(structure.id, **repeatable)
 @utils.multicase(structure=structure_t, cmt=basestring)
 def comment(structure, cmt, **repeatable):
-    '''Set the comment to ``cmt`` for the specified ``structure``.'''
+    '''Set the comment to `cmt` for the specified `structure`.'''
     return comment(structure.id, cmt, **repeatable)
 @utils.multicase(id=six.integer_types, cmt=basestring)
 def comment(id, cmt, **repeatable):
-    """Set the comment of the structure identified by ``id`` to ``cmt``.
+    """Set the comment of the structure identified by `id` to `cmt`.
 
-    If the bool ``repeatable`` is specified, set the repeatable comment.
+    If the bool `repeatable` is specified, set the repeatable comment.
     """
     return idaapi.set_struc_cmt(id, cmt, repeatable.get('repeatable', True))
 
 @utils.multicase(id=six.integer_types)
 def index(id):
-    '''Return the index of the structure identified by ``id``.'''
+    '''Return the index of the structure identified by `id`.'''
     return idaapi.get_struc_idx(id)
 @utils.multicase(structure=structure_t)
 def index(structure):
-    '''Return the index of the specified ``structure``.'''
+    '''Return the index of the specified `structure`.'''
     return index(structure.id)
 @utils.multicase(id=six.integer_types, index=six.integer_types)
 def index(id, index):
-    '''Move the structure identified by ``id`` to the specified ``index`` in the structure list.'''
+    '''Move the structure identified by `id` to the specified `index` in the structure list.'''
     return idaapi.set_struc_idx(id, index)
 @utils.multicase(structure=structure_t, index=six.integer_types)
 def index(structure, index):
-    '''Move the specified ``structure`` to the specified ``index`` in the structure list.'''
+    '''Move the specified `structure` to the specified `index` in the structure list.'''
     return index(structure.id, index)
 
 @utils.multicase(structure=structure_t)
 def size(structure):
-    '''Return the size of the specified ``structure``.'''
+    '''Return the size of the specified `structure`.'''
     return size(structure.id)
 @utils.multicase(id=six.integer_types)
 def size(id):
-    '''Return the size of the structure identified by ``id``.'''
+    '''Return the size of the structure identified by `id`.'''
     return idaapi.get_struc_size(id)
 
 @utils.multicase(structure=structure_t)
 def members(structure):
-    '''Yield each member of the specified ``structure``.'''
+    '''Yield each member of the specified `structure`.'''
     return members(structure.id)
 @utils.multicase(id=six.integer_types)
 def members(id):
-    """Yield each member of the structure identified by ``id``.
+    """Yield each member of the structure identified by `id`.
 
-    Each iteration yields the ``((offset, size), (name, comment, repeatable-comment))`` of each member.
+    Each iteration yields the `((offset, size), (name, comment, repeatable-comment))` of each member.
     """
 
     st = idaapi.get_struc(id)
@@ -594,21 +594,21 @@ def members(id):
 
 @utils.multicase(structure=structure_t, offset=six.integer_types, size=six.integer_types)
 def fragment(structure, offset, size):
-    '''Yield each member of the specified ``structure`` from the ``offset`` up to the ``size``.'''
+    '''Yield each member of the specified `structure` from the `offset` up to the `size`.'''
     return fragment(structure.id, offset, size)
 @utils.multicase(id=six.integer_types, offset=six.integer_types, size=six.integer_types)
 def fragment(id, offset, size):
-    """Yield each member of the structure identified by ``id`` from the ``offset`` up to the ``size``.
+    """Yield each member of the structure identified by `id` from the `offset` up to the `size`.
 
     Each iteration yields a tuple of the following format for each
     member within the requested bounds. This allows one to select
     certain fragments of a structure which can then be used to export
     to other programs or applications.
 
-    ``((offset, size), (name, comment, repeatable))``
+    `((offset, size), (name, comment, repeatable))`
 
-    In this tuple, the field ``comment`` represents the non-repeatable
-    comment whereas ``repeatable`` contains the member's ``repeatable``
+    In this tuple, the field `comment` represents the non-repeatable
+    comment whereas `repeatable` contains the member's `repeatable`
     comment.
     """
     member = members(id)
@@ -633,7 +633,7 @@ def fragment(id, offset, size):
 
 @utils.multicase(structure=structure_t)
 def remove(structure):
-    '''Remove the specified ``structure`` from the database.'''
+    '''Remove the specified `structure` from the database.'''
     ok = idaapi.del_struc(structure.ptr)
     if not ok:
         logging.fatal("{:s}.remove(\"{:s}\") : Unable to remove structure {:#x}.".format(__name__, name, res.id))
@@ -641,17 +641,17 @@ def remove(structure):
     return True
 @utils.multicase(name=basestring)
 def remove(name):
-    '''Remove the structure with the specified ``name``.'''
+    '''Remove the structure with the specified `name`.'''
     res = by_name(name)
     return remove(res)
 @utils.multicase(id=six.integer_types)
 def remove(id):
-    '''Remove a structure by its index or ``id``.'''
+    '''Remove a structure by its index or `id`.'''
     res = by(id)
     return remove(res)
 @utils.multicase()
 def remove(**type):
-    '''Remove the first structure that matches the result described by ``type``.'''
+    '''Remove the first structure that matches the result described by `type`.'''
     res = by(**type)
     return remove(res)
 delete = utils.alias(remove)
@@ -660,27 +660,26 @@ class members_t(object):
     """
     This object is an abstraction around all the members belonging to
     a specific IDA structure. This object is implicitly part of a
-    `structure_t` and allows one to access each member of the structure
+    ``structure_t`` and allows one to access each member of the structure
     by its index as well as create new members and remove existing ones
     from the structure.
 
     To list the different members available in the structure, one can
-    use `structure.list(...)` with a chosen method of filtering. This
-    will list all of the available members that match the keyword
-    that they specified. The keywords that are available to filter
-    members are:
+    use ``structure.list`` with a chosen method of filtering. This will
+    list all of the available members that match the keyword that they
+    specified. The keywords that are available to filter members are:
 
-        ``name`` - Match the structure member by a name
-        ``offset`` - Match the structure member by its offset
-        ``like`` - Filter the structure members according to a glob
-        ``regex`` - Filter the structure members according to a regular-expression
-        ``index`` - Match the structure member by its index
-        ``fullname`` - Filter the structure members by matching its full name according to a glob
-        ``comment`` or ``comments` - Filter the structure members by applying a glob to its comment
-        ``identifier`` or ``id`` - Match the structure member by its identifier
-        ``greater`` or ``gt`` - Filter the structure members for any after the specified offset
-        ``less`` or ``lt`` - Filter the structure members for any before the specified offset
-        ``predicate`` - Filter the structure members by passing the `member_t` to a callable
+        `name` - Match the structure member by a name
+        `offset` - Match the structure member by its offset
+        `like` - Filter the structure members according to a glob
+        `regex` - Filter the structure members according to a regular-expression
+        `index` - Match the structure member by its index
+        `fullname` - Filter the structure members by matching its full name according to a glob
+        `comment` or `comments` - Filter the structure members by applying a glob to its comment
+        `identifier` or `id` - Match the structure member by its identifier
+        `greater` or `gt` - Filter the structure members for any after the specified offset
+        `less` or `lt` - Filter the structure members for any before the specified offset
+        `predicate` - Filter the structure members by passing the ``member_t`` to a callable
 
     Some examples of using these keywords are as follows::
 
@@ -694,11 +693,11 @@ class members_t(object):
     # members state
     @property
     def owner(self):
-        '''Return the `structure_t` that owns this `members_t`.'''
+        '''Return the ``structure_t`` that owns this ``members_t``.'''
         return self.__owner
     @property
     def ptr(self):
-        '''Return the pointer to the `idaapi.member_t` that contains all the members.'''
+        '''Return the pointer to the ``idaapi.member_t`` that contains all the members.'''
         return self.__owner.ptr.members
     def __init__(self, owner, baseoffset=0):
         self.__owner = owner
@@ -727,7 +726,7 @@ class members_t(object):
             yield member_t(self.owner, idx)
         return
     def __getitem__(self, index):
-        '''Return the member at the specified ``index``.'''
+        '''Return the member at the specified `index`.'''
         if isinstance(index, six.integer_types):
             index = self.owner.ptr.memqty + index if index < 0 else index
             res = member_t(self.owner, index) if index >= 0 and index < self.owner.ptr.memqty else None
@@ -743,7 +742,7 @@ class members_t(object):
         return res
 
     def index(self, member_t):
-        '''Return the index of the member specified by ``member_t``.'''
+        '''Return the index of the member specified by `member_t`.'''
         for i in six.moves.range(self.owner.ptr.memqty):
             if member_t.id == self[i].id:
                 return i
@@ -767,7 +766,7 @@ class members_t(object):
     # searching members
     @utils.multicase()
     def iterate(self, **type):
-        '''Iterate through all of the members in the structure that match the keyword specified by ``type``.'''
+        '''Iterate through all of the members in the structure that match the keyword specified by `type`.'''
         if not type: type = {'predicate':lambda n: True}
         res = builtins.list(iter(self))
         for key, value in six.iteritems(type):
@@ -776,11 +775,11 @@ class members_t(object):
 
     @utils.multicase(string=basestring)
     def list(self, string):
-        '''List any members that match the glob in ``string``.'''
+        '''List any members that match the glob in `string`.'''
         return self.list(like=string)
     @utils.multicase()
     def list(self, **type):
-        '''List all the members within the structure that match the keyword specified by ``type``.'''
+        '''List all the members within the structure that match the keyword specified by `type`.'''
         res = builtins.list(self.iterate(**type))
 
         escape = repr
@@ -796,7 +795,7 @@ class members_t(object):
 
     @utils.multicase()
     def by(self, **type):
-        '''Return the member that matches the keyword specified by ``type``.'''
+        '''Return the member that matches the keyword specified by `type`.'''
         searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
 
         res = builtins.list(self.iterate(**type))
@@ -810,15 +809,15 @@ class members_t(object):
         return res
     @utils.multicase(name=basestring)
     def by(self, name):
-        '''Return the member with the specified ``name``.'''
+        '''Return the member with the specified `name`.'''
         return self.by_name(name)
     @utils.multicase(offset=six.integer_types)
     def by(self, offset):
-        '''Return the member at the specified ``offset``.'''
+        '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
 
     def by_name(self, name):
-        '''Return the member with the specified ``name``.'''
+        '''Return the member with the specified `name`.'''
         mem = idaapi.get_member_by_name(self.owner.ptr, name)
         if mem is None:
             raise E.MemberNotFoundError("{:s}.instance({:s}).members.by_name : Unable to find member with requested name {!r}.".format(__name__, self.owner.name, name))
@@ -827,7 +826,7 @@ class members_t(object):
     byname = byName = utils.alias(by_name, 'members_t')
 
     def by_fullname(self, fullname):
-        '''Return the member with the specified ``fullname``.'''
+        '''Return the member with the specified `fullname`.'''
         mem = idaapi.get_member_by_fullname(self.owner.ptr, fullname)
         if mem is None:
             raise E.MemberNotFoundError("{:s}.instance({:s}).members.by_fullname : Unable to find member with full name {!r}.".format(__name__, self.owner.name, fullname))
@@ -836,7 +835,7 @@ class members_t(object):
     byfullname = byFullname = utils.alias(by_fullname, 'members_t')
 
     def by_offset(self, offset):
-        '''Return the member at the specified ``offset``.'''
+        '''Return the member at the specified `offset`.'''
         min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr), idaapi.get_struc_last_offset(self.owner.ptr)))
 
         mptr = idaapi.get_member(self.owner.ptr, max - self.baseoffset)
@@ -853,7 +852,7 @@ class members_t(object):
     byoffset = byOffset = utils.alias(by_offset, 'members_t')
 
     def by_identifier(self, id):
-        '''Return the member in the structure that has the specified ``id``.'''
+        '''Return the member in the structure that has the specified `id`.'''
         res = idaapi.get_member_by_id(id)
         if res is None:
             raise E.MemberNotFoundError("{:s}.instance({:s}).members.by_id : Unable to find member with id {:#x}.".format(__name__, self.owner.name, id))
@@ -867,7 +866,7 @@ class members_t(object):
     by_id = byId = byIdentifier = utils.alias(by_identifier, 'members_t')
 
     def near_offset(self, offset):
-        '''Return the member nearest to the specified ``offset``.'''
+        '''Return the member nearest to the specified `offset`.'''
         min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr), idaapi.get_struc_last_offset(self.owner.ptr)))
         if (offset < min) or (offset >= max):
             logging.warn("{:s}.instance({:s}).members.near_offset : Requested offset {:+#x} not within bounds {:#x}<->{:#x}. Trying anyways..".format(__name__, self.owner.name, offset, min, max))
@@ -888,19 +887,19 @@ class members_t(object):
     # adding/removing members
     @utils.multicase(name=(basestring, tuple))
     def add(self, name):
-        '''Append the specified member ``name`` with the default type at the end of the structure.'''
+        '''Append the specified member `name` with the default type at the end of the structure.'''
         offset = self.owner.size + self.baseoffset
         return self.add(name, int, offset)
     @utils.multicase(name=(basestring, tuple))
     def add(self, name, type):
-        '''Append the specified member ``name`` with the given ``type`` at the end of the structure.'''
+        '''Append the specified member `name` with the given `type` at the end of the structure.'''
         offset = self.owner.size + self.baseoffset
         return self.add(name, type, offset)
     @utils.multicase(name=(basestring, tuple), offset=six.integer_types)
     def add(self, name, type, offset):
-        """Add a member at ``offset`` with the given ``name`` and ``type``.
+        """Add a member at `offset` with the given `name` and `type`.
 
-        To specify a particular size, ``type`` can be a tuple with the second element referring to the size.
+        To specify a particular size, `type` can be a tuple with the second element referring to the size.
         """
         flag, typeid, nbytes = interface.typemap.resolve(type)
 
@@ -937,20 +936,20 @@ class members_t(object):
         return member_t(self.owner, idx)
 
     def pop(self, index):
-        '''Remove the member at the specified ``index``.'''
+        '''Remove the member at the specified `index`.'''
         item = self[index]
         return self.remove(item.offset - self.baseoffset)
     def __delitem__(self, index):
-        '''Remove the member at the specified ``index``.'''
+        '''Remove the member at the specified `index`.'''
         return self.pop(index)
 
     @utils.multicase()
     def remove(self, offset):
-        '''Remove the member at ``offset`` from the structure.'''
+        '''Remove the member at `offset` from the structure.'''
         return idaapi.del_struc_member(self.owner.ptr, offset - self.baseoffset)
     @utils.multicase()
     def remove(self, offset, size):
-        '''Remove all the members from the structure from ``offset`` up to ``size``.'''
+        '''Remove all the members from the structure from `offset` up to `size`.'''
         res = offset - self.baseoffset
         return idaapi.del_struc_members(self.owner.ptr, res, res + size)
 
@@ -973,16 +972,16 @@ class member_t(object):
     This object is an abstraction around a single member belonging to
     a structure. A member within a structue contains a number of
     properties which this object will expose. Some of these properties
-    allow for a user to modify the member's `type` or `name`. The
-    `tag` method is also provided to allow for a user to annotate the
+    allow for a user to modify the member's ``type`` or ``name``. The
+    ``tag`` method is also provided to allow for a user to annotate the
     member similar to the database or a function's contents. Another
-    method, `refs` will allow one to enumerate everything in the
+    method, ``refs`` will allow one to enumerate everything in the
     database that references said member.
     """
     __slots__ = ('__owner', '__index')
 
     def __init__(self, owner, index):
-        '''Create a member_t for the field in the structure ``owner`` at ``index``.'''
+        '''Create a member_t for the field in the structure `owner` at `index`.'''
         self.__index = index
         self.__owner = owner
 
@@ -1041,11 +1040,11 @@ class member_t(object):
     # read-only properties
     @property
     def ptr(self):
-        '''Return the pointer of the `idaapi.member_t`.'''
+        '''Return the pointer of the ``idaapi.member_t``.'''
         return self.__owner.ptr.get_member(self.__index)
     @property
     def id(self):
-        '''Return the `.id` attribute of the member.'''
+        '''Return the identifier of the member.'''
         return self.ptr.id
     @property
     def size(self):
@@ -1057,7 +1056,7 @@ class member_t(object):
         return self.ptr.get_soff() + self.__owner.members.baseoffset
     @property
     def flag(self):
-        '''Return the `.flag` attribute of the member.'''
+        '''Return the "flag" attribute of the member.'''
         m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
         return 0 if m is None else m.flag
     @property
@@ -1066,7 +1065,7 @@ class member_t(object):
         return idaapi.get_member_fullname(self.id)
     @property
     def typeid(self):
-        '''Return the `.tid` attribute of the type of the member.'''
+        '''Return the identifier of the type of the member.'''
         opinfo = idaapi.opinfo_t()
         if idaapi.__version__ < 7.0:
             res = idaapi.retrieve_member_info(self.ptr, opinfo)
@@ -1098,7 +1097,7 @@ class member_t(object):
         return idaapi.get_member_name(self.id) or ''
     @name.setter
     def name(self, string):
-        '''Set the name of the member to ``string``.'''
+        '''Set the name of the member to `string`.'''
         if isinstance(string, tuple):
             string = interface.tuplename(*string)
 
@@ -1115,7 +1114,7 @@ class member_t(object):
         return idaapi.get_member_cmt(self.id, repeatable) or idaapi.get_member_cmt(self.id, not repeatable)
     @comment.setter
     def comment(self, value, repeatable=True):
-        '''Set the repeatable comment of the member to ``value``.'''
+        '''Set the repeatable comment of the member to `value`.'''
         return idaapi.set_member_cmt(self.ptr, value, repeatable)
 
     @utils.multicase()
@@ -1140,19 +1139,19 @@ class member_t(object):
         return res
     @utils.multicase(key=basestring)
     def tag(self, key):
-        '''Return the tag identified by ``key`` belonging to the member.'''
+        '''Return the tag identified by `key` belonging to the member.'''
         res = self.tag()
         return res[key]
     @utils.multicase(key=basestring)
     def tag(self, key, value):
-        '''Set the tag identified by ``key`` to ``value`` for the member.'''
+        '''Set the tag identified by `key` to `value` for the member.'''
         state = self.tag()
         repeatable, res, state[key] = True, state.get(key, None), value
         ok = idaapi.set_member_cmt(self.ptr, internal.comment.encode(state), repeatable)
         return res
     @utils.multicase(key=basestring, none=types.NoneType)
     def tag(self, key, none):
-        '''Removes the tag specified by ``key`` from the member.'''
+        '''Removes the tag specified by `key` from the member.'''
         state = self.tag()
         repeatable, res, = True, state.pop(key)
         ok = idaapi.set_member_cmt(self.ptr, internal.comment.encode(state), repeatable)
@@ -1160,7 +1159,7 @@ class member_t(object):
 
     @property
     def dt_type(self):
-        '''Return the `.dt_type` attribute of the member.'''
+        '''Return the `dt_type` attribute of the member.'''
         m = idaapi.get_member(self.__owner.ptr, self.offset - self.__owner.members.baseoffset)
         if m is None:
             return 0
@@ -1207,7 +1206,7 @@ class member_t(object):
         return "{:s}\n[{:d}] {:-#x}:{:+#x} \'{:s}\' {:s}{:s}".format(self.__class__, self.index, self.offset, self.size, name, typ, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
 
     def refs(self):
-        '''Return the ``(address, opnum, type)`` of all the references to this member within the database.'''
+        '''Return the `(address, opnum, type)` of all the references to this member within the database.'''
         mid = self.id
 
         # calculate the high-byte which is used to determine an address from a structure

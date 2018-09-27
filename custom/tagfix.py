@@ -29,11 +29,11 @@ import idaapi
 output = sys.stderr
 
 def fetch_contents(fn):
-    """Fetch the reference count for the contents of function ``fn`` in the database.
+    """Fetch the reference count for the contents of function `fn` in the database.
 
-    Returns the tuple ``(func, address, tags)`` where the ``address`` and
-    ``tags`` fields are both dictionaries containing the reference count for
-    the addresses and tag names. The field ``func`` contains the address of the
+    Returns the tuple `(func, address, tags)` where the `address` and
+    `tags` fields are both dictionaries containing the reference count for
+    the addresses and tag names. The field `func` contains the address of the
     function.
     """
     addr, tags = {}, {}
@@ -49,7 +49,7 @@ def fetch_contents(fn):
     return func.address(fn), addr, tags
 
 def check_contents(ea):
-    '''Validate the cache defined for the contents of the function ``ea``.'''
+    '''Validate the cache defined for the contents of the function `ea`.'''
     node, key = internal.netnode.get(internal.comment.tagging.node()), internal.comment.contents._key(ea)
     tag = internal.comment.decode(db.comment(key))
 
@@ -62,7 +62,7 @@ def check_contents(ea):
     return True
 
 def check_global(ea):
-    '''Validate the cache defined for the global at the address ``ea``.'''
+    '''Validate the cache defined for the global at the address `ea`.'''
     if func.within(ea): return False
 
     cache = internal.comment.decode(db.comment(db.top()))
@@ -84,7 +84,7 @@ def check_global(ea):
 def fetch_globals_functions():
     """Fetch the reference count for the global tags (function) in the database.
 
-    Returns the tuple ``(address, tags)`` where the ``address`` and ``tags``
+    Returns the tuple `(address, tags)` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
     the addresses and tag names.
     """
@@ -104,7 +104,7 @@ def fetch_globals_functions():
 def fetch_globals_data():
     """Fetch the reference count for the global tags (non-function) in the database.
 
-    Returns the tuple ``(address, tags)`` where the ``address`` and ``tags``
+    Returns the tuple `(address, tags)` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
     the addresses and tag names.
     """
@@ -126,7 +126,7 @@ def fetch_globals_data():
 def fetch_globals():
     """Fetch the reference count of all of the global tags for both functions and non-functions.
 
-    Returns the tuple ``(address, tags)`` where the ``address`` and ``tags``
+    Returns the tuple `(address, tags)` where the `address` and `tags`
     fields are both dictionaries containing the reference count for
     the addresses and tag names.
     """
@@ -148,7 +148,7 @@ def fetch_globals():
     return addr, tags
 
 def contents(ea):
-    '''Re-build the cache for the contents of the function ``ea``.'''
+    '''Re-build the cache for the contents of the function `ea`.'''
     try:
         func.address(ea)
     except internal.exceptions.FunctionNotFoundError:

@@ -23,11 +23,11 @@ import database, function as func, instruction, segment
 import ui, internal
 
 def map(F, **kwargs):
-    """Execute the callback ``F`` on all functions in the database. Synonymous to ``map(F, database.functions())`` but with some extra logging to display the current progress.
+    """Execute the callback `F` on all functions in the database. Synonymous to `map(F, database.functions())` but with some extra logging to display the current progress.
 
-    The ``F`` parameter is defined as a function taking either an
-    ``(address, **kwargs)`` or a ``(index, address, **kwargs)``. Any
-    keyword arguments are passed to ``F`` unmodified.
+    The `F` parameter is defined as a function taking either an
+    `(address, **kwargs)` or a `(index, address, **kwargs)`. Any
+    keyword arguments are passed to `F` unmodified.
     """
     f1 = lambda (idx, ea), **kwargs: F(ea, **kwargs)
     f2 = lambda (idx, ea), **kwargs: F(idx, ea, **kwargs)
@@ -55,9 +55,9 @@ class remote(object):
     a binary address to its runtime address.
     """
     def __init__(self, remote, local=None):
-        """Create a new instance with the specified ``remote`` base address.
+        """Create a new instance with the specified `remote` base address.
 
-        If ``local`` is not specified, then use the current database's base
+        If `local` is not specified, then use the current database's base
         address for performing calculations.
         """
         if local is None:
@@ -84,7 +84,7 @@ class remote(object):
 ##          in the future, this would be abstracted into a arbitrarily sized tree.
 
 def colormarks(color=0x7f007f):
-    """Walk through the current list of marks whilst coloring them with the specified ``color``.
+    """Walk through the current list of marks whilst coloring them with the specified `color`.
 
     Each mark's address is tagged with its description, and if the
     address belongs to a function, the function is also tagged with the
@@ -109,7 +109,7 @@ def colormarks(color=0x7f007f):
     return
 
 def recovermarks():
-    """Walk through the tags made by `colormarks` and re-create the marks that were found.
+    """Walk through the tags made by ``colormarks`` and re-create the marks that were found.
 
     This is useful if any marks were accidentally deleted and can be used for
     recovering them as long as they were initally tagged properly.
@@ -186,9 +186,9 @@ def checkmarks():
     return
 
 def collect(ea, sentinel):
-    """Collect all the basic blocks starting at address ``ea`` and recurse until a terminating block is encountered.
+    """Collect all the basic blocks starting at address `ea` and recurse until a terminating block is encountered.
 
-    If the set ``sentinel`` is specified, then its addresses are used as
+    If the set `sentinel` is specified, then its addresses are used as
     sentinel blocks and collection will terminate when those blocks are
     reached.
     """
@@ -209,9 +209,9 @@ def collect(ea, sentinel):
     return _collect(addr, set([blk]))
 
 def collectcall(ea, sentinel=set()):
-    """Collect all of the function calls starting at function ``ea`` and recurse until a terminating function is encountered.
+    """Collect all of the function calls starting at function `ea` and recurse until a terminating function is encountered.
 
-    If the set ``sentinel`` is specified, then its addresses are used as
+    If the set `sentinel` is specified, then its addresses are used as
     sentinel functions and collection will terminate when one of those
     functions are reached.
     """
@@ -237,22 +237,22 @@ def collectcall(ea, sentinel=set()):
 
 # FIXME: Don't emit the +0 if offset is 0
 def above(ea, includeSegment=False):
-    '''Return all of the function names and their offset that calls the function at ``ea``.'''
+    '''Return all of the function names and their offset that calls the function at `ea`.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
     return '\n'.join(':'.join((segment.name(ea), tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.up(ea))
 
 # FIXME: Don't emit the +0 if offset is 0
 def below(ea, includeSegment=False):
-    '''Return all of the function names and their offset that are called by the function at ``ea``.'''
+    '''Return all of the function names and their offset that are called by the function at `ea`.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
     return '\n'.join(':'.join((segment.name(ea), tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.down(ea))
 
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea=None, target=None):
-    """Output the function call at ``ea`` and its arguments with the address they originated from.
+    """Output the function call at `ea` and its arguments with the address they originated from.
 
-    If ``target`` is specified, then assume that the instruction is
-    calling ``target`` instead of the target address that the call
+    If `target` is specified, then assume that the instruction is
+    calling `target` instead of the target address that the call
     is referencing.
     """
     ea = current.address() if ea is None else ea
