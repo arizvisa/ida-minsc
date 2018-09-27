@@ -8,7 +8,7 @@ windows that are in use as well as utilities for simplifying the
 customization of the interface.
 
 There are a few namespaces that are provided in order to get the
-current state. The `ui.current` namespace allows for one to get
+current state. The ``ui.current`` namespace allows for one to get
 the current address, function, segment, window, as well as a number
 of other things.
 
@@ -214,24 +214,24 @@ class names(appwindow):
         return idaapi.get_nlist_size()
     @classmethod
     def contains(cls, ea):
-        '''Return whether the address ``ea`` is referenced in the names list.'''
+        '''Return whether the address `ea` is referenced in the names list.'''
         return idaapi.is_in_nlist(ea)
     @classmethod
     def search(cls, ea):
-        '''Return the index of the address ``ea`` in the names list.'''
+        '''Return the index of the address `ea` in the names list.'''
         return idaapi.get_nlist_idx(ea)
 
     @classmethod
     def at(cls, index):
-        '''Return the address and the symbol name of the specified ``index``.'''
+        '''Return the address and the symbol name of the specified `index`.'''
         return idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
     @classmethod
     def name(cls, index):
-        '''Return the name at the specified ``index``.'''
+        '''Return the name at the specified `index`.'''
         return idaapi.get_nlist_name(index)
     @classmethod
     def ea(cls, index):
-        '''Return the address at the specified ``index``.'''
+        '''Return the address at the specified `index`.'''
         return idaapi.get_nlist_ea(index)
 
     @classmethod
@@ -291,7 +291,7 @@ class strings(appwindow):
         return idaapi.get_strlist_qty()
     @classmethod
     def at(cls, index):
-        '''Return the string at the specified ``index``.'''
+        '''Return the string at the specified `index`.'''
         string = idaapi.string_info_t()
         res = idaapi.get_strlist_item(index, string)
         if not res:
@@ -299,7 +299,7 @@ class strings(appwindow):
         return string
     @classmethod
     def get(cls, index):
-        '''Return the address and the string at the specified ``index``.'''
+        '''Return the address and the string at the specified `index`.'''
         si = cls.at(index)
         return si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
     @classmethod
@@ -331,7 +331,7 @@ class timer(object):
     clock = {}
     @classmethod
     def register(cls, id, interval, callable):
-        '''Register the specified ``callable`` with the requested ``id`` to be called at every ``interval``.'''
+        '''Register the specified `callable` with the requested `id` to be called at every `interval`.'''
         if id in cls.clock:
             idaapi.unregister_timer(cls.clock[id])
 
@@ -340,7 +340,7 @@ class timer(object):
         return res
     @classmethod
     def unregister(cls, id):
-        '''Unregister the specified ``id``.'''
+        '''Unregister the specified `id`.'''
         raise internal.exceptions.UnsupportedCapability("{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
         idaapi.unregister_timer(cls.clock[id])
         del(cls.clock[id])
@@ -369,14 +369,14 @@ class navigation(object):
 
     @classmethod
     def set(cls, ea):
-        '''Set the auto-analysis address on the navigation bar to ``ea``.'''
+        '''Set the auto-analysis address on the navigation bar to `ea`.'''
         return cls.__set__(ea)
 
     @classmethod
     def auto(cls, ea, **type):
-        """Set the auto-analysis address and type on the navigation bar to ``ea``.
+        """Set the auto-analysis address and type on the navigation bar to `ea`.
 
-        If ``type`` is specified, then update using the specified auto-analysis type.
+        If `type` is specified, then update using the specified auto-analysis type.
         """
         return cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
 
@@ -410,14 +410,14 @@ class menu(object):
     state = {}
     @classmethod
     def add(cls, path, name, callable, hotkey='', flags=0, args=()):
-        '''Register a ``callable`` as a menu item at the specified ``path`` with the provided ``name``.'''
+        '''Register a `callable` as a menu item at the specified `path` with the provided `name`.'''
         if (path, name) in cls.state:
             cls.rm(path, name)
         ctx = idaapi.add_menu_item(path, name, hotkey, flags, callable, args)
         cls.state[path, name] = ctx
     @classmethod
     def rm(cls, path, name):
-        '''Remove the menu item at the specified ``path`` with the provided ``name``.'''
+        '''Remove the menu item at the specified `path` with the provided `name`.'''
         idaapi.del_menu_item( cls.state[path, name] )
         del cls.state[path, name]
     @classmethod
@@ -458,12 +458,12 @@ class widget(object):
     This namespace is for selecting a specific or particular widget.
     """
     def __new__(self, (x, y)):
-        '''Return the widget at the specified ``x`` and ``y`` coordinate.'''
+        '''Return the widget at the specified `x` and `y` coordinate.'''
         res = (x, y)
         return cls.at(res)
     @classmethod
     def at(cls, (x, y)):
-        '''Return the widget at the specified ``x`` and ``y`` coordinate.'''
+        '''Return the widget at the specified `x` and `y` coordinate.'''
         global application
         q = application()
         return q.widgetAt(x, y)
@@ -495,7 +495,7 @@ class mouse(object):
 
     @classmethod
     def position(cls):
-        '''Return the current ``(x, y)`` position of the cursor.'''
+        '''Return the current `(x, y)` position of the cursor.'''
         raise internal.exceptions.MissingMethodError
 
 class keyboard(object):
@@ -512,14 +512,14 @@ class keyboard(object):
     hotkey = {}
     @classmethod
     def map(cls, key, callable):
-        '''Map a specific ``key`` to a python ``callable``.'''
+        '''Map a specific `key` to a python `callable`.'''
         if key in cls.hotkey:
             idaapi.del_hotkey(cls.hotkey[key])
         cls.hotkey[key] = res = idaapi.add_hotkey(key, callable)
         return res
     @classmethod
     def unmap(cls, key):
-        '''Unmap the specified ``key`` from its callable.'''
+        '''Unmap the specified `key` from its callable.'''
         idaapi.del_hotkey(cls.hotkey[key])
         del(cls.hotkey[key])
     add, rm = internal.utils.alias(map, 'keyboard'), internal.utils.alias(unmap, 'keyboard')
@@ -546,7 +546,7 @@ try:
         """
         @classmethod
         def position(cls):
-            '''Return the current ``(x, y)`` position of the cursor.'''
+            '''Return the current `(x, y)` position of the cursor.'''
             qt = PyQt5.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
@@ -582,7 +582,7 @@ try:
 
         # methods
         def open(self, width=0.8, height=0.1):
-            '''Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.'''
+            '''Open a progress bar with the specified `width` and `height` relative to the dimensions of IDA's window.'''
             global window
             cls = self.__class__
 
@@ -677,7 +677,7 @@ try:
         """
         @classmethod
         def position(cls):
-            '''Return the current ``(x, y)`` position of the cursor.'''
+            '''Return the current `(x, y)` position of the cursor.'''
             qt = PySide.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
@@ -710,9 +710,11 @@ class hook(object):
     This namespace exposes the ability to hook different parts of IDA.
 
     There are 3 different components in IDA that can be hooked. These
-    are available as `hook.idp`, `hook.idb`, and `hook.ui`. Please refer
-    to the documentation for `idaapi.IDP_Hooks`, `idaapi.IDB_Hooks`, and
-    `idaapi.UI_Hooks` for identifying what's available.
+    are available as ``hook.idp``, ``hook.idb``, and ``hook.ui``.
+
+    Please refer to the documentation for ``idaapi.IDP_Hooks``,
+    ``idaapi.IDB_Hooks``, and ``idaapi.UI_Hooks`` for identifying what
+    is available.
     """
     @classmethod
     def __start_ida__(cls):
@@ -776,7 +778,7 @@ class queue(object):
 
     @classmethod
     def add(cls, callable, *args, **kwds):
-        '''Add the specified ``callable`` to the execution queue passing to it any extra arguments.'''
+        '''Add the specified `callable` to the execution queue passing to it any extra arguments.'''
         if not cls.execute.running:
             logging.warn("{:s}.add(...) : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
         return cls.execute.push(callable, *args, **kwds)
@@ -802,7 +804,7 @@ class InputBox(idaapi.PluginForm):
         pass
 
     def Show(self, caption, options=0):
-        '''Show the form with the specified ``caption`` and ``options``.'''
+        '''Show the form with the specified `caption` and `options`.'''
         return super(InputBox, self).Show(caption, options)
 
 ### Console-only progress bar
@@ -822,7 +824,7 @@ class ConsoleProgress(object):
     current = property(fget=lambda s: self.__value__)
 
     def open(self, width=0.8, height=0.1):
-        '''Open a progress bar with the specified ``width`` and ``height`` relative to the dimensions of IDA's window.'''
+        '''Open a progress bar with the specified `width` and `height` relative to the dimensions of IDA's window.'''
         return
 
     def close(self):
@@ -860,7 +862,7 @@ class Progress(object):
     timeout = 5.0
 
     def __new__(cls, *args, **kwargs):
-        '''Figure out which progress bar to use and instantiate it with the provided parameters ``args`` and ``kwargs``.'''
+        '''Figure out which progress bar to use and instantiate it with the provided parameters `args` and `kwargs`.'''
         if 'UIProgress' not in globals():
             logging.warn("{:s}(...) : Using console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
             return ConsoleProgress(*args, **kwargs)
