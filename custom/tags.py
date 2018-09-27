@@ -61,9 +61,9 @@ def locationToAddress(loc):
     return loc
 
 def addressToLocation(ea, chunks=None):
-    """Convert the address ``ea`` to a `(function, id, offset)`.
+    """Convert the address ``ea`` to a ``(function, id, offset)``.
 
-    The fields `id` and `offset` represent the chunk index and the
+    The fields ``id`` and ``offset`` represent the chunk index and the
     offset into the chunk for the function at ``ea``. If the list
     ``chunks`` is specified as a parameter, then use it as a tuple
     of ranges in order to calculate the correct address.
@@ -143,7 +143,7 @@ class read(object):
     def everything(cls, location=False):
         """Read all of the tags defined within the database.
 
-        Returns a tuple of the format `(Globals, Contents, Frames)`. Each field
+        Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
         is a dictionary keyed by location or offset that retains the tags that
         were read. If the boolean ``location`` was specified then key each
         contents tag by location instead of address.
@@ -198,8 +198,8 @@ class read(object):
     def contents(location=False):
         """Iterate through the contents tags for all the functions within the database.
 
-        Each iteration yields a tuple of the format `(location, tags)` where
-        `location` can be either an address or a chunk identifier and offset
+        Each iteration yields a tuple of the format ``(location, tags)`` where
+        ``location`` can be either an address or a chunk identifier and offset
         depending on whether ``location`` was specified as true or not.
         """
         global read
@@ -242,7 +242,7 @@ class apply(object):
     """
 
     def __new__(cls, (Globals, Contents, Frames), **tagmap):
-        '''Apply the tags in the argument `(Globals, Contents, Frames)` back into the database.'''
+        '''Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.'''
         res = Globals, Contents, Frames
         return cls.everything(res, **tagmap)
 
@@ -312,7 +312,7 @@ class apply(object):
     ## apply everything to the entire database
     @classmethod
     def everything(cls, (Globals, Contents, Frames), **tagmap):
-        '''Apply the tags in the argument `(Globals, Contents, Frames)` back into the database.'''
+        '''Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.'''
         global apply
 
         ## convert a sorted list keyed by an address into something that updates ida's navigation pointer
@@ -509,7 +509,7 @@ class export(object):
     def everything(cls, *tags, **location):
         """Read all of the specified ``tags`` within the database using the cache.
 
-        Returns a tuple of the format `(Globals, Contents, Frames)`. Each field
+        Returns a tuple of the format ``(Globals, Contents, Frames)``. Each field
         is a dictionary keyed by location or offset that retains the tags that
         were read. If the boolean ``location`` was specified then key each
         contents tag by location instead of address.
@@ -550,8 +550,8 @@ class export(object):
     def contents(*tags, **location):
         """Iterate through the specified contents ``tags`` within the database using the cache.
 
-        Each iteration yields a tuple of the format `(location, tags)` where
-        `location` can be either an address or a chunk identifier and offset
+        Each iteration yields a tuple of the format ``(location, tags)`` where
+        ``location`` can be either an address or a chunk identifier and offset
         depending on whether ``location`` was specified as true or not.
         """
         global export
