@@ -42,7 +42,7 @@ def ask(string, **default):
     If any of the options are specified as a boolean, then it is
     assumed that this option will be the default. If the user
     chooses "cancel", then this value will be returned instead of
-    the value `None`.
+    the value ``None``.
     """
     state = {'no': 0, 'yes': 1, 'cancel': -1}
     results = {0: False, 1: True}
@@ -495,7 +495,7 @@ class mouse(object):
 
     @classmethod
     def position(cls):
-        '''Return the current `(x, y)` position of the cursor.'''
+        '''Return the current ``(x, y)`` position of the cursor.'''
         raise internal.exceptions.MissingMethodError
 
 class keyboard(object):
@@ -546,7 +546,7 @@ try:
         """
         @classmethod
         def position(cls):
-            '''Return the current `(x, y)` position of the cursor.'''
+            '''Return the current ``(x, y)`` position of the cursor.'''
             qt = PyQt5.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
@@ -677,7 +677,7 @@ try:
         """
         @classmethod
         def position(cls):
-            '''Return the current `(x, y)` position of the cursor.'''
+            '''Return the current ``(x, y)`` position of the cursor.'''
             qt = PySide.QtGui.QCursor
             res = qt.pos()
             return res.x(), res.y()
