@@ -29,38 +29,39 @@ class typemap:
 
     The syntax for types is fairly straight forward if one is familiar
     with the names that python exposes. Essentially the base type is
-    a tuple of the format ``(type, size)``. If ``size`` is not specified,
+    a tuple of the format `(type, size)`. If `size` is not specified,
     then the size will be assumed to be the default word size for the
-    current database. The ``type`` field is then any one of the python
-    types such as `int`, `chr`, `str, `float`, `type`, or `None`.
+    current database. The `type` field is then any one of the python
+    types such as ``int``, ``chr``, ``str``, ``float``, ``type``, or
+    ``None``.
 
     These types have the following meanings:
 
-        `int` or `long` - an integral
-        `chr` - a character
-        `str` or `unicode` - a string or a character
-        `float` - a floating point number
-        `type` - a pointer
-        `None` - alignment
+        ``int`` or ``long`` - an integral
+        ``chr`` - a character
+        ``str`` or ``unicode`` - a string or a character
+        ``float`` - a floating point number
+        ``type`` - a pointer
+        ``None`` - alignment
 
     This can result in the describing of an IDA type and its size
     using a much simpler interface. Some examples can be:
 
-        ``int`` - An integer with the default size
-        ``(int, 2)`` - a 16-bit integer
-        ``(chr, 3)`` - a 3-byte string
-        ``(type, 4)`` - a 32-bit pointer
-        ``(float, 4)`` - a 16-bit floating point (ieee754 single)
-        ``(None, 16)`` - aligned to 16 bytes
+        `int` - An integer with the default size
+        `(int, 2)` - a 16-bit integer
+        `(chr, 3)` - a 3-byte string
+        `(type, 4)` - a 32-bit pointer
+        `(float, 4)` - a 16-bit floating point (ieee754 single)
+        `(None, 16)` - aligned to 16 bytes
 
     If an array needs to be represented, then one can simply wrap
     their type within a list. A few examples of this follows:
 
-        ``[int, 4]`` - a 4 element array of default sized integers
-        ``[chr, 9]`` - a 4 element array of characters
-        ``[(int, 2), 3]`` - a 3 element array of 16-bit integers
-        ``[(float, 8), 4]`` - a 4 element array of 64-bit floating point numbers.
-        ``[type, 6]`` - a 6 element array of pointers
+        `[int, 4]` - a 4 element array of default sized integers
+        `[chr, 9]` - a 4 element array of characters
+        `[(int, 2), 3]` - a 3 element array of 16-bit integers
+        `[(float, 8), 4]` - a 4 element array of 64-bit floating point numbers.
+        `[type, 6]` - a 6 element array of pointers
 
     These types are commonly associated with members of structures
     and thus can be used to quickly read or apply a type to a
@@ -138,7 +139,7 @@ class typemap:
 
     @classmethod
     def dissolve(cls, flag, typeid, size):
-        '''Convert the specified ``flag``, ``typeid``, and ``size`` into a pythonic type.'''
+        '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
         dt = flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
         if dt == idaapi.FF_STRU and isinstance(typeid, six.integer_types):
@@ -162,7 +163,7 @@ class typemap:
 
     @classmethod
     def resolve(cls, pythonType):
-        '''Convert the provided `pythonic-type` to IDA's ``(flag, typeid, size)``.'''
+        '''Convert the provided `pythonType` into IDA's `(flag, typeid, size)`.'''
         sz, count = None, 1
         # FIXME: figure out how to fix this recursive module dependency
 
@@ -204,7 +205,7 @@ class priorityhook(object):
     STOP = type('stop', (result,), {})()
 
     def __init__(self, hooktype, **exclude):
-        '''Construct an instance of a priority hook with the specified IDA hook type which can be one of `idaapi.*_Hooks`.'''
+        '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
         exclusions = set(exclude.get('exclude', ()))
         self.__type__ = hooktype
         self.__cache = collections.defaultdict(list)
@@ -217,14 +218,14 @@ class priorityhook(object):
         return self.object.unhook()
 
     def enable(self, name):
-        '''Enable any hooks for the ``name`` event that have been previously disabled.'''
+        '''Enable any hooks for the `name` event that have been previously disabled.'''
         if name not in self.__disabled:
             logging.fatal("{:s}.enable({!r}) : Hook {:s} is not disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.discard(name)
         return True
     def disable(self, name):
-        '''Disable execution of all the hooks for the ``name`` event.'''
+        '''Disable execution of all the hooks for the `name` event.'''
         if name not in self.__cache:
             logging.fatal("{:s}.disable({!r}) : Hook {:s} does not exist ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
             return False
@@ -240,7 +241,7 @@ class priorityhook(object):
         return
 
     def cycle(self, object=None):
-        '''Cycle the hooks for this object with the `idaapi.*_Hooks` instance provided by ``object``.'''
+        '''Cycle the hooks for this object with the ``idaapi.*_Hooks`` instance provided by `object`.'''
         cls = self.__class__
         # uhook previous object
         ok = object.unhook()
@@ -257,7 +258,7 @@ class priorityhook(object):
         return object
 
     def add(self, name, callable, priority=50):
-        '''Add a hook for the event ``name`` to call the requested ``callable`` at the given ``priority`` (lower is prioritized).'''
+        '''Add a hook for the event `name` to call the requested `callable` at the given `priority` (lower is prioritized).'''
         if name not in self.__cache:
             res = self.apply(name)
             setattr(self.object, name, res)
@@ -272,12 +273,12 @@ class priorityhook(object):
         return True
 
     def get(self, name):
-        '''Return all the callables that are hooking the event ``name``.'''
+        '''Return all the callables that are hooking the event `name`.'''
         res = self.__cache[name]
         return tuple(f for _, f in res)
 
     def discard(self, name, callable):
-        '''Discard the specified ``callable`` from hooking the event ``name``.'''
+        '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
             raise NameError("{:s}.add({!r}, {!r}) : Unable to add a method to hooker for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name, callable))
@@ -296,7 +297,7 @@ class priorityhook(object):
         return True if found else False
 
     def apply(self, name):
-        '''Apply the currently registered callables to the event ``name``.'''
+        '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
             raise NameError("{:s}.apply({!r}) : Unable to apply the hook for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name))
@@ -364,7 +365,7 @@ class address(object):
 
     @classmethod
     def __head1__(cls, ea, **silent):
-        # Ensures that ``ea`` is pointing to a valid address
+        '''Ensures that `ea` is pointing to a valid address.'''
         entryframe = cls.pframe()
         logF = logging.warn if not silent.get('silent', False) else logging.debug
 
@@ -374,7 +375,7 @@ class address(object):
         return res
     @classmethod
     def __head2__(cls, start, end, **silent):
-        # Ensures that both ``start`` and ``end`` are pointing to valid addresses
+        '''Ensures that both `start` and `end` are pointing to valid addresses.'''
         entryframe = cls.pframe()
         logF = logging.warn if not silent.get('silent', False) else logging.debug
 
@@ -393,7 +394,7 @@ class address(object):
 
     @classmethod
     def __inside1__(cls, ea):
-        # Ensures that ``ea`` is within the database and pointing at a valid address
+        '''Ensures that `ea` is within the database and pointing at a valid address.'''
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
@@ -406,7 +407,7 @@ class address(object):
         return cls.head(res, silent=True)
     @classmethod
     def __inside2__(cls, start, end):
-        # Ensures that both ``start`` and ``end`` are within the database and pointing at a valid address
+        '''Ensures that both `start` and `end` are within the database and pointing at a valid address.'''
 
         entryframe = cls.pframe()
         start, end = cls.within(start, end)
@@ -421,7 +422,7 @@ class address(object):
 
     @classmethod
     def __within1__(cls, ea):
-        # Ensures that ``ea`` is within the database
+        '''Ensures that `ea` is within the database.'''
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
@@ -436,7 +437,7 @@ class address(object):
         return ea
     @classmethod
     def __within2__(cls, start, end):
-        # Ensures that both ``start`` and ``end`` are within the database
+        '''Ensures that both `start` and `end` are within the database.'''
         entryframe = cls.pframe()
 
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
@@ -580,7 +581,7 @@ class node(object):
 
     @staticmethod
     def alt_opinverted(ea, opnum):
-        '''Return whether the operand ``opnum`` at the address ``ea`` has its sign inverted or not.'''
+        '''Return whether the operand `opnum` at the address `ea` has its sign inverted or not.'''
         OP_REPR, INVERT_BIT = 8, 0x100000
         return internal.netnode.alt.get(ea, OP_REPR) & (INVERT_BIT << opnum) != 0
 
@@ -598,7 +599,7 @@ class namedtypedtuple(tuple):
     _types = ()
 
     def __new__(cls, *args):
-        '''Construct a new instance of a tuple using the specified ``args``.'''
+        '''Construct a new instance of a tuple using the specified `args`.'''
         res = args[:]
         for n, t, x in zip(cls._fields, cls._types, args):
             if not isinstance(x, t): raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n, t))
@@ -606,10 +607,10 @@ class namedtypedtuple(tuple):
 
     @classmethod
     def _make(cls, iterable, cons=tuple.__new__, len=len):
-        """Make a tuple using the values specified in ``iterable``.
+        """Make a tuple using the values specified in `iterable`.
 
-        If ``cons`` is specified as a callable, then use it to construct the type.
-        If ``len`` is specified as a callable, then use it to return the length.
+        If `cons` is specified as a callable, then use it to construct the type.
+        If `len` is specified as a callable, then use it to return the length.
         """
         result = cons(cls, iterable)
         if len(result) != len(cls._fields):
@@ -620,7 +621,7 @@ class namedtypedtuple(tuple):
 
     @classmethod
     def _type(cls, name):
-        '''Return the type for the field ``name``.'''
+        '''Return the type for the field `name`.'''
         res = (t for n, t in zip(cls._fields, cls._types) if n == name)
         try:
             result = next(res)
@@ -643,7 +644,7 @@ class namedtypedtuple(tuple):
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     def _replace(self, **fields):
-        '''Assign the specified ``fields`` to the fields within the tuple.'''
+        '''Assign the specified `fields` to the fields within the tuple.'''
         fc = fields.copy()
         result = self._make(map(fc.pop, self._fields, self))
         if fc:
@@ -665,7 +666,7 @@ class symbol_t(object):
 
     @property
     def symbols(self):
-        '''Must be implemented by each sub-class: Return a generator that returns each symbol described by ``self``.'''
+        '''Must be implemented by each sub-class: Return a generator that returns each symbol described by `self`.'''
         raise internal.exceptions.MissingMethodError
 
 class register_t(symbol_t):
@@ -732,11 +733,11 @@ class register_t(symbol_t):
         return not (self == other)
 
     def __contains__(self, other):
-        '''Returns True if the ``other`` register is a sub-part of ``self``.'''
+        '''Returns True if the `other` register is a sub-part of `self`.'''
         return other in six.viewvalues(self.__children__)
 
     def subsetQ(self, other):
-        '''Returns true if the ``other`` register is a part of ``self``.'''
+        '''Returns true if the `other` register is a part of `self`.'''
         def collect(node):
             res = set([node])
             [res.update(collect(n)) for n in six.itervalues(node.__children__)]
@@ -744,7 +745,7 @@ class register_t(symbol_t):
         return other in self.alias or other in collect(self)
 
     def supersetQ(self, other):
-        '''Returns true if the ``other`` register actually contains ``self``.'''
+        '''Returns true if the `other` register actually contains `self`.'''
         res, pos = set(), self
         while pos is not None:
             res.add(pos)
@@ -752,7 +753,7 @@ class register_t(symbol_t):
         return other in self.alias or other in res
 
     def relatedQ(self, other):
-        '''Returns true if both ``other`` and ``self`` affect each other when one is modified.'''
+        '''Returns true if both `other` and `self` affect each other when one is modified.'''
         return self.supersetQ(other) or self.subsetQ(other)
 
 class regmatch(object):
@@ -763,7 +764,7 @@ class regmatch(object):
     are written to or read from.
     """
     def __new__(cls, *regs, **modifiers):
-        '''Construct a closure that can be used for matching instruction using the specified ``regs`` and ``modifiers``.'''
+        '''Construct a closure that can be used for matching instruction using the specified `regs` and `modifiers`.'''
         if not regs:
             args = ', '.join(map("{:s}".format, regs))
             mods = ', '.join(map(internal.utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
@@ -775,16 +776,16 @@ class regmatch(object):
 
     @classmethod
     def use(cls, regs):
-        '''Return a closure that checks if an address and opnum uses the specified ``regs``.'''
+        '''Return a closure that checks if an address and opnum uses the specified `regs`.'''
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # convert any regs that are strings into their correct object type
         regs = { _instruction.architecture.by_name(r) if isinstance(r, basestring) else r for r in regs }
 
-        # returns an iterable of bools that returns whether r is a subset of any of the registers in ``regs``.
+        # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
         match = lambda r, regs=regs: any(itertools.imap(r.relatedQ, regs))
 
-        # returns true if the operand at the specified address is related to one of the registers in ``regs``.
+        # returns true if the operand at the specified address is related to one of the registers in `regs`.
         def uses_register(ea, opnum):
             val = _instruction.op(ea, opnum)
             if isinstance(val, symbol_t):
@@ -795,17 +796,17 @@ class regmatch(object):
 
     @classmethod
     def modifier(cls, **modifiers):
-        '''Return a closure iterates through all the operands in an address that use the specified ``modifiers``.'''
+        '''Return a closure iterates through all the operands in an address that use the specified `modifiers`.'''
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # by default, grab all operand indexes
         iterops = internal.utils.fcompose(_instruction.ops_count, six.moves.range, sorted)
 
-        # if ``read`` is specified, then only grab operand indexes that are read from
+        # if `read` is specified, then only grab operand indexes that are read from
         if modifiers.get('read', False):
             iterops = _instruction.ops_read
 
-        # if ``write`` is specified that only grab operand indexes that are written to
+        # if `write` is specified that only grab operand indexes that are written to
         if modifiers.get('write', False):
             iterops = _instruction.ops_write
         return iterops
@@ -865,20 +866,20 @@ class ref_t(set):
         return "ref_t({:s})".format(str().join(sorted(self)))
 
     def __init__(self, xrtype, iterable):
-        '''Construct a `ref_t` using ``xrtype`` and any semantics specified in ``iterable``.'''
+        '''Construct a ``ref_t`` using `xrtype` and any semantics specified in `iterable`.'''
         self.F = xrtype
         self.update(iterable)
 
     @classmethod
     def of(cls, xrtype):
-        '''Convert an IDA reference type in ``xrtype`` to a `ref_t`.'''
+        '''Convert an IDA reference type in `xrtype` to a ``ref_t``.'''
         res = cls.__mapper__.get(xrtype, '')
         return cls(xrtype, res)
     of_type = of
 
     @classmethod
     def of_state(cls, state):
-        '''Convert a `ref_t` in ``state`` back into an IDA reference type.'''
+        '''Convert a ``ref_t`` in `state` back into an IDA reference type.'''
         if state == '*':
             return cls(31, '*')     # code 31 used internally by ida-minsc
         res = set(state)
@@ -891,7 +892,7 @@ class ref_t(set):
 class AddressOpnumReftype(namedtypedtuple):
     """
     This tuple is used to represent references that include an operand number
-    and has the format ``(address, opnum, ref_t)``. The operand number is
+    and has the format `(address, opnum, ref_t)`. The operand number is
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
@@ -903,7 +904,7 @@ OREF = AddressOpnumReftype
 #      .range/.cases more accurately instead of them being based on .elbase.
 class switch_t(object):
     """
-    This object is a wrapper around the `idaapi.switch_info_ex_t` class and
+    This object is a wrapper around the ``idaapi.switch_info_ex_t`` class and
     allows for easily querying the semantics of the different attributes that
     are exposed by the switch_info_ex_t. A number of methods are provided
     which allow one to enumerate the valid case numbers, the handlers for them
@@ -968,7 +969,7 @@ class switch_t(object):
         '''Return whether the switch performs a translation (subtract) on the index.'''
         return self.object.is_subtract()
     def case(self, case):
-        '''Return the handler for a particular ``case``.'''
+        '''Return the handler for a particular `case`.'''
         # return the ea of the specified case number
         # FIXME: check that this works with a different .ind_lowcase
         if case < self.base or case >= self.count + self.base:
@@ -979,7 +980,7 @@ class switch_t(object):
             idx = self.index[idx]
         return self.branch[idx]
     def handler(self, ea):
-        '''Return all the cases that are handled by the address ``ea`` as a tuple.'''
+        '''Return all the cases that are handled by the address `ea` as a tuple.'''
         return tuple(case for case in self.range if self.case(case) == ea)
     @property
     def cases(self):
@@ -998,7 +999,7 @@ class switch_t(object):
         return "<type '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
 
 def xiterate(ea, start, next):
-    '''Utility function for iterating through idaapi's xrefs from ``start`` to ``end``.'''
+    '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
     getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
     ea = ea if getflags(ea) & idaapi.FF_DATA else idaapi.prev_head(ea, 0)
 
@@ -1009,10 +1010,10 @@ def xiterate(ea, start, next):
     return
 
 def addressOfRuntimeOrStatic(func):
-    """Used to determine if ``func`` is a statically linked address or a runtime-linked address.
+    """Used to determine if `func` is a statically linked address or a runtime-linked address.
 
-    This returns a tuple of the format ``(runtimeQ, address)`` where
-    ``runtimeQ`` is a boolean returning true if the symbol is linked
+    This returns a tuple of the format `(runtimeQ, address)` where
+    `runtimeQ` is a boolean returning true if the symbol is linked
     during runtime.
     """
     import function
@@ -1046,9 +1047,9 @@ def addressOfRuntimeOrStatic(func):
 class fc_block_type_t:
     """
     This namespace contains a number of internal enumerations for
-    `idaapi.FlowChart` that were missed by IDAPython. This can
+    ``idaapi.FlowChart`` that were missed by IDAPython. This can
     be used for checking the type of the various elements within
-    an `idaapi.FlowChart`.
+    an ``idaapi.FlowChart``.
     """
     fcb_normal = 0  # normal block
     fcb_indjump = 1 # block ends with indirect jump
@@ -1103,10 +1104,10 @@ class architecture_t(object):
     r = register = property(fget=lambda s: s.__register__)
 
     def __init__(self, **cache):
-        """Instantiate an `architecture_t` object which represents the registers available to an architecture.
+        """Instantiate an ``architecture_t`` object which represents the registers available to an architecture.
 
-        If ``cache`` is defined, then use the specified dictionary to map
-        an IDA register's ``(name, dtype)`` to a string containing the
+        If `cache` is defined, then use the specified dictionary to map
+        an IDA register's `(name, dtype)` to a string containing the
         more commonly recognized register name.
         """
         self.__register__, self.__cache__ = map_t(), cache.get('cache', {})
@@ -1156,7 +1157,7 @@ class architecture_t(object):
         return res
 
     def by_index(self, index):
-        """Lookup a register according to its ``index``.
+        """Lookup a register according to its `index`.
 
         The default size is based on the architecture that IDA is using.
         """
@@ -1164,7 +1165,7 @@ class architecture_t(object):
         return self.by_name(res)
 
     def by_indextype(self, index, dtype):
-        """Lookup a register according to its ``index`` and ``dtype``.
+        """Lookup a register according to its `index` and `dtype`.
 
         Some examples of dtypes: idaapi.dt_byte, idaapi.dt_word, idaapi.dt_dword, idaapi.dt_qword
         """
@@ -1173,7 +1174,7 @@ class architecture_t(object):
         return getattr(self.__register__, name)
 
     def by_name(self, name):
-        '''Lookup a register according to its ``name``.'''
+        '''Lookup a register according to its `name`.'''
         if any(name.startswith(prefix) for prefix in ('%', '$')):        # at&t, mips
             return getattr(self.__register__, name[1:].lower())
         if name.lower() in self.__register__:
@@ -1181,12 +1182,12 @@ class architecture_t(object):
         return getattr(self.__register__, name)
 
     def by_indexsize(self, index, size):
-        '''Lookup a register according to its ``index`` and ``size``.'''
+        '''Lookup a register according to its `index` and `size`.'''
         dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
         dtype = dtype_by_size(size)
         return self.by_indextype(index, dtype)
     def promote(self, register, size=None):
-        '''Promote the specified ``register`` to its next larger ``size``.'''
+        '''Promote the specified `register` to its next larger `size`.'''
         parent = internal.utils.fcompose(operator.attrgetter('__parent__'), internal.utils.fbox, functools.partial(filter, None), iter, next)
         try:
             if size is None:
@@ -1196,7 +1197,7 @@ class architecture_t(object):
         cls = self.__class__
         raise internal.exceptions.RegisterNotFoundError("{:s}.promote({:s}{:s}) : Unable to determine the register to promote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
     def demote(self, register, size=None):
-        '''Demote the specified ``register`` to its next smaller ``size``.'''
+        '''Demote the specified `register` to its next smaller `size`.'''
         childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('iteritems'))
         firstchild = internal.utils.fcompose(childitems, functools.partial(sorted, key=operator.itemgetter(0)), iter, next, operator.itemgetter(1))
         try:
@@ -1210,7 +1211,7 @@ class architecture_t(object):
 class bounds_t(namedtypedtuple):
     """
     This tuple is used to represent references that describe a bounds
-    and has the format ``(left, right)``.
+    and has the format `(left, right)`.
     """
     _fields = ('left', 'right')
     _types = (six.integer_types, six.integer_types)
