@@ -130,6 +130,11 @@ class SizeMismatchError(SerializationError):
     There was an error while trying to serialize or deserialize the specified data due to its size not matching.
     """
 
+class UnknownPrototypeError(E.LookupError):
+    """
+    The requested prototype does not match any of the ones that are available.
+    """
+
 #structure:742 and previous to it should output the module name, classname, and method
 #comment:334 should catch whatever tree.find raises
 #comment:100 (this needs some kind of error when the symbol or token component is not found)
