@@ -23,7 +23,7 @@ from six.moves import builtins
 
 import functools, operator, itertools, types
 import sys, os, logging
-import math, array, fnmatch, re, ctypes
+import math, array as _array, fnmatch, re, ctypes
 
 import function, segment
 import structure as _structure, instruction as _instruction
@@ -4393,19 +4393,24 @@ class get(object):
         # Some 32-bit versions of python might not have array.array('Q')
         # and some versions of IDA also might not have FF_QWRD..
         try:
-            array.array('Q')
+            _array.array('Q')
             numerics[idaapi.FF_QWRD] = 'Q'
         except (AttributeError, ValueError):
             pass
 
-        lnumerics = {
-            idaapi.FF_QWRD : 8,
-        }
+        # lookup table for long-numerics that require manually reading
+        lnumerics = {}
+
+        # if we have FF_QWRD defined but its not in _array, then add it to our
+        # long-numerics so we can read them
+        if hasattr(idaapi, 'FF_QWRD') and getattr(idaapi, 'FF_QWRD') not in numerics:
+            lnumerics[idaapi.FF_QWRD] = 8
 
         # FF_OWORD, FF_YWORD and FF_ZWORD might not exist in older versions
-        # of IDA, so try to add them to lnumerics "softly".
+        # of IDA, so try to add them to our long-numerics "softly".
         try:
-            lnumerics[idaapi.FF_OWORD] = 16,
+            lnumerics[idaapi.FF_QWRD] = 8
+            lnumerics[idaapi.FF_OWORD] = 16
             lnumerics[idaapi.FF_YWORD] = 32
             lnumerics[idaapi.FF_ZWORD] = 64
         except AttributeError:
@@ -4441,7 +4446,7 @@ class get(object):
 
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
-        res = array.array(t, read(ea, count * cb))
+        res = _array.array(t, read(ea, count * cb))
         if len(res) != count:
             logging.warn("{:s}.get({:#x}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, len(res), count))
         return res
