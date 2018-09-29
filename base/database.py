@@ -4125,11 +4125,21 @@ class set(object):
 
     struc = struct = utils.alias(structure, 'set')
 
+    @utils.multicase(type=types.ListType)
+    @classmethod
+    def array(cls, type):
+        '''Set the data at the current address to an array of the specified `type`.'''
+        return cls.array(ui.current.address(), type, 1)
     @utils.multicase(length=six.integer_types)
     @classmethod
     def array(cls, type, length):
         '''Set the data at the current address to an array with the specified `length` and `type`.'''
         return cls.array(ui.current.address(), type, length)
+    @utils.multicase(ea=six.integer_types, type=types.ListType)
+    @classmethod
+    def array(cls, ea, type):
+        '''Set the data at the address `ea` to an array of the specified `type`.'''
+        return cls.array(ea, type, 1)
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
