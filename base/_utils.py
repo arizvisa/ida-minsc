@@ -16,6 +16,7 @@ import sys, heapq, collections
 
 import multiprocessing, Queue
 
+import internal
 import idaapi
 
 __all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','fapply','fcurry','frpartial','freversed','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
@@ -197,8 +198,25 @@ class multicase(object):
             # ..and then restore the wrapper to its former glory
             return cons(res)
 
+        # validate type arguments
+        for n, t in t_args.iteritems():
+            if not isinstance(t, (types.TypeType, types.TupleType)) and t not in {callable}:
+                error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+                raise internal.exceptions.InvalidParameterError("@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, n))
+            continue
+
+        # validate arguments containing original callable
+        try:
+            for c in other:
+                cls.ex_function(c)
+        except:
+            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+            raise internal.exceptions.InvalidParameterError("@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
+
+        # throw an exception if we were given an unexpected number of arguments
         if len(other) > 1:
-            raise SyntaxError("{:s} : More than one callable was specified ({!r}). Not sure which callable to clone original state from.".format('.'.join(('internal', __name__, cls.__name__)), other))
+            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+            raise internal.exceptions.InvalidParameterError("@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(c.co_name if isinstance(c, types.CodeType) else c.__name__) for c in other)))
         return result
 
     @classmethod
@@ -216,10 +234,10 @@ class multicase(object):
         return '\n'.join(res)
 
     @classmethod
-    def prototype(cls, func, types={}):
+    def prototype(cls, func, parameters={}):
         '''Generate a prototype for an instance of a function.'''
         args, defaults, (star, starstar) = cls.ex_args(func)
-        argsiter = (("{:s}={:s}".format(n, "{:s}".format('|'.join(t.__name__ for t in types[n])) if not isinstance(types[n], type) and hasattr(types[n], '__iter__') else types[n].__name__) if types.has_key(n) else n) for n in args)
+        argsiter = ("{:s}={:s}".format(n, parameters[n].__name__ if isinstance(parameters[n], types.TypeType) or parameters[n] in {callable} else '|'.join(t.__name__ for t in parameters[n]) if hasattr(parameters[n], '__iter__') else "{!r}".format(parameters[n])) if parameters.has_key(n) else n for n in args)
         res = (argsiter, ("*{:s}".format(star),) if star else (), ("**{:s}".format(starstar),) if starstar else ())
         return "{:s}({:s})".format(func.func_name, ', '.join(itertools.chain(*res)))
 
@@ -262,9 +280,9 @@ class multicase(object):
             # we should have a match
             return f, (tuple(args[:sa]) + a, wA, wK)
 
-        error_arguments = (n.__class__.__name__ for n in args)
-        error_keywords = ("{:s}={:s}".format(n, kwds[n].__class__.__name__) for n in kwds)
-        raise LookupError("@multicase.call({:s}, The type {{{!s}}}) does not match any of the available prototypes. The prototypes that are available are {:s}.".format(', '.join(error_arguments) if args else '*()', ', '.join(error_keywords), ', '.join(cls.prototype(f, t) for f, t, _ in heap)))
+        error_arguments = [n.__class__.__name__ for n in args]
+        error_keywords = ["{:s}={!s}".format(n, kwds[n].__class__.__name__) for n in kwds]
+        raise internal.exceptions.UnknownPrototypeError("@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(cls.prototype(f, t) for f, t, _ in heap)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
@@ -304,7 +322,7 @@ class multicase(object):
             return res
         elif isinstance(object, (staticmethod, classmethod)):
             return object.__func__
-        raise TypeError, object
+        raise internal.exceptions.InvalidTypeOrValueError(object)
 
     @classmethod
     def reconstructor(cls, n):
@@ -319,7 +337,7 @@ class multicase(object):
             return lambda f: types.InstanceType(type(n), dict(f.__dict__))
         if isinstance(n, (types.TypeType, types.ClassType)):
             return lambda f: type(n)(n.__name__, n.__bases__, dict(f.__dict__))
-        raise NotImplementedError, type(func)
+        raise internal.exceptions.InvalidTypeOrValueError(type(n))
 
     @classmethod
     def ex_args(cls, f):
