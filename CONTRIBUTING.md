@@ -1,59 +1,80 @@
 # Contributing to IDA-minsc
 
-First of all, all development happens within in the `development` branch.
-I tend to modify this thing pretty sloppily, so I figure by adding broken
-things to a different branch this might improve stability or something.
-When you submit a pull request, please submit it against this branch as 
-this branch will eventually be merged into `master`.
+Contribution to the IDA-minsc plugin is pretty much exclusively done with
+GitHub's interface. Hence, there are numerous places in which one can to
+contribute to the IDA-minsc plugin. Some of these places can be the
+documentation, the plugin itself, writing tutorials, blogposts, adding to
+the project wiki, helping with user issues, or even idling on the irc
+channel.
 
 ## Issues
 
-If you're unsure of something or the documentation isn't clear, feel
-free to create an issue and someone will try and help you figure it out.
+If you're unsure of how to do something or the documentation isn't clear,
+feel free to create an issue and someone will try and help you figure it
+out, or the documentation can be updated with your concern.
+
+If you find yourself constantly typing something and discovering it not
+being there, or if you desire a shorter alias for some common namespace
+that you use, feel free to create an issue requesting an alias be made.
+This can then be discussed and possibly merged if it doesn't conflict
+with something in the future and it's (of course) reasonable.
 
 ### Reporting an issue
 
-Of course, search the current issue list to see if someone else has
-already reported it. Typically I'll self-report issues, but who knows.
+Before reporting an issue, search the current issue tracker to see if
+someone else has already reported your issue. If it is related to
+another issue, feel free to reference that in your new issue's details.
+Any duplicate issues will be re-referenced and closed so that related
+discussion can occur in the original issue that was reported.
 
-When creating an issue be sure to include the version of IDA you're using,
+When creating your issue be sure to include the version of IDA you're using,
 the platform it's running on (32-bit or 64-bit), the architecture of your
-database, and whatever code you're running that doesn't work. Pretty
-straight-forward...
+database, and whatever code you're running that doesn't appear to work.
 
 ## Pull requests
 
-When submitting a pull request, keep in mind about what version of IDA
-your PR doesn't work on as this plugin needs to be backwards compatible
-with IDA 6.9 (before the `idaapi` modules were split up). If your
-addition does not support IDA 6.9, please make sure you mention it in
-the details when you submit your PR.
+When submitting a pull request, please rebase it against `master` before
+submitting. If you are creating a fix for a particular issue, please name
+the branch according to the issue number as `GH-#`. This causes GitHub
+to automatically create a reference which allows for simple correlation
+of PRs to the issues that they are for.
 
-Another thing to keep in mind is which module (or context) your
-addition is for. If it warrants a new base module, please mention it
-and we can discuss what the best way to do this might be.
+When submitting a pull request, keep in mind about what version of IDA
+your PR doesn't work on. This plugin aims to be backwards compatible
+with IDA all the way back to 6.9. This is right before the `idaapi`
+module was split up into its current state. If your addition does not
+support one of these versions, please make sure you mention it in
+the details of the PR you're trying to get merged upstream so a
+committer can come up with a solution or workaround if possible.
+
+Another thing to pay attention to is which module (or context) your
+addition is for. If your addition warrants the creation of a new base
+module, please create a separate PR with details about why you feel
+that a new module is necessary along with a reference to the PR that
+includes your addition. This way the creation of new modules can be
+discussed or possibly staged inside a different path before your new
+functionality gets added to them.
 
 The last thing to note is keep in mind how multicase functions work.
-If you're not sure of what these are, please refer again to
-documentation. If you're adding a new function, try and consider what
-other types your function might be able to take, and how many ways
-a user can get to those types.
-
-Again, if you're not sure. Submit the PR to start a discussion, and
-we can discuss what other requirements there might be.
+If you're not sure of what these are, please refer to the documentation.
+When you are adding a new function, try and consider what other types
+your function might be able to take, and the different ways the plugin
+can automatically determine those types using IDA.
 
 ### Pull requests in progress
 
 If you're still working on a pull request, you can prefix the title of
-your pull request with "[WIP]". This will notify any committers that your
-PR is still in development.  When you're ready for it to be merged,
-remove the prefix or mention it in the discussion and after it's reviewed,
-it will likely get merged.
+your pull request with "[WIP]". This will notify any user with commit
+access that your PR is still in development. When you're ready for it
+to be merged, remove the prefix or mention it in the discussion so
+that way it can be reviewed before it gets merged.
 
 ### Titling pull requests
 
-When titling the pull request, prefix it with either the module you're modifying
-or if it's in the root directory, include the full filename.
+When titling the pull request, prefix it with the path that the user
+needs to type at the IDAPython prompt in order to navigate to the
+module that contains your addition. If the addition is within a file
+in the root directory, include the full filename.
 
 As an example, the `base/database.py` module might have a title of:
 
@@ -63,52 +84,55 @@ Another example, say for `idapythonrc.py` could be:
 
     idapythonrc.py: added support for external plugins
 
-This should result in much better looking (and easier to follow) commit
-logs than the author's.
+This way it is immediately apparent to the committer what component
+of IDA the addition is for.
 
 ### Pull requests for documentation
 
 The `docs` branch contains the current state of documentation for this
 plugin. Each module's documentation is actually generated by the
-`docs/docparse.py` file based on some magic decorators in the
-`base/_document.py` module.
+`docs/docparse.py` file based on some magic decorators that are used
+to communicate semantics to the document parser.
 
 This means other than the static documentation in `docs/static`, the
 documentation for each function and its parameters will need to be
 modified within the module that actually contains it.
 
-If something on there is badly documented or is missing for
-some crazy reason, please prefix your PR title with "docs/" and follow
-the same method as described in "Titling pull requests". If you've
-updated the documentation for "matching.rst", then title it like:
+If something on there is poorly documented or is missing for some
+reason, please prefix your PR title with "docs/" and follow the same
+method as described in "Titling pull requests". If you've updated the
+documentation for "matching.rst", then title it like:
 
     docs/matching: fixed some really bad english
 
-Or if it's some documentation in a specific module such as
-`base/instruction.py`:
+Or if it's some documentation in a particular module such as
+`base/instruction.py` one can use:
 
     docs/instruction: fixed the spacing for the module autodocs
 
 The reason being is that any modifications to the documentation's
 autodocs will need to be backported into the `master` branch. This
-"docs/" prefix will notify me that it needs to happen.
+"docs/" prefix will notify the primary committer that this needs to
+happen.
 
 ## Requested work
 
 The following pull requests are desired:
 
-* Pull requests that introduce new architecture (registers or operands)
-* Pull requests involving the decompiler (I don't really like it, so
-  I have no reason to write wrappers around it)
-* Bug fixes (I did a lot of refactoring to get this to a release point.
-  There's a chance I broke some things, but who knows).
-* Documentation fixes
+* Pull requests that introduce support for new architectures (registers
+  or operands)
+* Pull requests involving the decompiler (I don't really use it, thus
+  I haven't found a reason to write wrappers around its functionality)
+* Bug fixes (A lot of refactoring was done to get this plugin to a
+  release state. Some stuff might be broken, but who knows)
+* Documentation issues or especially translation to other languages
+* Fixes for any of the issues that are listed in GitHub's issue tracker
 
 ## New Versions of IDA (Tags)
 
-If a new version of IDA gets release, a new tag will be created with
-a name matching the previous version of IDA that the plugin was developed
-against. This is primarily for bisecting against if something in the
+If a new version of IDA gets released, a new git tag will be created with
+its name matching the previous version of IDA that the plugin was developed
+against. This is primarily for bisecting against in case something in the
 future gets broken. IDAPython's API is pretty much a moving target so
 we need all the help we can get!
 
