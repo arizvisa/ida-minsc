@@ -4139,18 +4139,18 @@ class set(object):
         # the specified length
         if isinstance(type, list):
             t, l = type
-            realtype = [t, l * length]
+            realtype, reallength = [t, l * length], l * length
 
         # otherwise, promote it into an array
         else:
-            realtype = [type, length]
+            realtype, reallength = [type, length], length
 
         # now we can figure out its IDA type
         flags, typeid, nbytes = interface.typemap.resolve(realtype)
         ok = idaapi.create_data(ea, flags, nbytes, typeid)
         if not ok:
             raise E.DisassemblerError("{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join((__name__, cls.__name__)), ea, type, length))
-        return get.array(ea, length=length)
+        return get.array(ea, length=reallength)
 
 class get(object):
     """
