@@ -225,8 +225,8 @@ database via :py:func:`database.functions`.
    of. We can do this using :py:func:`instruction.op_type()<instruction.opt>`
    which is aliased as :py:func:`instruction.opt<instruction.opt>`. Actually,
    in order to check our results, let's actually store *all* of the operand
-   types using its plural, :py:func:`instruction.ops_type`. As usual, this
-   has an abbreviated alias of :py:func:`instruction.opts<instruction.ops_type>`.
+   types using its plural form, :py:func:`instruction.ops_type<instruction.opts>`.
+   As usual, this has an abbreviated alias of :py:func:`instruction.opts`.
    We'll also keep things clean again, by removing the previous tag,
    "indirect-call".
 
@@ -363,8 +363,9 @@ database via :py:func:`database.functions`.
    >
    > print "Dumped breakpoints to %s"% filename
 
-12. If another user wants to import this pickled object, we can again use the
-    :py:mod:`custom.tags<tags>` to help us.
+12. Again, if a user wants to import these pickled tags into their database,
+    then can simply unpickle the object and then use the functionality
+    available within the :py:mod:`custom.tags<tags>` module to do this.
 
 .. code-block:: python
 
