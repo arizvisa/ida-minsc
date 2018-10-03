@@ -19,7 +19,7 @@ import multiprocessing, Queue
 import internal
 import idaapi
 
-__all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','fapply','fcurry','frpartial','freversed','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','fapply','fcurry','frpartial','freverse','freversed','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
