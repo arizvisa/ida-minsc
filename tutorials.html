@@ -259,8 +259,8 @@ determine which registers the instructions’ operands are composed
 of. We can do this using <a class="reference internal" href="modules/instruction.html#instruction.opt" title="instruction.opt"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_type()</span></code></a>
 which is aliased as <a class="reference internal" href="modules/instruction.html#instruction.opt" title="instruction.opt"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opt</span></code></a>. Actually,
 in order to check our results, let’s actually store <em>all</em> of the operand
-types using its plural, <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_type()</span></code>. As usual, this
-has an abbreviated alias of <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opts</span></code>.
+types using its plural form, <a class="reference internal" href="modules/instruction.html#instruction.opts" title="instruction.opts"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_type</span></code></a>.
+As usual, this has an abbreviated alias of <a class="reference internal" href="modules/instruction.html#instruction.opts" title="instruction.opts"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.opts()</span></code></a>.
 We’ll also keep things clean again, by removing the previous tag,
 “indirect-call”.</li>
 </ol>
@@ -396,8 +396,9 @@ them the “break-calli” tags which can be exported via the following code.</l
 </pre></div>
 </div>
 <ol class="arabic simple" start="12">
-<li>If another user wants to import this pickled object, we can again use the
-<a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a> to help us.</li>
+<li>Again, if a user wants to import these pickled tags into their database,
+then can simply unpickle the object and then use the functionality
+available within the <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a> module to do this.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">with</span> <span class="nb">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="nb">input</span><span class="p">:</span>

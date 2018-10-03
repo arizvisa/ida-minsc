@@ -5259,7 +5259,21 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 
 <dl class="function">
 <dt id="database.set.array">
-<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>type</em>, <em>length</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.array" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>type</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.array" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to an array of the specified <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>type</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>type</em>, <em>length</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the data at the current address to an array with the specified <code class="docutils literal notranslate"><span class="pre">length</span></code> and <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -5268,6 +5282,24 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>type</strong> – a pythonic type</li>
 <li><strong>length</strong> (<em>int</em><em> or </em><em>long</em>) – the number of elements in the array</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em>, <em>type</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an array of the specified <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>type</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – </li>
 </ul>
 </td>
 </tr>
