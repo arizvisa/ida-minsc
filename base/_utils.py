@@ -14,8 +14,6 @@ import logging, types, weakref
 import functools, operator, itertools
 import sys, heapq, collections
 
-import multiprocessing, Queue
-
 import internal
 import idaapi
 
@@ -378,41 +376,52 @@ class alias(object):
         res.__doc__ = document
         return res
 
-### asynchronous process monitor
-import sys, os, threading, weakref, subprocess, time, itertools, operator
+### namespace for asynchronous process monitor
+class Asynchronous:
+    import threading
+    Thread, Event = map(staticmethod, (threading.Thread, threading.Event))
+
+    import Queue
+    Queue, QueueEmptyException = map(staticmethod, (Queue.Queue, Queue.Empty))
+
+    import subprocess
+    spawn, spawn_options = map(staticmethod, (subprocess.Popen, subprocess))
+
+### warm up some pasta
+import sys, os, weakref, time, itertools, shlex
 
 # monitoring an external process' i/o via threads/queues
 class process(object):
     """Spawns a program along with a few monitoring threads for allowing asynchronous(heh) interaction with a subprocess.
 
     mutable properties:
-    program -- subprocess.Popen instance
-    commandline -- subprocess.Popen commandline
-    eventWorking -- threading.Event() instance for signalling task status to monitor threads
-    stdout, stderr -- callables that are used to process available work in the taskQueue
+    program -- Asynchronous.spawn result
+    commandline -- Asynchronous.spawn commandline
+    eventWorking -- Asynchronous.Event() instance for signalling task status to monitor threads
+    stdout,stderr -- callables that are used to process available work in the taskQueue
 
     properties:
     id -- subprocess pid
     running -- returns true if process is running and monitor threads are workingj
     working -- returns true if monitor threads are working
     threads -- list of threads that are monitoring subprocess pipes
-    taskQueue -- Queue.Queue() instance that contains work to be processed
-    exceptionQueue -- Queue.Queue() instance containing exceptions generated during processing
+    taskQueue -- Asynchronous.Queue() instance that contains work to be processed
+    exceptionQueue -- Asynchronous.Queue() instance containing exceptions generated during processing
     (process.stdout, process.stderr)<Queue> -- Queues containing output from the spawned process.
     """
 
-    program = None              # subprocess.Popen object
-    id = property(fget=lambda s: s.program and s.program.pid or -1)
-    running = property(fget=lambda s: False if s.program is None else s.program.poll() is None)
-    working = property(fget=lambda s: s.running and not s.eventWorking.is_set())
-    threads = property(fget=lambda s: list(s.__threads))
-    updater = property(fget=lambda s: s.__updater)
+    program = None              # Asynchronous.spawn result
+    id = property(fget=lambda self: self.program and self.program.pid or -1)
+    running = property(fget=lambda self: False if self.program is None else self.program.poll() is None)
+    working = property(fget=lambda self: self.running and not self.eventWorking.is_set())
+    threads = property(fget=lambda self: list(self.__threads))
+    updater = property(fget=lambda self: self.__updater)
 
-    taskQueue = property(fget=lambda s: s.__taskQueue)
-    exceptionQueue = property(fget=lambda s: s.__exceptionQueue)
+    taskQueue = property(fget=lambda self: self.__taskQueue)
+    exceptionQueue = property(fget=lambda self: self.__exceptionQueue)
 
     def __init__(self, command, **kwds):
-        """Creates a new instance that monitors subprocess.Popen(`command`), the created process starts in a paused state.
+        """Creates a new instance that monitors Asynchronous.spawn(`command`), the created process starts in a paused state.
 
         Keyword options:
         env<dict> = os.environ -- environment to execute program with
@@ -421,66 +430,71 @@ class process(object):
         newlines<bool> = True -- allow python to tamper with i/o to convert newlines
         show<bool> = False -- if within a windowed environment, open up a console for the process.
         paused<bool> = False -- if enabled, then don't start the process until .start() is called
-        timeout<float> = -1 -- if positive, then raise a Queue.Empty exception at the specified interval.
+        timeout<float> = -1 -- if positive, then raise a Asynchronous.Empty exception at the specified interval.
         """
-        # default properties
+        ## default properties
         self.__updater = None
         self.__threads = weakref.WeakSet()
         self.__kwds = kwds
-        self.commandline = command
 
-        import Queue
-        self.eventWorking = threading.Event()
-        self.__taskQueue = Queue.Queue()
-        self.__exceptionQueue = Queue.Queue()
+        args = shlex.split(command) if isinstance(command, basestring) else command[:]
+        command = args.pop(0)
+        self.command = command, args[:]
+
+        self.eventWorking = Asynchronous.Event()
+        self.__taskQueue = Asynchronous.Queue()
+        self.__exceptionQueue = Asynchronous.Queue()
 
         self.stdout = kwds.pop('stdout')
         self.stderr = kwds.pop('stderr')
 
-        # start the process
-        not kwds.get('paused', False) and self.start(command)
+        ## start the process
+        not kwds.get('paused', False) and self.start()
 
-    def start(self, command=None, **options):
-        '''Start the specified `command` with the requested `options`.'''
+    def start(self, **options):
+        '''Start the command with the requested `options`.'''
         if self.running:
             raise OSError("Process {:d} is still running.".format(self.id))
         if self.updater or len(self.threads):
             raise OSError("Process {:d} management threads are still running.".format(self.id))
 
-        kwds = dict(self.__kwds)
+        ## copy our default options into a dictionary
+        kwds = self.__kwds.copy()
         kwds.update(options)
-        command = command or self.commandline
 
         env = kwds.get('env', os.environ)
         cwd = kwds.get('cwd', os.getcwd())
         newlines = kwds.get('newlines', True)
         shell = kwds.get('shell', False)
         stdout, stderr = options.pop('stdout', self.stdout), options.pop('stderr', self.stderr)
-        self.program = process.subprocess(command, cwd, env, newlines, joined=(stderr is None) or stdout == stderr, shell=shell, show=kwds.get('show', False))
-        self.commandline = command
+
+        ## spawn our subprocess using our new outputs
+        self.program = process.subprocess([self.command[0]] + self.command[1], cwd, env, newlines, joined=(stderr is None) or stdout == stderr, shell=shell, show=kwds.get('show', False))
         self.eventWorking.clear()
 
-        # monitor program's i/o
+        ## monitor program's i/o
         self.__start_monitoring(stdout, stderr)
         self.__start_updater(timeout=kwds.get('timeout', -1))
 
-        # start monitoring
+        ## start monitoring
         self.eventWorking.set()
         return self
 
     def __start_updater(self, daemon=True, timeout=0):
         '''Start the updater thread. **used internally**'''
-        import Queue
+
+        ## define the closure that wraps our co-routines
         def task_exec(emit, data):
             if hasattr(emit, 'send'):
                 res = emit.send(data)
                 res and P.write(res)
             else: emit(data)
 
+        ## define the closures that block on the specified timeout
         def task_get_timeout(P, timeout):
             try:
                 emit, data = P.taskQueue.get(block=True, timeout=timeout)
-            except Queue.Empty:
+            except Asynchronous.QueueEmptyException:
                 _, _, tb = sys.exc_info()
                 P.exceptionQueue.put(StopIteration, StopIteration(), tb)
                 return ()
@@ -488,9 +502,9 @@ class process(object):
 
         def task_get_notimeout(P, timeout):
             return P.taskQueue.get(block=True)
-
         task_get = task_get_timeout if timeout > 0 else task_get_notimeout
 
+        ## define the closure that updates our queues and results
         def update(P, timeout):
             P.eventWorking.wait()
             while P.eventWorking.is_set():
@@ -505,48 +519,63 @@ class process(object):
                 except:
                     P.exceptionQueue.put(sys.exc_info())
                 finally:
-                    P.taskQueue.task_done()
+                    hasattr(P.taskQueue, 'task_done') and P.taskQueue.task_done()
                 continue
             return
 
-        self.__updater = updater = threading.Thread(target=update, name="thread-%x.update"% self.id, args=(self, timeout))
+        ## actually create and start our update threads
+        self.__updater = updater = Asynchronous.Thread(target=update, name="thread-{:x}.update".format(self.id), args=(self, timeout))
         updater.daemon = daemon
         updater.start()
         return updater
 
     def __start_monitoring(self, stdout, stderr=None):
         '''Start monitoring threads. **used internally**'''
-        program = self.program
-        name = "thread-{:x}".format(program.pid)
+        name = "thread-{:x}".format(self.program.pid)
 
-        # create monitoring threads + coroutines
+        ## create monitoring threads (coroutines)
         if stderr:
-            res = process.monitorPipe(self.taskQueue, (stdout, program.stdout), (stderr, program.stderr), name=name)
+            res = process.monitorPipe(self.taskQueue, (stdout, self.program.stdout), (stderr, self.program.stderr), name=name)
         else:
-            res = process.monitorPipe(self.taskQueue, (stdout, program.stdout), name=name)
+            res = process.monitorPipe(self.taskQueue, (stdout, self.program.stdout), name=name)
 
+        ## attach a friendly method that allows injection of data into the monitor
         res = map(None, res)
-        # attach a method for injecting data into a monitor
         for t, q in res: t.send = q.send
         threads, senders = zip(*res)
 
-        # update threads for destruction later
+        ## update our set of threads for destruction later
         self.__threads.update(threads)
 
-        # set things off
+        ## set everything off
         for t in threads: t.start()
 
     @staticmethod
-    def subprocess(program, cwd, environment, newlines, joined, shell=True, show=False):
-        '''Create a subprocess using subprocess.Popen.'''
-        stderr = subprocess.STDOUT if joined else subprocess.PIPE
+    def subprocess(program, cwd, environment, newlines, joined, shell=(os.name == 'nt'), show=False):
+        '''Create a subprocess using Asynchronous.spawn.'''
+        stderr = Asynchronous.spawn_options.STDOUT if joined else Asynchronous.spawn_options.PIPE
+
+        ## collect our default options for calling Asynchronous.spawn (subprocess.Popen)
+        options = dict(universal_newlines=newlines, stdin=Asynchronous.spawn_options.PIPE, stdout=Asynchronous.spawn_options.PIPE, stderr=stderr)
         if os.name == 'nt':
-            si = subprocess.STARTUPINFO()
-            si.dwFlags = subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0 if show else subprocess.SW_HIDE
-            cf = subprocess.CREATE_NEW_CONSOLE if show else 0
-            return subprocess.Popen(program, universal_newlines=newlines, shell=shell, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, close_fds=False, startupinfo=si, creationflags=cf, cwd=cwd, env=environment)
-        return subprocess.Popen(program, universal_newlines=newlines, shell=shell, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, close_fds=True, cwd=cwd, env=environment)
+            options['startupinfo'] = si = Asynchronous.spawn_options.STARTUPINFO()
+            si.dwFlags = Asynchronous.spawn_options.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0 if show else Asynchronous.spawn_options.SW_HIDE
+            options['creationflags'] = cf = Asynchronous.spawn_options.CREATE_NEW_CONSOLE if show else 0
+            options['close_fds'] = False
+            options.update(dict(close_fds=False, startupinfo=si, creationflags=cf))
+        else:
+            options['close_fds'] = True
+        options['cwd'] = cwd
+        options['env'] = environment
+        options['shell'] = shell
+
+        ## split our arguments out if necessary
+        command = shlex.split(program) if isinstance(program, basestring) else program[:]
+
+        ## finally hand it off to subprocess.Popen
+        try: return Asynchronous.spawn(command, **options)
+        except OSError: raise OSError("Unable to execute command: {!r}".format(command))
 
     @staticmethod
     def monitorPipe(q, (id, pipe), *more, **options):
@@ -570,10 +599,19 @@ class process(object):
         For every single byte, `send` is called. The thread is named according to
         the `name` parameter.
 
-        Returns the monitoring threading.thread instance
+        Returns the monitoring Asynchronous.Thread instance
         """
+
+        # FIXME: if we can make this asychronous on windows, then we can
+        #        probably improve this significantly by either watching for
+        #        a newline (newline buffering), or timing out if no data was
+        #        received after a set period of time. so this way we can
+        #        implement this in a lwt, and simply swap into and out-of
+        #        shuffling mode.
         def shuffle(send, pipe):
             while not pipe.closed:
+                # FIXME: would be nice if python devers implemented support for
+                # reading asynchronously or a select.select from an anonymous pipe.
                 data = pipe.read(blocksize)
                 if len(data) == 0:
                     # pipe.read syscall was interrupted. so since we can't really
@@ -582,16 +620,20 @@ class process(object):
                     break
                 map(send, data)
             return
+
+        ## create our shuffling thread
         if name:
-            monitorThread = threading.Thread(target=shuffle, name=name, args=(send, pipe))
+            truffle = Asynchronous.Thread(target=shuffle, name=name, args=(send, pipe))
         else:
-            monitorThread = threading.Thread(target=shuffle, args=(send, pipe))
-        monitorThread.daemon = daemon
-        return monitorThread
+            truffle = Asynchronous.Thread(target=shuffle, args=(send, pipe))
+
+        ## ..and set its daemonicity
+        truffle.daemon = daemon
+        return truffle
 
     def __format_process_state(self):
         if self.program is None:
-            return "Process \"{:s}\" {:s}.".format(self.commandline, 'was never started')
+            return "Process \"{!r}\" {:s}.".format(self.command[0], 'was never started')
         res = self.program.poll()
         return "Process {:d} {:s}".format(self.id, 'is still running' if res is None else "has terminated with code {:d}".format(res))
 
@@ -601,57 +643,61 @@ class process(object):
             if self.updater and self.updater.is_alive():
                 return self.program.stdin.write(data)
             raise IOError("Unable to write to stdin for process {:d}. Updater thread has prematurely terminated.".format(self.id))
-        raise IOError("Unable to write to stdin for process. Current state is {:s}.".format(self.__format_process_state()))
+        raise IOError("Unable to write to stdin for process. {:s}.".format(self.__format_process_state()))
 
     def close(self):
         '''Closes stdin of the program.'''
         if self.running and not self.program.stdin.closed:
             return self.program.stdin.close()
-        raise IOError("Unable to close stdin for process. Current state is {:s}.".format(self.__format_process_state()))
+        raise IOError("Unable to close stdin for process. {:s}.".format(self.__format_process_state()))
 
     def signal(self, signal):
         '''Raise a signal to the program.'''
         if self.running:
             return self.program.send_signal(signal)
-        raise IOError("Unable to raise signal {!r} to process. Current state is {:s}.".format(signal, self.__format_process_state()))
+        raise IOError("Unable to raise signal {!r} to process. {:s}.".format(signal, self.__format_process_state()))
 
     def exception(self):
         '''Grab an exception if there's any in the queue.'''
         if self.exceptionQueue.empty(): return
         res = self.exceptionQueue.get()
-        self.exceptionQueue.task_done()
+        hasattr(self.exceptionQueue, 'task_done') and self.exceptionQueue.task_done()
         return res
 
     def wait(self, timeout=0.0):
         '''Wait a given amount of time for the process to terminate.'''
-        program = self.program
-        if program is None:
-            raise RuntimeError("Program {:s} is not running.".format(self.commandline))
+        if self.program is None:
+            raise RuntimeError("Program {!r} is not running.".format(self.command[0]))
 
-        if not self.running: return program.returncode
+        ## if we're not running, then return the result that we already received
+        if not self.running:
+            return self.program.returncode
+
         self.updater.is_alive() and self.eventWorking.wait()
 
+        ## spin the cpu until we timeout
         if timeout:
             t = time.time()
-            while self.running and self.eventWorking.is_set() and time.time() - t < timeout:        # spin cpu until we timeout
+            while self.running and self.eventWorking.is_set() and time.time() - t < timeout:
                 if not self.exceptionQueue.empty():
                     res = self.exception()
                     raise res[0], res[1], res[2]
                 continue
-            return program.returncode if self.eventWorking.is_set() else self.__terminate()
+            return self.program.returncode if self.eventWorking.is_set() else self.__terminate()
 
-        # return program.wait() # XXX: doesn't work correctly with PIPEs due to
-        #   pythonic programmers' inability to understand os semantics
+        ## return the program's result
+
+        # XXX: doesn't work correctly with PIPEs due to pythonic programmers' inability to understand os semantics
 
         while self.running and self.eventWorking.is_set():
             if not self.exceptionQueue.empty():
                 res = self.exception()
                 raise res[0], res[1], res[2]
-            continue    # ugh...poll-forever/kill-cpu until program terminates...
+            continue    # ugh...poll-forever (and kill-cpu) until program terminates...
 
         if not self.eventWorking.is_set():
             return self.__terminate()
-        return program.returncode
+        return self.program.returncode
 
     def stop(self):
         self.eventWorking.clear()
@@ -659,8 +705,13 @@ class process(object):
 
     def __terminate(self):
         '''Sends a SIGKILL signal and then waits for program to complete.'''
-        self.program.kill()
-        while self.running: continue
+        pid = self.program.pid
+        try:
+            self.program.kill()
+        except OSError, e:
+            logger.fatal("{:s}.__terminate : Exception {!r} was raised while trying to kill process {:d}. Terminating its management threads regardless.".format('.'.join((__name__, self.__class__.__name__)), e, pid), exc_info=True)
+        finally:
+            while self.running: continue
 
         self.__stop_monitoring()
         if self.exceptionQueue.empty():
@@ -675,18 +726,25 @@ class process(object):
         if P.poll() is None:
             raise RuntimeError("Unable to stop monitoring while process {!r} is still running.".format(P))
 
-        # stop the update thread
+        ## stop the update thread
         self.eventWorking.clear()
 
-        # forcefully close pipes that still open, this should terminate the monitor threads
-        #   also, this fixes a resource leak since python doesn't do this on subprocess death
+        ## forcefully close pipes that still open (this should terminate the monitor threads)
+
+        # also, this fixes a resource leak since python doesn't do this on subprocess death
         for p in (P.stdin, P.stdout, P.stderr):
             while p and not p.closed:
                 try: p.close()
                 except: pass
             continue
 
-        # join all monitoring threads
+        ## join all monitoring threads
+
+        # XXX: when cleaning up, this module disappears despite there still
+        #      being a reference for some reason
+        import operator
+
+        # XXX: there should be a better way to block until all threads have joined
         map(operator.methodcaller('join'), self.threads)
 
         # now spin until none of them are alive
@@ -696,16 +754,17 @@ class process(object):
                 del(th)
             continue
 
-        # join the updater thread, and then remove it
+        ## join the updater thread, and then remove it
         self.taskQueue.put(None)
         self.updater.join()
-        assert not self.updater.is_alive()
+        if self.updater.is_alive():
+            raise AssertionError
         self.__updater = None
         return
 
     def __repr__(self):
         ok = self.exceptionQueue.empty()
-        state = "running pid:{:d}".format(self.id) if self.running else "stopped cmd:\"{:s}\"".format(self.commandline)
+        state = "running pid:{:d}".format(self.id) if self.running else "stopped cmd:{!r}".format(self.command[0])
         threads = [
             ('updater', 0 if self.updater is None else self.updater.is_alive()),
             ('input/output', len(self.threads))
@@ -734,36 +793,57 @@ def spawn(stdout, command, **options):
     # spawn the sub-process
     return process(command, stdout=stdout, stderr=stderr, **options)
 
-### scheduler
+### execution scheduler
+import threading, multiprocessing, Queue
+
+# we use "multiprocessing" locks because they use straight-up and simple
+# platform-specific semaphores instead of python's stupid and unstable BGL
+# used by everything in "threading". i'm not trying to share my precious
+# (time-)slices with you, Python.
+
+# FIXME: using this result queue is a horrible way to get results.
+#        instead it'd be nice to expose a promise-like paradigm and
+#        also expose a way to directly re-prioritize the scheduler's
+#        execution queue based on which promises are checked the most
+#        often or being directly blocked on. (heapq or queue.PriorityQueue)
 class execution(object):
     __slots__ = ('queue', 'state', 'result', 'ev_unpaused', 'ev_terminating')
     __slots__+= ('thread', 'lock')
 
+    running = property(fget=lambda self: self.thread.is_alive() and self.ev_unpaused.is_set() and not s.ev_terminating.is_set())
+    dead = property(fget=lambda self: self.thread.is_alive())
+
     def __init__(self):
         '''Execute a function asynchronously in another thread.'''
 
-        # management of execution queue
+        ## management of the current execution queue
         res = multiprocessing.Lock()
         self.queue = multiprocessing.Condition(res)
         self.state = []
 
-        # results
+        ## queue of results from successful tasks
+
+        # the data in this queue is shared with the main python thread,
+        # so it's okay to use Python's giant lock here.
         self.result = Queue.Queue()
 
-        # thread management
+        ## thread-based task scheduler
         self.ev_unpaused = multiprocessing.Event()
         self.ev_terminating = multiprocessing.Event()
         self.thread = threading.Thread(target=self.__run__, name="Thread-{:s}-{:x}".format(self.__class__.__name__, id(self)))
 
-        # FIXME: we can support multiple threads, but since this is
-        #        being bound by a single lock due to my distrust for IDA
-        #        and race-conditions...we only use one.
+        # FIXME: we _can_ support multiple threads, but this is all being
+        #        bound by a single lock due to my distrust for IDAPython.
+        #        it _does_ seem to run Python stuff in its own thread, but
+        #        i don't have faith in that they're grabbing Python's huge
+        #        lock during all idaapi calls.
         self.lock = multiprocessing.Lock()
 
+        ## start our task scheduler
         return self.__start()
 
     def release(self):
-        '''Release any resources required to execute a function asynchronously.'''
+        '''Empty out all the tasks and release all the resources required to execute them.'''
         self.queue.acquire()
         self.state = []
         self.queue.release()
@@ -784,9 +864,6 @@ class execution(object):
         res = tuple(self.state)
         return "<class '{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal', __name__, cls.__name__)), state, len(res), self.result.unfinished_tasks)
 
-    running = property(fget=lambda s: s.thread.is_alive() and s.ev_unpaused.is_set() and not s.ev_terminating.is_set())
-    dead = property(fget=lambda s: s.thread.is_alive())
-
     def notify(self):
         '''Notify the execution queue that it should process anything that is queued.'''
         logging.debug("{:s}.notify : Waking up execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
@@ -795,7 +872,7 @@ class execution(object):
         self.queue.release()
 
     def next(self):
-        '''Notify the execution queue that a result is needed, then return the next one available.'''
+        '''Notify the execution queue that a result is needed, and then block until we can return the next one that's available.'''
         self.queue.acquire()
         while self.state:
             self.queue.notify()
@@ -807,17 +884,17 @@ class execution(object):
 
     def __start(self):
         cls = self.__class__
-        logging.debug("{:s}.start : Starting execution queue thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.debug("{:s}.start : Starting execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         self.ev_terminating.clear(), self.ev_unpaused.set()
         self.thread.daemon = True
         return self.thread.start()
 
     def __stop(self):
         cls = self.__class__
-        logging.debug("{:s}.stop : Terminating execution queue thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.debug("{:s}.stop : Terminating execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         if not self.thread.is_alive():
             cls = self.__class__
-            logging.warn("{:s}.stop : Execution queue has already been terminated as {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.warn("{:s}.stop : Execution scheduler has already been terminated as {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return
         self.ev_unpaused.set(), self.ev_terminating.set()
         self.queue.acquire()
@@ -829,9 +906,9 @@ class execution(object):
         '''Start to dispatch callables in the execution queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.start : Unable to resume an already terminated execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.fatal("{:s}.start : Unable to resume an already terminated execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return False
-        logging.info("{:s}.start : Resuming the execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.info("{:s}.start : Resuming the execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.set()
         self.queue.acquire()
         self.queue.notify_all()
@@ -839,12 +916,12 @@ class execution(object):
         return not res
 
     def stop(self):
-        '''Pause the execution queue.'''
+        '''Pause the execution scheduler.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.stop : Unable to pause the execution queue {!r} as it has already been terminated.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.fatal("{:s}.stop : Unable to pause the execution scheduler {!r} as it has already been terminated.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return False
-        logging.info("{:s}.stop : Pausing execution queue thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.info("{:s}.stop : Pausing execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.clear()
         self.queue.acquire()
         self.queue.notify_all()
@@ -857,7 +934,7 @@ class execution(object):
         res = functools.partial(F, *args, **kwds)
 
         cls = self.__class__
-        logging.debug("{:s}.push : Adding the callable {!r} to the execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), F, self))
+        logging.debug("{:s}.push : Adding the callable {!r} to the execution scheduler's queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), F, self))
         # shove it down a multiprocessing.Queue
         self.queue.acquire()
         self.state.append(res)
@@ -869,10 +946,10 @@ class execution(object):
         '''Pop a result off of the result queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.pop : Refusing to wait for a result when execution queue has already terminated. Execution queue is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.fatal("{:s}.pop : Refusing to wait for a result when execution scheduler has already terminated. Execution queue is currently {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             raise Queue.Empty
 
-        logging.debug("{:s}.pop : Popping result off of the execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+        logging.debug("{:s}.pop : Popping result off of the execution scheduler's result queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
         try:
             _, res, err = self.result.get(block=0)
             if err != (None, None, None):
@@ -911,14 +988,14 @@ class execution(object):
         consumer = self.__consume(self.ev_terminating, self.queue, self.state)
         executor = self.__dispatch(self.lock); next(executor)
 
-        logging.debug("{:s}.running : The execution queue is now running with thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.debug("{:s}.running : The execution scheduler is now running under thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         while not self.ev_terminating.is_set():
             # check if we're allowed to execute
             if not self.ev_unpaused.is_set():
                 self.ev_unpaused.wait()
 
             # pull a callable out of the queue
-            logging.debug("{:s}.running : Waiting for an item on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+            logging.debug("{:s}.running : Waiting for an item from schduler on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
             self.queue.acquire()
             item = next(consumer)
             self.queue.release()
@@ -930,20 +1007,23 @@ class execution(object):
             if self.ev_terminating.is_set(): break
 
             # now we can execute it
-            logging.debug("{:s}.running : Executing {!r} asynchronously with thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), item, self.thread))
+            logging.debug("{:s}.running : Scheduled item {!r} asynchronously on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), item, self.thread))
             res, err = executor.send(item)
 
             # and stash our result
-            logging.debug("{:s}.running : Received result {!r} from {!r} on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), (res, err), item, self.thread))
+            logging.debug("{:s}.running : Scheduler received result {!r} from item {!r} on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), (res, err), item, self.thread))
             self.result.put((item, res, err))
         return
 
-# FIXME: figure out how to match against a bounds in a non-hacky way
+### matcher class helper
+
+# FIXME: figure out how to match against a bounds_t in a non-hacky way
 class matcher(object):
     """
     An object that allows one to match or filter a list of things in an
     sort of elegant way.
     """
+
     def __init__(self):
         self.__predicate__ = {}
     def __attrib__(self, *attribute):
