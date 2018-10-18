@@ -457,6 +457,22 @@ class chunk(object):
 
     @utils.multicase()
     @classmethod
+    def iterate(cls):
+        '''Iterate through all the instructions for the function chunk containing the current address.'''
+        for ea in cls.iterate(ui.current.address()):
+            yield ea
+        return
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def iterate(cls, ea):
+        '''Iterate through all the instructions for the function chunk containing the address ``ea``.'''
+        start, end = cls(ea)
+        for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, end)):
+            yield ea
+        return
+
+    @utils.multicase()
+    @classmethod
     def at(cls):
         '''Return a tuple containing the bounds of the current function chunk.'''
         return cls.at(ui.current.function(), ui.current.address())
