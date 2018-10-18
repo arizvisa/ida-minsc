@@ -95,6 +95,7 @@ class current(object):
     def symbol(cls):
         '''Return the current highlighted symbol name.'''
         return idaapi.get_highlighted_identifier()
+    @document.aliases('current.selected')
     @classmethod
     def selection(cls):
         '''Return the current address range of whatever is selected'''
@@ -141,16 +142,19 @@ class state(object):
             return res.graph_view != 0
         return res.is_graph_view()
 
+    @document.aliases('wait')
     @classmethod
     def wait(cls):
         '''Wait until IDA's autoanalysis queues are empty.'''
         return idaapi.autoWait() if idaapi.__version__ < 7.0 else idaapi.auto_wait()
 
+    @document.aliases('beep')
     @classmethod
     def beep(cls):
         '''Beep using IDA's interface.'''
         return idaapi.beep()
 
+    @document.aliases('refresh')
     @classmethod
     def refresh(cls):
         '''Refresh all of IDA's windows.'''
@@ -576,6 +580,7 @@ class keyboard(object):
         return q.keyboardModifiers()
 
     hotkey = {}
+    @document.aliases('keyboard.add')
     @classmethod
     @document.parameters(key='the key to map', callable='a python callable to execute when the specified key is pressed')
     def map(cls, key, callable):
@@ -589,6 +594,7 @@ class keyboard(object):
         # XXX: I'm not sure if the key needs to be utf8 encoded or not
         cls.hotkey[key] = res = idaapi.add_hotkey(key, callable)
         return res
+    @document.aliases('keyboard.rm')
     @classmethod
     @document.parameters(key='the key mapping to unmap')
     def unmap(cls, key):
