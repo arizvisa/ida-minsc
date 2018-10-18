@@ -365,36 +365,67 @@ class address(object):
 
     @classmethod
     def __head1__(cls, ea, **silent):
-        '''Ensures that `ea` is pointing to a valid address.'''
+        '''Adjusts `ea` so that it is pointing to the beginning of an item.'''
         entryframe = cls.pframe()
         logF = logging.warn if not silent.get('silent', False) else logging.debug
 
         res = idaapi.get_item_head(ea)
         if ea != res:
-            logF("{:s} : Specified address {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, ea, res))
+            logF("{:s} : Specified address {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, ea, res))
         return res
     @classmethod
     def __head2__(cls, start, end, **silent):
-        '''Ensures that both `start` and `end` are pointing to valid addresses.'''
+        '''Adjusts both `start` and `end` so that each are pointing to the beginning of their respective items.'''
         entryframe = cls.pframe()
         logF = logging.warn if not silent.get('silent', False) else logging.debug
 
         res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
         # FIXME: off-by-one here, as end can be the size of the db.
         if res_start != start:
-            logF("{:s} : Starting address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
+            logF("{:s} : Starting address of {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
         if res_end != end:
-            logF("{:s} : Ending address of {:#x} not aligned to the beginning of an item. Setting the argument to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
+            logF("{:s} : Ending address of {:#x} is not pointing to the beginning of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
         return res_start, res_end
     @classmethod
     def head(cls, *args, **silent):
+        '''Adjusts the specified addresses so that they point to the beginning of their specified items.'''
         if len(args) > 1:
             return cls.__head2__(*args, **silent)
         return cls.__head1__(*args, **silent)
 
     @classmethod
+    def __tail1__(cls, ea, **silent):
+        '''Adjusts `ea` so that it is pointing to the end of an item.'''
+        entryframe = cls.pframe()
+        logF = logging.warn if not silent.get('silent', False) else logging.debug
+
+        res = idaapi.get_item_end(ea)
+        if ea != res:
+            logF("{:s} : Specified address {:#x} not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, ea, res))
+        return res
+    @classmethod
+    def __tail2__(cls, start, end, **silent):
+        '''Adjusts both `start` and `end` so that each are pointing to the end of their respective items.'''
+        entryframe = cls.pframe()
+        logF = logging.warn if not silent.get('silent', False) else logging.debug
+
+        res_start, res_end = idaapi.get_item_end(start), idaapi.get_item_end(end)
+        # FIXME: off-by-one here, as end can be the size of the db.
+        if res_start != start:
+            logF("{:s} : Starting address of {:#x} is not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, start, res_start))
+        if res_end != end:
+            logF("{:s} : Ending address of {:#x} is not pointing to the end of an item. Setting the address to {:#x}.".format(entryframe.f_code.co_name, end, res_end))
+        return res_start, res_end
+    @classmethod
+    def tail(cls, *args, **silent):
+        '''Adjusts the specified addresses so that they point to the end of their specified items.'''
+        if len(args) > 1:
+            return cls.__tail2__(*args, **silent)
+        return cls.__tail1__(*args, **silent)
+
+    @classmethod
     def __inside1__(cls, ea):
-        '''Ensures that `ea` is within the database and pointing at a valid address.'''
+        '''Check that `ea` is within the database and adjust it to point to the beginning of its item.'''
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
@@ -407,22 +438,23 @@ class address(object):
         return cls.head(res, silent=True)
     @classmethod
     def __inside2__(cls, start, end):
-        '''Ensures that both `start` and `end` are within the database and pointing at a valid address.'''
+        '''Check that both `start` and `end` are within the database and adjust them to point at their specified range.'''
 
         entryframe = cls.pframe()
         start, end = cls.within(start, end)
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
             raise internal.exceptions.InvalidParameterError("{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
-        return cls.head(start, end, silent=True)
+        return cls.head(start, silent=True), cls.tail(end, silent=True) - 1
     @classmethod
     def inside(cls, *args):
+        '''Check the specified addresses are within the database and adjust so that they point to their item or range.'''
         if len(args) > 1:
             return cls.__inside2__(*args)
         return cls.__inside1__(*args)
 
     @classmethod
     def __within1__(cls, ea):
-        '''Ensures that `ea` is within the database.'''
+        '''Check that `ea` is within the database.'''
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
@@ -437,7 +469,7 @@ class address(object):
         return ea
     @classmethod
     def __within2__(cls, start, end):
-        '''Ensures that both `start` and `end` are within the database.'''
+        '''Check that both `start` and `end` are within the database.'''
         entryframe = cls.pframe()
 
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
@@ -450,6 +482,7 @@ class address(object):
         return start, end
     @classmethod
     def within(cls, *args):
+        '''Check that the specified addresses are within the database.'''
         if len(args) > 1:
             return cls.__within2__(*args)
         return cls.__within1__(*args)
