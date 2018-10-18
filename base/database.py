@@ -3221,7 +3221,7 @@ class xref(object):
 
         If the reftype `call` is true, then specify this ref as a function call.
         """
-        ea, target = interface.address.inside(ea, target)
+        ea, target = interface.address.head(ea, target)
 
         isCall = builtins.next((reftype[k] for k in ('call', 'is_call', 'isCall', 'iscall', 'callQ') if k in reftype), None)
         if abs(target-ea) > 2**(config.bits()/2):
@@ -3244,7 +3244,7 @@ class xref(object):
 
         If the reftype `write` is true, then specify that this ref is writing to the target.
         """
-        ea, target = interface.address.inside(ea, target)
+        ea, target = interface.address.head(ea, target)
         isWrite = reftype.get('write', False)
         flowtype = idaapi.dr_W if isWrite else idaapi.dr_R
         idaapi.add_dref(ea, target, flowtype | idaapi.XREF_USER)
