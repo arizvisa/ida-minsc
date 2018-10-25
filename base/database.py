@@ -1734,11 +1734,12 @@ class address(object):
         if start == end: return
         op = operator.lt if start < end else operator.ge
 
-        res = start
-        while res not in {idaapi.BADADDR, None} and left <= res < right and op(res, end):
-            yield res
-            res = step(res)
-        return
+        try:
+            res = start
+            while res not in {idaapi.BADADDR, None} and left <= res < right and op(res, end):
+                yield res
+                res = step(res)
+        except E.OutOfBoundsError: pass
 
     @classmethod
     @utils.multicase(end=six.integer_types)
