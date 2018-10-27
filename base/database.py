@@ -2857,13 +2857,12 @@ class type(object):
             '''Return the `[type, length]` of the array at the address specified by `ea`.'''
             F, op, cb = type.flags(ea), idaapi.opinfo_t(), idaapi.get_item_size(ea)
 
-            # get the opinfo at the current address
+            # get the opinfo at the current address to verify if there's a structure or not
             ok = idaapi.get_opinfo(op, ea, 0, F)
-            if not ok:
-                raise E.MissingTypeOrAttribute("{:s}.array({:#x}) : Address {:#x} does not contain an array.".format('.'.join((__name__, cls.__name__)), ea, ea))
+            tid = op.tid if ok else idaapi.BADADDR
 
             # convert it to a pythonic type
-            res = interface.typemap.dissolve(F, op.tid, cb)
+            res = interface.typemap.dissolve(F, tid, cb)
 
             # if it's a list, then validate the result and return it
             if isinstance(res, list):
