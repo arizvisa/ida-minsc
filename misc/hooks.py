@@ -341,7 +341,7 @@ def __process_functions(percentage=0.10):
         text = functools.partial("Processing function {:#x} ({chunks:d} chunk{plural:s}) -> {:d} of {:d}".format, fn, i + 1, len(funcs))
         p.update(current=i)
         ui.navigation.procedure(fn)
-        if i % int(len(funcs) * percentage) == 0:
+        if i % (int(len(funcs) * percentage) or 1) == 0:
             logging.info("Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, i+1, len(funcs), i / float(len(funcs)) * 100.0))
 
         contents = set(internal.comment.contents.address(fn))
