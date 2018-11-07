@@ -3166,7 +3166,23 @@ class xref(object):
     def code_down(ea):
         '''Return all of the code xrefs that are referenced by the address `ea`.'''
         result = builtins.set(xref.code(ea, True))
-        result.discard(address.next(ea))
+
+        # if we're not pointing at code, then the logic that follows is irrelevant
+        if not type.is_code(ea):
+            return sorted(result)
+
+        try:
+            # try and grab the next instruction which might be referenced
+            next_ea = address.next(ea)
+
+            # if the current instruction is a non-"stop" instruction, then it will
+            # include a reference to the next instruction. so, we'll remove it.
+            if type.is_code(ea) and _instruction.feature(ea) & idaapi.CF_STOP != idaapi.CF_STOP:
+                result.discard(next_ea)
+
+        except E.OutOfBoundsError:
+            pass
+
         return sorted(result)
     cd = utils.alias(code_down, 'xref')
 
@@ -3180,7 +3196,23 @@ class xref(object):
     def code_up(ea):
         '''Return all of the code xrefs that refer to the address `ea`.'''
         result = builtins.set(xref.code(ea, False))
-        result.discard(address.prev(ea))
+
+        # if we're not pointing at code, then the logic that follows is irrelevant
+        if not type.is_code(ea):
+            return sorted(result)
+
+        try:
+            # try and grab the previous instruction which be referenced
+            prev_ea = address.prev(ea)
+
+            # if the previous instruction is a non-"stop" instruction, then it will
+            # reference the current instruction which is a reason to remove it.
+            if type.is_code(prev_ea) and _instruction.feature(prev_ea) & idaapi.CF_STOP != idaapi.CF_STOP:
+                result.discard(prev_ea)
+
+        except E.OutOfBoundsError:
+            pass
+
         return sorted(result)
     cu = utils.alias(code_up, 'xref')
 
@@ -3193,7 +3225,8 @@ class xref(object):
     @staticmethod
     def up(ea):
         '''Return all of the references that refer to the address `ea`.'''
-        return sorted(builtins.set(xref.data_up(ea) + xref.code_up(ea)))
+        code, data = builtins.set(xref.code_up(ea)), builtins.set(xref.data_up(ea))
+        return sorted(code | data)
     u = utils.alias(up, 'xref')
 
     # All locations that are referenced by the specified address
@@ -3206,7 +3239,8 @@ class xref(object):
     @staticmethod
     def down(ea):
         '''Return all of the references that are referred by the address `ea`.'''
-        return sorted(builtins.set(xref.data_down(ea) + xref.code_down(ea)))
+        code, data = builtins.set(xref.code_down(ea)), builtins.set(xref.data_down(ea))
+        return sorted(code | data)
     d = utils.alias(down, 'xref')
 
     @utils.multicase(target=six.integer_types)
