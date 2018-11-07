@@ -606,14 +606,13 @@ def op_enumeration(ea, opnum):
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
         raise E.MissingTypeOrAttribute("{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
-    # is the following api call the correct way to do this?
+    # XXX: is the following api call the proper way to do this?
     # idaapi.get_enum_id(*args):
 
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
     if res is None:
         raise E.DisassemblerError("{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
-
-    return enumeration.by(res.ec.tid), res.ec.serial if res.ec.serial > 0 else enumeration.by(res.ec.tid)
+    return enumeration.by(res.ec.tid)
 @utils.multicase(opnum=six.integer_types, name=basestring)
 def op_enumeration(opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
