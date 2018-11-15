@@ -4489,8 +4489,7 @@ class get(object):
     @classmethod
     def string(cls, **length):
         '''Return the array at the current address as a string.'''
-        res = cls.array(ui.current.address(), **length)
-        return res.tostring()
+        return cls.string(ui.current.address(), **length)
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def string(cls, ea, **length):
@@ -4498,8 +4497,65 @@ class get(object):
 
         If the integer `length` is defined, then use it as the length of the array.
         """
-        res = cls.array(ea, **length)
-        return res.tostring()
+        args = ', '.join(itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length)))
+
+        # Fetch the string type at the given address
+        strtype = idaapi.get_str_type(ea)
+
+        # If no string was found, then try to treat it as a plain old array
+        if strtype == idaapi.BADADDR:
+            res = cls.array(ea, **length)
+
+            # It wasn't an array and was probably a structure, so we'll just complain to the user about it
+            if not isinstance(res, _array.array):
+                raise E.InvalidTypeOrValueError("{:s}.string({:#x}{:s}) : The type at address {:#x} can't be treated as an unformatted array and as such is not string-convertible.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
+
+            # Warn the user and convert it into a string
+            logging.warn("{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
+            return res.tostring()
+
+        # Get the string encoding (not used)
+        encoding = idaapi.get_str_encoding_idx(strtype)
+
+        # Get the terminal characters that can terminate the string
+        sentinels = idaapi.get_str_term1(strtype) + idaapi.get_str_term2(strtype)
+
+        # Extract the fields out of the string type code
+        res = idaapi.get_str_type_code(strtype)
+        sl, sw = res & idaapi.STRLYT_MASK, res ^ (res & idaapi.STRLYT_MASK)
+
+        # Figure out the STRLYT field
+        if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
+            shift, f1 = 0, operator.methodcaller('rstrip', sentinels)
+        elif sl == idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT:
+            shift, f1 = 1, utils.fpass
+        elif sl == idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT:
+            shift, f1 = 2, utils.fpass
+        elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
+            shift, f1 = 4, utils.fpass
+        else:
+            raise E.UnsupportedCapability("{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sl, ea))
+
+        # Figure out the STRWIDTH field
+        if sw == idaapi.STRWIDTH_1B:
+            f2 = operator.methodcaller('decode', 'ascii')
+        elif sw == idaapi.STRWIDTH_2B:
+            f2 = operator.methodcaller('decode', 'utf-16')
+        elif sw == idaapi.STRWIDTH_4B:
+            f2 = operator.methodcaller('decode', 'utf-32')
+        else:
+            raise E.UnsupportedCapability("{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sw, ea))
+
+        # Read the pascal length if one was specified in the string type code
+        if shift:
+            res = cls.unsigned(ea, shift)
+            length.setdefault('length', res)
+
+        # Now we can read the string..
+        res = cls.array(ea + shift, **length).tostring()
+
+        # ..and then process it.
+        return f1(f2(res))
 
     @utils.multicase()
     @classmethod
