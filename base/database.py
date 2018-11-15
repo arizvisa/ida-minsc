@@ -1439,7 +1439,7 @@ def selectcontents(**boolean):
         # check to see that the dict's keys match
         if builtins.set(d.viewkeys()) != res:
             # FIXME: include query in warning
-            q = ', '.join("{:s}={!r}".format(k, v) for k, v in boolean.iteritems())
+            q = ', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(boolean))
             logging.warn("{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
 
         # now start aggregating the keys that the user is looking for
@@ -2124,7 +2124,7 @@ class address(object):
         '''Return the previous address from `ea` containing an instruction that uses `reg` or any one of the specified registers `regs` and matches `predicate`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -2185,7 +2185,7 @@ class address(object):
         '''Return the next address from `ea` containing an instruction that matches `predicate` and uses `reg` or any one of the registers in `regs`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), modifiers.items()))
+        args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -3371,10 +3371,10 @@ class marks(object):
         try:
             idx = cls.__find_slotaddress(ea)
             ea, res = cls.by_index(idx)
-            logging.warn("{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from {!r} to {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), extra.items()))) if extra else '', idx, ea, res, description))
+            logging.warn("{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from {!r} to {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, res, description))
         except (E.ItemNotFoundError, E.OutOfBoundsError):
             res, idx = None, cls.__free_slotindex()
-            logging.info("{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), extra.items()))) if extra else '', idx, ea, description))
+            logging.info("{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, description))
         cls.__set_description(idx, ea, description, **extra)
         return res
 
@@ -3436,7 +3436,7 @@ class marks(object):
         def __location(cls, **attrs):
             '''Return a location_t object with the specified attributes.'''
             res = idaapi.curloc()
-            builtins.list(itertools.starmap(functools.partial(setattr, res), attrs.items()))
+            builtins.list(itertools.starmap(functools.partial(setattr, res), six.iteritems(attrs)))
             return res
 
         @classmethod
@@ -3958,7 +3958,7 @@ class set(object):
         If `size` is specified, then align that number of bytes.
         """
         if not type.is_unknown(ea):
-            raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), alignment.items()))) if alignment else ''))
+            raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(alignment)))) if alignment else ''))
 
         # grab the size out of the kwarg
         if 'size' in alignment:
@@ -4014,7 +4014,7 @@ class set(object):
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         ok = idaapi.make_ascii_string(ea, 0, strtype)
         if not ok:
-            raise E.DisassemblerError("{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())) if type else ''))
+            raise E.DisassemblerError("{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
@@ -4026,11 +4026,11 @@ class set(object):
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         cb = cls.unknown(ea, size)
         if cb != size:
-            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())) if type else '', size))
+            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else '', size))
 
         ok = idaapi.make_ascii_string(ea, size, strtype)
         if not ok:
-            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in type.iteritems())) if type else ''))
+            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
 
     class integer(object):
@@ -4475,13 +4475,14 @@ class get(object):
             return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
         else:
             query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
-            raise E.UnsupportedCapability("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the idaapi.DT_TYPE as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if query_l else '', ea, F, T))
+            raise E.UnsupportedCapability("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the idaapi.DT_TYPE as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', ea, F, T))
 
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
         res = _array.array(t, read(ea, count * cb))
         if len(res) != count:
-            logging.warn("{:s}.get({:#x}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, len(res), count))
+            query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
+            logging.warn("{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', len(res), count))
         return res
 
     @utils.multicase()
