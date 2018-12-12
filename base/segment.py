@@ -94,24 +94,25 @@ def list(**type):
 ## searching
 def by_name(name):
     '''Return the segment with the given `name`.'''
-    s = idaapi.get_segm_by_name(name)
-    if s is None:
+    res = interface.string.to(name)
+    seg = idaapi.get_segm_by_name(res)
+    if seg is None:
         raise E.SegmentNotFoundError("{:s}.by_name({!r}) : Unable to locate the segment with the specified name.".format(__name__, name))
-    return s
+    return seg
 byName = utils.alias(by_name)
 def by_selector(selector):
     '''Return the segment associated with `selector`.'''
-    s = idaapi.get_segm_by_sel(selector)
-    if s is None:
+    seg = idaapi.get_segm_by_sel(selector)
+    if seg is None:
         raise E.SegmentNotFoundError("{:s}.by_selector({:#x}) : Unable to locate the segment with the specified selector.".format(__name__, selector))
-    return s
+    return seg
 bySelector = utils.alias(by_selector)
 def by_address(ea):
     '''Return the segment that contains the specified `ea`.'''
-    s = idaapi.getseg(interface.address.within(ea))
-    if s is None:
+    seg = idaapi.getseg(interface.address.within(ea))
+    if seg is None:
         raise E.SegmentNotFoundError("{:s}.by_address({:#x}) : Unable to locate segment containing the specified address.".format(__name__, ea))
-    return s
+    return seg
 byAddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
 def by(segment):
@@ -286,12 +287,14 @@ def name():
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError("{:s}.name() : Unable to locate the current segment.".format(__name__))
-    return idaapi.get_true_segm_name(seg)
+    res = idaapi.get_true_segm_name(seg)
+    return interface.string.of(res)
 @utils.multicase()
 def name(segment):
     '''Return the name of the segment identified by `segment`.'''
     seg = by(segment)
-    return idaapi.get_true_segm_name(seg)
+    res = idaapi.get_true_segm_name(seg)
+    return interface.string.of(res)
 
 @utils.multicase()
 def color():
@@ -357,18 +360,28 @@ def contains(segment, ea):
 # shamefully ripped from idc.py
 def __load_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
+
+    # use IDA to open up the file contents
+    # XXX: does IDA support unicode file paths?
     res = idaapi.open_linput(path, False)
     if not res:
         raise E.DisassemblerError("{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create loader_input_t from path \"{:s}\".".format(__name__, filename, ea, size, path))
+
+    # now we can write the file into the specified address as a segment
     ok = idaapi.file2base(res, offset, ea, ea+size, False)
     idaapi.close_linput(res)
     return ok
 
 def __save_file(filename, ea, size, offset=0):
     path = os.path.abspath(filename)
+
+    # use IDA to open up a file to write to
+    # XXX: does IDA support unicode file paths?
     of = idaapi.fopenWB(path)
     if not of:
         raise E.DisassemblerError("{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file \"{:s}\".".format(__name__, filename, ea, size, path))
+
+    # now we can write the segment into the file we opened
     res = idaapi.base2file(of, offset, ea, ea+size)
     idaapi.eclose(of)
     return res
@@ -393,12 +406,18 @@ def map(ea, size, newea, **kwds):
 
     The keyword `name` can be used to name the segment.
     """
-    fpos,data = idaapi.get_fileregion_offset(ea),database.read(ea, size)
+
+    # grab the file offset and the data we want
+    fpos, data = idaapi.get_fileregion_offset(ea), database.read(ea, size)
     if len(data) != size:
         raise E.ReadOrWriteError("{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to read {:#x} bytes from {:#x}.".format(__name__, ea, size, newea, size, ea))
+
+    # rebase the data to the new address
     res = idaapi.mem2base(data, newea, fpos)
     if not res:
         raise E.DisassemblerError("{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, newea, ea, size, newea))
+
+    # now we can create the new segment
     return new(newea, size, kwds.get("name', 'map_{:x}".format(ea)))
     #return create(newea, size, kwds.get("name', 'map_{:s}".format(newea>>4)))
 
@@ -411,11 +430,15 @@ def new(offset, size, name, **kwds):
     The keyword `align` can be used to specify paragraph alignment (idaapi.sa*)
     The keyword `org` specifies the origin of the segment (must be paragraph aligned due to ida)
     """
-    seg = idaapi.get_segm_by_name(name)
+    res = interface.string.to(name)
+
+    # find the segment according to the name specified by the user
+    seg = idaapi.get_segm_by_name(res)
     if seg is not None:
         raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', name))
 
-    bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits()) # FIXME: use disassembler default bit length instead of 32
+    # FIXME: use disassembler default bit length instead of 32
+    bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits())
 
     ## create a selector with the requested origin
     if bits == 16:
@@ -434,7 +457,7 @@ def new(offset, size, name, **kwds):
     ## choose the paragraph size defined by the user
     elif 'para' in kwds or 'paragraphs' in kwds:
         para = kwds.get('paragraph', kwds.get('para', 1))
-        sel = idaapi.setup_selector(res)
+        sel = idaapi.setup_selector(para)
 
     ## find a selector that is 1 paragraph size,
     elif idaapi.get_selector_qty():
@@ -445,7 +468,7 @@ def new(offset, size, name, **kwds):
         sel = idaapi.find_free_selector()
         idaapi.set_selector(sel, 1)
 
-    # create segment. ripped from idc
+    # populate the segment_t using code ripped from the idc module
     seg = idaapi.segment_t()
     seg.startEA = offset
     seg.endEA = offset+size
@@ -454,7 +477,9 @@ def new(offset, size, name, **kwds):
     seg.comb = kwds.get('comb', idaapi.scPub)       # public
     seg.align = kwds.get('align', idaapi.saRelByte)  # paragraphs
 
-    ok = idaapi.add_segm_ex(seg, name, "", idaapi.ADDSEG_NOSREG|idaapi.ADDSEG_SPARSE)
+    # now we can add our segment_t to the database
+    res = interface.string.to(name)
+    ok = idaapi.add_segm_ex(seg, res, "", idaapi.ADDSEG_NOSREG|idaapi.ADDSEG_SPARSE)
     if not ok:
         ok = idaapi.del_selector(sel)
         if not ok:
@@ -473,10 +498,12 @@ def remove(segment, contents=False):
         cls = idaapi.segment_t
         raise E.InvalidParameterError("{:s}.remove({!r}) : Expected a {!s}, but received a {!s}.".format(__name__, segment, cls, type(segment)))
 
+    # delete the selector defined by the segment_t
     res = idaapi.del_selector(segment.sel)
     if res == 0:
         logging.warn("{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
 
+    # remove the actual segment using the address in the segment_t
     res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL if contents else idaapi.SEGMOD_KEEP)
     if res == 0:
         logging.warn("{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
