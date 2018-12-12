@@ -52,7 +52,7 @@ def ask(string, **default):
         dflt = next((k for k in keys), 'cancel')
     else:
         dflt = 'cancel'
-    res = idaapi.ask_yn(state[dflt], string)
+    res = idaapi.ask_yn(state[dflt], internal.interface.string.to(string))
     return results.get(res, None)
 
 class current(object):
@@ -226,11 +226,13 @@ class names(appwindow):
     @classmethod
     def at(cls, index):
         '''Return the address and the symbol name of the specified `index`.'''
-        return idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
+        ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
+        return ea, internal.interface.string.of(name)
     @classmethod
     def name(cls, index):
         '''Return the name at the specified `index`.'''
-        return idaapi.get_nlist_name(index)
+        res = idaapi.get_nlist_name(index)
+        return internal.interface.string.of(res)
     @classmethod
     def ea(cls, index):
         '''Return the address at the specified `index`.'''
@@ -277,7 +279,8 @@ class strings(appwindow):
 
         res = [idaapi.ASCSTR_TERMCHR, idaapi.ASCSTR_PASCAL, idaapi.ASCSTR_LEN2, idaapi.ASCSTR_UNICODE, idaapi.ASCSTR_LEN4, idaapi.ASCSTR_ULEN2, idaapi.ASCSTR_ULEN4]
         config.strtypes = reduce(lambda t, c: t | (2**c), res, 0)
-        assert idaapi.set_strlist_options(config)
+        if not idaapi.set_strlist_options(config):
+            raise internal.exceptions.DisassemblerError("{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
         #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
     # FIXME: I don't think that these callbacks are stackable
@@ -294,22 +297,26 @@ class strings(appwindow):
     @classmethod
     def at(cls, index):
         '''Return the string at the specified `index`.'''
-        string = idaapi.string_info_t()
-        res = idaapi.get_strlist_item(index, string)
+        si = idaapi.string_info_t()
+
+        # FIXME: this isn't being used correctly
+        res = idaapi.get_strlist_item(index, si)
         if not res:
             raise internal.exceptions.DisassemblerError("{:s}.at({:d}) : The call to idaapi.get_strlist_item({:d}) returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
-        return string
+        return si
     @classmethod
     def get(cls, index):
         '''Return the address and the string at the specified `index`.'''
         si = cls.at(index)
-        return si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
+        res = idaapi.get_ascii_contents(si.ea, si.length, si.type)
+        return si.ea, internal.interface.string.of(res)
     @classmethod
     def iterate(cls):
         '''Iterate through all of the address and strings in the strings list.'''
         for index in six.moves.range(cls.size()):
             si = cls.at(index)
-            yield si.ea, idaapi.get_ascii_contents(si.ea, si.length, si.type)
+            res = idaapi.get_ascii_contents(si.ea, si.length, si.type)
+            yield si.ea, internal.interface.string.of(res)
         return
 
 class segments(appwindow):
@@ -413,14 +420,21 @@ class menu(object):
     @classmethod
     def add(cls, path, name, callable, hotkey='', flags=0, args=()):
         '''Register a `callable` as a menu item at the specified `path` with the provided `name`.'''
+
+        # check to see if our menu item is in our cache and remove it if so
         if (path, name) in cls.state:
             cls.rm(path, name)
-        ctx = idaapi.add_menu_item(path, name, hotkey, flags, callable, args)
+
+        # now we can add the menu item since everything is ok
+        # XXX: I'm not sure if the path needs to be utf8 encoded or not
+        res = internal.interface.string.to(name)
+        ctx = idaapi.add_menu_item(path, res, hotkey, flags, callable, args)
         cls.state[path, name] = ctx
     @classmethod
     def rm(cls, path, name):
         '''Remove the menu item at the specified `path` with the provided `name`.'''
-        idaapi.del_menu_item( cls.state[path, name] )
+        res = cls.state[path, name]
+        idaapi.del_menu_item(res)
         del cls.state[path, name]
     @classmethod
     def reset(cls):
@@ -515,8 +529,13 @@ class keyboard(object):
     @classmethod
     def map(cls, key, callable):
         '''Map a specific `key` to a python `callable`.'''
+
+        # check to see if the key is stored within our cache and remove it if so
         if key in cls.hotkey:
             idaapi.del_hotkey(cls.hotkey[key])
+
+        # now we can add the hotkey and stash it in our cache
+        # XXX: I'm not sure if the key needs to be utf8 encoded or not
         cls.hotkey[key] = res = idaapi.add_hotkey(key, callable)
         return res
     @classmethod
@@ -807,7 +826,8 @@ class InputBox(idaapi.PluginForm):
 
     def Show(self, caption, options=0):
         '''Show the form with the specified `caption` and `options`.'''
-        return super(InputBox, self).Show(caption, options)
+        res = internal.interface.string.to(caption)
+        return super(InputBox, self).Show(res, options)
 
 ### Console-only progress bar
 class ConsoleProgress(object):
