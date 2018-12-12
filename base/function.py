@@ -47,9 +47,15 @@ byAddress = utils.alias(by_address)
 
 def by_name(name):
     '''Return the function with the specified `name`.'''
-    ea = idaapi.get_name_ea(idaapi.BADADDR, name)
+    # convert the name into something friendly for IDA
+    res = interface.string.to(name)
+
+    # ask IDA to get its address
+    ea = idaapi.get_name_ea(idaapi.BADADDR, res)
     if ea == idaapi.BADADDR:
         raise E.FunctionNotFoundError("{:s}.by_name({!r}) : Unable to locate function by name.".format(__name__, name))
+
+    # now that we have its address, return the func_t
     res = idaapi.get_func(ea)
     if res is None:
         raise E.FunctionNotFoundError("{:s}.by_name({!r}) : Unable to locate function by address.".format(__name__, name))
@@ -91,7 +97,8 @@ def offset(func):
 def comment(**repeatable):
     '''Return the comment for the current function.'''
     fn = ui.current.function()
-    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    return interface.string.of(res)
 @utils.multicase()
 def comment(func, **repeatable):
     """Return the comment for the function `func`.
@@ -99,7 +106,8 @@ def comment(func, **repeatable):
     If the bool `repeatable` is specified, then return the repeatable comment.
     """
     fn = by(func)
-    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    return interface.string.of(res)
 @utils.multicase(string=basestring)
 def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
@@ -113,7 +121,7 @@ def comment(func, string, **repeatable):
     """
     fn = by(func)
 
-    res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', True))
+    res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, interface.string.to(string), repeatable.get('repeatable', True))
     if not ok:
         raise E.DisassemblerError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
     return res
@@ -127,15 +135,30 @@ def name(func):
     '''Return the name of the function `func`.'''
     get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
 
+    # check to see if it's a runtime-linked function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     if rt:
-        res = get_name(ea)
+        name = get_name(ea)
+
+        # decode the string from IDA's UTF-8
+        # XXX: how does demangling work with unicode? this would be implementation specific, no?
+        res = interface.string.of(res)
+
+        # demangle it if necessary
         return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
         #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
-    res = idaapi.get_func_name(ea)
-    if not res: res = get_name(ea)
-    if not res: res = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
-    return res
+
+    # otherwise it's a regular function, so try and get its name in a couple of ways
+    name = idaapi.get_func_name(ea)
+    if not name: name = get_name(ea)
+    if not name: name = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
+
+    # decode the string from IDA's UTF-8
+    # XXX: how does demangling work with unicode? this would be implementation specific, no?
+    res = interface.string.of(name)
+
+    # demangle it if we need to
+    return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
 @utils.multicase(none=types.NoneType)
@@ -164,15 +187,9 @@ def name(func, string, *suffix):
     # figure out if address is a runtime or static function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-    # filter out invalid characters
-    res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
-    if string and string != res:
-        logging.info("{:s}.name({:#x}, {!r}) : Stripped the invalid chars from the function name resulting in {!r}.".format(__name__, ea, string, res))
-        string = res
-
-    # now we can assign the name
+    # now we can assign the name depending on whether it's a function or a runtime-linked function
+    # FIXME: mangle the name and shuffle it into the prototype if possible
     if rt:
-        # FIXME: shuffle the new name into the prototype and then re-mangle it
         res = database.name(ea, string)
     else:
         res = database.name(ea, string, flags=idaapi.SN_PUBLIC)
@@ -211,15 +228,15 @@ def prototype(func):
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     funcname = database.name(ea) or name(ea)
     try:
-        res = internal.declaration.function(ea)
-        idx = res.find('(')
-        result = res[:idx] + ' ' + funcname + res[idx:]
+        decl = internal.declaration.function(ea)
+        idx = decl.find('(')
+        res = "{return:s} {name:s}{parameters:s}".format(result=decl[:idx], name=funcname, parameters=decl[idx:])
 
     except E.MissingTypeOrAttribute:
         if not internal.declaration.mangledQ(funcname):
             raise
-        result = internal.declaration.demangle(funcname)
-    return result
+        return internal.declaration.demangle(funcname)
+    return res
 
 @utils.multicase()
 def bounds():
@@ -301,16 +318,15 @@ def marks():
 @utils.multicase()
 def marks(func):
     '''Return all the marks in the function `func`.'''
-    fn = by(func)
-    result = []
+    fn, res = by(func), []
     for ea, comment in database.marks():
         try:
             if address(ea) == fn.startEA:
-                result.append((ea, comment))
+                res.append((ea, comment))
         except E.FunctionNotFoundError:
             pass
         continue
-    return result
+    return res
 
 ## functions
 @utils.multicase()
@@ -1190,7 +1206,8 @@ class block(object):
             for fmt in formatted:
                 res.append( fmt.print1(source.__deref__()) )
         except TypeError: pass
-        return '\n'.join(itertools.imap(idaapi.tag_remove, res))
+        res = itertools.imap(idaapi.tag_remove, res)
+        return '\n'.join(map(interface.string.of, res))
 
 class frame(object):
     """
