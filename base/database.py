@@ -69,12 +69,14 @@ class config(object):
     @classmethod
     def filename(cls):
         '''Returns the filename that the database was built from.'''
-        return idaapi.get_root_filename()
+        res = idaapi.get_root_filename()
+        return interface.string.of(res)
 
     @classmethod
     def idb(cls):
         '''Return the full path to the database.'''
         res = idaapi.cvar.database_idb if idaapi.__version__ < 7.0 else idaapi.get_path(idaapi.PATH_TYPE_IDB)
+        res = interface.string.of(res)
         return res.replace(os.sep, '/')
 
     @classmethod
@@ -169,7 +171,8 @@ class config(object):
     @classmethod
     def processor(cls):
         '''Return processor name used by the database.'''
-        return cls.info.procName
+        res = cls.info.procName
+        return interface.string.of(res)
 
     @classmethod
     def main(cls):
@@ -200,7 +203,8 @@ class config(object):
         @classmethod
         def names(cls):
             '''Return all of the register names in the database.'''
-            return idaapi.ph_get_regnames()
+            res = idaapi.ph_get_regnames()
+            return map(interface.string.of, res)
         @classmethod
         def segments(cls):
             '''Return all of the segment registers in the database.'''
@@ -209,11 +213,13 @@ class config(object):
         @classmethod
         def codesegment(cls):
             '''Return all of the code segment registers in the database.'''
-            return cls.names()[idaapi.ph_get_regCodeSreg()]
+            res = idaapi.ph_get_regCodeSreg()
+            return cls.names()[res]
         @classmethod
         def datasegment(cls):
             '''Return all of the data segment registers in the database.'''
-            return cls.names()[idaapi.ph_get_regDataSreg()]
+            res = idaapi.ph_get_regDataSreg()
+            return cls.names()[res]
         @classmethod
         def segmentsize(cls):
             '''Return the segment register size for the database.'''
@@ -469,11 +475,18 @@ def instruction():
 @utils.multicase(ea=six.integer_types)
 def instruction(ea):
     '''Return the instruction at the address `ea` as a string.'''
+
+    # first grab the disassembly and then remove all of IDA's tag information from it
     insn = idaapi.generate_disasm_line(interface.address.inside(ea))
     unformatted = idaapi.tag_remove(insn)
+
+    # produce a version that doesn't have a comment
     comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
     nocomment = unformatted[:comment] if comment != -1 else unformatted
-    return reduce(lambda t, x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')
+
+    # combine any multiple spaces into just a single space and return it
+    res = interface.string.of(nocomment)
+    return reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), res, '')
 
 @utils.multicase()
 def disassemble(**options):
@@ -489,13 +502,24 @@ def disassemble(ea, **options):
     ea = interface.address.inside(ea)
     commentQ = builtins.next((options[k] for k in ('comment', 'comments') if k in options), False)
 
+    # enter a loop that goes through the number of line items requested by the user
     res, count = [], options.get('count', 1)
     while count > 0:
+        # grab the instruction and remove all of IDA's tag information from it
         insn = idaapi.generate_disasm_line(ea) or ''
         unformatted = idaapi.tag_remove(insn)
+
+        # convert it into one that doesn't have a comment
         comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
         nocomment = unformatted[:comment] if comment != -1 and not commentQ else unformatted
-        res.append("{:x}: {:s}".format(ea, reduce(lambda t, x: t + (('' if t.endswith(' ') else ' ') if x == ' ' else x), nocomment, '')) )
+
+        # combine all multiple spaces together so it's single-spaced
+        noextraspaces = reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), interface.string.of(nocomment), '')
+
+        # append it to our result with the address in front
+        res.append("{:x}: {:s}".format(ea, noextraspaces) )
+
+        # move on to the next iteration
         ea = address.next(ea)
         count -= 1
     return '\n'.join(res)
@@ -859,7 +883,7 @@ def name(ea, **flags):
         aname = idaapi.get_ea_name(ea, flags.get('flags', idaapi.GN_LOCAL))
 
     # return the name at the specified address or not
-    return aname or None
+    return interface.string.of(aname) or None
 @utils.multicase(string=basestring)
 def name(string, *suffix, **flags):
     '''Renames the current address to `string`.'''
@@ -913,6 +937,7 @@ def name(ea, string, *suffix, **flags):
 
     # check to see if we're a label being applied to a switch
     # that way we can make it a local label
+    # FIXME: figure out why this doesn't work on some switch labels
     try:
         # check if we're a label of some kind
         f = type.flags(ea)
@@ -927,14 +952,17 @@ def name(ea, string, *suffix, **flags):
                     fl |= idaapi.SN_LOCAL
     except: pass
 
+    # convert the specified string into a form that IDA can handle
+    ida_string = interface.string.to(string)
+
     # validate the name
-    res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
-    if string and string != res:
-        logging.info("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', res))
-        string = res
+    res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
+    if ida_string and ida_string != res:
+        logging.info("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', interface.string.of(res)))
+        ida_string = res
 
     # set the name and use the value of 'flags' if it was explicit
-    res, ok = name(ea), idaapi.set_name(ea, string or "", flags.get('flags', fl))
+    res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flags.get('flags', fl))
 
     if not ok:
         raise E.DisassemblerError("{:s}.name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
@@ -989,7 +1017,10 @@ def comment(ea, **repeatable):
 
     If the bool `repeatable` is specified, then return the repeatable comment.
     """
-    return idaapi.get_cmt(interface.address.inside(ea), repeatable.get('repeatable', False))
+    res = idaapi.get_cmt(interface.address.inside(ea), repeatable.get('repeatable', False))
+
+    # return the string in a format the user can process
+    return interface.string.of(res)
 @utils.multicase(string=basestring)
 def comment(string, **repeatable):
     '''Set the comment at the current address to `string`.'''
@@ -1000,7 +1031,8 @@ def comment(ea, string, **repeatable):
 
     If the bool `repeatable` is specified, then modify the repeatable comment.
     """
-    res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), string, repeatable.get('repeatable', False))
+    # apply the comment to the specified address
+    res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), interface.string.to(string), repeatable.get('repeatable', False))
     if not ok:
         raise E.DisassemblerError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
     return res
@@ -3443,7 +3475,7 @@ class marks(object):
         def __set_description(cls, index, ea, description, **extra):
             '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
             res = cls.__location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
-            title, descr = description, description
+            title, descr = map(interface.string.to, (description, description))
             res.mark(index, title, descr)
             #raise E.DisassemblerError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
             return index
@@ -3451,7 +3483,8 @@ class marks(object):
         @classmethod
         def __get_description(cls, index):
             '''Return the description of the mark at the specified `index`.'''
-            return cls.__location().markdesc(index)
+            res = cls.__location().markdesc(index)
+            return interface.string.of(res)
 
         @classmethod
         def __find_slotaddress(cls, ea):
@@ -3489,14 +3522,16 @@ class marks(object):
         @classmethod
         def __set_description(cls, index, ea, description, **extra):
             '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
-            idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, description)
+            res = interface.string.to(description)
+            idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, res)
             #raise E.AddressNotFoundError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
             return index
 
         @classmethod
         def __get_description(cls, index):
             '''Return the description of the mark at the specified `index`.'''
-            return idaapi.get_mark_comment(index)
+            res = idaapi.get_mark_comment(index)
+            return interface.string.of(res)
 
         @classmethod
         def __find_slotaddress(cls, ea):
@@ -3617,6 +3652,7 @@ class extra(object):
     if idaapi.__version__ < 7.0:
         @classmethod
         def __hide__(cls, ea):
+            '''Hide the extra comment(s) at address ``ea``.'''
             if type.flags(ea, idaapi.FF_LINE) == idaapi.FF_LINE:
                 type.flags(ea, idaapi.FF_LINE, 0)
                 return True
@@ -3624,6 +3660,7 @@ class extra(object):
 
         @classmethod
         def __show__(cls, ea):
+            '''Show the extra comment(s) at address ``ea``.'''
             if type.flags(ea, idaapi.FF_LINE) != idaapi.FF_LINE:
                 type.flags(ea, idaapi.FF_LINE, idaapi.FF_LINE)  # FIXME: IDA 7.0 : ida_nalt.set_visible_item?
                 return True
@@ -3631,43 +3668,93 @@ class extra(object):
 
         @classmethod
         def __get__(cls, ea, base):
+            '''Fetch the extra comment(s) for the address ``ea`` at the index ``base``.'''
             sup = internal.netnode.sup
+
+            # count the number of rows
             count = cls.__count__(ea, base)
             if count is None: return None
+
+            # now we can fetch them
             res = (sup.get(ea, base+i) for i in six.moves.range(count))
-            return '\n'.join(row[:-1] if row.endswith('\x00') else row for row in res)
+
+            # remove the null-terminator if there is one
+            res = (row[:-1] if row.endswith('\x00') else row for row in res)
+
+            # fetch them from IDA and join them with newlines
+            return '\n'.join(itertools.imap(interface.string.of, res))
         @classmethod
         def __set__(cls, ea, string, base):
+            '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
             cls.__hide__(ea)
             sup = internal.netnode.sup
-            [ sup.set(ea, base+i, row+'\x00') for i, row in enumerate(string.split('\n')) ]
+
+            # break the string up into rows, and encode each type for IDA
+            res = itertools.imap(interface.string.to, string.split('\n'))
+
+            # assign them directly into IDA
+            [ sup.set(ea, base+i, row+'\x00') for i, row in enumerate(res) ]
+
+            # now we can show (refresh) them
             cls.__show__(ea)
+
+            # an exception before this happens would imply failure
             return True
         @classmethod
         def __del__(cls, ea, base):
+            '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
             sup = internal.netnode.sup
+
+            # count the number of rows to remove
             count = cls.__count__(ea, base)
             if count is None: return False
+
+            # hide them before we modify it
             cls.__hide__(ea)
+
+            # now we can remove them
             [ sup.remove(ea, base+i) for i in six.moves.range(count) ]
+
+            # and then show (refresh) it
             cls.__show__(ea)
             return True
     else:
         @classmethod
         def __get__(cls, ea, base):
+            '''Fetch the extra comment(s) for the address ``ea`` at the index ``base``.'''
+            # count the number of rows
             count = cls.__count__(ea, base)
             if count is None: return None
+
+            # grab the extra commenta from the database
             res = (idaapi.get_extra_cmt(ea, base+i) or '' for i in six.moves.range(count))
+
+            # convert them back into Python and join them with a newline
+            res = itertools.imap(interface.string.of, res)
             return '\n'.join(res)
         @classmethod
         def __set__(cls, ea, string, base):
-            [ idaapi.update_extra_cmt(ea, base+i, row) for i, row in enumerate(string.split('\n')) ]
+            '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
+            # break the string up into rows, and encode each type for IDA
+            res = itertools.imap(interface.string.to, string.split('\n'))
+
+            # assign them into IDA using its api
+            [ idaapi.update_extra_cmt(ea, base+i, row) for i, row in enumerate(res) ]
+
+            # return how many newlines there were
             return string.count('\n')
         @classmethod
         def __del__(cls, ea, base):
+            '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
+
+            # count the number of extra comments to remove
             res = cls.__count__(ea, base)
             if res is None: return 0
+
+            # now we can delete them using the api
             [idaapi.del_extra_cmt(ea, base+i) for i in six.moves.range(res)]
+
+            # return how many comments we deleted
             return res
 
     @utils.multicase(ea=six.integer_types)
