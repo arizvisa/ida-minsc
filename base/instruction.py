@@ -137,7 +137,8 @@ def mnemonic():
 def mnemonic(ea):
     '''Returns the mnemonic of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
-    return (idaapi.ua_mnem(ea) or '').lower()
+    res = (idaapi.ua_mnem(ea) or '').lower()
+    return interface.string.of(res)
 mnem = utils.alias(mnemonic)
 
 ## functions that return an ``idaapi.op_t`` for an operand
@@ -316,8 +317,8 @@ def op_repr(ea, opnum):
         res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     except:
         logging.warn("{:s}({:#x}, {:d}) : Unable to strip tags from operand {!r}. Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, oppr(insn.ea, opnum), '.'.join((__name__, 'op'))))
-        return "{:s}".format(op(insn.ea, opnum))
-    return res
+        return u"{!s}".format(op(insn.ea, opnum))
+    return interface.string.of(res)
 
 @utils.multicase(opnum=six.integer_types)
 def op_state(opnum):
