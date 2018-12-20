@@ -4592,17 +4592,31 @@ class get(object):
         res = {}
         for m in st.members:
             t, val = m.type, read(m.offset, m.size) or ''
+
+            # try and lookup the individual type+size
             try:
                 ct = typelookup[t]
-            except KeyError:
-                ty, sz = t if isinstance(t, builtins.tuple) else (m.type, 0)
+
+            # either we don't support it, or it's an array
+            except (TypeError, KeyError):
+
+                # if it's an array, then figure the count. otherwise use a count of 0
+                ty, count = t if isinstance(t, builtins.list) else (t, 0)
+
+                # when handling an array, just look up its type and multiply by the count
                 if isinstance(t, builtins.list):
                     t = typelookup[tuple(ty)]
-                    ct = t*sz
+                    ct = t * count
+
+                # if our type is a string type, then we can combine them with ctypes
                 elif ty in {chr, str}:
-                    ct = ctypes.c_char*sz
+                    ct = ctypes.c_char * count
+
+                # otherwise we have no idea what ctype we can use for this, so skip it
                 else:
                     ct = None
+
+            # finally we can add the member to our result
             finally:
                 res[m.name] = val if any(_ is None for _ in (ct, val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
         return res
