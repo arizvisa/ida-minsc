@@ -1556,9 +1556,9 @@ class imports(object):
         """
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
-            result = []
-            idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, result.append, utils.fconstant(True)))
-            for ea, name, ordinal in result:
+            res = []
+            idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, res.append, utils.fconstant(True)))
+            for ea, name, ordinal in res:
                 yield ea, (module, name, ordinal)
             continue
         return
@@ -3197,11 +3197,11 @@ class xref(object):
     @staticmethod
     def code_down(ea):
         '''Return all of the code xrefs that are referenced by the address `ea`.'''
-        result = builtins.set(xref.code(ea, True))
+        res = builtins.set(xref.code(ea, True))
 
         # if we're not pointing at code, then the logic that follows is irrelevant
         if not type.is_code(ea):
-            return sorted(result)
+            return sorted(res)
 
         try:
             # try and grab the next instruction which might be referenced
@@ -3210,12 +3210,12 @@ class xref(object):
             # if the current instruction is a non-"stop" instruction, then it will
             # include a reference to the next instruction. so, we'll remove it.
             if type.is_code(ea) and _instruction.feature(ea) & idaapi.CF_STOP != idaapi.CF_STOP:
-                result.discard(next_ea)
+                res.discard(next_ea)
 
         except E.OutOfBoundsError:
             pass
 
-        return sorted(result)
+        return sorted(res)
     cd = utils.alias(code_down, 'xref')
 
     @utils.multicase()
@@ -3227,11 +3227,11 @@ class xref(object):
     @staticmethod
     def code_up(ea):
         '''Return all of the code xrefs that refer to the address `ea`.'''
-        result = builtins.set(xref.code(ea, False))
+        res = builtins.set(xref.code(ea, False))
 
         # if we're not pointing at code, then the logic that follows is irrelevant
         if not type.is_code(ea):
-            return sorted(result)
+            return sorted(res)
 
         try:
             # try and grab the previous instruction which be referenced
@@ -3240,12 +3240,12 @@ class xref(object):
             # if the previous instruction is a non-"stop" instruction, then it will
             # reference the current instruction which is a reason to remove it.
             if type.is_code(prev_ea) and _instruction.feature(prev_ea) & idaapi.CF_STOP != idaapi.CF_STOP:
-                result.discard(prev_ea)
+                res.discard(prev_ea)
 
         except E.OutOfBoundsError:
             pass
 
-        return sorted(result)
+        return sorted(res)
     cu = utils.alias(code_up, 'xref')
 
     @utils.multicase()
