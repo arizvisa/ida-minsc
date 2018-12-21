@@ -230,7 +230,7 @@ def prototype(func):
     try:
         decl = internal.declaration.function(ea)
         idx = decl.find('(')
-        res = "{return:s} {name:s}{parameters:s}".format(result=decl[:idx], name=funcname, parameters=decl[idx:])
+        res = "{result:s} {name:s}{parameters:s}".format(result=decl[:idx], name=funcname, parameters=decl[idx:])
 
     except E.MissingTypeOrAttribute:
         if not internal.declaration.mangledQ(funcname):
@@ -1610,16 +1610,16 @@ def down():
 def down(func):
     '''Return all the functions that are called by the function `func`.'''
     def codeRefs(fn):
-        resultData, resultCode = [], []
+        data, code = [], []
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.is_call(ea):
                     logging.info("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
-                    #resultCode.append((ea, 0))
+                    #code.append((ea, 0))
                 continue
-            resultData.extend( (ea, x) for x in database.xref.data_down(ea) )
-            resultCode.extend( (ea, x) for x in database.xref.code_down(ea) if fn.startEA == x or not contains(fn, x) )
-        return resultData, resultCode
+            data.extend( (ea, x) for x in database.xref.data_down(ea) )
+            code.extend( (ea, x) for x in database.xref.code_down(ea) if fn.startEA == x or not contains(fn, x) )
+        return data, code
     fn = by(func)
     return sorted({d for _, d in codeRefs(fn)[1]})
 
