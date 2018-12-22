@@ -194,7 +194,7 @@ def repr(enum):
     w = size(eid)*2
     res = [(member.name(n), member.value(n), member.mask(n), member.comment(n)) for n in members.iterate(eid)]
     aligned = max([len(n) for n, _, _, _ in res] or [0])
-    return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned)+((' # '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res)))
+    return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned)+((' // '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res)))
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
@@ -409,7 +409,7 @@ class members(object):
         maxindex = max(builtins.map(utils.first, enumerate(res)) or [1])
         maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), res) or [1])
         for i, mid in enumerate(res):
-             six.print_(u"[{:d}] {:#>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
+             six.print_(u"[{:d}] 0x{:>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
         return
 
 class member(object):
@@ -505,7 +505,7 @@ class member(object):
         If the bool `repeatable` is specified, then set the repeatable comment.
         """
         res = interface.string.to(comment)
-        return idaapi.set_enum_member_cmt(mid, res, kwds.get('repeatable', True))
+        return idaapi.set_enum_member_cmt(mid, res, repeatable.get('repeatable', True))
     @utils.multicase(comment=basestring)
     @classmethod
     def comment(cls, enum, member, comment, **repeatable):
