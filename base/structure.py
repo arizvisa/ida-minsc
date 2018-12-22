@@ -118,7 +118,7 @@ def list(**type):
     maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), res) or [1])
 
     for st in res:
-        six.print_("[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), " // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
+        six.print_(u"[{:{:d}d}] {:>{:d}s} {:<+#{:d}x} ({:d} members){:s}".format(idaapi.get_struc_idx(st.id), maxindex, st.name, maxname, st.size, maxsize, len(st.members), u" // {!s}".format(st.tag() if '\n' in st.comment else st.comment) if st.comment else ''))
     return
 
 @utils.multicase(name=basestring)
@@ -853,7 +853,7 @@ class members_t(object):
         maxtype = max(builtins.map(utils.fcompose(operator.attrgetter('type'), repr, len), res) or [1])
 
         for m in res:
-            six.print_("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), " // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
+            six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
         return
 
     @utils.multicase()
