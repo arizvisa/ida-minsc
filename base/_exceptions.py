@@ -110,6 +110,11 @@ class RegisterNotFoundError(ItemNotFoundError):
     Unable to locate the specified register.
     """
 
+class NetNodeNotFoundError(ItemNotFoundError):
+    """
+    Unable to locate the specified netnode.
+    """
+
 class ReadOrWriteError(E.IOError, E.ValueError):
     """
     Unable to read or write the specified number of bytes .
