@@ -517,7 +517,7 @@ def disassemble(ea, **options):
         noextraspaces = reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), interface.string.of(nocomment), '')
 
         # append it to our result with the address in front
-        res.append("{:x}: {:s}".format(ea, noextraspaces) )
+        res.append(u"{:x}: {:s}".format(ea, noextraspaces) )
 
         # move on to the next iteration
         ea = address.next(ea)
