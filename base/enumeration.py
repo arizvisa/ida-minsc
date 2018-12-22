@@ -198,9 +198,9 @@ def repr(enum):
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
-__matcher__.boolean('regex', re.search, idaapi.get_enum_name)
-__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), idaapi.get_enum_name)
-__matcher__.boolean('name', operator.eq, idaapi.get_enum_name)
+__matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_enum_name, interface.string.of))
+__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_enum_name, interface.string.of))
+__matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_enum_name, interface.string.of))
 __matcher__.attribute('id')
 __matcher__.attribute('identifier')
 __matcher__.predicate('pred')
@@ -237,7 +237,8 @@ def list(**type):
     except: cmask = 0
 
     for n in res:
-        six.print_("[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), idaapi.get_enum_name(n), maxname, mask(n), int(cmask), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else ''))
+        name = idaapi.get_enum_name(n)
+        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), interface.string.of(name), maxname, mask(n), int(cmask), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else ''))
     return
 
 ## members
@@ -408,7 +409,7 @@ class members(object):
         maxindex = max(builtins.map(utils.first, enumerate(res)) or [1])
         maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), res) or [1])
         for i, mid in enumerate(res):
-             six.print_("[{:d}] {:#>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
+             six.print_(u"[{:d}] {:#>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
         return
 
 class member(object):
