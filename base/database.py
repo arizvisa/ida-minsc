@@ -367,7 +367,7 @@ class functions(object):
         clvars = math.floor(math.log(lvars or 1)/math.log(10)) if lvars else 1
 
         for index, ea in enumerate(res):
-            six.print_("[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
+            six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
                 offset(ea), int(cmaxoffset),
                 fminaddr(ea), int(cminaddr), fmaxaddr(ea), int(cmaxaddr),
@@ -586,16 +586,16 @@ class names(object):
     """
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', idaapi.get_nlist_ea), __matcher__.mapping('ea', idaapi.get_nlist_ea)
-    __matcher__.boolean('name', operator.eq, idaapi.get_nlist_name)
-    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), idaapi.get_nlist_name)
-    __matcher__.boolean('regex', re.search, idaapi.get_nlist_name)
+    __matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_nlist_name, interface.string.of))
+    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_nlist_name, interface.string.of))
+    __matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_nlist_name, interface.string.of))
     __matcher__.predicate('predicate', idaapi.get_nlist_ea)
     __matcher__.predicate('pred', idaapi.get_nlist_ea)
     __matcher__.attribute('index')
 
     def __new__(cls):
         for index in six.moves.range(idaapi.get_nlist_size()):
-            res = zip((idaapi.get_nlist_ea, idaapi.get_nlist_name), (index,)*2)
+            res = zip((idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, interface.string.of)), (index,)*2)
             yield tuple(f(x) for f, x in res)
         return
 
@@ -622,7 +622,8 @@ class names(object):
     def iterate(cls, **type):
         '''Iterate through all of the names in the database that match the keyword specified by `type`.'''
         for idx in cls.__iterate__(**type):
-            yield idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
+            ea, name = idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
+            yield ea, interface.string.of(name)
         return
 
     @utils.multicase(string=basestring)
@@ -642,7 +643,8 @@ class names(object):
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
 
         for index in res:
-            six.print_("[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), idaapi.get_nlist_ea(index), int(caddr), idaapi.get_nlist_name(index)))
+            ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
+            six.print_(u"[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), ea, int(caddr), interface.string.of(name)))
         return
 
     @utils.multicase(string=basestring)
@@ -658,8 +660,8 @@ class names(object):
 
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
-            builtins.map(logging.info, (("[{:d}] {:x} {:s}".format(idx, idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx))) for idx in res))
-            f1, f2 = idaapi.get_nlist_ea, idaapi.get_nlist_name
+            f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, interface.string.of)
+            builtins.map(logging.info, (("[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in res))
             logging.warn("{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
 
         res = builtins.next(iter(res), None)
@@ -671,15 +673,16 @@ class names(object):
     def name(cls, ea):
         '''Return the symbol name of the string at address `ea`.'''
         res = idaapi.get_nlist_idx(ea)
-        return idaapi.get_nlist_name(res)
+        return interface.string.of(idaapi.get_nlist_name(res))
     @classmethod
     def address(cls, index):
         '''Return the address of the string at `index`.'''
         return idaapi.get_nlist_ea(index)
     @classmethod
     def at(cls, ea):
-        res = idaapi.get_nlist_idx(ea)
-        return idaapi.get_nlist_ea(res), idaapi.get_nlist_name(res)
+        idx = idaapi.get_nlist_idx(ea)
+        ea, name = idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
+        return ea, interface.string.of(name)
 
 class search(object):
     """
@@ -1069,9 +1072,9 @@ class entries(object):
     __matcher__.mapping('ea', utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
     __matcher__.boolean('greater', operator.le, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('gt', operator.lt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
     __matcher__.boolean('less', operator.ge, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('lt', operator.gt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
-    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
-    __matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
+    __matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, interface.string.of))
+    __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, interface.string.of))
+    __matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, interface.string.of))
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal)
     __matcher__.predicate('pred', idaapi.get_entry_ordinal)
     __matcher__.boolean('index', operator.eq)
@@ -1124,7 +1127,7 @@ class entries(object):
         return None if res == idaapi.BADADDR else res
 
     # Returns the name of the entry point at the specified `index`.
-    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name))
+    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, interface.string.of))
     # Returns the ordinal of the entry point at the specified `index`.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
@@ -1178,7 +1181,7 @@ class entries(object):
         cordinal = math.floor(math.log(maxordinal or 1)/math.log(16))
 
         for index in res:
-            six.print_("[{:{:d}d}] {:>#{:d}x} : ({:#{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index)))
+            six.print_(u"[{:{:d}d}] {:>#{:d}x} : ({:#{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index)))
         return
 
     @utils.multicase(string=basestring)
@@ -1239,11 +1242,11 @@ class entries(object):
     @classmethod
     def new(cls, ea, name, ordinal):
         '''Adds an entry point at `ea` with the specified `name` and `ordinal`.'''
-        res = idaapi.add_entry(ordinal, interface.address.inside(ea), name, 0)
+        res = idaapi.add_entry(ordinal, interface.address.inside(ea), interface.string.to(name), 0)
         ui.state.wait()
         return res
 
-    add = utils.alias(new, 'entry')
+    add = utils.alias(new, 'entries')
 exports = entries     # XXX: ns alias
 
 def tags():
@@ -1532,8 +1535,8 @@ class imports(object):
 
     # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
 
-    __formats__ = staticmethod(lambda (module, name, ordinal): name or "Ordinal{:d}".format(ordinal))
-    __formatl__ = staticmethod(lambda (module, name, ordinal): "{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal))))
+    __formats__ = staticmethod(lambda (module, name, ordinal): name or u"Ordinal{:d}".format(ordinal))
+    __formatl__ = staticmethod(lambda (module, name, ordinal): u"{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal))))
     __format__ = __formatl__
 
     __matcher__ = utils.matcher()
@@ -1559,7 +1562,7 @@ class imports(object):
             res = []
             idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, res.append, utils.fconstant(True)))
             for ea, name, ordinal in res:
-                yield ea, (module, name, ordinal)
+                yield ea, (interface.string.of(module), interface.string.of(name), ordinal)
             continue
         return
 
@@ -1651,7 +1654,8 @@ class imports(object):
     @classmethod
     def modules(cls):
         '''Return all of the import modules defined in the database.'''
-        return [idaapi.get_import_module_name(i) for i in six.moves.range(idaapi.get_import_module_qty())]
+        res = (idaapi.get_import_module_name(i) for i in six.moves.range(idaapi.get_import_module_qty()))
+        return map(interface.string.of, res)
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1670,7 +1674,7 @@ class imports(object):
         cordinal = max(builtins.map(utils.fcompose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
 
         for ea, (module, name, ordinal) in res:
-            six.print_("{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name))
+            six.print_(u"{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name))
         return
 
     @utils.multicase(string=basestring)
