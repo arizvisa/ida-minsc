@@ -281,7 +281,7 @@ class priorityhook(object):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
-            raise NameError("{:s}.add({!r}, {!r}) : Unable to add a method to hooker for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name, callable))   # XXX
+            raise NameError("{:s}.add({!r}, {!r}) : Unable to add a method to hooker for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name, callable))
         if name not in self.__cache: return False
 
         res, found = [], 0
@@ -300,7 +300,7 @@ class priorityhook(object):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
-            raise NameError("{:s}.apply({!r}) : Unable to apply the hook for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name))     # XXX
+            raise NameError("{:s}.apply({!r}) : Unable to apply the hook for an unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name))
 
         def method(hookinstance, *args):
             if name in self.__cache and name not in self.__disabled:
@@ -325,7 +325,7 @@ class priorityhook(object):
                     elif res == self.STOP:
                         break
                     cls = self.__class__
-                    raise TypeError("{:s}.callback : Unable to determine result type from {!r}.".format('.'.join(('internal', __name__, cls.__name__)), res))   # XXX
+                    raise TypeError("{:s}.callback : Unable to determine the result type from {!r}.".format('.'.join(('internal', __name__, cls.__name__)), res))
 
             supermethod = getattr(super(hookinstance.__class__, hookinstance), name)
             return supermethod(*args)
@@ -635,7 +635,9 @@ class namedtypedtuple(tuple):
         '''Construct a new instance of a tuple using the specified `args`.'''
         res = args[:]
         for n, t, x in zip(cls._fields, cls._types, args):
-            if not isinstance(x, t): raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n, t)) # XXX
+            if not isinstance(x, t):
+                raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n.encode('utf8') if isinstance(n, unicode) else n, t))
+            continue
         return tuple.__new__(cls, res)
 
     @classmethod
@@ -647,9 +649,11 @@ class namedtypedtuple(tuple):
         """
         result = cons(cls, iterable)
         if len(result) != len(cls._fields):
-            raise TypeError("Expected {:d} arguments, got {:d}.".format(len(cls._fields), len(result)))     # XXX
+            raise TypeError("Expected {:d} arguments, got {:d}.".format(len(cls._fields), len(result)))
         for n, t, x in zip(cls._fields, cls._types, result):
-            if not isinstance(x, t): raise TypeError("Unexpected type ({!r} for field {:s} should be {!r}.".format(type(x), n, t))  # XXX
+            if not isinstance(x, t):
+                raise TypeError("Unexpected type ({!r} for field {:s} should be {!r}.".format(type(x), n.encode('utf8') if isinstance(n, unicode) else n, t))
+            continue
         return result
 
     @classmethod
@@ -659,7 +663,7 @@ class namedtypedtuple(tuple):
         try:
             result = next(res)
         except StopIteration:
-            raise NameError("Unable to locate the type for an unknown field {!r}.".format(name))    # XXX
+            raise NameError("Unable to locate the type for an unknown field {!r}.".format(name))
         return result
 
     def __getattribute__(self, name):
