@@ -103,14 +103,14 @@ class config(object):
         '''Returns whether the database is read-only or not.'''
         if idaapi.__version__ >= 7.0:
             return cls.info.readonly_idb()
-        raise E.UnsupportedVersion("{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
+        raise E.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
 
     @classmethod
     def sharedobject(cls):
         '''Returns whether the database is a shared-object or not.'''
         if idaapi.__version__ >= 7.0:
             return cls.info.is_dll()
-        raise E.UnsupportedVersion("{:s}.sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
+        raise E.UnsupportedVersion(u"{:s}.sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
     is_sharedobject = sharedQ = sharedobject
 
     @classmethod
@@ -118,14 +118,14 @@ class config(object):
         '''Returns the number of changes within the database.'''
         if idaapi.__version__ >= 7.0:
             return cls.info.database_change_count
-        raise E.UnsupportedVersion("{:s}.changes() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
+        raise E.UnsupportedVersion(u"{:s}.changes() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
 
     @classmethod
     def processor(cls):
         '''Returns the name of the processor configured by the database.'''
         if idaapi.__version__ >= 7.0:
             return cls.info.get_procName()
-        raise E.UnsupportedVersion("{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
+        raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
 
     @classmethod
     def compiler(cls):
@@ -158,7 +158,7 @@ class config(object):
             return 64
         elif cls.info.is_32bit():
             return 32
-        raise E.UnsupportedCapability("{:s}.bits() : Unknown bit size.".format('.'.join((__name__, cls.__name__))))
+        raise E.UnsupportedCapability(u"{:s}.bits() : Unknown bit size.".format('.'.join((__name__, cls.__name__))))
 
     @classmethod
     def byteorder(cls):
@@ -400,7 +400,7 @@ class functions(object):
 
         res = builtins.next(iter(res), None)
         if res is None:
-            raise E.SearchResultsError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
+            raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res
 
 class segments(object):
@@ -666,7 +666,7 @@ class names(object):
 
         res = builtins.next(iter(res), None)
         if res is None:
-            raise E.SearchResultsError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
+            raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return idaapi.get_nlist_ea(res)
 
     @classmethod
@@ -725,7 +725,7 @@ class search(object):
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         res = idaapi.find_binary(ea, idaapi.BADADDR, ' '.join("{:d}".format(six.byte2int(ch)) for ch in string), direction.get('radix', 16), idaapi.SEARCH_CASE | flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError("{:s}.by_bytes({:#x}, {!r}{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(direction))) if direction else '', res))
+            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {!r}{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(direction))) if direction else '', res))
         return res
     byBytes = by_bytes
 
@@ -748,7 +748,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, string, flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError("{:s}.by_regex({:#x}, {!r}{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, {!r}{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
         return res
     byRegex = by_regex
 
@@ -771,7 +771,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, string, flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError("{:s}.by_text({:#x}, {!r}{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_text({:#x}, {!r}{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
         return res
     byText = utils.alias(by_text, 'search')
 
@@ -794,7 +794,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, name, flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError("{:s}.by_name({:#x}, {!r}{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_name({:#x}, {!r}{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
         return res
     byName = utils.alias(by_name, 'search')
 
@@ -968,7 +968,7 @@ def name(ea, string, *suffix, **flags):
     res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flags.get('flags', fl))
 
     if not ok:
-        raise E.DisassemblerError("{:s}.name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
+        raise E.DisassemblerError(u"{:s}.name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
     return res
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
@@ -1037,7 +1037,7 @@ def comment(ea, string, **repeatable):
     # apply the comment to the specified address
     res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), interface.string.to(string), repeatable.get('repeatable', False))
     if not ok:
-        raise E.DisassemblerError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
     return res
 
 class entries(object):
@@ -1143,7 +1143,7 @@ class entries(object):
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryordinal__(res)
-        raise E.MissingTypeOrAttribute("{:s}.ordinal({:#x}) : No entry point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
+        raise E.MissingTypeOrAttribute(u"{:s}.ordinal({:#x}) : No entry point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase()
     @classmethod
@@ -1157,7 +1157,7 @@ class entries(object):
         res = cls.__index__(ea)
         if res is not None:
             return cls.__entryname__(res)
-        raise E.MissingTypeOrAttribute("{:s}.name({:#x}) : No entry point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
+        raise E.MissingTypeOrAttribute(u"{:s}.name({:#x}) : No entry point at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1203,7 +1203,7 @@ class entries(object):
 
         res = builtins.next(iter(res), None)
         if res is None:
-            raise E.SearchResultsError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
+            raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return cls.__address__(res)
 
     @utils.multicase()
@@ -1212,7 +1212,7 @@ class entries(object):
         '''Makes an entry point at the current address.'''
         ea, entryname, ordinal = ui.current.address(), name(ui.current.address()) or function.name(ui.current.address()), idaapi.get_entry_qty()
         if entryname is None:
-            raise E.MissingTypeOrAttribute("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(ea=six.integer_types)
     @classmethod
@@ -1220,7 +1220,7 @@ class entries(object):
         '''Makes an entry point at the specified address `ea`.'''
         entryname, ordinal = name(ea) or function.name(ea), idaapi.get_entry_qty()
         if entryname is None:
-            raise E.MissingTypeOrAttribute("{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}.new({:#x}) : Unable to determine name at address.".format( '.'.join((__name__, cls.__name__)), ea))
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(name=basestring)
     @classmethod
@@ -1310,12 +1310,12 @@ def tag(ea, key):
     res = tag(ea)
     if key in res:
         return res[key]
-    raise E.MissingTagError("{:s}.tag({:#x}, {!r}) : Unable to read tag {!r} from address.".format(__name__, ea, key, key))
+    raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag {!r} from address.".format(__name__, ea, key, key))
 @utils.multicase(ea=six.integer_types, key=basestring)
 def tag(ea, key, value):
     '''Set the tag identified by `key` to `value` at the address `ea`.'''
     if value is None:
-        raise E.InvalidParameterError("{:s}.tag({:#x}, {!r}, {!r}) : Tried to set tag {!r} to an invalid value {!r}.".format(__name__, ea, key, value, key, value))
+        raise E.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set tag {!r} to an invalid value {!r}.".format(__name__, ea, key, value, key, value))
 
     # if an implicit tag was specified, then dispatch to the correct handler
     if key == '__name__':
@@ -1380,7 +1380,7 @@ def tag(ea, key, none):
     state and comment(ea, '', repeatable=not repeatable) # clear the old one
     state.update(internal.comment.decode(comment(ea, repeatable=repeatable)))
     if key not in state:
-        raise E.MissingTagError("{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag {!r} from address.".format(__name__, ea, key, none, key))
+        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag {!r} from address.".format(__name__, ea, key, none, key))
     res = state.pop(key)
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
 
@@ -1597,7 +1597,7 @@ class imports(object):
             return utils.second(builtins.next(res))
         except StopIteration:
             pass
-        raise E.MissingTypeOrAttribute("{:s}.at({:#x}) : Unable to determine import at specified address.".format('.'.join((__name__, cls.__name__)), ea))
+        raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : Unable to determine import at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     @utils.multicase()
     @classmethod
@@ -1613,7 +1613,7 @@ class imports(object):
             if addr == ea:
                 return module
             continue
-        raise E.MissingTypeOrAttribute("{:s}.module({:#x}) : Unable to determine import module name at specified address.".format('.'.join((__name__, cls.__name__)), ea))
+        raise E.MissingTypeOrAttribute(u"{:s}.module({:#x}) : Unable to determine import module name at specified address.".format('.'.join((__name__, cls.__name__)), ea))
 
     # specific parts of the import
     @utils.multicase()
@@ -1696,7 +1696,7 @@ class imports(object):
 
         res = builtins.next(iter(res), None)
         if res is None:
-            raise E.SearchResultsError("{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
+            raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res[0]
 
 getImportModules = utils.alias(imports.modules, 'imports')
@@ -1935,7 +1935,7 @@ class address(object):
             Fprev = idaapi.prev_not_tail
 
         if Fprev(ea) == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError("{:s}.prevF: Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), config.bounds()[0], ea))
+            raise E.AddressOutOfBoundsError(u"{:s}.prevF: Refusing to seek past the top of the database ({:#x}). Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), config.bounds()[0], ea))
 
         res = cls.__walk__(Fprev(ea), Fprev, Finverse)
         return cls.prevF(res, predicate, count-1) if count > 1 else res
@@ -1959,7 +1959,7 @@ class address(object):
         """
         Fnext, Finverse = utils.fcompose(interface.address.within, idaapi.next_not_tail), utils.fcompose(predicate, operator.not_)
         if Fnext(ea) == idaapi.BADADDR:
-            raise E.AddressOutOfBoundsError("{:s}.nextF: Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), config.bounds()[1], idaapi.get_item_end(ea)))
+            raise E.AddressOutOfBoundsError(u"{:s}.nextF: Refusing to seek past the bottom of the database ({:#x}). Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), config.bounds()[1], idaapi.get_item_end(ea)))
         res = cls.__walk__(Fnext(ea), Fnext, Finverse)
         return cls.nextF(res, predicate, count-1) if count > 1 else res
 
@@ -2194,7 +2194,7 @@ class address(object):
         res = cls.__walk__(prevea, cls.prev, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
-            raise E.RegisterNotFoundError("{:s}.prevreg({:s}) : Unable to find register{:s} within the chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
+            raise E.RegisterNotFoundError(u"{:s}.prevreg({:s}) : Unable to find register{:s} within the chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2255,7 +2255,7 @@ class address(object):
         res = cls.__walk__(nextea, cls.next, F)
         if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
-            raise E.RegisterNotFoundError("{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', ea, end, res))
+            raise E.RegisterNotFoundError(u"{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', ea, end, res))
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2276,7 +2276,7 @@ class address(object):
         start, _ = function.chunk(ea)
         res = cls.__walk__(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res < start:
-            raise E.AddressOutOfBoundsError("{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the top ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, start, fn, res))
+            raise E.AddressOutOfBoundsError(u"{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the top ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, start, fn, res))
         return res
 
     # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
@@ -2294,7 +2294,7 @@ class address(object):
         _, end = function.chunk(ea)
         res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res >= end:
-            raise E.AddressOutOfBoundsError("{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the bottom ({:#x} of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, end, fn, res))
+            raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the bottom ({:#x} of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, end, fn, res))
         return res
     prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
 
@@ -2661,7 +2661,7 @@ class type(object):
             res = idaapi.getFlags(ea)
             idaapi.setFlags(ea, (res&~mask) | value)
             return res & mask
-        raise E.UnsupportedVersion("{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated idaapi.setFlags(...).".format('.'.join((__name__, cls.__name__)), ea, mask, value))
+        raise E.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated idaapi.setFlags(...).".format('.'.join((__name__, cls.__name__)), ea, mask, value))
 
     @utils.multicase()
     @staticmethod
@@ -2993,12 +2993,12 @@ class type(object):
 
             res = type.flags(ea, idaapi.DT_TYPE)
             if res != idaapi.FF_STRU:
-                raise E.MissingTypeOrAttribute("{:s}.id({:#x}) : The type at specified addresss is not an FF_STRU({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
+                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified addresss is not an FF_STRU({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
 
             ti, F = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, F, ti)
             if not res:
-                raise E.DisassemblerError("{:s}.id({:#x}) : The call to idaapi.get_opinfo failed at {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, ea))
+                raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to idaapi.get_opinfo failed at {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, ea))
             return ti.tid
 
         @utils.multicase()
@@ -3451,7 +3451,7 @@ class marks(object):
         '''Return the `(address, description)` of the mark at the specified `index` in the mark list.'''
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.__get_slotaddress(index), cls.__get_description(index))
-        raise E.IndexOutOfBoundsError("{:s}.by_index({:d}) : The specified mark slot index ({:d}) is out of bounds ({:s}).".format('.'.join((__name__, cls.__name__)), index, index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
+        raise E.IndexOutOfBoundsError(u"{:s}.by_index({:d}) : The specified mark slot index ({:d}) is out of bounds ({:s}).".format('.'.join((__name__, cls.__name__)), index, index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
     byIndex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
@@ -3481,7 +3481,7 @@ class marks(object):
             res = cls.__location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
             title, descr = map(interface.string.to, (description, description))
             res.mark(index, title, descr)
-            #raise E.DisassemblerError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
+            #raise E.DisassemblerError(u"{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
             return index
 
         @classmethod
@@ -3499,10 +3499,10 @@ class marks(object):
             try:
                 count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
             except:
-                raise E.AddressNotFoundError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
+                raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             builtins.list(itertools.islice(iterable, count))
             if builtins.next(iterable) != ea:
-                raise E.AddressNotFoundError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
+                raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             return count
 
         @classmethod
@@ -3518,7 +3518,7 @@ class marks(object):
             intp.assign(index)
             res = loc.markedpos(intp)
             if res == idaapi.BADADDR:
-                raise E.AddressNotFoundError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index))
+                raise E.AddressNotFoundError(u"{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index))
             return address.head(res)
 
     ## Internal functions depending on which version of IDA is being used (>= 7.0)
@@ -3528,7 +3528,7 @@ class marks(object):
             '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
             res = interface.string.to(description)
             idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, res)
-            #raise E.AddressNotFoundError("{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
+            #raise E.AddressNotFoundError(u"{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
             return index
 
         @classmethod
@@ -3545,10 +3545,10 @@ class marks(object):
             try:
                 count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
             except:
-                raise E.AddressNotFoundError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
+                raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             builtins.list(itertools.islice(iterable, count))
             if builtins.next(iterable) != ea:
-                raise E.AddressNotFoundError("{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
+                raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join((__name__, cls.__name__)), ea))
             return count
 
         @classmethod
@@ -3564,7 +3564,7 @@ class marks(object):
             '''Get the address of the mark at index `index`.'''
             res = idaapi.get_marked_pos(index)
             if res == idaapi.BADADDR:
-                raise E.AddressNotFoundError("{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index))
+                raise E.AddressNotFoundError(u"{:s}.get_slotaddress({:d}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index))
             return address.head(res)
 
 @utils.multicase()
@@ -4105,7 +4105,7 @@ class set(object):
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         ok = idaapi.make_ascii_string(ea, 0, strtype)
         if not ok:
-            raise E.DisassemblerError("{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
+            raise E.DisassemblerError(u"{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
@@ -4117,11 +4117,11 @@ class set(object):
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         cb = cls.unknown(ea, size)
         if cb != size:
-            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else '', size))
+            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else '', size))
 
         ok = idaapi.make_ascii_string(ea, size, strtype)
         if not ok:
-            raise E.DisassemblerError("{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
+            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
 
     class integer(object):
@@ -4147,11 +4147,11 @@ class set(object):
             '''Set the data at address `ea` to a byte.'''
             cb = set.unknown(ea, 1)
             if cb != 1:
-                raise E.DisassemblerError("{:s}.byte({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
+                raise E.DisassemblerError(u"{:s}.byte({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
 
             ok = set.data(ea, 1, type=idaapi.FF_BYTE)
             if not ok:
-                raise E.DisassemblerError("{:s}.byte({:#x}) : Unable to assign a byte to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.byte({:#x}) : Unable to assign a byte to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 1)
         uint8_t = utils.alias(byte, 'set.integer')
 
@@ -4166,11 +4166,11 @@ class set(object):
             '''Set the data at address `ea` to a word.'''
             cb = set.unknown(ea, 2)
             if cb != 2:
-                raise E.DisassemblerError("{:s}.word({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+                raise E.DisassemblerError(u"{:s}.word({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
             ok = set.data(ea, 2, type=idaapi.FF_WORD)
             if not ok:
-                raise E.DisassemblerError("{:s}.word({:#x}) : Unable to assign a word to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.word({:#x}) : Unable to assign a word to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 2)
         uint16_t = utils.alias(word, 'set.integer')
 
@@ -4185,11 +4185,11 @@ class set(object):
             '''Set the data at address `ea` to a double-word.'''
             cb = set.unknown(ea, 4)
             if cb != 4:
-                raise E.DisassemblerError("{:s}.dword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
+                raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             ok = set.data(ea, 4, type=idaapi.FF_DWRD)
             if not ok:
-                raise E.DisassemblerError("{:s}.dword({:#x}) : Unable to assign a dword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to assign a dword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 4)
         uint32_t = utils.alias(word, 'set.integer')
 
@@ -4204,11 +4204,11 @@ class set(object):
             '''Set the data at address `ea` to a quad-word.'''
             cb = set.unknown(ea, 8)
             if cb != 8:
-                raise E.DisassemblerError("{:s}.qword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
+                raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             ok = set.data(ea, 8, type=idaapi.FF_QWRD)
             if not ok:
-                raise E.DisassemblerError("{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 8)
         uint64_t = utils.alias(word, 'set.integer')
 
@@ -4223,11 +4223,11 @@ class set(object):
             '''Set the data at address `ea` to an octal-word.'''
             cb = set.unknown(ea, 16)
             if cb != 16:
-                raise E.DisassemblerError("{:s}.oword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
+                raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
             ok = set.data(ea, 16, type=idaapi.FF_OWRD)
             if not ok:
-                raise E.DisassemblerError("{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 16)
         uint128_t = utils.alias(word, 'set.integer')
 
@@ -4244,7 +4244,7 @@ class set(object):
         '''Set the data at address `ea` to the structure_t specified by `type`.'''
         ok = cls.data(ea, type.size, type=type)
         if not ok:
-            raise E.DisassemblerError("{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join((__name__, cls.__name__)), ea, type))
+            raise E.DisassemblerError(u"{:s}.structure({:#x}, {!r}) : Unable to define the specified address as a structure.".format('.'.join((__name__, cls.__name__)), ea, type))
         return get.structure(ea, structure=type)
 
     struc = struct = utils.alias(structure, 'set')
@@ -4283,7 +4283,7 @@ class set(object):
         flags, typeid, nbytes = interface.typemap.resolve(realtype)
         ok = idaapi.create_data(ea, flags, nbytes, typeid)
         if not ok:
-            raise E.DisassemblerError("{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join((__name__, cls.__name__)), ea, type, length))
+            raise E.DisassemblerError(u"{:s}.array({:#x}, {!r}, {:d}) : Unable to define the specified address as an array.".format('.'.join((__name__, cls.__name__)), ea, type, length))
         return get.array(ea, length=reallength)
 
 class get(object):
@@ -4566,7 +4566,7 @@ class get(object):
             return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
         else:
             query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
-            raise E.UnsupportedCapability("{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the idaapi.DT_TYPE as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', ea, F, T))
+            raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the idaapi.DT_TYPE as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', ea, F, T))
 
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
@@ -4599,7 +4599,7 @@ class get(object):
 
             # It wasn't an array and was probably a structure, so we'll just complain to the user about it
             if not isinstance(res, _array.array):
-                raise E.InvalidTypeOrValueError("{:s}.string({:#x}{:s}) : The type at address {:#x} can't be treated as an unformatted array and as such is not string-convertible.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
+                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The type at address {:#x} can't be treated as an unformatted array and as such is not string-convertible.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
 
             # Warn the user and convert it into a string
             logging.warn("{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
@@ -4625,7 +4625,7 @@ class get(object):
         elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
             shift, f1 = 4, utils.fpass
         else:
-            raise E.UnsupportedCapability("{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sl, ea))
+            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sl, ea))
 
         # Figure out the STRWIDTH field
         if sw == idaapi.STRWIDTH_1B:
@@ -4635,7 +4635,7 @@ class get(object):
         elif sw == idaapi.STRWIDTH_4B:
             f2 = operator.methodcaller('decode', 'utf-32')
         else:
-            raise E.UnsupportedCapability("{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sw, ea))
+            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sw, ea))
 
         # Read the pascal length if one was specified in the string type code
         if shift:
@@ -4740,7 +4740,7 @@ class get(object):
                     return interface.switch_t(res)
                 except StopIteration:
                     pass
-            raise E.MissingTypeOrAttribute("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
         def __getarray(cls, ea):
@@ -4752,13 +4752,13 @@ class get(object):
                 return interface.switch_t(res)
             except StopIteration:
                 pass
-            raise E.MissingTypeOrAttribute("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
         def __getinsn(cls, ea):
             res = idaapi.get_switch_info_ex(ea)
             if res is None:
-                raise E.MissingTypeOrAttribute("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
             return interface.switch_t(res)
 
         @utils.multicase()
@@ -4781,5 +4781,5 @@ class get(object):
                 return cls.__getlabel(ea)
             except E.MissingTypeOrAttribute:
                 pass
-            raise E.MissingTypeOrAttribute("{:s}({:#x}) : Unable to instantiate a switch_info_ex_t.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
