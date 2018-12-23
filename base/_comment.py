@@ -97,7 +97,7 @@ class trie(dict):
         yield self
         for i, n in enumerate(symbols):
             if not isinstance(self, trie) or (n not in self):
-                raise KeyError(i, n)
+                raise KeyError(i, n)    # XXX
             self = self[n]
             yield self
         return
@@ -106,7 +106,7 @@ class trie(dict):
         for i, n in enumerate(self.descend(symbols)):
             continue
         if isinstance(n, trie):
-            raise KeyError(i, n)
+            raise KeyError(i, n)    # XXX
         return n
 
     def find(self, symbols):
@@ -114,7 +114,7 @@ class trie(dict):
             if not isinstance(n, trie):
                 return n
             continue
-        raise KeyError(i, n)
+        raise KeyError(i, n)    # XXX
 
     def dump(self):
         cls = self.__class__
@@ -157,7 +157,7 @@ class cache(object):
                 type = next(t for t in cls.state if issubclass(type, t))
             res = next(enc for enc in cls.state[type] if enc.type(instance))
         except StopIteration:
-            raise internal.exceptions.SerializationError("{:s}.by({!s}) : Unable to find an encoder for the serialization of the specified type {!s}.".format('.'.join(('internal', __name__, cls.__name__)), type, type))
+            raise internal.exceptions.SerializationError(u"{:s}.by({!s}) : Unable to find an encoder for the serialization of the specified type {!s}.".format('.'.join(('internal', __name__, cls.__name__)), type, type))
         return res
 
     @classmethod
@@ -320,12 +320,12 @@ def key_escape(iterable, sentinel):
                 return
             yield ch
     except StopIteration: pass
-    raise internal.exceptions.InvalidFormatError("{:s}.key_escape({!s}, {!r}) : Input is not properly terminated with the specified sentinel {!r}.".format('.'.join(('internal', __name__)), iterable, sentinel, sentinel))
+    raise internal.exceptions.InvalidFormatError(u"{:s}.key_escape({!s}, {!r}) : Input is not properly terminated with the specified sentinel {!r}.".format('.'.join(('internal', __name__)), iterable, sentinel, sentinel))
 
 def parse_line(iterable):
     ch = next(iterable)
     if ch != '[':
-        raise internal.exceptions.InvalidFormatError("{:s}.parse_line({!s}) : Input does not begin with the proper character {!r} and instead starts with {!r}.".format('.'.join(('internal', __name__)), iterable, '[', ch))
+        raise internal.exceptions.InvalidFormatError(u"{:s}.parse_line({!s}) : Input does not begin with the proper character {!r} and instead starts with {!r}.".format('.'.join(('internal', __name__)), iterable, '[', ch))
     res = key_escape(iterable, ']')
     key = ''.join(res)
 
@@ -341,7 +341,7 @@ def parse_line(iterable):
         t = _str
         logging.debug("{:s}.parse_line({!s}) : Assuming tag {!r} is of type {!s} with the value {!r}.".format('.'.join(('internal', __name__)), iterable, key, t, value))
         res = t.decode(value)
-        #raise internal.exceptions.SerializationError("Unable to decode data with {!r} : {!r}".format(t, value))
+        #raise internal.exceptions.SerializationError(u"Unable to decode data with {!r} : {!r}".format(t, value))
     return key, res
 
 def emit_line(key, value):
@@ -441,7 +441,7 @@ class contents(tagging):
     def _read_header(cls, target, ea):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError("{:s}._read_header({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
 
         encdata = internal.netnode.sup.get(node, key)
         if encdata is None:
@@ -450,21 +450,21 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError((sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
         except:
-            raise internal.exceptions.SerializationError("{:s}._read_header({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
+            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
         except:
-            raise internal.exceptions.SerializationError("{:s}._read_header({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
         return result
 
     @classmethod
     def _write_header(cls, target, ea, value):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError("{:s}._write_header({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
 
         if not value:
             ok = internal.netnode.sup.remove(node, key)
@@ -473,14 +473,14 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(value)
         except:
-            raise internal.exceptions.SerializationError("{:s}._write_header({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, value))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, value))
 
         try:
             encdata, sz = cls.codec.encode(data)
             if sz != len(data):
-                raise internal.exceptions.SizeMismatchError((value, sz, len(data)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(data)))
         except:
-            raise internal.exceptions.SerializationError("{:s}._write_header({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls__name__)), target, ea, value, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls__name__)), target, ea, value, key, ea, data))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
             logging.warn("{:s}._write_header({!r}, {:#x}, {!r}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, len(encdata), internal.netnode.sup.MAX_SIZE))
@@ -493,7 +493,7 @@ class contents(tagging):
         '''Reads a dictionary from the specific object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError("{:s}._read({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
 
         encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
@@ -502,14 +502,14 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError((sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
         except:
-            raise internal.exceptions.SerializationError("{:s}._read({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
+            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
         except:
-            raise internal.exceptions.SerializationError("{:s}._read({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
         return result
 
     @classmethod
@@ -517,7 +517,7 @@ class contents(tagging):
         '''Writes a dictionary to the specified object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError("{:s}._write({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
 
         # erase cache and blob if no data is specified
         if not value:
@@ -533,22 +533,22 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(res)
         except:
-            raise internal.exceptions.SerializationError("{:s}._write({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, res))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, res))
 
         try:
             encdata, sz = cls.codec.encode(data)
         except:
-            raise internal.exceptions.SerializationError("{:s}._write({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, data))
 
         if sz != len(data):
-            raise internal.exceptions.SizeMismatchError((res, sz, len(data)))
+            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(data)))
 
         # write blob
         try:
             ok = internal.netnode.blob.set(key, cls.btag, encdata)
             if not ok: raise AssertionError
         except:
-            raise internal.exceptions.DisassemblerError("{:s}._write({!r}, {:#x}, {!r}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, encdata))
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, encdata))
 
         # update sup cache with keys
         res = set(value.viewkeys())
@@ -641,7 +641,7 @@ class contents(tagging):
         ok = cls._write(target.get('target', None), address, state)
         if ok:
             return state
-        raise internal.exceptions.ReadOrWriteError("{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
 
     @classmethod
     def set_address(cls, address, count, **target):
@@ -661,7 +661,7 @@ class contents(tagging):
         ok = cls._write(target.get('target', None), address, state)
         if ok:
             return state
-        raise internal.exceptions.ReadOrWriteError("{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
 
 class globals(tagging):
     '''Tagging for a function-tag or a global'''
