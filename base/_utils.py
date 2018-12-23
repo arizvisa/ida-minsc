@@ -200,7 +200,7 @@ class multicase(object):
         for n, t in t_args.iteritems():
             if not isinstance(t, (types.TypeType, types.TupleType)) and t not in {callable}:
                 error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-                raise internal.exceptions.InvalidParameterError("@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, n))
+                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, n))
             continue
 
         # validate arguments containing original callable
@@ -209,12 +209,12 @@ class multicase(object):
                 cls.ex_function(c)
         except:
             error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-            raise internal.exceptions.InvalidParameterError("@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
+            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
 
         # throw an exception if we were given an unexpected number of arguments
         if len(other) > 1:
             error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-            raise internal.exceptions.InvalidParameterError("@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(c.co_name if isinstance(c, types.CodeType) else c.__name__) for c in other)))
+            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(c.co_name if isinstance(c, types.CodeType) else c.__name__) for c in other)))
         return result
 
     @classmethod
@@ -280,7 +280,7 @@ class multicase(object):
 
         error_arguments = [n.__class__.__name__ for n in args]
         error_keywords = ["{:s}={!s}".format(n, kwds[n].__class__.__name__) for n in kwds]
-        raise internal.exceptions.UnknownPrototypeError("@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(cls.prototype(f, t) for f, t, _ in heap)))
+        raise internal.exceptions.UnknownPrototypeError(u"@multicase.call({:s}{:s}): The requested argument types do not match any of the available prototypes. The prototypes that are available are: {:s}.".format(', '.join(error_arguments) if args else '*()', ", {:s}".format(', '.join(error_keywords)) if error_keywords else '', ', '.join(cls.prototype(f, t) for f, t, _ in heap)))
 
     @classmethod
     def new_wrapper(cls, func, cache):
