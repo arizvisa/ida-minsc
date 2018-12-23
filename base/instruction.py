@@ -424,7 +424,7 @@ def op_segment(ea, opnum):
     if segment:
         global architecture
         return architecture.by_index(segment)
-    #raise NotImplementedError(u"{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for the specified operand number. {!r} was returned.".format(__name__, ea, opnum, segment))    # XXX
+    #raise NotImplementedError("{:s}.op_segment({:#x}, {:d}) : Unable to determine the segment register for the specified operand number. {!r} was returned.".format(__name__, ea, opnum, segment))
     return None
 # FIXME: maybe use idaapi.op_seg(*args) to apply a segment to an operand?
 
