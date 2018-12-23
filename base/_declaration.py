@@ -16,7 +16,7 @@ def function(ea):
     '''Returns the C function declaration at the address `ea`.'''
     res = idaapi.idc_get_type(ea)
     if res is None:
-        raise internal.exceptions.MissingTypeOrAttribute("The function {:x} does not have a declaration.".format(ea))
+        raise internal.exceptions.MissingTypeOrAttribute(u"The function {:x} does not have a declaration.".format(ea))
     return res
 
 def arguments(ea):
@@ -37,7 +37,7 @@ def size(string):
         res = idaapi.idc_parse_decl(idaapi.cvar.idati, internal.interface.string.to(semicoloned), 0)
 
     if res is None:
-        raise internal.exceptions.DisassemblerError("Unable to parse the specified C declaration ({!r}).".format(string))
+        raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration ({!r}).".format(string))
     _, type, _ = res
     return idaapi.get_type_size0(idaapi.cvar.idati, type)
 
