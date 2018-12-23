@@ -97,7 +97,7 @@ class trie(dict):
         yield self
         for i, n in enumerate(symbols):
             if not isinstance(self, trie) or (n not in self):
-                raise KeyError(i, n)    # XXX
+                raise KeyError(i, n)    # raise KeyError for .get() and .find()
             self = self[n]
             yield self
         return
@@ -106,7 +106,7 @@ class trie(dict):
         for i, n in enumerate(self.descend(symbols)):
             continue
         if isinstance(n, trie):
-            raise KeyError(i, n)    # XXX
+            raise KeyError(i, n)    # raise KeyError for our caller if we couldn't find anything
         return n
 
     def find(self, symbols):
@@ -114,7 +114,7 @@ class trie(dict):
             if not isinstance(n, trie):
                 return n
             continue
-        raise KeyError(i, n)    # XXX
+        raise KeyError(i, n)    # raise KeyError for our caller if we couldn't find anything
 
     def dump(self):
         cls = self.__class__
