@@ -97,21 +97,21 @@ def by_name(name):
     res = interface.string.to(name)
     seg = idaapi.get_segm_by_name(res)
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.by_name({!r}) : Unable to locate the segment with the specified name.".format(__name__, name))
+        raise E.SegmentNotFoundError(u"{:s}.by_name({!r}) : Unable to locate the segment with the specified name.".format(__name__, name))
     return seg
 byName = utils.alias(by_name)
 def by_selector(selector):
     '''Return the segment associated with `selector`.'''
     seg = idaapi.get_segm_by_sel(selector)
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.by_selector({:#x}) : Unable to locate the segment with the specified selector.".format(__name__, selector))
+        raise E.SegmentNotFoundError(u"{:s}.by_selector({:#x}) : Unable to locate the segment with the specified selector.".format(__name__, selector))
     return seg
 bySelector = utils.alias(by_selector)
 def by_address(ea):
     '''Return the segment that contains the specified `ea`.'''
     seg = idaapi.getseg(interface.address.within(ea))
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.by_address({:#x}) : Unable to locate segment containing the specified address.".format(__name__, ea))
+        raise E.SegmentNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate segment containing the specified address.".format(__name__, ea))
     return seg
 byAddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
@@ -144,7 +144,7 @@ def by(**type):
 
     res = next(iter(res), None)
     if res is None:
-        raise E.SearchResultsError("{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
+        raise E.SearchResultsError(u"{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
 @utils.multicase(name=basestring)
@@ -162,7 +162,7 @@ def bounds():
     '''Return the bounds of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.bounds() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.bounds() : Unable to locate the current segment.".format(__name__))
     return seg.startEA, seg.endEA
 @utils.multicase()
 def bounds(segment):
@@ -176,7 +176,7 @@ def iterate():
     '''Iterate through all of the addresses within the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.iterate() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.iterate() : Unable to locate the current segment.".format(__name__))
     return iterate(seg)
 @utils.multicase()
 def iterate(segment):
@@ -195,7 +195,7 @@ def size():
     '''Return the size of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.size() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.size() : Unable to locate the current segment.".format(__name__))
     return seg.endEA - seg.startEA
 @utils.multicase()
 def size(segment):
@@ -233,7 +233,7 @@ def read():
     '''Return the contents of the current segment.'''
     segment = ui.current.segment()
     if segment is None:
-        raise E.SegmentNotFoundError("{:s}.read() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.read() : Unable to locate the current segment.".format(__name__))
     return idaapi.get_many_bytes(segment.startEA, segment.endEA-segment.startEA)
 @utils.multicase()
 def read(segment):
@@ -247,7 +247,7 @@ def repr():
     '''Return the current segment in a printable form.'''
     segment = ui.current.segment()
     if segment is None:
-        raise E.SegmentNotFoundError("{:s}.repr() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.repr() : Unable to locate the current segment.".format(__name__))
     return repr(segment)
 @utils.multicase()
 def repr(segment):
@@ -260,7 +260,7 @@ def top():
     '''Return the top address of the current segment.'''
     segment = ui.current.segment()
     if segment is None:
-        raise E.SegmentNotFoundError("{:s}.top() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.top() : Unable to locate the current segment.".format(__name__))
     return segment.startEA
 @utils.multicase()
 def top(segment):
@@ -273,7 +273,7 @@ def bottom():
     '''Return the bottom address of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.bottom() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.bottom() : Unable to locate the current segment.".format(__name__))
     return seg.endEA
 @utils.multicase()
 def bottom(segment):
@@ -286,7 +286,7 @@ def name():
     '''Return the name of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.name() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.name() : Unable to locate the current segment.".format(__name__))
     res = idaapi.get_true_segm_name(seg)
     return interface.string.of(res)
 @utils.multicase()
@@ -301,7 +301,7 @@ def color():
     '''Return the color of the current segment.'''
     seg = ui.current.segment()
     if seg is None:
-        raise E.SegmentNotFoundError("{:s}.color() : Unable to locate the current segment.".format(__name__))
+        raise E.SegmentNotFoundError(u"{:s}.color() : Unable to locate the current segment.".format(__name__))
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
 @utils.multicase()
@@ -365,7 +365,7 @@ def __load_file(filename, ea, size, offset=0):
     # XXX: does IDA support unicode file paths?
     res = idaapi.open_linput(path, False)
     if not res:
-        raise E.DisassemblerError("{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create loader_input_t from path \"{:s}\".".format(__name__, filename, ea, size, path))
+        raise E.DisassemblerError(u"{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create loader_input_t from path \"{:s}\".".format(__name__, filename, ea, size, path))
 
     # now we can write the file into the specified address as a segment
     ok = idaapi.file2base(res, offset, ea, ea+size, False)
@@ -379,7 +379,7 @@ def __save_file(filename, ea, size, offset=0):
     # XXX: does IDA support unicode file paths?
     of = idaapi.fopenWB(path)
     if not of:
-        raise E.DisassemblerError("{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file \"{:s}\".".format(__name__, filename, ea, size, path))
+        raise E.DisassemblerError(u"{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file \"{:s}\".".format(__name__, filename, ea, size, path))
 
     # now we can write the segment into the file we opened
     res = idaapi.base2file(of, offset, ea, ea+size)
@@ -398,7 +398,7 @@ def load(filename, ea, size=None, offset=0, **kwds):
     cb = filesize - offset if size is None else size
     res = __load_file(filename, ea, cb, offset)
     if not res:
-        raise E.ReadOrWriteError("{:s}.load({!r}, {:#x}, {:+#x}, {:#x}) : Unable to load file into {:#x}:{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, ea, cb, os.path.relpath(filename)))
+        raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}) : Unable to load file into {:#x}:{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, ea, cb, os.path.relpath(filename)))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
 
 def map(ea, size, newea, **kwds):
@@ -410,12 +410,12 @@ def map(ea, size, newea, **kwds):
     # grab the file offset and the data we want
     fpos, data = idaapi.get_fileregion_offset(ea), database.read(ea, size)
     if len(data) != size:
-        raise E.ReadOrWriteError("{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to read {:#x} bytes from {:#x}.".format(__name__, ea, size, newea, size, ea))
+        raise E.ReadOrWriteError(u"{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to read {:#x} bytes from {:#x}.".format(__name__, ea, size, newea, size, ea))
 
     # rebase the data to the new address
     res = idaapi.mem2base(data, newea, fpos)
     if not res:
-        raise E.DisassemblerError("{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, newea, ea, size, newea))
+        raise E.DisassemblerError(u"{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, newea, ea, size, newea))
 
     # now we can create the new segment
     return new(newea, size, kwds.get("name', 'map_{:x}".format(ea)))
@@ -435,7 +435,7 @@ def new(offset, size, name, **kwds):
     # find the segment according to the name specified by the user
     seg = idaapi.get_segm_by_name(res)
     if seg is not None:
-        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', name))
+        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', name))   # XXX
 
     # FIXME: use disassembler default bit length instead of 32
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits())
@@ -444,7 +444,7 @@ def new(offset, size, name, **kwds):
     if bits == 16:
         org = kwds.get('org',0)
         if org & 0xf > 0:
-            raise E.InvalidTypeOrValueError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : The specified origin ({:#x}) is not aligned to the size of a paragraph (0x10).".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', org))
+            raise E.InvalidTypeOrValueError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : The specified origin ({:#x}) is not aligned to the size of a paragraph (0x10).".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', org))
 
         para = offset/16
         sel = idaapi.allocate_selector(para)
@@ -485,7 +485,7 @@ def new(offset, size, name, **kwds):
         if not ok:
             logging.warn("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', sel))
 
-        raise E.DisassemblerError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to add a new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else ''))
+        raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to add a new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else ''))
     return seg
 create = utils.alias(new)
 
@@ -496,7 +496,7 @@ def remove(segment, contents=False):
     """
     if not isinstance(segment, idaapi.segment_t):
         cls = idaapi.segment_t
-        raise E.InvalidParameterError("{:s}.remove({!r}) : Expected a {!s}, but received a {!s}.".format(__name__, segment, cls, type(segment)))
+        raise E.InvalidParameterError(u"{:s}.remove({!r}) : Expected a {!s}, but received a {!s}.".format(__name__, segment, cls, type(segment)))
 
     # delete the selector defined by the segment_t
     res = idaapi.del_selector(segment.sel)
