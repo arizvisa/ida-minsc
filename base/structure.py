@@ -133,7 +133,7 @@ def new(name, offset):
     # add a structure with the specified name
     id = idaapi.add_struc(idaapi.BADADDR, res)
     if id == idaapi.BADADDR:
-        raise E.DisassemblerError("{:s}.new({!r}, {:#x}) : Unable to add a new structure to the database.".format(__name__, name, offset))
+        raise E.DisassemblerError(u"{:s}.new({!r}, {:#x}) : Unable to add a new structure to the database.".format(__name__, name, offset))
 
     # FIXME: we should probably move the new structure to the end of the list via idaapi.set_struc_idx
 
@@ -166,7 +166,7 @@ def by(**type):
 
     res = next(iter(res), None)
     if res is None:
-        raise E.SearchResultsError("{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
+        raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
 def search(string):
@@ -180,7 +180,7 @@ def by_name(name, **options):
     # try and find the structure id according to its name
     id = idaapi.get_struc_id(res)
     if id == idaapi.BADADDR:
-        raise E.StructureNotFoundError("{:s}.by_name({!r}) : Unable to locate structure with given name.".format(__name__, name))
+        raise E.StructureNotFoundError(u"{:s}.by_name({!r}) : Unable to locate structure with given name.".format(__name__, name))
 
     # grab an instance of the structure by its id that we found
     return __instance__(id, **options)
@@ -190,7 +190,7 @@ def by_index(index, **options):
     '''Return a structure by its index.'''
     id = idaapi.get_struc_by_idx(index)
     if id == idaapi.BADADDR:
-        raise E.StructureNotFoundError("{:s}.by_index({:d}) : Unable to locate structure at given index.".format(__name__, index))
+        raise E.StructureNotFoundError(u"{:s}.by_index({:d}) : Unable to locate structure at given index.".format(__name__, index))
 
     # grab an instance of the structure by the id we found
     return __instance__(id, **options)
@@ -331,7 +331,7 @@ class structure_t(object):
                 mptr, _ = idaapi.get_member_by_fullname(name)
                 if not isinstance(mptr, idaapi.member_t):
                     cls = self.__class__
-                    raise E.InvalidTypeOrValueError("{:s}.instance({!r}).refs() : Unexpected type {!s} for netnode {!r}.".format(__name__, self.name, mptr.__class__, name))
+                    raise E.InvalidTypeOrValueError(u"{:s}.instance({!r}).refs() : Unexpected type {!s} for netnode {!r}.".format(__name__, self.name, mptr.__class__, name))
                 sptr = idaapi.get_sptr(mptr)
 
                 # get frame, func_t
@@ -770,7 +770,7 @@ class members_t(object):
         res = interface.string.to(ownername)
         identifier = idaapi.get_struc_id(res)
         if identifier == idaapi.BADADDR:
-            raise E.DisassemblerError("{:s}.instance({!r}).members.__setstate__ : Failure trying to create a members_t for the structure_t {!r}.".format(__name__, self.owner.name, ownername))
+            raise E.DisassemblerError(u"{:s}.instance({!r}).members.__setstate__(...) : Failure trying to create a members_t for the structure_t {!r}.".format(__name__, self.owner.name, ownername))
             #logging.warn("{:s}.instance({!r}).members.__setstate__ : Creating structure {:s} at offset {:+#x} with {:d} members.".format(__name__, self.owner.name, ownername, baseoffset, len(members)))
             #identifier = idaapi.add_struc(idaapi.BADADDR, ownername)
 
@@ -798,10 +798,10 @@ class members_t(object):
         elif isinstance(index, slice):
             res = [self.__getitem__(i) for i in six.moves.range(self.owner.ptr.memqty)].__getitem__(index)
         else:
-            raise E.InvalidParameterError(index)
+            raise E.InvalidParameterError(u"{:s}.instance({!r}).members.__getitem__({!r}) : An invalid type ({!r}) was specified for the index.".format(__name__, self.owner.name, index, index.__class__))
 
         if res is None:
-            raise E.MemberNotFoundError(index)
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.__getitem__({!r}) : Unable to find the member that was requested.".format(__name__, self.owner.name, index))
         return res
 
     def index(self, member_t):
@@ -810,7 +810,7 @@ class members_t(object):
             if member_t.id == self[i].id:
                 return i
             continue
-        raise E.MemberNotFoundError("{:s}.instance({!r}).members.index : The member {!r} is not in the members list.".format(__name__, self.owner.name, member_t))
+        raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.index({:#x}) : The member {!r} is not in the members list.".format(__name__, self.owner.name, member_t.id, member_t))
 
     __member_matcher = utils.matcher()
     __member_matcher.boolean('regex', re.search, 'name')
@@ -868,7 +868,7 @@ class members_t(object):
 
         res = next(iter(res), None)
         if res is None:
-            raise E.SearchResultsError("{:s}.instance({!r}).members.by({:s}) : Found 0 matching results.".format(__name__, self.owner.name, searchstring))
+            raise E.SearchResultsError(u"{:s}.instance({!r}).members.by({:s}) : Found 0 matching results.".format(__name__, self.owner.name, searchstring))
         return res
     @utils.multicase(name=basestring)
     def by(self, name):
@@ -886,7 +886,7 @@ class members_t(object):
         # grab the member_t of the structure by its name
         mem = idaapi.get_member_by_name(self.owner.ptr, res)
         if mem is None:
-            raise E.MemberNotFoundError("{:s}.instance({!r}).members.by_name({!r}) : Unable to find member with requested name.".format(__name__, self.owner.name, name))
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_name({!r}) : Unable to find member with requested name.".format(__name__, self.owner.name, name))
 
         # figure out the index of the member so we can return the member_t we've cached
         index = self.index(mem)
@@ -900,7 +900,7 @@ class members_t(object):
         # grab the member_t of the structure by its fullname
         mem = idaapi.get_member_by_fullname(self.owner.ptr, res)
         if mem is None:
-            raise E.MemberNotFoundError("{:s}.instance({!r}).members.by_fullname({!r}) : Unable to find member with full name.".format(__name__, self.owner.name, fullname))
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_fullname({!r}) : Unable to find member with full name.".format(__name__, self.owner.name, fullname))
 
         # figure out the index of the member so we can return the member_t we've cached
         index = self.index(mem)
@@ -914,11 +914,11 @@ class members_t(object):
         mptr = idaapi.get_member(self.owner.ptr, max - self.baseoffset)
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max+msize):
-            raise E.OutOfBoundsError("{:s}.instance({!r}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format(__name__, self.owner.name, offset, min, max+msize))
+            raise E.OutOfBoundsError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format(__name__, self.owner.name, offset, min, max+msize))
 
         mem = idaapi.get_member(self.owner.ptr, offset - self.baseoffset)
         if mem is None:
-            raise E.MemberNotFoundError("{:s}.instance({!r}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.owner.name, offset))
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.owner.name, offset))
 
         index = self.index(mem)
         return self[index]
@@ -928,7 +928,7 @@ class members_t(object):
         '''Return the member in the structure that has the specified `id`.'''
         res = idaapi.get_member_by_id(id)
         if res is None:
-            raise E.MemberNotFoundError("{:s}.instance({!r}).members.by_id({:#x}) : Unable to find member with specified id.".format(__name__, self.owner.name, id))
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_id({:#x}) : Unable to find member with specified id.".format(__name__, self.owner.name, id))
 
         # unpack the member out of the result
         mem, fn, st = res
@@ -951,7 +951,7 @@ class members_t(object):
             mem = idaapi.get_best_fit_member(self.owner.ptr, res)
 
         if mem is None:
-            raise E.MemberNotFoundError("{:s}.instance({!r}).members.near_offset({:+#x}) : Unable to find member near offset.".format(__name__, self.owner.name, offset))
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.near_offset({:+#x}) : Unable to find member near offset.".format(__name__, self.owner.name, offset))
 
         index = self.index(mem)
         return self[index]
