@@ -66,7 +66,7 @@ def by_name(name):
     '''Return the identifier for the enumeration with the given `name`.'''
     res = idaapi.get_enum(interface.string.to(name))
     if res == idaapi.BADADDR:
-        raise E.EnumerationNotFoundError("{:s}.by_name({!r}) : Unable to locate enumeration by the name {!r}.".format(__name__, name, name))
+        raise E.EnumerationNotFoundError(u"{:s}.by_name({!r}) : Unable to locate enumeration by the name {!r}.".format(__name__, name, name))
     return res
 byName = utils.alias(by_name)
 
@@ -74,7 +74,7 @@ def by_index(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
     res = idaapi.getn_enum(index)
     if res == idaapi.BADADDR:
-        raise E.EnumerationNotFoundError("{:s}.by_index({:#x}) : Unable to locate enumeration by the index {:d}.".format(__name__, index, index))
+        raise E.EnumerationNotFoundError(u"{:s}.by_index({:#x}) : Unable to locate enumeration by the index {:d}.".format(__name__, index, index))
     return res
 byIndex = utils.alias(by_index)
 
@@ -102,7 +102,7 @@ def by(**type):
 
     res = next(iter(res), None)
     if res is None:
-        raise E.SearchResultsError("{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
+        raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
 @utils.multicase(string=basestring)
@@ -129,7 +129,7 @@ def new(name, flags=0):
     idx = count()
     res = idaapi.add_enum(idx, interface.string.to(name), flags)
     if res == idaapi.BADADDR:
-        raise E.DisassemblerError("{:s}.new({!r}, flags={:d}) : Unable to create enumeration named {:s}.".format(__name__, name, flags, name))
+        raise E.DisassemblerError(u"{:s}.new({!r}, flags={:d}) : Unable to create enumeration named {:s}.".format(__name__, name, flags, name))
     return res
 
 def delete(enum):
@@ -286,7 +286,7 @@ class members(object):
 
         err = {getattr(idaapi, n) : n for n in ('ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV')}
         if ok in err.viewkeys():
-            raise E.DisassemblerError("{:s}.add({:#x}, {!r}, {:#x}, bitmask={!r}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join((__name__, cls.__name__)), eid, name, value, bitmask, err[ok], ok))
+            raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {:#x}, bitmask={!r}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join((__name__, cls.__name__)), eid, name, value, bitmask, err[ok], ok))
         return eid
     new = create = utils.alias(add, 'members')
 
@@ -324,14 +324,14 @@ class members(object):
         eid = by(enum)
         try: return next(mid for i, mid in enumerate(cls.iterate(eid)) if i == index)
         except StopIteration: pass
-        raise E.MemberNotFoundError("{:s}.by_index({:#x}, {:d}) : Unable to locate member by index.".format('.'.join((__name__, cls.__name__)), eid, index))
+        raise E.MemberNotFoundError(u"{:s}.by_index({:#x}, {:d}) : Unable to locate member by index.".format('.'.join((__name__, cls.__name__)), eid, index))
 
     @classmethod
     def by_identifier(cls, enum, mid):
         '''Return the member of the enumeration specified by `enum` and its `mid`.'''
         eid = by(enum)
         if member.parent(mid) != eid:
-            raise E.MemberNotFoundError("{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__, cls.__name__)), eid, index))
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__, cls.__name__)), eid, index))
         return mid
 
     @classmethod
@@ -341,7 +341,7 @@ class members(object):
         bmask = idaapi.BADADDR & mask(eid)
         res, _ = idaapi.get_first_serial_enum_member(eid, value, bmask)
         if res == idaapi.BADADDR:
-            raise E.MemberNotFoundError("{:s}.by_value({:#x}, {:d}) : Unable to locate member by value.".format('.'.join((__name__, cls.__name__)), eid, value))
+            raise E.MemberNotFoundError(u"{:s}.by_value({:#x}, {:d}) : Unable to locate member by value.".format('.'.join((__name__, cls.__name__)), eid, value))
         return res
     byValue = utils.alias(by_value, 'members')
 
@@ -442,7 +442,7 @@ class member(object):
         # XXX: is a serial of 0 valid?
         res = idaapi.del_enum_member(eid, value, 0, idaapi.BADADDR & cls.mask(mid))
         if not res:
-            raise E.DisassemblerError("{:s}.member.remove({:#x}) : Unable to remove member from enumeration.".format(__name__, mid))
+            raise E.DisassemblerError(u"{:s}.member.remove({:#x}) : Unable to remove member from enumeration.".format(__name__, mid))
         return res
     @utils.multicase()
     @classmethod
