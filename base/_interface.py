@@ -281,7 +281,7 @@ class priorityhook(object):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
-            raise NameError("{:s}.add({!r}, {!r}) : Unable to add a method to hooker for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name, callable))
+            raise NameError("{:s}.add({!r}, {!r}) : Unable to add a method to hooker for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name, callable))   # XXX
         if name not in self.__cache: return False
 
         res, found = [], 0
@@ -300,7 +300,7 @@ class priorityhook(object):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
-            raise NameError("{:s}.apply({!r}) : Unable to apply the hook for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name))
+            raise NameError("{:s}.apply({!r}) : Unable to apply the hook for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name))     # XXX
 
         def method(hookinstance, *args):
             if name in self.__cache and name not in self.__disabled:
@@ -325,7 +325,7 @@ class priorityhook(object):
                     elif res == self.STOP:
                         break
                     cls = self.__class__
-                    raise TypeError("{:s}.callback : Unable to determine result type from {!r}.".format('.'.join(('internal', __name__, cls.__name__)), res))
+                    raise TypeError("{:s}.callback : Unable to determine result type from {!r}.".format('.'.join(('internal', __name__, cls.__name__)), res))   # XXX
 
             supermethod = getattr(super(hookinstance.__class__, hookinstance), name)
             return supermethod(*args)
@@ -429,10 +429,10 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
-            raise internal.exceptions.InvalidParameterError("{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
-            raise internal.exceptions.InvalidParameterError("{:s} : An invalid address ({:#x}) was specified.".format(entryframe.f_code.co_name, ea))
+            raise internal.exceptions.InvalidParameterError(u"{:s} : An invalid address ({:#x}) was specified.".format(entryframe.f_code.co_name, ea))
 
         res = cls.within(ea)
         return cls.head(res, silent=True)
@@ -443,7 +443,7 @@ class address(object):
         entryframe = cls.pframe()
         start, end = cls.within(start, end)
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
-            raise internal.exceptions.InvalidParameterError("{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
         return cls.head(start, silent=True), cls.tail(end, silent=True) - 1
     @classmethod
     def inside(cls, *args):
@@ -458,14 +458,14 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(ea, six.integer_types):
-            raise internal.exceptions.InvalidParameterError("{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s} : The specified address {!r} is not an integral type ({!r}).".format(entryframe.f_code.co_name, ea, ea.__class__))
 
         if ea == idaapi.BADADDR:
-            raise internal.exceptions.InvalidParameterError("{:s} : An invalid address {:#x} was specified.".format(entryframe.f_code.co_name, ea))
+            raise internal.exceptions.InvalidParameterError(u"{:s} : An invalid address {:#x} was specified.".format(entryframe.f_code.co_name, ea))
 
         if not cls.__within__(ea):
             l, r = cls.__bounds__()
-            raise internal.exceptions.OutOfBoundsError("{:s} : The specified address {:#x} is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, l, r))
+            raise internal.exceptions.OutOfBoundsError(u"{:s} : The specified address {:#x} is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, ea, l, r))
         return ea
     @classmethod
     def __within2__(cls, start, end):
@@ -473,12 +473,12 @@ class address(object):
         entryframe = cls.pframe()
 
         if not isinstance(start, six.integer_types) or not isinstance(end, six.integer_types):
-            raise internal.exceptions.InvalidParameterError("{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
+            raise internal.exceptions.InvalidParameterError(u"{:s} : The specified addresses ({!r}, {!r}) are not integral types ({!r}, {!r}).".format(entryframe.f_code.co_name, start, end, start.__class__, end.__class__))
 
         # FIXME: off-by-one here, as end can be the size of the db.
         if any(not cls.__within__(ea) for ea in (start, end-1)):
             l, r = cls.__bounds__()
-            raise internal.exceptions.OutOfBoundsError("{:s} : The specified range ({:#x}<>{:#x}) is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, start, end, l, r))
+            raise internal.exceptions.OutOfBoundsError(u"{:s} : The specified range ({:#x}<>{:#x}) is not within the bounds of the database ({:#x}<>{:#x}).".format(entryframe.f_code.co_name, start, end, l, r))
         return start, end
     @classmethod
     def within(cls, *args):
@@ -508,7 +508,7 @@ class node(object):
         by = onext(iterable)
         if by & 0xf0:
             # FIXME: If this doesn't match, then this is a type that forwards to the real function type.
-            raise internal.exceptions.UnsupportedCapability("{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join(('internal', node.__name__)), sup.encode('hex'), by, 2 + 2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join(('internal', node.__name__)), sup.encode('hex'), by, 2 + 2))
         res.append( (by & idaapi.CM_MASK) )
         res.append( (by & idaapi.CM_M_MASK) )
 
@@ -518,7 +518,7 @@ class node(object):
         if cc == idaapi.CM_CC_SPOILED:
             if count != 15:
                 lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('CM_CC_') }
-                raise internal.exceptions.UnsupportedCapability("{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
             funcattr = onext(iterable)
             by = onext(iterable)
             res.append( (by & idaapi.CM_CC_MASK) )
@@ -543,8 +543,8 @@ class node(object):
         elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
             if base == idaapi.BT_COMPLEX:
-                raise internal.exceptions.UnsupportedCapability("{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2+2))
-            raise internal.exceptions.UnsupportedCapability("{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2+2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2+2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2+2))
 
         # append the return type
         res.append(data)
@@ -582,7 +582,7 @@ class node(object):
             count, res = le(sup[:2]), sup[2:]
             chunks = zip(*((iter(res),) * 4))
             if len(chunks) != count:
-                raise internal.exceptions.SizeMismatchError("{:s}.op_id(\"{:s}\") -> id32 : The number of chunks ({:d}) does not match the count ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id32 : The number of chunks ({:d}) does not match the count ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, 0x3f000000), res)
             return tuple(res)
@@ -605,7 +605,7 @@ class node(object):
             chunks = zip(*((iterable,)*5))
             #length = le(chunks.pop(0))
             if len(chunks) != length:
-                raise internal.exceptions.SizeMismatchError("{:s}.op_id(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), length, map(''.join, chunks)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), length, map(''.join, chunks)))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, 0xc0000000ff), res)
             return tuple(ror(n, 8, 64) for n in res)
@@ -635,7 +635,7 @@ class namedtypedtuple(tuple):
         '''Construct a new instance of a tuple using the specified `args`.'''
         res = args[:]
         for n, t, x in zip(cls._fields, cls._types, args):
-            if not isinstance(x, t): raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n, t))
+            if not isinstance(x, t): raise TypeError("Unexpected type ({!r}) for field {:s} should be {!r}.".format(type(x), n, t)) # XXX
         return tuple.__new__(cls, res)
 
     @classmethod
@@ -647,9 +647,9 @@ class namedtypedtuple(tuple):
         """
         result = cons(cls, iterable)
         if len(result) != len(cls._fields):
-            raise TypeError("Expected {:d} arguments, got {:d}.".format(len(cls._fields), len(result)))
+            raise TypeError("Expected {:d} arguments, got {:d}.".format(len(cls._fields), len(result)))     # XXX
         for n, t, x in zip(cls._fields, cls._types, result):
-            if not isinstance(x, t): raise TypeError("Unexpected type ({!r} for field {:s} should be {!r}.".format(type(x), n, t))
+            if not isinstance(x, t): raise TypeError("Unexpected type ({!r} for field {:s} should be {!r}.".format(type(x), n, t))  # XXX
         return result
 
     @classmethod
@@ -659,7 +659,7 @@ class namedtypedtuple(tuple):
         try:
             result = next(res)
         except StopIteration:
-            raise NameError("Unable to locate the type for an unknown field {!r}.".format(name))
+            raise NameError("Unable to locate the type for an unknown field {!r}.".format(name))    # XXX
         return result
 
     def __getattribute__(self, name):
@@ -801,7 +801,7 @@ class regmatch(object):
         if not regs:
             args = ', '.join(map("{:s}".format, regs))
             mods = ', '.join(map(internal.utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
-            raise internal.exceptions.InvalidParameterError("{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join(('internal', __name__, cls.__name__)), args, (', '+mods) if mods else ''))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join(('internal', __name__, cls.__name__)), args, (', '+mods) if mods else ''))
         use, iterops = cls.use(regs), cls.modifier(**modifiers)
         def match(ea):
             return any(map(functools.partial(use, ea), iterops(ea)))
@@ -920,7 +920,7 @@ class ref_t(set):
             if set(t) == res:
                 return cls(F, str().join(sorted(res)))
             continue
-        raise internal.exceptions.InvalidTypeOrValueError("{:s}.of_state({!r}) : Unable to find the cross-reference type that matches requested state.".format('.'.join(('internal', __name__, cls.__name__)), str().join(sorted(res))))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to find the cross-reference type that matches requested state.".format('.'.join(('internal', __name__, cls.__name__)), str().join(sorted(res))))
 
 class AddressOpnumReftype(namedtypedtuple):
     """
@@ -1007,7 +1007,7 @@ class switch_t(object):
         # FIXME: check that this works with a different .ind_lowcase
         if case < self.base or case >= self.count + self.base:
             cls = self.__class__
-            raise internal.exceptions.IndexOutOfBoundsError("{:s}.case({:d}) : The specified case ({:d}) was out of bounds ({:#x}<>{:#x}).".format(cls.__name__, case, case, self.base, self.base+self.count - 1))
+            raise internal.exceptions.IndexOutOfBoundsError(u"{:s}.case({:d}) : The specified case ({:d}) was out of bounds ({:#x}<>{:#x}).".format(cls.__name__, case, case, self.base, self.base+self.count - 1))
         idx = case - self.base
         if self.indirectQ():
             idx = self.index[idx]
@@ -1228,7 +1228,7 @@ class architecture_t(object):
             return register if register.size == size else self.promote(parent(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError("{:s}.promote({:s}{:s}) : Unable to determine the register to promote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({:s}{:s}) : Unable to determine the register to promote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
     def demote(self, register, size=None):
         '''Demote the specified `register` to its next smaller `size`.'''
         childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('iteritems'))
@@ -1239,7 +1239,7 @@ class architecture_t(object):
             return register if register.size == size else self.demote(firstchild(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError("{:s}.demote({:s}{:s}) : Unable to determine the register to demote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({:s}{:s}) : Unable to determine the register to demote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
 
 class bounds_t(namedtypedtuple):
     """
