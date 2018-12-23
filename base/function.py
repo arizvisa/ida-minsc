@@ -41,7 +41,7 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
-        raise E.FunctionNotFoundError("{:s}.by_address({:#x}) : Unable to locate function.".format(__name__, ea))
+        raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate function.".format(__name__, ea))
     return res
 byAddress = utils.alias(by_address)
 
@@ -53,12 +53,12 @@ def by_name(name):
     # ask IDA to get its address
     ea = idaapi.get_name_ea(idaapi.BADADDR, res)
     if ea == idaapi.BADADDR:
-        raise E.FunctionNotFoundError("{:s}.by_name({!r}) : Unable to locate function by name.".format(__name__, name))
+        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to locate function by name.".format(__name__, name))
 
     # now that we have its address, return the func_t
     res = idaapi.get_func(ea)
     if res is None:
-        raise E.FunctionNotFoundError("{:s}.by_name({!r}) : Unable to locate function by address.".format(__name__, name))
+        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to locate function by address.".format(__name__, name))
     return res
 byName = utils.alias(by_name)
 
@@ -123,7 +123,7 @@ def comment(func, string, **repeatable):
 
     res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, interface.string.to(string), repeatable.get('repeatable', True))
     if not ok:
-        raise E.DisassemblerError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
     return res
 
 @utils.multicase()
@@ -209,11 +209,11 @@ def convention(func):
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     sup = internal.netnode.sup.get(ea, 0x3000)
     if sup is None:
-        raise E.MissingTypeOrAttribute("{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
+        raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
     try:
         _, _, cc = interface.node.sup_functype(sup)
     except E.UnsupportedCapability:
-        raise E.UnsupportedCapability("{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
+        raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
     return cc
 cc = utils.alias(convention)
 
@@ -247,7 +247,7 @@ def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function `func`.'''
     fn = by(func)
     if fn is None:
-        raise E.FunctionNotFoundError("{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func, ea))
+        raise E.FunctionNotFoundError(u"{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func, ea))
     return fn.startEA, fn.endEA
 range = utils.alias(bounds)
 
@@ -284,7 +284,7 @@ def address():
     '''Return the entry-point of the current function.'''
     res = ui.current.function()
     if res is None:
-        raise E.FunctionNotFoundError("{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
+        raise E.FunctionNotFoundError(u"{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
     return res.startEA
 @utils.multicase()
 def address(func):
@@ -379,7 +379,7 @@ class chunks(object):
         fn = by(func)
         fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
         if not fci.main():
-            raise E.DisassemblerError("{:s}.chunks({:#x}) : Unable to create an idaapi.func_tail_iterator_t.".format(__name__, fn.startEA))
+            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an idaapi.func_tail_iterator_t.".format(__name__, fn.startEA))
 
         while True:
             ch = fci.chunk()
@@ -422,7 +422,7 @@ class chunks(object):
             if left <= ea < right:
                 return interface.bounds_t(left, right)
             continue
-        raise E.AddressNotFoundError("{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
@@ -679,7 +679,7 @@ class blocks(object):
             if bb.startEA <= ea < bb.endEA:
                 return bb
             continue
-        raise E.AddressNotFoundError("{:s}.at({:#x}, {:#x}) : Unable to locate idaapi.BasicBlock for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate idaapi.BasicBlock for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
 
     @utils.multicase()
     @classmethod
@@ -1235,7 +1235,7 @@ class frame(object):
         res = idaapi.get_frame(fn.startEA)
         if res is not None:
             return structure.by_identifier(res.id, offset=-fn.frsize)
-        raise E.MissingTypeOrAttribute("{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
+        raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
 
     @utils.multicase()
     @classmethod
@@ -1318,7 +1318,7 @@ class frame(object):
             # grab from structure
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute("{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
@@ -1418,7 +1418,7 @@ def tag(func, key):
     res = tag(func)
     if key in res:
         return res[key]
-    raise E.MissingFunctionTagError("{:s}.tag({!r}, {!r}) : Unable to read tag {!r} from function.".format(__name__, func, key, key))
+    raise E.MissingFunctionTagError(u"{:s}.tag({!r}, {!r}) : Unable to read tag {!r} from function.".format(__name__, func, key, key))
 @utils.multicase()
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
@@ -1454,7 +1454,7 @@ def tag(func):
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
     if value is None:
-        raise E.InvalidParameterError("{:s}.tag({!r}) : Tried to set tag {!r} to an unsupported type.".format(__name__, ea, key))
+        raise E.InvalidParameterError(u"{:s}.tag({!r}) : Tried to set tag {!r} to an unsupported type.".format(__name__, ea, key))
 
     # Check to see if function tag is being applied to an import
     try:
@@ -1520,7 +1520,7 @@ def tag(func, key, none):
     # decode the comment, remove the key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
     if key not in state:
-        raise E.MissingFunctionTagError("{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag {!r} from function.".format(__name__, fn.startEA, key, none, key))
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag {!r} from function.".format(__name__, fn.startEA, key, none, key))
     res = state.pop(key)
     comment(fn, internal.comment.encode(state), repeatable=True)
 
