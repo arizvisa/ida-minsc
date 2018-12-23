@@ -435,7 +435,7 @@ def new(offset, size, name, **kwds):
     # find the segment according to the name specified by the user
     seg = idaapi.get_segm_by_name(res)
     if seg is not None:
-        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', name))   # XXX
+        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name.encode('utf8') if isinstance(name, unicode) else name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', name))
 
     # FIXME: use disassembler default bit length instead of 32
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits())
