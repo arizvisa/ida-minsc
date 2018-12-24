@@ -1322,7 +1322,7 @@ class frame(object):
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.debug("{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, cc))
+                logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, cc))
 
             base = get_vars_size(fn)+get_regs_size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, get_args_size(fn)):
@@ -1425,11 +1425,11 @@ def tag(func):
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
-        logging.warn("{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
+        logging.warn(u"{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return database.tag(func)
 
     if rt:
-        logging.warn("{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
+        logging.warn(u"{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
         return database.tag(ea)
 
     fn, repeatable = by_address(ea), True
@@ -1439,7 +1439,7 @@ def tag(func):
     d2 = internal.comment.decode(res)
 
     if d1.viewkeys() & d2.viewkeys():
-        logging.info("{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     res = {}
     map(res.update, (d1, d2) if repeatable else (d2, d1))
@@ -1461,12 +1461,12 @@ def tag(func, key, value):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
         # If we're not even in a function, then use a database tag.
-        logging.warn("{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
+        logging.warn(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
         return database.tag(func, key, value)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
+        logging.warn(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
         return database.tag(ea, key, value)
 
     # Otherwise, it's a function.
@@ -1500,12 +1500,12 @@ def tag(func, key, none):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
         # If we're not even in a function, then use a database tag.
-        logging.warn("{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
+        logging.warn(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
         return database.tag(func, key, none)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, none))
+        logging.warn(u"{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, none))
         return database.tag(ea, key, none)
 
     # Otherwise, it's a function.
@@ -1614,7 +1614,7 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.is_call(ea):
-                    logging.info("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
+                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
                     #code.append((ea, 0))
                 continue
             data.extend( (ea, x) for x in database.xref.data_down(ea) )
