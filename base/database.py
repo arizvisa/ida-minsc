@@ -394,9 +394,9 @@ class functions(object):
 
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
-            builtins.map(logging.info, (("[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(res)))
+            builtins.map(logging.info, ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(res)))
             f = utils.fcompose(function.by, function.name)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results. Returning the first function {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -661,8 +661,8 @@ class names(object):
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, interface.string.of)
-            builtins.map(logging.info, (("[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in res))
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
+            builtins.map(logging.info, ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in res))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -961,7 +961,7 @@ def name(ea, string, *suffix, **flags):
     # validate the name
     res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
     if ida_string and ida_string != res:
-        logging.info("{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', interface.string.of(res)))
+        logging.info(u"{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', interface.string.of(res)))
         ida_string = res
 
     # set the name and use the value of 'flags' if it was explicit
@@ -1197,9 +1197,9 @@ class entries(object):
 
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
-            builtins.map(logging.info, (("[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
+            builtins.map(logging.info, ((u"[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
             f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -1278,7 +1278,7 @@ def tag(ea):
 
     # check to see if they're not overwriting each other
     if d1.viewkeys() & d2.viewkeys():
-        logging.info("{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
@@ -1475,7 +1475,7 @@ def selectcontents(**boolean):
         if builtins.set(d.viewkeys()) != res:
             # FIXME: include query in warning
             q = ', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(boolean))
-            logging.warn("{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
+            logging.warn(u"{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
 
         # now start aggregating the keys that the user is looking for
         res, d = builtins.set(), internal.comment.contents.name(ea)
@@ -1690,9 +1690,9 @@ class imports(object):
 
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
-            builtins.map(logging.info, ("{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in res))
+            builtins.map(logging.info, (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in res))
             f = utils.fcompose(utils.second, cls.__formatl__)
-            logging.warn("{:s}.search({:s}) : Found {:d} matching results. Returning the first import {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -2187,7 +2187,7 @@ class address(object):
         prevea = cls.prev(ea)
         if prevea is None:
             # FIXME: include registers in message
-            logging.fatal("{:s}.prevreg({:s}) : Unable to start walking from the previous address of {:#x}.".format('.'.join((__name__, cls.__name__)), args, ea))
+            logging.fatal(u"{:s}.prevreg({:s}) : Unable to start walking from the previous address of {:#x}.".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
 
         # now walk while none of our registers match
@@ -2248,7 +2248,7 @@ class address(object):
         nextea = cls.next(ea)
         if nextea is None:
             # FIXME: include registers in message
-            logging.fatal("{:s}.nextreg({:s}) : Unable to start walking from the next address of {:#x}.".format('.'.join((__name__, cls.__name__)), args, ea))
+            logging.fatal(u"{:s}.nextreg({:s}) : Unable to start walking from the next address of {:#x}.".format('.'.join((__name__, cls.__name__)), args, ea))
             return ea
 
         # now walk while none of our registers match
@@ -2271,7 +2271,9 @@ class address(object):
     @classmethod
     def prevstack(cls, ea, delta):
         '''Return the previous instruction from `ea` that is past the specified sp `delta`.'''
-        logging.warn("{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join((__name__, cls.__name__)), ea, delta))
+        # FIXME: only render the following warning once
+        logging.warn(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join((__name__, cls.__name__)), ea, delta))
+
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
         res = cls.__walk__(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
@@ -2289,7 +2291,10 @@ class address(object):
     @classmethod
     def nextstack(cls, ea, delta):
         '''Return the next instruction from `ea` that is past the sp `delta`.'''
-        logging.warn("{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join((__name__, cls.__name__)), ea, delta))
+
+        # FIXME: only render the following warning once
+        logging.warn(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join((__name__, cls.__name__)), ea, delta))
+
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
         res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
@@ -3407,10 +3412,10 @@ class marks(object):
         try:
             idx = cls.__find_slotaddress(ea)
             ea, res = cls.by_index(idx)
-            logging.warn("{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from {!r} to {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, res, description))
+            logging.warn(u"{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from {!r} to {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, res, description))
         except (E.ItemNotFoundError, E.OutOfBoundsError):
             res, idx = None, cls.__free_slotindex()
-            logging.info("{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, description))
+            logging.info(u"{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, description))
         cls.__set_description(idx, ea, description, **extra)
         return res
 
@@ -3427,7 +3432,7 @@ class marks(object):
         idx = cls.__find_slotaddress(ea)
         descr = cls.__get_description(idx)
         cls.__set_description(idx, ea, '')
-        logging.warn("{:s}.remove({:#x}) : Removed mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, idx, ea, descr))
+        logging.warn(u"{:s}.remove({:#x}) : Removed mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, idx, ea, descr))
         return descr
 
     @classmethod
@@ -4573,7 +4578,7 @@ class get(object):
         res = _array.array(t, read(ea, count * cb))
         if len(res) != count:
             query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
-            logging.warn("{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', len(res), count))
+            logging.warn(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', len(res), count))
         return res
 
     @utils.multicase()
@@ -4602,7 +4607,7 @@ class get(object):
                 raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The type at address {:#x} can't be treated as an unformatted array and as such is not string-convertible.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
 
             # Warn the user and convert it into a string
-            logging.warn("{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
+            logging.warn(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
             return res.tostring()
 
         # Get the string encoding (not used)
