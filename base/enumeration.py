@@ -97,8 +97,8 @@ def by(**type):
 
     res = builtins.list(iterate(**type))
     if len(res) > 1:
-        map(logging.info, ("[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtins.list(members(n))), " // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
-        logging.warn("{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {!r}.".format(__name__, searchstring, len(res), res[0]))
+        map(logging.info, (u"[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
+        logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {!r}.".format(__name__, searchstring, len(res), res[0]))
 
     res = next(iter(res), None)
     if res is None:
@@ -194,7 +194,7 @@ def repr(enum):
     w = size(eid)*2
     res = [(member.name(n), member.value(n), member.mask(n), member.comment(n)) for n in members.iterate(eid)]
     aligned = max([len(n) for n, _, _, _ in res] or [0])
-    return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned)+((' // '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res)))
+    return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned)+((' // '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res)))   # XXX
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
