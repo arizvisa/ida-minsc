@@ -200,7 +200,7 @@ class multicase(object):
         for n, t in t_args.iteritems():
             if not isinstance(t, (types.TypeType, types.TupleType)) and t not in {callable}:
                 error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, n))
+                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, n))    # XXX
             continue
 
         # validate arguments containing original callable
@@ -214,7 +214,7 @@ class multicase(object):
         # throw an exception if we were given an unexpected number of arguments
         if len(other) > 1:
             error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(c.co_name if isinstance(c, types.CodeType) else c.__name__) for c in other)))
+            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(c.co_name if isinstance(c, types.CodeType) else c.__name__) for c in other))) # XXX
         return result
 
     @classmethod
@@ -862,11 +862,11 @@ class execution(object):
         if not self.thread.is_alive():
             state = 'dead'
         res = tuple(self.state)
-        return "<class '{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal', __name__, cls.__name__)), state, len(res), self.result.unfinished_tasks)
+        return "<class '{:s}'> {:s} Queue:{:d} Results:{:d}".format('.'.join(('internal', __name__, cls.__name__)), state, len(res), self.result.unfinished_tasks)  # XXX
 
     def notify(self):
         '''Notify the execution queue that it should process anything that is queued.'''
-        logging.debug("{:s}.notify : Waking up execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+        logging.debug(u"{:s}.notify() : Waking up execution queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
         self.queue.acquire()
         self.queue.notify()
         self.queue.release()
@@ -884,17 +884,17 @@ class execution(object):
 
     def __start(self):
         cls = self.__class__
-        logging.debug("{:s}.start : Starting execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.debug(u"{:s}.start() : Starting execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         self.ev_terminating.clear(), self.ev_unpaused.set()
         self.thread.daemon = True
         return self.thread.start()
 
     def __stop(self):
         cls = self.__class__
-        logging.debug("{:s}.stop : Terminating execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.debug(u"{:s}.stop() : Terminating execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         if not self.thread.is_alive():
             cls = self.__class__
-            logging.warn("{:s}.stop : Execution scheduler has already been terminated as {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.warn(u"{:s}.stop() : Execution scheduler has already been terminated as {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return
         self.ev_unpaused.set(), self.ev_terminating.set()
         self.queue.acquire()
@@ -906,9 +906,9 @@ class execution(object):
         '''Start to dispatch callables in the execution queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.start : Unable to resume an already terminated execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.fatal(u"{:s}.start() : Unable to resume an already terminated execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return False
-        logging.info("{:s}.start : Resuming the execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.info(u"{:s}.start() : Resuming the execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.set()
         self.queue.acquire()
         self.queue.notify_all()
@@ -919,9 +919,9 @@ class execution(object):
         '''Pause the execution scheduler.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.stop : Unable to pause the execution scheduler {!r} as it has already been terminated.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.fatal(u"{:s}.stop() : Unable to pause the execution scheduler {!r} as it has already been terminated.".format('.'.join(('internal', __name__, cls.__name__)), self))
             return False
-        logging.info("{:s}.stop : Pausing execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.info(u"{:s}.stop() : Pausing execution scheduler {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         res, _ = self.ev_unpaused.is_set(), self.ev_unpaused.clear()
         self.queue.acquire()
         self.queue.notify_all()
@@ -934,7 +934,7 @@ class execution(object):
         res = functools.partial(F, *args, **kwds)
 
         cls = self.__class__
-        logging.debug("{:s}.push : Adding the callable {!r} to the execution scheduler's queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), F, self))
+        logging.debug(u"{:s}.push : Adding the callable {!r} to the execution scheduler's queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), F, self))
         # shove it down a multiprocessing.Queue
         self.queue.acquire()
         self.state.append(res)
@@ -946,10 +946,10 @@ class execution(object):
         '''Pop a result off of the result queue.'''
         cls = self.__class__
         if not self.thread.is_alive():
-            logging.fatal("{:s}.pop : Refusing to wait for a result when execution scheduler has already terminated. Execution queue is currently {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+            logging.fatal(u"{:s}.pop() : Refusing to wait for a result when execution scheduler has already terminated. Execution queue is currently {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
             raise Queue.Empty
 
-        logging.debug("{:s}.pop : Popping result off of the execution scheduler's result queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
+        logging.debug(u"{:s}.pop() : Popping result off of the execution scheduler's result queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self))
         try:
             _, res, err = self.result.get(block=0)
             if err != (None, None, None):
@@ -988,14 +988,14 @@ class execution(object):
         consumer = self.__consume(self.ev_terminating, self.queue, self.state)
         executor = self.__dispatch(self.lock); next(executor)
 
-        logging.debug("{:s}.running : The execution scheduler is now running under thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+        logging.debug(u"{:s}.running : The execution scheduler is now running under thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))  # XXX
         while not self.ev_terminating.is_set():
             # check if we're allowed to execute
             if not self.ev_unpaused.is_set():
                 self.ev_unpaused.wait()
 
             # pull a callable out of the queue
-            logging.debug("{:s}.running : Waiting for an item from schduler on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
+            logging.debug(u"{:s}.running : Waiting for an item from scheduler on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))     # XXX
             self.queue.acquire()
             item = next(consumer)
             self.queue.release()
@@ -1007,11 +1007,11 @@ class execution(object):
             if self.ev_terminating.is_set(): break
 
             # now we can execute it
-            logging.debug("{:s}.running : Scheduled item {!r} asynchronously on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), item, self.thread))
+            logging.debug(u"{:s}.running : Scheduled item {!r} asynchronously on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), item, self.thread))   # XXX
             res, err = executor.send(item)
 
             # and stash our result
-            logging.debug("{:s}.running : Scheduler received result {!r} from item {!r} on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), (res, err), item, self.thread))
+            logging.debug(u"{:s}.running : Scheduler received result {!r} from item {!r} on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), (res, err), item, self.thread))    # XXX
             self.result.put((item, res, err))
         return
 
