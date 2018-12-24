@@ -339,7 +339,7 @@ def parse_line(iterable):
         res = t.decode(value)
     except:
         t = _str
-        logging.debug("{:s}.parse_line({!s}) : Assuming tag {!r} is of type {!s} with the value {!r}.".format('.'.join(('internal', __name__)), iterable, key, t, value))
+        logging.debug(u"{:s}.parse_line({!s}) : Assuming tag {!r} is of type {!s} with the value {!r}.".format('.'.join(('internal', __name__)), iterable, key, t, value))
         res = t.decode(value)
         #raise internal.exceptions.SerializationError(u"Unable to decode data with {!r} : {!r}".format(t, value))
     return key, res
@@ -409,7 +409,7 @@ class tagging(object):
     @classmethod
     def __init_tagcache__(cls, idp_modname):
         cls.node()
-        logging.debug("{:s}.init_tagcache({!r}) : Initialized tagcache with netnode {!r} and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), idp_modname, cls.__node__, cls.__nodeid__))
+        logging.debug(u"{:s}.init_tagcache({!r}) : Initialized tagcache with netnode {!r} and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), idp_modname, cls.__node__, cls.__nodeid__))
 
     @classmethod
     def node(cls):
@@ -483,7 +483,7 @@ class contents(tagging):
             raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls__name__)), target, ea, value, key, ea, data))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
-            logging.warn("{:s}._write_header({!r}, {:#x}, {!r}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, len(encdata), internal.netnode.sup.MAX_SIZE))
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!r}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, len(encdata), internal.netnode.sup.MAX_SIZE))
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
@@ -524,7 +524,7 @@ class contents(tagging):
             try:
                 ok = cls._write_header(target, ea, None)
                 if not ok:
-                    logging.debug("{:s}._write({!r}, {:#x}, {!r}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
             finally:
                 return internal.netnode.blob.remove(key, cls.btag)
 
@@ -556,7 +556,7 @@ class contents(tagging):
             ok = cls._write_header(target, ea, res)
             if not ok: raise AssertionError
         except:
-            logging.fatal("{:s}._write({!r}, {:#x}, {!r}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
+            logging.fatal(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
         return ok
 
     @classmethod
@@ -566,7 +566,7 @@ class contents(tagging):
             encdata = internal.netnode.sup.get(node, ea)
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                logging.warn("{:s}.iterate() : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
+                logging.warn(u"{:s}.iterate() : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
             res = cls.marshaller.loads(data)
             yield ea, res
         return
