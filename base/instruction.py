@@ -316,7 +316,7 @@ def op_repr(ea, opnum):
     try:
         res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     except:
-        logging.warn("{:s}({:#x}, {:d}) : Unable to strip tags from operand {!r}. Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, oppr(insn.ea, opnum), '.'.join((__name__, 'op'))))
+        logging.warn(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand {!r}. Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, oppr(insn.ea, opnum), '.'.join((__name__, 'op'))))
         return u"{!s}".format(op(insn.ea, opnum))
     return interface.string.of(res)
 
@@ -541,7 +541,7 @@ def op_structure(ea, opnum, path, **delta):
         res.append(path[len(res)])
 
     if len(res) < len(path):
-        logging.warn("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
+        logging.warn(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
     path = res[:]
 
     # if the delta is in the path, move it into the delta kwarg
@@ -573,7 +573,7 @@ def op_structure(ea, opnum, path, **delta):
 
     # check what was different
     if len(path) != len(tids) + 1:
-        logging.warn("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        logging.warn(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # build the list of member ids and prefix it with a structure id
     length = len(tids) + 1
@@ -694,7 +694,7 @@ def op_refs(ea, opnum):
             member, stkofs = idaapi.get_stkvar(inst, op, res)
 
         if stkofs != stkofs_:
-            logging.warn("{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
@@ -734,7 +734,7 @@ def op_refs(ea, opnum):
         x = idaapi.xrefblk_t()
 
         if not x.first_to(mem.id, 0):
-            logging.warn("{:s}.op_refs({:#x}, {:d}) : No references found to struct member {:s}.".format(__name__, inst.ea, opnum, mem.fullname))
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member {:s}.".format(__name__, inst.ea, opnum, mem.fullname))
 
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
@@ -918,7 +918,7 @@ class operand_types:
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
             return architecture.by_indextype(res, op.dtyp)
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
-        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))   # XXX: replace ellipsis
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
@@ -934,7 +934,7 @@ class operand_types:
             # if op.value has its sign inverted, then signify it otherwise just use it
             return -2 ** bits + res if interface.node.alt_opinverted(ea, op.n) else res & (2 ** bits - 1)
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
-        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))  # XXX: replace ellipsis
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
@@ -946,7 +946,7 @@ class operand_types:
             seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
             return op.addr
         optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
-        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, ...) : Expected operand type {:s} or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, ...) : Expected operand type {:s} or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], op.type))  # XXX: replace ellipsis
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(ea, op):
@@ -990,14 +990,14 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1)) # XXX: replace ellipsis
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
             elif op.type == idaapi.o_phrase:
                 offset = op.value
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the offset for op.type ({:d}).".format('.'.join((__name__, 'operand_types')), ea, op.type))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the offset for op.type ({:d}).".format('.'.join((__name__, 'operand_types')), ea, op.type)) # XXX: replace ellipsis
 
             # XXX: for some reason stack variables include both base and index
             #      testing .specval seems to be a good way to determine whether
@@ -1026,12 +1026,12 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1)) # XXX: replace ellipsis
             offset = op.addr
 
         else:
             optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], optype[2], op.type))
+            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], optype[2], op.type)) # XXX: replace ellipsis
 
         # if arch == x64, then index += 8
 
