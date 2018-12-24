@@ -139,8 +139,8 @@ def by(**type):
     if len(res) > 1:
         maxaddr = max(builtins.map(operator.attrgetter('endEA'), res) or [1])
         caddr = math.ceil(math.log(maxaddr)/math.log(16))
-        builtins.map(logging.info, (("[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), interface.string.of(idaapi.get_true_segm_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in res))
-        logging.warn("{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(res), res[0].index, res[0].startEA, int(caddr), res[0].endEA, int(caddr), interface.string.of(idaapi.get_true_segm_name(res[0])), res[0].size()))
+        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), interface.string.of(idaapi.get_true_segm_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in res))
+        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(res), res[0].index, res[0].startEA, int(caddr), res[0].endEA, int(caddr), interface.string.of(idaapi.get_true_segm_name(res[0])), res[0].size()))
 
     res = next(iter(res), None)
     if res is None:
@@ -418,8 +418,8 @@ def map(ea, size, newea, **kwds):
         raise E.DisassemblerError(u"{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, newea, ea, size, newea))
 
     # now we can create the new segment
-    return new(newea, size, kwds.get("name', 'map_{:x}".format(ea)))
-    #return create(newea, size, kwds.get("name', 'map_{:s}".format(newea>>4)))
+    return new(newea, size, kwds.get("name", "map_{:x}".format(ea)))
+    #return create(newea, size, kwds.get("name", "map_{:s}".format(newea>>4)))
 
 # creation/destruction
 def new(offset, size, name, **kwds):
@@ -483,8 +483,7 @@ def new(offset, size, name, **kwds):
     if not ok:
         ok = idaapi.del_selector(sel)
         if not ok:
-            logging.warn("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', sel))
-
+            logging.warn(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', sel))
         raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to add a new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else ''))
     return seg
 create = utils.alias(new)
@@ -501,12 +500,12 @@ def remove(segment, contents=False):
     # delete the selector defined by the segment_t
     res = idaapi.del_selector(segment.sel)
     if res == 0:
-        logging.warn("{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
+        logging.warn(u"{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
 
     # remove the actual segment using the address in the segment_t
     res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL if contents else idaapi.SEGMOD_KEEP)
     if res == 0:
-        logging.warn("{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
+        logging.warn(u"{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
     return res
 delete = utils.alias(remove)
 
