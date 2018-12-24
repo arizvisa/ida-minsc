@@ -11,6 +11,7 @@ import six
 import sys, logging
 import functools, operator, itertools, types
 import collections, heapq, traceback, ctypes
+import unicodedata as _unicodedata, string as _string
 
 import ui, internal
 import idaapi
@@ -1269,3 +1270,93 @@ class string(object):
     def to(cls, string):
         '''Convert a string into a form that IDA will accept.'''
         return None if string is None else string.encode('utf8') if isinstance(string, unicode) else string
+
+    class __escape__(object):
+        """
+        This is the namespace that is used to escape the characters
+        in the ``escape`` function that is defined immediately afterwards.
+
+        It's simply for pre-defining closures and variables that are
+        necessary to escape an arbitrary ascii/unicode string.
+        """
+        # backslash
+        backslash = '\\'
+
+        # functions for determining printability of a character
+        asciiQ = staticmethod(internal.utils.fpartial(operator.contains, set(_string.printable)))
+        unicodeQ = staticmethod(internal.utils.fcompose(_unicodedata.category, operator.itemgetter(0), internal.utils.fpartial(operator.ne, 'C')))
+
+        # function to output the hexdigit for a given number
+        hexdigit = staticmethod(internal.utils.fpartial(operator.getitem, _string.hexdigits))
+
+        # dictionary for mapping control characters to their correct forms
+        mapping = {
+            '\t'  : r'\t',
+            '\n'  : r'\n',
+            '\r'  : r'\r',
+            '\b'  : r'\b',
+            '\a'  : r'\a',
+            '\f'  : r'\f',
+            '\v'  : r'\v',
+             ' '  :  r' ',
+            '\t'  :  '\t',
+        }
+
+    @classmethod
+    def escape(cls, string, quote):
+        '''Escape the characters in `string` specified within `quote`.'''
+        cls = cls.__escape__
+
+        # figure out the correct function that determines printability of a char
+        printableQ = cls.unicodeQ if isinstance(string, unicode) else cls.asciiQ
+        joined = (unicode() if isinstance(string, unicode) else str()).join
+
+        # generator that escapes/quotes each character
+        def escape_string(s, q):
+            """Yield each character in `s` whilst taking care to escape the characters specified in `q`.
+
+            Also escape any non-printable characters or characters
+            that may result in multi-lined output.
+            """
+            for ch in iter(s):
+
+                # check if character is a user-specified quote
+                if ch in q:
+                    yield cls.backslash
+                    yield ch
+
+                # check if character is a backslash
+                elif ch in cls.backslash:
+                    yield cls.backslash
+                    yield ch
+
+                # check if character has an escape mapping
+                elif ch in cls.mapping:
+                    for n in cls.mapping[ch]:
+                        yield n
+                    continue
+
+                # check if character is printable (ascii or unicode)
+                elif printableQ(ch):
+                    yield ch
+
+                # check if character is a single-byte ascii
+                elif ord(ch) < 0x100:
+                    n = ord(ch)
+                    yield cls.backslash
+                    yield 'x'
+                    yield cls.hexdigit((n & 0xf0) / 0x10)
+                    yield cls.hexdigit((n & 0x0f) / 0x01)
+
+                # otherwise character must be an unprintable unicode char
+                else:
+                    n = ord(ch)
+                    yield cls.backslash
+                    yield 'u'
+                    yield cls.hexdigit((n & 0xf000) / 0x1000)
+                    yield cls.hexdigit((n & 0x0f00) / 0x0100)
+                    yield cls.hexdigit((n & 0x00f0) / 0x0010)
+                    yield cls.hexdigit((n & 0x000f) / 0x0001)
+                continue
+            return
+        return joined(escape_string(string, quote))
