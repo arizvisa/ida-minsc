@@ -148,7 +148,7 @@ class typemap:
             sz = t.size
             return t if sz == size else [t, size // sz]
         if dt not in cls.inverted:
-            logging.warn("{:s}.dissolve({!r}, {!r}, {!r}) : Unable to identify a pythonic type.".format('.'.join(('internal', __name__, cls.__name__)), dt, typeid, size))
+            logging.warn(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to identify a pythonic type.".format('.'.join(('internal', __name__, cls.__name__)), dt, typeid, size))
 
         t, sz = cls.inverted[dt]
         # if the type and size are the same, then it's a string or pointer type
@@ -220,17 +220,17 @@ class priorityhook(object):
     def enable(self, name):
         '''Enable any hooks for the `name` event that have been previously disabled.'''
         if name not in self.__disabled:
-            logging.fatal("{:s}.enable({!r}) : Hook {:s} is not disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.fatal(u"{:s}.enable({!r}) : Hook {:s} is not disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.discard(name)
         return True
     def disable(self, name):
         '''Disable execution of all the hooks for the `name` event.'''
         if name not in self.__cache:
-            logging.fatal("{:s}.disable({!r}) : Hook {:s} does not exist ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
+            logging.fatal(u"{:s}.disable({!r}) : Hook {:s} does not exist ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
             return False
         if name in self.__disabled:
-            logging.warn("{:s}.disable({!r}) : Hook {:s} has already been disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.warn(u"{:s}.disable({!r}) : Hook {:s} has already been disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.add(name)
         return True
@@ -246,7 +246,7 @@ class priorityhook(object):
         # uhook previous object
         ok = object.unhook()
         if not ok:
-            logging.debug("{:s}.cycle(...) : Error trying to unhook object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), object))
+            logging.debug(u"{:s}.cycle(...) : Error trying to unhook object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), object))
 
         namespace = { name : self.apply(name) for name in self.__cache.viewkeys() }
         res = type(object.__class__.__name__, (self.__type__,), namespace)
@@ -254,7 +254,7 @@ class priorityhook(object):
 
         ok = object.hook()
         if not ok:
-            logging.debug("{:s}.cycle(...) : Unable to hook with object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), object))
+            logging.debug(u"{:s}.cycle(...) : Unable to hook with object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), object))
         return object
 
     def add(self, name, callable, priority=50):
@@ -313,10 +313,10 @@ class priorityhook(object):
                         cls = self.__class__
                         message = functools.partial("{:s}.callback : {:s}".format, '.'.join(('internal', __name__, cls.__name__)))
 
-                        logging.fatal("{:s}.callback : Callback for {:s} raised an exception.".format('.'.join(('internal', __name__, cls.__name__)), '.'.join((self.__type__.__name__, name))), exc_info=True)
+                        logging.fatal(u"{:s}.callback : Callback for {:s} raised an exception.".format('.'.join(('internal', __name__, cls.__name__)), '.'.join((self.__type__.__name__, name))), exc_info=True)
 
                         res = traceback.format_list(self.__traceback[name, func])
-                        logging.warn("{:s}.callback : Hook originated from -> ".format('.'.join(('internal', __name__, cls.__name__))) + "\n{:s}".format(''.join(res)))
+                        logging.warn(u"{:s}.callback : Hook originated from -> ".format('.'.join(('internal', __name__, cls.__name__))) + "\n{:s}".format(''.join(res)))
 
                         res = self.STOP
 
@@ -686,7 +686,7 @@ class namedtypedtuple(tuple):
         result = self._make(map(fc.pop, self._fields, self))
         if fc:
             cls = self.__class__
-            logging.warn("{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join("{!s}={!r}".format(k, v) for k, v in fields.iteritems()), '{' + ', '.join(map("{!r}".format, six.viewkeys(fc))) + '}'))
+            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join("{!s}={!r}".format(k, v) for k, v in fields.iteritems()), '{' + ', '.join(map("{!r}".format, six.viewkeys(fc))) + '}'))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
@@ -855,7 +855,7 @@ elif idaapi.BADADDR == 0xffffffffffffffff:
     sval_t = ctypes.c_longlong
 else:
     sval_t = ctypes.c_int
-    logging.fatal("{:s} : Unable to determine size of idaapi.BADADDR in order to determine boundaries of sval_t. Setting default size to {:d}-bits. The value of idaapi.BADADDR is {!r}.".format(__name__, ctypes.sizeof(sval_t), idaapi.BADADDR))
+    logging.fatal(u"{:s} : Unable to determine size of idaapi.BADADDR in order to determine boundaries of sval_t. Setting default size to {:d}-bits. The value of idaapi.BADADDR is {!r}.".format(__name__, ctypes.sizeof(sval_t), idaapi.BADADDR))
 
 #Ref_Types = {
 #    0 : 'Data_Unknown', 1 : 'Data_Offset',
