@@ -221,17 +221,17 @@ class priorityhook(object):
     def enable(self, name):
         '''Enable any hooks for the `name` event that have been previously disabled.'''
         if name not in self.__disabled:
-            logging.fatal(u"{:s}.enable({!r}) : Hook {:s} is not disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.fatal(u"{:s}.enable({!r}) : Hook \"{:s}\" is not disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.discard(name)
         return True
     def disable(self, name):
         '''Disable execution of all the hooks for the `name` event.'''
         if name not in self.__cache:
-            logging.fatal(u"{:s}.disable({!r}) : Hook {:s} does not exist ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
+            logging.fatal(u"{:s}.disable({!r}) : Hook \"{:s}\" does not exist ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
             return False
         if name in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : Hook {:s} has already been disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.warn(u"{:s}.disable({!r}) : Hook \"{:s}\" has already been disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.add(name)
         return True
