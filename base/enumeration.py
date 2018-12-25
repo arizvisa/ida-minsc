@@ -66,7 +66,7 @@ def by_name(name):
     '''Return the identifier for the enumeration with the given `name`.'''
     res = idaapi.get_enum(interface.string.to(name))
     if res == idaapi.BADADDR:
-        raise E.EnumerationNotFoundError(u"{:s}.by_name({!r}) : Unable to locate enumeration by the name {!r}.".format(__name__, name, name))
+        raise E.EnumerationNotFoundError(u"{:s}.by_name({!r}) : Unable to locate enumeration by the name \"{:s}\".".format(__name__, name, interface.string.escape(name, '"')))
     return res
 byName = utils.alias(by_name)
 
@@ -98,7 +98,7 @@ def by(**type):
     res = builtins.list(iterate(**type))
     if len(res) > 1:
         map(logging.info, (u"[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
-        logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {!r}.".format(__name__, searchstring, len(res), res[0]))
+        logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(res), res[0]))
 
     res = next(iter(res), None)
     if res is None:
@@ -129,7 +129,7 @@ def new(name, flags=0):
     idx = count()
     res = idaapi.add_enum(idx, interface.string.to(name), flags)
     if res == idaapi.BADADDR:
-        raise E.DisassemblerError(u"{:s}.new({!r}, flags={:d}) : Unable to create enumeration named {:s}.".format(__name__, name, flags, name))
+        raise E.DisassemblerError(u"{:s}.new({!r}, flags={:d}) : Unable to create enumeration named \"{:s}\".".format(__name__, name, flags, interface.string.escape(name, '"')))
     return res
 
 def delete(enum):
