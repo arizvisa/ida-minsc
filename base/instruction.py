@@ -316,7 +316,7 @@ def op_repr(ea, opnum):
     try:
         res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     except:
-        logging.warn(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand {!r}. Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, oppr(insn.ea, opnum), '.'.join((__name__, 'op'))))
+        logging.warn(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand \"{:s}\". Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, interface.string.escape(oppr(insn.ea, opnum), '"'), '.'.join((__name__, 'op'))))
         return u"{!s}".format(op(insn.ea, opnum))
     return interface.string.of(res)
 
@@ -490,7 +490,7 @@ def op_structure(ea, opnum, id, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
 
     offset, sptr, name = 0, idaapi.get_struc(id), idaapi.get_member_fullname(id)
     if sptr is not None:
@@ -522,7 +522,7 @@ def op_structure(ea, opnum, path, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item type at requested address is not code.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # validate the path
     if len(path) == 0:
@@ -734,7 +734,7 @@ def op_refs(ea, opnum):
         x = idaapi.xrefblk_t()
 
         if not x.first_to(mem.id, 0):
-            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member {:s}.".format(__name__, inst.ea, opnum, mem.fullname))
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, interface.string.escape(mem.fullname, '"')))
 
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
@@ -918,7 +918,7 @@ class operand_types:
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
             return architecture.by_indextype(res, op.dtyp)
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
-        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))   # XXX: replace ellipsis
+        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
@@ -934,7 +934,7 @@ class operand_types:
             # if op.value has its sign inverted, then signify it otherwise just use it
             return -2 ** bits + res if interface.node.alt_opinverted(ea, op.n) else res & (2 ** bits - 1)
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
-        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))  # XXX: replace ellipsis
+        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype, op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
@@ -946,20 +946,20 @@ class operand_types:
             seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
             return op.addr
         optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
-        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, ...) : Expected operand type {:s} or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], op.type))  # XXX: replace ellipsis
+        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, {!r}) : Expected operand type `{:s}` or `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype[0], optype[1], op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec0`` which returns a trap register.'''
-        raise E.UnsupportedCapability(u"{:s}.trregister({:#x}, ...) : Trap registers (trX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
+        raise E.UnsupportedCapability(u"{:s}.trregister({:#x}, ...) : Trap registers (`%trX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
     def dbregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec1`` which returns a db register.'''
-        raise E.UnsupportedCapability(u"{:s}.dbregister({:#x}, ...) : Db registers (dbX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
+        raise E.UnsupportedCapability(u"{:s}.dbregister({:#x}, ...) : Db registers (`%dbX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
     def crregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec2`` which returns a control reigster.'''
-        raise E.UnsupportedCapability(u"{:s}.crregister({:#x}, ...) : Cr registers (crX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
+        raise E.UnsupportedCapability(u"{:s}.crregister({:#x}, ...) : Cr registers (`%crX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
         return getattr(reg, "cr{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
     def fpregister(ea, op):
@@ -990,14 +990,14 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1)) # XXX: replace ellipsis
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op, op.type, F1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
             elif op.type == idaapi.o_phrase:
                 offset = op.value
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the offset for op.type ({:d}).".format('.'.join((__name__, 'operand_types')), ea, op.type)) # XXX: replace ellipsis
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join((__name__, 'operand_types')), ea, op, op.type))
 
             # XXX: for some reason stack variables include both base and index
             #      testing .specval seems to be a good way to determine whether
@@ -1026,12 +1026,12 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1)) # XXX: replace ellipsis
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op, op.type, F1))
             offset = op.addr
 
         else:
             optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, ...) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], optype[2], op.type)) # XXX: replace ellipsis
+            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype[0], optype[1], optype[2], op.type))
 
         # if arch == x64, then index += 8
 
