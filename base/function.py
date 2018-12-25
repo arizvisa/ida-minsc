@@ -41,7 +41,7 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
-        raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate function.".format(__name__, ea))
+        raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate function by address.".format(__name__, ea))
     return res
 byAddress = utils.alias(by_address)
 
@@ -245,9 +245,10 @@ def bounds():
 @utils.multicase()
 def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function `func`.'''
-    fn = by(func)
-    if fn is None:
-        raise E.FunctionNotFoundError(u"{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func, ea))
+    try:
+        fn = by(func)
+    except E.ItemNotFoundError:
+        raise E.FunctionNotFoundError(u"{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func))
     return fn.startEA, fn.endEA
 range = utils.alias(bounds)
 
@@ -282,8 +283,9 @@ def color(none):
 @utils.multicase()
 def address():
     '''Return the entry-point of the current function.'''
-    res = ui.current.function()
-    if res is None:
+    try:
+        res = ui.current.function()
+    except E.ItemNotFoundError:
         raise E.FunctionNotFoundError(u"{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
     return res.startEA
 @utils.multicase()
