@@ -157,7 +157,7 @@ class cache(object):
                 type = next(t for t in cls.state if issubclass(type, t))
             res = next(enc for enc in cls.state[type] if enc.type(instance))
         except StopIteration:
-            raise internal.exceptions.SerializationError(u"{:s}.by({!s}) : Unable to find an encoder for the serialization of the specified type {!s}.".format('.'.join(('internal', __name__, cls.__name__)), type, type))
+            raise internal.exceptions.SerializationError(u"{:s}.by({!s}) : Unable to find an encoder for the serialization of the specified type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), type, type))
         return res
 
     @classmethod
@@ -320,12 +320,12 @@ def key_escape(iterable, sentinel):
                 return
             yield ch
     except StopIteration: pass
-    raise internal.exceptions.InvalidFormatError(u"{:s}.key_escape({!s}, {!r}) : Input is not properly terminated with the specified sentinel {!r}.".format('.'.join(('internal', __name__)), iterable, sentinel, sentinel))
+    raise internal.exceptions.InvalidFormatError(u"{:s}.key_escape({!s}, '{:s}') : Input is not properly terminated with the correct sentinel '{:s}'.".format('.'.join(('internal', __name__)), iterable, internal.interface.string.escape(sentinel, '\''), internal.interface.string.escape(sentinel, '\'')))
 
 def parse_line(iterable):
     ch = next(iterable)
     if ch != '[':
-        raise internal.exceptions.InvalidFormatError(u"{:s}.parse_line({!s}) : Input does not begin with the proper character {!r} and instead starts with {!r}.".format('.'.join(('internal', __name__)), iterable, '[', ch))
+        raise internal.exceptions.InvalidFormatError(u"{:s}.parse_line({!s}) : Input does not begin with the proper character '{:s}' and instead starts with '{:s}'.".format('.'.join(('internal', __name__)), iterable, internal.interface.string.escape('[', '\''), internal.interface.string.escape(ch, '\'')))
     res = key_escape(iterable, ']')
     key = ''.join(res)
 
@@ -339,7 +339,7 @@ def parse_line(iterable):
         res = t.decode(value)
     except:
         t = _str
-        logging.debug(u"{:s}.parse_line({!s}) : Assuming tag {!r} is of type {!s} with the value {!r}.".format('.'.join(('internal', __name__)), iterable, key, t, value))
+        logging.debug(u"{:s}.parse_line({!s}) : Assuming tag \"{:s}\" is of type {!s} with the value {!r}.".format('.'.join(('internal', __name__)), iterable, internal.interface.string.escape(key, '"'), t, value))
         res = t.decode(value)
         #raise internal.exceptions.SerializationError(u"Unable to decode data with {!r} : {!r}".format(t, value))
     return key, res
@@ -409,7 +409,7 @@ class tagging(object):
     @classmethod
     def __init_tagcache__(cls, idp_modname):
         cls.node()
-        logging.debug(u"{:s}.init_tagcache({!r}) : Initialized tagcache with netnode {!r} and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), idp_modname, cls.__node__, cls.__nodeid__))
+        logging.debug(u"{:s}.init_tagcache({!r}) : Initialized tagcache with netnode \"{:s}\" and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), idp_modname, internal.interface.string.escape(cls.__node__, '"'), cls.__nodeid__))
 
     @classmethod
     def node(cls):
@@ -546,7 +546,7 @@ class contents(tagging):
         # write blob
         try:
             ok = internal.netnode.blob.set(key, cls.btag, encdata)
-            if not ok: raise AssertionError
+            if not ok: raise AssertionError # XXX: use an explicit exception
         except:
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, encdata))
 
@@ -554,7 +554,7 @@ class contents(tagging):
         res = set(value.viewkeys())
         try:
             ok = cls._write_header(target, ea, res)
-            if not ok: raise AssertionError
+            if not ok: raise AssertionError # XXX: use an explicit exception
         except:
             logging.fatal(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
         return ok
