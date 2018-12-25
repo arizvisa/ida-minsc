@@ -149,7 +149,7 @@ class typemap:
             sz = t.size
             return t if sz == size else [t, size // sz]
         if dt not in cls.inverted:
-            logging.warn(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to identify a pythonic type.".format('.'.join(('internal', __name__, cls.__name__)), dt, typeid, size))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join(('internal', __name__, cls.__name__)), dt, typeid, size))
 
         t, sz = cls.inverted[dt]
         # if the type and size are the same, then it's a string or pointer type
@@ -221,17 +221,19 @@ class priorityhook(object):
     def enable(self, name):
         '''Enable any hooks for the `name` event that have been previously disabled.'''
         if name not in self.__disabled:
-            logging.fatal(u"{:s}.enable({!r}) : Hook \"{:s}\" is not disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            cls = self.__class__
+            logging.fatal(u"{:s}.enable({!r}) : Hook \"{:s}\" is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.discard(name)
         return True
     def disable(self, name):
         '''Disable execution of all the hooks for the `name` event.'''
+        cls = self.__class__
         if name not in self.__cache:
-            logging.fatal(u"{:s}.disable({!r}) : Hook \"{:s}\" does not exist ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
+            logging.fatal(u"{:s}.disable({!r}) : Hook \"{:s}\" does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
             return False
         if name in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : Hook \"{:s}\" has already been disabled ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.warn(u"{:s}.disable({!r}) : Hook \"{:s}\" has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.add(name)
         return True
@@ -244,6 +246,8 @@ class priorityhook(object):
     def cycle(self, object=None):
         '''Cycle the hooks for this object with the ``idaapi.*_Hooks`` instance provided by `object`.'''
         cls = self.__class__
+        object = object or self.object
+
         # uhook previous object
         ok = object.unhook()
         if not ok:
