@@ -794,7 +794,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, name, flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_name({:#x}, {!r}{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_name({:#x}, {!r}{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, name, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
         return res
     byName = utils.alias(by_name, 'search')
 
