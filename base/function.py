@@ -123,7 +123,7 @@ def comment(func, string, **repeatable):
 
     res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, interface.string.to(string), repeatable.get('repeatable', True))
     if not ok:
-        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
     return res
 
 @utils.multicase()
@@ -379,7 +379,7 @@ class chunks(object):
         fn = by(func)
         fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
         if not fci.main():
-            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an idaapi.func_tail_iterator_t.".format(__name__, fn.startEA))
+            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `idaapi.func_tail_iterator_t`.".format(__name__, fn.startEA))
 
         while True:
             ch = fci.chunk()
@@ -679,7 +679,7 @@ class blocks(object):
             if bb.startEA <= ea < bb.endEA:
                 return bb
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate idaapi.BasicBlock for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
 
     @utils.multicase()
     @classmethod
@@ -1418,7 +1418,7 @@ def tag(func, key):
     res = tag(func)
     if key in res:
         return res[key]
-    raise E.MissingFunctionTagError(u"{:s}.tag({!r}, {!r}) : Unable to read tag {!r} from function.".format(__name__, func, key, key))
+    raise E.MissingFunctionTagError(u"{:s}.tag({!r}, {!r}) : Unable to read tag \"{:s}\" from function.".format(__name__, func, key, interface.string.escape(key, '"')))
 @utils.multicase()
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
@@ -1439,7 +1439,7 @@ def tag(func):
     d2 = internal.comment.decode(res)
 
     if d1.viewkeys() & d2.viewkeys():
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     res = {}
     map(res.update, (d1, d2) if repeatable else (d2, d1))
@@ -1454,7 +1454,7 @@ def tag(func):
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
     if value is None:
-        raise E.InvalidParameterError(u"{:s}.tag({!r}) : Tried to set tag {!r} to an unsupported type.".format(__name__, ea, key))
+        raise E.InvalidParameterError(u"{:s}.tag({!r}) : Tried to set tag \"{:s}\" to an unsupported type.".format(__name__, ea, interface.string.escape(key, '"')))
 
     # Check to see if function tag is being applied to an import
     try:
@@ -1520,7 +1520,7 @@ def tag(func, key, none):
     # decode the comment, remove the key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
     if key not in state:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag {!r} from function.".format(__name__, fn.startEA, key, none, key))
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, fn.startEA, key, none, interface.string.escape(key, '"')))
     res = state.pop(key)
     comment(fn, internal.comment.encode(state), repeatable=True)
 
@@ -1614,7 +1614,7 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.is_call(ea):
-                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
+                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, fn.startEA, interface.string.escape(database.disassemble(ea), '"')))
                     #code.append((ea, 0))
                 continue
             data.extend( (ea, x) for x in database.xref.data_down(ea) )
