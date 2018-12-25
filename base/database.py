@@ -396,7 +396,7 @@ class functions(object):
         if len(res) > 1:
             builtins.map(logging.info, ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(res)))
             f = utils.fcompose(function.by, function.name)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(res), interface.string.escape(f(res[0]), '"')))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -662,7 +662,7 @@ class names(object):
         if len(res) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, interface.string.of)
             builtins.map(logging.info, ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in res))
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), f2(res[0])))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), interface.string.escape(f2(res[0]), '"')))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -961,14 +961,14 @@ def name(ea, string, *suffix, **flags):
     # validate the name
     res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
     if ida_string and ida_string != res:
-        logging.info(u"{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in {!r}.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', interface.string.of(res)))
+        logging.info(u"{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', interface.string.escape(interface.string.of(res), '"')))
         ida_string = res
 
     # set the name and use the value of 'flags' if it was explicit
     res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flags.get('flags', fl))
 
     if not ok:
-        raise E.DisassemblerError(u"{:s}.name({:#x}, {!r}{:s}) : Unable to call idaapi.set_name({:#x}, {!r}, {:#x}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, string, flags.get('flags', fl)))
+        raise E.DisassemblerError(u"{:s}.name({:#x}, {!r}{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, interface.string.escape(string, '"'), flags.get('flags', fl)))
     return res
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
@@ -1037,7 +1037,7 @@ def comment(ea, string, **repeatable):
     # apply the comment to the specified address
     res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), interface.string.to(string), repeatable.get('repeatable', False))
     if not ok:
-        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', False)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_cmt({:#x}, \"{:s}\", {!s})`.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, interface.string.escape(string, '"'), repeatable.get('repeatable', False)))
     return res
 
 class entries(object):
@@ -1278,7 +1278,7 @@ def tag(ea):
 
     # check to see if they're not overwriting each other
     if d1.viewkeys() & d2.viewkeys():
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
@@ -1310,12 +1310,12 @@ def tag(ea, key):
     res = tag(ea)
     if key in res:
         return res[key]
-    raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag {!r} from address.".format(__name__, ea, key, key))
+    raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag \"{:s}\" from address.".format(__name__, ea, key, interface.string.escape(key, '"')))
 @utils.multicase(ea=six.integer_types, key=basestring)
 def tag(ea, key, value):
     '''Set the tag identified by `key` to `value` at the address `ea`.'''
     if value is None:
-        raise E.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set tag {!r} to an invalid value {!r}.".format(__name__, ea, key, value, key, value))
+        raise E.InvalidParameterError(u"{:s}.tag({:#x}, {!r}, {!r}) : Tried to set tag \"{:s}\" to an invalid value {!r}.".format(__name__, ea, key, value, interface.string.escape(key, '"'), value))
 
     # if an implicit tag was specified, then dispatch to the correct handler
     if key == '__name__':
@@ -1380,7 +1380,7 @@ def tag(ea, key, none):
     state and comment(ea, '', repeatable=not repeatable) # clear the old one
     state.update(internal.comment.decode(comment(ea, repeatable=repeatable)))
     if key not in state:
-        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag {!r} from address.".format(__name__, ea, key, none, key))
+        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from address.".format(__name__, ea, key, none, interface.string.escape(key, '"')))
     res = state.pop(key)
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
 
@@ -1692,7 +1692,7 @@ class imports(object):
         if len(res) > 1:
             builtins.map(logging.info, (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in res))
             f = utils.fcompose(utils.second, cls.__formatl__)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import {!r}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(res), interface.string.escape(f(res[0]), '"')))
 
         res = builtins.next(iter(res), None)
         if res is None:
@@ -2299,7 +2299,7 @@ class address(object):
         _, end = function.chunk(ea)
         res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
         if res == idaapi.BADADDR or res >= end:
-            raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the bottom ({:#x} of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, end, fn, res))
+            raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the bottom ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, end, fn, res))
         return res
     prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
 
@@ -2666,7 +2666,7 @@ class type(object):
             res = idaapi.getFlags(ea)
             idaapi.setFlags(ea, (res&~mask) | value)
             return res & mask
-        raise E.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated idaapi.setFlags(...).".format('.'.join((__name__, cls.__name__)), ea, mask, value))
+        raise E.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated `idaapi.setFlags(...)`.".format('.'.join((__name__, cls.__name__)), ea, mask, value))
 
     @utils.multicase()
     @staticmethod
@@ -3003,7 +3003,7 @@ class type(object):
             ti, F = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, F, ti)
             if not res:
-                raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to idaapi.get_opinfo failed at {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, ea))
+                raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to `idaapi.get_opinfo()` failed at {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, ea))
             return ti.tid
 
         @utils.multicase()
@@ -3412,10 +3412,10 @@ class marks(object):
         try:
             idx = cls.__find_slotaddress(ea)
             ea, res = cls.by_index(idx)
-            logging.warn(u"{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from {!r} to {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, res, description))
+            logging.warn(u"{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from \"{:s}\" to \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, interface.string.escape(res, '"'), interface.string.escape(description, '"')))
         except (E.ItemNotFoundError, E.OutOfBoundsError):
             res, idx = None, cls.__free_slotindex()
-            logging.info(u"{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, description))
+            logging.info(u"{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, interface.string.escape(description, '"')))
         cls.__set_description(idx, ea, description, **extra)
         return res
 
@@ -3432,7 +3432,7 @@ class marks(object):
         idx = cls.__find_slotaddress(ea)
         descr = cls.__get_description(idx)
         cls.__set_description(idx, ea, '')
-        logging.warn(u"{:s}.remove({:#x}) : Removed mark {:d} at {:#x} with the description {!r}.".format('.'.join((__name__, cls.__name__)), ea, idx, ea, descr))
+        logging.warn(u"{:s}.remove({:#x}) : Removed mark {:d} at {:#x} with the description \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, idx, ea, interface.string.escape(descr, '"')))
         return descr
 
     @classmethod
@@ -4054,7 +4054,7 @@ class set(object):
         If `size` is specified, then align that number of bytes.
         """
         if not type.is_unknown(ea):
-            raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(alignment)))) if alignment else ''))
+            raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(alignment)))) if alignment else ''))  # XXX: define a custom warning
 
         # grab the size out of the kwarg
         if 'size' in alignment:
@@ -4571,7 +4571,7 @@ class get(object):
             return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
         else:
             query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
-            raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the idaapi.DT_TYPE as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', ea, F, T))
+            raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the `idaapi.DT_TYPE` as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', ea, F, T))
 
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
@@ -4604,7 +4604,7 @@ class get(object):
 
             # It wasn't an array and was probably a structure, so we'll just complain to the user about it
             if not isinstance(res, _array.array):
-                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The type at address {:#x} can't be treated as an unformatted array and as such is not string-convertible.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
+                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The type at address {:#x} cannot be treated as an unformatted array and as such is not convertible to a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
 
             # Warn the user and convert it into a string
             logging.warn(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
@@ -4745,7 +4745,7 @@ class get(object):
                     return interface.switch_t(res)
                 except StopIteration:
                     pass
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
         def __getarray(cls, ea):
@@ -4757,13 +4757,13 @@ class get(object):
                 return interface.switch_t(res)
             except StopIteration:
                 pass
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
         def __getinsn(cls, ea):
             res = idaapi.get_switch_info_ex(ea)
             if res is None:
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
             return interface.switch_t(res)
 
         @utils.multicase()
@@ -4786,5 +4786,5 @@ class get(object):
                 return cls.__getlabel(ea)
             except E.MissingTypeOrAttribute:
                 pass
-            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate a switch_info_ex_t.".format('.'.join((__name__, 'type', cls.__name__)), ea))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t`.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
