@@ -37,7 +37,7 @@ def size(string):
         res = idaapi.idc_parse_decl(idaapi.cvar.idati, internal.interface.string.to(semicoloned), 0)
 
     if res is None:
-        raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration ({!r}).".format(string))
+        raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(internal.interface.string.escape(string, '"')))
     _, type, _ = res
     return idaapi.get_type_size0(idaapi.cvar.idati, type)
 
