@@ -39,7 +39,8 @@ def size(string):
     if res is None:
         raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(internal.interface.string.escape(string, '"')))
     _, type, _ = res
-    return idaapi.get_type_size0(idaapi.cvar.idati, type)
+    f = idaapi.get_type_size0 if idaapi.__version__ < 6.8 else idaapi.calc_type_size
+    return f(idaapi.cvar.idati, type)
 
 def demangle(string):
     '''Given a mangled C++ `string`, demangle it back into a human-readable symbol.'''
