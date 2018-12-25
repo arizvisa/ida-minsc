@@ -441,7 +441,7 @@ class contents(tagging):
     def _read_header(cls, target, ea):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
 
         encdata = internal.netnode.sup.get(node, key)
         if encdata is None:
@@ -464,7 +464,7 @@ class contents(tagging):
     def _write_header(cls, target, ea, value):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
 
         if not value:
             ok = internal.netnode.sup.remove(node, key)
@@ -480,7 +480,7 @@ class contents(tagging):
             if sz != len(data):
                 raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(data)))
         except:
-            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls__name__)), target, ea, value, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, data))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
             logging.warn(u"{:s}._write_header({!r}, {:#x}, {!r}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, len(encdata), internal.netnode.sup.MAX_SIZE))
@@ -493,7 +493,7 @@ class contents(tagging):
         '''Reads a dictionary from the specific object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
 
         encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
@@ -517,7 +517,7 @@ class contents(tagging):
         '''Writes a dictionary to the specified object'''
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to find a function for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
 
         # erase cache and blob if no data is specified
         if not value:
