@@ -331,7 +331,7 @@ class members(object):
         '''Return the member of the enumeration specified by `enum` and its `mid`.'''
         eid = by(enum)
         if member.parent(mid) != eid:
-            raise E.MemberNotFoundError(u"{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__, cls.__name__)), eid, index))
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__, cls.__name__)), eid, mid))
         return mid
 
     @classmethod
@@ -449,7 +449,7 @@ class member(object):
     def remove(cls, enum, member):
         '''Remove the specified `member` of the enumeration `enum`.'''
         eid = by(enum)
-        mid = cls.by(eid, member)
+        mid = members.by(eid, member)
         return cls.remove(mid)
 
     ## properties
