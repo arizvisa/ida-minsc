@@ -200,7 +200,7 @@ class multicase(object):
         for n, t in t_args.iteritems():
             if not isinstance(t, (types.TypeType, types.TupleType)) and t not in {callable}:
                 error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, n))    # XXX
+                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, internal.interface.string.escape(n, '"')))
             continue
 
         # validate arguments containing original callable
@@ -214,7 +214,7 @@ class multicase(object):
         # throw an exception if we were given an unexpected number of arguments
         if len(other) > 1:
             error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(c.co_name if isinstance(c, types.CodeType) else c.__name__) for c in other))) # XXX
+            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(internal.interface.string.escape(c.co_name if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
         return result
 
     @classmethod
@@ -575,7 +575,7 @@ class process(object):
 
         ## finally hand it off to subprocess.Popen
         try: return Asynchronous.spawn(command, **options)
-        except OSError: raise OSError("Unable to execute command: {!r}".format(command))
+        except OSError: raise OSError("Unable to execute command: \"{:s}\"".format(internal.interface.string.escape(command, '"')))
 
     @staticmethod
     def monitorPipe(q, (id, pipe), *more, **options):
@@ -667,7 +667,7 @@ class process(object):
     def wait(self, timeout=0.0):
         '''Wait a given amount of time for the process to terminate.'''
         if self.program is None:
-            raise RuntimeError("Program {!r} is not running.".format(self.command[0]))
+            raise RuntimeError("Program '{:s}' is not running.".format(internal.interface.string.escape(self.command[0], '\'')))
 
         ## if we're not running, then return the result that we already received
         if not self.running:
@@ -988,14 +988,14 @@ class execution(object):
         consumer = self.__consume(self.ev_terminating, self.queue, self.state)
         executor = self.__dispatch(self.lock); next(executor)
 
-        logging.debug(u"{:s}.running : The execution scheduler is now running under thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))  # XXX
+        logging.debug(u"{:s}.thread({!r}) : The execution scheduler's thread is now running.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
         while not self.ev_terminating.is_set():
             # check if we're allowed to execute
             if not self.ev_unpaused.is_set():
                 self.ev_unpaused.wait()
 
             # pull a callable out of the queue
-            logging.debug(u"{:s}.running : Waiting for an item from scheduler on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))     # XXX
+            logging.debug(u"{:s}.thread({!r}) : Waiting for an item from scheduler.".format('.'.join(('internal', __name__, cls.__name__)), self.thread))
             self.queue.acquire()
             item = next(consumer)
             self.queue.release()
@@ -1007,11 +1007,11 @@ class execution(object):
             if self.ev_terminating.is_set(): break
 
             # now we can execute it
-            logging.debug(u"{:s}.running : Scheduled item {!r} asynchronously on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), item, self.thread))   # XXX
+            logging.debug(u"{:s}.thread({!r}) : Item {!r} has been scheduled asynchronously on thread.".format('.'.join(('internal', __name__, cls.__name__)), self.thread, item))
             res, err = executor.send(item)
 
             # and stash our result
-            logging.debug(u"{:s}.running : Scheduler received result {!r} from item {!r} on thread {!r}.".format('.'.join(('internal', __name__, cls.__name__)), (res, err), item, self.thread))    # XXX
+            logging.debug(u"{:s}.thread({!r}) : Scheduler received result {!r} for item {!r}.".format('.'.join(('internal', __name__, cls.__name__)), self.thread, (res, err), item))
             self.result.put((item, res, err))
         return
 
