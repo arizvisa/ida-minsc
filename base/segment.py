@@ -365,7 +365,7 @@ def __load_file(filename, ea, size, offset=0):
     # XXX: does IDA support unicode file paths?
     res = idaapi.open_linput(path, False)
     if not res:
-        raise E.DisassemblerError(u"{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create loader_input_t from path \"{:s}\".".format(__name__, filename, ea, size, path))
+        raise E.DisassemblerError(u"{:s}.load_file({!r}, {:#x}, {:+#x}) : Unable to create an `idaapi.loader_input_t` from path \"{:s}\".".format(__name__, filename, ea, size, path))
 
     # now we can write the file into the specified address as a segment
     ok = idaapi.file2base(res, offset, ea, ea+size, False)
@@ -379,7 +379,7 @@ def __save_file(filename, ea, size, offset=0):
     # XXX: does IDA support unicode file paths?
     of = idaapi.fopenWB(path)
     if not of:
-        raise E.DisassemblerError(u"{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file \"{:s}\".".format(__name__, filename, ea, size, path))
+        raise E.DisassemblerError(u"{:s}.save_file({!r}, {:#x}, {:+#x}) : Unable to open target file \"{:s}\".".format(__name__, filename, ea, size, interface.string.escape(path, '"')))
 
     # now we can write the segment into the file we opened
     res = idaapi.base2file(of, offset, ea, ea+size)
@@ -398,7 +398,7 @@ def load(filename, ea, size=None, offset=0, **kwds):
     cb = filesize - offset if size is None else size
     res = __load_file(filename, ea, cb, offset)
     if not res:
-        raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}) : Unable to load file into {:#x}:{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, ea, cb, os.path.relpath(filename)))
+        raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}) : Unable to load file into {:#x}:{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, ea, cb, interface.string.escape(os.path.relpath(filename), '"')))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
 
 def map(ea, size, newea, **kwds):
@@ -435,7 +435,7 @@ def new(offset, size, name, **kwds):
     # find the segment according to the name specified by the user
     seg = idaapi.get_segm_by_name(res)
     if seg is not None:
-        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name ({!r}) already exists.".format(__name__, offset, size, name.encode('utf8') if isinstance(name, unicode) else name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', name))
+        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name (\"{:s}\") already exists.".format(__name__, offset, size, name.encode('utf8') if isinstance(name, unicode) else name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', interface.string.escape(name, '"')))
 
     # FIXME: use disassembler default bit length instead of 32
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits())
@@ -495,7 +495,7 @@ def remove(segment, contents=False):
     """
     if not isinstance(segment, idaapi.segment_t):
         cls = idaapi.segment_t
-        raise E.InvalidParameterError(u"{:s}.remove({!r}) : Expected a {!s}, but received a {!s}.".format(__name__, segment, cls, type(segment)))
+        raise E.InvalidParameterError(u"{:s}.remove({!r}) : Expected an `idaapi.segment_t`, but received a {!s}.".format(__name__, segment, type(segment)))
 
     # delete the selector defined by the segment_t
     res = idaapi.del_selector(segment.sel)
