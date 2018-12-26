@@ -690,7 +690,7 @@ class namedtypedtuple(tuple):
 
     def __repr__(self):
         cls = self.__class__
-        res = ("{:s}={!r}".format(name, value) for name, value in zip(self._fields, self))
+        res = ("{!s}={!s}".format(string.escape(name, ''), string.repr(value)) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     def _replace(self, **fields):
@@ -766,9 +766,8 @@ class register_t(symbol_t):
             dt, = [name for name in dir(idaapi) if name.startswith('dt_') and getattr(idaapi, name) == self.dtype]
         except (AttributeError, ValueError):
             dt = 'unknown'
-        cls = self.__class__
-        return "<{:s}({:d},{:s}) {!r} {:d}:{:+d}>".format('.'.join(('internal', __name__, 'register', cls.__name__)), self.id, dt, self.name, self.position, self.size)
-        #return "{:s} {:s} {:d}:{:+d}".format(self.__class__, dt, self.position, self.size, dt)
+        cls = register_t
+        return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, string.escape(self.name, '\''), self.position, self.size)
 
     def __eq__(self, other):
         if isinstance(other, basestring):
@@ -1047,8 +1046,8 @@ class switch_t(object):
     def __repr__(self):
         cls = self.__class__
         if self.indirectQ():
-            return "<type '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
-        return "<type '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
+            return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} index[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.jcases, self.object.jumps, self.object.ncases, self.object.lowcase, self.register)
+        return "<class '{:s}{{{:d}}}' at {:#x}> default:*{:#x} branch[{:d}]:*{:#x} register:{:s}".format(cls.__name__, self.count, self.ea, self.default, self.object.ncases, self.object.jumps, self.register)
 
 def xiterate(ea, start, next):
     '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
@@ -1135,7 +1134,7 @@ class map_t(object):
         return name in self.__state__
 
     def __repr__(self):
-        return "{:s} {!r}".format(self.__class__, self.__state__)
+        return "{:s} {!s}".format(self.__class__, string.repr(self.__state__))
 
 class architecture_t(object):
     """
@@ -1317,7 +1316,7 @@ class string(object):
         }
 
     @classmethod
-    def escape(cls, string, quote):
+    def escape(cls, string, quote=''):
         '''Escape the characters in `string` specified within `quote`.'''
         cls = cls.__escape__
 
