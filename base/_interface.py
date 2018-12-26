@@ -576,6 +576,9 @@ class node(object):
         )
         ror = lambda n, shift, bits: (n>>shift) | ((n & 2**shift - 1) << (bits - shift))
 
+        # 16-bit
+        # 0001 9ac1 -- _SYSTEMTIME
+
         # 32-bit
         # 0001 c0006e92 -- ULARGE_INTEGER
         # 0002 c0006e92 c0006e98 -- ULARGE_INTEGER.quadpart
@@ -585,6 +588,11 @@ class node(object):
 
         def id32(sup):
             count, res = le(sup[:2]), sup[2:]
+            if len(res) == 2:
+                if count > 1:
+                    raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id32 : The count for the 16-bit identifier ({:d}) is larger than the expected count ({:d}).".format('.'.join(('internal', __name__)), sup.encode('hex'), count, 1))
+                return (0xff000000 | 0x8000 ^ le(res),)
+
             chunks = zip(*((iter(res),) * 4))
             if len(chunks) != count:
                 raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id32 : The number of chunks ({:d}) does not match the count ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
