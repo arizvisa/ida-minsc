@@ -453,8 +453,25 @@ def op_structure(ea, opnum):
     if len(path) == 1:
         # get the member offset of the operand
         st = structure.by(path[0])
-        m = st.by(value)
+        try:
+            m = st.by(value)
+
+        # if we couldn't find one, then figure out whether to use
+        # the last or first member depending where we are
+        except E.OutOfBoundsError:
+            if value > st.members[-1].offset:
+                m = st.members[-1]
+            elif value < st.members[0].offset:
+                m = st.members[0]
+            else:
+                raise
+
+        # now to build the path that gets walked
         path = [st.id, m.id]
+
+    # if there's no path, then this is not a structure
+    elif len(path) == 0:
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # collect all the path members
     moff, st = 0, structure.by(path.pop(0))
@@ -465,7 +482,7 @@ def op_structure(ea, opnum):
         moff, st = moff + st.offset, st.type
 
     ofs = delta - moff + value
-    return tuple(res + [ofs]) if ofs > 0 else tuple(res)
+    return tuple(res + [ofs]) if ofs != 0 else tuple(res)
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
@@ -636,7 +653,7 @@ def op_string(opnum):
 def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
-    if fl & idaapi.STRLIT == 0:
+    if fl & idaapi.FF_STRLIT == 0:
         raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
@@ -718,17 +735,23 @@ def op_refs(ea, opnum):
         if not ok:
             raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand.".format(__name__, inst.ea, opnum))
 
-        # get the structure offset and then figure its member
+        # get the structure offset and then use that to figure out the correct member
         addr = operator.attrgetter('value' if idaapi.__version__ < 7.0 else 'addr')     # FIXME: this will be incorrect for an offsetted struct
-        memofs = addr(operand(inst.ea, opnum))
+        memofs = addr(operand(inst.ea, opnum)) + delta.value()
+
+        # FIXME: use interface.node.sup_opstruct to figure out the actual path to search for
 
         st = idaapi.get_struc(pathvar[0])
         if st is None:
             raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure pointer for id {:#x}.".format(__name__, inst.ea, opnum, pathvar[0]))
 
+        # get the member at the specified offset in order to snag its id
         mem = idaapi.get_member(st, memofs)
         if mem is None:
-            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to find the member for offset ({:#x}) in the structure {:#x}.".format(__name__, inst.ea, opnum, memofs, st.id))
+            # if memofs does not point to the size of structure, then warn that we're falling back to the structure
+            if memofs != idaapi.get_struc_size(st):
+                logging.warn(u"{:s}.op_refs({:#x}, {:d}) : Unable to find the member for offset ({:#x}) in the structure {:#x}. Falling back to references to the structure itself.".format(__name__, inst.ea, opnum, memofs, st.id))
+            mem = st
 
         # extract the references
         x = idaapi.xrefblk_t()
@@ -968,7 +991,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
     def mmxregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec4`` which returns an mmx register.'''
-        return getattr(reg, "mmx{:d}".format(op.reg)).id
+        return getattr(reg, "mm{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
     def xmmregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec5`` which returns an xmm register.'''
