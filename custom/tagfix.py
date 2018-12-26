@@ -92,7 +92,7 @@ def fetch_globals_functions():
     t = len(list(db.functions()))
     for i, ea in enumerate(db.functions()):
         ui.navigation.auto(ea)
-        print >>output, "globals: fetching tag from function {:#x} : {:d} of {:d}".format(ea, i, t)
+        six.print_(u"globals: fetching tag from function {:#x} : {:d} of {:d}".format(ea, i, t), file=output)
         res = func.tag(ea)
         #res.pop('name', None)
         for k, v in six.iteritems(res):
@@ -110,7 +110,7 @@ def fetch_globals_data():
     """
     addr, tags = {}, {}
     left, right = db.range()
-    print >>output, 'globals: fetching tags from data'
+    six.print_(u'globals: fetching tags from data', file=output)
     for ea in db.address.iterate(left, right):
         if func.within(ea): continue
         ui.navigation.auto(ea)
@@ -135,15 +135,15 @@ def fetch_globals():
     daddr, dtags = fetch_globals_data()
 
     # consolidate tags into individual dictionaries
-    print >>output, 'globals: aggregating results'
+    six.print_(u'globals: aggregating results', file=output)
     addr, tags = dict(faddr), dict(ftags)
     for k, v in six.iteritems(daddr):
         addr[k] = addr.get(k, 0) + v
     for k, v in six.iteritems(dtags):
         tags[k] = tags.get(k, 0) + v
 
-    print >>output, "globals: found {:d} addrs".format(len(addr))
-    print >>output, "globals: found {:d} tags".format(len(tags))
+    six.print_(u"globals: found {:d} addresses".format(len(addr)), file=output)
+    six.print_(u"globals: found {:d} tags".format(len(tags)), file=output)
 
     return addr, tags
 
@@ -156,7 +156,7 @@ def contents(ea):
 
     # read addresses and tags from contents
     ui.navigation.auto(ea)
-    logging.debug("{:s}.contents({:#x}): Fetching the contents from the function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
+    logging.debug(u"{:s}.contents({:#x}): Fetching the contents from the function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
     f, addr, tags = fetch_contents(ea)
 
     # clean out any hidden tag values
@@ -174,11 +174,11 @@ def contents(ea):
 
     # update addresses and tags to contents
     ui.navigation.set(ea)
-    logging.debug("{:s}.contents({:#x}): Updating the name reference cache for the contents of function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
+    logging.debug(u"{:s}.contents({:#x}): Updating the name reference cache for the contents of function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
     for k, v in six.iteritems(tags):
         internal.comment.contents.set_name(f, k, v)
 
-    logging.debug("{:s}.contents({:#x}): Updating the address reference cache for the contents of function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
+    logging.debug(u"{:s}.contents({:#x}): Updating the address reference cache for the contents of function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
     for k, v in six.iteritems(addr):
         if not func.within(k):
             continue
@@ -193,11 +193,11 @@ def globals():
     addr, tags = fetch_globals()
 
     # update the global state
-    print >>output, 'globals: updating global name refs'
+    six.print_(u'globals: updating global name refs', file=output)
     for k, v in six.iteritems(tags):
         internal.comment.globals.set_name(k, v)
 
-    print >>output, 'globals: updating global address refs'
+    six.print_(u'globals: updating global address refs', file=output)
     for k, v in six.iteritems(addr):
         internal.comment.globals.set_address(k, v)
 
@@ -209,11 +209,11 @@ def all():
 
     # process all function contents tags
     for i, ea in enumerate(db.functions()):
-        print >>output, "updating references for contents ({:#x}) : {:d} of {:d}".format(ea, i, total)
+        six.print_(u"updating references for contents ({:#x}) : {:d} of {:d}".format(ea, i, total), file=output)
         _, _ = contents(ea)
 
     # process all global tags
-    print >>output, 'updating references for globals'
+    six.print_(u'updating references for globals', file=output)
     _, _ = globals()
 
 def customnames():
@@ -289,12 +289,12 @@ def erase():
 
     current = 0
     for idx, ea in iter1:
-        print >>output, "erasing contents for function {:#x} : {:d} of {:d}".format(ea, idx, total)
+        six.print_(u"erasing contents for function {:#x} : {:d} of {:d}".format(ea, idx, total), file=output)
 
     res = idx + 1
     for idx, addressOrName in iter2:
         fmt = "{:#x}" if isinstance(addressOrName, six.integer_types) else "tagname {!r}"
-        print >>output, "erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), res+idx, total)
+        six.print_(u"erasing global {:s} : {:d} of {:d}".format(fmt.format(addressOrName), res+idx, total), file=output)
     return
 
 __all__ = ['everything', 'globals', 'contents']
