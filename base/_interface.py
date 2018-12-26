@@ -1374,3 +1374,29 @@ class string(object):
                 continue
             return
         return joined(escape_string(string, quote))
+
+    @classmethod
+    def repr(cls, item):
+        """Given an item, return the `repr()` of it whilst ensuring that a proper ascii string is returned.
+
+        All unicode strings are encoded to UTF-8 in order to guarantee a proper ascii string is returned.
+        """
+        if isinstance(item, unicode):
+            res = cls.escape(item, '\'')
+            return "'{:s}'".format(res.encode('utf8'))
+        elif isinstance(item, str):
+            res = cls.escape(item, '\'')
+            return "'{:s}'".format(res)
+        elif isinstance(item, tuple):
+            res = map(cls.repr, item)
+            return "({:s}{:s})".format(', '.join(res), ',' if len(item) == 1 else '')
+        elif isinstance(item, list):
+            res = map(cls.repr, item)
+            return "[{:s}]".format(', '.join(res))
+        elif isinstance(item, set):
+            res = map(cls.repr, item)
+            return "set([{:s}])".format(', '.join())
+        elif isinstance(item, dict):
+            res = ("{:s}: {:s}".format(cls.repr(k), cls.repr(v)) for k, v in six.iteritems(item))
+            return "{{{:s}}}".format(', '.join(res))
+        return repr(item)
