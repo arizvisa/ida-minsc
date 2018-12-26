@@ -932,6 +932,8 @@ class ref_t(set):
         '''Convert a ``ref_t`` in `state` back into an IDA reference type.'''
         if state == '*':
             return cls(31, '*')     # code 31 used internally by ida-minsc
+        elif state == 'rw':
+            state = 'w'
         res = set(state)
         for F, t in six.iteritems(cls.__mapper__):
             if set(t) == res:
