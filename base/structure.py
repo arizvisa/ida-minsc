@@ -1002,13 +1002,10 @@ class members_t(object):
             callee = u"idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})".format(interface.string.escape(self.owner.name, '"'), interface.string.escape(name, '"'), realoffset, flag, typeid, nbytes)
             raise E.DisassemblerError(u"{:s}.instance({!r}.members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format(__name__, self.owner.name, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
 
-        # grab the member at the specified offset again
-        res = idaapi.get_member(self.owner.ptr, realoffset)
-        if res is None:
-            logging.fatal(u"{:s}.instance({!r}.members.add({!r}, {!s}, {:+#x}) : Failed to create member \"{:s}\" at offset {:s}{:+#x}.".format(__name__, self.owner.name, name, type, offset, interface.string.escape(name, '"'), realoffset, nbytes))
-
-        # sloppily figure out what its index might be
+        # now we can fetch the member at the specified offset to return
         mem = idaapi.get_member(self.owner.ptr, realoffset)
+        if mem is None:
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}.members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at offset {:s}{:+#x}.".format(__name__, self.owner.name, name, type, offset, interface.string.escape(name, '"'), realoffset, nbytes))
         idx = self.index(mem)
 
         # and then create a new instance of the member at our guessed index
