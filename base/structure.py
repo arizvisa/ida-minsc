@@ -509,8 +509,9 @@ class structure_t(object):
         return idaapi.del_struc(self.ptr)
 
     def __repr__(self):
-        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment, self.tag()
-        return "<type 'structure' name={!r}{:s} size=+{:#x}>{:s}".format(name, (" offset={:#x}".format(offset) if offset > 0 else ''), size, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
+        '''Display the structure in a readable format.'''
+        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment or '', self.tag()
+        return "<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(interface.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(interface.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
 
     def field(self, offset):
         '''Return the member at the specified offset.'''
@@ -1036,12 +1037,12 @@ class members_t(object):
         for i in six.moves.range(len(self)):
             m = self[i]
             name, t, ofs, size, comment, tag = m.name, m.type, m.offset, m.size, m.comment, m.tag()
-            res.append((i, name, t, ofs, size, comment, tag))
+            res.append((i, name, t, ofs, size, comment or '', tag))
             mn = max((mn, len(name)))
             ms = max((ms, len("{:+#x}".format(size))))
         mi = len("{:d}".format(len(self)))
-        mo = max(map(len, map("{:x}".format, (self.baseoffset, self.baseoffset+self.owner.size))))
-        return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, "'{:s}'".format(n), mn+2, t, " // {!s}".format(T if '\n' in c else c) if c else '') for i, n, t, o, s, c, T in res))
+        mo = max(map(len, map("{:x}".format, (self.baseoffset, self.baseoffset+self[-1].size))))
+        return "{!r}\n{:s}".format(self.owner, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:<{:d}s} {!r} {:s}".format(i, mi, o, mo, s, ms, interface.string.repr(n), mn+2, t, " // {!s}".format(interface.string.repr(T) if '\n' in c else c.encode('utf8')) if c else '') for i, n, t, o, s, c, T in res))
 
 class member_t(object):
     """
@@ -1304,8 +1305,9 @@ class member_t(object):
 
     def __repr__(self):
         '''Display the member in a readable format.'''
-        id, name, typ, comment, tag = self.id, self.name, self.type, self.comment, self.tag()
-        return "{:s}\n[{:d}] {:-#x}:{:+#x} \'{:s}\' {:s}{:s}".format(self.__class__, self.index, self.offset, self.size, name, typ, " // {!s}".format(tag if '\n' in comment else comment) if comment else '')
+        id, name, typ, comment, tag = self.id, self.name, self.type, self.comment or '', self.tag()
+        return "<class 'member' index={:d} name={!s}{:s} size={:#x}> {!s}{:s}".format(self.index, interface.string.repr(name), " offset={:-#x}".format(self.offset) if self.offset != 0 else '', self.size, interface.string.repr(typ), " // {!s}".format(interface.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
+        #return "{:s} [{:d}] {!s} {:-#x}{:+#x} {:s}{:s}".format(self.__class__, self.index, interface.string.repr(name), self.offset, self.size, typ, " // {!s}".format(interface.string.repr(tag if '\n' in comment else comment)) if comment else '')
 
     def refs(self):
         '''Return the `(address, opnum, type)` of all the references to this member within the database.'''
