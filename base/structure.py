@@ -346,7 +346,7 @@ class structure_t(object):
 
                 # now we can add it
                 for xr in xl:
-                    ea, opnum, state = xr.ea, int(xr.opnum), instruction.op_state(ea, opnum)
+                    ea, opnum, state = xr.ea, int(xr.opnum), instruction.op_state(ea, xr.opnum)
                     res.append( interface.OREF(ea, opnum, interface.ref_t.of_state(state)) )
                 continue
 
@@ -694,8 +694,7 @@ def remove(structure):
     '''Remove the specified `structure` from the database.'''
     ok = idaapi.del_struc(structure.ptr)
     if not ok:
-        logging.fatal(u"{:s}.remove({!r}) : Unable to remove structure {:#x}.".format(__name__, name, res.id))
-        return False
+        raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to remove structure {:#x}.".format(__name__, structure, structure.id))
     return True
 @utils.multicase(name=basestring)
 def remove(name):
@@ -810,7 +809,7 @@ class members_t(object):
             if member_t.id == self[i].id:
                 return i
             continue
-        raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.index({:#x}) : The requested member is not in the members list.".format(__name__, self.owner.name, member_t))
+        raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.index({!r}) : The requested member is not in the members list.".format(__name__, self.owner.name, member_t))
 
     __member_matcher = utils.matcher()
     __member_matcher.boolean('regex', re.search, 'name')
@@ -898,7 +897,7 @@ class members_t(object):
         res = interface.string.to(fullname)
 
         # grab the member_t of the structure by its fullname
-        mem = idaapi.get_member_by_fullname(self.owner.ptr, res)
+        mem, _ = idaapi.get_member_by_fullname(res)
         if mem is None:
             raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_fullname({!r}) : Unable to find member with full name.".format(__name__, self.owner.name, fullname))
 
@@ -991,7 +990,7 @@ class members_t(object):
         # try and add the structure memberb
         res = idaapi.add_struc_member(self.owner.ptr, interface.string.to(name), realoffset, flag, opinfo, nbytes)
         if res == idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.info(u"{:s}.instance({!r}).members.add({!r}, {!s}, {:+#x}) : The call to idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x}) returned success.".format(__name__, self.owner.name, name, type, offset, interface.string.escape(self.owner.name, '"'), interface.string.escape(name, '"'), realoffset, flag, typeid, nbytes))
+            logging.info(u"{:s}.instance({!r}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success.".format(__name__, self.owner.name, name, type, offset, interface.string.escape(self.owner.name, '"'), interface.string.escape(name, '"'), realoffset, flag, typeid, nbytes))
 
         # we failed, so try figure out a good error message to inform the user with
         else:
@@ -1000,9 +999,8 @@ class members_t(object):
                 idaapi.STRUC_ERROR_MEMBER_OFFSET : 'Invalid offset',
                 idaapi.STRUC_ERROR_MEMBER_SIZE : 'Invalid size',
             }
-            callee = "idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})".format(interface.string.escape(self.owner.name, '"'), interface.string.escape(name, '"'), realoffset, flag, typeid, nbytes)
-            logging.fatal(u"{:s}.instance({!r}.members.add({!r}, {!s}, {:+#x}) : {:s} -> {:s}".format(__name__, self.owner.name, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
-            return None
+            callee = u"idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})".format(interface.string.escape(self.owner.name, '"'), interface.string.escape(name, '"'), realoffset, flag, typeid, nbytes)
+            raise E.DisassemblerError(u"{:s}.instance({!r}.members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format(__name__, self.owner.name, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
 
         # grab the member at the specified offset again
         res = idaapi.get_member(self.owner.ptr, realoffset)
