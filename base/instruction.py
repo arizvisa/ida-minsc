@@ -576,7 +576,7 @@ def op_structure(ea, opnum, path, **delta):
         elif isinstance(item, structure.member_t):
             m = item.ptr
         else:
-            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), i+1, type(item)))
+            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), i+1, item.__class__))
         tids.append(m.id)
         moff += m.soff
 
