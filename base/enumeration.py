@@ -93,7 +93,7 @@ def by(name):
 @utils.multicase()
 def by(**type):
     '''Return the identifier for the first enumeration matching the keyword specified by `type`.'''
-    searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+    searchstring = interface.string.kwargs(type)
 
     res = builtins.list(iterate(**type))
     if len(res) > 1:
@@ -286,7 +286,7 @@ class members(object):
 
         err = {getattr(idaapi, n) : n for n in ('ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV')}
         if ok in err.viewkeys():
-            raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {:#x}, bitmask={!r}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join((__name__, cls.__name__)), eid, name, value, bitmask, err[ok], ok))
+            raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {:#x}{:s}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join((__name__, cls.__name__)), eid, name, value, u", {:s}".format(interface.string.kwargs(bitmask)) if bitmask else '', err[ok], ok))
         return eid
     new = create = utils.alias(add, 'members')
 
