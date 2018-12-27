@@ -390,7 +390,7 @@ class functions(object):
     @classmethod
     def search(cls, **type):
         '''Search through all of the functions within the database and return the first result matching the keyword specified by `type`.'''
-        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+        query_s = interface.string.kwargs(type)
 
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
@@ -656,7 +656,7 @@ class names(object):
     @classmethod
     def search(cls, **type):
         '''Search through all of the names within the database and return the first result matching the keyword specified by `type`.'''
-        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+        query_s = interface.string.kwargs(type)
 
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
@@ -725,7 +725,7 @@ class search(object):
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         res = idaapi.find_binary(ea, idaapi.BADADDR, ' '.join("{:d}".format(six.byte2int(ch)) for ch in string), direction.get('radix', 16), idaapi.SEARCH_CASE | flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {!r}{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(direction))) if direction else '', res))
+            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {!r}{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, string, u", {:s}".format(interface.string.kwargs(direction)) if direction else '', res))
         return res
     byBytes = by_bytes
 
@@ -748,7 +748,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, string, flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, {!r}{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, {!r}{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, string, u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
         return res
     byRegex = by_regex
 
@@ -771,7 +771,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, string, flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_text({:#x}, {!r}{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_text({:#x}, {!r}{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, string, u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
         return res
     byText = utils.alias(by_text, 'search')
 
@@ -794,7 +794,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, name, flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_name({:#x}, {!r}{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, name, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(options))) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, interface.string.escape(name, '"'), u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
         return res
     byName = utils.alias(by_name, 'search')
 
@@ -961,14 +961,14 @@ def name(ea, string, *suffix, **flags):
     # validate the name
     res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
     if ida_string and ida_string != res:
-        logging.info(u"{:s}.name({:#x}, {!r}{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', interface.string.escape(interface.string.of(res), '"')))
+        logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, interface.string.escape(string, '"'), u", {:s}".format(interface.string.kwargs(flags)) if flags else '', interface.string.escape(interface.string.of(res), '"')))
         ida_string = res
 
     # set the name and use the value of 'flags' if it was explicit
     res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flags.get('flags', fl))
 
     if not ok:
-        raise E.DisassemblerError(u"{:s}.name({:#x}, {!r}{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(flags))) if flags else '', ea, interface.string.escape(string, '"'), flags.get('flags', fl)))
+        raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, interface.string.escape(string, '"'), u", {:s}".format(interface.string.kwargs(flags)) if flags else '', ea, interface.string.escape(string, '"'), flags.get('flags', fl)))
     return res
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
@@ -1037,7 +1037,7 @@ def comment(ea, string, **repeatable):
     # apply the comment to the specified address
     res, ok = comment(ea, **repeatable), idaapi.set_cmt(interface.address.inside(ea), interface.string.to(string), repeatable.get('repeatable', False))
     if not ok:
-        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_cmt({:#x}, \"{:s}\", {!s})`.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, interface.string.escape(string, '"'), repeatable.get('repeatable', False)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_cmt({:#x}, \"{:s}\", {!s})`.".format(__name__, ea, string, u", {:s}".format(interface.string.kwargs(repeatable)) if repeatable else '', ea, interface.string.escape(string, '"'), repeatable.get('repeatable', False)))
     return res
 
 class entries(object):
@@ -1193,7 +1193,7 @@ class entries(object):
     @classmethod
     def search(cls, **type):
         '''Search through all of the entry points within the database and return the first result matching the keyword specified by `type`.'''
-        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+        query_s = interface.string.kwargs(type)
 
         res = builtins.list(cls.__iterate__(**type))
         if len(res) > 1:
@@ -1278,7 +1278,7 @@ def tag(ea):
 
     # check to see if they're not overwriting each other
     if d1.viewkeys() & d2.viewkeys():
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
@@ -1474,7 +1474,7 @@ def selectcontents(**boolean):
         # check to see that the dict's keys match
         if builtins.set(d.viewkeys()) != res:
             # FIXME: include query in warning
-            q = ', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(boolean))
+            q = interface.string.kwargs(boolean)
             logging.warn(u"{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
 
         # now start aggregating the keys that the user is looking for
@@ -1686,7 +1686,7 @@ class imports(object):
     @classmethod
     def search(cls, **type):
         '''Search through all of the imports within the database and return the first result matching the keyword specified by `type`.'''
-        query_s = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+        query_s = interface.string.kwargs(type)
 
         res = builtins.list(cls.iterate(**type))
         if len(res) > 1:
@@ -2160,7 +2160,8 @@ class address(object):
         '''Return the previous address from `ea` containing an instruction that uses `reg` or any one of the specified registers `regs` and matches `predicate`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
+        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(interface.string.escape(reg, '"')) for reg in regs])
+        args = args + (u", {:s}".format(interface.string.kwargs(modifiers)) if modifiers else '')
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -2221,7 +2222,8 @@ class address(object):
         '''Return the next address from `ea` containing an instruction that matches `predicate` and uses `reg` or any one of the registers in `regs`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = ', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + builtins.map("\"{:s}\"".format, regs) + builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
+        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(interface.string.escape(reg, '"')) for reg in regs])
+        args = args + (u", {:s}".format(interface.string.kwargs(modifiers)) if modifiers else '')
 
         # generate each helper using the regmatch class
         iterops = interface.regmatch.modifier(**modifiers)
@@ -3412,10 +3414,10 @@ class marks(object):
         try:
             idx = cls.__find_slotaddress(ea)
             ea, res = cls.by_index(idx)
-            logging.warn(u"{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from \"{:s}\" to \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, interface.string.escape(res, '"'), interface.string.escape(description, '"')))
+            logging.warn(u"{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from \"{:s}\" to \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, description, u", {:s}".format(interface.string.kwargs(extra)) if extra else '', idx, ea, interface.string.escape(res, '"'), interface.string.escape(description, '"')))
         except (E.ItemNotFoundError, E.OutOfBoundsError):
             res, idx = None, cls.__free_slotindex()
-            logging.info(u"{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, description, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else '', idx, ea, interface.string.escape(description, '"')))
+            logging.info(u"{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, description, u", {:s}".format(interface.string.kwargs(extra)) if extra else '', idx, ea, interface.string.escape(description, '"')))
         cls.__set_description(idx, ea, description, **extra)
         return res
 
@@ -3486,7 +3488,7 @@ class marks(object):
             res = cls.__location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
             title, descr = map(interface.string.to, (description, description))
             res.mark(index, title, descr)
-            #raise E.DisassemblerError(u"{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra))) if extra else '')))
+            #raise E.DisassemblerError(u"{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, u", {:s}".format(interface.string.kwargs(extra)) if extra else '')))
             return index
 
         @classmethod
@@ -3533,7 +3535,7 @@ class marks(object):
             '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
             res = interface.string.to(description)
             idaapi.mark_position(ea, extra.get('lnnum', 0), extra.get('x', 0), extra.get('y', 0), index, res)
-            #raise E.AddressNotFoundError(u"{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, ", {:s}".format(', '.join(itertools.imap(utils.funbox("{:s}={!r}".format), six.iteritems(extra)))) if extra else ''))
+            #raise E.AddressNotFoundError(u"{:s}.set_description({:d}, {:#x}, {!r}{:s}) : Unable to get slot address for specified index.".format('.'.join((__name__, cls.__name__)), index, ea, description, u", {:s}".format(interface.string.kwargs(extra)) if extra else ''))
             return index
 
         @classmethod
@@ -4054,7 +4056,7 @@ class set(object):
         If `size` is specified, then align that number of bytes.
         """
         if not type.is_unknown(ea):
-            raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join(builtins.map(utils.funbox("{:s}={!r}".format), six.iteritems(alignment)))) if alignment else ''))  # XXX: define a custom warning
+            raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(alignment)) if alignment else ''))  # XXX: define a custom warning
 
         # grab the size out of the kwarg
         if 'size' in alignment:
@@ -4110,7 +4112,7 @@ class set(object):
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         ok = idaapi.make_ascii_string(ea, 0, strtype)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
+            raise E.DisassemblerError(u"{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(type)) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
@@ -4122,11 +4124,11 @@ class set(object):
         strtype = type.get('type', idaapi.ASCSTR_LAST)
         cb = cls.unknown(ea, size)
         if cb != size:
-            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else '', size))
+            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(interface.string.kwargs(type)) if type else '', size))
 
         ok = idaapi.make_ascii_string(ea, size, strtype)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in six.iteritems(type))) if type else ''))
+            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(interface.string.kwargs(type)) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
 
     class integer(object):
@@ -4570,15 +4572,13 @@ class get(object):
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
             return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
         else:
-            query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
-            raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the `idaapi.DT_TYPE` as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', ea, F, T))
+            raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the `idaapi.DT_TYPE` as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(length)) if length else '', ea, F, T))
 
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
         res = _array.array(t, read(ea, count * cb))
         if len(res) != count:
-            query_l = itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length))
-            logging.warn(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, (', '+', '.join(query_l)) if length else '', len(res), count))
+            logging.warn(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(length)) if length else '', len(res), count))
         return res
 
     @utils.multicase()
@@ -4593,7 +4593,6 @@ class get(object):
 
         If the integer `length` is defined, then use it as the length of the array.
         """
-        args = ', '.join(itertools.imap(utils.funbox('{:s}={!r}'.format), six.iteritems(length)))
 
         # Fetch the string type at the given address
         strtype = idaapi.get_str_type(ea)
@@ -4604,10 +4603,10 @@ class get(object):
 
             # It wasn't an array and was probably a structure, so we'll just complain to the user about it
             if not isinstance(res, _array.array):
-                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The type at address {:#x} cannot be treated as an unformatted array and as such is not convertible to a string.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
+                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The type at address {:#x} cannot be treated as an unformatted array and as such is not convertible to a string.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(length)) if length else '', ea))
 
             # Warn the user and convert it into a string
-            logging.warn(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', ea))
+            logging.warn(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(length)) if length else '', ea))
             return res.tostring()
 
         # Get the string encoding (not used)
@@ -4630,7 +4629,7 @@ class get(object):
         elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
             shift, f1 = 4, utils.fpass
         else:
-            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sl, ea))
+            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(length)) if length else '', sl, ea))
 
         # Figure out the STRWIDTH field
         if sw == idaapi.STRWIDTH_1B:
@@ -4640,7 +4639,7 @@ class get(object):
         elif sw == idaapi.STRWIDTH_4B:
             f2 = operator.methodcaller('decode', 'utf-32')
         else:
-            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, ", {:s}".format(args) if args else '', sw, ea))
+            raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(interface.string.kwargs(length)) if length else '', sw, ea))
 
         # Read the pascal length if one was specified in the string type code
         if shift:
