@@ -156,8 +156,7 @@ def by(id, **options):
 @utils.multicase()
 def by(**type):
     '''Return the structure matching the keyword specified by `type`.'''
-
-    searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+    searchstring = interface.string.kwargs(type)
 
     res = builtins.list(iterate(**type))
     if len(res) > 1:
@@ -180,7 +179,7 @@ def by_name(name, **options):
     # try and find the structure id according to its name
     id = idaapi.get_struc_id(res)
     if id == idaapi.BADADDR:
-        raise E.StructureNotFoundError(u"{:s}.by_name({!r}) : Unable to locate structure with given name.".format(__name__, name))
+        raise E.StructureNotFoundError(u"{:s}.by_name(\"{:s}\"{:s}) : Unable to locate structure with given name.".format(__name__, interface.string.escape(name, '"'), u", {:s}".format(interface.string.kwargs(options)) if options else ''))
 
     # grab an instance of the structure by its id that we found
     return __instance__(id, **options)
@@ -190,7 +189,7 @@ def by_index(index, **options):
     '''Return a structure by its index.'''
     id = idaapi.get_struc_by_idx(index)
     if id == idaapi.BADADDR:
-        raise E.StructureNotFoundError(u"{:s}.by_index({:d}) : Unable to locate structure at given index.".format(__name__, index))
+        raise E.StructureNotFoundError(u"{:s}.by_index({:d}{:s}) : Unable to locate structure at given index.".format(__name__, index, u", {:s}".format(interface.string.kwargs(options)) if options else ''))
 
     # grab an instance of the structure by the id we found
     return __instance__(id, **options)
@@ -859,7 +858,7 @@ class members_t(object):
     @utils.multicase()
     def by(self, **type):
         '''Return the member that matches the keyword specified by `type`.'''
-        searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+        searchstring = interface.string.kwargs(type)
 
         res = builtins.list(self.iterate(**type))
         if len(res) > 1:
