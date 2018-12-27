@@ -699,7 +699,7 @@ class namedtypedtuple(tuple):
         result = self._make(map(fc.pop, self._fields, self))
         if fc:
             cls = self.__class__
-            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join("{!s}={!r}".format(k, v) for k, v in fields.iteritems()), '{' + ', '.join(map("{!r}".format, six.viewkeys(fc))) + '}'))
+            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(('internal', __name__, cls.__name__)), string.kwargs(fields), '{' + ', '.join(map(string.repr, six.viewkeys(fc))) + '}'))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
@@ -815,8 +815,8 @@ class regmatch(object):
     def __new__(cls, *regs, **modifiers):
         '''Construct a closure that can be used for matching instruction using the specified `regs` and `modifiers`.'''
         if not regs:
-            args = ', '.join(map("{:s}".format, regs))
-            mods = ', '.join(map(internal.utils.funbox("{:s}={!r}".format), six.iteritems(modifiers)))
+            args = ', '.join(map(string.escape, regs))
+            mods = string.kwargs(modifiers)
             raise internal.exceptions.InvalidParameterError(u"{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join(('internal', __name__, cls.__name__)), args, (', '+mods) if mods else ''))
         use, iterops = cls.use(regs), cls.modifier(**modifiers)
         def match(ea):
@@ -1317,7 +1317,11 @@ class string(object):
 
     @classmethod
     def escape(cls, string, quote=''):
-        '''Escape the characters in `string` specified within `quote`.'''
+        """Escape the characters in `string` specified by `quote`.
+
+        Handles both unicode and ascii. Defaults to escaping only
+        the unprintable characters.
+        """
         cls = cls.__escape__
 
         # figure out the correct function that determines printability of a char
@@ -1394,8 +1398,18 @@ class string(object):
             return "[{:s}]".format(', '.join(res))
         elif isinstance(item, set):
             res = map(cls.repr, item)
-            return "set([{:s}])".format(', '.join())
+            return "set([{:s}])".format(', '.join(res))
         elif isinstance(item, dict):
             res = ("{:s}: {:s}".format(cls.repr(k), cls.repr(v)) for k, v in six.iteritems(item))
             return "{{{:s}}}".format(', '.join(res))
         return repr(item)
+
+    @classmemthod
+    def kwargs(cls, kwds):
+        '''Format a dictionary (from kwargs) so that it can be emitted to a user as part of a message.'''
+        res = []
+        for key, value in six.iteritems(kwds):
+            k, v = cls.escape(key), cls.repr(value)
+            res.append("{:s}={!s}".format(k.encode('utf8'), v))
+        return ', '.join(res).decode('utf8')
+
