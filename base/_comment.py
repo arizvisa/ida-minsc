@@ -641,7 +641,7 @@ class contents(tagging):
         ok = cls._write(target.get('target', None), address, state)
         if ok:
             return state
-        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.interface.string.kwargs(target)) if target else '', address))
 
     @classmethod
     def set_address(cls, address, count, **target):
@@ -661,7 +661,7 @@ class contents(tagging):
         ok = cls._write(target.get('target', None), address, state)
         if ok:
             return state
-        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(', '.join("{:s}={!r}".format(k, v) for k, v in target.iteritems())) if target else '', address))
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.interface.string.kwargs(target)) if target else '', address))
 
 class globals(tagging):
     '''Tagging for a function-tag or a global'''
