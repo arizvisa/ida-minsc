@@ -999,8 +999,9 @@ class members_t(object):
                 idaapi.STRUC_ERROR_MEMBER_OFFSET : 'Invalid offset',
                 idaapi.STRUC_ERROR_MEMBER_SIZE : 'Invalid size',
             }
+            e = E.DuplicateItemError if res == idaapi.STRUC_ERROR_MEMBER_NAME else E.DisassemblerError
             callee = u"idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})".format(interface.string.escape(self.owner.name, '"'), interface.string.escape(name, '"'), realoffset, flag, typeid, nbytes)
-            raise E.DisassemblerError(u"{:s}.instance({!r}.members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format(__name__, self.owner.name, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
+            raise e(u"{:s}.instance({!r}.members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format(__name__, self.owner.name, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
 
         # now we can fetch the member at the specified offset to return
         mem = idaapi.get_member(self.owner.ptr, realoffset)
