@@ -213,6 +213,11 @@ class UnknownPrototypeError(UnicodeException, E.LookupError):
     The requested prototype does not match any of the ones that are available.
     """
 
+class DuplicateItemError(E.DisassemblerError, E.NameError):
+    """
+    The requested command has failed due to a duplicate item.
+    """
+
 #structure:742 and previous to it should output the module name, classname, and method
 #comment:334 should catch whatever tree.find raises
 #comment:100 (this needs some kind of error when the symbol or token component is not found)
