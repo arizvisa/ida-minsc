@@ -213,16 +213,16 @@ try:
 
     except ImportError:
         # otherwise try to figure it out without tainting the namespace
-        if __import__('os').getenv('HOME'):
+        if __import__('os').getenv('HOME', default=None) is not None:
             execfile(__import__('os').path.join(__import__('os').getenv('HOME'), '.idapythonrc.py'))
-        elif __import__('os').getenv('USERPROFILE'):
+        elif __import__('os').getenv('USERPROFILE', default=None) is not None:
             execfile(__import__('os').path.join(__import__('os').getenv('USERPROFILE'), '.idapythonrc.py'))
         else:
-            raise OSError('Unable to determine the user home directory.')
+            raise OSError('Unable to determine the user\'s home directory.')
         pass
 
 except IOError:
-    __import__('logging').warn('No .idapythonrc.py file found in the user home directory.')
+    __import__('logging').warn('No .idapythonrc.py file found in the user\'s home directory.')
 
 except Exception, e:
     print("Unexpected exception raised while trying to execute `~/.idapythonrc.py`.")
