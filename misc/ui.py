@@ -77,7 +77,7 @@ class current(object):
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
-            raise internal.exceptions.FunctionNotFoundError("{:s}.function() : Unable to locate the current function.".format('.'.join((__name__, cls.__name__))))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}.function() : Unable to locate the current function.".format('.'.join((__name__, cls.__name__))))
         return res
     @classmethod
     def segment(cls):
@@ -87,7 +87,7 @@ class current(object):
     @classmethod
     def status(cls):
         '''Return the IDA status.'''
-        raise internal.exceptions.UnsupportedCapability("{:s}.status() : Unable to return the current status of IDA.".format('.'.join((__name__, cls.__name__))))
+        raise internal.exceptions.UnsupportedCapability(u"{:s}.status() : Unable to return the current status of IDA.".format('.'.join((__name__, cls.__name__))))
     @classmethod
     def symbol(cls):
         '''Return the current highlighted symbol name.'''
@@ -99,7 +99,7 @@ class current(object):
         left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
         ok = idaapi.read_selection(view, left, right)
         if not ok:
-            raise internal.exceptions.DisassemblerError("{:s}.selection() : Unable to read the current selection.".format('.'.join((__name__, cls.__name__))))
+            raise internal.exceptions.DisassemblerError(u"{:s}.selection() : Unable to read the current selection.".format('.'.join((__name__, cls.__name__))))
         pl_l, pl_r = left.place(view), right.place(view)
         ea_l, ea_r = internal.interface.address.inside(pl_l.ea, pl_r.ea)
         return internal.interface.bounds_t(ea_l, ea_r)
@@ -269,7 +269,7 @@ class strings(appwindow):
     @classmethod
     def __on_openidb__(cls, code, is_old_database):
         if code != idaapi.NW_OPENIDB or is_old_database:
-            raise internal.exceptions.InvalidParameterError("{:s}.__on_openidb__({:#x}, {:b}) : Hook was called with an unexpected code or an old database.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__on_openidb__({:#x}, {:b}) : Hook was called with an unexpected code or an old database.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
         config = idaapi.strwinsetup_t()
         config.minlen = 3
         config.ea1, config.ea2 = idaapi.cvar.inf.minEA, idaapi.cvar.inf.maxEA
@@ -280,7 +280,7 @@ class strings(appwindow):
         res = [idaapi.ASCSTR_TERMCHR, idaapi.ASCSTR_PASCAL, idaapi.ASCSTR_LEN2, idaapi.ASCSTR_UNICODE, idaapi.ASCSTR_LEN4, idaapi.ASCSTR_ULEN2, idaapi.ASCSTR_ULEN4]
         config.strtypes = reduce(lambda t, c: t | (2**c), res, 0)
         if not idaapi.set_strlist_options(config):
-            raise internal.exceptions.DisassemblerError("{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
+            raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
         #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
     # FIXME: I don't think that these callbacks are stackable
@@ -302,7 +302,7 @@ class strings(appwindow):
         # FIXME: this isn't being used correctly
         res = idaapi.get_strlist_item(index, si)
         if not res:
-            raise internal.exceptions.DisassemblerError("{:s}.at({:d}) : The call to idaapi.get_strlist_item({:d}) returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
+            raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
         return si
     @classmethod
     def get(cls, index):
@@ -350,7 +350,7 @@ class timer(object):
     @classmethod
     def unregister(cls, id):
         '''Unregister the specified `id`.'''
-        raise internal.exceptions.UnsupportedCapability("{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
+        raise internal.exceptions.UnsupportedCapability(u"{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
         idaapi.unregister_timer(cls.clock[id])
         del(cls.clock[id])
     @classmethod
@@ -592,8 +592,8 @@ try:
             res.setVisible(False)
             res.setWindowModality(blocking)
             res.setAutoClose(True)
-            path = "{:s}/{:s}".format(_database.config.path(), _database.config.filename())
-            self.update(current=0, min=0, max=0, text='Processing...', tooltip='...', title=path)
+            path = u"{:s}/{:s}".format(_database.config.path(), _database.config.filename())
+            self.update(current=0, min=0, max=0, text=u'Processing...', tooltip=u'...', title=path)
 
         # properties
         canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s, v: s.object.canceled.connect(v))
@@ -613,7 +613,7 @@ try:
                 main = window.main()
 
             if main is None:
-                logging.warn("{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join((__name__, cls.__name__)), width, height))
+                logging.warn(u"{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join((__name__, cls.__name__)), width, height))
 
             # figure out the dimensions of the window
             if main is None:
@@ -623,7 +623,7 @@ try:
                 w, h = main.width(), main.height()
 
             # now we can calculate the dimensions of the progress bar
-            logging.info("{:s}.open({!s}, {!s}) : Using dimensions ({:d}, {:d}) for progress bar.".format('.'.join((__name__, cls.__name__)), width, height, int(w*width), int(h*height)))
+            logging.info(u"{:s}.open({!s}, {!s}) : Using dimensions ({:d}, {:d}) for progress bar.".format('.'.join((__name__, cls.__name__)), width, height, int(w*width), int(h*height)))
             self.object.setFixedWidth(w * width), self.object.setFixedHeight(h * height)
 
             # calculate the center
@@ -636,7 +636,7 @@ try:
 
             # ...and center it.
             x, y = cx - (w * width * 0.5), cy - (h * height * 1.0)
-            logging.info("{:s}.open({!s}, {!s}) : Centering progress bar at ({:d}, {:d}).".format('.'.join((__name__, cls.__name__)), width, height, int(x), int(y)))
+            logging.info(u"{:s}.open({!s}, {!s}) : Centering progress bar at ({:d}, {:d}).".format('.'.join((__name__, cls.__name__)), width, height, int(x), int(y)))
             self.object.move(x, y)
 
             # now everything should look good.
@@ -656,11 +656,11 @@ try:
             if maximum is not None:
                 self.object.setMaximum(maximum)
             if title is not None:
-                self.object.setWindowTitle(title)
+                self.object.setWindowTitle(internal.interface.string.to(title))
             if tooltip is not None:
-                self.object.setToolTip(tooltip)
+                self.object.setToolTip(internal.interface.string.to(tooltip))
             if text is not None:
-                self.object.setLabelText(text)
+                self.object.setLabelText(internal.interface.string.to(text))
 
             res = self.object.value()
             if 'current' in options:
@@ -680,7 +680,7 @@ try:
             return ns.FormToPyQtWidget(twidget)
 
 except ImportError:
-    logging.info("{:s}:Unable to locate PyQt5.Qt module.".format(__name__))
+    logging.info(u"{:s}:Unable to locate `PyQt5.Qt` module.".format(__name__))
 
 ### PySide-specific functions and namespaces
 try:
@@ -723,7 +723,7 @@ try:
             return ns.FormToPySideWidget(twidget)
 
 except ImportError:
-    logging.info("{:s}:Unable to locate PySide module.".format(__name__))
+    logging.info(u"{:s}:Unable to locate `PySide` module.".format(__name__))
 
 ### wrapper that uses a priorityhook around IDA's hooking capabilities.
 class hook(object):
@@ -777,7 +777,7 @@ class queue(object):
     @classmethod
     def __start_ida__(cls):
         if hasattr(cls, 'execute') and not cls.execute.dead:
-            logging.warn("{:s}.start() : Skipping re-instantiation of execution queue {!r}.".format('.'.join((__name__, cls.__name__)), cls.execute))
+            logging.warn(u"{:s}.start() : Skipping re-instantiation of execution queue {!r}.".format('.'.join((__name__, cls.__name__)), cls.execute))
             return
         cls.execute = internal.utils.execution()
         return
@@ -785,7 +785,7 @@ class queue(object):
     @classmethod
     def __stop_ida__(cls):
         if not hasattr(cls, 'execute'):
-            logging.warn("{:s}.stop() : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
+            logging.warn(u"{:s}.stop() : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
             return
         return cls.execute.release()
 
@@ -801,7 +801,7 @@ class queue(object):
     def add(cls, callable, *args, **kwds):
         '''Add the specified `callable` to the execution queue passing to it any extra arguments.'''
         if not cls.execute.running:
-            logging.warn("{:s}.add(...) : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
+            logging.warn(u"{:s}.add(...) : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
         return cls.execute.push(callable, *args, **kwds)
 
     @classmethod
@@ -835,7 +835,7 @@ class ConsoleProgress(object):
     Helper class used to simplify the showing of a progress bar in IDA's console.
     """
     def __init__(self, blocking=True):
-        self.__path__ = "{:s}/{:s}".format(_database.config.path(), _database.config.filename())
+        self.__path__ = u"{:s}/{:s}".format(_database.config.path(), _database.config.filename())
         self.__value__ = 0
         self.__min__, self.__max__ = 0, 0
         return
@@ -863,15 +863,16 @@ class ConsoleProgress(object):
         if maximum is not None:
             self.__max__ = maximum
 
+        res = self.__value__
         if 'current' in options:
             self.__value__ = options['current']
         if 'value' in options:
             self.__value__ = options['value']
 
         if text is not None:
-            logging.info(text)
+            logging.info(internal.interface.string.of(text))
 
-        return self.__value__
+        return res
 
 ### Fake progress bar class that instantiates whichever one is available
 class Progress(object):
@@ -886,7 +887,7 @@ class Progress(object):
     def __new__(cls, *args, **kwargs):
         '''Figure out which progress bar to use and instantiate it with the provided parameters `args` and `kwargs`.'''
         if 'UIProgress' not in globals():
-            logging.warn("{:s}(...) : Using console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
+            logging.warn(u"{:s}(...) : Using console-only implementation of the `ui.Progress` class.".format('.'.join((__name__, cls.__name__))))
             return ConsoleProgress(*args, **kwargs)
 
         # XXX: spin for a bit looking for the application window as IDA seems to be racy with this for some reason
@@ -896,7 +897,7 @@ class Progress(object):
 
         # If no main window was found, then fall back to the console-only progress bar
         if main is None:
-            logging.warn("{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the ui.Progress class.".format('.'.join((__name__, cls.__name__))))
+            logging.warn(u"{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the `ui.Progress` class.".format('.'.join((__name__, cls.__name__))))
             return ConsoleProgress(*args, **kwargs)
 
         cls.__appwindow__ = main
