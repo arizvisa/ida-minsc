@@ -257,7 +257,7 @@ class apply(object):
     @classmethod
     def frame(cls, ea, frame, **tagmap):
         '''Apply the fields from `frame` back into the function at `ea`.'''
-        tagmap_output = ", {:s}".format(', '.join("{:s}={:s}".format(k, v) for k, v in six.iteritems(tagmap))) if tagmap else ''
+        tagmap_output = u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.interface.string.escape(k), internal.interface.string.escape(v)) for k, v in six.iteritems(tagmap))) if tagmap else ''
 
         F = func.frame(ea)
         for offset, (name, type, comment) in six.iteritems(frame):
@@ -359,7 +359,7 @@ class apply(object):
     def globals(Globals, **tagmap):
         '''Apply the tags in `Globals` back into the database.'''
         global apply
-        cls, tagmap_output = apply.__class__, ", {:s}".format(', '.join("{:s}={:s}".format(oldtag, newtag) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
+        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.interface.string.escape(oldtag), internal.interface.string.escape(newtag)) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
 
         count = 0
         for ea, res in Globals:
@@ -397,7 +397,7 @@ class apply(object):
     def contents(Contents, **tagmap):
         '''Apply the tags in `Contents` back into each function within the database.'''
         global apply
-        cls, tagmap_output = apply.__class__, ", {:s}".format(', '.join("{:s}={:s}".format(oldtag, newtag) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
+        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.interface.string.escape(oldtag), internal.interface.string.escape(newtag)) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
 
         count = 0
         for loc, res in Contents:
@@ -439,7 +439,7 @@ class apply(object):
     def frames(Frames, **tagmap):
         '''Apply the fields from `Frames` back into each function's frame.'''
         global apply
-        cls, tagmap_output = apply.__class__, ", {:s}".format(', '.join("{:s}={:s}".format(oldtag, newtag) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
+        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.interface.string.escape(oldtag), internal.interface.string.escape(newtag)) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
 
         count = 0
         for ea, res in Frames:
