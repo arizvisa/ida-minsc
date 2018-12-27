@@ -123,7 +123,7 @@ def comment(func, string, **repeatable):
 
     res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, interface.string.to(string), repeatable.get('repeatable', True))
     if not ok:
-        raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, interface.string.escape(string, '"'), u", {:s}".format(interface.string.kwargs(repeatable)) if repeatable else '', ea, interface.string.to(string), repeatable.get('repeatable', True)))
     return res
 
 @utils.multicase()
