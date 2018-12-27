@@ -934,7 +934,7 @@ class execution(object):
         res = functools.partial(F, *args, **kwds)
 
         cls = self.__class__
-        logging.debug(u"{:s}.push : Adding the callable {!r} to the execution scheduler's queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), F, self))
+        logging.debug(u"{:s}.push(...) : Adding the callable {!r} to the execution scheduler's queue {!r}.".format('.'.join(('internal', __name__, cls.__name__)), F, self))
         # shove it down a multiprocessing.Queue
         self.queue.acquire()
         self.state.append(res)
