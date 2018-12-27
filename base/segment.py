@@ -133,7 +133,7 @@ def by():
 @utils.multicase()
 def by(**type):
     '''Return the segment matching the specified keywords in `type`.'''
-    searchstring = ', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(type))
+    searchstring = interface.string.kwargs(type)
 
     res = builtins.list(__iterate__(**type))
     if len(res) > 1:
@@ -398,7 +398,7 @@ def load(filename, ea, size=None, offset=0, **kwds):
     cb = filesize - offset if size is None else size
     res = __load_file(filename, ea, cb, offset)
     if not res:
-        raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}) : Unable to load file into {:#x}:{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, ea, cb, interface.string.escape(os.path.relpath(filename), '"')))
+        raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}{:s}) : Unable to load file into {:#x}{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, u", {:s}".format(interface.string.kwargs(kwds)) if kwds else '', ea, cb, interface.string.escape(os.path.relpath(filename), '"')))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
 
 def map(ea, size, newea, **kwds):
@@ -410,12 +410,12 @@ def map(ea, size, newea, **kwds):
     # grab the file offset and the data we want
     fpos, data = idaapi.get_fileregion_offset(ea), database.read(ea, size)
     if len(data) != size:
-        raise E.ReadOrWriteError(u"{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to read {:#x} bytes from {:#x}.".format(__name__, ea, size, newea, size, ea))
+        raise E.ReadOrWriteError(u"{:s}.map({:#x}, {:+#x}, {:#x}{:s}) : Unable to read {:#x} bytes from {:#x}.".format(__name__, ea, size, newea, u", {:s}".format(interface.string.kwargs(kwds)) if kwds else '', size, ea))
 
     # rebase the data to the new address
     res = idaapi.mem2base(data, newea, fpos)
     if not res:
-        raise E.DisassemblerError(u"{:s}.map({:#x}, {:+#x}, {:#x}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, newea, ea, size, newea))
+        raise E.DisassemblerError(u"{:s}.map({:#x}, {:+#x}, {:#x}{:s}) : Unable to remap {:#x}:{:+#x} to {:#x}.".format(__name__, ea, size, newea, u", {:s}".format(interface.string.kwargs(kwds)) if kwds else '', ea, size, newea))
 
     # now we can create the new segment
     return new(newea, size, kwds.get("name", "map_{:x}".format(ea)))
@@ -435,7 +435,7 @@ def new(offset, size, name, **kwds):
     # find the segment according to the name specified by the user
     seg = idaapi.get_segm_by_name(res)
     if seg is not None:
-        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name (\"{:s}\") already exists.".format(__name__, offset, size, name.encode('utf8') if isinstance(name, unicode) else name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', interface.string.escape(name, '"')))
+        raise NameError("{:s}.new({:#x}, {:+#x}, {!r}{:s}) : A segment with the specified name (\"{:s}\") already exists.".format(__name__, offset, size, name.encode('utf8') if isinstance(name, unicode) else name, u", {:s}".format(interface.string.kwargs(kwds)) if kwds else '', interface.string.escape(name, '"')))
 
     # FIXME: use disassembler default bit length instead of 32
     bits = kwds.get( 'bits', 32 if idaapi.getseg(offset) is None else idaapi.getseg(offset).abits())
@@ -444,7 +444,7 @@ def new(offset, size, name, **kwds):
     if bits == 16:
         org = kwds.get('org',0)
         if org & 0xf > 0:
-            raise E.InvalidTypeOrValueError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : The specified origin ({:#x}) is not aligned to the size of a paragraph (0x10).".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', org))
+            raise E.InvalidTypeOrValueError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : The specified origin ({:#x}) is not aligned to the size of a paragraph (0x10).".format(__name__, offset, size, name, u", {:s}".format(interface.string.kwargs(kwds)) if kwds else '', org))
 
         para = offset/16
         sel = idaapi.allocate_selector(para)
@@ -483,8 +483,8 @@ def new(offset, size, name, **kwds):
     if not ok:
         ok = idaapi.del_selector(sel)
         if not ok:
-            logging.warn(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else '', sel))
-        raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to add a new segment.".format(__name__, offset, size, name, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in kwds.iteritems())) if kwds else ''))
+            logging.warn(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, u", {:s}".format(interface.string.kwargs(kwds)) if kwds else '', sel))
+        raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to add a new segment.".format(__name__, offset, size, name, u", {:s}".format(interface.string.kwargs(kwds)) if kwds else ''))
     return seg
 create = utils.alias(new)
 
