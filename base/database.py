@@ -708,24 +708,39 @@ class search(object):
     result.
     """
 
-    @utils.multicase(string=bytes)
+    @utils.multicase()
     @staticmethod
-    def by_bytes(string, **direction):
-        '''Search through the database at the current address for the bytes specified by `string`.'''
-        return search.by_bytes(ui.current.address(), string, **direction)
-    @utils.multicase(ea=six.integer_types, string=bytes, reverse=bool)
+    def by_bytes(data, **direction):
+        '''Search through the database at the current address for the bytes specified by `data`.'''
+        return search.by_bytes(ui.current.address(), data, **direction)
+    @utils.multicase(ea=six.integer_types)
     @staticmethod
-    def by_bytes(ea, string, **direction):
-        """Search through the database at address `ea` for the bytes specified by `string`.
+    def by_bytes(ea, data, **direction):
+        """Search through the database at address `ea` for the bytes specified by `data`.
 
         If `reverse` is specified as a bool, then search backwards from the given address.
-        If `radix` is specified, then use it as the number radix for describing the bytes.
+        If `radix` is specified, then use it as the numerical radix for describing the bytes.
+        If `radix` is not specified, then assume that `data` represents the exact bytes to search.
         """
+        radix = direction.get('radix', 0)
+
+        # convert the data directly into a string of base-10 integers
+        if isinstance(string, bytes) and radix == 0:
+            radix, queryF = 10, lambda string: ' '.join("{:d}".format(six.byte2int(ch)) for ch in string)
+
+        # convert the unicode string directly into a string of base-10 integers
+        elif isinstance(string, unicode) and radix == 0:
+            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((six.byte2int(ch) & 0xff00) / 0x100, (six.byte2int(ch) & 0x00ff) / 0x1) for ch in string))))
+
+        # otherwise, leave it alone because the user specified the radix already
+        else:
+            radix, queryF = radix or 16, interface.string.to
+
         reverseQ = builtins.next((direction[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in direction), False)
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
-        res = idaapi.find_binary(ea, idaapi.BADADDR, ' '.join("{:d}".format(six.byte2int(ch)) for ch in string), direction.get('radix', 16), idaapi.SEARCH_CASE | flags)
+        res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(string), radix, idaapi.SEARCH_CASE | flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, {!r}{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, string, u", {:s}".format(interface.string.kwargs(direction)) if direction else '', res))
+            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, \"{:s}\"{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, interface.string.escape(string, '"'), u", {:s}".format(interface.string.kwargs(direction)) if direction else '', res))
         return res
     byBytes = by_bytes
 
@@ -742,13 +757,15 @@ class search(object):
         If `reverse` is specified as a bool, then search backwards from the given address.
         If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
+        queryF = interface.string.to
+
         reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
         flags = idaapi.SEARCH_REGEX
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        res = idaapi.find_text(ea, 0, 0, string, flags)
+        res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, {!r}{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, string, u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, interface.string.escape(string, '"'), u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
         return res
     byRegex = by_regex
 
@@ -765,15 +782,17 @@ class search(object):
         If `reverse` is specified as a bool, then search backwards from the given address.
         If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
+        queryF = interface.string.to
+
         reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
         flags = 0
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        res = idaapi.find_text(ea, 0, 0, string, flags)
+        res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_text({:#x}, {!r}{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, string, u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, interface.string.escape(string, '"'), u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
         return res
-    byText = utils.alias(by_text, 'search')
+    byText = by_string = byString = utils.alias(by_text, 'search')
 
     @utils.multicase(name=basestring)
     @staticmethod
@@ -788,44 +807,58 @@ class search(object):
         If `reverse` is specified as a bool, then search backwards from the given address.
         If `sensitive` is specified as bool, then perform a case-sensitive search.
         """
+        queryF = interface.string.to
+
         reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
         flags = idaapi.SEARCH_IDENT
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
-        res = idaapi.find_text(ea, 0, 0, name, flags)
+        res = idaapi.find_text(ea, 0, 0, queryF(name), flags)
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, interface.string.escape(name, '"'), u", {:s}".format(interface.string.kwargs(options)) if options else '', res))
         return res
     byName = utils.alias(by_name, 'search')
 
-    @utils.multicase(string=basestring)
-    @staticmethod
-    def iterate(string, **options):
-        '''Iterate through all search results that match the bytes `string` starting at the current address.'''
-        return search.iterate(ui.current.address(), string, search.by_bytes, **options)
-    @utils.multicase(string=basestring, predicate=callable)
-    @staticmethod
-    def iterate(string, predicate, **options):
-        '''Iterate through all search results matched by the function `predicate` with the specified `string` starting at the current address.'''
-        return search.iterate(ui.current.address(), string, predicate, **options)
-    @utils.multicase(start=six.integer_types, string=basestring)
-    @staticmethod
-    def iterate(start, string, **options):
-        '''Iterate through all search results that match the bytes `string` starting at address `start`.'''
-        return search.iterate(start, string, search.by_bytes, **options)
-    @utils.multicase(start=six.integer_types, string=basestring, predicate=callable)
-    @staticmethod
-    def iterate(start, string, predicate, **options):
-        '''Iterate through all search results matched by the function `predicate` with the specified `string` starting at address `start`.'''
-        ea = predicate(start, string, **options)
+    @utils.multicase()
+    @classmethod
+    def iterate(cls, data, **options):
+        '''Iterate through all search results that match the bytes `data` starting at the current address.'''
+        predicate = options.pop('predicate', cls.by_bytes)
+        return cls.iterate(ui.current.address(), data, predicate, **options)
+    @utils.multicase(predicate=callable)
+    @classmethod
+    def iterate(cls, data, predicate, **options):
+        '''Iterate through all search results matched by the function `predicate` with the specified `data` starting at the current address.'''
+        return cls.iterate(ui.current.address(), data, predicate, **options)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def iterate(cls, ea, data, **options):
+        '''Iterate through all search results that match the bytes `data` starting at address `ea`.'''
+        predicate = options.pop('predicate', cls.by_bytes)
+        return cls.iterate(ea, data, predicate, **options)
+    @utils.multicase(ea=six.integer_types, predicate=callable)
+    @classmethod
+    def iterate(cls, ea, data, predicate, **options):
+        '''Iterate through all search results matched by the function `predicate` with the specified `data` starting at address `ea`.'''
+        ea = predicate(ea, data, **options)
         while ea != idaapi.BADADDR:
             yield ea
-            ea = predicate(address.next(ea), string)
+            ea = predicate(address.next(ea), data)
         return
 
-    def __new__(cls, string):
-        '''Search through the database for the specified `string`.'''
-        return cls.by_name(ui.current.address(), string)
+    @utils.multicase()
+    def __new__(cls, data, **direction):
+        '''Search through the database at the current address for the bytes specified by `data`.'''
+        return cls.by_bytes(ui.current.address(), data, **direction)
+    @utils.multicase(ea=six.integer_types)
+    def __new__(cls, ea, data, **direction):
+        """Search through the database at address `ea` for the bytes specified by `data`.
+
+        If `reverse` is specified as a bool, then search backwards from the given address.
+        If `radix` is specified, then use it as the numerical radix for describing the bytes.
+        If `radix` is not specified, then assume that `data` represents the exact bytes to search.
+        """
+        return cls.by_bytes(ea, data, **direction)
 
 byName = by_name = utils.alias(search.by_name, 'search')
 
