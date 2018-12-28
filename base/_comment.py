@@ -409,7 +409,7 @@ class tagging(object):
     @classmethod
     def __init_tagcache__(cls, idp_modname):
         cls.node()
-        logging.debug(u"{:s}.init_tagcache({!r}) : Initialized tagcache with netnode \"{:s}\" and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), idp_modname, internal.interface.string.escape(cls.__node__, '"'), cls.__nodeid__))
+        logging.debug(u"{:s}.init_tagcache('{:s}') : Initialized tagcache with netnode \"{:s}\" and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), internal.interface.string.escape(idp_modname, '\''), internal.interface.string.escape(cls.__node__, '"'), cls.__nodeid__))
 
     @classmethod
     def node(cls):
@@ -464,7 +464,7 @@ class contents(tagging):
     def _write_header(cls, target, ea, value):
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key, ea))
 
         if not value:
             ok = internal.netnode.sup.remove(node, key)
@@ -473,17 +473,17 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(value)
         except:
-            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, value))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key, ea, value))
 
         try:
             encdata, sz = cls.codec.encode(data)
             if sz != len(data):
-                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(data)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), sz, len(data)))
         except:
-            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key, ea, data))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
-            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!r}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, len(encdata), internal.netnode.sup.MAX_SIZE))
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), len(encdata), internal.netnode.sup.MAX_SIZE))
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
@@ -524,7 +524,7 @@ class contents(tagging):
             try:
                 ok = cls._write_header(target, ea, None)
                 if not ok:
-                    logging.debug(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key))
             finally:
                 return internal.netnode.blob.remove(key, cls.btag)
 
@@ -533,22 +533,22 @@ class contents(tagging):
         try:
             data = cls.marshaller.dumps(res)
         except:
-            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, res))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key, ea, res))
 
         try:
             encdata, sz = cls.codec.encode(data)
         except:
-            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key, ea, data))
 
         if sz != len(data):
-            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(data)))
+            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), sz, len(data)))
 
         # write blob
         try:
             ok = internal.netnode.blob.set(key, cls.btag, encdata)
             if not ok: raise AssertionError # XXX: use an explicit exception
         except:
-            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea, encdata))
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key, ea, encdata))
 
         # update sup cache with keys
         res = set(value.viewkeys())
@@ -556,7 +556,7 @@ class contents(tagging):
             ok = cls._write_header(target, ea, res)
             if not ok: raise AssertionError # XXX: use an explicit exception
         except:
-            logging.fatal(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key))
+            logging.fatal(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.interface.string.repr(value), key))
         return ok
 
     @classmethod
