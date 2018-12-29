@@ -138,7 +138,7 @@ def mnemonic(ea):
     '''Returns the mnemonic of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     res = (idaapi.ua_mnem(ea) or '').lower()
-    return interface.string.of(res)
+    return utils.string.of(res)
 mnem = utils.alias(mnemonic)
 
 ## functions that return an ``idaapi.op_t`` for an operand
@@ -316,9 +316,9 @@ def op_repr(ea, opnum):
     try:
         res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     except:
-        logging.warn(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand \"{:s}\". Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, interface.string.escape(oppr(insn.ea, opnum), '"'), '.'.join((__name__, 'op'))))
+        logging.warn(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand \"{:s}\". Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, utils.string.escape(oppr(insn.ea, opnum), '"'), '.'.join((__name__, 'op'))))
         return u"{!s}".format(op(insn.ea, opnum))
-    return interface.string.of(res)
+    return utils.string.of(res)
 
 @utils.multicase(opnum=six.integer_types)
 def op_state(opnum):
@@ -507,21 +507,21 @@ def op_structure(ea, opnum, id, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, id, ", {:s}".format(interface.string.kwargs(delta)) if delta else ''))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
 
     offset, sptr, name = 0, idaapi.get_struc(id), idaapi.get_member_fullname(id)
     if sptr is not None:
         offset = idaapi.get_struc_first_offset(sptr)
         sid, mptr = sptr.id, idaapi.get_member(sptr, offset)
         if mptr is None:
-            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(interface.string.kwargs(delta)) if delta else ''))
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
         mid = mptr.id
     elif name is not None:
         fn = idaapi.get_member_fullname(id)
         sptr = idaapi.get_member_struc(name)
         sid, mid = sptr.id, id
     else:
-        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(interface.string.kwargs(delta)) if delta else ''))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
 
     # if an offset was specified such as if the first member of the structure
     # is not at offset 0, then adjust the delta by its value
@@ -757,7 +757,7 @@ def op_refs(ea, opnum):
         x = idaapi.xrefblk_t()
 
         if not x.first_to(mem.id, 0):
-            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, interface.string.escape(mem.fullname, '"')))
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(mem.fullname, '"')))
 
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
