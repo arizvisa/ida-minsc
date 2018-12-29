@@ -48,7 +48,7 @@ byAddress = utils.alias(by_address)
 def by_name(name):
     '''Return the function with the specified `name`.'''
     # convert the name into something friendly for IDA
-    res = interface.string.to(name)
+    res = utils.string.to(name)
 
     # ask IDA to get its address
     ea = idaapi.get_name_ea(idaapi.BADADDR, res)
@@ -98,7 +98,7 @@ def comment(**repeatable):
     '''Return the comment for the current function.'''
     fn = ui.current.function()
     res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
-    return interface.string.of(res)
+    return utils.string.of(res)
 @utils.multicase()
 def comment(func, **repeatable):
     """Return the comment for the function `func`.
@@ -107,7 +107,7 @@ def comment(func, **repeatable):
     """
     fn = by(func)
     res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
-    return interface.string.of(res)
+    return utils.string.of(res)
 @utils.multicase(string=basestring)
 def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
@@ -121,9 +121,9 @@ def comment(func, string, **repeatable):
     """
     fn = by(func)
 
-    res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, interface.string.to(string), repeatable.get('repeatable', True))
+    res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, utils.string.to(string), repeatable.get('repeatable', True))
     if not ok:
-        raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, interface.string.escape(string, '"'), u", {:s}".format(interface.string.kwargs(repeatable)) if repeatable else '', ea, interface.string.to(string), repeatable.get('repeatable', True)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.to(string), repeatable.get('repeatable', True)))
     return res
 
 @utils.multicase()
@@ -142,7 +142,7 @@ def name(func):
 
         # decode the string from IDA's UTF-8
         # XXX: how does demangling work with unicode? this would be implementation specific, no?
-        res = interface.string.of(res)
+        res = utils.string.of(res)
 
         # demangle it if necessary
         return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
@@ -155,7 +155,7 @@ def name(func):
 
     # decode the string from IDA's UTF-8
     # XXX: how does demangling work with unicode? this would be implementation specific, no?
-    res = interface.string.of(name)
+    res = utils.string.of(name)
 
     # demangle it if we need to
     return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
@@ -1209,7 +1209,7 @@ class block(object):
                 res.append( fmt.print1(source.__deref__()) )
         except TypeError: pass
         res = itertools.imap(idaapi.tag_remove, res)
-        return '\n'.join(map(interface.string.of, res))
+        return '\n'.join(map(utils.string.of, res))
 
 class frame(object):
     """
@@ -1420,7 +1420,7 @@ def tag(func, key):
     res = tag(func)
     if key in res:
         return res[key]
-    raise E.MissingFunctionTagError(u"{:s}.tag({!r}, {!r}) : Unable to read tag \"{:s}\" from function.".format(__name__, func, key, interface.string.escape(key, '"')))
+    raise E.MissingFunctionTagError(u"{:s}.tag({!r}, {!r}) : Unable to read tag \"{:s}\" from function.".format(__name__, func, key, utils.string.escape(key, '"')))
 @utils.multicase()
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
@@ -1456,7 +1456,7 @@ def tag(func):
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
     if value is None:
-        raise E.InvalidParameterError(u"{:s}.tag({!r}) : Tried to set tag \"{:s}\" to an unsupported type.".format(__name__, ea, interface.string.escape(key, '"')))
+        raise E.InvalidParameterError(u"{:s}.tag({!r}) : Tried to set tag \"{:s}\" to an unsupported type.".format(__name__, ea, utils.string.escape(key, '"')))
 
     # Check to see if function tag is being applied to an import
     try:
@@ -1522,7 +1522,7 @@ def tag(func, key, none):
     # decode the comment, remove the key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
     if key not in state:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, fn.startEA, key, none, interface.string.escape(key, '"')))
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, fn.startEA, key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
     comment(fn, internal.comment.encode(state), repeatable=True)
 
@@ -1616,7 +1616,7 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.is_call(ea):
-                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, fn.startEA, interface.string.escape(database.disassemble(ea), '"')))
+                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, fn.startEA, utils.string.escape(database.disassemble(ea), '"')))
                     #code.append((ea, 0))
                 continue
             data.extend( (ea, x) for x in database.xref.data_down(ea) )
