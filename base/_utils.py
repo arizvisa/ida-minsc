@@ -200,7 +200,7 @@ class multicase(object):
         for n, t in t_args.iteritems():
             if not isinstance(t, (types.TypeType, types.TupleType)) and t not in {callable}:
                 error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, internal.interface.string.escape(n, '"')))
+                raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), t, string.escape(n, '"')))
             continue
 
         # validate arguments containing original callable
@@ -214,7 +214,7 @@ class multicase(object):
         # throw an exception if we were given an unexpected number of arguments
         if len(other) > 1:
             error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
-            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(internal.interface.string.escape(c.co_name if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
+            raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(c.co_name if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
         return result
 
     @classmethod
@@ -575,7 +575,7 @@ class process(object):
 
         ## finally hand it off to subprocess.Popen
         try: return Asynchronous.spawn(command, **options)
-        except OSError: raise OSError("Unable to execute command: \"{:s}\"".format(internal.interface.string.escape(command, '"')))
+        except OSError: raise OSError("Unable to execute command: \"{:s}\"".format(string.escape(command, '"')))
 
     @staticmethod
     def monitorPipe(q, (id, pipe), *more, **options):
@@ -667,7 +667,7 @@ class process(object):
     def wait(self, timeout=0.0):
         '''Wait a given amount of time for the process to terminate.'''
         if self.program is None:
-            raise RuntimeError("Program '{:s}' is not running.".format(internal.interface.string.escape(self.command[0], '\'')))
+            raise RuntimeError("Program '{:s}' is not running.".format(string.escape(self.command[0], '\'')))
 
         ## if we're not running, then return the result that we already received
         if not self.running:
@@ -1047,3 +1047,320 @@ class matcher(object):
     def match(self, type, value, iterable):
         matcher = self.__predicate__[type](value)
         return itertools.ifilter(matcher, iterable)
+
+### character processing (escaping and unescaping)
+class character(object):
+    """
+    This namespace is responsible for performing actions on individual
+    characters such as detecting printability or encoding them in a
+    form that can be evaluated.
+    """
+    class const(object):
+        ''' Constants '''
+        import string as _string, unicodedata as _unicodedata
+
+        backslash = '\\'
+
+        # character mappings to escaped versions
+        mappings = {
+            '\a' : r'\a',
+            '\b' : r'\b',
+            '\t' : r'\t',
+            '\n' : r'\n',
+            '\v' : r'\v',
+            '\f' : r'\f',
+            '\r' : r'\r',
+            '\0' : r'\0',
+            '\1' : r'\1',
+            '\2' : r'\2',
+            '\3' : r'\3',
+            '\4' : r'\4',
+            '\5' : r'\5',
+            '\6' : r'\6',
+            # '\7' : r'\7',     # this is the same as '\a'
+        }
+
+        # inverse mappings of characters plus the '\7 -> '\a' byte
+        inverse = { v : k for k, v in itertools.chain([('\7', r'\7')], six.iteritems(mappings)) }
+
+        # whitespace characters as a set
+        whitespace = { ch for ch in _string.whitespace }
+
+        # printable characters as a set
+        printable = { ch for ch in _string.printable } - whitespace
+
+        # hexadecimal digits as a lookup
+        hexadecimal = { ch : i for i, ch in enumerate(_string.hexdigits[:0x10]) }
+
+    @classmethod
+    def asciiQ(cls, ch):
+        '''Returns whether an ascii character is printable or not.'''
+        return operator.contains(cls.const.printable, ch)
+
+    @classmethod
+    def unicodeQ(cls, ch):
+        '''Returns whether a unicode character is printable or not.'''
+        cat = cls.const._unicodedata.category(ch)
+        return cat[0] != 'C'
+
+    @classmethod
+    def whitespaceQ(cls, ch):
+        '''Returns whether a character represents whitespace or not.'''
+        return operator.contains(cls.const.whitespace, ch)
+
+    @classmethod
+    def mapQ(cls, ch):
+        '''Returns whether a character is mappable or not.'''
+        return operator.contains(cls.const.mappings, ch)
+
+    @classmethod
+    def map(cls, ch):
+        '''Given a mappable character, return the string that emits it.'''
+        return operator.getitem(cls.const.mappings, ch)
+
+    @classmethod
+    def hexQ(cls, ch):
+        '''Returns whether a character is a hex digit or not.'''
+        return operator.contains(cls.const.hexadecimal, ch)
+
+    @classmethod
+    def to_hex(cls, integer):
+        '''Given an integer, return the hex digit that it represents.'''
+        if integer >= 0 and integer < 0x10:
+            return six.int2byte(integer + 0x30) if integer < 10 else six.int2byte(integer + 0x57)
+        raise ValueError
+
+    @classmethod
+    def of_hex(cls, digit):
+        '''Given a hex digit, return it as an integer.'''
+        return operator.getitem(cls.const.hexadecimal, digit.lower())
+
+    @classmethod
+    def escape(cls, result):
+        '''Return a generator that escapes all non-printable characters and sends them to `result`.'''
+
+        # begin processing any input that is fed to us
+        while True:
+            ch = (yield)
+            n = six.byte2int(ch)
+
+            # check if character has an existing escape mapping
+            if cls.mapQ(ch):
+                for ch in cls.map(ch):
+                    result.send(ch)
+
+            # check if character is printable (unicode)
+            elif isinstance(ch, unicode) and cls.unicodeQ(ch):
+                result.send(ch)
+
+            # check if character is printable (ascii)
+            elif isinstance(ch, str) and cls.asciiQ(ch):
+                result.send(ch)
+
+            # check if character is a single-byte ascii
+            elif n < 0x100:
+                result.send(cls.const.backslash)
+                result.send('x')
+                result.send(cls.to_hex((n & 0xf0) / 0x10))
+                result.send(cls.to_hex((n & 0x0f) / 0x01))
+
+            # check that character is an unprintable unicode character
+            elif n < 0x10000:
+                result.send(cls.const.backslash)
+                result.send('u')
+                result.send(cls.to_hex((n & 0xf000) / 0x1000))
+                result.send(cls.to_hex((n & 0x0f00) / 0x0100))
+                result.send(cls.to_hex((n & 0x00f0) / 0x0010))
+                result.send(cls.to_hex((n & 0x000f) / 0x0001))
+
+            # maybe the character is an unprintable long-unicode character
+            elif n < 0x110000:
+                result.send(cls.const.backslash)
+                result.send('U')
+                result.send(cls.to_hex((n & 0x100000) / 0x100000))
+                result.send(cls.to_hex((n & 0x0f0000) / 0x010000))
+                result.send(cls.to_hex((n & 0x00f000) / 0x001000))
+                result.send(cls.to_hex((n & 0x000f00) / 0x000100))
+                result.send(cls.to_hex((n & 0x0000f0) / 0x000010))
+                result.send(cls.to_hex((n & 0x00000f) / 0x000001))
+
+            # if we're here, then we have no idea what kind of character it is
+            else:
+                raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Unable to determine how to escape the current character code ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), iterable, n))
+
+            continue
+        return
+
+    @classmethod
+    def unescape(cls, result):
+        '''Return a generator that reads characters from an escaped string, unescapes/evaluates them, and then the unescaped character to `result`.'''
+
+        # enter our processing loop for each character
+        while True:
+            ch = (yield)
+
+            # okay, we got a backslash, so let's go...
+            if ch == cls.const.backslash:
+                t = (yield)
+
+                # check if our character is in our inverse mappings
+                if operator.contains(cls.const.inverse, cls.const.backslash + t):
+                    ch = operator.getitem(cls.const.inverse, cls.const.backslash + t)
+                    result.send(ch)
+
+                # check if the 'x' prefix is specified, which represents a hex digit
+                elif t == 'x':
+                    hb, lb = (yield), (yield)
+                    if any(map(cls.hexQ, (hb, lb))):
+                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next two characters ('{:s}', '{:s}') to be hex digits for an ascii character.".format('.'.join(('internal', __name__, cls.__name__)), iterable, internal.interface.string.escape(hb, '\''), internal.interface.string.escape(lb, '\'')))
+
+                    # convert the two hex digits into their integral forms
+                    h, l = map(cls.of_hex, (hb.lower(), lb.lower()))
+
+                    # coerce the digits into an ascii character and send the character to our result
+                    result.send(six.int2byte(
+                        h * 0x10 |
+                        l * 0x01 |
+                    0))
+
+                # if we find a 'u' prefix, then we have a unicode character
+                elif t == 'u':
+                    hwb, lwb, hb, lb = (yield), (yield), (yield), (yield)
+                    if any(map(cls.hexQ, (hwb, lwb, hb, lb))):
+                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next four characters ('{:s}', '{:s}', '{:s}', '{:s}') to be hex digits for a unicode character.".format('.'.join(('internal', __name__, cls.__name__)), iterable, internal.interface.string.escape(hwb, '\''), internal.interface.string.escape(lwb, '\''), internal.interface.string.escape(hb, '\''), internal.interface.string.escape(lb, '\'')))
+
+                    # convert the four hex digits into their integral forms
+                    hw, lw, h, l = map(cls.of_hex, (hwb.lower(), lwb.lower(), hb.lower(), lb.lower()))
+
+                    # coerce the digits into a unicode character and send the character to our result
+                    result.send(six.unichr(
+                        hw * 0x1000 |
+                        lw * 0x0100 |
+                        h  * 0x0010 |
+                        l  * 0x0001 |
+                    0))
+
+                # if we find a 'U' prefix, then we have a long unicode character
+                elif t == 'U':
+                    Hwb, Lwb, hwb, lwb, hb, lb = (yield), (yield), (yield), (yield), (yield), (yield)
+                    if any(map(cls.hexQ, (Hwb, Lwb, hwb, lwb, hb, lb))) or Hwb not in {'0', '1'}:
+                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next six characters ('{:s}', '{:s}', '{:s}', '{:s}', '{:s}', '{:s}') to be hex digits for a long-unicode character.".format('.'.join(('internal', __name__, cls.__name__)), iterable, internal.interface.string.escape(Hwb, '\''), internal.interface.string.escape(Lwb, '\''), internal.interface.string.escape(hwb, '\''), internal.interface.string.escape(lwb, '\''), internal.interface.string.escape(hb, '\''), internal.interface.string.escape(lb, '\'')))
+
+                    # convert the six hex digits into their integral forms
+                    Hw, Lw, hw, lw, h, l = map(cls.of_hex, (Hwb.lower(), Lwb.lower(), hwb.lower(), lwb.lower(), hb.lower(), lb.lower()))
+
+                    # coerce the digits into a unicode character and send the character to our result
+                    result.send(six.unichr(
+                        Hw * 0x100000 |
+                        Lw * 0x010000 |
+                        hw * 0x001000 |
+                        lw * 0x000100 |
+                        h  * 0x000010 |
+                        l  * 0x000001 |
+                    0))
+
+                else:
+                    raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : An unknown character code was specified ('{:s}').".format('.'.join(('internal', __name__, cls.__name__)), iterable, internal.interface.string.escape(t, '\'')))
+
+            # we haven't received a backslash, so there's nothing to unescape
+            else:
+                result.send(ch)
+
+            continue
+        return
+
+### string casting, escaping and emitting
+class string(object):
+    """
+    IDA takes ascii strings and internally encodes them as UTF8. So
+    this class aims to normalize all of these strings by converting
+    them into a `unicode` type.
+    """
+
+    @classmethod
+    def of(cls, string):
+        '''Return a string from IDA in a format that is consistent'''
+        return None if string is None else string.decode('utf8') if isinstance(string, str) else string
+
+    @classmethod
+    def to(cls, string):
+        '''Convert a string into a form that IDA will accept.'''
+        return None if string is None else string.encode('utf8') if isinstance(string, unicode) else string
+
+    # dictionary for mapping control characters to their correct forms
+    mapping = {
+        '\n' : r'\n',
+         ' ' : r' ',
+    }
+
+    @classmethod
+    def escape(cls, string, quote=''):
+        """Escape the characters in `string` specified by `quote`.
+
+        Handles both unicode and ascii. Defaults to escaping only
+        the unprintable characters.
+        """
+
+        # construct a list for anything that gets transformed
+        res = internal.interface.collect_t(list, lambda agg, value: agg + [value])
+
+        # instantiate our generator for escaping unprintables in the string
+        transform = character.escape(res); next(transform)
+
+        # iterate through each character, sending everything to res
+        for ch in iter(string):
+
+            # check if character is a user-specified quote or a backslash
+            if any(operator.contains(set, ch) for set in (quote, '\\')):
+                res.send('\\')
+                res.send(ch)
+
+            # check if character has an escape mapping to use
+            elif operator.contains(cls.mapping, ch):
+                map(res.send, cls.mapping[ch])
+
+            # otherwise we can just send it to transform to escape it
+            else:
+                transform.send(ch)
+            continue
+
+        # figure out the correct function that determines how to join the res
+        fjoin = (unicode() if isinstance(string, unicode) else str()).join
+
+        return fjoin(res.get())
+
+    @classmethod
+    def repr(cls, item):
+        """Given an item, return the `repr()` of it whilst ensuring that a proper ascii string is returned.
+
+        All unicode strings are encoded to UTF-8 in order to guarantee
+        the resulting string can be emitted.
+        """
+        if isinstance(item, basestring):
+            res = cls.escape(item, '\'')
+            if all(six.byte2int(ch) < 0x100 for ch in item):
+                return "'{:s}'".format(res)
+            return "u'{:s}'".format(res.encode('utf8'))
+        elif isinstance(item, tuple):
+            res = map(cls.repr, item)
+            return "({:s}{:s})".format(', '.join(res), ',' if len(item) == 1 else '')
+        elif isinstance(item, list):
+            res = map(cls.repr, item)
+            return "[{:s}]".format(', '.join(res))
+        elif isinstance(item, set):
+            res = map(cls.repr, item)
+            return "set([{:s}])".format(', '.join(res))
+        elif isinstance(item, dict):
+            res = ("{:s}: {:s}".format(cls.repr(k), cls.repr(v)) for k, v in six.iteritems(item))
+            return "{{{:s}}}".format(', '.join(res))
+        return repr(item)
+
+    @classmethod
+    def kwargs(cls, kwds):
+        '''Format a dictionary (from kwargs) so that it can be emitted to a user as part of a message.'''
+        res = []
+        for key, value in six.iteritems(kwds):
+            k, v = cls.escape(key), cls.repr(value)
+            res.append("{:s}={!s}".format(k.encode('utf8'), v))
+        return ', '.join(res).decode('utf8')
+
