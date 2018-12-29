@@ -34,10 +34,10 @@ def size(string):
         res = idaapi.idc_parse_decl(idaapi.cvar.idati, 'void*;', 0)
     else:
         semicoloned = string if string.endswith(';') else "{:s};".format(string)
-        res = idaapi.idc_parse_decl(idaapi.cvar.idati, internal.interface.string.to(semicoloned), 0)
+        res = idaapi.idc_parse_decl(idaapi.cvar.idati, internal.utils.string.to(semicoloned), 0)
 
     if res is None:
-        raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(internal.interface.string.escape(string, '"')))
+        raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(internal.utils.string.escape(string, '"')))
     _, type, _ = res
     f = idaapi.get_type_size0 if idaapi.__version__ < 6.8 else idaapi.calc_type_size
     return f(idaapi.cvar.idati, type)
@@ -71,8 +71,8 @@ def mangledQ(string):
 class extract:
     @staticmethod
     def declaration(string):
-        res = idaapi.demangle_name(internal.interface.string.to(string), idaapi.cvar.inf.long_demnames)
-        return string if res is None else internal.interface.string.of(res)
+        res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames)
+        return string if res is None else internal.utils.string.of(res)
 
     @staticmethod
     def convention(string):
