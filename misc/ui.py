@@ -52,7 +52,7 @@ def ask(string, **default):
         dflt = next((k for k in keys), 'cancel')
     else:
         dflt = 'cancel'
-    res = idaapi.ask_yn(state[dflt], internal.interface.string.to(string))
+    res = idaapi.ask_yn(state[dflt], internal.utils.string.to(string))
     return results.get(res, None)
 
 class current(object):
@@ -227,12 +227,12 @@ class names(appwindow):
     def at(cls, index):
         '''Return the address and the symbol name of the specified `index`.'''
         ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
-        return ea, internal.interface.string.of(name)
+        return ea, internal.utils.string.of(name)
     @classmethod
     def name(cls, index):
         '''Return the name at the specified `index`.'''
         res = idaapi.get_nlist_name(index)
-        return internal.interface.string.of(res)
+        return internal.utils.string.of(res)
     @classmethod
     def ea(cls, index):
         '''Return the address at the specified `index`.'''
@@ -309,14 +309,14 @@ class strings(appwindow):
         '''Return the address and the string at the specified `index`.'''
         si = cls.at(index)
         res = idaapi.get_ascii_contents(si.ea, si.length, si.type)
-        return si.ea, internal.interface.string.of(res)
+        return si.ea, internal.utils.string.of(res)
     @classmethod
     def iterate(cls):
         '''Iterate through all of the address and strings in the strings list.'''
         for index in six.moves.range(cls.size()):
             si = cls.at(index)
             res = idaapi.get_ascii_contents(si.ea, si.length, si.type)
-            yield si.ea, internal.interface.string.of(res)
+            yield si.ea, internal.utils.string.of(res)
         return
 
 class segments(appwindow):
@@ -427,7 +427,7 @@ class menu(object):
 
         # now we can add the menu item since everything is ok
         # XXX: I'm not sure if the path needs to be utf8 encoded or not
-        res = internal.interface.string.to(name)
+        res = internal.utils.string.to(name)
         ctx = idaapi.add_menu_item(path, res, hotkey, flags, callable, args)
         cls.state[path, name] = ctx
     @classmethod
@@ -656,11 +656,11 @@ try:
             if maximum is not None:
                 self.object.setMaximum(maximum)
             if title is not None:
-                self.object.setWindowTitle(internal.interface.string.to(title))
+                self.object.setWindowTitle(internal.utils.string.to(title))
             if tooltip is not None:
-                self.object.setToolTip(internal.interface.string.to(tooltip))
+                self.object.setToolTip(internal.utils.string.to(tooltip))
             if text is not None:
-                self.object.setLabelText(internal.interface.string.to(text))
+                self.object.setLabelText(internal.utils.string.to(text))
 
             res = self.object.value()
             if 'current' in options:
@@ -826,7 +826,7 @@ class InputBox(idaapi.PluginForm):
 
     def Show(self, caption, options=0):
         '''Show the form with the specified `caption` and `options`.'''
-        res = internal.interface.string.to(caption)
+        res = internal.utils.string.to(caption)
         return super(InputBox, self).Show(res, options)
 
 ### Console-only progress bar
@@ -870,7 +870,7 @@ class ConsoleProgress(object):
             self.__value__ = options['value']
 
         if text is not None:
-            logging.info(internal.interface.string.of(text))
+            logging.info(internal.utils.string.of(text))
 
         return res
 
