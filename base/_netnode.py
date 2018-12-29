@@ -232,7 +232,7 @@ class utils(object):
         return
 
 def new(name):
-    res = internal.interface.string.to(res)
+    res = internal.utils.string.to(res)
     node = netnode.new(res, len(res), True)
     return netnode.index(node)
 
@@ -240,7 +240,7 @@ def get(name):
     if isinstance(name, six.integer_types):
         node = netnode.new(name)
         return netnode.index(node)
-    res = internal.interface.string.to(name)
+    res = internal.utils.string.to(name)
     node = netnode.new(res, len(res), False)
     return netnode.index(node)
 
@@ -254,11 +254,11 @@ class name(object):
     def get(cls, nodeidx):
         node = netnode.new(nodeidx)
         res = netnode.name(node)
-        return internal.interface.string.of(res)
+        return internal.utils.string.of(res)
     @classmethod
     def set(cls, nodeidx, string):
         node = netnode.new(nodeidx)
-        res = internal.interface.string.to(string)
+        res = internal.utils.string.to(string)
         return netnode.rename(node, res)
 
 ### node value (?)
