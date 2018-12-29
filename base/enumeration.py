@@ -64,9 +64,9 @@ def flags(enum, mask):
 
 def by_name(name):
     '''Return the identifier for the enumeration with the given `name`.'''
-    res = idaapi.get_enum(interface.string.to(name))
+    res = idaapi.get_enum(utils.string.to(name))
     if res == idaapi.BADADDR:
-        raise E.EnumerationNotFoundError(u"{:s}.by_name({!r}) : Unable to locate enumeration by the name \"{:s}\".".format(__name__, name, interface.string.escape(name, '"')))
+        raise E.EnumerationNotFoundError(u"{:s}.by_name({!r}) : Unable to locate enumeration by the name \"{:s}\".".format(__name__, name, utils.string.escape(name, '"')))
     return res
 byName = utils.alias(by_name)
 
@@ -93,7 +93,7 @@ def by(name):
 @utils.multicase()
 def by(**type):
     '''Return the identifier for the first enumeration matching the keyword specified by `type`.'''
-    searchstring = interface.string.kwargs(type)
+    searchstring = utils.string.kwargs(type)
 
     res = builtins.list(iterate(**type))
     if len(res) > 1:
@@ -127,9 +127,9 @@ def values(enum):
 def new(name, flags=0):
     '''Create an enumeration with the specified `name` and `flags` using ``idaapi.add_enum``.'''
     idx = count()
-    res = idaapi.add_enum(idx, interface.string.to(name), flags)
+    res = idaapi.add_enum(idx, utils.string.to(name), flags)
     if res == idaapi.BADADDR:
-        raise E.DisassemblerError(u"{:s}.new({!r}, flags={:d}) : Unable to create enumeration named \"{:s}\".".format(__name__, name, flags, interface.string.escape(name, '"')))
+        raise E.DisassemblerError(u"{:s}.new({!r}, flags={:d}) : Unable to create enumeration named \"{:s}\".".format(__name__, name, flags, utils.string.escape(name, '"')))
     return res
 
 def delete(enum):
@@ -144,11 +144,11 @@ def name(enum):
     '''Return the name of the enumeration `enum`.'''
     eid = by(enum)
     res = idaapi.get_enum_name(eid)
-    return interface.string.of(res)
+    return utils.string.of(res)
 @utils.multicase(name=basestring)
 def name(enum, name):
     '''Rename the enumeration `enum` to the string `name`.'''
-    eid, res = by(enum), interface.string.to(name)
+    eid, res = by(enum), utils.string.to(name)
     return idaapi.set_enum_name(eid, res)
 
 @utils.multicase()
@@ -159,14 +159,14 @@ def comment(enum, **repeatable):
     """
     eid = by(enum)
     res = idaapi.get_enum_cmt(eid, repeatable.get('repeatable', True))
-    return interface.string.of(res)
+    return utils.string.of(res)
 @utils.multicase(comment=basestring)
 def comment(enum, comment, **repeatable):
     """Set the comment for the enumeration `enum` to `comment`.
 
     If the bool `repeatable` is specified, then modify the repeatable comment.
     """
-    eid, res = by(enum), interface.string.to(comment)
+    eid, res = by(enum), utils.string.to(comment)
     return idaapi.set_enum_cmt(eid, res, repeatable.get('repeatable', True))
 
 @utils.multicase()
@@ -198,9 +198,9 @@ def repr(enum):
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
-__matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_enum_name, interface.string.of))
-__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_enum_name, interface.string.of))
-__matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_enum_name, interface.string.of))
+__matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_enum_name, utils.string.of))
+__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_enum_name, utils.string.of))
+__matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_enum_name, utils.string.of))
 __matcher__.attribute('id')
 __matcher__.attribute('identifier')
 __matcher__.predicate('pred')
@@ -238,7 +238,7 @@ def list(**type):
 
     for n in res:
         name = idaapi.get_enum_name(n)
-        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), interface.string.of(name), maxname, mask(n), int(cmask), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else ''))
+        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), utils.string.of(name), maxname, mask(n), int(cmask), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else ''))
     return
 
 ## members
@@ -282,11 +282,11 @@ class members(object):
         bmask = bitmask.get('bitmask', idaapi.BADADDR & mask(eid))
 
         res = interface.tuplename(name) if isinstance(name, tuple) else name
-        ok = idaapi.add_enum_member(eid, interface.string.to(res), value, bmask)
+        ok = idaapi.add_enum_member(eid, utils.string.to(res), value, bmask)
 
         err = {getattr(idaapi, n) : n for n in ('ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV')}
         if ok in err.viewkeys():
-            raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {:#x}{:s}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join((__name__, cls.__name__)), eid, name, value, u", {:s}".format(interface.string.kwargs(bitmask)) if bitmask else '', err[ok], ok))
+            raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {:#x}{:s}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join((__name__, cls.__name__)), eid, name, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else '', err[ok], ok))
         return eid
     new = create = utils.alias(add, 'members')
 
@@ -458,7 +458,7 @@ class member(object):
     def name(cls, mid):
         '''Return the name of the enumeration member `mid`.'''
         res = idaapi.get_enum_member_name(mid)
-        return interface.string.of(res)
+        return utils.string.of(res)
     @utils.multicase()
     @classmethod
     def name(cls, enum, member):
@@ -471,7 +471,7 @@ class member(object):
     def name(cls, mid, name):
         '''Rename the enumeration member `mid` to `name`.'''
         res = interface.tuplename(*name) if isinstance(name, tuple) else name
-        return idaapi.set_enum_member_name(mid, interface.string.to(res))
+        return idaapi.set_enum_member_name(mid, utils.string.to(res))
     @utils.multicase(name=basestring)
     @classmethod
     def name(cls, enum, member, name, *suffix):
@@ -479,7 +479,7 @@ class member(object):
         eid = by(enum)
         mid = members.by(member)
         res = (name,) + suffix
-        return idaapi.set_enum_member_name(mid, interface.string.to(interface.tuplename(*res)))
+        return idaapi.set_enum_member_name(mid, utils.string.to(interface.tuplename(*res)))
 
     @utils.multicase(mid=six.integer_types)
     @classmethod
@@ -489,7 +489,7 @@ class member(object):
         If the bool `repeatable` is specified, then return the repeatable comment.
         """
         res = idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True))
-        return interface.string.of(res)
+        return utils.string.of(res)
     @utils.multicase()
     @classmethod
     def comment(cls, enum, member, **repeatable):
@@ -504,7 +504,7 @@ class member(object):
 
         If the bool `repeatable` is specified, then set the repeatable comment.
         """
-        res = interface.string.to(comment)
+        res = utils.string.to(comment)
         return idaapi.set_enum_member_cmt(mid, res, repeatable.get('repeatable', True))
     @utils.multicase(comment=basestring)
     @classmethod
