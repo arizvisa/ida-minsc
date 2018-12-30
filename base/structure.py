@@ -438,9 +438,9 @@ class structure_t(object):
         repeatable = True
 
         # grab the repeatable and non-repeatable comment for the structure
-        res = idaapi.get_struc_cmt(self.id, False)
+        res = utils.string.of(idaapi.get_struc_cmt(self.id, False))
         d1 = internal.comment.decode(res)
-        res = idaapi.get_struc_cmt(self.id, True)
+        res = utils.string.of(idaapi.get_struc_cmt(self.id, True))
         d2 = internal.comment.decode(res)
 
         # check for duplicate keys
@@ -462,14 +462,14 @@ class structure_t(object):
         '''Set the tag identified by `key` to `value` for the structure.'''
         state = self.tag()
         repeatable, res, state[key] = True, state.get(key, None), value
-        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
+        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
     @utils.multicase(key=basestring, none=types.NoneType)
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the structure.'''
         state = self.tag()
         repeatable, res = True, state.pop(key)
-        ok = idaapi.set_struc_cmt(self.id, internal.comment.encode(state), repeatable)
+        ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
 
     @property
@@ -1223,9 +1223,9 @@ class member_t(object):
         repeatable = True
 
         # grab the repeatable and non-repeatable comment
-        res = idaapi.get_member_cmt(self.id, False)
+        res = utils.string.of(idaapi.get_member_cmt(self.id, False))
         d1 = internal.comment.decode(res)
-        res = idaapi.get_member_cmt(self.id, True)
+        res = utils.string.of(idaapi.get_member_cmt(self.id, True))
         d2 = internal.comment.decode(res)
 
         # check for duplicate keys
@@ -1250,14 +1250,14 @@ class member_t(object):
         '''Set the tag identified by `key` to `value` for the member.'''
         state = self.tag()
         repeatable, res, state[key] = True, state.get(key, None), value
-        ok = idaapi.set_member_cmt(self.ptr, internal.comment.encode(state), repeatable)
+        ok = idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
     @utils.multicase(key=basestring, none=types.NoneType)
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
         state = self.tag()
         repeatable, res, = True, state.pop(key)
-        ok = idaapi.set_member_cmt(self.ptr, internal.comment.encode(state), repeatable)
+        ok = idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
 
     @property
@@ -1305,9 +1305,8 @@ class member_t(object):
 
     def __repr__(self):
         '''Display the member in a readable format.'''
-        id, name, typ, comment, tag = self.id, self.name, self.type, self.comment or '', self.tag()
-        return "<class 'member' index={:d} name={!s}{:s} size={:#x}> {!s}{:s}".format(self.index, utils.string.repr(name), " offset={:-#x}".format(self.offset) if self.offset != 0 else '', self.size, utils.string.repr(typ), " // {!s}".format(utils.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
-        #return "{:s} [{:d}] {!s} {:-#x}{:+#x} {:s}{:s}".format(self.__class__, self.index, utils.string.repr(name), self.offset, self.size, typ, " // {!s}".format(utils.string.repr(tag if '\n' in comment else comment)) if comment else '')
+        id, name, typ, comment, tag = self.id, self.fullname, self.type, self.comment or '', self.tag()
+        return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}> {!s}{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, utils.string.repr(typ), " // {!s}".format(utils.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
 
     def refs(self):
         '''Return the `(address, opnum, type)` of all the references to this member within the database.'''
