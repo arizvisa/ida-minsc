@@ -57,13 +57,14 @@ character is prefixed with a backslash, it will decode into a character
 that is prefixed with a backslash.
 """
 
-import itertools, functools, operator
+import functools, operator, itertools, types
 import collections, heapq, string
 import six, logging
 
 import internal, idaapi
 import codecs
 
+### cheap data structure for doing pattern matching with
 class trie(dict):
     class star(tuple): pass
     class maybe(tuple): pass
@@ -133,6 +134,7 @@ class trie(dict):
             return result
         return '\n'.join(("{!r}({:d})".format(cls, self.id), '\n'.join(stringify(self))))
 
+### cache for looking up encoder/decoder types
 class cache(object):
     state, tree = collections.defaultdict(set), trie()
 
@@ -175,6 +177,7 @@ class default(object):
     def decode(cls, data):
         return eval(data)
 
+### type encoder/decoder registration
 # FIXME: maybe figure out how to parse out an int from a long (which ends in 'L')
 @cache.register(object, trie.star(' \t'), trie.maybe('-+'), '0123456789')
 class _int(default):
@@ -306,68 +309,197 @@ class _set(default):
         f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
         return 'set([' + ', '.join(map(f, instance)) + '])'
 
-### parsing functions
-def key_escape(iterable, sentinel):
-    try:
-        while True:
-            ch = next(iterable)
-            if ch == '\\':
+### general tag encoding/decoding
+class tag(object):
+    """
+    Namespace for encoding and decoding a tag and it's value.
+    """
+
+    ## Tag name
+    class name(object):
+        """
+        Namespace for encoding and decoding a tag's name.
+        """
+
+        prefix, suffix = '[]'
+        backslash = '\\'
+
+        mappings = {
+            prefix : backslash + prefix,
+            suffix : backslash + suffix,
+            ' ' : r' ',
+            backslash : backslash + backslash,
+        }
+
+        @classmethod
+        def encode(cls, iterable, result):
+            '''Given an `iterable` string, send each character in a printable form to `result`.'''
+
+            # construct a transformer that writes characters to result
+            escape = internal.utils.character.escape(result); next(escape)
+
+            # send the key prefix
+            result.send(cls.prefix)
+
+            # now we can actually process the string
+            for ch in iterable:
+
+                # first check if character has an existing key mapping
+                if operator.contains(cls.mappings, ch):
+                    for ch in operator.getitem(cls.mappings, ch):
+                        result.send(ch)
+
+                # otherwise pass it to the regular escape function
+                else:
+                    escape.send(ch)
+
+                continue
+
+            # submit the suffix and we're good
+            result.send(cls.suffix)
+            return
+
+        @classmethod
+        def decode(cls, iterable, result):
+            '''Given an `iterable`, decode it into a unicode string and send it to `result`.'''
+
+            # first create our aggregate type for decoding into
+            agg = internal.interface.collect_t(unicode, operator.add)
+
+            # construct a transformer that unescapes characters to result
+            unescape = internal.utils.character.unescape(agg); next(unescape)
+
+            # first we'll skip the initial whitespace
+            ch = next(iterable, '')
+            while ch != cls.prefix and internal.utils.character.whitespaceQ(ch):
+                ch = next(iterable, '')
+
+            # check if it matches our prefix (which it should)
+            if ch != cls.prefix:
+                raise internal.exceptions.InvalidFormatError(u"{:s}.decode({!s}, {!s}) : Input for tag name does not begin with the proper character ('{:s}') and instead starts with '{:s}'.".format('.'.join(('internal', __name__, 'tag', cls.__name__)), iterable, result, internal.utils.string.escape(cls.prefix, '\''), internal.utils.string.escape(ch, '\'')))
+
+            # read each character up to the sentinel
+            agg.reset()
+            try:
                 ch = next(iterable)
-                if   ch == 'n': yield '\n'; continue
-                elif ch == 'r': yield '\r'; continue
-                elif ch == 't': yield '\t'; continue
-            elif ch == sentinel:
-                return
-            yield ch
-    except StopIteration: pass
-    raise internal.exceptions.InvalidFormatError(u"{:s}.key_escape({!s}, '{:s}') : Input is not properly terminated with the correct sentinel '{:s}'.".format('.'.join(('internal', __name__)), iterable, internal.utils.string.escape(sentinel, '\''), internal.utils.string.escape(sentinel, '\'')))
 
-def parse_line(iterable):
-    ch = next(iterable)
-    if ch != '[':
-        raise internal.exceptions.InvalidFormatError(u"{:s}.parse_line({!s}) : Input does not begin with the proper character '{:s}' and instead starts with '{:s}'.".format('.'.join(('internal', __name__)), iterable, internal.utils.string.escape('[', '\''), internal.utils.string.escape(ch, '\'')))
-    res = key_escape(iterable, ']')
-    key = ''.join(res)
+                # loop until we find our suffix
+                while ch != cls.suffix:
 
-    value = ''.join(iterable)
-    try:
-        t = cache.match(value)
-    except KeyError:
-        return key, _str.decode(value)
+                    # submit our character to the unescape transformer
+                    unescape.send(ch)
 
-    try:
-        res = t.decode(value)
-    except:
-        t = _str
-        logging.debug(u"{:s}.parse_line({!s}) : Assuming tag \"{:s}\" is of type {!s} with the value {!r}.".format('.'.join(('internal', __name__)), iterable, internal.utils.string.escape(key, '"'), t, value))
-        res = t.decode(value)
-        #raise internal.exceptions.SerializationError(u"Unable to decode data with {!r} : {!r}".format(t, value))
-    return key, res
+                    # try reading the next character again
+                    ch = next(iterable)
 
-def emit_line(key, value):
-    escape = {
-        '\\' : r'\\',
-        '['  : r'\[',
-        ']'  : r'\]',
-        '\0' : r'\0',
-        '\1' : r'\1',
-        '\2' : r'\2',
-        '\3' : r'\3',
-        '\4' : r'\4',
-        '\5' : r'\5',
-        '\6' : r'\6',
-        '\a' : r'\a',
-        '\b' : r'\b',
-        '\t' : r'\t',
-        '\n' : r'\n',
-        '\v' : r'\v',
-        '\f' : r'\f',
-        '\r' : r'\r',
-    }
-    # FIXME: should probably use _str.encode here
-    k = str().join(escape.get(n, n) for n in key)
-    t = cache.by(value)
-    return "[{:s}] {:s}".format(k, t.encode(value))
+            except StopIteration:
+                pass
+
+            # the last character read should be our suffix, so fail if otherwise
+            if ch != cls.suffix:
+                raise internal.exceptions.InvalidFormatError(u"{:s}.decode({!s}, {!s}) : Input for tag name does not terminate with the correct character ('{:s}') and instead is terminated with '{:s}'.".format('.'.join(('internal', __name__, 'tag', cls.__name__)), iterable, result, internal.utils.string.escape(cls.suffix, '\''), internal.utils.string.escape(ch, '\'')))
+
+            # at this point, agg should have our unescaped key that we can submit
+            result.send(agg.get())
+
+    ## Tag value
+    class value(object):
+        """
+        Namespace for encoding and decoding a tag's value.
+        """
+
+        @classmethod
+        def encode(cls, iterable, result):
+            '''Read a value from `iterable` and encode it into `result`.'''
+            value = next(iterable)
+            t = cache.by(value)
+            for ch in t.encode(value):
+                result.send(ch)
+            return
+
+        @classmethod
+        def decode(cls, iterable, result):
+            '''Given an `iterable`, decode it into a unicode string and send it to `result`.'''
+            res = []
+
+            # first we'll skip whitespace
+            ch = next(iterable, '\n')
+            while ch != '\n' and internal.utils.character.whitespaceQ(ch):
+                res.append(ch)
+                ch = next(iterable, '\n')
+
+            # if we were just whitespace, then decode it as
+            # a unicode string to return
+            if ch == '\n':
+                value_s = unicode().join(res)
+                result.send(_str.decode(value_s))
+                raise StopIteration
+
+            # now we'll continue reading until the sentinel character
+            value_l = []
+            while ch != '\n':
+                value_l.append(ch)
+                ch = next(iterable, '\n')
+            value_s = str().join(value_l)
+
+            # now we'll try to find out what type to decode it as
+            try:
+                t = cache.match(value_s)
+            except KeyError:
+                t = _str
+
+            # we have a type and a value. try to decode it
+            try:
+                value = t.decode(value_s)
+
+            # if we weren't able to, then fall back to a string
+            except:
+                t = _str
+                logging.debug(u"{:s}.decode({!s}, {!s}) : Assuming value ({!s}) is of type {!s}.".format('.'.join(('internal', __name__, 'tag', cls.__name__)), iterable, result, internal.utils.string.repr(value_s), t))
+                value = t.decode(value_s)
+
+            # now we can submit it
+            result.send(value)
+
+    @classmethod
+    def encode(cls, key, value):
+        '''Encode the provided `key` and `value` into a line fit for a comment.'''
+        result = internal.interface.collect_t(unicode, operator.add)
+
+        # first encode the beginning of the name
+        try:
+            tag.name.encode(iter(key), result)
+        except:
+            raise
+
+        # store some whitespace in between
+        result.send(' ')
+
+        # next encode the value component
+        try:
+            tag.value.encode(iter({value}), result)
+        except:
+            raise
+
+        # now we can return the resulting string
+        return result.get()
+
+    @classmethod
+    def decode(cls, iterable):
+        '''Read the line in `iterable` and return the key and its value.'''
+        key = internal.interface.collect_t(object, lambda agg, key: key)
+        try:
+            tag.name.decode(iterable, key)
+        except:
+            raise
+
+        value = internal.interface.collect_t(object, lambda agg, value: value)
+        try:
+            tag.value.decode(iterable, value)
+        except:
+            raise
+
+        return key.get(), value.get()
 
 ### Encoding and decoding of a comment
 def decode(data, default=''):
@@ -376,25 +508,31 @@ def decode(data, default=''):
     If unable to decode the key and value from a line in `data`, then use `default` as the key name.
     """
     res = {}
+    key, value = internal.interface.collect_t(object, lambda _, key: key), internal.interface.collect_t(object, lambda _, value: value)
+
     try:
         for line in (data or '').split('\n'):
-            try: k, v = parse_line(iter(line))
-            except KeyError: k, v = default, line
+            iterable = iter(line)
+            try:
+                k, v = tag.decode(iterable)
+            except KeyError:
+                k, v = default, line
             res[k] = v
     except StopIteration: pass
     return res
 
 def encode(dict):
+    '''Encode a dictionary into a multi-line string encoded as a list of tags.'''
     res = []
     for k, v in six.iteritems(dict or {}):
-        res.append(emit_line(k, v))
+        res.append(tag.encode(k, v))
     return '\n'.join(res)
 
 def check(data):
     res = map(iter, (data or '').split('\n'))
     try:
-        map(parse_line, res)
-    except (KeyError, StopIteration):
+        map(tag.decode, res)
+    except:
         return False
     return True
 
