@@ -199,9 +199,17 @@ class _float(default):
 
 @cache.register(str)
 class _str(default):
+    """
+    This encoder/decoder actually supports both ``unicode`` and regular
+    ``str`` due to the ``type`` method returning ``basestring``. Also,
+    we use this class as a superclass for ``_unicode`` so that any kind
+    of string will be encoded into a unicode string which will be
+    converted into UTF8 when written into IDA.
+    """
+
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, str)
+        return isinstance(instance, basestring)
 
     @classmethod
     def _unescape(cls, iterable):
@@ -241,18 +249,34 @@ class _str(default):
 
     @classmethod
     def decode(cls, data):
-        res = str(data).lstrip()
-        return str().join(cls._unescape(iter(res)))
+        res = data if isinstance(data, unicode) else data.decode('utf8')
+        return unicode().join(cls._unescape(iter(res.lstrip())))
+
     @classmethod
     def encode(cls, instance):
         res = cls._escape(iter(instance))
-        return str().join(res)
+        return unicode().join(res)
 
 @cache.register(unicode, trie.star(' \t'), *"u'")
-class _unicode(default):
+class _unicode(_str):
+    """
+    This encoder/decoder really just a wrapper around the ``_str``
+    class. Its encoder will simply escape the string in the exact
+    same way as ``_str``. We register a pattern for it so that we
+    can decode unicode strings encoded in their older format. Due
+    to the older format requiring unicode strings to begin with
+    the "u'" prefix, we can simply eval it in order to decode
+    back to a unicode string.
+    """
+
     @classmethod
     def type(cls, instance):
         return isinstance(instance, unicode)
+
+    @classmethod
+    def decode(cls, data):
+        logging.warn(u"{:s}.decode({!s}) : Decoding a unicode string that was encoded using the old format.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.repr(data)))
+        return eval(data)
 
 @cache.register(dict, trie.star(' \t'), '{')
 class _dict(default):
