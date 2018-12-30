@@ -203,56 +203,41 @@ class _str(default):
     def type(cls, instance):
         return isinstance(instance, str)
 
-    uncmap = { ch : six.int2byte(i) for i, ch in enumerate('0123456abtnvfr') }
     @classmethod
     def _unescape(cls, iterable):
-        try:
-            while True:
-                ch = next(iterable)
-                if ch == '\\':
-                    ch = next(iterable)
-                    # double-backslash reduced down to a single one
-                    if ch == '\\':
-                        yield '\\'
-                    # standard escaped character
-                    elif ch in cls.uncmap:
-                        yield cls.uncmap[ch]
-                    # FIXME: read octal digits
-                    elif ch in string.digits:
-                        pass
-                    # FIXME: read hexadecimal digits
-                    elif ch in 'x':
-                        pass
-                    # otherwise it's mistakenly escaped, and python returns both
-                    else:
-                        yield '\\';
-                        yield ch
-                    continue
-                yield ch
-        except StopIteration: pass
+        '''Invert the utils.character.unescape coroutine into a generator.'''
+        state = internal.interface.collect_t(list, lambda agg, ch: agg + [ch])
+        unescape = internal.utils.character.unescape(state); next(unescape)
 
-    cmap = { six.int2byte(i) : ch for i, ch in enumerate('0123456abtnvfr') }
+        # iterate through each character in the string
+        for ch in iterable:
+            unescape.send(ch)
+
+            # iterate through the results and yield them to the caller
+            for ch in state.get():
+                yield ch
+
+            # now we can start over
+            state.reset()
+        return
+
     @classmethod
     def _escape(cls, iterable):
-        try:
-            while True:
-                ch = next(iterable)
-                # if it's a single backslash, then double it.
-                if ch == '\\':
-                    yield '\\'
-                    yield '\\'
-                # if it's a known escapable character, then return it
-                elif ch in cls.cmap:
-                    yield '\\'
-                    yield cls.cmap[ch]
-                # otherwise, it should be printable and doesn't need to be escaped
-                elif ch in string.printable:
-                    yield ch
-                # we don't know, so let python handle it
-                else:
-                    # FIXME: replace this repr() hack with a proper \x encoding
-                    yield repr(ch)[1:-1]
-        except StopIteration: pass
+        '''Invert the utils.character.escape coroutine into a generator.'''
+        state = internal.interface.collect_t(list, lambda agg, ch: agg + [ch])
+        escape = internal.utils.character.escape(state); next(escape)
+
+        # iterate through each character in the string
+        for ch in iterable:
+            escape.send(ch)
+
+            # iterate through the results and yield them to the caller
+            for ch in state.get():
+                yield ch
+
+            # empty our state and start over
+            state.reset()
+        return
 
     @classmethod
     def decode(cls, data):
