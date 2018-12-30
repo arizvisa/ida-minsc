@@ -828,27 +828,27 @@ class globals(tagging):
 
     @classmethod
     def inc(cls, address, name):
-        node = tagging.node()
+        node, eName = tagging.node(), internal.utils.string.to(name)
 
-        cName = (internal.netnode.hash.get(node, name, type=int) or 0) + 1
+        cName = (internal.netnode.hash.get(node, eName, type=int) or 0) + 1
         cAddress = (internal.netnode.alt.get(node, address) or 0) + 1
 
-        internal.netnode.hash.set(node, name, cName)
+        internal.netnode.hash.set(node, eName, cName)
         internal.netnode.alt.set(node, address, cAddress)
 
         return cName
 
     @classmethod
     def dec(cls, address, name):
-        node = tagging.node()
+        node, eName = tagging.node(), internal.utils.string.to(name)
 
-        cName = (internal.netnode.hash.get(node, name, type=int) or 1) - 1
+        cName = (internal.netnode.hash.get(node, eName, type=int) or 1) - 1
         cAddress = (internal.netnode.alt.get(node, address) or 1) - 1
 
         if cName < 1:
-            internal.netnode.hash.remove(node, name)
+            internal.netnode.hash.remove(node, eName)
         else:
-            internal.netnode.hash.set(node, name, cName)
+            internal.netnode.hash.set(node, eName, cName)
 
         if cAddress < 1:
             internal.netnode.alt.remove(node, address)
@@ -861,7 +861,7 @@ class globals(tagging):
     def name(cls):
         '''Return all the tag names in the specified database (globals and func-tags)'''
         node = tagging.node()
-        return set(internal.netnode.hash.fiter(node))
+        return { internal.utils.string.of(name) for name in internal.netnode.hash.fiter(node) }
 
     @classmethod
     def address(cls):
@@ -870,14 +870,14 @@ class globals(tagging):
 
     @classmethod
     def set_name(cls, name, count):
-        node = tagging.node()
-        res = internal.netnode.hash.get(node, name, type=int)
-        internal.netnode.hash.set(node, name, count)
+        node, eName = tagging.node(), internal.utils.string.to(name)
+        res = internal.netnode.hash.get(node, eName, type=int)
+        internal.netnode.hash.set(node, eName, count)
         return res
 
     @classmethod
     def set_address(cls, address, count):
-        node = tagging.node()
+        node, eName = tagging.node()
         res = internal.netnode.alt.get(node, address)
         internal.netnode.alt.set(node, address, count)
         return res
