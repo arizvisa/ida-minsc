@@ -380,20 +380,16 @@ class tag(object):
 
             # read each character up to the sentinel
             agg.reset()
-            try:
-                ch = next(iterable)
+            ch = next(iterable, cls.suffix)
 
-                # loop until we find our suffix
-                while ch != cls.suffix:
+            # loop until we find our suffix
+            while ch != cls.suffix:
 
-                    # submit our character to the unescape transformer
-                    unescape.send(ch)
+                # submit our character to the unescape transformer
+                unescape.send(ch)
 
-                    # try reading the next character again
-                    ch = next(iterable)
-
-            except StopIteration:
-                pass
+                # try reading the next character again
+                ch = next(iterable, cls.suffix)
 
             # the last character read should be our suffix, so fail if otherwise
             if ch != cls.suffix:
@@ -433,7 +429,7 @@ class tag(object):
             if ch == '\n':
                 value_s = unicode().join(res)
                 result.send(_str.decode(value_s))
-                raise StopIteration
+                return
 
             # now we'll continue reading until the sentinel character
             value_l = []
@@ -467,19 +463,13 @@ class tag(object):
         result = internal.interface.collect_t(unicode, operator.add)
 
         # first encode the beginning of the name
-        try:
-            tag.name.encode(iter(key), result)
-        except:
-            raise
+        tag.name.encode(iter(key), result)
 
         # store some whitespace in between
         result.send(' ')
 
         # next encode the value component
-        try:
-            tag.value.encode(iter({value}), result)
-        except:
-            raise
+        tag.value.encode(iter({value}), result)
 
         # now we can return the resulting string
         return result.get()
@@ -487,18 +477,16 @@ class tag(object):
     @classmethod
     def decode(cls, iterable):
         '''Read the line in `iterable` and return the key and its value.'''
+
+        # first decode the key
         key = internal.interface.collect_t(object, lambda agg, key: key)
-        try:
-            tag.name.decode(iterable, key)
-        except:
-            raise
+        tag.name.decode(iterable, key)
 
+        # next decode its value
         value = internal.interface.collect_t(object, lambda agg, value: value)
-        try:
-            tag.value.decode(iterable, value)
-        except:
-            raise
+        tag.value.decode(iterable, value)
 
+        # plain and simple...
         return key.get(), value.get()
 
 ### Encoding and decoding of a comment
@@ -507,25 +495,46 @@ def decode(data, default=''):
 
     If unable to decode the key and value from a line in `data`, then use `default` as the key name.
     """
+
+    # if data is empty, then return an empty dict
+    if not data:
+        return {}
+
+    # initialize some variables to keep our state
     res = {}
     key, value = internal.interface.collect_t(object, lambda _, key: key), internal.interface.collect_t(object, lambda _, value: value)
 
-    try:
-        for line in (data or '').split('\n'):
-            iterable = iter(line)
-            try:
-                k, v = tag.decode(iterable)
-            except KeyError:
-                k, v = default, line
-            res[k] = v
-    except StopIteration: pass
+    # iterate through each line in the data
+    for line in data.split('\n'):
+        iterable = iter(line)
+
+        # try and decode the key and the value from the line
+        try:
+            k, v = tag.decode(iterable)
+
+        # if the key was formatted incorrectly, then key the whole line by the default key
+        except internal.exceptions.InvalidFormatError:
+            k, v = default, line
+
+        # add our item to the result dictionary
+        res[k] = v
+
+    # return the dictionary we decoded
     return res
 
 def encode(dict):
     '''Encode a dictionary into a multi-line string encoded as a list of tags.'''
     res = []
+
+    # walk each item in the dictionary
     for k, v in six.iteritems(dict or {}):
-        res.append(tag.encode(k, v))
+        # encode the key and value from the dictionary
+        line = tag.encode(k, v)
+
+        # aggregate it into our list
+        res.append(line)
+
+    # join them by newlines and return them to the caller
     return '\n'.join(res)
 
 def check(data):
