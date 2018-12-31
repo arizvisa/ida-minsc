@@ -232,7 +232,7 @@ class utils(object):
         return
 
 def new(name):
-    res = internal.utils.string.to(res)
+    res = internal.utils.string.to(name)
     node = netnode.new(res, len(res), True)
     return netnode.index(node)
 
