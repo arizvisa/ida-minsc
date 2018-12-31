@@ -85,7 +85,7 @@ class address(comment):
         while True:
             # cmt_changing event
             ea, rpt, new = (yield)
-            old = idaapi.get_cmt(ea, rpt)
+            old = utils.string.of(idaapi.get_cmt(ea, rpt))
             f, o, n = idaapi.get_func(ea), internal.comment.decode(old), internal.comment.decode(new)
 
             # update references before we update the comment
@@ -96,7 +96,7 @@ class address(comment):
 
             # now fix the comment the user typed
             if (newea, nrpt, none) == (ea, rpt, None):
-                ncmt, repeatable = idaapi.get_cmt(ea, rpt), cls._is_repeatable(ea)
+                ncmt, repeatable = utils.string.of(idaapi.get_cmt(ea, rpt)), cls._is_repeatable(ea)
 
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
@@ -106,14 +106,14 @@ class address(comment):
 #                    idaapi.set_cmt(ea, '', nrpt)
 
 #                # write the tag back to the address
-#                if internal.comment.check(new): idaapi.set_cmt(ea, internal.comment.encode(n), repeatable)
+#                if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), repeatable)
 #                # write the comment back if it's non-empty
-#                elif new: idaapi.set_cmt(ea, new, repeatable)
+#                elif new: idaapi.set_cmt(ea, utils.string.to(new), repeatable)
 #                # otherwise, remove its reference since it's being deleted
 #                else: cls._delete_refs(ea, n)
 
-                if internal.comment.check(new): idaapi.set_cmt(ea, internal.comment.encode(n), rpt)
-                elif new: idaapi.set_cmt(ea, new, rpt)
+                if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), rpt)
+                elif new: idaapi.set_cmt(ea, utils.string.to(new), rpt)
                 else: cls._delete_refs(ea, n)
 
                 continue
@@ -127,7 +127,7 @@ class address(comment):
             logging.warn(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(o)))
 
             # new comment
-            new = idaapi.get_cmt(newea, nrpt)
+            new = utils.string.of(idaapi.get_cmt(newea, nrpt))
             n = internal.comment.decode(new)
             cls._create_refs(newea, n)
 
@@ -137,8 +137,8 @@ class address(comment):
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
         logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        oldcmt = idaapi.get_cmt(ea, repeatable_cmt)
-        try: cls.event.send((ea, bool(repeatable_cmt), newcmt))
+        oldcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
+        try: cls.event.send((ea, bool(repeatable_cmt), utils.string.of(newcmt)))
         except StopIteration, e:
             logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt)))
             cls.event = cls._event(); next(cls.event)
@@ -146,7 +146,7 @@ class address(comment):
     @classmethod
     def changed(cls, ea, repeatable_cmt):
         logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        newcmt = idaapi.get_cmt(ea, repeatable_cmt)
+        newcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         try: cls.event.send((ea, bool(repeatable_cmt), None))
         except StopIteration, e:
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt))
@@ -185,7 +185,7 @@ class globals(comment):
             # cmt_changing event
             ea, rpt, new = (yield)
             fn = idaapi.get_func(ea)
-            old = idaapi.get_func_cmt(fn, rpt)
+            old = utils.string.of(idaapi.get_func_cmt(fn, rpt))
             o, n = internal.comment.decode(old), internal.comment.decode(new)
 
             # update references before we update the comment
@@ -196,7 +196,7 @@ class globals(comment):
 
             # now we can fix the user's new coment
             if (newea, nrpt, none) == (ea, rpt, None):
-                ncmt = idaapi.get_func_cmt(fn, rpt)
+                ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
 
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
@@ -206,15 +206,15 @@ class globals(comment):
 #                    idaapi.set_func_cmt(fn, '', nrpt)
 
 #                # write the tag back to the function
-#                if internal.comment.check(new): idaapi.set_func_cmt(fn, internal.comment.encode(n), True)
+#                if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), True)
 #                # otherwise, write the comment back as long as it's valid
-#                elif new: idaapi.set_func_cmt(fn, new, True)
+#                elif new: idaapi.set_func_cmt(fn, utils.string.to(new), True)
 #                # otherwise, the user has deleted it..so update its refs.
 #                else: cls._delete_refs(fn, n)
 
                 # write the tag back to the function
-                if internal.comment.check(new): idaapi.set_func_cmt(fn, internal.comment.encode(n), rpt)
-                elif new: idaapi.set_func_cmt(fn, new, rpt)
+                if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), rpt)
+                elif new: idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
                 else: cls._delete_refs(fn, n)
                 continue
 
@@ -228,7 +228,7 @@ class globals(comment):
 
             # new comment
             newfn = idaapi.get_func(newea)
-            new = idaapi.get_func_cmt(newfn, nrpt)
+            new = utils.string.of(idaapi.get_func_cmt(newfn, nrpt))
             n = internal.comment.decode(new)
             cls._create_refs(newfn, n)
 
@@ -240,8 +240,8 @@ class globals(comment):
         logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', a.startEA))
         fn = idaapi.get_func(a.startEA)
         if fn is None and not cmt: return
-        oldcmt = idaapi.get_func_cmt(fn, repeatable)
-        try: cls.event.send((fn.startEA, bool(repeatable), cmt))
+        oldcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
+        try: cls.event.send((fn.startEA, bool(repeatable), utils.string.of(cmt)))
         except StopIteration, e:
             logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
@@ -251,7 +251,7 @@ class globals(comment):
         logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', a.startEA))
         fn = idaapi.get_func(a.startEA)
         if fn is None and not cmt: return
-        newcmt = idaapi.get_func_cmt(fn, repeatable)
+        newcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
         try: cls.event.send((fn.startEA, bool(repeatable), None))
         except StopIteration, e:
             logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable))
