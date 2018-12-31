@@ -121,12 +121,12 @@ class trie(dict):
         cls = self.__class__
         # FIXME: doesn't support recursion
         def stringify(node, indent=0, tab='  '):
-            data = (k for k, v in node.viewitems() if not isinstance(v, trie))
+            data = (k for k, v in six.viewitems(node) if not isinstance(v, trie))
             result = []
             for k in data:
                 result.append("{:s}{!r} -> {!r}".format(tab * indent, k, node[k]))
 
-            branches = [k for k, v in node.viewitems() if isinstance(v, trie)]
+            branches = [k for k, v in six.viewitems(node) if isinstance(v, trie)]
             for k in branches:
                 result.append("{:s}{!r}".format(tab * indent, k))
                 branch_data = stringify(node[k], indent+1, tab=tab)
@@ -547,6 +547,7 @@ def encode(dict):
     return '\n'.join(res)
 
 def check(data):
+    '''Check that the string `data` has the correct format by trying to decode it.'''
     res = map(iter, (data or '').split('\n'))
     try:
         map(tag.decode, res)
@@ -556,6 +557,23 @@ def check(data):
 
 ### Tag reference counting
 class tagging(object):
+    """
+    This namespace is essentially the configuration of the tagging
+    database. This configurations specifies how to marshal and
+    compress reference counts that are retained by the tagging
+    infrastructure.
+
+    The keys for the dictionaries that store the reference count
+    are named according to ``tagging.__tags__`` for the tag names
+    and ``tagging.__address__`` for the tag addresses. In order
+    to access the tagging database, the netnode is returned by
+    the ``tagging.node()`` function.
+
+    When a database has been successfully created, a hook is
+    responsible for calling the ``tagging.__init_tagcache__()``
+    function. This will then create a netnode with the name
+    specified in ``tagging.__node__``.
+    """
     __node__ = '$ tagcache'
     __tags__, __address__ = 'name', 'address'
 
@@ -579,6 +597,27 @@ class tagging(object):
 
 class contents(tagging):
     '''Tagging for an address within a function (contents)'''
+    """
+    This namespace is used to update the tag state for any content tags
+    associated with a function in the database. The address for the top
+    of the function represents a key within the netnode that is used to
+    fetch the blob and the supval which contains a marshall'd dictionary
+    and a marshall'd set. These are stored within the `tagging.node()`
+    netnode withn the tag `contents.btag`.
+
+    The marshall'd dictionary that is stored in the netnode's blob is
+    used to retain a dictionary of reference counts for both the tag
+    names and the addresses that they reside at. Anytime a tag is
+    written or removed, the reference count for both the name and the
+    address is adjusted.
+
+    Due to a size limit of a blob, the supval for the tagging node is
+    used to store the tag names that are used within a function as a
+    marshall'd ``set``. This ``set`` is used to verify that the tag
+    names within the contents of the function correspond with the
+    reference count that is stored within the marshall'd dictionary
+    in the blob.
+    """
 
     ## for each function's content
     # netnode.blob[fn.startEA, btag] = marshal.dumps({'name', 'address'})
@@ -589,12 +628,16 @@ class contents(tagging):
 
     @classmethod
     def _key(cls, ea):
-        '''Converts address to a key that's used to store arbitrary data'''
+        '''Converts the address `ea` to a key that's used to store contents data for the specified function.'''
         res = idaapi.get_func(ea)
         return res.startEA if res else None
 
     @classmethod
     def _read_header(cls, target, ea):
+        """Read the contents dictionary out of the supval belonging to the function at `target`.
+
+        If `target` is ``None``, then use the address of the function containing `ea`.
+        """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
@@ -618,6 +661,11 @@ class contents(tagging):
 
     @classmethod
     def _write_header(cls, target, ea, value):
+        """Write the specified `value` into the contents supval belonging to the supval of the function at `target`.
+
+        If `target` is ``None`` then use `ea` to locate the function.
+        If `value` is ``None``, then remove the supval at the specified `target`.
+        """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea))
@@ -646,7 +694,10 @@ class contents(tagging):
 
     @classmethod
     def _read(cls, target, ea):
-        '''Reads a dictionary from the specific object'''
+        """Reads the value from the contents supval for the specific `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
@@ -670,7 +721,11 @@ class contents(tagging):
 
     @classmethod
     def _write(cls, target, ea, value):
-        '''Writes a dictionary to the specified object'''
+        """Writes a `value` to the contents supval for the specific `target`.
+
+        If `target` is undefined or ``None`` then use `ea` to locate the function.
+        If `value` is ``None``, then erase the value from the supval.
+        """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
@@ -707,7 +762,7 @@ class contents(tagging):
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, encdata))
 
         # update sup cache with keys
-        res = set(value.viewkeys())
+        res = set(six.viewkeys(value))
         try:
             ok = cls._write_header(target, ea, res)
             if not ok: raise AssertionError # XXX: use an explicit exception
@@ -717,6 +772,7 @@ class contents(tagging):
 
     @classmethod
     def iterate(cls):
+        '''Yield each address and names for all of the contents tags in the database according to what is written into the tagging supval.'''
         node = tagging.node()
         for ea in internal.netnode.sup.fiter(node):
             encdata = internal.netnode.sup.get(node, ea)
@@ -729,6 +785,10 @@ class contents(tagging):
 
     @classmethod
     def inc(cls, address, name, **target):
+        """Increase the ref count for the given `address` and `name` belonging to the function `target`.
+
+        If `target` is undefined or ``None`` then use `address` to locate the function.
+        """
         res = cls._read(target.get('target', None), address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
@@ -746,6 +806,10 @@ class contents(tagging):
 
     @classmethod
     def dec(cls, address, name, **target):
+        """Decreate the ref count for the given `address` and `name` belonging to the function `target`.
+
+        If `target` is undefined or ``None`` then use `address` to locate the function.
+        """
         res = cls._read(target.get('target', None), address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
@@ -767,20 +831,30 @@ class contents(tagging):
 
     @classmethod
     def name(cls, address, **target):
-        '''Return all the tag names for the specified function'''
+        """Return all the tag names (``set``) for the contents of the function `target`.
+
+        If `target` is undefined or ``None`` then use `address` to locate the function.
+        """
         res = cls._read(target.get('target', None), address) or {}
         res = res.get(cls.__tags__, {})
-        return set(res.viewkeys())
+        return set(six.viewkeys(res))
 
     @classmethod
     def address(cls, address, **target):
-        '''Return all the tag address for the specified function'''
+        """Return all the addresses (``sorted``) with tags in the contents for the function `target`.
+
+        If `target` is undefined or ``None`` then use `address` to locate the function.
+        """
         res = cls._read(target.get('target', None), address) or {}
         res = res.get(cls.__address__, {})
-        return sorted(res.viewkeys())
+        return sorted(six.viewkeys(res))
 
     @classmethod
     def set_name(cls, address, name, count, **target):
+        """Set the contents tag count for the function `target` and `name` to `count`.
+
+        If `target` is undefined or ``None`` then use `address` to locate the function.
+        """
         state = cls._read(target.get('target', None), address) or {}
 
         res = state.get(cls.__tags__, {})
@@ -801,6 +875,10 @@ class contents(tagging):
 
     @classmethod
     def set_address(cls, address, count, **target):
+        """Set the contents tag count for the function `target` and `address` to `count`.
+
+        If `target` is undefined or ``None`` then use `address` to locate the function.
+        """
         state = cls._read(target.get('target', None), address) or {}
 
         res = state.get(cls.__address__, {})
@@ -820,7 +898,17 @@ class contents(tagging):
         raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
 
 class globals(tagging):
-    '''Tagging for a function-tag or a global'''
+    """
+    This namespace is used to update the tag state for all the globals in
+    the database. Each global tag has its target address and its name and
+    is managed by keeping track of a reference count.
+
+    The reference count is stored within a netnode as defined by
+    `tagging.node()`. The refcount for each address containing a
+    tag is stored in an altval keyed by the address. The refcount
+    for each tag name is stored in a hashval keyed by the tags
+    name.
+    """
 
     ## FIXME: for each global/function
     # netnode.alt[address] = refcount
@@ -828,6 +916,7 @@ class globals(tagging):
 
     @classmethod
     def inc(cls, address, name):
+        '''Increase the global tag count for the given `address` and `name`.'''
         node, eName = tagging.node(), internal.utils.string.to(name)
 
         cName = (internal.netnode.hash.get(node, eName, type=int) or 0) + 1
@@ -840,6 +929,7 @@ class globals(tagging):
 
     @classmethod
     def dec(cls, address, name):
+        '''Decrease the global tag count for the given `address` and `name`.'''
         node, eName = tagging.node(), internal.utils.string.to(name)
 
         cName = (internal.netnode.hash.get(node, eName, type=int) or 1) - 1
@@ -859,17 +949,18 @@ class globals(tagging):
 
     @classmethod
     def name(cls):
-        '''Return all the tag names in the specified database (globals and func-tags)'''
+        '''Return all the tag names (``set``) in the specified database (globals and func-tags)'''
         node = tagging.node()
         return { internal.utils.string.of(name) for name in internal.netnode.hash.fiter(node) }
 
     @classmethod
     def address(cls):
-        '''Return all the tag addresses in the specified database (globals and func-tags)'''
+        '''Return all the tag addresses (``sorted``) in the specified database (globals and func-tags)'''
         return sorted(ea for ea, _ in internal.netnode.alt.fiter(tagging.node()))
 
     @classmethod
     def set_name(cls, name, count):
+        '''Set the global tag count for `name` in the database to `count`.'''
         node, eName = tagging.node(), internal.utils.string.to(name)
         res = internal.netnode.hash.get(node, eName, type=int)
         internal.netnode.hash.set(node, eName, count)
@@ -877,6 +968,7 @@ class globals(tagging):
 
     @classmethod
     def set_address(cls, address, count):
+        '''Set the global tag count for `address` in the database to `count`.'''
         node, eName = tagging.node()
         res = internal.netnode.alt.get(node, address)
         internal.netnode.alt.set(node, address, count)
