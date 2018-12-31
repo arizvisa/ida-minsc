@@ -1340,7 +1340,7 @@ class string(object):
             res = cls.escape(item, '\'')
             if all(six.byte2int(ch) < 0x100 for ch in item):
                 return "'{:s}'".format(res)
-            return "u'{:s}'".format(res.encode('utf8'))
+            return u"u'{:s}'".format(res)
         elif isinstance(item, tuple):
             res = map(cls.repr, item)
             return "({:s}{:s})".format(', '.join(res), ',' if len(item) == 1 else '')
