@@ -57,6 +57,7 @@ __matcher__.boolean('greater', operator.le, 'endEA'), __matcher__.boolean('gt', 
 __matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', operator.gt, 'startEA')
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def __iterate__(**type):
     '''Iterate through each segment defined in the database that match the keywords specified by `type`.'''
     if not type: type = {'predicate':lambda n: True}
@@ -70,10 +71,12 @@ def __iterate__(**type):
     for item in res: yield item
 
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def list(string):
     '''List all of the segments whose name matches the glob specified by `string`.'''
     return list(like=string)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all of the segments in the database that match the keyword specified by `type`.'''
     res = builtins.list(__iterate__(**type))
@@ -92,6 +95,7 @@ def list(**type):
     return
 
 ## searching
+@utils.string.decorate_arguments('name')
 def by_name(name):
     '''Return the segment with the given `name`.'''
     res = utils.string.to(name)
@@ -119,6 +123,7 @@ def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
     return segment
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def by(name):
     '''Return the segment by its `name`.'''
     return by_name(name)
@@ -131,6 +136,7 @@ def by():
     '''Return the current segment.'''
     return ui.current.segment()
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
     '''Return the segment matching the specified keywords in `type`.'''
     searchstring = utils.string.kwargs(type)
@@ -148,10 +154,12 @@ def by(**type):
     return res
 
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def search(name):
     '''Search through all the segments and return the first one matching the glob `name`.'''
     return by(like=string)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def search(**type):
     '''Search through all the segments and return the first one that matches the keyword specified by `type`.'''
     return by(**type)
@@ -347,6 +355,7 @@ def contains(address, ea):
     seg = by_address(address)
     return contains(seg, ea)
 @utils.multicase(name=basestring, ea=six.integer_types)
+@utils.string.decorate_arguments('name')
 def contains(name, ea):
     '''Returns true if the address `ea` is contained within the segment with the specified `name`.'''
     seg = by_name(name)
@@ -386,6 +395,7 @@ def __save_file(filename, ea, size, offset=0):
     idaapi.eclose(of)
     return res
 
+@utils.string.decorate_arguments('filename')
 def load(filename, ea, size=None, offset=0, **kwds):
     """Load the specified `filename` to the address `ea` as a segment.
 
@@ -396,7 +406,7 @@ def load(filename, ea, size=None, offset=0, **kwds):
     filesize = os.stat(filename).st_size
 
     cb = filesize - offset if size is None else size
-    res = __load_file(filename, ea, cb, offset)
+    res = __load_file(utils.string.to(filename), ea, cb, offset)
     if not res:
         raise E.ReadOrWriteError(u"{:s}.load({!r}, {:#x}, {:+#x}, {:#x}{:s}) : Unable to load file into {:#x}{:+#x} from \"{:s}\".".format(__name__, filename, ea, cb, offset, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', ea, cb, utils.string.escape(os.path.relpath(filename), '"')))
     return new(ea, cb, kwds.get('name', os.path.split(filename)[1]))
@@ -422,6 +432,7 @@ def map(ea, size, newea, **kwds):
     #return create(newea, size, kwds.get("name", "map_{:s}".format(newea>>4)))
 
 # creation/destruction
+@utils.string.decorate_arguments('name')
 def new(offset, size, name, **kwds):
     """Create a segment at `offset` with `size` and name it according to `name`.
 
@@ -509,13 +520,14 @@ def remove(segment, contents=False):
     return res
 delete = utils.alias(remove)
 
+@utils.string.decorate_arguments('filename')
 def save(filename, segment, offset=0):
     """Export the segment identified by `segment` to the file named `filename`.
 
     If the int `offset` is specified, then begin writing into the file at the specified offset.
     """
     if isinstance(segment, idaapi.segment_t):
-        return __save_file(filename, segment.startEA, size(segment), offset)
+        return __save_file(utils.string.to(filename), segment.startEA, size(segment), offset)
     return save(filename, by(segment))
 export = utils.alias(save)
 
