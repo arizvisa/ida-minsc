@@ -1361,7 +1361,7 @@ class string(object):
         res = []
         for key, value in six.iteritems(kwds):
             k, v = cls.escape(key), cls.repr(value)
-            res.append("{:s}={!s}".format(k.encode('utf8'), v))
+            res.append("{:s}={!s}".format(*(item.encode('utf8') if isinstance(item, unicode) else item for item in (k, v))))
         return ', '.join(res).decode('utf8')
 
     @classmethod
