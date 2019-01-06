@@ -1364,6 +1364,11 @@ class string(object):
             res.append("{:s}={!s}".format(k.encode('utf8'), v))
         return ', '.join(res).decode('utf8')
 
+    @classmethod
+    def decorate_arguments(cls, *names):
+        '''Given a list of argument names, decode them into unicode strings.'''
+        return transform(cls.of, *names)
+
 ### wrapping functions with another caller whilst preserving the wrapped function
 class wrap(object):
     """
