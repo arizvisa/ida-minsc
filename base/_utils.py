@@ -1557,11 +1557,11 @@ class wrap(object):
     def arguments(cls, f):
         '''Extract the arguments from a function `f`.'''
         c = f.func_code
-        varnames_count, varnames_iter = c.co_argcount, iter(c.co_varnames)
-        args = tuple(itertools.islice(varnames_iter, varnames_count))
+        count, iterable = c.co_argcount, iter(c.co_varnames)
+        args = tuple(itertools.islice(iterable, count))
         res = { a : v for v, a in zip(reversed(f.func_defaults or []), reversed(args)) }
-        starargs = next(varnames_iter, '') if c.co_flags & cls.CO_VARARGS else ''
-        kwdargs = next(varnames_iter, '') if c.co_flags & cls.CO_VARKEYWORDS else ''
+        starargs = next(iterable, '') if c.co_flags & cls.CO_VARARGS else ''
+        kwdargs = next(iterable, '') if c.co_flags & cls.CO_VARKEYWORDS else ''
         return args, res, (starargs, kwdargs)
 
     @classmethod
@@ -1597,20 +1597,21 @@ def transform(translate, *names):
     names = {name for name in names}
     def wrapper(F, *rargs, **rkwds):
         f = wrap.extract(F)
-        argnames, defaults, _ = wrap.arguments(f)
+        argnames, defaults, (wildname, _) = wrap.arguments(f)
 
         # convert any positional arguments
         res = ()
         for value, argname in zip(rargs, argnames):
             res += (translate(value) if argname in names else value),
 
+        # get the rest
         for value in rargs[len(res):]:
-            res += (value,)
+            res += (translate(value) if wildname in names else value,)
 
         # convert any keywords arguments
         kwds = dict(rkwds)
         for argname in six.viewkeys(rkwds) & names:
-            kwds[argname] = kwds[argname].decode('utf8')
+            kwds[argname] = translate(kwds[argname])
         return F(*res, **kwds)
 
     # decorater that wraps the function `F` with `wrapper`.
