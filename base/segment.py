@@ -157,7 +157,7 @@ def by(**type):
 @utils.string.decorate_arguments('name')
 def search(name):
     '''Search through all the segments and return the first one matching the glob `name`.'''
-    return by(like=string)
+    return by(like=name)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def search(**type):
