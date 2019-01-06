@@ -45,6 +45,7 @@ def by_address(ea):
     return res
 byAddress = utils.alias(by_address)
 
+@utils.string.decorate_arguments('name')
 def by_name(name):
     '''Return the function with the specified `name`.'''
     # convert the name into something friendly for IDA
@@ -75,6 +76,7 @@ def by(ea):
     '''Return the function at the address `ea`.'''
     return by_address(ea)
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def by(name):
     '''Return the function with the specified `name`.'''
     return by_name(name)
@@ -109,11 +111,13 @@ def comment(func, **repeatable):
     res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
     return utils.string.of(res)
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
     fn = ui.current.function()
     return comment(fn, string, **repeatable)
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def comment(func, string, **repeatable):
     """Set the comment for the function `func` to `string`.
 
@@ -169,6 +173,7 @@ def name(none):
     # function and wanting to rename that instead.
     return name(ui.current.address(), none or '')
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix):
     '''Set the name of the current function to `string`.'''
     return name(ui.current.address(), string, *suffix)
@@ -177,6 +182,7 @@ def name(func, none):
     '''Remove the custom-name from the function `func`.'''
     return name(func, none or '')
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(func, string, *suffix):
     '''Set the name of the function `func` to `string`.'''
 
@@ -1407,14 +1413,17 @@ def tag():
     '''Returns all the tags defined for the current function.'''
     return tag(ui.current.address())
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key')
 def tag(key):
     '''Returns the value of the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key)
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key', 'value')
 def tag(key, value):
     '''Sets the value for the tag `key` to `value` for the current function.'''
     return tag(ui.current.address(), key, value)
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key')
 def tag(func, key):
     '''Returns the value of the tag identified by `key` for the function `func`.'''
     res = tag(func)
@@ -1453,6 +1462,7 @@ def tag(func):
     # ..and now hand it off.
     return res
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key', 'value')
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
     if value is None:
@@ -1490,10 +1500,12 @@ def tag(func, key, value):
     # return what we fetched from the dict
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
+@utils.string.decorate_arguments('key')
 def tag(key, none):
     '''Removes the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key, None)
 @utils.multicase(key=basestring, none=types.NoneType)
+@utils.string.decorate_arguments('key')
 def tag(func, key, none):
     '''Removes the tag identified by `key` from the function `func`.'''
 
@@ -1543,28 +1555,33 @@ def tags(func):
 # FIXME: consolidate this logic into the utils module
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
+@utils.string.decorate_arguments('And', 'Or')
 def select(**boolean):
     '''Query the contents of the current function for any tags specified by `boolean`'''
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
+@utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(tag, *And, **boolean):
     '''Query the contents of the current function for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
     boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
+@utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *And, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
     boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
+@utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *And, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
     res = set(builtins.list(tag) + builtins.list(And))
     boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
     return select(func, **boolean)
 @utils.multicase()
+@utils.string.decorate_arguments('And', 'Or')
 def select(func, **boolean):
     """Query the contents of the function `func` for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
 
