@@ -334,7 +334,7 @@ def __process_functions(percentage=0.10):
     funcs = list(database.functions())
     p.update(current=0, max=len(funcs), title=u"Pre-building tagcache...")
     p.open()
-    logging.info(u"Pre-building tagcache for {:d} functions.".format(len(funcs)))
+    six.print_(u"Pre-building tagcache for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
         chunks = list(function.chunks(fn))
 
@@ -342,7 +342,7 @@ def __process_functions(percentage=0.10):
         p.update(current=i)
         ui.navigation.procedure(fn)
         if i % (int(len(funcs) * percentage) or 1) == 0:
-            logging.info(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, i+1, len(funcs), i / float(len(funcs)) * 100.0))
+            six.print_(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, i+1, len(funcs), i / float(len(funcs)) * 100.0))
 
         contents = set(internal.comment.contents.address(fn))
         for ci, (l, r) in enumerate(chunks):
@@ -358,7 +358,7 @@ def __process_functions(percentage=0.10):
                 continue
             continue
         continue
-    logging.info(u"Successfully built tag-cache composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
+    six.print_(u"Successfully built tag-cache composed of {:d} tag{:s}.".format(total, '' if total == 1 else 's'))
     p.close()
 
 def rebase(info):
@@ -369,12 +369,13 @@ def rebase(info):
     fcount = gcount = 0
 
     scount = info.size() + 1
-    logging.warn(u"{:s}.rebase({!s}) : Rebasing tagcache for {:d} segments.".format(__name__, utils.string.repr(info), scount))
+    six.print_(u"{:s}.rebase({!s}) : Rebasing tagcache for {:d} segments.".format(__name__, utils.string.repr(info), scount))
 
     # for each segment
     p.open()
     for si in six.moves.range(scount):
-        p.update(title=u"Rebasing segment {:d} of {:d} : {:#x} ({:+#x}) -> {:#x}".format(si, scount, info[si]._from, info[si].size, info[si].to))
+        msg = u"Rebasing tagcache for segment {:d} of {:d} : {:#x} ({:+#x}) -> {:#x}".format(si, scount, info[si]._from, info[si].size, info[si].to)
+        p.update(title=msg), six.print_(msg)
 
         # for each function (using target address because ida moved the netnodes for us)
         res = [n for n in functions if info[si].to <= n < info[si].to + info[si].size]
