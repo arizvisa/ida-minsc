@@ -921,7 +921,8 @@ class members_t(object):
         res = utils.string.to(fullname)
 
         # grab the member_t of the structure by its fullname
-        mem, _ = idaapi.get_member_by_fullname(res)
+        member = idaapi.get_member_by_fullname(res)
+        mem, _ = (None, None) if member is None else member
         if mem is None:
             raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_fullname({!r}) : Unable to find member with full name.".format(__name__, self.owner.name, fullname))
 
