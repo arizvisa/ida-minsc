@@ -493,7 +493,7 @@ class member(object):
     def name(cls, enum, member, name, *suffix):
         '''Rename the enumeration `member` belonging to `enum` to `name`.'''
         eid = by(enum)
-        mid = members.by(member)
+        mid = members.by(eid, member)
         res = (name,) + suffix
         return idaapi.set_enum_member_name(mid, utils.string.to(interface.tuplename(*res)))
 
@@ -511,7 +511,7 @@ class member(object):
     def comment(cls, enum, member, **repeatable):
         '''Return the comment for the enumeration `member` belonging to `enum`.'''
         eid = by(enum)
-        mid = members.by(eid, name)
+        mid = members.by(eid, member)
         return cls.comment(mid, **repeatable)
     @utils.multicase(mid=six.integer_types, comment=basestring)
     @classmethod
@@ -529,7 +529,7 @@ class member(object):
     def comment(cls, enum, member, comment, **repeatable):
         '''Set the comment for the enumeration `member` belonging to `enum` to the string `comment`.'''
         eid = by(enum)
-        mid = members.by(eid, name)
+        mid = members.by(eid, member)
         return cls.comment(mid, comment, **repeatable)
 
     @utils.multicase(mid=six.integer_types)
@@ -542,7 +542,7 @@ class member(object):
     def value(cls, enum, member):
         '''Return the value of the specified `member` belonging to the enumeration `enum`.'''
         eid = by(enum)
-        mid = members.by(member)
+        mid = members.by(eid, member)
         return cls.value(mid)
     @utils.multicase(mid=six.integer_types, value=six.integer_types)
     @classmethod
@@ -561,7 +561,7 @@ class member(object):
         If the integer `bitmask` is specified, then use it as a bitmask. Otherwise assume all bits are set.
         """
         eid = by(enum)
-        mid = members.by(enum, member)
+        mid = members.by(eid, member)
         return cls.value(mid, value, **bitmask)
 
     @utils.multicase(mid=six.integer_types)
