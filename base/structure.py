@@ -92,10 +92,12 @@ def __iterate__():
     return
 
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def iterate(string):
     '''Iterate through all of the structures in the database with a glob that matches `string`.'''
     return iterate(like=string)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
     if not type: type = {'predicate':lambda n: True}
@@ -105,10 +107,12 @@ def iterate(**type):
     for item in res: yield item
 
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def list(string):
     '''List any structures that match the glob in `string`.'''
     return list(like=string)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all the structures within the database that match the keyword specified by `type`.'''
     res = builtins.list(iterate(**type))
@@ -122,10 +126,12 @@ def list(**type):
     return
 
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def new(name):
     '''Returns a new structure `name`.'''
     return new(name, 0)
 @utils.multicase(name=basestring, offset=six.integer_types)
+@utils.string.decorate_arguments('name')
 def new(name, offset):
     '''Returns a new structure `name` using `offset` as its base offset.'''
     res = utils.string.to(name)
@@ -141,6 +147,7 @@ def new(name, offset):
     return __instance__(id, offset=offset)
 
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def by(name, **options):
     '''Return a structure by its name.'''
     return by_name(name, **options)
@@ -154,6 +161,7 @@ def by(id, **options):
         return __instance__(res, **options)
     return by_index(res, **options)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
     '''Return the structure matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
@@ -172,6 +180,7 @@ def search(string):
     '''Search through all the structures using globbing.'''
     return by(like=string)
 
+@utils.string.decorate_arguments('name')
 def by_name(name, **options):
     '''Return a structure by its name.'''
     res = utils.string.to(name)
@@ -403,6 +412,7 @@ class structure_t(object):
         res = idaapi.get_struc_name(self.id)
         return utils.string.of(res)
     @name.setter
+    @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the structure to `string`.'''
         if isinstance(string, tuple):
@@ -427,6 +437,7 @@ class structure_t(object):
         res = idaapi.get_struc_cmt(self.id, repeatable) or idaapi.get_struc_cmt(self.id, not repeatable)
         return utils.string.of(res)
     @comment.setter
+    @utils.string.decorate_arguments('value')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
         res = utils.string.to(value)
@@ -453,11 +464,13 @@ class structure_t(object):
         builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
         return res
     @utils.multicase(key=basestring)
+    @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the structure.'''
         res = self.tag()
         return res[key]
     @utils.multicase(key=basestring)
+    @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the structure.'''
         state = self.tag()
@@ -465,6 +478,7 @@ class structure_t(object):
         ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
     @utils.multicase(key=basestring, none=types.NoneType)
+    @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the structure.'''
         state = self.tag()
@@ -537,6 +551,7 @@ def name(id):
 def name(structure):
     return name(structure.id)
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(id, string, *suffix):
     '''Set the name of the structure identified by `id` to `string`.'''
     res = (string,) + suffix
@@ -554,6 +569,7 @@ def name(id, string, *suffix):
     # now we can set the name of the structure
     return idaapi.set_struc_name(id, ida_string)
 @utils.multicase(structure=structure_t, string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(structure, string, *suffix):
     '''Set the name of the specified `structure` to `string`.'''
     return name(structure.id, string, *suffix)
@@ -571,10 +587,12 @@ def comment(structure, **repeatable):
     '''Return the comment for the specified `structure`.'''
     return comment(structure.id, **repeatable)
 @utils.multicase(structure=structure_t, cmt=basestring)
+@utils.string.decorate_arguments('cmt')
 def comment(structure, cmt, **repeatable):
     '''Set the comment to `cmt` for the specified `structure`.'''
     return comment(structure.id, cmt, **repeatable)
 @utils.multicase(id=six.integer_types, cmt=basestring)
+@utils.string.decorate_arguments('cmt')
 def comment(id, cmt, **repeatable):
     """Set the comment of the structure identified by `id` to `cmt`.
 
@@ -697,6 +715,7 @@ def remove(structure):
         raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to remove structure {:#x}.".format(__name__, structure, structure.id))
     return True
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def remove(name):
     '''Remove the structure with the specified `name`.'''
     res = by_name(name)
@@ -836,10 +855,12 @@ class members_t(object):
         for item in res: yield item
 
     @utils.multicase(string=basestring)
+    @utils.string.decorate_arguments('string')
     def list(self, string):
         '''List any members that match the glob in `string`.'''
         return self.list(like=string)
     @utils.multicase()
+    @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
     def list(self, **type):
         '''List all the members within the structure that match the keyword specified by `type`.'''
         res = builtins.list(self.iterate(**type))
@@ -856,6 +877,7 @@ class members_t(object):
         return
 
     @utils.multicase()
+    @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
     def by(self, **type):
         '''Return the member that matches the keyword specified by `type`.'''
         searchstring = utils.string.kwargs(type)
@@ -870,6 +892,7 @@ class members_t(object):
             raise E.SearchResultsError(u"{:s}.instance({!r}).members.by({:s}) : Found 0 matching results.".format(__name__, self.owner.name, searchstring))
         return res
     @utils.multicase(name=basestring)
+    @utils.string.decorate_arguments('name')
     def by(self, name):
         '''Return the member with the specified `name`.'''
         return self.by_name(name)
@@ -892,6 +915,7 @@ class members_t(object):
         return self[index]
     byname = byName = utils.alias(by_name, 'members_t')
 
+    @utils.string.decorate_arguments('fullname')
     def by_fullname(self, fullname):
         '''Return the member with the specified `fullname`.'''
         res = utils.string.to(fullname)
@@ -958,16 +982,19 @@ class members_t(object):
 
     # adding/removing members
     @utils.multicase(name=(basestring, tuple))
+    @utils.string.decorate_arguments('name')
     def add(self, name):
         '''Append the specified member `name` with the default type at the end of the structure.'''
         offset = self.owner.size + self.baseoffset
         return self.add(name, int, offset)
     @utils.multicase(name=(basestring, tuple))
+    @utils.string.decorate_arguments('name')
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` at the end of the structure.'''
         offset = self.owner.size + self.baseoffset
         return self.add(name, type, offset)
     @utils.multicase(name=(basestring, tuple), offset=six.integer_types)
+    @utils.string.decorate_arguments('name')
     def add(self, name, type, offset):
         """Add a member at `offset` with the given `name` and `type`.
 
@@ -1188,6 +1215,7 @@ class member_t(object):
         res = idaapi.get_member_name(self.id) or ''
         return utils.string.of(res)
     @name.setter
+    @utils.string.decorate_arguments('string')
     def name(self, string):
         '''Set the name of the member to `string`.'''
         if isinstance(string, tuple):
@@ -1212,6 +1240,7 @@ class member_t(object):
         res = idaapi.get_member_cmt(self.id, repeatable) or idaapi.get_member_cmt(self.id, not repeatable)
         return utils.string.of(res)
     @comment.setter
+    @utils.string.decorate_arguments('value')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment of the member to `value`.'''
         res = utils.string.to(value)
@@ -1241,11 +1270,13 @@ class member_t(object):
         builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
         return res
     @utils.multicase(key=basestring)
+    @utils.string.decorate_arguments('key')
     def tag(self, key):
         '''Return the tag identified by `key` belonging to the member.'''
         res = self.tag()
         return res[key]
     @utils.multicase(key=basestring)
+    @utils.string.decorate_arguments('key', 'value')
     def tag(self, key, value):
         '''Set the tag identified by `key` to `value` for the member.'''
         state = self.tag()
@@ -1253,6 +1284,7 @@ class member_t(object):
         ok = idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
     @utils.multicase(key=basestring, none=types.NoneType)
+    @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
         state = self.tag()
