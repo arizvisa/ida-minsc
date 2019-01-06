@@ -870,7 +870,7 @@ class ConsoleProgress(object):
             self.__value__ = options['value']
 
         if text is not None:
-            logging.info(internal.utils.string.of(text))
+            six.print_(internal.utils.string.of(text))
 
         return res
 
