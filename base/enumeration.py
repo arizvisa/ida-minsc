@@ -62,6 +62,7 @@ def flags(enum, mask):
     eid = by(enum)
     return idaapi.get_enum_flag(eid) & mask
 
+@utils.string.decorate_arguments('name')
 def by_name(name):
     '''Return the identifier for the enumeration with the given `name`.'''
     res = idaapi.get_enum(utils.string.to(name))
@@ -87,10 +88,12 @@ def by(index):
         return index
     return by_index(index)
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def by(name):
     '''Return the identifier for the enumeration with the specified `name`.'''
     return by_name(name)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
     '''Return the identifier for the first enumeration matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
@@ -106,10 +109,12 @@ def by(**type):
     return res
 
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def search(string):
     '''Return the identifier of the first enumeration that matches the glob `string`.'''
     return by(like=string)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def search(**type):
     '''Return the identifier of the first enumeration that matches the keyword specified by `type`.'''
     return by(**type)
@@ -124,6 +129,7 @@ def values(enum):
     return [member.value(n) for n in members.iterate(enum)]
 
 ## creation/deletion
+@utils.string.decorate_arguments('name')
 def new(name, flags=0):
     '''Create an enumeration with the specified `name` and `flags` using ``idaapi.add_enum``.'''
     idx = count()
@@ -146,6 +152,7 @@ def name(enum):
     res = idaapi.get_enum_name(eid)
     return utils.string.of(res)
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def name(enum, name):
     '''Rename the enumeration `enum` to the string `name`.'''
     eid, res = by(enum), utils.string.to(name)
@@ -161,6 +168,7 @@ def comment(enum, **repeatable):
     res = idaapi.get_enum_cmt(eid, repeatable.get('repeatable', True))
     return utils.string.of(res)
 @utils.multicase(comment=basestring)
+@utils.string.decorate_arguments('comment')
 def comment(enum, comment, **repeatable):
     """Set the comment for the enumeration `enum` to `comment`.
 
@@ -212,6 +220,7 @@ def __iterate__():
         yield idaapi.getn_enum(n)
     return
 
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the enumerations in the database that match the keyword specified by `type`.'''
     if not type: type = {'predicate':lambda n: True}
@@ -221,10 +230,12 @@ def iterate(**type):
     for item in res: yield item
 
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def list(string):
     '''List any enumerations that match the glob in `string`.'''
     return list(like=string)
 @utils.multicase()
+@utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all of the enumerations within the database that match the keyword specified by `type`.'''
     res = builtins.list(iterate(**type))
@@ -273,6 +284,7 @@ class members(object):
 
     ## scope
     @classmethod
+    @utils.string.decorate_arguments('name')
     def add(cls, enum, name, value, **bitmask):
         """Add an enumeration member `name` with the specified `value` to the enumeration `enum`.
 
@@ -346,6 +358,7 @@ class members(object):
     byValue = utils.alias(by_value, 'members')
 
     @classmethod
+    @utils.string.decorate_arguments('name')
     def by_name(cls, enum, name):
         '''Return the member identifier for the member of the enumeration `enum` with the specified `name`.'''
         eid = by(enum)
@@ -367,6 +380,7 @@ class members(object):
         return cls.by_index(enum, n)
     @utils.multicase(member=basestring)
     @classmethod
+    @utils.string.decorate_arguments('member')
     def by(cls, enum, member):
         '''Return the member with the given `name` belonging to `enum`.'''
         return cls.by_name(enum, member)
@@ -468,12 +482,14 @@ class member(object):
         return cls.name(mid)
     @utils.multicase(mid=six.integer_types, name=(basestring, tuple))
     @classmethod
+    @utils.string.decorate_arguments('name')
     def name(cls, mid, name):
         '''Rename the enumeration member `mid` to `name`.'''
         res = interface.tuplename(*name) if isinstance(name, tuple) else name
         return idaapi.set_enum_member_name(mid, utils.string.to(res))
     @utils.multicase(name=basestring)
     @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
     def name(cls, enum, member, name, *suffix):
         '''Rename the enumeration `member` belonging to `enum` to `name`.'''
         eid = by(enum)
@@ -499,6 +515,7 @@ class member(object):
         return cls.comment(mid, **repeatable)
     @utils.multicase(mid=six.integer_types, comment=basestring)
     @classmethod
+    @utils.string.decorate_arguments('comment')
     def comment(cls, mid, comment, **repeatable):
         """Set the comment for the enumeration member id `mid` to `comment`.
 
@@ -508,6 +525,7 @@ class member(object):
         return idaapi.set_enum_member_cmt(mid, res, repeatable.get('repeatable', True))
     @utils.multicase(comment=basestring)
     @classmethod
+    @utils.string.decorate_arguments('comment')
     def comment(cls, enum, member, comment, **repeatable):
         '''Set the comment for the enumeration `member` belonging to `enum` to the string `comment`.'''
         eid = by(enum)
