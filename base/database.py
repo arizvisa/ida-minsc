@@ -303,11 +303,13 @@ class functions(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def iterate(cls, string):
         '''Iterate through all of the functions in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
         if not type:
@@ -322,11 +324,13 @@ class functions(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def list(cls, string):
         '''List all of the functions in the database with a glob that matches `string`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the functions in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
@@ -383,11 +387,13 @@ class functions(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def search(cls, string):
         '''Search through all of the functions matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def search(cls, **type):
         '''Search through all of the functions within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -437,33 +443,39 @@ class segments(object):
 
     @utils.multicase(name=basestring)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def iterate(cls, name):
         '''List all of the segments defined in the database that match the glob `name`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the segments in the database that match the keyword specified by `type`.'''
         return segment.list(**type)
 
     @utils.multicase(name=basestring)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def iterate(cls, name):
         '''Iterate through all of the segments in the database with a glob that matches `name`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all the segments defined in the database matching the keyword specified by `type`.'''
         return segment.__iterate__(**type)
 
     @utils.multicase(name=basestring)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def search(cls, name):
         '''Search through all of the segments matching the glob `name` and return the first result.'''
         return cls.search(like=name)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def search(cls, **type):
         '''Search through all of the segments within the database and return the first result matching the keyword specified by `type`.'''
         return segment.search(**type)
@@ -601,10 +613,12 @@ class names(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def __iterate__(cls, string):
         return cls.__iterate__(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
         if not type: type = {'predicate':lambda n: True}
         res = six.moves.range(idaapi.get_nlist_size())
@@ -614,11 +628,13 @@ class names(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def iterate(cls, string):
         '''Iterate through all of the names in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the names in the database that match the keyword specified by `type`.'''
         for idx in cls.__iterate__(**type):
@@ -628,11 +644,13 @@ class names(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def list(cls, string):
         '''List all of the names in the database with a glob that matches `string`.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the names in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.__iterate__(**type))
@@ -649,11 +667,13 @@ class names(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def search(cls, string):
         '''Search through all of the names matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def search(cls, **type):
         '''Search through all of the names within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -746,11 +766,13 @@ class search(object):
 
     @utils.multicase(string=basestring)
     @staticmethod
+    @utils.string.decorate_arguments('string')
     def by_regex(string, **options):
         '''Search through the database at the current address for the regex matched by `string`.'''
         return search.by_regex(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @staticmethod
+    @utils.string.decorate_arguments('string')
     def by_regex(ea, string, **options):
         """Search the database at address `ea` for the regex matched by `string`.
 
@@ -771,11 +793,13 @@ class search(object):
 
     @utils.multicase(string=basestring)
     @staticmethod
+    @utils.string.decorate_arguments('string')
     def by_text(string, **options):
         '''Search through the database at the current address for the text matched by `string`.'''
         return search.by_text(ui.current.address(), string, **options)
     @utils.multicase(ea=six.integer_types, string=basestring)
     @staticmethod
+    @utils.string.decorate_arguments('string')
     def by_text(ea, string, **options):
         """Search the database at address `ea` for the text matched by `string`.
 
@@ -796,11 +820,13 @@ class search(object):
 
     @utils.multicase(name=basestring)
     @staticmethod
+    @utils.string.decorate_arguments('name')
     def by_name(name, **options):
         '''Search through the database at the current address for the symbol `name`.'''
         return search.by_name(ui.current.address(), name, **options)
     @utils.multicase(ea=six.integer_types, name=basestring)
     @staticmethod
+    @utils.string.decorate_arguments('name')
     def by_name(ea, name, **options):
         """Search through the database at address `ea` for the symbol `name`.
 
@@ -921,6 +947,7 @@ def name(ea, **flags):
     # return the name at the specified address or not
     return utils.string.of(aname) or None
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
     '''Renames the current address to `string`.'''
     return name(ui.current.address(), string, *suffix, **flags)
@@ -929,6 +956,7 @@ def name(none, **flags):
     '''Removes the name at the current address.'''
     return name(ui.current.address(), '', **flags)
 @utils.multicase(ea=six.integer_types, string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(ea, string, *suffix, **flags):
     """Renames the address  specified by `ea` to `string`.
 
@@ -1058,10 +1086,12 @@ def comment(ea, **repeatable):
     # return the string in a format the user can process
     return utils.string.of(res)
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def comment(string, **repeatable):
     '''Set the comment at the current address to `string`.'''
     return comment(ui.current.address(), string, **repeatable)
 @utils.multicase(ea=six.integer_types, string=basestring)
+@utils.string.decorate_arguments('string')
 def comment(ea, string, **repeatable):
     """Set the comment at address `ea` to `string`.
 
@@ -1120,10 +1150,12 @@ class entries(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def __iterate__(cls, string):
         return cls.__iterate__(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
         if not type: type = {'predicate':lambda n: True}
         res = six.moves.range(idaapi.get_entry_qty())
@@ -1133,11 +1165,13 @@ class entries(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def iterate(cls, string):
         '''Iterate through all of the entry points in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the entry points in the database that match the keyword specified by `type`.'''
         res = itertools.imap(cls.__address__, cls.__iterate__(**type))
@@ -1194,11 +1228,13 @@ class entries(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def list(cls, string):
         '''List all of the entry points matching the glob `string` against the name.'''
         return cls.list(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the entry points in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.__iterate__(**type))
@@ -1219,11 +1255,13 @@ class entries(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def search(cls, string):
         '''Search through all of the entry point names matching the glob `string` and return the first result.'''
         return cls.search(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'like', 'regex')
     def search(cls, **type):
         '''Search through all of the entry points within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -1257,22 +1295,26 @@ class entries(object):
         return cls.new(ea, entryname, ordinal)
     @utils.multicase(name=basestring)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def new(cls, name):
         '''Adds the current address as an entry point using `name` and the next available index as the ordinal.'''
         return cls.new(ui.current.address(), name, idaapi.get_entry_qty())
     @utils.multicase(ea=six.integer_types, name=basestring)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def new(cls, ea, name):
         '''Makes the specified address `ea` an entry point having the specified `name`.'''
         ordinal = idaapi.get_entry_qty()
         return cls.new(ea, name, ordinal)
     @utils.multicase(name=basestring, ordinal=six.integer_types)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def new(cls, name, ordinal):
         '''Adds an entry point with the specified `name` to the database using `ordinal` as its index.'''
         return cls.new(ui.current.address(), name, ordinal)
     @utils.multicase(ea=six.integer_types, name=basestring, ordinal=six.integer_types)
     @classmethod
+    @utils.string.decorate_arguments('name')
     def new(cls, ea, name, ordinal):
         '''Adds an entry point at `ea` with the specified `name` and `ordinal`.'''
         res = idaapi.add_entry(ordinal, interface.address.inside(ea), utils.string.to(name), 0)
@@ -1330,14 +1372,17 @@ def tag(ea):
     # now return what the user cares about
     return res
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key')
 def tag(key):
     '''Return the tag identified by `key` at the current address.'''
     return tag(ui.current.address(), key)
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key', 'value')
 def tag(key, value):
     '''Set the tag identified by `key` to `value` at the current address.'''
     return tag(ui.current.address(), key, value)
 @utils.multicase(ea=six.integer_types, key=basestring)
+@utils.string.decorate_arguments('key')
 def tag(ea, key):
     '''Returns the tag identified by `key` from address `ea`.'''
     res = tag(ea)
@@ -1345,6 +1390,7 @@ def tag(ea, key):
         return res[key]
     raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}) : Unable to read tag \"{:s}\" from address.".format(__name__, ea, key, utils.string.escape(key, '"')))
 @utils.multicase(ea=six.integer_types, key=basestring)
+@utils.string.decorate_arguments('key', 'value')
 def tag(ea, key, value):
     '''Set the tag identified by `key` to `value` at the address `ea`.'''
     if value is None:
@@ -1389,6 +1435,7 @@ def tag(key, none):
     '''Remove the tag identified by `key` from the current address.'''
     return tag(ui.current.address(), key, none)
 @utils.multicase(ea=six.integer_types, key=basestring, none=types.NoneType)
+@utils.string.decorate_arguments('key')
 def tag(ea, key, none):
     '''Removes the tag identified by `key` at the address `ea`.'''
     ea = interface.address.inside(ea)
@@ -1430,12 +1477,14 @@ def tag(ea, key, none):
 # FIXME: document this properly
 # FIXME: add support for searching global tags using the addressing cache
 @utils.multicase(tag=basestring)
+@utils.string.decorate_arguments('And', 'Or')
 def select(tag, *And, **boolean):
     '''Query all of the global tags in the database for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
     boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())).union(res))
     return select(**boolean)
 @utils.multicase()
+@utils.string.decorate_arguments('And', 'Or')
 def select(**boolean):
     """Query all the global tags for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
 
@@ -1476,12 +1525,14 @@ def select(**boolean):
 # FIXME: consolidate the boolean querying logic into the utils module
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
+@utils.string.decorate_arguments('tag', 'And', 'Or')
 def selectcontents(tag, *Or, **boolean):
     '''Query all function contents for the specified `tag` or any others specified as `Or`.'''
     res = (tag,) + Or
     boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())).union(res))
     return selectcontents(**boolean)
 @utils.multicase()
+@utils.string.decorate_arguments('And', 'Or')
 def selectcontents(**boolean):
     """Query all function contents for any tags specified by `boolean`. Yields each function and the tags that match as a set.
 
@@ -1601,11 +1652,13 @@ class imports(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def iterate(cls, string):
         '''Iterate through all of the imports in the database with a glob that matches `string`.'''
         return cls.iterate(like=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the imports in the database that match the keyword specified by `type`.'''
         if not type: type = {'predicate':lambda n: True}
@@ -1692,11 +1745,13 @@ class imports(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def list(cls, string):
         '''List all of the imports matching the glob `string` against the fullname.'''
         return cls.list(fullname=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def list(cls, **type):
         '''List all of the imports in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
@@ -1712,11 +1767,13 @@ class imports(object):
 
     @utils.multicase(string=basestring)
     @classmethod
+    @utils.string.decorate_arguments('string')
     def search(cls, string):
         '''Search through all of the imports matching the fullname glob `string`.'''
         return cls.search(fullname=string)
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def search(cls, **type):
         '''Search through all of the imports within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
@@ -2510,16 +2567,19 @@ class address(object):
 
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def prevtag(cls, **tagname):
         '''Return the previous address that contains a tag.'''
         return cls.prevtag(ui.current.address(), 1, **tagname)
     @utils.multicase(predicate=builtins.callable)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def prevtag(cls, predicate, **tagname):
         '''Return the previous address that contains a tag and matches `predicate`.'''
         return cls.prevtag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def prevtag(cls, ea, **tagname):
         """Returns the previous address from `ea` that contains a tag.
 
@@ -2528,6 +2588,7 @@ class address(object):
         return cls.prevtag(ea, 1, **tagname)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def prevtag(cls, ea, predicate, **tagname):
         '''Returns the previous address from `ea` that contains a tag and matches `predicate`.'''
         tagname = tagname.get('tagname', None)
@@ -2536,6 +2597,7 @@ class address(object):
         return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def prevtag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
@@ -2543,16 +2605,19 @@ class address(object):
 
     @utils.multicase()
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def nexttag(cls, **tagname):
         '''Return the next address that contains a tag.'''
         return cls.nexttag(ui.current.address(), 1, **tagname)
     @utils.multicase(predicate=builtins.callable)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def nexttag(cls, predicate, **tagname):
         '''Return the next address that contains a tag and matches `predicate`.'''
         return cls.nexttag(ui.current.address(), predicate, **tagname)
     @utils.multicase(ea=six.integer_types)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def nexttag(cls, ea, **tagname):
         """Returns the next address from `ea` that contains a tag.
 
@@ -2561,6 +2626,7 @@ class address(object):
         return cls.nexttag(ea, 1, **tagname)
     @utils.multicase(ea=six.integer_types, predicate=builtins.callable)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def nexttag(cls, ea, predicate, **tagname):
         '''Returns the next address from `ea` that contains a tag and matches `predicate`.'''
         tagname = tagname.get('tagname', None)
@@ -2569,6 +2635,7 @@ class address(object):
         return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
+    @utils.string.decorate_arguments('tagname')
     def nexttag(cls, ea, count, **tagname):
         tagname = tagname.get('tagname', None)
         Ftag = type.has_comment if tagname is None else utils.fcompose(tag, utils.frpartial(operator.contains, tagname))
@@ -3436,11 +3503,13 @@ class marks(object):
 
     @utils.multicase(description=basestring)
     @classmethod
+    @utils.string.decorate_arguments('description')
     def new(cls, description):
         '''Create a mark at the current address with the given `description`.'''
         return cls.new(ui.current.address(), description)
     @utils.multicase(ea=six.integer_types, description=basestring)
     @classmethod
+    @utils.string.decorate_arguments('description')
     def new(cls, ea, description, **extra):
         '''Create a mark at the address `ea` with the given `description` and return its index.'''
         ea = interface.address.inside(ea)
@@ -3516,6 +3585,7 @@ class marks(object):
             return res
 
         @classmethod
+        @utils.string.decorate_arguments('description')
         def __set_description(cls, index, ea, description, **extra):
             '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
             res = cls.__location(ea=ea, x=extra.get('x', 0), y=extra.get('y', 0), lnnum=extra.get('y', 0))
@@ -3564,6 +3634,7 @@ class marks(object):
     ## Internal functions depending on which version of IDA is being used (>= 7.0)
     else:
         @classmethod
+        @utils.string.decorate_arguments('description')
         def __set_description(cls, index, ea, description, **extra):
             '''Modify the mark at `index` to point to the address `ea` with the specified `description`.'''
             res = utils.string.to(description)
@@ -3622,6 +3693,7 @@ def mark(ea):
     _, res = marks.by_address(ea)
     return res
 @utils.multicase(description=basestring)
+@utils.string.decorate_arguments('description')
 def mark(description):
     '''Set the mark at the current address to the specified `description`.'''
     return mark(ui.current.address(), description)
@@ -3635,6 +3707,7 @@ def mark(ea, none):
     color(ea, None)
     return marks.remove(ea)
 @utils.multicase(ea=six.integer_types, description=basestring)
+@utils.string.decorate_arguments('description')
 def mark(ea, description):
     '''Sets the mark at address `ea` to the specified `description`.'''
     return marks.new(ea, description)
@@ -3728,6 +3801,7 @@ class extra(object):
             # fetch them from IDA and join them with newlines
             return '\n'.join(itertools.imap(utils.string.of, res))
         @classmethod
+        @utils.string.decorate_arguments('string')
         def __set__(cls, ea, string, base):
             '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
             cls.__hide__(ea)
@@ -3777,6 +3851,7 @@ class extra(object):
             res = itertools.imap(utils.string.of, res)
             return '\n'.join(res)
         @classmethod
+        @utils.string.decorate_arguments('string')
         def __set__(cls, ea, string, base):
             '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
             # break the string up into rows, and encode each type for IDA
