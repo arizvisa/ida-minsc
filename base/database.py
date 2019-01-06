@@ -446,7 +446,7 @@ class segments(object):
     @utils.string.decorate_arguments('name')
     def iterate(cls, name):
         '''List all of the segments defined in the database that match the glob `name`.'''
-        return cls.list(like=string)
+        return cls.list(like=name)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
@@ -459,7 +459,7 @@ class segments(object):
     @utils.string.decorate_arguments('name')
     def iterate(cls, name):
         '''Iterate through all of the segments in the database with a glob that matches `name`.'''
-        return cls.iterate(like=string)
+        return cls.iterate(like=name)
     @utils.multicase()
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
