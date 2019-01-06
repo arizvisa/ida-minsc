@@ -632,10 +632,12 @@ def op_enumeration(ea, opnum):
         raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
     return enumeration.by(res.ec.tid)
 @utils.multicase(opnum=six.integer_types, name=basestring)
+@utils.string.decorate_arguments('name')
 def op_enumeration(opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=basestring)
+@utils.string.decorate_arguments('name')
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
     return op_enumeration(ea, opnum, enumeration.by(name))
