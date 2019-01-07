@@ -306,7 +306,7 @@ class apply(object):
 
             # finally we can create the frame
             logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Creating a new frame for function {:#x} with the parameters lvars={:+#x} regs={:+#x} args={:+#x}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, ea, abs(minimum), regs, abs(maximum)))
-            F = func.frame.new(ea, abs(minimum), regs, abs(maximum))
+            F = func.frame.new(ea, abs(minimum), regs, abs(maximum) - regs)
 
         # iterate through our dictionary of members
         for offset, (name, type, comment) in six.iteritems(frame):
