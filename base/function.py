@@ -1247,6 +1247,31 @@ class frame(object):
 
     @utils.multicase()
     @classmethod
+    def new(cls):
+        '''Add an empty frame to the current function.'''
+        return cls.new(ui.current.function(), 0, 0, 0)
+    @utils.multicase(lvars=six.integer_types, args=six.integer_types)
+    @classmethod
+    def new(cls, lvars, args):
+        '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
+        return cls.new(ui.current.function(), lvars, 0, args)
+    @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
+    @classmethod
+    def new(cls, lvars, regs, args):
+        '''Add a frame to the current function using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.'''
+        return cls.new(ui.current.function(), lvars, regs, args)
+    @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
+    @classmethod
+    def new(cls, func, lvars, regs, args):
+        '''Add a frame to the function `func` using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.'''
+        fn = by(func)
+        ok = idaapi.add_frame(fn, lvars, regs, args)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join((__name__, cls.__name__)), fn.startEA, lvars, regs, args, fn.startEA, lvars, regs, args))
+        return cls(fn)
+
+    @utils.multicase()
+    @classmethod
     def id(cls):
         '''Returns the structure id for the current function's frame.'''
         return cls.id(ui.current.function())
