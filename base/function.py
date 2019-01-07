@@ -1249,12 +1249,14 @@ class frame(object):
     @classmethod
     def new(cls):
         '''Add an empty frame to the current function.'''
-        return cls.new(ui.current.function(), 0, 0, 0)
+        _r = database.config.bits() / 8
+        return cls.new(ui.current.function(), 0, _r, 0)
     @utils.multicase(lvars=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, lvars, args):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
-        return cls.new(ui.current.function(), lvars, 0, args)
+        _r = database.config.bits() / 8
+        return cls.new(ui.current.function(), lvars, _r, args)
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, lvars, regs, args):
@@ -1263,11 +1265,15 @@ class frame(object):
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, func, lvars, regs, args):
-        '''Add a frame to the function `func` using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.'''
+        """Add a frame to the function `func` using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.
+
+        When specifying the size of the registers (`regs`) the size of the saved instruction pointer must also be included.
+        """
         fn = by(func)
-        ok = idaapi.add_frame(fn, lvars, regs, args)
+        _r = database.config.bits() / 8
+        ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join((__name__, cls.__name__)), fn.startEA, lvars, regs, args, fn.startEA, lvars, regs, args))
+            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join((__name__, cls.__name__)), fn.startEA, lvars, regs - _r, args, fn.startEA, lvars, regs - _r, args))
         return cls(fn)
 
     @utils.multicase()
