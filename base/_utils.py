@@ -1177,16 +1177,18 @@ class character(object):
             elif n < 0x110000:
                 result.send(cls.const.backslash)
                 result.send('U')
-                result.send(cls.to_hex((n & 0x100000) / 0x100000))
-                result.send(cls.to_hex((n & 0x0f0000) / 0x010000))
-                result.send(cls.to_hex((n & 0x00f000) / 0x001000))
-                result.send(cls.to_hex((n & 0x000f00) / 0x000100))
-                result.send(cls.to_hex((n & 0x0000f0) / 0x000010))
-                result.send(cls.to_hex((n & 0x00000f) / 0x000001))
+                result.send(cls.to_hex((n & 0x00000000) / 0x10000000))
+                result.send(cls.to_hex((n & 0x00000000) / 0x01000000))
+                result.send(cls.to_hex((n & 0x00100000) / 0x00100000))
+                result.send(cls.to_hex((n & 0x000f0000) / 0x00010000))
+                result.send(cls.to_hex((n & 0x0000f000) / 0x00001000))
+                result.send(cls.to_hex((n & 0x00000f00) / 0x00000100))
+                result.send(cls.to_hex((n & 0x000000f0) / 0x00000010))
+                result.send(cls.to_hex((n & 0x0000000f) / 0x00000001))
 
             # if we're here, then we have no idea what kind of character it is
             else:
-                raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Unable to determine how to escape the current character code ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), iterable, n))
+                raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Unable to determine how to escape the current character code ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), result, n))
 
             continue
         return
@@ -1212,7 +1214,7 @@ class character(object):
                 elif t == 'x':
                     hb, lb = (yield), (yield)
                     if any(not cls.hexQ(b) for b in {hb, lb}):
-                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next two characters ('{:s}', '{:s}') to be hex digits for an ascii character.".format('.'.join(('internal', __name__, cls.__name__)), result, internal.interface.string.escape(hb, '\''), internal.interface.string.escape(lb, '\'')))
+                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next two characters ('{:s}', '{:s}') to be hex digits for an ascii character.".format('.'.join(('internal', __name__, cls.__name__)), result, string.escape(hb, '\''), string.escape(lb, '\'')))
 
                     # convert the two hex digits into their integral forms
                     h, l = map(cls.of_hex, (hb.lower(), lb.lower()))
@@ -1227,7 +1229,7 @@ class character(object):
                 elif t == 'u':
                     hwb, lwb, hb, lb = (yield), (yield), (yield), (yield)
                     if any(not cls.hexQ(b) for b in {hwb, lwb, hb, lb}):
-                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next four characters ('{:s}', '{:s}', '{:s}', '{:s}') to be hex digits for a unicode character.".format('.'.join(('internal', __name__, cls.__name__)), result, internal.interface.string.escape(hwb, '\''), internal.interface.string.escape(lwb, '\''), internal.interface.string.escape(hb, '\''), internal.interface.string.escape(lb, '\'')))
+                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next four characters ('{:s}', '{:s}', '{:s}', '{:s}') to be hex digits for a unicode character.".format('.'.join(('internal', __name__, cls.__name__)), result, string.escape(hwb, '\''), string.escape(lwb, '\''), string.escape(hb, '\''), string.escape(lb, '\'')))
 
                     # convert the four hex digits into their integral forms
                     hw, lw, h, l = map(cls.of_hex, (hwb.lower(), lwb.lower(), hb.lower(), lb.lower()))
@@ -1242,9 +1244,11 @@ class character(object):
 
                 # if we find a 'U' prefix, then we have a long unicode character
                 elif t == 'U':
-                    Hwb, Lwb, hwb, lwb, hb, lb = (yield), (yield), (yield), (yield), (yield), (yield)
+                    hzb, lzb, Hwb, Lwb, hwb, lwb, hb, lb = (yield), (yield), (yield), (yield), (yield), (yield), (yield), (yield)
+                    if any(not cls.hexQ(b) or cls.of_hex(b) for b in (hzb, lzb)):
+                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next two characters ('{:s}', '{:s}') to be zero for a long-unicode character.".format('.'.join(('internal', __name__, cls.__name__)), result, string.escape(hzb, '\''), string.escape(lzb, '\'')))
                     if any(not cls.hexQ(b) for b in {Hwb, Lwb, hwb, lwb, hb, lb}) or Hwb not in {'0', '1'}:
-                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next six characters ('{:s}', '{:s}', '{:s}', '{:s}', '{:s}', '{:s}') to be hex digits for a long-unicode character.".format('.'.join(('internal', __name__, cls.__name__)), result, internal.interface.string.escape(Hwb, '\''), internal.interface.string.escape(Lwb, '\''), internal.interface.string.escape(hwb, '\''), internal.interface.string.escape(lwb, '\''), internal.interface.string.escape(hb, '\''), internal.interface.string.escape(lb, '\'')))
+                        raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : Expected the next six characters ('{:s}', '{:s}', '{:s}', '{:s}', '{:s}', '{:s}') to be hex digits for a long-unicode character.".format('.'.join(('internal', __name__, cls.__name__)), result, string.escape(Hwb, '\''), string.escape(Lwb, '\''), string.escape(hwb, '\''), string.escape(lwb, '\''), string.escape(hb, '\''), string.escape(lb, '\'')))
 
                     # convert the six hex digits into their integral forms
                     Hw, Lw, hw, lw, h, l = map(cls.of_hex, (Hwb.lower(), Lwb.lower(), hwb.lower(), lwb.lower(), hb.lower(), lb.lower()))
@@ -1260,7 +1264,7 @@ class character(object):
                     0))
 
                 else:
-                    raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : An unknown character code was specified ('{:s}').".format('.'.join(('internal', __name__, cls.__name__)), result, internal.interface.string.escape(t, '\'')))
+                    raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : An unknown character code was specified ('{:s}').".format('.'.join(('internal', __name__, cls.__name__)), result, string.escape(t, '\'')))
 
             # we haven't received a backslash, so there's nothing to unescape
             else:
