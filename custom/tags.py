@@ -25,7 +25,7 @@ To apply previously read tags with different names to the database::
 
 """
 
-import six, sys, logging
+import six, sys, logging, builtins
 import functools, operator, itertools, types, string
 
 import database as db, function as func, structure as struc, ui
@@ -119,7 +119,12 @@ class read(object):
         F = func.by(ea)
 
         # iterate through all of the frame's members
-        res = func.frame(F)
+        try:
+            res = func.frame(F)
+        except internal.exceptions.MissingTypeOrAttribute:
+            logging.info(u"{:s}.frame({:#x}) : Skipping function at {:#x} due to a missing frame.".format('.'.join((__name__, cls.__name__)), ea, ea))
+            return
+
         for member in res.members:
             # if ida has named it and there's no comment, then skip
             if lvarNameQ(member.name) and not member.comment:
@@ -259,7 +264,51 @@ class apply(object):
         '''Apply the fields from `frame` back into the function at `ea`.'''
         tagmap_output = u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(k), internal.utils.string.escape(v)) for k, v in six.iteritems(tagmap))) if tagmap else ''
 
-        F = func.frame(ea)
+        # nothing to do here, so we gtfo
+        if not frame:
+            return
+
+        # grab the function's frame
+        try:
+            F = func.frame(ea)
+
+        # if no frame exists for the function, we'll need to create it
+        except internal.exceptions.MissingTypeOrAttribute:
+
+            # first we figure out the bounds of our members in order to figure out the the lvars and args sizes
+            minimum, maximum = min(six.viewkeys(frame)), max(six.viewkeys(frame))
+
+            # calculate the size of regs by first finding everything that begins at offset 0
+            res = sorted(offset for offset in six.viewkeys(frame) if offset >= 0)
+
+            # now we look for anything near offset 0 that begins with a space (which should be a register)
+            regs = 0
+            for offset in res:
+                name, type, _ = frame[offset]
+                if not name.startswith(' '): break
+
+                # if type is a string, then treat it as a structure so we can calculate a size
+                if isinstance(type, basestring):
+                    try:
+                        st = struc.by(type)
+                    except internal.exceptions.StructureNotFoundError:
+                        logging.fatal(u"{:s}.frame({:#x}, ...{:s}): Unable to find structure \"{:s}\" for member {:+#x} in order to calculate register size for function at {:+#x}. Using register size of {:+#x}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, internal.utils.string.escape(type, '"'), offset, ea, regs))
+                        break
+                    type = [(int, 1), st.size]
+
+                # extract the size components and calculate the total number of bytes
+                realtype, reallength = type if isinstance(type, builtins.list) else [type, 1]
+                _, realsize = realtype
+                cb = realsize * reallength
+
+                # add it to the current aggregate of the register size
+                regs += cb
+
+            # finally we can create the frame
+            logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Creating a new frame for function {:#x} with the parameters lvars={:+#x} regs={:+#x} args={:+#x}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, ea, abs(minimum), regs, abs(maximum)))
+            F = func.frame.new(ea, abs(minimum), regs, abs(maximum))
+
+        # iterate through our dictionary of members
         for offset, (name, type, comment) in six.iteritems(frame):
             try:
                 member = F.by_offset(offset)
