@@ -1312,7 +1312,7 @@ class string(object):
         transform = character.escape(res); next(transform)
 
         # iterate through each character, sending everything to res
-        for ch in iter(string):
+        for ch in iter(string or ''):
 
             # check if character is a user-specified quote or a backslash
             if any(operator.contains(set, ch) for set in (quote, '\\')):
