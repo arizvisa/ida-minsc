@@ -1595,21 +1595,21 @@ def select(**boolean):
 def select(tag, *And, **boolean):
     '''Query the contents of the current function for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
+    boolean['And'] = tuple(set(boolean.get('And', set())) | set(res))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *And, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
+    boolean['And'] = tuple(set(boolean.get('And', set())) | set(res))
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *And, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
-    res = set(builtins.list(tag) + builtins.list(And))
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
+    res = (tag,) + And
+    boolean['And'] = tuple(set(boolean.get('And', set())) | set(res))
     return select(func, **boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1643,7 +1643,7 @@ def select(func, **boolean):
         # And(&) includes any tags only if they include all the specified tagnames
         And = boolean.get('And', set())
         if And:
-            if And.intersection(d.viewkeys()) == And:
+            if And & d.viewkeys() == And:
                 res.update({key : value for key, value in six.iteritems(d) if key in And})
             else: continue
 
