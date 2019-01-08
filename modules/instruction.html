@@ -130,180 +130,6 @@ functions and aliases. For more information on this, please see
 </dd></dl>
 
 <dl class="function">
-<dt id="instruction.is_branch">
-<code class="descclassname">instruction.</code><code class="descname">is_branch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_branch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns true if the current instruction is any kind of branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_branch" title="instruction.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isBranch</span></code></a>, <a class="reference internal" href="#instruction.is_branch" title="instruction.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.branchQ</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_branch</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is any kind of branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_branch" title="instruction.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isBranch</span></code></a>, <a class="reference internal" href="#instruction.is_branch" title="instruction.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.branchQ</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="instruction.is_call">
-<code class="descclassname">instruction.</code><code class="descname">is_call</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_call" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns true if the current instruction is a call.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_call" title="instruction.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.callQ</span></code></a>, <a class="reference internal" href="#instruction.is_call" title="instruction.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isCall</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_call</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a call.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_call" title="instruction.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.callQ</span></code></a>, <a class="reference internal" href="#instruction.is_call" title="instruction.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isCall</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="instruction.is_calli">
-<code class="descclassname">instruction.</code><code class="descname">is_calli</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_calli" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return true if the current instruction is an indirect call.</p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_calli</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is an indirect call.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="instruction.is_jmp">
-<code class="descclassname">instruction.</code><code class="descname">is_jmp</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_jmp" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns true if the current instruction is an immediate and indirect branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_jmp" title="instruction.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmp</span></code></a>, <a class="reference internal" href="#instruction.is_jmp" title="instruction.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpQ</span></code></a>, <a class="reference internal" href="#instruction.is_jmp" title="instruction.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.JmpQ</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_jmp</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is an immediate and indrect branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_jmp" title="instruction.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmp</span></code></a>, <a class="reference internal" href="#instruction.is_jmp" title="instruction.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpQ</span></code></a>, <a class="reference internal" href="#instruction.is_jmp" title="instruction.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.JmpQ</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="instruction.is_jmpi">
-<code class="descclassname">instruction.</code><code class="descname">is_jmpi</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_jmpi" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns true if the instruction at the current address is an indirect branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_jmpi" title="instruction.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.JmpiQ</span></code></a>, <a class="reference internal" href="#instruction.is_jmpi" title="instruction.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmpi</span></code></a>, <a class="reference internal" href="#instruction.is_jmpi" title="instruction.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpiQ</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_jmpi</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is an indirect branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_jmpi" title="instruction.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.JmpiQ</span></code></a>, <a class="reference internal" href="#instruction.is_jmpi" title="instruction.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmpi</span></code></a>, <a class="reference internal" href="#instruction.is_jmpi" title="instruction.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpiQ</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="instruction.is_jxx">
-<code class="descclassname">instruction.</code><code class="descname">is_jxx</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_jxx" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns true if the current instruction is a conditional branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_jxx" title="instruction.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jxxQ</span></code></a>, <a class="reference internal" href="#instruction.is_jxx" title="instruction.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.JxxQ</span></code></a>, <a class="reference internal" href="#instruction.is_jxx" title="instruction.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJxx</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_jxx</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a conditional branch.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_jxx" title="instruction.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jxxQ</span></code></a>, <a class="reference internal" href="#instruction.is_jxx" title="instruction.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.JxxQ</span></code></a>, <a class="reference internal" href="#instruction.is_jxx" title="instruction.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJxx</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="instruction.is_return">
-<code class="descclassname">instruction.</code><code class="descname">is_return</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_return" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns true if the current instruction is a return-type instruction.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_return" title="instruction.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.returnQ</span></code></a>, <a class="reference internal" href="#instruction.is_return" title="instruction.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isReturn</span></code></a>, <a class="reference internal" href="#instruction.is_return" title="instruction.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.retQ</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_return</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a return-type instruction.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_return" title="instruction.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.returnQ</span></code></a>, <a class="reference internal" href="#instruction.is_return" title="instruction.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isReturn</span></code></a>, <a class="reference internal" href="#instruction.is_return" title="instruction.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.retQ</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="instruction.is_shift">
-<code class="descclassname">instruction.</code><code class="descname">is_shift</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.is_shift" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns true if the current instruction is a bit-shifting instruction.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_shift" title="instruction.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isShift</span></code></a>, <a class="reference internal" href="#instruction.is_shift" title="instruction.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.shiftQ</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">is_shift</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a bit-shifting instruction.</p>
-<p>Aliases: <a class="reference internal" href="#instruction.is_shift" title="instruction.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isShift</span></code></a>, <a class="reference internal" href="#instruction.is_shift" title="instruction.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.shiftQ</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="instruction.mnemonic">
 <code class="descclassname">instruction.</code><code class="descname">mnemonic</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.mnemonic" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the mnemonic of the instruction at the current address.</p>
@@ -1443,6 +1269,204 @@ can be returned for the MIPS architecture.</p>
 
 </div>
 </div>
+<div class="section" id="instruction-type">
+<span id="ns-instruction-type"></span><h3>3.1.4.2.4. instruction.type<a class="headerlink" href="#instruction-type" title="Permalink to this headline">¶</a></h3>
+<p>This namespace is for fetching information about the instruction
+type at a given address within the database. The functions within
+this namespace return a boolean based on whether the instruction at
+the given address fits a particular type.</p>
+<p>It is prudent to note that the information that these functions
+expose are essentially flags for the instruction and is provided
+in order to allow a user to infer how IDA has processed the
+instruction. These flags are used by IDA in order to determine
+things such as whether or not it should continue disassembling,
+or if it should add the instruction’s operand to its queue in
+order to recursively disassemble code witin the database.</p>
+<p>This namespace is also aliased as <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.t</span></code>.</p>
+<p>Some examples of using this namespace are:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_return</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_jxx</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_branch</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="instruction.type.is_branch">
+<code class="descclassname">type.</code><code class="descname">is_branch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_branch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current instruction is any kind of branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isBranch</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.branchQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.branchQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_branch</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isBranch</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_branch</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is any kind of branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isBranch</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.branchQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.branchQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_branch</span></code></a>, <a class="reference internal" href="#instruction.type.is_branch" title="instruction.type.is_branch"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isBranch</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.type.is_call">
+<code class="descclassname">type.</code><code class="descname">is_call</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_call" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current instruction is a call.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.callQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_call</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isCall</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isCall</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.callQ</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_call</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a call.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.callQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_call</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isCall</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isCall</span></code></a>, <a class="reference internal" href="#instruction.type.is_call" title="instruction.type.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.callQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.type.is_calli">
+<code class="descclassname">type.</code><code class="descname">is_calli</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_calli" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return true if the current instruction is an indirect call.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_calli</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.calliQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.calliQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isCalli</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isCalli</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_calli</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is an indirect call.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_calli</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.calliQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.calliQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isCalli</span></code></a>, <a class="reference internal" href="#instruction.type.is_calli" title="instruction.type.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isCalli</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.type.is_jmp">
+<code class="descclassname">type.</code><code class="descname">is_jmp</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_jmp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current instruction is an immediate and indirect branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isJmp</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmp</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.jmpQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_jmp</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpQ</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_jmp</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is an immediate and indrect branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isJmp</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmp</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.jmpQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_jmp</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmp" title="instruction.type.is_jmp"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.type.is_jmpi">
+<code class="descclassname">type.</code><code class="descname">is_jmpi</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_jmpi" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the instruction at the current address is an indirect branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpiQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isJmpi</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmpi</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_jmpi</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.jmpiQ</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_jmpi</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is an indirect branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jmpiQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isJmpi</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJmpi</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_jmpi</span></code></a>, <a class="reference internal" href="#instruction.type.is_jmpi" title="instruction.type.is_jmpi"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.jmpiQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.type.is_jxx">
+<code class="descclassname">type.</code><code class="descname">is_jxx</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_jxx" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current instruction is a conditional branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.jxxQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_jxx</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jxxQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isJxx</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJxx</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_jxx</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a conditional branch.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.jxxQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_jxx</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.jxxQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isJxx</span></code></a>, <a class="reference internal" href="#instruction.type.is_jxx" title="instruction.type.is_jxx"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isJxx</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.type.is_return">
+<code class="descclassname">type.</code><code class="descname">is_return</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_return" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current instruction is a return-type instruction.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.returnQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.retQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_return</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.retQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.returnQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isReturn</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isReturn</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_return</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a return-type instruction.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.returnQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.retQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_return</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.retQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.returnQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isReturn</span></code></a>, <a class="reference internal" href="#instruction.type.is_return" title="instruction.type.is_return"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isReturn</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="instruction.type.is_shift">
+<code class="descclassname">type.</code><code class="descname">is_shift</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_shift" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current instruction is a bit-shifting instruction.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.shiftQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isShift</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.shiftQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_shift</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isShift</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_shift</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is a bit-shifting instruction.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.shiftQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.isShift</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.shiftQ</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_shift</span></code></a>, <a class="reference internal" href="#instruction.type.is_shift" title="instruction.type.is_shift"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.type.isShift</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
 </div>
 <div class="section" id="class-list">
 <h2>3.1.4.3. Class list<a class="headerlink" href="#class-list" title="Permalink to this headline">¶</a></h2>
@@ -1541,6 +1565,7 @@ but are treated as special instructions by IDA.</p>
 <li><a class="reference internal" href="#mipsops-phrase">3.1.4.2.3.1. mipsops.phrase</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#instruction-type">3.1.4.2.4. instruction.type</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#class-list">3.1.4.3. Class list</a><ul>

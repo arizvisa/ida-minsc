@@ -226,7 +226,7 @@ to use <a class="reference internal" href="modules/function.html#function.chunks
 <a class="reference internal" href="modules/function.html#function.chunks.iterate" title="function.chunks.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.iterate</span></code></a>) to look for our
 instruction type. To test for an indirect call instruction (a call
 which branches to a register or a phrase), we can simply use the
-<a class="reference internal" href="modules/instruction.html#instruction.is_calli" title="instruction.is_calli"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_calli()</span></code></a> function.</li>
+<code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_calli()</span></code> function.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;is-memory-function&#39;</span><span class="p">,</span> <span class="s1">&#39;calls-memory-function&#39;</span><span class="p">)):</span>
       <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
@@ -428,7 +428,7 @@ the combinators provided by this plugin.</p>
 might reduce the time it takes a reverser to determine the complexity of a
 function. This plugin makes it pretty easy to do this thanks to the help
 of functions like <a class="reference internal" href="modules/function.html#function.down" title="function.down"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.down()</span></code></a> or the combination of
-<a class="reference internal" href="modules/function.html#function.chunks.iterate" title="function.chunks.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.chunks.iterate()</span></code></a> and <a class="reference internal" href="modules/instruction.html#instruction.is_call" title="instruction.is_call"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_call()</span></code></a>.
+<a class="reference internal" href="modules/function.html#function.chunks.iterate" title="function.chunks.iterate"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.chunks.iterate()</span></code></a> and <code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.is_call()</span></code>.
 So, let’s use these tools to define a function that returns whether a
 function calls other functions or not.</li>
 </ol>
