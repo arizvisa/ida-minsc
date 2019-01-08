@@ -654,15 +654,15 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">select</code><span class="sig-paren">(</span><em>tag</em>, <em>*And</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
-<dd><p>Query the contents of the current function for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">And</span></code>.</p>
+<code class="descclassname">function.</code><code class="descname">select</code><span class="sig-paren">(</span><em>tag</em>, <em>*Or</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query the contents of the current function for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">Or</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>tag</strong> (<em>str</em>) – a required tag name to search the contents for</li>
-<li><strong>*And</strong> – any other required tag names</li>
+<li><strong>*Or</strong> – any other tag names to include</li>
 <li><strong>**boolean</strong> – either <code class="docutils literal notranslate"><span class="pre">And</span></code> or <code class="docutils literal notranslate"><span class="pre">Or</span></code> which specifies required or optional tags (respectively)</li>
 </ul>
 </td>
@@ -673,8 +673,8 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">select</code><span class="sig-paren">(</span><em>func</em>, <em>tag</em>, <em>*And</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
-<dd><p>Query the contents of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">And</span></code>.</p>
+<code class="descclassname">function.</code><code class="descname">select</code><span class="sig-paren">(</span><em>func</em>, <em>tag</em>, <em>*Or</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query the contents of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">Or</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -682,7 +682,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the contents tags to select</li>
 <li><strong>tag</strong> (<em>str</em>) – a required tag name to search the contents for</li>
-<li><strong>*And</strong> – any other required tag names</li>
+<li><strong>*Or</strong> – any other tag names to include</li>
 <li><strong>**boolean</strong> – either <code class="docutils literal notranslate"><span class="pre">And</span></code> or <code class="docutils literal notranslate"><span class="pre">Or</span></code> which specifies required or optional tags (respectively)</li>
 </ul>
 </td>
@@ -693,8 +693,8 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">select</code><span class="sig-paren">(</span><em>func</em>, <em>tag</em>, <em>*And</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
-<dd><p>Query the contents of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">And</span></code>.</p>
+<code class="descclassname">function.</code><code class="descname">select</code><span class="sig-paren">(</span><em>func</em>, <em>tag</em>, <em>*Or</em>, <em>**boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Query the contents of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">Or</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -702,7 +702,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function containing the contents tags to select</li>
 <li><strong>tag</strong> (<em>set</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – a list of tag names to search the contents for</li>
-<li><strong>*And</strong> – any other required tag names</li>
+<li><strong>*Or</strong> – any other tag names to include</li>
 <li><strong>**boolean</strong> – either <code class="docutils literal notranslate"><span class="pre">And</span></code> or <code class="docutils literal notranslate"><span class="pre">Or</span></code> which specifies required or optional tags (respectively)</li>
 </ul>
 </td>
@@ -2129,6 +2129,26 @@ the chunk containing the requested address.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="function.chunk.iterate">
+<code class="descclassname">chunk.</code><code class="descname">iterate</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all the instructions for the function chunk containing the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">chunk.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all the instructions for the function chunk containing the address <code class="xref py py-obj docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.chunk.remove">
 <code class="descclassname">chunk.</code><code class="descname">remove</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.chunk.remove" title="Permalink to this definition">¶</a></dt>
 <dd><p>Aliases: <a class="reference internal" href="#function.chunk.remove" title="function.chunk.remove"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.remove_chunk</span></code></a></p>
@@ -2410,6 +2430,70 @@ function.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the frame id for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.frame.new">
+<code class="descclassname">frame.</code><code class="descname">new</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.frame.new" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add an empty frame to the current function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">frame.</code><code class="descname">new</code><span class="sig-paren">(</span><em>lvars</em>, <em>args</em><span class="sig-paren">)</span></dt>
+<dd><p>Add a frame to the current function using the sizes specified by <code class="docutils literal notranslate"><span class="pre">lvars</span></code> for local variables, and <code class="docutils literal notranslate"><span class="pre">args</span></code> for arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>lvars</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for local variables</li>
+<li><strong>args</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for arguments</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">frame.</code><code class="descname">new</code><span class="sig-paren">(</span><em>lvars</em>, <em>regs</em>, <em>args</em><span class="sig-paren">)</span></dt>
+<dd><p>Add a frame to the current function using the sizes specified by <code class="docutils literal notranslate"><span class="pre">lvars</span></code> for local variables, <code class="docutils literal notranslate"><span class="pre">regs</span></code> for frame registers, and <code class="docutils literal notranslate"><span class="pre">args</span></code> for arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>lvars</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for local variables</li>
+<li><strong>regs</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for registers</li>
+<li><strong>args</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for arguments</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">frame.</code><code class="descname">new</code><span class="sig-paren">(</span><em>func</em>, <em>lvars</em>, <em>regs</em>, <em>args</em><span class="sig-paren">)</span></dt>
+<dd><p>Add a frame to the function <code class="docutils literal notranslate"><span class="pre">func</span></code> using the sizes specified by <code class="docutils literal notranslate"><span class="pre">lvars</span></code> for local variables, <code class="docutils literal notranslate"><span class="pre">regs</span></code> for frame registers, and <code class="docutils literal notranslate"><span class="pre">args</span></code> for arguments.</p>
+<p>When specifying the size of the registers (<code class="docutils literal notranslate"><span class="pre">regs</span></code>) the size of the saved instruction pointer must also be included.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to add the frame to</li>
+<li><strong>lvars</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for local variables</li>
+<li><strong>regs</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for registers</li>
+<li><strong>args</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to allocate for arguments</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2756,7 +2840,7 @@ one to filter functions according to their particular attributes.</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.6.
     </div>
   </body>
 </html>

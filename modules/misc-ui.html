@@ -183,6 +183,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 <dt id="ui.current.selection">
 <code class="descclassname">current.</code><code class="descname">selection</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.current.selection" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the current address range of whatever is selected</p>
+<p>Aliases: <a class="reference internal" href="#ui.current.selection" title="ui.current.selection"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.current.selected</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -249,6 +250,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 <dt id="ui.keyboard.map">
 <code class="descclassname">keyboard.</code><code class="descname">map</code><span class="sig-paren">(</span><em>key</em>, <em>callable</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.map" title="Permalink to this definition">¶</a></dt>
 <dd><p>Map a specific <code class="docutils literal notranslate"><span class="pre">key</span></code> to a python <code class="docutils literal notranslate"><span class="pre">callable</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#ui.keyboard.map" title="ui.keyboard.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.keyboard.add</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -273,6 +275,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 <dt id="ui.keyboard.unmap">
 <code class="descclassname">keyboard.</code><code class="descname">unmap</code><span class="sig-paren">(</span><em>key</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.unmap" title="Permalink to this definition">¶</a></dt>
 <dd><p>Unmap the specified <code class="docutils literal notranslate"><span class="pre">key</span></code> from its callable.</p>
+<p>Aliases: <a class="reference internal" href="#ui.keyboard.unmap" title="ui.keyboard.unmap"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.keyboard.rm</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -662,6 +665,7 @@ being viewed in graph view or not.</p>
 <dt id="ui.state.beep">
 <code class="descclassname">state.</code><code class="descname">beep</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.beep" title="Permalink to this definition">¶</a></dt>
 <dd><p>Beep using IDA’s interface.</p>
+<p>Aliases: <a class="reference internal" href="#ui.state.beep" title="ui.state.beep"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.beep</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -674,12 +678,14 @@ being viewed in graph view or not.</p>
 <dt id="ui.state.refresh">
 <code class="descclassname">state.</code><code class="descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.refresh" title="Permalink to this definition">¶</a></dt>
 <dd><p>Refresh all of IDA’s windows.</p>
+<p>Aliases: <a class="reference internal" href="#ui.state.refresh" title="ui.state.refresh"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.refresh</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt id="ui.state.wait">
 <code class="descclassname">state.</code><code class="descname">wait</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.state.wait" title="Permalink to this definition">¶</a></dt>
 <dd><p>Wait until IDA’s autoanalysis queues are empty.</p>
+<p>Aliases: <a class="reference internal" href="#ui.state.wait" title="ui.state.wait"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.wait</span></code></a></p>
 </dd></dl>
 
 </div>
@@ -1183,7 +1189,7 @@ based on what is presently available.</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.6.
     </div>
   </body>
 </html>

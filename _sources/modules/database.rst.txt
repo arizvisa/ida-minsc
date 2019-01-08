@@ -2789,35 +2789,48 @@ parameter ``predicate``. One can provide one of the search methods provided
 or include their own. This function will then yield each matched search
 result.
 
-.. py:function:: search(string)
+.. py:function:: search(data, \*\*direction)
    
-   Search through the database for the specified ``string``.
+   Search through the database at the current address for the bytes specified by ``data``.
    
-   :param string: the string to search for
+   :param data: the bytes to search for
+   :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
-.. py:function:: search\.by_bytes(string, \*\*direction)
+.. py:function:: search(ea, data, \*\*direction)
    
-   Search through the database at the current address for the bytes specified by ``string``.
+   Search through the database at address ``ea`` for the bytes specified by ``data``.
+   
+   If ``reverse`` is specified as a bool, then search backwards from the given address.
+   If ``radix`` is specified, then use it as the numerical radix for describing the bytes.
+   If ``radix`` is not specified, then assume that ``data`` represents the exact bytes to search.
+   
+   :param ea: the starting address to search from
+   :type ea: int or long
+   :param data: the bytes to search for
+   :param \*\*direction: if ``reverse`` is specified as true then search backwards
+   
+.. py:function:: search\.by_bytes(data, \*\*direction)
+   
+   Search through the database at the current address for the bytes specified by ``data``.
    
    Aliases: :py:func:`database.search.byBytes<search\.by_bytes>`
    
-   :param string: the bytes to search for
-   :type string: bytes
+   :param data: the bytes to search for
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
-.. py:function:: search\.by_bytes(ea, string, \*\*direction)
+.. py:function:: search\.by_bytes(ea, data, \*\*direction)
    
-   Search through the database at address ``ea`` for the bytes specified by ``string``.
+   Search through the database at address ``ea`` for the bytes specified by ``data``.
    
    If ``reverse`` is specified as a bool, then search backwards from the given address.
-   If ``radix`` is specified, then use it as the number radix for describing the bytes.
+   If ``radix`` is specified, then use it as the numerical radix for describing the bytes.
+   If ``radix`` is not specified, then assume that ``data`` represents the exact bytes to search.
    
    Aliases: :py:func:`database.search.byBytes<search\.by_bytes>`
    
    :param ea: the starting address to search from
    :type ea: int or long
-   :param string: the bytes to search for
-   :type string: bytes
+   :param data: the bytes to search for
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
    
 .. py:function:: search\.by_name(name, \*\*options)
@@ -2895,42 +2908,38 @@ result.
    :type string: str
    :param \*\*options: if ``reverse`` is specified as true then search backwards. if ``sensitive`` is true, then search with regards to the case.
    
-.. py:function:: search\.iterate(string, \*\*options)
+.. py:function:: search\.iterate(data, \*\*options)
    
-   Iterate through all search results that match the bytes ``string`` starting at the current address.
+   Iterate through all search results that match the bytes ``data`` starting at the current address.
    
-   :param string: the bytes to search for
-   :type string: str
+   :param data: the bytes to search for
    :param \*\*options: any options to pass to the ``predicate``
    
-.. py:function:: search\.iterate(string, predicate, \*\*options)
+.. py:function:: search\.iterate(data, predicate, \*\*options)
    
-   Iterate through all search results matched by the function ``predicate`` with the specified ``string`` starting at the current address.
+   Iterate through all search results matched by the function ``predicate`` with the specified ``data`` starting at the current address.
    
-   :param string: the string to pass to the ``predicate``
-   :type string: str
+   :param data: the bytes to pass to the ``predicate``
    :param predicate: the callable to search with
    :type predicate: callable
    :param \*\*options: any options to pass to the ``predicate``
    
-.. py:function:: search\.iterate(start, string, \*\*options)
+.. py:function:: search\.iterate(ea, data, \*\*options)
    
-   Iterate through all search results that match the bytes ``string`` starting at address ``start``.
+   Iterate through all search results that match the bytes ``data`` starting at address ``ea``.
    
-   :param start: the starting address to search from
-   :type start: int or long
-   :param string: the bytes to search for
-   :type string: str
+   :param ea: the starting address to search from
+   :type ea: int or long
+   :param data: the bytes to search for
    :param \*\*options: any options to search with
    
-.. py:function:: search\.iterate(start, string, predicate, \*\*options)
+.. py:function:: search\.iterate(ea, data, predicate, \*\*options)
    
-   Iterate through all search results matched by the function ``predicate`` with the specified ``string`` starting at address ``start``.
+   Iterate through all search results matched by the function ``predicate`` with the specified ``data`` starting at address ``ea``.
    
-   :param start: the starting address to search from
-   :type start: int or long
-   :param string: the string to pass to the predicate
-   :type string: str
+   :param ea: the starting address to search from
+   :type ea: int or long
+   :param data: the bytes to pass to the predicate
    :param predicate: the callable to search with
    :type predicate: callable
    :param \*\*options: any options to pass to the ``predicate``
@@ -3049,7 +3058,7 @@ This can be used as in the following examples::
    
    Set the data at the current address to an array of the specified ``type``.
    
-   :param type:
+   :param type: a pythonic type
    :type type: list
    
 .. py:function:: set\.array(type, length)
@@ -3064,9 +3073,9 @@ This can be used as in the following examples::
    
    Set the data at the address ``ea`` to an array of the specified ``type``.
    
-   :param ea:
+   :param ea: an address in the database
    :type ea: int or long
-   :param type:
+   :param type: a pythonic type
    :type type: list
    
 .. py:function:: set\.array(ea, type, length)

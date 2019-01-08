@@ -153,7 +153,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(enum, name)
    
-   Rename the enumeration ``enum`` to ``name``.
+   Rename the enumeration ``enum`` to the string ``name``.
    
    :param enum: the enumeration to rename
    :param name: the name to rename the enumeration to

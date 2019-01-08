@@ -4841,29 +4841,14 @@ or include their own. This function will then yield each matched search
 result.</p>
 <dl class="function">
 <dt id="database.search">
-<code class="descclassname">database.</code><code class="descname">search</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search" title="Permalink to this definition">¶</a></dt>
-<dd><p>Search through the database for the specified <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> – the string to search for</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="database.search.by_bytes">
-<code class="descclassname">search.</code><code class="descname">by_bytes</code><span class="sig-paren">(</span><em>string</em>, <em>**direction</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.by_bytes" title="Permalink to this definition">¶</a></dt>
-<dd><p>Search through the database at the current address for the bytes specified by <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_bytes" title="database.search.by_bytes"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byBytes</span></code></a></p>
+<code class="descclassname">database.</code><code class="descname">search</code><span class="sig-paren">(</span><em>data</em>, <em>**direction</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search" title="Permalink to this definition">¶</a></dt>
+<dd><p>Search through the database at the current address for the bytes specified by <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> (<em>bytes</em>) – the bytes to search for</li>
+<li><strong>data</strong> – the bytes to search for</li>
 <li><strong>**direction</strong> – if <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as true then search backwards</li>
 </ul>
 </td>
@@ -4874,10 +4859,52 @@ result.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">search.</code><code class="descname">by_bytes</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em>, <em>**direction</em><span class="sig-paren">)</span></dt>
-<dd><p>Search through the database at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> for the bytes specified by <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<code class="descclassname">database.</code><code class="descname">search</code><span class="sig-paren">(</span><em>ea</em>, <em>data</em>, <em>**direction</em><span class="sig-paren">)</span></dt>
+<dd><p>Search through the database at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> for the bytes specified by <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
 <p>If <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as a bool, then search backwards from the given address.
-If <code class="docutils literal notranslate"><span class="pre">radix</span></code> is specified, then use it as the number radix for describing the bytes.</p>
+If <code class="docutils literal notranslate"><span class="pre">radix</span></code> is specified, then use it as the numerical radix for describing the bytes.
+If <code class="docutils literal notranslate"><span class="pre">radix</span></code> is not specified, then assume that <code class="docutils literal notranslate"><span class="pre">data</span></code> represents the exact bytes to search.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address to search from</li>
+<li><strong>data</strong> – the bytes to search for</li>
+<li><strong>**direction</strong> – if <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as true then search backwards</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.search.by_bytes">
+<code class="descclassname">search.</code><code class="descname">by_bytes</code><span class="sig-paren">(</span><em>data</em>, <em>**direction</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.by_bytes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Search through the database at the current address for the bytes specified by <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_bytes" title="database.search.by_bytes"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byBytes</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>data</strong> – the bytes to search for</li>
+<li><strong>**direction</strong> – if <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as true then search backwards</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">search.</code><code class="descname">by_bytes</code><span class="sig-paren">(</span><em>ea</em>, <em>data</em>, <em>**direction</em><span class="sig-paren">)</span></dt>
+<dd><p>Search through the database at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> for the bytes specified by <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as a bool, then search backwards from the given address.
+If <code class="docutils literal notranslate"><span class="pre">radix</span></code> is specified, then use it as the numerical radix for describing the bytes.
+If <code class="docutils literal notranslate"><span class="pre">radix</span></code> is not specified, then assume that <code class="docutils literal notranslate"><span class="pre">data</span></code> represents the exact bytes to search.</p>
 <p>Aliases: <a class="reference internal" href="#database.search.by_bytes" title="database.search.by_bytes"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byBytes</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -4885,7 +4912,7 @@ If <code class="docutils literal notranslate"><span class="pre">radix</span></co
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address to search from</li>
-<li><strong>string</strong> (<em>bytes</em>) – the bytes to search for</li>
+<li><strong>data</strong> – the bytes to search for</li>
 <li><strong>**direction</strong> – if <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as true then search backwards</li>
 </ul>
 </td>
@@ -5019,14 +5046,14 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 
 <dl class="function">
 <dt id="database.search.iterate">
-<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>string</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.iterate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Iterate through all search results that match the bytes <code class="docutils literal notranslate"><span class="pre">string</span></code> starting at the current address.</p>
+<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>data</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all search results that match the bytes <code class="docutils literal notranslate"><span class="pre">data</span></code> starting at the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> (<em>str</em>) – the bytes to search for</li>
+<li><strong>data</strong> – the bytes to search for</li>
 <li><strong>**options</strong> – any options to pass to the <code class="docutils literal notranslate"><span class="pre">predicate</span></code></li>
 </ul>
 </td>
@@ -5037,14 +5064,14 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 
 <dl class="function">
 <dt>
-<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>string</em>, <em>predicate</em>, <em>**options</em><span class="sig-paren">)</span></dt>
-<dd><p>Iterate through all search results matched by the function <code class="docutils literal notranslate"><span class="pre">predicate</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">string</span></code> starting at the current address.</p>
+<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>data</em>, <em>predicate</em>, <em>**options</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all search results matched by the function <code class="docutils literal notranslate"><span class="pre">predicate</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">data</span></code> starting at the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> (<em>str</em>) – the string to pass to the <code class="docutils literal notranslate"><span class="pre">predicate</span></code></li>
+<li><strong>data</strong> – the bytes to pass to the <code class="docutils literal notranslate"><span class="pre">predicate</span></code></li>
 <li><strong>predicate</strong> (<em>callable</em>) – the callable to search with</li>
 <li><strong>**options</strong> – any options to pass to the <code class="docutils literal notranslate"><span class="pre">predicate</span></code></li>
 </ul>
@@ -5056,15 +5083,15 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 
 <dl class="function">
 <dt>
-<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>start</em>, <em>string</em>, <em>**options</em><span class="sig-paren">)</span></dt>
-<dd><p>Iterate through all search results that match the bytes <code class="docutils literal notranslate"><span class="pre">string</span></code> starting at address <code class="docutils literal notranslate"><span class="pre">start</span></code>.</p>
+<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>ea</em>, <em>data</em>, <em>**options</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all search results that match the bytes <code class="docutils literal notranslate"><span class="pre">data</span></code> starting at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address to search from</li>
-<li><strong>string</strong> (<em>str</em>) – the bytes to search for</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address to search from</li>
+<li><strong>data</strong> – the bytes to search for</li>
 <li><strong>**options</strong> – any options to search with</li>
 </ul>
 </td>
@@ -5075,15 +5102,15 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 
 <dl class="function">
 <dt>
-<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>start</em>, <em>string</em>, <em>predicate</em>, <em>**options</em><span class="sig-paren">)</span></dt>
-<dd><p>Iterate through all search results matched by the function <code class="docutils literal notranslate"><span class="pre">predicate</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">string</span></code> starting at address <code class="docutils literal notranslate"><span class="pre">start</span></code>.</p>
+<code class="descclassname">search.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>ea</em>, <em>data</em>, <em>predicate</em>, <em>**options</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all search results matched by the function <code class="docutils literal notranslate"><span class="pre">predicate</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">data</span></code> starting at address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address to search from</li>
-<li><strong>string</strong> (<em>str</em>) – the string to pass to the predicate</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the starting address to search from</li>
+<li><strong>data</strong> – the bytes to pass to the predicate</li>
 <li><strong>predicate</strong> (<em>callable</em>) – the callable to search with</li>
 <li><strong>**options</strong> – any options to pass to the <code class="docutils literal notranslate"><span class="pre">predicate</span></code></li>
 </ul>
@@ -5265,7 +5292,7 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>type</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>type</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – a pythonic type</td>
 </tr>
 </tbody>
 </table>
@@ -5298,8 +5325,8 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
-<li><strong>type</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – </li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>type</strong> (<a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – a pythonic type</li>
 </ul>
 </td>
 </tr>
@@ -6932,7 +6959,7 @@ also aliased as globals. Some of these are:</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.6.
     </div>
   </body>
 </html>

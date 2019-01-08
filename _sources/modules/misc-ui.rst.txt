@@ -119,6 +119,8 @@ segment, clipboard, widget, or even the current window in use.
    
    Return the current address range of whatever is selected
    
+   Aliases: :py:func:`ui.current.selected<current\.selection>`
+   
 .. py:function:: current\.status()
    
    Return the IDA status.
@@ -195,6 +197,8 @@ Base namespace for interacting with the keyboard input.
    
    Map a specific ``key`` to a python ``callable``.
    
+   Aliases: :py:func:`ui.keyboard.add<keyboard\.map>`
+   
    :param key: the key to map
    :param callable: a python callable to execute when the specified key is pressed
    
@@ -205,6 +209,8 @@ Base namespace for interacting with the keyboard input.
 .. py:function:: keyboard\.unmap(key)
    
    Unmap the specified ``key`` from its callable.
+   
+   Aliases: :py:func:`ui.keyboard.rm<keyboard\.unmap>`
    
    :param key: the key mapping to unmap
    
@@ -428,6 +434,8 @@ being viewed in graph view or not.
    
    Beep using IDA's interface.
    
+   Aliases: :py:func:`ui.beep<state\.beep>`
+   
 .. py:function:: state\.graphview()
    
    Returns true if the current function is being viewed in graph view mode.
@@ -436,9 +444,13 @@ being viewed in graph view or not.
    
    Refresh all of IDA's windows.
    
+   Aliases: :py:func:`ui.refresh<state\.refresh>`
+   
 .. py:function:: state\.wait()
    
    Wait until IDA's autoanalysis queues are empty.
+   
+   Aliases: :py:func:`ui.wait<state\.wait>`
    
 .. _ns-ui-strings:
 

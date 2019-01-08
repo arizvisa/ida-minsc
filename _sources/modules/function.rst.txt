@@ -329,33 +329,33 @@ functions and aliases. For more information on this, please see
    
    :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
-.. py:function:: select(tag, \*And, \*\*boolean)
+.. py:function:: select(tag, \*Or, \*\*boolean)
    
-   Query the contents of the current function for the specified ``tag`` and any others specified as ``And``.
+   Query the contents of the current function for the specified ``tag`` and any others specified as ``Or``.
    
    :param tag: a required tag name to search the contents for
    :type tag: str
-   :param \*And: any other required tag names
+   :param \*Or: any other tag names to include
    :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
-.. py:function:: select(func, tag, \*And, \*\*boolean)
+.. py:function:: select(func, tag, \*Or, \*\*boolean)
    
-   Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``And``.
+   Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``Or``.
    
    :param func: the function containing the contents tags to select
    :param tag: a required tag name to search the contents for
    :type tag: str
-   :param \*And: any other required tag names
+   :param \*Or: any other tag names to include
    :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
-.. py:function:: select(func, tag, \*And, \*\*boolean)
+.. py:function:: select(func, tag, \*Or, \*\*boolean)
    
-   Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``And``.
+   Query the contents of the function ``func`` for the specified ``tag`` and any others specified as ``Or``.
    
    :param func: the function containing the contents tags to select
    :param tag: a list of tag names to search the contents for
    :type tag: set or list
-   :param \*And: any other required tag names
+   :param \*Or: any other tag names to include
    :param \*\*boolean: either ``And`` or ``Or`` which specifies required or optional tags (respectively)
    
 .. py:function:: select(func, \*\*boolean)
@@ -1154,6 +1154,17 @@ The functions in this namespace can be used as::
    :param ea: the address of the chunk
    :type ea: int or long
    
+.. py:function:: chunk\.iterate()
+   
+   Iterate through all the instructions for the function chunk containing the current address.
+   
+.. py:function:: chunk\.iterate(ea)
+   
+   Iterate through all the instructions for the function chunk containing the address :py:obj:`ea`.
+   
+   :param ea:
+   :type ea: int or long
+   
 .. py:function:: chunk\.remove()
    
    Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
@@ -1332,6 +1343,44 @@ Some ways of using this can be::
    Aliases: :py:func:`function.get_frameid<frame\.id>`
    
    :param func: the function to return the frame id for
+   
+.. py:function:: frame\.new()
+   
+   Add an empty frame to the current function.
+   
+.. py:function:: frame\.new(lvars, args)
+   
+   Add a frame to the current function using the sizes specified by ``lvars`` for local variables, and ``args`` for arguments.
+   
+   :param lvars: the number of bytes to allocate for local variables
+   :type lvars: int or long
+   :param args: the number of bytes to allocate for arguments
+   :type args: int or long
+   
+.. py:function:: frame\.new(lvars, regs, args)
+   
+   Add a frame to the current function using the sizes specified by ``lvars`` for local variables, ``regs`` for frame registers, and ``args`` for arguments.
+   
+   :param lvars: the number of bytes to allocate for local variables
+   :type lvars: int or long
+   :param regs: the number of bytes to allocate for registers
+   :type regs: int or long
+   :param args: the number of bytes to allocate for arguments
+   :type args: int or long
+   
+.. py:function:: frame\.new(func, lvars, regs, args)
+   
+   Add a frame to the function ``func`` using the sizes specified by ``lvars`` for local variables, ``regs`` for frame registers, and ``args`` for arguments.
+   
+   When specifying the size of the registers (``regs``) the size of the saved instruction pointer must also be included.
+   
+   :param func: the function to add the frame to
+   :param lvars: the number of bytes to allocate for local variables
+   :type lvars: int or long
+   :param regs: the number of bytes to allocate for registers
+   :type regs: int or long
+   :param args: the number of bytes to allocate for arguments
+   :type args: int or long
    
 .. _ns-function-frame-args:
 
