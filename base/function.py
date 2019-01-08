@@ -1608,7 +1608,7 @@ def select(func, tag, *And, **boolean):
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *And, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
-    res = (tag,) + And
+    res = tuple(iter(tag)) + And
     boolean['And'] = tuple(set(iter(boolean.get('And', ()))) | set(res))
     return select(func, **boolean)
 @utils.multicase()
