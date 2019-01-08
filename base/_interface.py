@@ -1038,7 +1038,7 @@ class switch_t(object):
     def cases(self):
         '''Return all of the non-default cases in the switch.'''
         import instruction
-        f = lambda ea, dflt=self.default: (ea == dflt) or (instruction.is_jmp(ea) and instruction.op(ea, 0) == dflt)
+        f = lambda ea, dflt=self.default: (ea == dflt) or (instruction.type.is_jmp(ea) and instruction.op(ea, 0) == dflt)
         return tuple(idx for idx in six.moves.range(self.base, self.base+self.count) if not f(self.case(idx)))
     @property
     def range(self):
