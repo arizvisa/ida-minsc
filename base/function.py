@@ -1592,24 +1592,24 @@ def select(**boolean):
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
-def select(tag, *And, **boolean):
-    '''Query the contents of the current function for the specified `tag` and any others specified as `And`.'''
-    res = (tag,) + And
-    boolean['And'] = tuple(set(iter(boolean.get('And', ()))) | set(res))
+def select(tag, *Or, **boolean):
+    '''Query the contents of the current function for the specified `tag` and any others specified as `Or`.'''
+    res = (tag,) + Or
+    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
-def select(func, tag, *And, **boolean):
-    '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
-    res = (tag,) + And
-    boolean['And'] = tuple(set(iter(boolean.get('And', ()))) | set(res))
+def select(func, tag, *Or, **boolean):
+    '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
+    res = (tag,) + Or
+    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
 @utils.string.decorate_arguments('tag', 'And', 'Or')
-def select(func, tag, *And, **boolean):
-    '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
-    res = tuple(iter(tag)) + And
-    boolean['And'] = tuple(set(iter(boolean.get('And', ()))) | set(res))
+def select(func, tag, *Or, **boolean):
+    '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
+    res = tuple(iter(tag)) + Or
+    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
     return select(func, **boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
