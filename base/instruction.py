@@ -46,7 +46,7 @@ import logging, collections
 import database, function
 import structure, enumeration
 import ui, internal
-from internal import utils, interface, exceptions as E, document
+from internal import utils, interface, exceptions as E
 
 import idaapi
 

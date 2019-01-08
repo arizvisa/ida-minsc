@@ -28,7 +28,7 @@ import math, array as _array, fnmatch, re, ctypes
 import function, segment
 import structure as _structure, instruction as _instruction
 import ui, internal
-from internal import utils, interface, exceptions as E, document
+from internal import utils, interface, exceptions as E
 
 import idaapi
 

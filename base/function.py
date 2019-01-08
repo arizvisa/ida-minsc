@@ -26,7 +26,7 @@ import logging
 
 import database, instruction, structure
 import ui, internal
-from internal import utils, interface, exceptions as E, document
+from internal import utils, interface, exceptions as E
 
 import idaapi
 

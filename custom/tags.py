@@ -28,9 +28,8 @@ To apply previously read tags with different names to the database::
 import six, sys, logging, builtins
 import functools, operator, itertools, types, string
 
-import database as db, function as func, structure as struc
-import ui, internal
-from internal import document
+import database as db, function as func, structure as struc, ui
+import internal
 
 output = sys.stderr
 

@@ -22,8 +22,6 @@ import logging
 import database, function as func, instruction, segment
 import ui, internal
 
-from internal import document
-
 @document.parameters(F='the callback to execute on each function', kwargs='any extra arguments to pass to the callback')
 def map(F, **kwargs):
     """Execute the callback `F` on all functions in the database. Synonymous to `map(F, database.functions())` but with some extra logging to display the current progress.

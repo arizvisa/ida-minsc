@@ -24,7 +24,6 @@ import functools, operator, itertools, types
 
 import database as db, function as func, ui
 import internal
-from internal import document
 
 import idaapi
 output = sys.stderr

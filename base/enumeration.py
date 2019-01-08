@@ -40,7 +40,7 @@ import fnmatch, re
 import database
 
 import internal
-from internal import utils, interface, exceptions as E, document
+from internal import utils, interface, exceptions as E
 
 import idaapi
 

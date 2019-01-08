@@ -24,7 +24,6 @@ import logging
 
 import idaapi, internal
 import database as _database
-from internal import document
 
 ## TODO:
 # locate window under current cursor position

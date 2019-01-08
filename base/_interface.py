@@ -14,8 +14,6 @@ import collections, heapq, traceback, ctypes
 import unicodedata as _unicodedata, string as _string
 
 import ui, internal
-from internal import document
-
 import idaapi
 
 class typemap:
