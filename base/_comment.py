@@ -478,7 +478,7 @@ class tag(object):
         result.send(' ')
 
         # next encode the value component
-        tag.value.encode(iter({value}), result)
+        tag.value.encode(iter([value]), result)
 
         # now we can return the resulting string
         return result.get()
