@@ -1595,21 +1595,21 @@ def select(**boolean):
 def select(tag, *And, **boolean):
     '''Query the contents of the current function for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
-    boolean['And'] = tuple(set(boolean.get('And', set())) | set(res))
+    boolean['And'] = tuple(set(iter(boolean.get('And', ()))) | set(res))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *And, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
-    boolean['And'] = tuple(set(boolean.get('And', set())) | set(res))
+    boolean['And'] = tuple(set(iter(boolean.get('And', ()))) | set(res))
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *And, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
-    boolean['And'] = tuple(set(boolean.get('And', set())) | set(res))
+    boolean['And'] = tuple(set(iter(boolean.get('And', ()))) | set(res))
     return select(func, **boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1631,17 +1631,18 @@ def select(func, **boolean):
             if res: yield ea, res
         return
 
+    # collect the keys to query as specified by the user
+    Or, And = (set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
+
     # walk through every tagged address and cross-check it against query
     for ea in internal.comment.contents.address(fn.startEA):
         ui.navigation.analyze(ea)
         res, d = {}, database.tag(ea)
 
         # Or(|) includes any of the tags being queried
-        Or = boolean.get('Or', set())
         res.update({key : value for key, value in six.iteritems(d) if key in Or})
 
         # And(&) includes any tags only if they include all the specified tagnames
-        And = boolean.get('And', set())
         if And:
             if And & d.viewkeys() == And:
                 res.update({key : value for key, value in six.iteritems(d) if key in And})
