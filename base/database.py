@@ -1481,7 +1481,7 @@ def tag(ea, key, none):
 def select(tag, *And, **boolean):
     '''Query all of the global tags in the database for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
-    boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())) | builtins.set(res))
+    boolean['And'] = tuple(builtins.set(iter(boolean.get('And', ()))) | builtins.set(res))
     return select(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1502,17 +1502,18 @@ def select(**boolean):
             if res: yield ea, res
         return
 
+    # collect the keys to query as specified by the user
+    Or, And = (builtins.set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
+
     # walk through all tags so we can cross-check them with the query
     for ea in internal.comment.globals.address():
         ui.navigation.set(ea)
         res, d = {}, function.tag(ea) if function.within(ea) else tag(ea)
 
         # Or(|) includes any tags that were queried
-        Or = boolean.get('Or', builtins.set())
         res.update({key : value for key, value in six.iteritems(d) if key in Or})
 
         # And(&) includes any tags that match all of the queried tagnames
-        And = boolean.get('And', builtins.set())
         if And:
             if And & d.viewkeys() == And:
                 res.update({key : value  for key, value in six.iteritems(d) if key in And})
@@ -1529,7 +1530,7 @@ def select(**boolean):
 def selectcontents(tag, *Or, **boolean):
     '''Query all function contents for the specified `tag` or any others specified as `Or`.'''
     res = (tag,) + Or
-    boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())) | builtins.set(res))
+    boolean['Or'] = tuple(builtins.set(iter(boolean.get('Or', ()))) | builtins.set(res))
     return selectcontents(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1550,6 +1551,9 @@ def selectcontents(**boolean):
             if res: yield ea, res
         return
 
+    # collect the keys to query as specified by the user
+    Or, And = (builtins.set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
+
     # walk through all tagnames so we can cross-check them against the query
     for ea, res in internal.comment.contents.iterate():
         ui.navigation.procedure(ea)
@@ -1565,11 +1569,9 @@ def selectcontents(**boolean):
         res, d = builtins.set(), internal.comment.contents.name(ea)
 
         # Or(|) includes any of the tagnames being queried
-        Or = boolean.get('Or', builtins.set())
         res.update(Or & d)
 
         # And(&) includes tags only if they include all of the specified tagnames
-        And = boolean.get('And', builtins.set())
         if And:
             if And & d == And:
                 res.update(And)
