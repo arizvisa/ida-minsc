@@ -1481,7 +1481,7 @@ def tag(ea, key, none):
 def select(tag, *And, **boolean):
     '''Query all of the global tags in the database for the specified `tag` and any others specified as `And`.'''
     res = (tag,) + And
-    boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())).union(res))
+    boolean['And'] = tuple(builtins.set(boolean.get('And', builtins.set())) | builtins.set(res))
     return select(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1514,7 +1514,7 @@ def select(**boolean):
         # And(&) includes any tags that match all of the queried tagnames
         And = boolean.get('And', builtins.set())
         if And:
-            if And.intersection(d.viewkeys()) == And:
+            if And & d.viewkeys() == And:
                 res.update({key : value  for key, value in six.iteritems(d) if key in And})
             else: continue
 
@@ -1529,7 +1529,7 @@ def select(**boolean):
 def selectcontents(tag, *Or, **boolean):
     '''Query all function contents for the specified `tag` or any others specified as `Or`.'''
     res = (tag,) + Or
-    boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())).union(res))
+    boolean['Or'] = tuple(builtins.set(boolean.get('Or', builtins.set())) | builtins.set(res))
     return selectcontents(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1566,12 +1566,12 @@ def selectcontents(**boolean):
 
         # Or(|) includes any of the tagnames being queried
         Or = boolean.get('Or', builtins.set())
-        res.update(Or.intersection(d))
+        res.update(Or & d)
 
         # And(&) includes tags only if they include all of the specified tagnames
         And = boolean.get('And', builtins.set())
         if And:
-            if And.intersection(d) == And:
+            if And & d == And:
                 res.update(And)
             else: continue
 
