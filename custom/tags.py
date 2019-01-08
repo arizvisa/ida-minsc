@@ -310,15 +310,26 @@ class apply(object):
 
         # iterate through our dictionary of members
         for offset, (name, type, comment) in six.iteritems(frame):
-            try:
-                member = F.by_offset(offset)
-            except internal.exceptions.MemberNotFoundError:
-                logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Skipping application of the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\") to it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
-                continue
 
+            # first try and locate the member
+            try:
+                member = F.members.by_offset(offset)
+            except:
+                member = None
+
+            # if we didn't find a member, then try and add it with what we currently know
+            if member is None:
+                logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Attempting to create the member with the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\").".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
+                try:
+                    member = F.members.add(name, type, offset)
+                except:
+                    logging.fatal(u"{:s}.frame({:#x}, ...{:s}) : Unable to add frame member at {:+#x}. Skipping application of the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\") to it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
+                    continue
+
+            # check if the name has changed or is different in some way
             if member.name != name:
-                if any(not member.name.startswith(n) for n in ('arg_', 'var_', ' ')):
-                    logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Renaming frame member {:+#x} from the name \"{:s}\" to \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(member.name, '"'), internal.utils.string.escape(name, '"')))
+                log = logging.info if lvarNameQ(member.name) else logging.warn
+                log(u"{:s}.frame({:#x}, ...{:s}) : Renaming frame member {:+#x} from the name \"{:s}\" to \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(member.name, '"'), internal.utils.string.escape(name, '"')))
                 member.name = name
 
             # check what's going to be overwritten with different values prior to doing it
