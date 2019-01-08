@@ -969,7 +969,7 @@ class globals(tagging):
     @classmethod
     def set_address(cls, address, count):
         '''Set the global tag count for `address` in the database to `count`.'''
-        node, eName = tagging.node()
+        node = tagging.node()
         res = internal.netnode.alt.get(node, address)
         internal.netnode.alt.set(node, address, count)
         return res
