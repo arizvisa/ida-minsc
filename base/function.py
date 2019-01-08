@@ -1396,17 +1396,20 @@ class frame(object):
         return cls.new(ui.current.function(), 0, _r, 0)
     @utils.multicase(lvars=six.integer_types, args=six.integer_types)
     @classmethod
+    @document.parameters(lvars='the number of bytes to allocate for local variables', args='the number of bytes to allocate for arguments')
     def new(cls, lvars, args):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
         _r = database.config.bits() / 8
         return cls.new(ui.current.function(), lvars, _r, args)
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
+    @document.parameters(lvars='the number of bytes to allocate for local variables', regs='the number of bytes to allocate for registers', args='the number of bytes to allocate for arguments')
     def new(cls, lvars, regs, args):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.'''
         return cls.new(ui.current.function(), lvars, regs, args)
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
+    @document.parameters(func='the function to add the frame to', lvars='the number of bytes to allocate for local variables', regs='the number of bytes to allocate for registers', args='the number of bytes to allocate for arguments')
     def new(cls, func, lvars, regs, args):
         """Add a frame to the function `func` using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.
 
