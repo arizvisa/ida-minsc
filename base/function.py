@@ -1664,7 +1664,7 @@ def down(func):
         data, code = [], []
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
-                if database.type.is_code(ea) and instruction.is_call(ea):
+                if database.type.is_code(ea) and instruction.type.is_call(ea):
                     logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, fn.startEA, utils.string.escape(database.disassemble(ea), '"')))
                     #code.append((ea, 0))
                 continue
