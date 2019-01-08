@@ -812,110 +812,163 @@ def op_refs(ea, opnum):
 op_ref = utils.alias(op_refs)
 
 ## types of instructions
-@utils.multicase()
-def is_return():
-    '''Returns true if the current instruction is a return-type instruction.'''
-    return is_return(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_return(ea):
-    '''Returns true if the instruction at `ea` is a return-type instruction.'''
-    ea = interface.address.inside(ea)
-    returnQ = lambda ea: feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
+class type(object):
+    """
+    This namespace is for fetching information about the instruction
+    type at a given address within the database. The functions within
+    this namespace return a boolean based on whether the instruction at
+    the given address fits a particular type.
 
-    # Older versions of IDA required idaapi.cmd to be populated for is_ret_insn to work.
-    if hasattr(idaapi, 'is_ret_insn'):
-        idaapi.decode_insn(ea)
-        returnQ = idaapi.is_ret_insn
+    It is prudent to note that the information that these functions
+    expose are essentially flags for the instruction and is provided
+    in order to allow a user to infer how IDA has processed the
+    instruction. These flags are used by IDA in order to determine
+    things such as whether or not it should continue disassembling,
+    or if it should add the instruction's operand to its queue in
+    order to recursively disassemble code witin the database.
 
-    return database.is_code(ea) and returnQ(ea)
-isReturn = returnQ = retQ = utils.alias(is_return)
+    This namespace is also aliased as ``instruction.t``.
 
-@utils.multicase()
-def is_shift():
-    '''Returns true if the current instruction is a bit-shifting instruction.'''
-    return is_shift(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_shift(ea):
-    '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
-    ea = interface.address.inside(ea)
-    return database.is_code(ea) and feature(ea) & idaapi.CF_SHFT == idaapi.CF_SHFT
-isShift = shiftQ = utils.alias(is_shift)
+    Some examples of using this namespace are::
 
-@utils.multicase()
-def is_branch():
-    '''Returns true if the current instruction is any kind of branch.'''
-    return is_branch(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_branch(ea):
-    '''Returns true if the instruction at `ea` is any kind of branch.'''
-    ea = interface.address.inside(ea)
-    return database.is_code(ea) and is_jmp(ea) or is_jxx(ea) or is_jmpi(ea)
-isBranch = branchQ = utils.alias(is_branch)
+        > print instruction.type.is_return(ea)
+        > print instruction.type.is_jxx(ea)
+        > print instruction.type.is_call(ea)
+        > print instruction.type.is_branch(ea)
 
-@utils.multicase()
-def is_jmp():
-    '''Returns true if the current instruction is an immediate and indirect branch.'''
-    return is_jmp(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_jmp(ea):
-    '''Returns true if the instruction at `ea` is an immediate and indrect branch.'''
-    ea = interface.address.inside(ea)
+    """
+    @utils.multicase()
+    @classmethod
+    def is_return(cls):
+        '''Returns true if the current instruction is a return-type instruction.'''
+        return cls.is_return(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_return(cls, ea):
+        '''Returns true if the instruction at `ea` is a return-type instruction.'''
+        ea = interface.address.inside(ea)
+        returnQ = lambda ea: feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
 
-    F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
-    return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_STOP == idaapi.CF_STOP) and len(list(X)) == 1 and not is_return(ea)
-isJmp = JmpQ = jmpQ = utils.alias(is_jmp)
+        # Older versions of IDA required idaapi.cmd to be populated for is_ret_insn to work.
+        if hasattr(idaapi, 'is_ret_insn'):
+            idaapi.decode_insn(ea)
+            returnQ = idaapi.is_ret_insn
 
-@utils.multicase()
-def is_jxx():
-    '''Returns true if the current instruction is a conditional branch.'''
-    return is_jxx(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_jxx(ea):
-    '''Returns true if the instruction at `ea` is a conditional branch.'''
-    ea = interface.address.inside(ea)
+        return database.is_code(ea) and returnQ(ea)
+    isReturn = returnQ = retQ = utils.alias(is_return, 'type')
 
-    F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
-    return database.is_code(ea) and all((F&x != x) for x in {idaapi.CF_CALL, idaapi.CF_STOP}) and len(list(X)) > 1
-isJxx = JxxQ = jxxQ = utils.alias(is_jxx)
+    @utils.multicase()
+    @classmethod
+    def is_shift(cls):
+        '''Returns true if the current instruction is a bit-shifting instruction.'''
+        return cls.is_shift(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_shift(cls, ea):
+        '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
+        ea = interface.address.inside(ea)
+        return database.is_code(ea) and feature(ea) & idaapi.CF_SHFT == idaapi.CF_SHFT
+    isShift = shiftQ = utils.alias(is_shift, 'type')
 
-@utils.multicase()
-def is_jmpi():
-    '''Returns true if the instruction at the current address is an indirect branch.'''
-    return is_jmpi(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_jmpi(ea):
-    '''Returns true if the instruction at `ea` is an indirect branch.'''
-    ea = interface.address.inside(ea)
-    F = feature(ea)
-    return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_JUMP == idaapi.CF_JUMP)
-isJmpi = JmpiQ = jmpiQ = utils.alias(is_jmpi)
+    @utils.multicase()
+    @classmethod
+    def is_branch(cls):
+        '''Returns true if the current instruction is any kind of branch.'''
+        return cls.is_branch(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_branch(cls, ea):
+        '''Returns true if the instruction at `ea` is any kind of branch.'''
+        ea = interface.address.inside(ea)
+        return database.is_code(ea) and cls.is_jmp(ea) or cls.is_jxx(ea) or cls.is_jmpi(ea)
+    isBranch = branchQ = utils.alias(is_branch, 'type')
 
-@utils.multicase()
-def is_call():
-    '''Returns true if the current instruction is a call.'''
-    return is_call(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_call(ea):
-    '''Returns true if the instruction at `ea` is a call.'''
-    ea = interface.address.inside(ea)
-    if hasattr(idaapi, 'is_call_insn'):
-        idaapi.decode_insn(ea)
-        return idaapi.is_call_insn(ea)
+    @utils.multicase()
+    @classmethod
+    def is_jmp(cls):
+        '''Returns true if the current instruction is an immediate and indirect branch.'''
+        return cls.is_jmp(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_jmp(cls, ea):
+        '''Returns true if the instruction at `ea` is an immediate and indrect branch.'''
+        ea = interface.address.inside(ea)
 
-    F = feature(ea)
-    return database.is_code(ea) and (feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL)
-isCall = callQ = utils.alias(is_call)
+        F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
+        return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_STOP == idaapi.CF_STOP) and len(list(X)) == 1 and not cls.is_return(ea)
+    isJmp = jmpQ = utils.alias(is_jmp, 'type')
 
-@utils.multicase()
-def is_calli():
-    '''Return true if the current instruction is an indirect call.'''
-    return is_calli(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def is_calli(ea):
-    '''Returns true if the instruction at `ea` is an indirect call.'''
-    ea = interface.address.inside(ea)
-    F = feature(ea)
-    return is_call(ea) and all(F&x == x for x in {idaapi.CF_CALL, idaapi.CF_JUMP})
+    @utils.multicase()
+    @classmethod
+    def is_jxx(cls):
+        '''Returns true if the current instruction is a conditional branch.'''
+        return cls.is_jxx(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_jxx(cls, ea):
+        '''Returns true if the instruction at `ea` is a conditional branch.'''
+        ea = interface.address.inside(ea)
+
+        F, X = feature(ea), interface.xiterate(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from)
+        return database.is_code(ea) and all((F&x != x) for x in {idaapi.CF_CALL, idaapi.CF_STOP}) and len(list(X)) > 1
+    isJxx = jxxQ = utils.alias(is_jxx, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def is_jmpi(cls):
+        '''Returns true if the instruction at the current address is an indirect branch.'''
+        return cls.is_jmpi(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_jmpi(cls, ea):
+        '''Returns true if the instruction at `ea` is an indirect branch.'''
+        ea = interface.address.inside(ea)
+        F = feature(ea)
+        return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_JUMP == idaapi.CF_JUMP)
+    isJmpi = jmpiQ = utils.alias(is_jmpi, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def is_call(cls):
+        '''Returns true if the current instruction is a call.'''
+        return cls.is_call(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_call(cls, ea):
+        '''Returns true if the instruction at `ea` is a call.'''
+        ea = interface.address.inside(ea)
+        if hasattr(idaapi, 'is_call_insn'):
+            idaapi.decode_insn(ea)
+            return idaapi.is_call_insn(ea)
+
+        F = feature(ea)
+        return database.is_code(ea) and (feature(ea) & idaapi.CF_CALL == idaapi.CF_CALL)
+    isCall = callQ = utils.alias(is_call, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def is_calli(cls):
+        '''Return true if the current instruction is an indirect call.'''
+        return cls.is_calli(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def is_calli(cls, ea):
+        '''Returns true if the instruction at `ea` is an indirect call.'''
+        ea = interface.address.inside(ea)
+        F = feature(ea)
+        return cls.is_call(ea) and all(F&x == x for x in {idaapi.CF_CALL, idaapi.CF_JUMP})
+    isCalli = calliQ = utils.alias(is_calli, 'type')
+
+t = type    # XXX: ns alias
+
+is_return = returnQ = retQ = utils.alias(type.is_return, 'type')
+is_shift = shiftQ = utils.alias(type.is_shift, 'type')
+is_branch = branchQ = utils.alias(type.is_branch, 'type')
+is_jmp = jmpQ = utils.alias(type.is_jmp, 'type')
+is_jxx = jxxQ = utils.alias(type.is_jxx, 'type')
+is_jmpi = jmpiQ = utils.alias(type.is_jmpi, 'type')
+is_call = callQ = utils.alias(type.is_call, 'type')
+is_calli = calliQ = utils.alias(type.is_calli, 'type')
 
 ## operand type registration
 ## XXX: This namespace is deleted after each method has been assigned to their lookup table
