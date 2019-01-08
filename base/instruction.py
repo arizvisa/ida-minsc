@@ -894,6 +894,7 @@ def op_refs(ea, opnum):
 op_ref = utils.alias(op_refs)
 
 ## types of instructions
+@document.namespace
 class type(object):
     """
     This namespace is for fetching information about the instruction
@@ -974,13 +975,13 @@ class type(object):
         return database.is_code(ea) and cls.is_jmp(ea) or cls.is_jxx(ea) or cls.is_jmpi(ea)
     isBranch = branchQ = utils.alias(is_branch, 'type')
 
-    @document.aliases('is_jmp', 'type.isJmp', 'type.JmpQ', 'type.jmpQ', 'isJmp', 'JmpQ', 'jmpQ', 'isJmp')
+    @document.aliases('is_jmp', 'type.isJmp', 'type.jmpQ', 'isJmp', 'jmpQ', 'isJmp')
     @utils.multicase()
     @classmethod
     def is_jmp(cls):
         '''Returns true if the current instruction is an immediate and indirect branch.'''
         return cls.is_jmp(ui.current.address())
-    @document.aliases('is_jmp', 'type.isJmp', 'type.JmpQ', 'type.jmpQ', 'isJmp', 'JmpQ', 'jmpQ', 'isJmp')
+    @document.aliases('is_jmp', 'type.isJmp', 'type.jmpQ', 'isJmp', 'jmpQ', 'isJmp')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     @document.parameters(ea='the address of an instruction')
@@ -992,13 +993,13 @@ class type(object):
         return database.is_code(ea) and (F & idaapi.CF_CALL != idaapi.CF_CALL) and (F & idaapi.CF_STOP == idaapi.CF_STOP) and len(list(X)) == 1 and not cls.is_return(ea)
     isJmp = jmpQ = utils.alias(is_jmp, 'type')
 
-    @document.aliases('is_jxx', 'type.isJxx', 'type.JxxQ', 'type.jxxQ', 'isJxx', 'JxxQ', 'jxxQ')
+    @document.aliases('is_jxx', 'type.isJxx', 'type.jxxQ', 'isJxx', 'jxxQ')
     @utils.multicase()
     @classmethod
     def is_jxx(cls):
         '''Returns true if the current instruction is a conditional branch.'''
         return cls.is_jxx(ui.current.address())
-    @document.aliases('is_jxx', 'type.isJxx', 'type.JxxQ', 'type.jxxQ', 'isJxx', 'JxxQ', 'jxxQ')
+    @document.aliases('is_jxx', 'type.isJxx', 'type.jxxQ', 'isJxx', 'jxxQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     @document.parameters(ea='the address of an instruction')
@@ -1010,13 +1011,13 @@ class type(object):
         return database.is_code(ea) and all((F&x != x) for x in {idaapi.CF_CALL, idaapi.CF_STOP}) and len(list(X)) > 1
     isJxx = jxxQ = utils.alias(is_jxx, 'type')
 
-    @document.aliases('is_jmpi', 'type.isJmpi', 'type.JmpiQ', 'type.jmpiQ', 'isJmpi', 'JmpiQ', 'jmpiQ')
+    @document.aliases('is_jmpi', 'type.isJmpi', 'type.jmpiQ', 'isJmpi', 'jmpiQ')
     @utils.multicase()
     @classmethod
     def is_jmpi(cls):
         '''Returns true if the instruction at the current address is an indirect branch.'''
         return cls.is_jmpi(ui.current.address())
-    @document.aliases('is_jmpi', 'type.isJmpi', 'type.JmpiQ', 'type.jmpiQ', 'isJmpi', 'JmpiQ', 'jmpiQ')
+    @document.aliases('is_jmpi', 'type.isJmpi', 'type.jmpiQ', 'isJmpi', 'jmpiQ')
     @utils.multicase(ea=six.integer_types)
     @classmethod
     @document.parameters(ea='the address of an instruction')
