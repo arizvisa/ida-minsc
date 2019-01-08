@@ -939,12 +939,12 @@ class search(object):
             ea = predicate(address.next(ea), data)
         return
 
-    @document.parameters(data='the bytes to search for')
+    @document.parameters(data='the bytes to search for', direction='if ``reverse`` is specified as true then search backwards')
     @utils.multicase()
     def __new__(cls, data, **direction):
         '''Search through the database at the current address for the bytes specified by `data`.'''
         return cls.by_bytes(ui.current.address(), data, **direction)
-    @document.parameters(ea='the starting address to search from', data='the bytes to search for')
+    @document.parameters(ea='the starting address to search from', data='the bytes to search for', direction='if ``reverse`` is specified as true then search backwards')
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea, data, **direction):
         """Search through the database at address `ea` for the bytes specified by `data`.
@@ -4879,6 +4879,7 @@ class set(object):
 
     @utils.multicase(type=types.ListType)
     @classmethod
+    @document.parameters(type='a pythonic type')
     def array(cls, type):
         '''Set the data at the current address to an array of the specified `type`.'''
         return cls.array(ui.current.address(), type, 1)
@@ -4890,6 +4891,7 @@ class set(object):
         return cls.array(ui.current.address(), type, length)
     @utils.multicase(ea=six.integer_types, type=types.ListType)
     @classmethod
+    @document.parameters(ea='an address in the database', type='a pythonic type')
     def array(cls, ea, type):
         '''Set the data at the address `ea` to an array of the specified `type`.'''
         return cls.array(ea, type, 1)
