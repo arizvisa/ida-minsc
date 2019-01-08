@@ -41,18 +41,25 @@ def by_address(ea):
     ea = interface.address.within(ea)
     res = idaapi.get_func(ea)
     if res is None:
-        raise E.FunctionNotFoundError("{:s}.by_address({:#x}) : Unable to locate function.".format(__name__, ea))
+        raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate function by address.".format(__name__, ea))
     return res
 byAddress = utils.alias(by_address)
 
+@utils.string.decorate_arguments('name')
 def by_name(name):
     '''Return the function with the specified `name`.'''
-    ea = idaapi.get_name_ea(idaapi.BADADDR, name)
+    # convert the name into something friendly for IDA
+    res = utils.string.to(name)
+
+    # ask IDA to get its address
+    ea = idaapi.get_name_ea(idaapi.BADADDR, res)
     if ea == idaapi.BADADDR:
-        raise E.FunctionNotFoundError("{:s}.by_name({!r}) : Unable to locate function by name.".format(__name__, name))
+        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to locate function by name.".format(__name__, name))
+
+    # now that we have its address, return the func_t
     res = idaapi.get_func(ea)
     if res is None:
-        raise E.FunctionNotFoundError("{:s}.by_name({!r}) : Unable to locate function by address.".format(__name__, name))
+        raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to locate function by address.".format(__name__, name))
     return res
 byName = utils.alias(by_name)
 
@@ -69,6 +76,7 @@ def by(ea):
     '''Return the function at the address `ea`.'''
     return by_address(ea)
 @utils.multicase(name=basestring)
+@utils.string.decorate_arguments('name')
 def by(name):
     '''Return the function with the specified `name`.'''
     return by_name(name)
@@ -91,7 +99,8 @@ def offset(func):
 def comment(**repeatable):
     '''Return the comment for the current function.'''
     fn = ui.current.function()
-    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    return utils.string.of(res)
 @utils.multicase()
 def comment(func, **repeatable):
     """Return the comment for the function `func`.
@@ -99,13 +108,16 @@ def comment(func, **repeatable):
     If the bool `repeatable` is specified, then return the repeatable comment.
     """
     fn = by(func)
-    return idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
+    return utils.string.of(res)
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
     fn = ui.current.function()
     return comment(fn, string, **repeatable)
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string')
 def comment(func, string, **repeatable):
     """Set the comment for the function `func` to `string`.
 
@@ -113,9 +125,9 @@ def comment(func, string, **repeatable):
     """
     fn = by(func)
 
-    res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, string, repeatable.get('repeatable', True))
+    res, ok = comment(fn, **repeatable), idaapi.set_func_cmt(fn, utils.string.to(string), repeatable.get('repeatable', True))
     if not ok:
-        raise E.DisassemblerError("{:s}.comment({:#x}, {!r}{:s}) : Unable to call idaapi.set_func_cmt({:#x}, {!r}, {!s}).".format(__name__, ea, string, ", {:s}".format(', '.join("{:s}={!r}".format(key, value) for key, value in six.iteritems(repeatable))) if repeatable else '', ea, string, repeatable.get('repeatable', True)))
+        raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.to(string), repeatable.get('repeatable', True)))
     return res
 
 @utils.multicase()
@@ -127,15 +139,30 @@ def name(func):
     '''Return the name of the function `func`.'''
     get_name = functools.partial(idaapi.get_name, idaapi.BADADDR) if idaapi.__version__ < 7.0 else idaapi.get_name
 
+    # check to see if it's a runtime-linked function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     if rt:
-        res = get_name(ea)
+        name = get_name(ea)
+
+        # decode the string from IDA's UTF-8
+        # XXX: how does demangling work with unicode? this would be implementation specific, no?
+        res = utils.string.of(res)
+
+        # demangle it if necessary
         return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
         #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
-    res = idaapi.get_func_name(ea)
-    if not res: res = get_name(ea)
-    if not res: res = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
-    return res
+
+    # otherwise it's a regular function, so try and get its name in a couple of ways
+    name = idaapi.get_func_name(ea)
+    if not name: name = get_name(ea)
+    if not name: name = idaapi.get_true_name(ea, ea) if idaapi.__version__ < 6.8 else idaapi.get_ea_name(ea, idaapi.GN_VISIBLE)
+
+    # decode the string from IDA's UTF-8
+    # XXX: how does demangling work with unicode? this would be implementation specific, no?
+    res = utils.string.of(name)
+
+    # demangle it if we need to
+    return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
 @utils.multicase(none=types.NoneType)
@@ -146,6 +173,7 @@ def name(none):
     # function and wanting to rename that instead.
     return name(ui.current.address(), none or '')
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix):
     '''Set the name of the current function to `string`.'''
     return name(ui.current.address(), string, *suffix)
@@ -154,6 +182,7 @@ def name(func, none):
     '''Remove the custom-name from the function `func`.'''
     return name(func, none or '')
 @utils.multicase(string=basestring)
+@utils.string.decorate_arguments('string', 'suffix')
 def name(func, string, *suffix):
     '''Set the name of the function `func` to `string`.'''
 
@@ -164,15 +193,9 @@ def name(func, string, *suffix):
     # figure out if address is a runtime or static function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-    # filter out invalid characters
-    res = idaapi.validate_name2(buffer(string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(string)[:], idaapi.VNT_VISIBLE)
-    if string and string != res:
-        logging.info("{:s}.name({:#x}, {!r}) : Stripped the invalid chars from the function name resulting in {!r}.".format(__name__, ea, string, res))
-        string = res
-
-    # now we can assign the name
+    # now we can assign the name depending on whether it's a function or a runtime-linked function
+    # FIXME: mangle the name and shuffle it into the prototype if possible
     if rt:
-        # FIXME: shuffle the new name into the prototype and then re-mangle it
         res = database.name(ea, string)
     else:
         res = database.name(ea, string, flags=idaapi.SN_PUBLIC)
@@ -192,11 +215,11 @@ def convention(func):
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     sup = internal.netnode.sup.get(ea, 0x3000)
     if sup is None:
-        raise E.MissingTypeOrAttribute("{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
+        raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
     try:
         _, _, cc = interface.node.sup_functype(sup)
     except E.UnsupportedCapability:
-        raise E.UnsupportedCapability("{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
+        raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
     return cc
 cc = utils.alias(convention)
 
@@ -211,15 +234,15 @@ def prototype(func):
     rt, ea = interface.addressOfRuntimeOrStatic(func)
     funcname = database.name(ea) or name(ea)
     try:
-        res = internal.declaration.function(ea)
-        idx = res.find('(')
-        result = res[:idx] + ' ' + funcname + res[idx:]
+        decl = internal.declaration.function(ea)
+        idx = decl.find('(')
+        res = "{result:s} {name:s}{parameters:s}".format(result=decl[:idx], name=funcname, parameters=decl[idx:])
 
     except E.MissingTypeOrAttribute:
         if not internal.declaration.mangledQ(funcname):
             raise
-        result = internal.declaration.demangle(funcname)
-    return result
+        return internal.declaration.demangle(funcname)
+    return res
 
 @utils.multicase()
 def bounds():
@@ -228,9 +251,10 @@ def bounds():
 @utils.multicase()
 def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function `func`.'''
-    fn = by(func)
-    if fn is None:
-        raise E.FunctionNotFoundError("{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func, ea))
+    try:
+        fn = by(func)
+    except E.ItemNotFoundError:
+        raise E.FunctionNotFoundError(u"{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func))
     return fn.startEA, fn.endEA
 range = utils.alias(bounds)
 
@@ -265,9 +289,10 @@ def color(none):
 @utils.multicase()
 def address():
     '''Return the entry-point of the current function.'''
-    res = ui.current.function()
-    if res is None:
-        raise E.FunctionNotFoundError("{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
+    try:
+        res = ui.current.function()
+    except E.ItemNotFoundError:
+        raise E.FunctionNotFoundError(u"{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
     return res.startEA
 @utils.multicase()
 def address(func):
@@ -301,16 +326,15 @@ def marks():
 @utils.multicase()
 def marks(func):
     '''Return all the marks in the function `func`.'''
-    fn = by(func)
-    result = []
+    fn, res = by(func), []
     for ea, comment in database.marks():
         try:
             if address(ea) == fn.startEA:
-                result.append((ea, comment))
+                res.append((ea, comment))
         except E.FunctionNotFoundError:
             pass
         continue
-    return result
+    return res
 
 ## functions
 @utils.multicase()
@@ -363,7 +387,7 @@ class chunks(object):
         fn = by(func)
         fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
         if not fci.main():
-            raise E.DisassemblerError("{:s}.chunks({:#x}) : Unable to create an idaapi.func_tail_iterator_t.".format(__name__, fn.startEA))
+            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `idaapi.func_tail_iterator_t`.".format(__name__, fn.startEA))
 
         while True:
             ch = fci.chunk()
@@ -406,7 +430,7 @@ class chunks(object):
             if left <= ea < right:
                 return interface.bounds_t(left, right)
             continue
-        raise E.AddressNotFoundError("{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
@@ -663,7 +687,7 @@ class blocks(object):
             if bb.startEA <= ea < bb.endEA:
                 return bb
             continue
-        raise E.AddressNotFoundError("{:s}.at({:#x}, {:#x}) : Unable to locate idaapi.BasicBlock for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
 
     @utils.multicase()
     @classmethod
@@ -1190,7 +1214,8 @@ class block(object):
             for fmt in formatted:
                 res.append( fmt.print1(source.__deref__()) )
         except TypeError: pass
-        return '\n'.join(itertools.imap(idaapi.tag_remove, res))
+        res = itertools.imap(idaapi.tag_remove, res)
+        return '\n'.join(map(utils.string.of, res))
 
 class frame(object):
     """
@@ -1218,7 +1243,38 @@ class frame(object):
         res = idaapi.get_frame(fn.startEA)
         if res is not None:
             return structure.by_identifier(res.id, offset=-fn.frsize)
-        raise E.MissingTypeOrAttribute("{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
+        raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
+
+    @utils.multicase()
+    @classmethod
+    def new(cls):
+        '''Add an empty frame to the current function.'''
+        _r = database.config.bits() / 8
+        return cls.new(ui.current.function(), 0, _r, 0)
+    @utils.multicase(lvars=six.integer_types, args=six.integer_types)
+    @classmethod
+    def new(cls, lvars, args):
+        '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
+        _r = database.config.bits() / 8
+        return cls.new(ui.current.function(), lvars, _r, args)
+    @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
+    @classmethod
+    def new(cls, lvars, regs, args):
+        '''Add a frame to the current function using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.'''
+        return cls.new(ui.current.function(), lvars, regs, args)
+    @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
+    @classmethod
+    def new(cls, func, lvars, regs, args):
+        """Add a frame to the function `func` using the sizes specified by `lvars` for local variables, `regs` for frame registers, and `args` for arguments.
+
+        When specifying the size of the registers (`regs`) the size of the saved instruction pointer must also be included.
+        """
+        fn = by(func)
+        _r = database.config.bits() / 8
+        ok = idaapi.add_frame(fn, lvars, regs - _r, args)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join((__name__, cls.__name__)), fn.startEA, lvars, regs - _r, args, fn.startEA, lvars, regs - _r, args))
+        return cls(fn)
 
     @utils.multicase()
     @classmethod
@@ -1301,11 +1357,11 @@ class frame(object):
             # grab from structure
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute("{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.debug("{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, cc))
+                logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, cc))
 
             base = get_vars_size(fn)+get_regs_size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, get_args_size(fn)):
@@ -1388,31 +1444,34 @@ def tag():
     '''Returns all the tags defined for the current function.'''
     return tag(ui.current.address())
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key')
 def tag(key):
     '''Returns the value of the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key)
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key', 'value')
 def tag(key, value):
     '''Sets the value for the tag `key` to `value` for the current function.'''
     return tag(ui.current.address(), key, value)
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key')
 def tag(func, key):
     '''Returns the value of the tag identified by `key` for the function `func`.'''
     res = tag(func)
     if key in res:
         return res[key]
-    raise E.MissingFunctionTagError("{:s}.tag({!r}, {!r}) : Unable to read tag {!r} from function.".format(__name__, func, key, key))
+    raise E.MissingFunctionTagError(u"{:s}.tag({!r}, {!r}) : Unable to read tag \"{:s}\" from function.".format(__name__, func, key, utils.string.escape(key, '"')))
 @utils.multicase()
 def tag(func):
     '''Returns all the tags defined for the function `func`.'''
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
-        logging.warn("{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
+        logging.warn(u"{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return database.tag(func)
 
     if rt:
-        logging.warn("{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
+        logging.warn(u"{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
         return database.tag(ea)
 
     fn, repeatable = by_address(ea), True
@@ -1422,7 +1481,7 @@ def tag(func):
     d2 = internal.comment.decode(res)
 
     if d1.viewkeys() & d2.viewkeys():
-        logging.info("{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same key ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
 
     res = {}
     map(res.update, (d1, d2) if repeatable else (d2, d1))
@@ -1434,22 +1493,23 @@ def tag(func):
     # ..and now hand it off.
     return res
 @utils.multicase(key=basestring)
+@utils.string.decorate_arguments('key', 'value')
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
     if value is None:
-        raise E.InvalidParameterError("{:s}.tag({!r}) : Tried to set tag {!r} to an unsupported type.".format(__name__, ea, key))
+        raise E.InvalidParameterError(u"{:s}.tag({!r}) : Tried to set tag \"{:s}\" to an unsupported type.".format(__name__, ea, utils.string.escape(key, '"')))
 
     # Check to see if function tag is being applied to an import
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
         # If we're not even in a function, then use a database tag.
-        logging.warn("{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
+        logging.warn(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
         return database.tag(func, key, value)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
+        logging.warn(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
         return database.tag(ea, key, value)
 
     # Otherwise, it's a function.
@@ -1471,10 +1531,12 @@ def tag(func, key, value):
     # return what we fetched from the dict
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
+@utils.string.decorate_arguments('key')
 def tag(key, none):
     '''Removes the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key, None)
 @utils.multicase(key=basestring, none=types.NoneType)
+@utils.string.decorate_arguments('key')
 def tag(func, key, none):
     '''Removes the tag identified by `key` from the function `func`.'''
 
@@ -1483,12 +1545,12 @@ def tag(func, key, none):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
         # If we're not even in a function, then use a database tag.
-        logging.warn("{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
+        logging.warn(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
         return database.tag(func, key, none)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn("{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, none))
+        logging.warn(u"{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, none))
         return database.tag(ea, key, none)
 
     # Otherwise, it's a function.
@@ -1503,7 +1565,7 @@ def tag(func, key, none):
     # decode the comment, remove the key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
     if key not in state:
-        raise E.MissingFunctionTagError("{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag {!r} from function.".format(__name__, fn.startEA, key, none, key))
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, fn.startEA, key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
     comment(fn, internal.comment.encode(state), repeatable=True)
 
@@ -1524,28 +1586,33 @@ def tags(func):
 # FIXME: consolidate this logic into the utils module
 # FIXME: document this properly
 @utils.multicase(tag=basestring)
+@utils.string.decorate_arguments('And', 'Or')
 def select(**boolean):
     '''Query the contents of the current function for any tags specified by `boolean`'''
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
-def select(tag, *And, **boolean):
-    '''Query the contents of the current function for the specified `tag` and any others specified as `And`.'''
-    res = (tag,) + And
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
+@utils.string.decorate_arguments('tag', 'And', 'Or')
+def select(tag, *Or, **boolean):
+    '''Query the contents of the current function for the specified `tag` and any others specified as `Or`.'''
+    res = (tag,) + Or
+    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
-def select(func, tag, *And, **boolean):
-    '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
-    res = (tag,) + And
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
+@utils.string.decorate_arguments('tag', 'And', 'Or')
+def select(func, tag, *Or, **boolean):
+    '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
+    res = (tag,) + Or
+    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
-def select(func, tag, *And, **boolean):
-    '''Query the contents of the function `func` for the specified `tag` and any others specified as `And`.'''
-    res = set(builtins.list(tag) + builtins.list(And))
-    boolean['And'] = tuple(set(boolean.get('And', set())).union(res))
+@utils.string.decorate_arguments('tag', 'And', 'Or')
+def select(func, tag, *Or, **boolean):
+    '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
+    res = tuple(iter(tag)) + Or
+    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
     return select(func, **boolean)
 @utils.multicase()
+@utils.string.decorate_arguments('And', 'Or')
 def select(func, **boolean):
     """Query the contents of the function `func` for any tags specified by `boolean`. Yields each address found along with the matching tags as a dictionary.
 
@@ -1564,19 +1631,20 @@ def select(func, **boolean):
             if res: yield ea, res
         return
 
+    # collect the keys to query as specified by the user
+    Or, And = (set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
+
     # walk through every tagged address and cross-check it against query
     for ea in internal.comment.contents.address(fn.startEA):
         ui.navigation.analyze(ea)
         res, d = {}, database.tag(ea)
 
         # Or(|) includes any of the tags being queried
-        Or = boolean.get('Or', set())
         res.update({key : value for key, value in six.iteritems(d) if key in Or})
 
         # And(&) includes any tags only if they include all the specified tagnames
-        And = boolean.get('And', set())
         if And:
-            if And.intersection(d.viewkeys()) == And:
+            if And & d.viewkeys() == And:
                 res.update({key : value for key, value in six.iteritems(d) if key in And})
             else: continue
 
@@ -1593,16 +1661,16 @@ def down():
 def down(func):
     '''Return all the functions that are called by the function `func`.'''
     def codeRefs(fn):
-        resultData, resultCode = [], []
+        data, code = [], []
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.is_call(ea):
-                    logging.info("{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is {!r}.".format(__name__, fn.startEA, database.disassemble(ea)))
-                    #resultCode.append((ea, 0))
+                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, fn.startEA, utils.string.escape(database.disassemble(ea), '"')))
+                    #code.append((ea, 0))
                 continue
-            resultData.extend( (ea, x) for x in database.xref.data_down(ea) )
-            resultCode.extend( (ea, x) for x in database.xref.code_down(ea) if fn.startEA == x or not contains(fn, x) )
-        return resultData, resultCode
+            data.extend( (ea, x) for x in database.xref.data_down(ea) )
+            code.extend( (ea, x) for x in database.xref.code_down(ea) if fn.startEA == x or not contains(fn, x) )
+        return data, code
     fn = by(func)
     return sorted({d for _, d in codeRefs(fn)[1]})
 

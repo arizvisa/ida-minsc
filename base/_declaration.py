@@ -14,17 +14,16 @@ import internal, idaapi
 ### c declaration stuff
 def function(ea):
     '''Returns the C function declaration at the address `ea`.'''
-    result = idaapi.idc_get_type(ea)
-    if result is None:
-        raise internal.exceptions.MissingTypeOrAttribute("The function {:x} does not have a declaration.".format(ea))
-    return result
+    res = idaapi.idc_get_type(ea)
+    if res is None:
+        raise internal.exceptions.MissingTypeOrAttribute(u"The function {:x} does not have a declaration.".format(ea))
+    return res
 
 def arguments(ea):
     '''Returns an array of all of the arguments within the prototype of the function at `ea`.'''
     decl = function(ea)
     args = decl[ decl.index('(')+1: decl.rindex(')') ]
-    result = [ x.strip() for x in args.split(',')]
-    return result
+    return [ arg.strip() for arg in args.split(',')]
 
 def size(string):
     '''Returns the size of a type described by a C declaration in `string`.'''
@@ -32,14 +31,16 @@ def size(string):
     if string.lower() == 'void':
         return 0
     elif string.startswith('class') and string.endswith('&'):
-        result = idaapi.idc_parse_decl(idaapi.cvar.idati, 'void*;', 0)
+        res = idaapi.idc_parse_decl(idaapi.cvar.idati, 'void*;', 0)
     else:
-        result = idaapi.idc_parse_decl(idaapi.cvar.idati, string if string.endswith(';') else string+';', 0)
+        semicoloned = string if string.endswith(';') else "{:s};".format(string)
+        res = idaapi.idc_parse_decl(idaapi.cvar.idati, internal.utils.string.to(semicoloned), 0)
 
-    if result is None:
-        raise internal.exceptions.DisassemblerError("Unable to parse the specified C declaration ({!r}).".format(string))
-    _, type, _ = result
-    return idaapi.get_type_size0(idaapi.cvar.idati, type)
+    if res is None:
+        raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(internal.utils.string.escape(string, '"')))
+    _, type, _ = res
+    f = idaapi.get_type_size0 if idaapi.__version__ < 6.8 else idaapi.calc_type_size
+    return f(idaapi.cvar.idati, type)
 
 def demangle(string):
     '''Given a mangled C++ `string`, demangle it back into a human-readable symbol.'''
@@ -70,38 +71,38 @@ def mangledQ(string):
 class extract:
     @staticmethod
     def declaration(string):
-        result = idaapi.demangle_name(string, idaapi.cvar.inf.long_demnames)
-        return string if result is None else result
+        res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames)
+        return string if res is None else internal.utils.string.of(res)
 
     @staticmethod
     def convention(string):
         types = set(('__cdecl', '__stdcall', '__thiscall', '__fastcall'))
-        result = string.split(' ')
-        return result[0]
+        res = string.split(' ')
+        return res[0]
 
     @staticmethod
     def fullname(string):
-        result = extract.declaration(string)
-        return result[:result.find('(')].split(' ', 3)[-1] if any(n in result for n in ('(', ' ')) else result
+        decl = extract.declaration(string)
+        return decl[:decl.find('(')].split(' ', 3)[-1] if any(n in decl for n in ('(', ' ')) else decl
 
     @staticmethod
     def name(string):
-        result = extract.fullname(string)
-        return result.rsplit(':', 2)[-1] if ':' in result else result
+        fn = extract.fullname(string)
+        return fn.rsplit(':', 2)[-1] if ':' in fn else fn
 
     @staticmethod
     def arguments(string):
-        result = extract.declaration(string)
-        return map(str.strip, result[result.index('(')+1:result.find(')')].split(',')) if '(' in result else []
+        decl = extract.declaration(string)
+        return map(str.strip, decl[decl.index('(')+1:decl.find(')')].split(',')) if '(' in decl else []
 
     @staticmethod
     def result(string):
-        result = extract.declaration(string)
-        result = result[:result.find('(')].rsplit(' ', 1)[0]
-        return result.split(':', 1)[1].strip() if ':' in result else result.strip()
+        decl = extract.declaration(string)
+        decl = decl[:decl.find('(')].rsplit(' ', 1)[0]
+        return decl.split(':', 1)[1].strip() if ':' in decl else decl.strip()
 
     @staticmethod
     def scope(string):
-        result = extract.declaration(string)
-        result = result[:result.find('(')].rsplit(' ', 1)[0]
-        return result.split(':', 1)[0].strip() if ':' in result else ''
+        decl = extract.declaration(string)
+        decl = decl[:decl.find('(')].rsplit(' ', 1)[0]
+        return decl.split(':', 1)[0].strip() if ':' in decl else ''

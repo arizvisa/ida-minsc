@@ -1,6 +1,79 @@
 import exceptions as E
 
-class MissingTagError(E.KeyError):
+class UnicodeException(E.BaseException):
+    """
+    A base exception that handles converting a unicode message
+    into its UTF-8 form so that it can be emitted using Python's
+    standard console.
+
+    Copied from Python 2.7.15 implementation.
+    """
+    # tp_init
+    def __init__(self, *args):
+        self.__args__ = args
+        self.__message__ = args[0] if len(args) == 1 else ''
+
+    # tp_str
+    def __str__(self):
+        length = len(self.args)
+        if length == 0:
+            return ""
+        elif length == 1:
+            item = self.args[0]
+            return str(item.encode('utf8') if isinstance(item, unicode) else item)
+        return str(self.args)
+
+    # tp_repr
+    def __repr__(self):
+        repr_suffix = repr(self.args)
+        name = type(self).__name__
+        dot = name.rfind('.')
+        shortname = name[dot+1:] if dot > -1 else name
+        return shortname + repr_suffix
+
+    # tp_as_sequence
+    def __iter__(self):
+        for item in self.args:
+            yield item
+        return
+
+    # tp_as_sequence
+    def __getitem__(self, index):
+        return self.args[index]
+    def __getslice__(self, *indices):
+        res = slice(*indices)
+        return self.args[res]
+
+    # tp_getset
+    @property
+    def message(self):
+        return self.__message__
+    @message.setter
+    def message(self, message):
+        # self.__message__ = "{!s}".format(message)
+        self.__message__ = message
+    @property
+    def args(self):
+        return self.__args__
+    @args.setter
+    def args(self, args):
+        self.__args__ = tuple(item for item in args)
+
+    # tp_methods
+    def __reduce__(self):
+        return self.args
+    def __setstate__(self, pack):
+        self.args = pack
+    def __unicode__(self):
+        # return unicode(self.__str__())
+        length = len(self.args)
+        if length == 0:
+            return u""
+        elif length == 1:
+            return unicode(self.args[0])
+        return unicode(self.args)
+
+class MissingTagError(UnicodeException, E.KeyError):
     """
     The requested tag at the specified address does not exist.
     """
@@ -10,22 +83,22 @@ class MissingFunctionTagError(MissingTagError):
     The requested tag for the specified function does not exist.
     """
 
-class MissingMethodError(E.NotImplementedError):
+class MissingMethodError(UnicodeException, E.NotImplementedError):
     """
     A method belonging to a superclass that is required to be overloaded was called.
     """
 
-class UnsupportedVersion(E.NotImplementedError):
+class UnsupportedVersion(UnicodeException, E.NotImplementedError):
     """
     This functionality is not supported on the current version of IDA.
     """
 
-class UnsupportedCapability(E.NotImplementedError, E.EnvironmentError):
+class UnsupportedCapability(UnicodeException, E.NotImplementedError, E.EnvironmentError):
     """
     An unexpected or unsupported capability was specified.
     """
 
-class ResultMissingError(E.LookupError):
+class ResultMissingError(UnicodeException, E.LookupError):
     """
     The requested item is missing from its results.
     """
@@ -35,17 +108,17 @@ class SearchResultsError(ResultMissingError):
     No results were found.
     """
 
-class DisassemblerError(E.EnvironmentError):
+class DisassemblerError(UnicodeException, E.EnvironmentError):
     """
     An api call has thrown an error or was unsuccessful.
     """
 
-class MissingTypeOrAttribute(E.TypeError):
+class MissingTypeOrAttribute(UnicodeException, E.TypeError):
     """
     The specified location is missing some specific attribute or type.
     """
 
-class InvalidTypeOrValueError(E.TypeError, E.ValueError):
+class InvalidTypeOrValueError(UnicodeException, E.TypeError, E.ValueError):
     """
     An invalid value or type was specified.
     """
@@ -55,7 +128,7 @@ class InvalidParameterError(InvalidTypeOrValueError, E.AssertionError):
     An invalid parameter was specified by the user.
     """
 
-class OutOfBoundsError(E.ValueError):
+class OutOfBoundsError(UnicodeException, E.ValueError):
     """
     The specified item is out of bounds.
     """
@@ -110,17 +183,22 @@ class RegisterNotFoundError(ItemNotFoundError):
     Unable to locate the specified register.
     """
 
-class ReadOrWriteError(E.IOError, E.ValueError):
+class NetNodeNotFoundError(ItemNotFoundError):
+    """
+    Unable to locate the specified netnode.
+    """
+
+class ReadOrWriteError(UnicodeException, E.IOError, E.ValueError):
     """
     Unable to read or write the specified number of bytes .
     """
 
-class InvalidFormatError(E.KeyError, E.ValueError):
+class InvalidFormatError(UnicodeException, E.KeyError, E.ValueError):
     """
     The specified data has an invalid format.
     """
 
-class SerializationError(E.ValueError, E.IOError):
+class SerializationError(UnicodeException, E.ValueError, E.IOError):
     """
     There was an error while trying to serialize or deserialize the specified data.
     """
@@ -130,9 +208,14 @@ class SizeMismatchError(SerializationError):
     There was an error while trying to serialize or deserialize the specified data due to its size not matching.
     """
 
-class UnknownPrototypeError(E.LookupError):
+class UnknownPrototypeError(UnicodeException, E.LookupError):
     """
     The requested prototype does not match any of the ones that are available.
+    """
+
+class DuplicateItemError(E.DisassemblerError, E.NameError):
+    """
+    The requested command has failed due to a duplicate item.
     """
 
 #structure:742 and previous to it should output the module name, classname, and method

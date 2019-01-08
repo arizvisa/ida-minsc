@@ -100,7 +100,7 @@ def at(ea):
     '''Returns the ``idaapi.insn_t`` instance at the address `ea`.'''
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError("{:s}.at({:#x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
+        raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
     length = idaapi.decode_insn(ea)
     if idaapi.__version__ < 7.0:
         return idaapi.cmd.copy()
@@ -137,7 +137,8 @@ def mnemonic():
 def mnemonic(ea):
     '''Returns the mnemonic of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
-    return (idaapi.ua_mnem(ea) or '').lower()
+    res = (idaapi.ua_mnem(ea) or '').lower()
+    return utils.string.of(res)
 mnem = utils.alias(mnemonic)
 
 ## functions that return an ``idaapi.op_t`` for an operand
@@ -315,9 +316,9 @@ def op_repr(ea, opnum):
     try:
         res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     except:
-        logging.warn("{:s}({:#x}, {:d}) : Unable to strip tags from operand {!r}. Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, oppr(insn.ea, opnum), '.'.join((__name__, 'op'))))
-        return "{:s}".format(op(insn.ea, opnum))
-    return res
+        logging.warn(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand \"{:s}\". Returning the result from {:s} instead.".format('.'.join((__name__, 'op_repr')), ea, opnum, utils.string.escape(oppr(insn.ea, opnum), '"'), '.'.join((__name__, 'op'))))
+        return u"{!s}".format(op(insn.ea, opnum))
+    return utils.string.of(res)
 
 @utils.multicase(opnum=six.integer_types)
 def op_state(opnum):
@@ -436,13 +437,13 @@ def op_structure(ea, opnum):
     '''Return the structure that operand `opnum` for instruction `ea` actually references.'''
     ti, fl, op = idaapi.opinfo_t(), database.type.flags(ea), operand(ea, opnum)
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
-        raise E.MissingTypeOrAttribute("{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # pathvar = idaapi.tid_array(length)
     # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
     if res is None:
-        raise E.DisassemblerError("{:s}.op_structure({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
     # get the path and the delta
     delta, path = res.path.delta, [res.path.ids[idx] for idx in six.moves.range(res.path.len)]
@@ -452,8 +453,25 @@ def op_structure(ea, opnum):
     if len(path) == 1:
         # get the member offset of the operand
         st = structure.by(path[0])
-        m = st.by(value)
+        try:
+            m = st.by(value)
+
+        # if we couldn't find one, then figure out whether to use
+        # the last or first member depending where we are
+        except E.OutOfBoundsError:
+            if value > st.members[-1].offset:
+                m = st.members[-1]
+            elif value < st.members[0].offset:
+                m = st.members[0]
+            else:
+                raise
+
+        # now to build the path that gets walked
         path = [st.id, m.id]
+
+    # if there's no path, then this is not a structure
+    elif len(path) == 0:
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # collect all the path members
     moff, st = 0, structure.by(path.pop(0))
@@ -464,7 +482,7 @@ def op_structure(ea, opnum):
         moff, st = moff + st.offset, st.type
 
     ofs = delta - moff + value
-    return tuple(res + [ofs]) if ofs > 0 else tuple(res)
+    return tuple(res + [ofs]) if ofs != 0 else tuple(res)
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
@@ -489,21 +507,21 @@ def op_structure(ea, opnum, id, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not code.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
 
     offset, sptr, name = 0, idaapi.get_struc(id), idaapi.get_member_fullname(id)
     if sptr is not None:
         offset = idaapi.get_struc_first_offset(sptr)
         sid, mptr = sptr.id, idaapi.get_member(sptr, offset)
         if mptr is None:
-            raise E.DisassemblerError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
         mid = mptr.id
     elif name is not None:
         fn = idaapi.get_member_fullname(id)
         sptr = idaapi.get_member_struc(name)
         sid, mid = sptr.id, id
     else:
-        raise E.InvalidParameterError("{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(', '.join("{:s}={!r}".format(k, v) for k, v in delta.iteritems())) if delta else ''))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
 
     # if an offset was specified such as if the first member of the structure
     # is not at offset 0, then adjust the delta by its value
@@ -521,14 +539,14 @@ def op_structure(ea, opnum, path, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item type at requested address is not code.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # validate the path
     if len(path) == 0:
-        raise E.InvalidParameterError("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring)+six.integer_types) for m in path):
-        raise E.InvalidParameterError("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # ensure the path begins with a structure.structure_t
     if isinstance(path[0], structure.member_t):
@@ -540,7 +558,7 @@ def op_structure(ea, opnum, path, **delta):
         res.append(path[len(res)])
 
     if len(res) < len(path):
-        logging.warn("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
+        logging.warn(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
     path = res[:]
 
     # if the delta is in the path, move it into the delta kwarg
@@ -558,7 +576,7 @@ def op_structure(ea, opnum, path, **delta):
         elif isinstance(item, structure.member_t):
             m = item.ptr
         else:
-            raise E.InvalidParameterError("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), i+1, type(item)))
+            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), i+1, item.__class__))
         tids.append(m.id)
         moff += m.soff
 
@@ -572,7 +590,7 @@ def op_structure(ea, opnum, path, **delta):
 
     # check what was different
     if len(path) != len(tids) + 1:
-        logging.warn("{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        logging.warn(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # build the list of member ids and prefix it with a structure id
     length = len(tids) + 1
@@ -604,20 +622,22 @@ def op_enumeration(ea, opnum):
     '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
-        raise E.MissingTypeOrAttribute("{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
     # XXX: is the following api call the proper way to do this?
     # idaapi.get_enum_id(*args):
 
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
     if res is None:
-        raise E.DisassemblerError("{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
     return enumeration.by(res.ec.tid)
 @utils.multicase(opnum=six.integer_types, name=basestring)
+@utils.string.decorate_arguments('name')
 def op_enumeration(opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=basestring)
+@utils.string.decorate_arguments('name')
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
     return op_enumeration(ea, opnum, enumeration.by(name))
@@ -635,12 +655,12 @@ def op_string(opnum):
 def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
     ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
-    if fl & idaapi.STRLIT == 0:
-        raise E.MissingTypeOrAttribute("{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
+    if fl & idaapi.FF_STRLIT == 0:
+        raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
     res = idaapi.get_opinfo(ea, opnum, fl, ti)
     if res is None:
-        raise E.DisassemblerError("{:s}.op_string({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
     return res.strtype
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
@@ -679,7 +699,7 @@ def op_refs(ea, opnum):
     if ok and res is None:
         fn = idaapi.get_func(ea)
         if fn is None:
-            raise E.FunctionNotFoundError("{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, ea, opnum, ea))
+            raise E.FunctionNotFoundError(u"{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, ea, opnum, ea))
 
         stkofs_ = idaapi.calc_stkvar_struc_offset(fn, inst.ea if idaapi.__version__ < 7.0 else inst, opnum)
 
@@ -693,7 +713,7 @@ def op_refs(ea, opnum):
             member, stkofs = idaapi.get_stkvar(inst, op, res)
 
         if stkofs != stkofs_:
-            logging.warn("{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
@@ -715,25 +735,31 @@ def op_refs(ea, opnum):
         else:
             ok = idaapi.get_stroff_path(pathvar.cast(), delta.cast(), inst.ea, opnum)
         if not ok:
-            raise E.DisassemblerError("{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand.".format(__name__, inst.ea, opnum))
+            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand.".format(__name__, inst.ea, opnum))
 
-        # get the structure offset and then figure its member
+        # get the structure offset and then use that to figure out the correct member
         addr = operator.attrgetter('value' if idaapi.__version__ < 7.0 else 'addr')     # FIXME: this will be incorrect for an offsetted struct
-        memofs = addr(operand(inst.ea, opnum))
+        memofs = addr(operand(inst.ea, opnum)) + delta.value()
+
+        # FIXME: use interface.node.sup_opstruct to figure out the actual path to search for
 
         st = idaapi.get_struc(pathvar[0])
         if st is None:
-            raise E.DisassemblerError("{:s}.op_refs({:#x}, {:d}) : Unable to get structure pointer for id {:#x}.".format(__name__, inst.ea, opnum, pathvar[0]))
+            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure pointer for id {:#x}.".format(__name__, inst.ea, opnum, pathvar[0]))
 
+        # get the member at the specified offset in order to snag its id
         mem = idaapi.get_member(st, memofs)
         if mem is None:
-            raise E.DisassemblerError("{:s}.op_refs({:#x}, {:d}) : Unable to find the member for offset ({:#x}) in the structure {:#x}.".format(__name__, inst.ea, opnum, memofs, st.id))
+            # if memofs does not point to the size of structure, then warn that we're falling back to the structure
+            if memofs != idaapi.get_struc_size(st):
+                logging.warn(u"{:s}.op_refs({:#x}, {:d}) : Unable to find the member for offset ({:#x}) in the structure {:#x}. Falling back to references to the structure itself.".format(__name__, inst.ea, opnum, memofs, st.id))
+            mem = st
 
         # extract the references
         x = idaapi.xrefblk_t()
 
         if not x.first_to(mem.id, 0):
-            logging.warn("{:s}.op_refs({:#x}, {:d}) : No references found to struct member {:s}.".format(__name__, inst.ea, opnum, mem.fullname))
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(mem.fullname, '"')))
 
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
@@ -754,7 +780,7 @@ def op_refs(ea, opnum):
         # enums are defined in a altval at index 0xb+opnum
         # the int points straight at the enumeration id
         # FIXME: references to enums don't seem to work
-        raise E.UnsupportedCapability("{:s}.op_refs({:#x}, {:d}) : References are not implemented for enumeration types.".format(__name__, inst.ea, opnum))
+        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : References are not implemented for enumeration types.".format(__name__, inst.ea, opnum))
 
     # FIXME: is this supposed to execute if ok == T? or not?
     # global
@@ -917,7 +943,7 @@ class operand_types:
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
             return architecture.by_indextype(res, op.dtyp)
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
-        raise E.InvalidTypeOrValueError("{:s}.register({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
@@ -933,7 +959,7 @@ class operand_types:
             # if op.value has its sign inverted, then signify it otherwise just use it
             return -2 ** bits + res if interface.node.alt_opinverted(ea, op.n) else res & (2 ** bits - 1)
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
-        raise E.InvalidTypeOrValueError("{:s}.immediate({:#x}, ...) : Expected operand type {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype, op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype, op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_far)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_near)
@@ -945,20 +971,20 @@ class operand_types:
             seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
             return op.addr
         optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
-        raise E.InvalidTypeOrValueError("{:s}.address({:#x}, ...) : Expected operand type {:s} or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], op.type))
+        raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, {!r}) : Expected operand type `{:s}` or `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype[0], optype[1], op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec0`` which returns a trap register.'''
-        raise E.UnsupportedCapability("{:s}.trregister({:#x}, ...) : Trap registers (trX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
+        raise E.UnsupportedCapability(u"{:s}.trregister({:#x}, ...) : Trap registers (`%trX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
     def dbregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec1`` which returns a db register.'''
-        raise E.UnsupportedCapability("{:s}.dbregister({:#x}, ...) : Db registers (dbX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
+        raise E.UnsupportedCapability(u"{:s}.dbregister({:#x}, ...) : Db registers (`%dbX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
     def crregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec2`` which returns a control reigster.'''
-        raise E.UnsupportedCapability("{:s}.crregister({:#x}, ...) : Cr registers (crX) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
+        raise E.UnsupportedCapability(u"{:s}.crregister({:#x}, ...) : Cr registers (`%crX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
         return getattr(reg, "cr{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
     def fpregister(ea, op):
@@ -967,7 +993,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
     def mmxregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec4`` which returns an mmx register.'''
-        return getattr(reg, "mmx{:d}".format(op.reg)).id
+        return getattr(reg, "mm{:d}".format(op.reg)).id
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
     def xmmregister(ea, op):
         '''Operand type decoder for Intel's ``idaapi.o_idpspec5`` which returns an xmm register.'''
@@ -989,14 +1015,14 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError("{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op, op.type, F1))
 
             if op.type == idaapi.o_displ:
                 offset = op.addr
             elif op.type == idaapi.o_phrase:
                 offset = op.value
             else:
-                raise E.InvalidTypeOrValueError("{:s}.phrase({:#x}, ...) : Unable to determine the offset for op.type ({:d}).".format('.'.join((__name__, 'operand_types')), ea, op.type))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the offset for op.type ({:d}).".format('.'.join((__name__, 'operand_types')), ea, op, op.type))
 
             # XXX: for some reason stack variables include both base and index
             #      testing .specval seems to be a good way to determine whether
@@ -1025,12 +1051,12 @@ class operand_types:
                 index = (F2 & 0x38) >> 3
 
             else:
-                raise E.InvalidTypeOrValueError("{:s}.phrase({:#x}, ...) : Unable to determine the operand format for op.type {:d}. The value of op_t.specflag1 was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op.type, F1))
+                raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Unable to determine the operand format for op.type {:d}. The value of `op_t.specflag1` was {:d}.".format('.'.join((__name__, 'operand_types')), ea, op, op.type, F1))
             offset = op.addr
 
         else:
             optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
-            raise E.InvalidTypeOrValueError("{:s}.phrase({:#x}, ...) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, optype[0], optype[1], optype[2], op.type))
+            raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype[0], optype[1], optype[2], op.type))
 
         # if arch == x64, then index += 8
 
