@@ -1890,11 +1890,11 @@ class address(object):
             ## XXX: in later versions of ida, is_basic_block_end takes two args (ea, bool call_insn_stops_block)
 
             # skip call instructions
-            if _instruction.is_call(ea):
+            if _instruction.type.is_call(ea):
                 continue
 
             # halting instructions terminate a block
-            if _instruction.is_return(ea):
+            if _instruction.type.is_return(ea):
                 yield block, nextea
                 block = ea
 
@@ -2416,12 +2416,12 @@ class address(object):
     @classmethod
     def prevcall(cls, ea, predicate):
         '''Return the previous call instruction from the address `ea` that matches `predicate`.'''
-        F = utils.fcompose(utils.fmap(_instruction.is_call, predicate), builtins.all)
+        F = utils.fcompose(utils.fmap(_instruction.type.is_call, predicate), builtins.all)
         return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevcall(cls, ea, count):
-        return cls.prevF(ea, _instruction.is_call, count)
+        return cls.prevF(ea, _instruction.type.is_call, count)
 
     @utils.multicase()
     @classmethod
@@ -2442,12 +2442,12 @@ class address(object):
     @classmethod
     def nextcall(cls, ea, predicate):
         '''Return the next call instruction from the address `ea` that matches `predicate`.'''
-        F = utils.fcompose(utils.fmap(_instruction.is_call, predicate), builtins.all)
+        F = utils.fcompose(utils.fmap(_instruction.type.is_call, predicate), builtins.all)
         return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextcall(cls, ea, count):
-        return cls.nextF(ea, _instruction.is_call, count)
+        return cls.nextF(ea, _instruction.type.is_call, count)
 
     @utils.multicase()
     @classmethod
@@ -2468,16 +2468,16 @@ class address(object):
     @classmethod
     def prevbranch(cls, ea, predicate):
         '''Return the previous branch instruction from the address `ea` that matches `predicate`.'''
-        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
-        Fbranch = _instruction.is_branch
+        Fnocall = utils.fcompose(_instruction.type.is_call, operator.not_)
+        Fbranch = _instruction.type.is_branch
         Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
         return cls.prevF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def prevbranch(cls, ea, count):
-        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
-        Fbranch = _instruction.is_branch
+        Fnocall = utils.fcompose(_instruction.type.is_call, operator.not_)
+        Fbranch = _instruction.type.is_branch
         F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         return cls.prevF(ea, F, count)
 
@@ -2500,16 +2500,16 @@ class address(object):
     @classmethod
     def nextbranch(cls, ea, predicate):
         '''Return the next branch instruction from the address `ea` that matches `predicate`.'''
-        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
-        Fbranch = _instruction.is_branch
+        Fnocall = utils.fcompose(_instruction.type.is_call, operator.not_)
+        Fbranch = _instruction.type.is_branch
         Fx = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         F = utils.fcompose(utils.fmap(Fx, predicate), builtins.all)
         return cls.nextF(ea, F, 1)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def nextbranch(cls, ea, count):
-        Fnocall = utils.fcompose(_instruction.is_call, operator.not_)
-        Fbranch = _instruction.is_branch
+        Fnocall = utils.fcompose(_instruction.type.is_call, operator.not_)
+        Fbranch = _instruction.type.is_branch
         F = utils.fcompose(utils.fmap(Fnocall, Fbranch), builtins.all)
         return cls.nextF(ea, F, count)
 
