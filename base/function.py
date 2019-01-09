@@ -1749,6 +1749,8 @@ class type(object):
     def has_return(cls, func):
         '''Return true if the function `func` returns.'''
         fn = by(func)
+        if fn.flags & idaapi.FUNC_NORET_PENDING == idaapi.FUNC_NORET_PENDING:
+            logging.warn(u"{:s}.has_return({:s}) : Analysis for function return is still pending. The flag (`idaapi.FUNC_NORET_PENDING`) is still set.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
     returnQ = utils.alias(has_return, 'type')
 
