@@ -1778,6 +1778,61 @@ class type(object):
         return fn.flags & idaapi.FUNC_THUNK == idaapi.FUNC_THUNK
     thunkQ = utils.alias(is_thunk, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def is_far(cls):
+        '''Returns true if the current function is considered a "far" function by IDA or the user.'''
+        return cls.is_far(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def is_far(cls, func):
+        '''Returns true if the function `func` is considered a "far" function by IDA or the user.'''
+        fn = by(func)
+        return any(fn.flags & fl == fl for fl in {idaapi.FUNC_FAR, idaapi.FUNC_USERFAR})
+    farQ = utils.alias(is_far, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def is_static(cls):
+        '''Returns true if the current function is a static function.'''
+        return cls.is_static(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def is_static(cls, func):
+        '''Returns true if the function `func` is a static function.'''
+        fn = by(func)
+        return fn.flags & idaapi.FUNC_STATIC == idaapi.FUNC_STATIC
+    staticQ = utils.alias(is_static, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def is_hidden(cls):
+        '''Returns true if the current function is hidden.'''
+        return cls.is_hidden(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def is_hidden(cls, func):
+        '''Returns true if the function `func` is hidden.'''
+        fn = by(func)
+        return fn.flags & idaapi.FUNC_HIDDEN == idaapi.FUNC_HIDDEN
+    hiddenQ = utils.alias(is_hidden, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def has_frameptr(cls):
+        '''Returns true if the frame pointer register is used for the current function.'''
+        return cls.has_frameptr(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def has_frameptr(cls, func):
+        """Returns true if the frame pointer register is used for the function `func`.
+
+        On the Intel architecture, this happens when the %bp register points to the bottom of the stack frame.
+        """
+        fn = by(func)
+        return fn.flags & idaapi.FUNC_BOTTOMBP == idaapi.FUNC_BOTTOMBP
+t = type # XXX: ns alias
+
 # FIXME: document this
 #def refs(func, member):
 #    xl, fn = idaapi.xreflist_t(), by(func)
