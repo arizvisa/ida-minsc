@@ -1363,8 +1363,8 @@ class frame(object):
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
                 logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, cc))
 
-            base = get_vars_size(fn)+get_regs_size(fn)
-            for (off, size), (name, _, _) in structure.fragment(fr.id, base, get_args_size(fn)):
+            base = frame.lvars.size(fn) + frame.regs.size(fn)
+            for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
                 yield off - base, name, size
             return
 
@@ -1379,7 +1379,7 @@ class frame(object):
             '''Returns the size of the arguments for the function `func`.'''
             fn = by(func)
             max = structure.size(get_frameid(fn))
-            total = get_vars_size(fn) + get_regs_size(fn)
+            total = frame.lvars.size(fn) + frame.regs.size(fn)
             return max - total
     arguments = args    # XXX: ns alias
 
