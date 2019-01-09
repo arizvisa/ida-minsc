@@ -1715,16 +1715,16 @@ class type(object):
     """
     @utils.multicase()
     @classmethod
-    def has_noframe(cls):
-        '''Return true if the current function has no frame.'''
-        return cls.has_noframe(ui.current.function())
+    def has_frameptr(cls):
+        '''Return true if the current function uses a frame pointer (register).'''
+        return cls.has_frameptr(ui.current.function())
     @utils.multicase()
     @classmethod
-    def has_noframe(cls, func):
-        '''Return true if the function `func` has no frame.'''
+    def has_frameptr(cls, func):
+        '''Return true if the function `func` uses a frame pointer (register).'''
         fn = by(func)
-        return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_FRAME == 0)
-    noframeQ = utils.alias(has_noframe, 'type')
+        return fn.flags & idaapi.FUNC_FRAME == idaapi.FUNC_FRAME
+    frameptrQ = utils.alias(has_frameptr, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1741,16 +1741,16 @@ class type(object):
 
     @utils.multicase()
     @classmethod
-    def has_noreturn(cls):
-        '''Return true if the current function does not return.'''
-        return cls.has_noreturn(ui.current.function())
+    def has_return(cls):
+        '''Return true if the current function returns.'''
+        return cls.has_return(ui.current.function())
     @utils.multicase()
     @classmethod
-    def has_noreturn(cls, func):
-        '''Return true if the function `func` does not return.'''
+    def has_return(cls, func):
+        '''Return true if the function `func` returns.'''
         fn = by(func)
-        return not cls.is_thunk(fn) and (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
-    noreturnQ = utils.alias(has_noreturn, 'type')
+        return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
+    returnQ = utils.alias(has_return, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1816,21 +1816,6 @@ class type(object):
         fn = by(func)
         return fn.flags & idaapi.FUNC_HIDDEN == idaapi.FUNC_HIDDEN
     hiddenQ = utils.alias(is_hidden, 'type')
-
-    @utils.multicase()
-    @classmethod
-    def has_frameptr(cls):
-        '''Returns true if the frame pointer register is used for the current function.'''
-        return cls.has_frameptr(ui.current.function())
-    @utils.multicase()
-    @classmethod
-    def has_frameptr(cls, func):
-        """Returns true if the frame pointer register is used for the function `func`.
-
-        On the Intel architecture, this happens when the %bp register points to the bottom of the stack frame.
-        """
-        fn = by(func)
-        return fn.flags & idaapi.FUNC_BOTTOMBP == idaapi.FUNC_BOTTOMBP
 t = type # XXX: ns alias
 
 # FIXME: document this
