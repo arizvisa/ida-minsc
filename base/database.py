@@ -335,7 +335,7 @@ class functions(object):
         '''List all of the functions in the database that match the keyword specified by `type`.'''
         res = builtins.list(cls.iterate(**type))
 
-        flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.get_vars_size(ea)) if function.by(ea).frsize else []
+        flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.frame.lvars.size(ea)) if function.by(ea).frsize else []
         fminaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)
         fmaxaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)
 
