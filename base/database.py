@@ -4219,8 +4219,8 @@ class set(object):
     @classmethod
     def string(cls, ea, **type):
         '''Set the data at address `ea` to a string with the specified `type`.'''
-        strtype = type.get('type', idaapi.ASCSTR_LAST)
-        ok = idaapi.make_ascii_string(ea, 0, strtype)
+        strtype = type.get('type', (idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT) | idaapi.STRWIDTH_1B)
+        ok = idaapi.make_ascii_string(ea, 0, strtype) if idaapi.__version__ < 7.0 else idaapi.create_strlit(ea, 0, strtype)
         if not ok:
             raise E.DisassemblerError(u"{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(type)) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
@@ -4231,12 +4231,12 @@ class set(object):
 
         If `type` is specified, use a string of the specified type.
         """
-        strtype = type.get('type', idaapi.ASCSTR_LAST)
+        strtype = type.get('type', (idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT) | idaapi.STRWIDTH_1B)
         cb = cls.unknown(ea, size)
         if cb != size:
             raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else '', size))
 
-        ok = idaapi.make_ascii_string(ea, size, strtype)
+        ok = idaapi.make_ascii_string(ea, size, strtype) if idaapi.__version__ < 7.0 else idaapi.create_strlit(ea, size, strtype)
         if not ok:
             raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else ''))
         return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
@@ -4728,7 +4728,7 @@ class get(object):
 
         # Extract the fields out of the string type code
         res = idaapi.get_str_type_code(strtype)
-        sl, sw = res & idaapi.STRLYT_MASK, res ^ (res & idaapi.STRLYT_MASK)
+        sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
 
         # Figure out the STRLYT field
         if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
@@ -4744,7 +4744,7 @@ class get(object):
 
         # Figure out the STRWIDTH field
         if sw == idaapi.STRWIDTH_1B:
-            f2 = operator.methodcaller('decode', 'ascii')
+            f2 = operator.methodcaller('decode', 'utf-8')
         elif sw == idaapi.STRWIDTH_2B:
             f2 = operator.methodcaller('decode', 'utf-16')
         elif sw == idaapi.STRWIDTH_4B:
