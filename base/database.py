@@ -4708,7 +4708,8 @@ class get(object):
         strtype = idaapi.get_str_type(ea)
 
         # If no string was found, then try to treat it as a plain old array
-        if strtype == idaapi.BADADDR:
+        # XXX: idaapi.get_str_type() seems to return 0xffffffff on failure instead of idaapi.BADADDR
+        if strtype in {idaapi.BADADDR, 0xffffffff}:
             res = cls.array(ea, **length)
 
             # It wasn't an array and was probably a structure, so we'll just complain to the user about it
