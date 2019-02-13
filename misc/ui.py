@@ -764,51 +764,6 @@ class hook(object):
             res.remove()
         return
 
-### for queueing the execution of a function asynchronously.
-## (which is probably pretty unsafe in IDA, but let's hope).
-class queue(object):
-    """
-    This namespace exposes the ability to queue execution of python
-    callables asynchronously so that they run at the same time as
-    IDA and signal when they have completed and a result is available.
-
-    XXX: This is probably pretty unsafe in IDA, but let's hope.
-    """
-    @classmethod
-    def __start_ida__(cls):
-        if hasattr(cls, 'execute') and not cls.execute.dead:
-            logging.warn(u"{:s}.start() : Skipping re-instantiation of execution queue {!r}.".format('.'.join((__name__, cls.__name__)), cls.execute))
-            return
-        cls.execute = internal.utils.execution()
-        return
-
-    @classmethod
-    def __stop_ida__(cls):
-        if not hasattr(cls, 'execute'):
-            logging.warn(u"{:s}.stop() : Refusing to release execution queue due to it not being initialized.".format('.'.join((__name__, cls.__name__))))
-            return
-        return cls.execute.release()
-
-    @classmethod
-    def __open_database__(cls, idp_modname):
-        return cls.execute.start()
-
-    @classmethod
-    def __close_database__(cls):
-        return cls.execute.stop()
-
-    @classmethod
-    def add(cls, callable, *args, **kwds):
-        '''Add the specified `callable` to the execution queue passing to it any extra arguments.'''
-        if not cls.execute.running:
-            logging.warn(u"{:s}.add(...) : Unable to execute {!r} due to queue not running.".format('.'.join((__name__, cls.__name__)), callable))
-        return cls.execute.push(callable, *args, **kwds)
-
-    @classmethod
-    def pop(cls):
-        '''Block until the next available result has been returned.'''
-        return next(cls.execute)
-
 ### Helper classes to use or inherit from
 # XXX: why was this base class implemented again??
 class InputBox(idaapi.PluginForm):
