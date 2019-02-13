@@ -96,16 +96,8 @@ import ui, tools, custom, app
 ### hooks for different parts of ida start here...
 
 ## entire scope for execution queue and hooks
-ui.queue.__start_ida__(), ui.hook.__start_ida__()
-ui.hook.ui.add('term', ui.queue.__stop_ida__, 1000), ui.hook.ui.add('term', ui.hook.__stop_ida__, 10000)
-
-## start or stop the execution queue when database is open or closed
-if idaapi.__version__ < 7.0:
-    ui.hook.idp.add('init', ui.queue.__open_database__, 0)
-    ui.hook.idp.add('term', ui.queue.__close_database__, 0)
-else:
-    ui.hook.idp.add('ev_init', ui.queue.__open_database__, 0)
-    ui.hook.idp.add('ev_term', ui.queue.__close_database__, 0)
+ui.hook.__start_ida__()
+ui.hook.ui.add('term', ui.hook.__stop_ida__, 10000)
 
 ## setup default integer types for the typemapper once the loader figures everything out
 if idaapi.__version__ < 7.0:
