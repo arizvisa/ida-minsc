@@ -284,7 +284,7 @@ class strings(appwindow):
         #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
     # FIXME: I don't think that these callbacks are stackable
-    idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)
+    #idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)
 
     @classmethod
     def refresh(cls):
@@ -300,8 +300,8 @@ class strings(appwindow):
         si = idaapi.string_info_t()
 
         # FIXME: this isn't being used correctly
-        res = idaapi.get_strlist_item(index, si)
-        if not res:
+        ok = idaapi.get_strlist_item(si, index)
+        if not ok:
             raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
         return si
     @classmethod
@@ -314,9 +314,7 @@ class strings(appwindow):
     def iterate(cls):
         '''Iterate through all of the address and strings in the strings list.'''
         for index in six.moves.range(cls.size()):
-            si = cls.at(index)
-            res = idaapi.get_ascii_contents(si.ea, si.length, si.type)
-            yield si.ea, internal.utils.string.of(res)
+            yield cls.get(index)
         return
 
 class segments(appwindow):
