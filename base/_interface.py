@@ -223,7 +223,7 @@ class priorityhook(object):
         '''Enable any hooks for the `name` event that have been previously disabled.'''
         if name not in self.__disabled:
             cls = self.__class__
-            logging.fatal(u"{:s}.enable({!r}) : Hook \"{:s}\" is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.fatal(u"{:s}.enable({!r}) : Hook \"{:s}\" is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.discard(name)
         return True
@@ -231,10 +231,10 @@ class priorityhook(object):
         '''Disable execution of all the hooks for the `name` event.'''
         cls = self.__class__
         if name not in self.__cache:
-            logging.fatal(u"{:s}.disable({!r}) : Hook \"{:s}\" does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
+            logging.fatal(u"{:s}.disable({!r}) : Hook \"{:s}\" does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
             return False
         if name in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : Hook \"{:s}\" has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.warn(u"{:s}.disable({!r}) : Hook \"{:s}\" has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
             return False
         self.__disabled.add(name)
         return True
@@ -691,7 +691,7 @@ class namedtypedtuple(tuple):
 
     def __repr__(self):
         cls = self.__class__
-        res = ("{!s}={!s}".format(string.escape(name, ''), string.repr(value)) for name, value in zip(self._fields, self))
+        res = ("{!s}={!s}".format(internal.utils.string.escape(name, ''), internal.utils.string.repr(value)) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     def _replace(self, **fields):
@@ -700,7 +700,7 @@ class namedtypedtuple(tuple):
         result = self._make(map(fc.pop, self._fields, self))
         if fc:
             cls = self.__class__
-            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(('internal', __name__, cls.__name__)), string.kwargs(fields), '{' + ', '.join(map(string.repr, six.viewkeys(fc))) + '}'))
+            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.kwargs(fields), '{' + ', '.join(map(internal.utils.string.repr, six.viewkeys(fc))) + '}'))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
@@ -768,7 +768,7 @@ class register_t(symbol_t):
         except (AttributeError, ValueError):
             dt = 'unknown'
         cls = register_t
-        return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, string.escape(self.name, '\''), self.position, self.size)
+        return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, internal.utils.string.escape(self.name, '\''), self.position, self.size)
 
     def __eq__(self, other):
         if isinstance(other, basestring):
@@ -816,8 +816,8 @@ class regmatch(object):
     def __new__(cls, *regs, **modifiers):
         '''Construct a closure that can be used for matching instruction using the specified `regs` and `modifiers`.'''
         if not regs:
-            args = ', '.join(map(string.escape, regs))
-            mods = string.kwargs(modifiers)
+            args = ', '.join(map(internal.utils.string.escape, regs))
+            mods = internal.utils.string.kwargs(modifiers)
             raise internal.exceptions.InvalidParameterError(u"{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join(('internal', __name__, cls.__name__)), args, (', '+mods) if mods else ''))
         use, iterops = cls.use(regs), cls.modifier(**modifiers)
         def match(ea):
@@ -1135,7 +1135,7 @@ class map_t(object):
         return name in self.__state__
 
     def __repr__(self):
-        return "{:s} {!s}".format(self.__class__, string.repr(self.__state__))
+        return "{:s} {!s}".format(self.__class__, internal.utils.string.repr(self.__state__))
 
 class collect_t(object):
     """
