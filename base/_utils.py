@@ -927,6 +927,11 @@ class character(object):
                 for ch in cls.map(ch):
                     result.send(ch)
 
+            # check if character is a backslash
+            elif operator.contains(cls.const.backslash, ch):
+                result.send(cls.const.backslash)
+                result.send(ch)
+
             # check if character is printable (unicode)
             elif isinstance(ch, unicode) and cls.unicodeQ(ch):
                 result.send(ch)
@@ -987,6 +992,10 @@ class character(object):
                 if operator.contains(cls.const.inverse, cls.const.backslash + t):
                     ch = operator.getitem(cls.const.inverse, cls.const.backslash + t)
                     result.send(ch)
+
+                # check if our character is a backslash
+                elif operator.contains(cls.const.backslash, t):
+                    result.send(cls.const.backslash)
 
                 # check if the 'x' prefix is specified, which represents a hex digit
                 elif t == 'x':
