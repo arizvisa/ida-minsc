@@ -146,7 +146,7 @@ def name(func):
 
         # decode the string from IDA's UTF-8
         # XXX: how does demangling work with unicode? this would be implementation specific, no?
-        res = utils.string.of(res)
+        res = utils.string.of(name)
 
         # demangle it if necessary
         return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
