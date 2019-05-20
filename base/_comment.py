@@ -219,6 +219,15 @@ class _str(default):
 
         # iterate through each character in the string
         for ch in iterable:
+
+            # if we encounter a backslash while not having any state then we
+            # can just emit the backslash since this is just a regular
+            # string w/ no magic
+            if ch == '\\' and not state.get():
+                yield '\\'
+                continue
+
+            # process the character so we can figure out what's being returned
             unescape.send(ch)
 
             # iterate through the results and yield them to the caller
@@ -237,6 +246,15 @@ class _str(default):
 
         # iterate through each character in the string
         for ch in iterable:
+
+            # check if we've been asked to escape a backslash while there's no
+            # state. this way we can handle backslashes specially since this
+            # is just a regular string.
+            if ch == '\\' and not state.get():
+                yield '\\'
+                continue
+
+            # process the character so we can figure out how to escape it
             escape.send(ch)
 
             # iterate through the results and yield them to the caller
