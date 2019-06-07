@@ -1827,6 +1827,12 @@ class address(object):
 
     """
 
+    # FIXME
+    # The methods in this namespace should be put into a utils class. This way
+    # each of these operations can be exposed to the user in function.chunks,
+    # function.block, etc. Most of these functions only need to know their
+    # searching boundaries, and so we should derive from that logic for our class.
+
     @staticmethod
     def __walk__(ea, next, match):
         '''Return the first address from `ea` using `next` for stepping until the provided callable doesn't `match`.'''
@@ -2365,8 +2371,11 @@ class address(object):
     @classmethod
     def prevstack(cls, ea, delta):
         '''Return the previous instruction from `ea` that is past the specified sp `delta`.'''
-        # FIXME: only render the following warning once
-        logging.warn(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join((__name__, cls.__name__)), ea, delta))
+
+        # FIXME: it'd be much better to keep track of this with a global class that wraps the logger
+        if getattr(cls, '__prevstack_warning_count__', 0) == 0:
+            logging.warn(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join((__name__, cls.__name__)), ea, delta))
+            cls.__prevstack_warning_count__ = getattr(cls, '__prevstack_warning_count__', 0) + 1
 
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
@@ -2386,8 +2395,10 @@ class address(object):
     def nextstack(cls, ea, delta):
         '''Return the next instruction from `ea` that is past the sp `delta`.'''
 
-        # FIXME: only render the following warning once
-        logging.warn(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join((__name__, cls.__name__)), ea, delta))
+        # FIXME: it'd be much better to keep track of this with a global class that wraps the logger
+        if getattr(cls, '__nextstack_warning_count__', 0) == 0:
+            logging.warn(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join((__name__, cls.__name__)), ea, delta))
+            cls.__nextstack_warning_count__ = getattr(cls, '__nextstack_warning_count__', 0) + 1
 
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
