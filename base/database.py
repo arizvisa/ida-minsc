@@ -2252,7 +2252,7 @@ class address(object):
         '''Return the previous address from `ea` containing an instruction that uses `reg` or any one of the specified registers `regs` and matches `predicate`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(reg, '"')) for reg in regs])
+        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(str(reg), '"')) for reg in regs])
         args = args + (u", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '')
 
         # generate each helper using the regmatch class
@@ -2314,7 +2314,7 @@ class address(object):
         '''Return the next address from `ea` containing an instruction that matches `predicate` and uses `reg` or any one of the registers in `regs`.'''
         regs = (reg,) + regs
         count = modifiers.get('count', 1)
-        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(reg, '"')) for reg in regs])
+        args = u', '.join(["{:x}".format(ea)] + ["{!r}".format(predicate)] + ["\"{:s}\"".format(utils.string.escape(str(reg), '"')) for reg in regs])
         args = args + (u", {:s}".format(utils.string.kwargs(modifiers)) if modifiers else '')
 
         # generate each helper using the regmatch class
