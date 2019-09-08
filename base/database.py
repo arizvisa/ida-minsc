@@ -1833,6 +1833,15 @@ class address(object):
     # function.block, etc. Most of these functions only need to know their
     # searching boundaries, and so we should derive from that logic for our class.
 
+    @utils.multicase()
+    def __new__(cls):
+        '''Return the address of the current address.'''
+        return cls.head(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    def __new__(cls, ea):
+        '''Return the address of the item containing the address `ea`.'''
+        return cls.head(ea)
+
     @staticmethod
     def __walk__(ea, next, match):
         '''Return the first address from `ea` using `next` for stepping until the provided callable doesn't `match`.'''
@@ -1919,7 +1928,7 @@ class address(object):
     @utils.multicase()
     @classmethod
     def head(cls):
-        '''Return the current address.'''
+        '''Return the address of the byte at the beginning of the current address.'''
         return cls.head(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
