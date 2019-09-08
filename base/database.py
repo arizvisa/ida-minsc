@@ -4704,9 +4704,27 @@ class get(object):
         else:
             raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the `idaapi.DT_TYPE` as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, F, T))
 
+        # grab the sizes of all our array components
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
-        res = _array.array(t, read(ea, count * cb))
+
+        # now we can construct our array
+        res = _array.array(t)
+
+        # validate that our itemsize matches so we can warn the user
+        # and fall back if necessary
+        if res.itemsize != cb:
+            logging.warn(u"{:s}.array({:#x}{:s}) : Unable to decode array with the correct type as the size (+{:d}) for the DT_TYPE ({:#x}) at the given address does not match the element size for the array (+{:d}).".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', res.itemsize, T, cb))
+
+            # fix the array so that it matches the expected itemsize
+            tlookup = { 1: 'B', 2: 'H', 4: 'L' }
+            res = _array.array(tlookup.get(cb, 1))
+
+        # read our data, and use it to initialize the array
+        data = read(ea, count * cb)
+        res.fromstring(data)
+
+        # check the length and warn the user if it's wrong
         if len(res) != count:
             logging.warn(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', len(res), count))
         return res
