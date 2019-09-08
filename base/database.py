@@ -4817,25 +4817,30 @@ class get(object):
             # either we don't support it, or it's an array
             except (TypeError, KeyError):
 
-                # if it's an array, then figure the count. otherwise use a count of 0
-                ty, count = t if isinstance(t, builtins.list) else (t, 0)
+                # if it's an array, then unpack the count. otherwise we'll use a
+                # count of -1 so that we can tell ctypes to not actually create
+                # the type as an array. we can't use 0 here because ctypes
+                # recognizes 0-length arrays.
+                ty, count = t if isinstance(t, builtins.list) else (t, -1)
 
-                # when handling an array, just look up its type and multiply by the count
-                if isinstance(t, builtins.list):
-                    t = typelookup[tuple(ty)]
-                    ct = t * count
+                # check that we really are handling an array, and lookup its type
+                # to build a ctype with its count
+                if isinstance(t, builtins.list) and operator.contains(typelookup, ty):
+                    t = typelookup[ty]
+                    ct = t if count < 0 else (t * count)
 
-                # if our type is a string type, then we can combine them with ctypes
+                # if our type is a string type, then we can simply make a ctype for it
                 elif ty in {chr, str}:
-                    ct = ctypes.c_char * count
+                    ct = ctypes.c_char if count < 0 else (ctypes.c_char * count)
 
                 # otherwise we have no idea what ctype we can use for this, so skip it
+                # by creating a buffer for it
                 else:
+                    logging.warn(u"{:s}.structure({:#x}, ...) : Using buffer with size {:+#x} for member #{:d} ({:s}) due to unsupported type {!s}.".format('.'.join((__name__, cls.__name__)), ea, m.size, m.index, m.fullname, ty if count < 0 else [ty, count]))
                     ct = None
 
-            # finally we can add the member to our result
-            finally:
-                res[m.name] = val if any(_ is None for _ in (ct, val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
+            # finally we can add the member to our result by creating a buffer for it
+            res[m.name] = val if any(_ is None for _ in (ct, val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
         return res
     struc = struct = utils.alias(structure, 'get')
 
