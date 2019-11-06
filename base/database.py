@@ -1174,8 +1174,8 @@ class entries(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the entry points in the database that match the keyword specified by `type`.'''
-        res = itertools.imap(cls.__address__, cls.__iterate__(**type))
-        for ea in res: yield ea
+        iterable = itertools.imap(cls.__address__, cls.__iterate__(**type))
+        for ea in iterable: yield ea
 
     @classmethod
     def __index__(cls, ea):
@@ -1237,20 +1237,21 @@ class entries(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the entry points in the database that match the keyword specified by `type`.'''
-        res = builtins.list(cls.__iterate__(**type))
+        listable = builtins.list(cls.__iterate__(**type))
 
         to_address = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
         to_numlen = utils.fcompose("{:x}".format, len)
 
-        maxindex = max(res+[1])
-        maxaddr = max(builtins.map(to_address, res) or [idaapi.BADADDR])
-        maxordinal = max(builtins.map(idaapi.get_entry_ordinal, res) or [1])
+        maxindex = max(listable+[1])
+        maxaddr = max(builtins.map(to_address, listable) or [idaapi.BADADDR])
+        maxordinal = max(builtins.map(idaapi.get_entry_ordinal, listable) or [1])
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-        caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
-        cordinal = math.floor(math.log(maxordinal or 1)/math.log(16))
+        caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
+        cordinal = math.ceil(math.log(maxordinal or 1)/math.log(16))
 
-        for index in res:
-            six.print_(u"[{:{:d}d}] {:>#{:d}x} : ({:#{:d}x}) {:s}".format(index, int(cindex), to_address(index), int(caddr), cls.__entryordinal__(index), int(cindex), cls.__entryname__(index)))
+        for index in listable:
+            ea, ordinal = to_address(index), cls.__entryordinal__(index)
+            six.print_(u"[{:{:d}d}] {:<#{:d}x} : {:s}{:s}".format(index, int(cindex), ea, 2 + int(caddr), '' if ea == ordinal else "({:#{:d}x}) ".format(ordinal, 2 + int(cindex)), cls.__entryname__(index)))
         return
 
     @utils.multicase(string=basestring)
@@ -1266,13 +1267,13 @@ class entries(object):
         '''Search through all of the entry points within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        res = builtins.list(cls.__iterate__(**type))
-        if len(res) > 1:
-            builtins.map(logging.info, ((u"[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in res))
+        listable = builtins.list(cls.__iterate__(**type))
+        if len(listable) > 1:
+            builtins.map(logging.info, ((u"[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in listable))
             f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join((__name__, cls.__name__)), query_s, len(res), f(res[0])))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join((__name__, cls.__name__)), query_s, len(listable), f(listable[0])))
 
-        res = builtins.next(iter(res), None)
+        res = builtins.next(iter(listable), None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return cls.__address__(res)
@@ -1645,9 +1646,9 @@ class imports(object):
         """
         for idx in six.moves.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
-            res = []
-            idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, res.append, utils.fconstant(True)))
-            for ea, name, ordinal in res:
+            listable = []
+            idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, listable.append, utils.fconstant(True)))
+            for ea, name, ordinal in listable:
                 yield ea, (utils.string.of(module), utils.string.of(name), ordinal)
             continue
         return
@@ -1680,9 +1681,9 @@ class imports(object):
     def at(cls, ea):
         '''Return the import at the address `ea`.'''
         ea = interface.address.inside(ea)
-        res = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
+        iterable = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
         try:
-            return utils.second(builtins.next(res))
+            return utils.second(builtins.next(iterable))
         except StopIteration:
             pass
         raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : Unable to determine import at specified address.".format('.'.join((__name__, cls.__name__)), ea))
@@ -1742,8 +1743,8 @@ class imports(object):
     @classmethod
     def modules(cls):
         '''Return all of the import modules defined in the database.'''
-        res = (idaapi.get_import_module_name(i) for i in six.moves.range(idaapi.get_import_module_qty()))
-        return map(utils.string.of, res)
+        iterable = (idaapi.get_import_module_name(i) for i in six.moves.range(idaapi.get_import_module_qty()))
+        return map(utils.string.of, iterable)
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1756,15 +1757,17 @@ class imports(object):
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def list(cls, **type):
         '''List all of the imports in the database that match the keyword specified by `type`.'''
-        res = builtins.list(cls.iterate(**type))
+        listable = builtins.list(cls.iterate(**type))
 
-        maxaddr = max(builtins.map(utils.first, res) or [idaapi.BADADDR])
-        maxmodule = max(builtins.map(utils.fcompose(utils.second, utils.first, len), res) or [''])
+        maxaddr = max(builtins.map(utils.first, listable) or [idaapi.BADADDR])
+        maxmodule = max(builtins.map(utils.fcompose(utils.second, utils.first, utils.fdefault(''), len), listable) or [''])
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
-        cordinal = max(builtins.map(utils.fcompose(utils.second, operator.itemgetter(2), "{:d}".format, len), res) or [1])
+        cordinal = max(builtins.map(utils.fcompose(utils.second, operator.itemgetter(2), "{:d}".format, len), listable) or [1])
+        has_ordinal = any(ordinal > 0 for _, (_, _, ordinal) in listable)
 
-        for ea, (module, name, ordinal) in res:
-            six.print_(u"{:#0{:d}x} {:s}<{:<d}>{:s} {:s}".format(ea, int(caddr), module, ordinal, ' '*(cordinal-len("{:d}".format(ordinal)) + (maxmodule-len(module))), name))
+        for ea, (module, name, ordinal) in listable:
+            moduleordinal = "{:s}{:s}".format(module, "<{:d}>".format(ordinal) if has_ordinal else '')
+            six.print_(u"{:<#0{:d}x} : {:s}{:s}".format(ea, 2 + int(caddr), "{:>{:d}s} ".format(moduleordinal, maxmodule + cordinal) if module else '', name))
         return
 
     @utils.multicase(string=basestring)
@@ -1780,13 +1783,13 @@ class imports(object):
         '''Search through all of the imports within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        res = builtins.list(cls.iterate(**type))
-        if len(res) > 1:
-            builtins.map(logging.info, (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in res))
+        listable = builtins.list(cls.iterate(**type))
+        if len(listable) > 1:
+            builtins.map(logging.info, (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in listable))
             f = utils.fcompose(utils.second, cls.__formatl__)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(res), utils.string.escape(f(res[0]), '"')))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
-        res = builtins.next(iter(res), None)
+        res = builtins.next(iter(listable), None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res[0]
