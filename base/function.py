@@ -588,7 +588,7 @@ def within():
 def within(ea):
     '''Return true if the address `ea` is within a function.'''
     ea = interface.address.within(ea)
-    return idaapi.get_func(ea) is not None
+    return idaapi.get_func(ea) is not None and idaapi.segtype(ea) != idaapi.SEG_XTRN
 
 # Checks if ea is contained in function or in any of its chunks
 @utils.multicase()
