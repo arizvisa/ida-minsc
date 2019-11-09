@@ -1092,6 +1092,19 @@ def addressOfRuntimeOrStatic(func):
         # yep, we're an import
         return True, func
 
+    # check if we're _not_ actually within a function (mis-defined external)
+    if not function.within(fn.startEA):
+        import database
+
+        # ensure that we're an import, otherwise this is definitely not misdefined
+        try:
+            database.imports.at(fn.startEA)
+        except internal.exceptions.MissingTypeOrAttribute:
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}.addressOfRuntimeOrStatic({#x}) : Unable to locate function by address.".format(cls.__name__, fn.startEA))
+
+        # ok, we found a mis-defined import
+        return True, func
+
     # nope, we're just a function
     return False, fn.startEA
 
