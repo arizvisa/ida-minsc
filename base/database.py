@@ -1353,7 +1353,7 @@ def tag(ea):
         func = function.by_address(ea)
     except E.FunctionNotFoundError:
         func = None
-    repeatable = False if func else True
+    repeatable = False if func and function.within(ea) else True
 
     # fetch the tags from the repeatable and non-repeatable comment at the given address
     res = comment(ea, repeatable=False)
@@ -1421,7 +1421,7 @@ def tag(ea, key, value):
         func = function.by_address(ea)
     except E.FunctionNotFoundError:
         func = None
-    repeatable = False if func else True
+    repeatable = False if func and function.within(ea) else True
 
     # grab the current tag out of the correct repeatable or non-repeatable comment
     ea = interface.address.inside(ea)
@@ -1431,7 +1431,7 @@ def tag(ea, key, value):
 
     # update the tag's reference if we're actually adding a key and not overwriting it
     if key not in state:
-        if func:
+        if func and function.within(ea):
             internal.comment.contents.inc(ea, key)
         else:
             internal.comment.globals.inc(ea, key)
@@ -1463,7 +1463,7 @@ def tag(ea, key, none):
         func = function.by_address(ea)
     except E.FunctionNotFoundError:
         func = None
-    repeatable = False if func else True
+    repeatable = False if func and function.within(ea) else True
 
     # fetch the dict, remove the key, then write it back.
     state = internal.comment.decode(comment(ea, repeatable=not repeatable))
@@ -1475,7 +1475,7 @@ def tag(ea, key, none):
     comment(ea, internal.comment.encode(state), repeatable=repeatable)
 
     # delete its reference since it's been removed from the dict
-    if func:
+    if func and function.within(ea):
         internal.comment.contents.dec(ea, key)
     else:
         internal.comment.globals.dec(ea, key)
