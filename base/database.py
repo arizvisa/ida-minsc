@@ -968,17 +968,59 @@ def name(ea, string, *suffix, **flags):
     res = (string,) + suffix
     string = interface.tuplename(*res)
 
-    # validate the address
+    # validate the address, and get the original flags
     ea = interface.address.inside(ea)
+    ofl = type.flags(ea)
 
-    # XXX: what's this for?
-    if idaapi.has_any_name(type.flags(ea)):
-        pass
+    ## define some closures that perform the different tasks necessary to
+    ## apply a name to a given address
+    def apply_name(ea, string, flags):
+        '''Apply the given ``string`` to the address ``ea`` with the specified ``flags``.'''
 
-    # XXX: isolate this default flags logic into a separate closure
-    #      since this logic can be short-circuited by the 'flags' parameter.
+        # convert the specified string into a form that IDA can handle
+        ida_string = utils.string.to(string)
 
-    # some default options
+        # validate the name
+        res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
+        if ida_string and ida_string != res:
+            logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(utils.string.of(res), '"')))
+            ida_string = res
+
+        # set the name and use the value of 'flags' if it was explicit
+        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flags)
+
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), flags.get('flags', fl)))
+        return res
+
+    def name_within(ea, string, fl):
+        '''Add or rename a label named ``string`` at the address ``ea`` with the specified ``flags``.'''
+        func = idaapi.get_func(ea)
+
+        # if we're within a function, then we simply make all labels local
+        fl |= idaapi.SN_LOCAL
+
+        # nothing left to do, so apply the name with the flags we figured
+        res = apply_name(ea, string, fl)
+
+        # check if our address does not point to a function beginning and if
+        # our visible name does not match the requested one. If so, then this
+        # might be a switch/jmptable of some sort that needs to be removed.
+        if func.startEA != ea and idaapi.get_visible_name(ea) != string:
+            idaapi.del_global_name(ea)
+        return res
+
+    def name_outside(ea, string, fl):
+        '''Add or rename a global named ``string`` at the address ``ea`` with the specified ``flags``.'''
+
+        # if 'listed' wasn't explicitly specified then ensure it's not listed as
+        # requested
+        if 'listed' not in flags:
+            fl &= ~idaapi.SN_NOLIST
+
+        return apply_name(ea, string, fl)
+
+    ## now we can define the actual logic for naming the given address
     fl = idaapi.SN_NON_AUTO
     fl |= idaapi.SN_NOCHECK
 
@@ -987,50 +1029,17 @@ def name(ea, string, *suffix, **flags):
     fl |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
     fl |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
 
-    # set its local flag based on whether we're in a function or not
-    fl = (fl | idaapi.SN_LOCAL) if function.within(ea) else (fl & ~idaapi.SN_LOCAL)
-
-    # if we're within a function and 'listed' wasn't explicitly specified
-    # then ensure it's not listed as it's likely to be a local label
-    if not function.within(ea) and 'listed' not in flags:
-        fl &= ~idaapi.SN_NOLIST
-
     # if the bool `listed` is True, then ensure that it's added to the name list.
     if 'listed' in flags:
         fl = (fl & ~idaapi.SN_NOLIST) if flags.get('listed', False) else (fl | idaapi.SN_NOLIST)
 
-    # check to see if we're a label being applied to a switch
-    # that way we can make it a local label
-    # FIXME: figure out why this doesn't work on some switch labels
-    try:
-        # check if we're a label of some kind
-        f = type.flags(ea)
-        if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
-            # that is referenced by an array with a correctly sized pointer inside it
-            (r, sidata), = ((r, type.array(r)) for r in xref.data_up(ea))
-            if config.bits() == sidata.itemsize*8 and ea in sidata:
-                # which we check to see if its a switch_info_t
-                si = next(idaapi.get_switch_info_ex(r) for r in xref.data_up(r))
-                if si is not None:
-                    # because its name has its local flag cleared
-                    fl |= idaapi.SN_LOCAL
-    except: pass
+    # if we're within a function, then use the name_within closure to apply the name
+    if function.within(ea):
+        return name_within(ea, string, fl)
 
-    # convert the specified string into a form that IDA can handle
-    ida_string = utils.string.to(string)
+    # otherwise, we use the name_without closure to apply it
+    return name_outside(ea, string, fl)
 
-    # validate the name
-    res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
-    if ida_string and ida_string != res:
-        logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(utils.string.of(res), '"')))
-        ida_string = res
-
-    # set the name and use the value of 'flags' if it was explicit
-    res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flags.get('flags', fl))
-
-    if not ok:
-        raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), flags.get('flags', fl)))
-    return res
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
     '''Removes the name defined at the address `ea`.'''
