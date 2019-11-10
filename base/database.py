@@ -1033,8 +1033,13 @@ def name(ea, string, *suffix, **flags):
     if 'listed' in flags:
         fl = (fl & ~idaapi.SN_NOLIST) if flags.get('listed', False) else (fl | idaapi.SN_NOLIST)
 
+    # if custom flags were specified, then just use those as they should get
+    # priority
+    if 'flags' in flags:
+        return apply_name(ea, string, flags['flags'])
+
     # if we're within a function, then use the name_within closure to apply the name
-    if function.within(ea):
+    elif function.within(ea):
         return name_within(ea, string, fl)
 
     # otherwise, we use the name_without closure to apply it
