@@ -684,7 +684,8 @@ class namedtypedtuple(tuple):
         try:
             # honor the ._fields first
             res = object.__getattribute__(self, '_fields')
-            res = operator.itemgetter(res.index(name))
+            res = map(operator.methodcaller('lower'), res)
+            res = operator.itemgetter(res.index(name.lower()))
         except (IndexError, ValueError):
             res = lambda s: object.__getattribute__(s, name)
         return res(self)
