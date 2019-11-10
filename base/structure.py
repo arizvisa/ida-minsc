@@ -1191,6 +1191,10 @@ class member_t(object):
         '''Return the size of the member.'''
         return idaapi.get_member_size(self.ptr)
     @property
+    def realoffset(self):
+        '''Return the real offset of the member.'''
+        return self.ptr.get_soff()
+    @property
     def offset(self):
         '''Return the offset of the member.'''
         return self.ptr.get_soff() + self.__owner.members.baseoffset
@@ -1394,7 +1398,8 @@ class member_t(object):
             res = []
             for xr in xl:
                 ea, opnum = xr.ea, int(xr.opnum)
-                res.append( interface.OREF(ea, opnum, interface.ref_t(xr.type, instruction.op_state(ea, opnum))) )    # FIXME
+                ref = interface.OREF(ea, opnum, interface.ref_t(xr.type, instruction.op_state(ea, opnum)))
+                res.append(ref)
             return res
 
         # otherwise, it's a structure..which means we need to specify the member to get refs for
@@ -1408,15 +1413,72 @@ class member_t(object):
         while x.next_to():
             refs.append((x.frm, x.iscode, x.type))
 
+        # collect all structure references that might reference us just 0in case
+        # we need to verify that a globally defined address is using a structure
+        # that contains our member
+        identifiers = { self.owner } | { member.owner for member in self.owner.refs() if isinstance(member, member_t) }
+        while True:
+            current = identifiers.copy()
+
+            # iterate through every single structure that we have, and gather
+            # its member_t references
+            for item in current:
+                for member in item.refs():
+                    if isinstance(item, member_t):
+                        current.add(item.owner)
+                    continue
+                continue
+
+            # if nothing changed, then we're good to leave this crazy loop
+            if current == identifiers:
+                break
+
+            # otherwise, merge our findings and try again
+            identifiers |= current
+
+        # okay, now we can convert this set into a set of identifiers
+        identifiers = { item.id for item in identifiers }
+
         # now figure out which operand has the structure member applied to it
         res = []
         for ea, _, t in refs:
-            ops = ((idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None)
-            ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in ops)
-            ops = (idx for idx, ids in ops if self.__owner.id in ids)    # sanity
-            res.extend( interface.OREF(ea, int(op), interface.ref_t.of(t)) for op in ops)
-        return res
+            listable = [(idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None]
 
-#strpath_t
-#op_stroff(ea, n, tid_t* path, int path_len, adiff_t delta)
-#get_stroff_path(ea, n, tid_t* path, adiff_t delta)
+            # check if we found any ops that point directly to this member
+            if any(listable):
+                iterable = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in listable)
+                iterable = (idx for idx, ids in iterable if self.__owner.id in ids)    # sanity
+                res.extend(interface.OREF(ea, int(opnum), interface.ref_t.of(t)) for opnum in iterable)
+
+            # otherwise our reference is implicitly pointing to our member, so
+            # now we need to figure out which operand is the one.
+            else:
+                fl = database.type.flags(ea)
+                iterable = ((opnum, idaapi.get_opinfo(idaapi.opinfo_t(), ea, opnum, fl)) for opnum in six.moves.range(idaapi.UA_MAXOP))
+                iterable = ((opnum, info) for opnum, info in iterable if isinstance(info, idaapi.opinfo_t))
+
+                # now that we got all the opinfo_t for each operand, we need to
+                # distinguish which operands are capable of being calculated to
+                # determine which ones point to our structure member.
+                iterable = ((opnum, info.ri, instruction.op(ea, opnum)) for opnum, info in iterable if info.ri.is_target_optional())
+
+                # now we can do some math to determine if the operands really
+                # are pointing to our structure member.
+                # pointing at our member exactly..
+                for opnum, ri, opvalue in iterable:
+                    offset = opvalue if isinstance(opvalue, six.integer_types) else six.next((getattr(opvalue, attribute) for attribute in {'offset', 'address'} if hasattr(opvalue, attribute)), None)
+
+                    # check if we got a valid offset, because if not then we just
+                    # need to skip to the next iteration
+                    if offset is None or not database.within(offset):
+                        continue
+
+                    # align the offset, and check if our address is using one
+                    # of our structure identifiers
+                    offset = interface.address.head(offset, silent=True)
+                    if database.type.flags(offset, idaapi.DT_TYPE) == idaapi.FF_STRU and database.type.structure.id(offset) in identifiers:
+                        res.append(interface.OREF(ea, opnum, interface.ref_t.of(t)))
+                    continue
+                continue
+            continue
+        return res
