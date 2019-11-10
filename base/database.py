@@ -974,8 +974,8 @@ def name(ea, string, *suffix, **flags):
 
     ## define some closures that perform the different tasks necessary to
     ## apply a name to a given address
-    def apply_name(ea, string, flags):
-        '''Apply the given ``string`` to the address ``ea`` with the specified ``flags``.'''
+    def apply_name(ea, string, fl):
+        '''Apply the given ``string`` to the address ``ea`` with the specified ``fl``.'''
 
         # convert the specified string into a form that IDA can handle
         ida_string = utils.string.to(string)
@@ -986,11 +986,11 @@ def name(ea, string, *suffix, **flags):
             logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
-        # set the name and use the value of 'flags' if it was explicit
-        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flags)
+        # set the name and use the value of 'fl' if it was explicit
+        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", fl)
 
         if not ok:
-            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), flags.get('flags', fl)))
+            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), fl))
         return res
 
     def name_within(ea, string, fl):
