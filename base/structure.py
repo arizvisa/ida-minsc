@@ -231,6 +231,8 @@ class structure_t(object):
 
     def __init__(self, id, offset=0):
         self.__id__ = id
+        if self.ptr is None:
+            raise E.StructureNotFoundError(u"{:s}.instance({:#x}, offset={:+#x}) : Unable to locate the structure with the specified identifier.".format(__name__, id, offset))
         self.__members__ = members_t(self, baseoffset=offset)
 
     def up(self):
@@ -308,11 +310,7 @@ class structure_t(object):
         return refs
 
     def refs(self):
-        """Return the `(address, opnum, type)` of all the code and data references within the database that reference this structure.
-
-        If `opnum` is ``None``, then the returned `address` has the structure applied to it.
-        If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
-        """
+        '''Return all structure or frame members within the database that reference this particular structure.'''
         x, sid = idaapi.xrefblk_t(), self.id
 
         # grab first reference to structure
@@ -332,34 +330,55 @@ class structure_t(object):
         # iterate through figuring out if sid is applied to an address or another structure
         res = []
         for ref, _, _ in refs:
+
             # structure (probably a frame member)
             if ref & highbyte == highbyte:
-                # get sptr, mptr
-                name = idaapi.get_member_fullname(ref)
-                mptr, _ = idaapi.get_member_by_fullname(name)
-                if not isinstance(mptr, idaapi.member_t):
-                    cls = self.__class__
-                    raise E.InvalidTypeOrValueError(u"{:s}.instance({!r}).refs() : Unexpected type {!s} returned for member \"{:s}\".".format(__name__, self.name, mptr.__class__, internal.utils.string.escape(name, '"')))
-                sptr = idaapi.get_sptr(mptr)
+                # get mptr and the member name
+                mpack = idaapi.get_member_by_id(ref)
+                if mpack is None:
+                    raise E.MemberNotFoundError(u"{:s}.instance({!r}).refs() : Unable to locate the member identified by {:#x}.".format(__name__, self.name, ref))
+                mptr, name, _ = mpack
 
-                # get frame, func_t
+                # validate mptr and get the sptr from it
+                if not isinstance(mptr, idaapi.member_t):
+                    cls, name = self.__class__, idaapi.get_member_fullname(ref)
+                    raise E.InvalidTypeOrValueError(u"{:s}.instance({!r}).refs() : Unexpected type {!s} returned for member \"{:s}\".".format(__name__, self.name, mptr.__class__, internal.utils.string.escape(name, '"')))
+                sptr = idaapi.get_member_struc(name)
+
+                # find out from mptr id if we're a function frame
                 frname, _ = name.split('.', 2)
                 frid = internal.netnode.get(frname)
                 ea = idaapi.get_func_by_frame(frid)
+
+                # if we were unable to get the function frame, then we must be
+                # referencing the member of another structure
+                if ea == idaapi.BADADDR:
+                    st = by_identifier(sptr.id)
+                    mem = st.members.by_identifier(mptr.id)
+                    res.append(mem)
+                    continue
+
+                # otherwise we're referencing a frame member, and we need to grab
+                # the frame for the given function
+                fr = idaapi.get_frame(ea)
+                if fr is None:
+                    raise E.MissingTypeOrAttribute(u"{:s}.instance({!r}).refs() : The function at {:#x} for frame member {:#x} does not have a frame.".format(__name__, self.name, ea, mptr.id))
+
+                # and we also need the func_t
                 f = idaapi.get_func(ea)
+                if f is None:
+                    raise E.FunctionNotFoundError(u"{:s}.instance({!r}).refs() : Unable to locate the function for frame member {:#x} by address {:#x}.".format(__name__, self.name, mptr.id, ea))
 
-                # now find all xrefs to member within function
-                xl = idaapi.xreflist_t()
-                idaapi.build_stkvar_xrefs(xl, f, mptr)
+                # so we can instantiate the structure with the correct offset
+                # and then grab the member that was referenced
+                st = by_identifier(fr.id, offset=-f.frsize)
+                mem = st.members.by_identifier(mptr.id)
+                res.append(mem)
 
-                # now we can add it
-                for xr in xl:
-                    ea, opnum, state = xr.ea, int(xr.opnum), instruction.op_state(ea, xr.opnum)
-                    res.append( interface.OREF(ea, opnum, interface.ref_t.of_state(state)) )
-                continue
-
-            # address
-            res.append( interface.OREF(ref, None, interface.ref_t.of_state('*')) )   # using '*' to describe being applied to the an address
+            # otherwise we just (strangely) got an address, so add it as a reference
+            else:
+                res.append( interface.OREF(ref, None, interface.ref_t.of_state('*')) )   # using '*' to describe being applied to the an address
+            continue
 
         return res
 
@@ -822,13 +841,16 @@ class members_t(object):
             raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.__getitem__({!r}) : Unable to find the member that was requested.".format(__name__, self.owner.name, index))
         return res
 
-    def index(self, member_t):
-        '''Return the index of the member specified by `member_t`.'''
+    def index(self, member):
+        '''Return the index of the specified `member`.'''
+        if not hasattr(member, 'id'):
+            raise E.InvalidParameterError(u"{:s}.instance({!r}).members.index({!r}) : An invalid type ({!r}) was specified for the member to search for.".format(__name__, self.owner.name, member, member.__class__))
+
         for i in six.moves.range(self.owner.ptr.memqty):
-            if member_t.id == self[i].id:
+            if member.id == self[i].id:
                 return i
             continue
-        raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.index({!r}) : The requested member is not in the members list.".format(__name__, self.owner.name, member_t))
+        raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.index({!s}) : The requested member is not in the members list.".format(__name__, self.owner.name, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member)))
 
     __member_matcher = utils.matcher()
     __member_matcher.boolean('regex', re.search, 'name')
@@ -1342,7 +1364,11 @@ class member_t(object):
         return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}> {!s}{:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, utils.string.repr(typ), " // {!s}".format(utils.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
 
     def refs(self):
-        '''Return the `(address, opnum, type)` of all the references to this member within the database.'''
+        """Return the `(address, opnum, type)` of all the code and data references to this member within the database.
+
+        If `opnum` is ``None``, then the returned `address` has the structure applied to it.
+        If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
+        """
         mid = self.id
 
         # calculate the high-byte which is used to determine an address from a structure
