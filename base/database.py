@@ -319,55 +319,65 @@ class functions(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the functions in the database that match the keyword specified by `type`.'''
-        listable = builtins.list(cls.iterate(**type))
+        listable = []
 
-        flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.frame.lvars.size(ea)) if function.by(ea).frsize else []
-        fminaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)
-        fmaxaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)
+        # Some utility functions for grabbing frame information
+        flvars = lambda f: _structure.fragment(f.frame, 0, f.frsize) if f.frsize else iter([])
+        favars = lambda f: function.frame.args(f) if f.frsize else iter([])
 
-        maxindex = len(listable)
-        maxentry = max(listable or [config.bounds()[0]])
-        maxaddr = max(builtins.map(fmaxaddr, listable) or [1])
-        minaddr = max(builtins.map(fminaddr, listable) or [1])
-        maxname = max(builtins.map(utils.fcompose(function.name, len), listable) or [1])
-        chunks = max(builtins.map(utils.fcompose(function.chunks, builtins.list, len), listable) or [1])
-        marks = max(builtins.map(utils.fcompose(function.marks, builtins.list, len), listable) or [1])
-        blocks = max(builtins.map(utils.fcompose(function.blocks, builtins.list, len), listable) or [1])
-        exits = max(builtins.map(utils.fcompose(function.bottom, builtins.list, len), listable) or [1])
-        lvars = max(builtins.map(utils.fcompose(lambda ea: flvars(ea) if function.by(ea).frsize else [], builtins.list, len), listable) or [1])
+        # Set some reasonable defaults here
+        maxentry = config.bounds()[0]
+        maxaddr = minaddr = 0
+        maxname = chunks = marks = blocks = exits = 0
+        lvars = avars = 0
 
-        # FIXME: fix function.arguments so that it works on non-stackbased functions
-        fargs = function.arguments
-        try:
-            args = max(builtins.map(utils.fcompose(lambda ea: fargs(ea) if function.by(ea).frsize else [], builtins.list, len), listable) or [1])
-        except:
-            args, fargs = 1, lambda ea: []
+        # First pass through the list to grab the maximum lengths of the different fields
+        for ea in cls.iterate(**type):
+            func, _ = function.by(ea), ui.navigation.procedure(ea)
+            maxentry = max(ea, maxentry)
+            maxname = max(len(function.name(func)), maxname)
 
-        cindex = math.ceil(math.log(maxindex or 1)/math.log(10)) if maxindex else 1
+            res = builtins.list(function.chunks(func))
+            maxaddr, minaddr = max(max(map(operator.itemgetter(-1), res)), maxaddr), max(max(map(operator.itemgetter(0), res)), minaddr)
+            chunks = max(len(res), chunks)
+
+            marks = max(len(builtins.list(function.marks(func))), marks)
+            blocks = max(len(builtins.list(function.blocks(func))), blocks)
+            exits = max(len(builtins.list(function.bottom(func))), exits)
+            lvars = max(len(builtins.list(flvars(func))) if func.frsize else lvars, lvars)
+            avars = max(len(builtins.list(favars(func))) if func.frsize else avars, avars)
+
+            listable.append(ea)
+
+        # Collect the maximum sizes for everything from the first pass
+        cindex = math.ceil(math.log(len(listable) or 1)/math.log(10)) if listable else 1
         try: cmaxoffset = math.floor(math.log(offset(maxentry)) or 1)/math.log(16)
         except: cmaxoffset = 0
         cmaxentry = math.floor(math.log(maxentry or 1)/math.log(16))
         cmaxaddr = math.floor(math.log(maxaddr or 1)/math.log(16))
         cminaddr = math.floor(math.log(minaddr or 1)/math.log(16))
         cchunks = math.floor(math.log(chunks or 1)/math.log(10)) if chunks else 1
-        cmarks = math.floor(math.log(marks or 1)/math.log(10)) if marks else 1
         cblocks = math.floor(math.log(blocks or 1)/math.log(10)) if blocks else 1
-        cargs = math.floor(math.log(args or 1)/math.log(10)) if args else 1
         cexits = math.floor(math.log(exits or 1)/math.log(10)) if exits else 1
+        cavars = math.floor(math.log(avars or 1)/math.log(10)) if avars else 1
         clvars = math.floor(math.log(lvars or 1)/math.log(10)) if lvars else 1
+        cmarks = math.floor(math.log(marks or 1)/math.log(10)) if marks else 1
 
+        # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
-            six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
+            func = function.by(ea)
+            res = builtins.list(function.chunks(func))
+            six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} {:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
                 offset(ea), int(cmaxoffset),
-                fminaddr(ea), int(cminaddr), fmaxaddr(ea), int(cmaxaddr),
-                len(list(function.chunks(ea))), int(cchunks),
-                function.name(ea), int(maxname),
-                len(list(fargs(ea))) if function.by(ea).frsize else 0, int(cargs),
-                len(list(flvars(ea))), int(clvars),
-                len(list(function.blocks(ea))), int(cblocks),
-                len(list(function.bottom(ea))), int(cexits),
-                len(list(function.marks(ea))), int(cmarks)
+                min(map(operator.itemgetter(0), res)), int(cminaddr), max(map(operator.itemgetter(-1), res)), int(cmaxaddr),
+                int(cchunks) * ' ', len(res),
+                function.name(func), int(maxname),
+                len(list(favars(func))) if func.frsize else 0, 1 + int(cavars),
+                len(list(flvars(func))), 1 + int(clvars),
+                len(list(function.blocks(func))), 1 + int(cblocks),
+                len(list(function.bottom(func))), 1 + int(cexits),
+                len(list(function.marks(func))), 1 + int(cmarks)
             ))
         return
 
@@ -638,13 +648,24 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the names in the database that match the keyword specified by `type`.'''
-        listable = builtins.list(cls.__iterate__(**type))
+        listable = []
 
-        maxindex = max(listable or [1])
-        maxaddr = max(builtins.map(idaapi.get_nlist_ea, listable) or [idaapi.BADADDR])
+        # Set some reasonable defaults
+        maxindex = 1
+        maxaddr = 0
+
+        # Perform the first pass through our listable grabbing our field lengths
+        for index in cls.__iterate__(**type):
+            maxindex = max(index, maxindex)
+            maxaddr = max(idaapi.get_nlist_ea(index), maxaddr)
+
+            listable.append(index)
+
+        # Collect the sizes from our first pass
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
 
+        # List all the fields of each name that was found
         for index in listable:
             ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
             six.print_(u"[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), ea, int(caddr), utils.string.of(name)))
@@ -1235,20 +1256,30 @@ class entries(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the entry points in the database that match the keyword specified by `type`.'''
-        listable = builtins.list(cls.__iterate__(**type))
+        listable = []
 
-        to_address = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-        to_numlen = utils.fcompose("{:x}".format, len)
+        # Set some reasonable defaults
+        maxindex = maxaddr = maxordinal = 0
 
-        maxindex = max(listable+[1])
-        maxaddr = max(builtins.map(to_address, listable) or [idaapi.BADADDR])
-        maxordinal = max(builtins.map(idaapi.get_entry_ordinal, listable) or [1])
+        # First pass through our listable grabbing the maximum lengths of our fields
+        for index in cls.__iterate__(**type):
+            maxindex = max(index, maxindex)
+
+            res = idaapi.get_entry_ordinal(index)
+            maxaddr = max(idaapi.get_entry(res), maxaddr)
+            maxordinal = max(res, maxordinal)
+
+            listable.append(index)
+
+        # Collect the maximum sizes for everything from the first pass
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
         caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
         cordinal = math.ceil(math.log(maxordinal or 1)/math.log(16))
 
+        # List all the fields from everything that matched
         for index in listable:
-            ea, ordinal = to_address(index), cls.__entryordinal__(index)
+            ordinal = cls.__entryordinal__(index)
+            ea = idaapi.get_entry(ordinal)
             six.print_(u"[{:{:d}d}] {:<#{:d}x} : {:s}{:s}".format(index, int(cindex), ea, 2 + int(caddr), '' if ea == ordinal else "({:#{:d}x}) ".format(ordinal, 2 + int(cindex)), cls.__entryname__(index)))
         return
 
@@ -1755,14 +1786,25 @@ class imports(object):
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def list(cls, **type):
         '''List all of the imports in the database that match the keyword specified by `type`.'''
-        listable = builtins.list(cls.iterate(**type))
+        listable = []
 
-        maxaddr = max(builtins.map(utils.first, listable) or [idaapi.BADADDR])
-        maxmodule = max(builtins.map(utils.fcompose(utils.second, utils.first, utils.fdefault(''), len), listable) or [''])
+        # Set some reasonable defaults
+        maxaddr = maxmodule = cordinal = 0
+        has_ordinal = False
+
+        # Perform the first pass through our listable grabbing our field lengths
+        for ea, (module, name, ordinal) in cls.iterate(**type):
+            maxaddr = max(ea, maxaddr)
+            maxmodule = max(len(module or ''), maxmodule)
+            cordinal = max(len("{:d}".format(ordinal)), cordinal)
+            has_ordinal = has_ordinal or ordinal > 0
+
+            listable.append((ea, (module, name, ordinal)))
+
+        # Collect the maximum sizes for the lengths from the first pass
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
-        cordinal = max(builtins.map(utils.fcompose(utils.second, operator.itemgetter(2), "{:d}".format, len), listable) or [1])
-        has_ordinal = any(ordinal > 0 for _, (_, _, ordinal) in listable)
 
+        # List all the fields of every import that was matched
         for ea, (module, name, ordinal) in listable:
             moduleordinal = "{:s}{:s}".format(module, "<{:d}>".format(ordinal) if has_ordinal else '')
             six.print_(u"{:<#0{:d}x} : {:s}{:s}".format(ea, 2 + int(caddr), "{:>{:d}s} ".format(moduleordinal, maxmodule + cordinal) if module else '', name))
