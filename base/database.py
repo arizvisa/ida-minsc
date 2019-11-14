@@ -430,7 +430,7 @@ class segments(object):
     @utils.multicase(name=basestring)
     @classmethod
     @utils.string.decorate_arguments('name')
-    def iterate(cls, name):
+    def list(cls, name):
         '''List all of the segments defined in the database that match the glob `name`.'''
         return cls.list(like=name)
     @utils.multicase()
