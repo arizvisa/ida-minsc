@@ -319,27 +319,27 @@ class functions(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the functions in the database that match the keyword specified by `type`.'''
-        res = builtins.list(cls.iterate(**type))
+        listable = builtins.list(cls.iterate(**type))
 
         flvars = lambda ea: _structure.fragment(function.frame(ea).id, 0, function.frame.lvars.size(ea)) if function.by(ea).frsize else []
         fminaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)
         fmaxaddr = utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)
 
-        maxindex = len(res)
-        maxentry = max(res or [config.bounds()[0]])
-        maxaddr = max(builtins.map(fmaxaddr, res) or [1])
-        minaddr = max(builtins.map(fminaddr, res) or [1])
-        maxname = max(builtins.map(utils.fcompose(function.name, len), res) or [1])
-        chunks = max(builtins.map(utils.fcompose(function.chunks, builtins.list, len), res) or [1])
-        marks = max(builtins.map(utils.fcompose(function.marks, builtins.list, len), res) or [1])
-        blocks = max(builtins.map(utils.fcompose(function.blocks, builtins.list, len), res) or [1])
-        exits = max(builtins.map(utils.fcompose(function.bottom, builtins.list, len), res) or [1])
-        lvars = max(builtins.map(utils.fcompose(lambda ea: flvars(ea) if function.by(ea).frsize else [], builtins.list, len), res) or [1])
+        maxindex = len(listable)
+        maxentry = max(listable or [config.bounds()[0]])
+        maxaddr = max(builtins.map(fmaxaddr, listable) or [1])
+        minaddr = max(builtins.map(fminaddr, listable) or [1])
+        maxname = max(builtins.map(utils.fcompose(function.name, len), listable) or [1])
+        chunks = max(builtins.map(utils.fcompose(function.chunks, builtins.list, len), listable) or [1])
+        marks = max(builtins.map(utils.fcompose(function.marks, builtins.list, len), listable) or [1])
+        blocks = max(builtins.map(utils.fcompose(function.blocks, builtins.list, len), listable) or [1])
+        exits = max(builtins.map(utils.fcompose(function.bottom, builtins.list, len), listable) or [1])
+        lvars = max(builtins.map(utils.fcompose(lambda ea: flvars(ea) if function.by(ea).frsize else [], builtins.list, len), listable) or [1])
 
         # FIXME: fix function.arguments so that it works on non-stackbased functions
         fargs = function.arguments
         try:
-            args = max(builtins.map(utils.fcompose(lambda ea: fargs(ea) if function.by(ea).frsize else [], builtins.list, len), res) or [1])
+            args = max(builtins.map(utils.fcompose(lambda ea: fargs(ea) if function.by(ea).frsize else [], builtins.list, len), listable) or [1])
         except:
             args, fargs = 1, lambda ea: []
 
@@ -356,7 +356,7 @@ class functions(object):
         cexits = math.floor(math.log(exits or 1)/math.log(10)) if exits else 1
         clvars = math.floor(math.log(lvars or 1)/math.log(10)) if lvars else 1
 
-        for index, ea in enumerate(res):
+        for index, ea in enumerate(listable):
             six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} ({:<{:d}d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
                 offset(ea), int(cmaxoffset),
@@ -384,13 +384,13 @@ class functions(object):
         '''Search through all of the functions within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        res = builtins.list(cls.iterate(**type))
-        if len(res) > 1:
-            builtins.map(logging.info, ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(res)))
+        listable = builtins.list(cls.iterate(**type))
+        if len(listable) > 1:
+            builtins.map(logging.info, ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(listable)))
             f = utils.fcompose(function.by, function.name)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(res), utils.string.escape(f(res[0]), '"')))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
-        res = builtins.next(iter(res), None)
+        res = builtins.next(iter(listable), None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res
@@ -423,8 +423,8 @@ class segments(object):
 
     def __new__(cls):
         '''Yield the bounds of each segment within the current database.'''
-        for s in segment.__iterate__():
-            yield interface.bounds_t(s.startEA, s.endEA)
+        for seg in segment.__iterate__():
+            yield interface.bounds_t(seg.startEA, seg.endEA)
         return
 
     @utils.multicase(name=basestring)
@@ -638,14 +638,14 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def list(cls, **type):
         '''List all of the names in the database that match the keyword specified by `type`.'''
-        res = builtins.list(cls.__iterate__(**type))
+        listable = builtins.list(cls.__iterate__(**type))
 
-        maxindex = max(res or [1])
-        maxaddr = max(builtins.map(idaapi.get_nlist_ea, res) or [idaapi.BADADDR])
+        maxindex = max(listable or [1])
+        maxaddr = max(builtins.map(idaapi.get_nlist_ea, listable) or [idaapi.BADADDR])
         cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
         caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
 
-        for index in res:
+        for index in listable:
             ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
             six.print_(u"[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), ea, int(caddr), utils.string.of(name)))
         return
@@ -663,13 +663,13 @@ class names(object):
         '''Search through all of the names within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        res = builtins.list(cls.__iterate__(**type))
-        if len(res) > 1:
+        listable = builtins.list(cls.__iterate__(**type))
+        if len(listable) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)
-            builtins.map(logging.info, ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in res))
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(res), f1(res[0]), utils.string.escape(f2(res[0]), '"')))
+            builtins.map(logging.info, ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in listable))
+            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join((__name__, cls.__name__)), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
 
-        res = builtins.next(iter(res), None)
+        res = builtins.next(iter(listable), None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return idaapi.get_nlist_ea(res)
@@ -3519,8 +3519,8 @@ class marks(object):
     # FIXME: implement a matcher class for this too
     def __new__(cls):
         '''Yields each of the marked positions within the database.'''
-        res = builtins.list(cls.iterate()) # make a copy in-case someone is actively modifying it
-        for ea, comment in cls.iterate():
+        listable = builtins.list(cls.iterate()) # make a copy in-case someone is actively modifying it
+        for ea, comment in listable:
             yield ea, comment
         return
 
