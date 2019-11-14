@@ -301,15 +301,10 @@ class functions(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
-        if not type:
-            #type = {'predicate':lambda n: True}
-            for item in cls.__iterate__():
-                yield item
-            return
-        res = cls.__iterate__()
-        for key, value in six.iteritems(type):
-            res = cls.__matcher__.match(key, value, res)
-        for item in res: yield item
+        iterable = cls.__iterate__()
+        for key, value in six.iteritems(type or builtins.dict(predicate=lambda ea: True)):
+            iterable = cls.__matcher__.match(key, value, iterable)
+        for item in iterable: yield item
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -609,11 +604,10 @@ class names(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
-        if not type: type = {'predicate':lambda n: True}
-        res = six.moves.range(idaapi.get_nlist_size())
-        for key, value in six.iteritems(type):
-            res = builtins.list(cls.__matcher__.match(key, value, res))
-        for item in res: yield item
+        iterable = iter(six.moves.range(idaapi.get_nlist_size()))
+        for key, value in six.iteritems(type or builtins.dict(predicate=lambda index: True)):
+            iterable = cls.__matcher__.match(key, value, iterable)
+        for item in iterable: yield item
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1160,11 +1154,10 @@ class entries(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
-        if not type: type = {'predicate':lambda n: True}
-        res = six.moves.range(idaapi.get_entry_qty())
-        for key, value in six.iteritems(type):
-            res = builtins.list(cls.__matcher__.match(key, value, res))
-        for item in res: yield item
+        iterable = iter(six.moves.range(idaapi.get_entry_qty()))
+        for key, value in six.iteritems(type or builtins.dict(predicate=lambda index: True)):
+            iterable = builtins.list(cls.__matcher__.match(key, value, iterable))
+        for item in iterable: yield item
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -1667,11 +1660,10 @@ class imports(object):
     @utils.string.decorate_arguments('name', 'module', 'fullname', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the imports in the database that match the keyword specified by `type`.'''
-        if not type: type = {'predicate':lambda n: True}
-        res = builtins.list(cls.__iterate__())
-        for key, value in six.iteritems(type):
-            res = builtins.list(cls.__matcher__.match(key, value, res))
-        for item in res: yield item
+        iterable = cls.__iterate__()
+        for key, value in six.iteritems(type or builtins.dict(predicate=lambda item: True)):
+            iterable = builtins.list(cls.__matcher__.match(key, value, iterable))
+        for item in iterable: yield item
 
     # searching
     @utils.multicase()
