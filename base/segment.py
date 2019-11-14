@@ -78,16 +78,26 @@ def list(string):
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all of the segments in the database that match the keyword specified by `type`.'''
-    listable = builtins.list(__iterate__(**type))
+    listable = []
 
-    maxindex = max(builtins.map(operator.attrgetter('index'), listable) or [1])
-    maxaddr = max(builtins.map(operator.attrgetter('endEA'), listable) or [1])
-    maxsize = max(builtins.map(operator.methodcaller('size'), listable) or [1])
-    maxname = max(builtins.map(utils.fcompose(idaapi.get_true_segm_name,len), listable) or [1])
+    # Set some reasonable defaults
+    maxindex = maxaddr = maxsize = maxname = 0
+
+    # First pass through our segments to grab lengths of displayed fields
+    for seg in __iterate__(**type):
+        maxindex = max(seg.index, maxindex)
+        maxaddr = max(seg.endEA, maxaddr)
+        maxsize = max(seg.size(), maxsize)
+        maxname = max(len(idaapi.get_true_segm_name(seg)), maxname)
+
+        listable.append(seg)
+
+    # Collect the maximum sizes for everything from the first pass
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
     caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
     csize = math.ceil(math.log(maxsize or 1)/math.log(16))
 
+    # List all the fields for each segment that we've aggregated
     for seg in listable:
         comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
         six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(idaapi.get_true_segm_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
