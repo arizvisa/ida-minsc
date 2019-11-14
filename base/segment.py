@@ -62,7 +62,7 @@ def __iterate__(**type):
     '''Iterate through each segment defined in the database that match the keywords specified by `type`.'''
     def newsegment(index):
         res = idaapi.getnseg(index)
-        res.index = index
+        res.index, _ = index, ui.navigation.set(res.startEA)
         return res
     iterable = itertools.imap(newsegment, six.moves.range(idaapi.get_segm_qty()))
     for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
@@ -99,7 +99,7 @@ def list(**type):
 
     # List all the fields for each segment that we've aggregated
     for seg in listable:
-        comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
+        comment, _ = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1), ui.navigation.set(seg.startEA)
         six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(idaapi.get_true_segm_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
     return
 
