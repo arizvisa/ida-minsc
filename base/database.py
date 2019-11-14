@@ -281,10 +281,12 @@ class functions(object):
         # find first function chunk
         ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
         while ch and ch.startEA < right and (ch.flags & idaapi.FUNC_TAIL) != 0:
+            ui.navigation.procedure(ch.startEA)
             ch = idaapi.get_next_fchunk(ch.startEA)
 
         # iterate through the rest of the functions in the database
         while ch and ch.startEA < right:
+            ui.navigation.procedure(ch.startEA)
             if function.within(ch.startEA):
                 yield ch.startEA
             ch = idaapi.get_next_func(ch.startEA)
@@ -302,7 +304,7 @@ class functions(object):
     def iterate(cls, **type):
         '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
         iterable = cls.__iterate__()
-        for key, value in six.iteritems(type or builtins.dict(predicate=lambda ea: True)):
+        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
             iterable = cls.__matcher__.match(key, value, iterable)
         for item in iterable: yield item
 
@@ -605,7 +607,7 @@ class names(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
         iterable = iter(six.moves.range(idaapi.get_nlist_size()))
-        for key, value in six.iteritems(type or builtins.dict(predicate=lambda index: True)):
+        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
             iterable = cls.__matcher__.match(key, value, iterable)
         for item in iterable: yield item
 
@@ -1155,7 +1157,7 @@ class entries(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
         iterable = iter(six.moves.range(idaapi.get_entry_qty()))
-        for key, value in six.iteritems(type or builtins.dict(predicate=lambda index: True)):
+        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
             iterable = builtins.list(cls.__matcher__.match(key, value, iterable))
         for item in iterable: yield item
 
@@ -1645,6 +1647,7 @@ class imports(object):
             listable = []
             idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, listable.append, utils.fconstant(True)))
             for ea, name, ordinal in listable:
+                ui.navigation.set(ea)
                 yield ea, (utils.string.of(module), utils.string.of(name), ordinal)
             continue
         return
@@ -1661,7 +1664,7 @@ class imports(object):
     def iterate(cls, **type):
         '''Iterate through all of the imports in the database that match the keyword specified by `type`.'''
         iterable = cls.__iterate__()
-        for key, value in six.iteritems(type or builtins.dict(predicate=lambda item: True)):
+        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
             iterable = builtins.list(cls.__matcher__.match(key, value, iterable))
         for item in iterable: yield item
 
