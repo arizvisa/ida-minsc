@@ -269,20 +269,8 @@ class functions(object):
     __matcher__.boolean('less', operator.ge, function.top), __matcher__.boolean('lt', operator.gt, function.top)
 
     def __new__(cls):
-        '''Returns a list of all of the functions in the current database (ripped from idautils).'''
-        left, right = config.bounds()
-
-        # find first function chunk
-        ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
-        while ch and ch.startEA < right and (ch.flags & idaapi.FUNC_TAIL) != 0:
-            ch = idaapi.get_next_fchunk(ch.startEA)
-
-        # iterate through the rest of the functions in the database
-        result = []
-        while ch and ch.startEA < right:
-            result.append(ch.startEA)
-            ch = idaapi.get_next_func(ch.startEA)
-        return result
+        '''Returns a list of all of the functions in the current database.'''
+        return builtins.list(cls.__iterate__())
 
     @utils.multicase()
     @classmethod
@@ -297,7 +285,8 @@ class functions(object):
 
         # iterate through the rest of the functions in the database
         while ch and ch.startEA < right:
-            yield ch.startEA
+            if function.within(ch.startEA):
+                yield ch.startEA
             ch = idaapi.get_next_func(ch.startEA)
         return
 
@@ -314,12 +303,12 @@ class functions(object):
         '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
         if not type:
             #type = {'predicate':lambda n: True}
-            for n in cls():
-                yield n
+            for item in cls.__iterate__():
+                yield item
             return
-        res = cls()
+        res = cls.__iterate__()
         for key, value in six.iteritems(type):
-            res = builtins.list(cls.__matcher__.match(key, value, res))
+            res = cls.__matcher__.match(key, value, res)
         for item in res: yield item
 
     @utils.multicase(string=basestring)
