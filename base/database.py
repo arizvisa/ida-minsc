@@ -365,7 +365,7 @@ class functions(object):
 
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
-            func = function.by(ea)
+            func, _ = function.by(ea), ui.navigation.procedure(ea)
             res = builtins.list(function.chunks(func))
             six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} {:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
                 index, int(cindex),
@@ -668,6 +668,7 @@ class names(object):
         # List all the fields of each name that was found
         for index in listable:
             ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
+            ui.navigation.set(ea)
             six.print_(u"[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), ea, int(caddr), utils.string.of(name)))
         return
 
@@ -1806,6 +1807,7 @@ class imports(object):
 
         # List all the fields of every import that was matched
         for ea, (module, name, ordinal) in listable:
+            ui.navigation.set(ea)
             moduleordinal = "{:s}{:s}".format(module, "<{:d}>".format(ordinal) if has_ordinal else '')
             six.print_(u"{:<#0{:d}x} : {:s}{:s}".format(ea, 2 + int(caddr), "{:>{:d}s} ".format(moduleordinal, maxmodule + cordinal) if module else '', name))
         return
