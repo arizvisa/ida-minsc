@@ -60,15 +60,14 @@ __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def __iterate__(**type):
     '''Iterate through each segment defined in the database that match the keywords specified by `type`.'''
-    if not type: type = {'predicate':lambda n: True}
     def newsegment(index):
         res = idaapi.getnseg(index)
         res.index = index
         return res
-    res = builtins.map(newsegment, six.moves.range(idaapi.get_segm_qty()))
-    for key, value in six.iteritems(type):
-        res = builtins.list(__matcher__.match(key, value, res))
-    for item in res: yield item
+    iterable = itertools.imap(newsegment, six.moves.range(idaapi.get_segm_qty()))
+    for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
+        iterable = builtins.list(__matcher__.match(key, value, iterable))
+    for item in iterable: yield item
 
 @utils.multicase(string=basestring)
 @utils.string.decorate_arguments('string')
@@ -79,17 +78,17 @@ def list(string):
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all of the segments in the database that match the keyword specified by `type`.'''
-    res = builtins.list(__iterate__(**type))
+    listable = builtins.list(__iterate__(**type))
 
-    maxindex = max(builtins.map(operator.attrgetter('index'), res) or [1])
-    maxaddr = max(builtins.map(operator.attrgetter('endEA'), res) or [1])
-    maxsize = max(builtins.map(operator.methodcaller('size'), res) or [1])
-    maxname = max(builtins.map(utils.fcompose(idaapi.get_true_segm_name,len), res) or [1])
+    maxindex = max(builtins.map(operator.attrgetter('index'), listable) or [1])
+    maxaddr = max(builtins.map(operator.attrgetter('endEA'), listable) or [1])
+    maxsize = max(builtins.map(operator.methodcaller('size'), listable) or [1])
+    maxname = max(builtins.map(utils.fcompose(idaapi.get_true_segm_name,len), listable) or [1])
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
     caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
     csize = math.ceil(math.log(maxsize or 1)/math.log(16))
 
-    for seg in res:
+    for seg in listable:
         comment = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1)
         six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(idaapi.get_true_segm_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
     return
@@ -141,14 +140,14 @@ def by(**type):
     '''Return the segment matching the specified keywords in `type`.'''
     searchstring = utils.string.kwargs(type)
 
-    res = builtins.list(__iterate__(**type))
-    if len(res) > 1:
-        maxaddr = max(builtins.map(operator.attrgetter('endEA'), res) or [1])
+    listable = builtins.list(__iterate__(**type))
+    if len(listable) > 1:
+        maxaddr = max(builtins.map(operator.attrgetter('endEA'), listable) or [1])
         caddr = math.ceil(math.log(maxaddr)/math.log(16))
-        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), utils.string.of(idaapi.get_true_segm_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in res))
-        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(res), res[0].index, res[0].startEA, int(caddr), res[0].endEA, int(caddr), utils.string.of(idaapi.get_true_segm_name(res[0])), res[0].size()))
+        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), utils.string.of(idaapi.get_true_segm_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
+        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, listable[0].startEA, int(caddr), listable[0].endEA, int(caddr), utils.string.of(idaapi.get_true_segm_name(listable[0])), listable[0].size()))
 
-    res = next(iter(res), None)
+    res = six.next(iter(listable), None)
     if res is None:
         raise E.SearchResultsError(u"{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
