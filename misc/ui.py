@@ -277,7 +277,14 @@ class strings(appwindow):
         config.only_7bit = True
         config.ignore_heads = False
 
-        res = [idaapi.ASCSTR_TERMCHR, idaapi.ASCSTR_PASCAL, idaapi.ASCSTR_LEN2, idaapi.ASCSTR_UNICODE, idaapi.ASCSTR_LEN4, idaapi.ASCSTR_ULEN2, idaapi.ASCSTR_ULEN4]
+        # aggregate all the string types for IDA 6.95x
+        if idaapi.__version__ < 7.0:
+            res = [idaapi.ASCSTR_TERMCHR, idaapi.ASCSTR_PASCAL, idaapi.ASCSTR_LEN2, idaapi.ASCSTR_UNICODE, idaapi.ASCSTR_LEN4, idaapi.ASCSTR_ULEN2, idaapi.ASCSTR_ULEN4]
+
+        # otherwise use IDA 7.x's naming scheme
+        else:
+            res = [idaapi.STRTYPE_TERMCHR, idaapi.STRTYPE_PASCAL, idaapi.STRTYPE_LEN2, idaapi.STRTYPE_C_16, idaapi.STRTYPE_LEN4, idaapi.STRTYPE_LEN2_16, idaapi.STRTYPE_LEN4_16]
+
         config.strtypes = reduce(lambda t, c: t | (2**c), res, 0)
         if not idaapi.set_strlist_options(config):
             raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
