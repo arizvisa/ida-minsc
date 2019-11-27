@@ -496,6 +496,17 @@ Some examples of using this namespace can be::
     > ea = database.a.nextref(ea)
     > ea = database.a.prevcall(ea)
 
+.. py:function:: address()
+   
+   Return the address of the current address.
+   
+.. py:function:: address(ea)
+   
+   Return the address of the item containing the address ``ea``.
+   
+   :param ea:
+   :type ea: int or long
+   
 .. py:function:: address\.blocks(end)
    
    Yields the bounds of each block from the current address to ``end``.
@@ -514,7 +525,7 @@ Some examples of using this namespace can be::
    
 .. py:function:: address\.head()
    
-   Return the current address.
+   Return the address of the byte at the beginning of the current address.
    
 .. py:function:: address\.head(ea)
    
@@ -2054,7 +2065,7 @@ Some examples of how to use these keywords are as follows::
 
 .. py:function:: functions()
    
-   Returns a list of all of the functions in the current database (ripped from idautils).
+   Returns a list of all of the functions in the current database.
    
 .. py:function:: functions\.iterate(string)
    
@@ -2978,13 +2989,6 @@ Some examples of using these keywords are as follows::
    
 .. py:function:: segments\.iterate(name)
    
-   List all of the segments defined in the database that match the glob ``name``.
-   
-   :param name: the glob to filter the segment names with
-   :type name: str
-   
-.. py:function:: segments\.iterate(name)
-   
    Iterate through all of the segments in the database with a glob that matches ``name``.
    
    :param name: the glob to filter the segment names with
@@ -2995,6 +2999,13 @@ Some examples of using these keywords are as follows::
    Iterate through all the segments defined in the database matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter segments with
+   
+.. py:function:: segments\.list(name)
+   
+   List all of the segments defined in the database that match the glob ``name``.
+   
+   :param name: the glob to filter the segment names with
+   :type name: str
    
 .. py:function:: segments\.list(\*\*type)
    

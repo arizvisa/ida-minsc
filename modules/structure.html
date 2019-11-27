@@ -9,12 +9,15 @@
     <title>3.1.6. structure – Structure module &#8212; IDA-minsc  documentation</title>
     <link rel="stylesheet" href="../_static/pyramid.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/sidebar.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/content.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="3.2.1. ui – User Interface module" href="misc-ui.html" />
@@ -840,20 +843,16 @@ database that references said member.</p>
 <dl class="attribute">
 <dt id="structure.member_t.offset">
 <code class="descname">offset</code><a class="headerlink" href="#structure.member_t.offset" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="docutils">
-<dt>The offset of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
-<dd><table class="first last docutils field-list" frame="void" rules="none">
+<dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the offset of the member.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Return the offset of the member.</td>
 </tr>
 </tbody>
 </table>
-</dd>
-</dl>
+</dd></dl>
+
 <dl class="attribute">
 <dt id="structure.member_t.owner">
 <code class="descname">owner</code><a class="headerlink" href="#structure.member_t.owner" title="Permalink to this definition">¶</a></dt>
@@ -883,6 +882,23 @@ database that references said member.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the pointer of the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.member_t</span></code>.</td>
+</tr>
+</tbody>
+</table>
+</dd>
+</dl>
+<dl class="attribute">
+<dt id="structure.member_t.realoffset">
+<code class="descname">realoffset</code><a class="headerlink" href="#structure.member_t.realoffset" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="docutils">
+<dt>The offset of this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
+<dd><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the real offset of the member.</td>
 </tr>
 </tbody>
 </table>
@@ -963,7 +979,9 @@ database that references said member.</p>
 <dl class="method">
 <dt id="structure.member_t.refs">
 <code class="descname">refs</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.member_t.refs" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">opnum,</span> <span class="pre">type)</span></code> of all the references to this member within the database.</p>
+<dd><p>Return the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">opnum,</span> <span class="pre">type)</span></code> of all the code and data references to this member within the database.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">opnum</span></code> is <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>, then the returned <code class="docutils literal notranslate"><span class="pre">address</span></code> has the structure applied to it.
+If <code class="docutils literal notranslate"><span class="pre">opnum</span></code> is defined, then the instruction at the returned <code class="docutils literal notranslate"><span class="pre">address</span></code> references a field that contains the specified structure.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1248,13 +1266,13 @@ specified. The keywords that are available to filter members are:</p>
 
 <dl class="method">
 <dt id="structure.members_t.index">
-<code class="descname">index</code><span class="sig-paren">(</span><em>self</em>, <em>member_t</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.index" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the index of the member specified by <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</p>
+<code class="descname">index</code><span class="sig-paren">(</span><em>self</em>, <em>member</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.members_t.index" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the index of the specified <code class="docutils literal notranslate"><span class="pre">member</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>member_t</strong> – the <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">member_t</span></code></a> to return the index for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>member</strong> – the <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">member_t</span></code></a> to return the index for</td>
 </tr>
 </tbody>
 </table>
@@ -1582,9 +1600,7 @@ already existing one.</p>
 <dl class="method">
 <dt id="structure.structure_t.refs">
 <code class="descname">refs</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.structure_t.refs" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">opnum,</span> <span class="pre">type)</span></code> of all the code and data references within the database that reference this structure.</p>
-<p>If <code class="docutils literal notranslate"><span class="pre">opnum</span></code> is <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>, then the returned <code class="docutils literal notranslate"><span class="pre">address</span></code> has the structure applied to it.
-If <code class="docutils literal notranslate"><span class="pre">opnum</span></code> is defined, then the instruction at the returned <code class="docutils literal notranslate"><span class="pre">address</span></code> references a field that contains the specified structure.</p>
+<dd><p>Return all structure or frame members within the database that reference this particular structure.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1742,7 +1758,7 @@ If <code class="docutils literal notranslate"><span class="pre">opnum</span></co
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.6.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>
 </html>

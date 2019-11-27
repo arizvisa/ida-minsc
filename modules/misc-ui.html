@@ -9,12 +9,15 @@
     <title>3.2.1. ui – User Interface module &#8212; IDA-minsc  documentation</title>
     <link rel="stylesheet" href="../_static/pyramid.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/sidebar.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/content.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="3.2.2. tools – Tools module" href="misc-tools.html" />
@@ -618,45 +621,13 @@ segment, clipboard, widget, or even the current window in use.</p>
 <p>This namespace is for interacting with the Notepad window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
-<div class="section" id="ui-queue">
-<span id="ns-ui-queue"></span><h3>3.2.1.2.14. ui.queue<a class="headerlink" href="#ui-queue" title="Permalink to this headline">¶</a></h3>
-<p>This namespace exposes the ability to queue execution of python
-callables asynchronously so that they run at the same time as
-IDA and signal when they have completed and a result is available.</p>
-<p>XXX: This is probably pretty unsafe in IDA, but let’s hope.</p>
-<dl class="function">
-<dt id="ui.queue.add">
-<code class="descclassname">queue.</code><code class="descname">add</code><span class="sig-paren">(</span><em>callable</em>, <em>*args</em>, <em>**kwds</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.queue.add" title="Permalink to this definition">¶</a></dt>
-<dd><p>Add the specified <code class="docutils literal notranslate"><span class="pre">callable</span></code> to the execution queue passing to it any extra arguments.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> – the python callable to execute</li>
-<li><strong>*args</strong> – any positional arguments to pass to the callable</li>
-<li><strong>**kwds</strong> – any keyword arguments to pass to the callable</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="ui.queue.pop">
-<code class="descclassname">queue.</code><code class="descname">pop</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.queue.pop" title="Permalink to this definition">¶</a></dt>
-<dd><p>Block until the next available result has been returned.</p>
-</dd></dl>
-
-</div>
 <div class="section" id="ui-segments">
-<span id="ns-ui-segments"></span><h3>3.2.1.2.15. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-segments"></span><h3>3.2.1.2.14. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Segments window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-state">
-<span id="ns-ui-state"></span><h3>3.2.1.2.16. ui.state<a class="headerlink" href="#ui-state" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-state"></span><h3>3.2.1.2.15. ui.state<a class="headerlink" href="#ui-state" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for fetching or interacting with the current
 state of IDA’s interface. These are things such as waiting for
 IDA’s analysis queue, or determining whether the function is
@@ -690,7 +661,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-strings">
-<span id="ns-ui-strings"></span><h3>3.2.1.2.17. ui.strings<a class="headerlink" href="#ui-strings" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-strings"></span><h3>3.2.1.2.16. ui.strings<a class="headerlink" href="#ui-strings" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Strings window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -741,12 +712,12 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-structures">
-<span id="ns-ui-structures"></span><h3>3.2.1.2.18. ui.structures<a class="headerlink" href="#ui-structures" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-structures"></span><h3>3.2.1.2.17. ui.structures<a class="headerlink" href="#ui-structures" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Structures window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-timer">
-<span id="ns-ui-timer"></span><h3>3.2.1.2.19. ui.timer<a class="headerlink" href="#ui-timer" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-timer"></span><h3>3.2.1.2.18. ui.timer<a class="headerlink" href="#ui-timer" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for registering a python callable to a timer in IDA.</p>
 <dl class="function">
 <dt id="ui.timer.register">
@@ -789,7 +760,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-widget">
-<span id="ns-ui-widget"></span><h3>3.2.1.2.20. ui.widget<a class="headerlink" href="#ui-widget" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-widget"></span><h3>3.2.1.2.19. ui.widget<a class="headerlink" href="#ui-widget" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for selecting a specific or particular widget.</p>
 <dl class="function">
 <dt id="ui.widget">
@@ -843,7 +814,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-window">
-<span id="ns-ui-window"></span><h3>3.2.1.2.21. ui.window<a class="headerlink" href="#ui-window" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-window"></span><h3>3.2.1.2.20. ui.window<a class="headerlink" href="#ui-window" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for selecting a specific or particular window.</p>
 <dl class="function">
 <dt id="ui.window.main">
@@ -859,7 +830,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-windows">
-<span id="ns-ui-windows"></span><h3>3.2.1.2.22. ui.windows<a class="headerlink" href="#ui-windows" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-windows"></span><h3>3.2.1.2.21. ui.windows<a class="headerlink" href="#ui-windows" title="Permalink to this headline">¶</a></h3>
 <p>Interact with any or all of the top-level windows for the application.</p>
 <dl class="function">
 <dt id="ui.windows">
@@ -1116,15 +1087,14 @@ based on what is presently available.</p>
 <li><a class="reference internal" href="#ui-names">3.2.1.2.11. ui.names</a></li>
 <li><a class="reference internal" href="#ui-navigation">3.2.1.2.12. ui.navigation</a></li>
 <li><a class="reference internal" href="#ui-notepad">3.2.1.2.13. ui.notepad</a></li>
-<li><a class="reference internal" href="#ui-queue">3.2.1.2.14. ui.queue</a></li>
-<li><a class="reference internal" href="#ui-segments">3.2.1.2.15. ui.segments</a></li>
-<li><a class="reference internal" href="#ui-state">3.2.1.2.16. ui.state</a></li>
-<li><a class="reference internal" href="#ui-strings">3.2.1.2.17. ui.strings</a></li>
-<li><a class="reference internal" href="#ui-structures">3.2.1.2.18. ui.structures</a></li>
-<li><a class="reference internal" href="#ui-timer">3.2.1.2.19. ui.timer</a></li>
-<li><a class="reference internal" href="#ui-widget">3.2.1.2.20. ui.widget</a></li>
-<li><a class="reference internal" href="#ui-window">3.2.1.2.21. ui.window</a></li>
-<li><a class="reference internal" href="#ui-windows">3.2.1.2.22. ui.windows</a></li>
+<li><a class="reference internal" href="#ui-segments">3.2.1.2.14. ui.segments</a></li>
+<li><a class="reference internal" href="#ui-state">3.2.1.2.15. ui.state</a></li>
+<li><a class="reference internal" href="#ui-strings">3.2.1.2.16. ui.strings</a></li>
+<li><a class="reference internal" href="#ui-structures">3.2.1.2.17. ui.structures</a></li>
+<li><a class="reference internal" href="#ui-timer">3.2.1.2.18. ui.timer</a></li>
+<li><a class="reference internal" href="#ui-widget">3.2.1.2.19. ui.widget</a></li>
+<li><a class="reference internal" href="#ui-window">3.2.1.2.20. ui.window</a></li>
+<li><a class="reference internal" href="#ui-windows">3.2.1.2.21. ui.windows</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#class-list">3.2.1.3. Class list</a><ul>
@@ -1189,7 +1159,7 @@ based on what is presently available.</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.6.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>
 </html>

@@ -10,12 +10,15 @@
     <title>Index &#8212; IDA-minsc  documentation</title>
     <link rel="stylesheet" href="_static/pyramid.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="_static/sidebar.css" type="text/css" />
-    <link rel="stylesheet" href="_static/content.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="_static/content.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="_static/content.css" />
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="#" />
     <link rel="search" title="Search" href="search.html" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
@@ -64,7 +67,6 @@
  | <a href="#N"><strong>N</strong></a>
  | <a href="#O"><strong>O</strong></a>
  | <a href="#P"><strong>P</strong></a>
- | <a href="#Q"><strong>Q</strong></a>
  | <a href="#R"><strong>R</strong></a>
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
@@ -91,8 +93,12 @@
 </li>
       <li><a href="modules/structure.html#structure.members_t.add">add() (structure.members_t method)</a>, <a href="modules/structure.html#structure.members_t.add">[1]</a>, <a href="modules/structure.html#structure.members_t.add">[2]</a>
 </li>
-      <li><a href="modules/function.html#function.address">address() (in module function)</a>, <a href="modules/function.html#function.address">[1]</a>
+      <li><a href="modules/database.html#database.address">address() (in module database)</a>, <a href="modules/database.html#database.address">[1]</a>
+
+      <ul>
+        <li><a href="modules/function.html#function.address">(in module function)</a>, <a href="modules/function.html#function.address">[1]</a>
 </li>
+      </ul></li>
       <li><a href="modules/database.html#database.address.blocks">address.blocks() (in module database)</a>, <a href="modules/database.html#database.address.blocks">[1]</a>
 </li>
       <li><a href="modules/database.html#database.address.head">address.head() (in module database)</a>, <a href="modules/database.html#database.address.head">[1]</a>
@@ -1182,18 +1188,6 @@
   </ul></td>
 </tr></table>
 
-<h2 id="Q">Q</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="modules/misc-ui.html#ui.queue.add">queue.add() (in module ui)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="modules/misc-ui.html#ui.queue.pop">queue.pop() (in module ui)</a>
-</li>
-  </ul></td>
-</tr></table>
-
 <h2 id="R">R</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -1217,10 +1211,12 @@
 </li>
       <li><a href="modules/custom-tags.html#tags.read.globals">read.globals() (in module tags)</a>
 </li>
-      <li><a href="modules/misc-tools.html#tools.recovermarks">recovermarks() (in module tools)</a>
+      <li><a href="modules/structure.html#structure.member_t.realoffset">realoffset (structure.member_t attribute)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/misc-tools.html#tools.recovermarks">recovermarks() (in module tools)</a>
+</li>
       <li><a href="modules/structure.html#structure.member_t.refs">refs() (structure.member_t method)</a>
 
       <ul>
@@ -1281,9 +1277,9 @@
 </li>
       <li><a href="modules/database.html#database.segments">segments() (in module database)</a>
 </li>
-      <li><a href="modules/database.html#database.segments.iterate">segments.iterate() (in module database)</a>, <a href="modules/database.html#database.segments.iterate">[1]</a>, <a href="modules/database.html#database.segments.iterate">[2]</a>
+      <li><a href="modules/database.html#database.segments.iterate">segments.iterate() (in module database)</a>, <a href="modules/database.html#database.segments.iterate">[1]</a>
 </li>
-      <li><a href="modules/database.html#database.segments.list">segments.list() (in module database)</a>
+      <li><a href="modules/database.html#database.segments.list">segments.list() (in module database)</a>, <a href="modules/database.html#database.segments.list">[1]</a>
 </li>
       <li><a href="modules/database.html#database.segments.search">segments.search() (in module database)</a>, <a href="modules/database.html#database.segments.search">[1]</a>
 </li>
@@ -1453,21 +1449,21 @@
 </li>
       <li><a href="modules/database.html#database.type.has_dummyname">type.has_dummyname() (in module database)</a>, <a href="modules/database.html#database.type.has_dummyname">[1]</a>
 </li>
+      <li><a href="modules/function.html#function.type.has_frameptr">type.has_frameptr() (in module function)</a>, <a href="modules/function.html#function.type.has_frameptr">[1]</a>
+</li>
       <li><a href="modules/database.html#database.type.has_label">type.has_label() (in module database)</a>, <a href="modules/database.html#database.type.has_label">[1]</a>
 </li>
       <li><a href="modules/database.html#database.type.has_listedname">type.has_listedname() (in module database)</a>, <a href="modules/database.html#database.type.has_listedname">[1]</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/function.html#function.type.has_name">type.has_name() (in module function)</a>, <a href="modules/function.html#function.type.has_name">[1]</a>
 </li>
-      <li><a href="modules/function.html#function.type.has_noframe">type.has_noframe() (in module function)</a>, <a href="modules/function.html#function.type.has_noframe">[1]</a>
-</li>
-      <li><a href="modules/function.html#function.type.has_noreturn">type.has_noreturn() (in module function)</a>, <a href="modules/function.html#function.type.has_noreturn">[1]</a>
-</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/database.html#database.type.has_publicname">type.has_publicname() (in module database)</a>, <a href="modules/database.html#database.type.has_publicname">[1]</a>
 </li>
       <li><a href="modules/database.html#database.type.has_reference">type.has_reference() (in module database)</a>, <a href="modules/database.html#database.type.has_reference">[1]</a>
+</li>
+      <li><a href="modules/function.html#function.type.has_return">type.has_return() (in module function)</a>, <a href="modules/function.html#function.type.has_return">[1]</a>
 </li>
       <li><a href="modules/database.html#database.type.has_weakname">type.has_weakname() (in module database)</a>, <a href="modules/database.html#database.type.has_weakname">[1]</a>
 </li>
@@ -1483,9 +1479,13 @@
 </li>
       <li><a href="modules/database.html#database.type.is_data">type.is_data() (in module database)</a>, <a href="modules/database.html#database.type.is_data">[1]</a>
 </li>
+      <li><a href="modules/function.html#function.type.is_far">type.is_far() (in module function)</a>, <a href="modules/function.html#function.type.is_far">[1]</a>
+</li>
       <li><a href="modules/database.html#database.type.is_globalref">type.is_globalref() (in module database)</a>, <a href="modules/database.html#database.type.is_globalref">[1]</a>
 </li>
       <li><a href="modules/database.html#database.type.is_head">type.is_head() (in module database)</a>, <a href="modules/database.html#database.type.is_head">[1]</a>
+</li>
+      <li><a href="modules/function.html#function.type.is_hidden">type.is_hidden() (in module function)</a>, <a href="modules/function.html#function.type.is_hidden">[1]</a>
 </li>
       <li><a href="modules/database.html#database.type.is_importref">type.is_importref() (in module database)</a>, <a href="modules/database.html#database.type.is_importref">[1]</a>
 </li>
@@ -1504,6 +1504,8 @@
       <li><a href="modules/instruction.html#instruction.type.is_return">type.is_return() (in module instruction)</a>, <a href="modules/instruction.html#instruction.type.is_return">[1]</a>
 </li>
       <li><a href="modules/instruction.html#instruction.type.is_shift">type.is_shift() (in module instruction)</a>, <a href="modules/instruction.html#instruction.type.is_shift">[1]</a>
+</li>
+      <li><a href="modules/function.html#function.type.is_static">type.is_static() (in module function)</a>, <a href="modules/function.html#function.type.is_static">[1]</a>
 </li>
       <li><a href="modules/database.html#database.type.is_tail">type.is_tail() (in module database)</a>, <a href="modules/database.html#database.type.is_tail">[1]</a>
 </li>
@@ -1682,7 +1684,7 @@
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.6.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>
 </html>

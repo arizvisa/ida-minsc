@@ -413,7 +413,6 @@ member_t
    
    .. py:attribute:: offset
    
-   The offset of this ``member_t``.
       :param getter: Return the offset of the member.
    
    .. py:attribute:: owner
@@ -425,6 +424,11 @@ member_t
    
    The :py:class:`idaapi.member_t` that this ``member_t`` wraps.
       :param getter: Return the pointer of the :py:obj:`idaapi.member_t`.
+   
+   .. py:attribute:: realoffset
+   
+   The offset of this ``member_t``.
+      :param getter: Return the real offset of the member.
    
    .. py:attribute:: right
    
@@ -450,7 +454,10 @@ member_t
    
    .. py:method:: refs(self)
       
-      Return the ``(address, opnum, type)`` of all the references to this member within the database.
+      Return the ``(address, opnum, type)`` of all the code and data references to this member within the database.
+      
+      If ``opnum`` is :py:obj:`None`, then the returned ``address`` has the structure applied to it.
+      If ``opnum`` is defined, then the instruction at the returned ``address`` references a field that contains the specified structure.
       
    .. py:method:: tag(self)
       
@@ -604,11 +611,11 @@ members_t
       
       :param offset: the member of the offset to return
       
-   .. py:method:: index(self, member_t)
+   .. py:method:: index(self, member)
       
-      Return the index of the member specified by ``member_t``.
+      Return the index of the specified ``member``.
       
-      :param member_t: the :py:obj:`member_t` to return the index for
+      :param member: the :py:obj:`member_t` to return the index for
       
    .. py:method:: iterate(self, \*\*type)
       
@@ -746,10 +753,7 @@ structure_t
       
    .. py:method:: refs(self)
       
-      Return the ``(address, opnum, type)`` of all the code and data references within the database that reference this structure.
-      
-      If ``opnum`` is :py:obj:`None`, then the returned ``address`` has the structure applied to it.
-      If ``opnum`` is defined, then the instruction at the returned ``address`` references a field that contains the specified structure.
+      Return all structure or frame members within the database that reference this particular structure.
       
    .. py:method:: tag(self)
       

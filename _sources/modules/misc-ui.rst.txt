@@ -385,30 +385,6 @@ This namespace is for interacting with the Notepad window.
 
 Bases: :ref:`ui.appwindow<ns-ui-appwindow>`
 
-.. _ns-ui-queue:
-
-********
-ui.queue
-********
-
-This namespace exposes the ability to queue execution of python
-callables asynchronously so that they run at the same time as
-IDA and signal when they have completed and a result is available.
-
-XXX: This is probably pretty unsafe in IDA, but let's hope.
-
-.. py:function:: queue\.add(callable, \*args, \*\*kwds)
-   
-   Add the specified ``callable`` to the execution queue passing to it any extra arguments.
-   
-   :param callable: the python callable to execute
-   :param \*args: any positional arguments to pass to the callable
-   :param \*\*kwds: any keyword arguments to pass to the callable
-   
-.. py:function:: queue\.pop()
-   
-   Block until the next available result has been returned.
-   
 .. _ns-ui-segments:
 
 ***********

@@ -1500,6 +1500,20 @@ Some simple ways of getting information about a function::
     > print function.type.has_noframe()
     > for ea in filter(function.type.is_library, database.functions()): ...
 
+.. py:function:: type\.has_frameptr()
+   
+   Return true if the current function uses a frame pointer (register).
+   
+   Aliases: :py:func:`function.type.frameptrQ<type\.has_frameptr>`
+   
+.. py:function:: type\.has_frameptr(func)
+   
+   Return true if the function ``func`` uses a frame pointer (register).
+   
+   Aliases: :py:func:`function.type.frameptrQ<type\.has_frameptr>`
+   
+   :param func: the function to check
+   
 .. py:function:: type\.has_name()
    
    Return true if the current function has a user-defined name.
@@ -1514,33 +1528,39 @@ Some simple ways of getting information about a function::
    
    :param func: the function to check
    
-.. py:function:: type\.has_noframe()
+.. py:function:: type\.has_return()
    
-   Return true if the current function has no frame.
+   Return true if the current function returns.
    
-   Aliases: :py:func:`function.type.noframeQ<type\.has_noframe>`
+   Aliases: :py:func:`function.type.returnQ<type\.has_return>`
    
-.. py:function:: type\.has_noframe(func)
+.. py:function:: type\.has_return(func)
    
-   Return true if the function ``func`` has no frame.
+   Return true if the function ``func`` returns.
    
-   Aliases: :py:func:`function.type.noframeQ<type\.has_noframe>`
-   
-   :param func: the function to check
-   
-.. py:function:: type\.has_noreturn()
-   
-   Return true if the current function does not return.
-   
-   Aliases: :py:func:`function.type.noreturnQ<type\.has_noreturn>`
-   
-.. py:function:: type\.has_noreturn(func)
-   
-   Return true if the function ``func`` does not return.
-   
-   Aliases: :py:func:`function.type.noreturnQ<type\.has_noreturn>`
+   Aliases: :py:func:`function.type.returnQ<type\.has_return>`
    
    :param func: the function to check
+   
+.. py:function:: type\.is_far()
+   
+   Returns true if the current function is considered a "far" function by IDA or the user.
+   
+.. py:function:: type\.is_far(func)
+   
+   Returns true if the function ``func`` is considered a "far" function by IDA or the user.
+   
+   :param func:
+   
+.. py:function:: type\.is_hidden()
+   
+   Returns true if the current function is hidden.
+   
+.. py:function:: type\.is_hidden(func)
+   
+   Returns true if the function ``func`` is hidden.
+   
+   :param func:
    
 .. py:function:: type\.is_library()
    
@@ -1555,6 +1575,16 @@ Some simple ways of getting information about a function::
    Aliases: :py:func:`function.type.libraryQ<type\.is_library>`
    
    :param func: the function to check
+   
+.. py:function:: type\.is_static()
+   
+   Returns true if the current function is a static function.
+   
+.. py:function:: type\.is_static(func)
+   
+   Returns true if the function ``func`` is a static function.
+   
+   :param func:
    
 .. py:function:: type\.is_thunk()
    

@@ -9,12 +9,15 @@
     <title>3.1.1. database – Database module &#8212; IDA-minsc  documentation</title>
     <link rel="stylesheet" href="../_static/pyramid.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/sidebar.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/content.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sidebar.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/content.css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../_static/jquery.js"></script>
     <script type="text/javascript" src="../_static/underscore.js"></script>
     <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="3.1.2. enumeration – Enumeration module" href="enumeration.html" />
@@ -921,6 +924,26 @@ determining the next valid address. These are:</p>
 </pre></div>
 </div>
 <dl class="function">
+<dt id="database.address">
+<code class="descclassname">database.</code><code class="descname">address</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the address of the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">address</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address of the item containing the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.address.blocks">
 <code class="descclassname">address.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>end</em><span class="sig-paren">)</span><a class="headerlink" href="#database.address.blocks" title="Permalink to this definition">¶</a></dt>
 <dd><p>Yields the bounds of each block from the current address to <code class="docutils literal notranslate"><span class="pre">end</span></code>.</p>
@@ -955,7 +978,7 @@ determining the next valid address. These are:</p>
 <dl class="function">
 <dt id="database.address.head">
 <code class="descclassname">address.</code><code class="descname">head</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address.head" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the current address.</p>
+<dd><p>Return the address of the byte at the beginning of the current address.</p>
 </dd></dl>
 
 <dl class="function">
@@ -3578,7 +3601,7 @@ each function.</p>
 <dl class="function">
 <dt id="database.functions">
 <code class="descclassname">database.</code><code class="descname">functions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.functions" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns a list of all of the functions in the current database (ripped from idautils).</p>
+<dd><p>Returns a list of all of the functions in the current database.</p>
 </dd></dl>
 
 <dl class="function">
@@ -5153,20 +5176,6 @@ database. By default each segment’s boundaries are yielded.</p>
 <dl class="function">
 <dt id="database.segments.iterate">
 <code class="descclassname">segments.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#database.segments.iterate" title="Permalink to this definition">¶</a></dt>
-<dd><p>List all of the segments defined in the database that match the glob <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the glob to filter the segment names with</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">segments.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span></dt>
 <dd><p>Iterate through all of the segments in the database with a glob that matches <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -5194,7 +5203,21 @@ database. By default each segment’s boundaries are yielded.</p>
 
 <dl class="function">
 <dt id="database.segments.list">
-<code class="descclassname">segments.</code><code class="descname">list</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span><a class="headerlink" href="#database.segments.list" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">segments.</code><code class="descname">list</code><span class="sig-paren">(</span><em>name</em><span class="sig-paren">)</span><a class="headerlink" href="#database.segments.list" title="Permalink to this definition">¶</a></dt>
+<dd><p>List all of the segments defined in the database that match the glob <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> (<em>str</em>) – the glob to filter the segment names with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">segments.</code><code class="descname">list</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
 <dd><p>List all of the segments in the database that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -6959,7 +6982,7 @@ also aliased as globals. Some of these are:</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Copyright 2010-2018, Ali Rizvi-Santiago.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.6.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
     </div>
   </body>
 </html>
