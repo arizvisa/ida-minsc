@@ -1374,6 +1374,7 @@ class member_t(object):
         If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
         """
         mid = self.id
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
         # calculate the high-byte which is used to determine an address from a structure
         bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
@@ -1476,7 +1477,7 @@ class member_t(object):
                     # align the offset, and check if our address is using one
                     # of our structure identifiers
                     offset = interface.address.head(offset, silent=True)
-                    if database.type.flags(offset, idaapi.DT_TYPE) == idaapi.FF_STRU and database.type.structure.id(offset) in identifiers:
+                    if database.type.flags(offset, idaapi.DT_TYPE) == FF_STRUCT and database.type.structure.id(offset) in identifiers:
                         res.append(interface.OREF(ea, opnum, interface.ref_t.of(t)))
                     continue
                 continue
