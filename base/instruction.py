@@ -991,7 +991,7 @@ class operand_types:
     def register(ea, op):
         '''Operand type decoder for ``idaapi.o_reg`` which returns a ``register_t``.'''
         global architecture
-        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         if op.type in {idaapi.o_reg}:
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
             return architecture.by_indextype(res, op.dtyp)
@@ -1122,7 +1122,7 @@ class operand_types:
         scale = scale_lookup[F2 & 0xc0]
 
         bits = database.config.bits()
-        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
 
         seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
