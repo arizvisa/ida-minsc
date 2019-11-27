@@ -17,7 +17,7 @@ def string(ea):
     if db.get.i.uint32_t(ea - 8) == 0xffffffff:
         db.set.undefined(ea)
         db.set.integer.dword(ea - 8)
-        cb = db.set.string(ea - 4, type=idaapi.ASCSTR_LEN4)
+        cb = db.set.string(ea - 4, type=idaapi.STRTYPE_LEN4)
         try:
             al = db.set.align(ea - 4 + cb, alignment=8)
         except TypeError:
