@@ -47,12 +47,12 @@ import idaapi
 
 ## enumerating
 __matcher__ = utils.matcher()
-__matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_true_segm_name, utils.string.of))
+__matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
 __matcher__.attribute('index', 'index')
 __matcher__.attribute('identifier', 'name'), __matcher__.attribute('id', 'name')
 __matcher__.attribute('selector', 'sel')
-__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_true_segm_name, utils.string.of))
-__matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_true_segm_name, utils.string.of))
+__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
+__matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
 __matcher__.boolean('greater', operator.le, 'endEA'), __matcher__.boolean('gt', operator.lt, 'endEA')
 __matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', operator.gt, 'startEA')
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
@@ -79,6 +79,7 @@ def list(string):
 def list(**type):
     '''List all of the segments in the database that match the keyword specified by `type`.'''
     listable = []
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
 
     # Set some reasonable defaults
     maxindex = maxaddr = maxsize = maxname = 0
@@ -88,7 +89,7 @@ def list(**type):
         maxindex = max(seg.index, maxindex)
         maxaddr = max(seg.endEA, maxaddr)
         maxsize = max(seg.size(), maxsize)
-        maxname = max(len(idaapi.get_true_segm_name(seg)), maxname)
+        maxname = max(len(get_segment_name(seg)), maxname)
 
         listable.append(seg)
 
@@ -100,7 +101,7 @@ def list(**type):
     # List all the fields for each segment that we've aggregated
     for seg in listable:
         comment, _ = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1), ui.navigation.set(seg.startEA)
-        six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(idaapi.get_true_segm_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
+        six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
     return
 
 ## searching
@@ -149,13 +150,14 @@ def by():
 def by(**type):
     '''Return the segment matching the specified keywords in `type`.'''
     searchstring = utils.string.kwargs(type)
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
 
     listable = builtins.list(__iterate__(**type))
     if len(listable) > 1:
         maxaddr = max(builtins.map(operator.attrgetter('endEA'), listable) or [1])
         caddr = math.ceil(math.log(maxaddr)/math.log(16))
-        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), utils.string.of(idaapi.get_true_segm_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
-        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, listable[0].startEA, int(caddr), listable[0].endEA, int(caddr), utils.string.of(idaapi.get_true_segm_name(listable[0])), listable[0].size()))
+        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
+        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, listable[0].startEA, int(caddr), listable[0].endEA, int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
 
     res = six.next(iter(listable), None)
     if res is None:
@@ -270,7 +272,8 @@ def repr():
 def repr(segment):
     '''Return the specified `segment` in a printable form.'''
     seg = by(segment)
-    return "{:s} {:s} {:#x}-{:#x} ({:+#x})".format(object.__repr__(seg),idaapi.get_true_segm_name(seg),seg.startEA,seg.endEA,seg.endEA-seg.startEA)
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
+    return "{:s} {:s} {:#x}-{:#x} ({:+#x})".format(object.__repr__(seg), get_segment_name(seg), seg.startEA, seg.endEA, seg.endEA - seg.startEA)
 
 @utils.multicase()
 def top():
@@ -304,13 +307,15 @@ def name():
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.name() : Unable to locate the current segment.".format(__name__))
-    res = idaapi.get_true_segm_name(seg)
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
+    res = get_segment_name(seg)
     return utils.string.of(res)
 @utils.multicase()
 def name(segment):
     '''Return the name of the segment identified by `segment`.'''
     seg = by(segment)
-    res = idaapi.get_true_segm_name(seg)
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
+    res = get_segment_name(seg)
     return utils.string.of(res)
 
 @utils.multicase()
