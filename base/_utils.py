@@ -1284,6 +1284,7 @@ class wrap(object):
         # include any wildcard arguments
         for n in Fwildargs:
             asm(cls.co_assemble('LOAD_FAST', co_varnames.index(n)))
+            co_stacksize += 1
 
         # call `wrapper` with the correct call type (+1 for `F`, -1 if bound)
         asm(cls.co_assemble(call, len(Fargs) + 1 - int(bound)))
