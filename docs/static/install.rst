@@ -118,7 +118,7 @@ are aliased in the root namespace:
 | :py:func:`go`   | -- | Aliased from :py:func:`database.go` which will navigate to      |
 |                 |    | the provided address                                            |
 +-----------------+----+-----------------------------------------------------------------+
-| :py:func:`goof` | -- | Aliased from :py:func:`datbase.go_offset` which will navigate   |
+| :py:func:`goof` | -- | Aliased from :py:func:`database.go_offset` which will navigate  |
 |                 |    | to the specified offset from the lowest address in the database |
 +-----------------+----+-----------------------------------------------------------------+
 
