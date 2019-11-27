@@ -3105,7 +3105,8 @@ class type(object):
         def element(cls, ea):
             '''Return the size of the element in the array at the address specified by `ea`.'''
             ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
-            return _structure.size(type.structure.id(ea)) if T == idaapi.FF_STRU else idaapi.get_full_data_elsize(ea, F)
+            FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+            return _structure.size(type.structure.id(ea)) if T == FF_STRUCT else idaapi.get_full_data_elsize(ea, F)
 
         @utils.multicase()
         @classmethod
@@ -3164,10 +3165,11 @@ class type(object):
         def id(cls, ea):
             '''Return the identifier of the structure at address `ea`.'''
             ea = interface.address.within(ea)
+            FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
             res = type.flags(ea, idaapi.DT_TYPE)
-            if res != idaapi.FF_STRU:
-                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified addresss is not an FF_STRU({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, idaapi.FF_STRU, res))
+            if res != FF_STRUCT:
+                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified addresss is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, FF_STRUCT, res))
 
             ti, F = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, F, ti)
@@ -4197,18 +4199,32 @@ class set(object):
 
         If `type` is not specified, then choose the correct type based on the size.
         """
-        lookup = {
-            1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWRD,
-            8 : idaapi.FF_QWRD
-        }
 
-        # Older versions of IDA might not define FF_OWRD, so we just
-        # try and add if its available. We fall back to an array anyways.
-        if hasattr(idaapi, 'FF_OWRD'): lookup[16] = idaapi.FF_OWRD
+        # Set some constants used for IDA 7.0
+        if idaapi.__version__ >= 7.0:
+            lookup = {
+                1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWORD,
+                8 : idaapi.FF_QWORD, 16 : idaapi.FF_OWORD
+            }
 
+            FF_STRUCT = idaapi.FF_STRUCT
+
+        # Set some constants for anything older than IDA 7.0
+        else:
+            lookup = {
+                1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWRD,
+                8 : idaapi.FF_QWRD
+            }
+            FF_STRUCT = idaapi.FF_STRU
+
+            # Older versions of IDA might not define FF_OWRD, so we just
+            # try and add if its available. We fall back to an array anyways.
+            if hasattr(idaapi, 'FF_OWRD'): lookup[16] = idaapi.FF_OWRD
+
+        # Now we can apply the type to the given address
         res = type['type'] if 'type' in type else lookup[size]
         if idaapi.__version__ < 7.0:
-            ok = idaapi.do_data_ex(ea, idaapi.FF_STRU if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
+            ok = idaapi.do_data_ex(ea, idaapi.FF_STRUCT if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
         elif isinstance(res, _structure.structure_t):
             ok = idaapi.create_struct(ea, size, res.id)
         elif res == idaapi.FF_ALIGN and hasattr(idaapi, 'create_align'):
@@ -4369,7 +4385,9 @@ class set(object):
             if cb != 4:
                 raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
-            ok = set.data(ea, 4, type=idaapi.FF_DWRD)
+            FF_DWORD = idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD
+
+            ok = set.data(ea, 4, type=idaapi.FF_DWORD)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to assign a dword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 4)
@@ -4388,7 +4406,9 @@ class set(object):
             if cb != 8:
                 raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
-            ok = set.data(ea, 8, type=idaapi.FF_QWRD)
+            FF_QWORD = idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD
+
+            ok = set.data(ea, 8, type=FF_QWORD)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 8)
@@ -4407,7 +4427,9 @@ class set(object):
             if cb != 16:
                 raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
-            ok = set.data(ea, 16, type=idaapi.FF_OWRD)
+            FF_OWORD = idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD
+
+            ok = set.data(ea, 16, type=FF_OWORD)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
             return get.unsigned(ea, 16)
@@ -4691,16 +4713,16 @@ class get(object):
         numerics = {
             idaapi.FF_BYTE : 'B',
             idaapi.FF_WORD : 'H',
-            idaapi.FF_DWRD : 'L',
+            idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : 'L',
             idaapi.FF_FLOAT : 'f',
             idaapi.FF_DOUBLE : 'd',
         }
 
         # Some 32-bit versions of python might not have array.array('Q')
-        # and some versions of IDA also might not have FF_QWRD..
+        # and some versions of IDA also might not have FF_QWORD..
         try:
             _array.array('Q')
-            numerics[idaapi.FF_QWRD] = 'Q'
+            numerics[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = 'Q'
         except (AttributeError, ValueError):
             pass
 
@@ -4709,16 +4731,19 @@ class get(object):
 
         # if we have FF_QWRD defined but its not in _array, then add it to our
         # long-numerics so we can read them
-        if hasattr(idaapi, 'FF_QWRD') and getattr(idaapi, 'FF_QWRD') not in numerics:
-            lnumerics[idaapi.FF_QWRD] = 8
+        if any(hasattr(idaapi, name) for name in {'FF_QWRD', 'FF_QWORD'}):
+            name = six.next(name for name in {'FF_QWRD', 'FF_QWORD'} if hasattr(idaapi, name))
+            if getattr(idaapi, name) not in numerics:
+                lnumerics[idaapi.FF_QWRD] = 8
+            pass
 
         # FF_OWORD, FF_YWORD and FF_ZWORD might not exist in older versions
         # of IDA, so try to add them to our long-numerics "softly".
         try:
-            lnumerics[idaapi.FF_QWRD] = 8
-            lnumerics[idaapi.FF_OWORD] = 16
-            lnumerics[idaapi.FF_YWORD] = 32
-            lnumerics[idaapi.FF_ZWORD] = 64
+            lnumerics[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = 8
+            lnumerics[idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD] = 16
+            lnumerics[idaapi.FF_YWORD if hasattr(idaapi, 'FF_YWORD') else idaapi.FF_YWRD] = 32
+            lnumerics[idaapi.FF_ZWORD if hasattr(idaapi, 'FF_ZWORD') else idaapi.FF_ZWRD] = 64
         except AttributeError:
             pass
 
@@ -4727,10 +4752,10 @@ class get(object):
             2 : 'u',
         }
         F, T = type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
-        if T == idaapi.FF_ASCI:
+        if T == idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI:
             elesize = idaapi.get_full_data_elsize(ea, F)
             t = strings[elesize]
-        elif T == idaapi.FF_STRU:
+        elif T == idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU:
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
             # FIXME: this math doesn't work (of course) with dynamically sized structures
