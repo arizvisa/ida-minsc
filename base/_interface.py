@@ -78,29 +78,55 @@ class typemap:
     # FIXME: Figure out how to update this to use/create an idaapi.tinfo_t()
     #        and also still remain backwards-compatible with the older idaapi.opinfo_t()
 
-    integermap = {
-        1:(idaapi.byteflag(), -1),  2:(idaapi.wordflag(), -1),  3:(idaapi.tribyteflag(), -1),
-        4:(idaapi.dwrdflag(), -1),  8:(idaapi.qwrdflag(), -1), 10:(idaapi.tbytflag(), -1),
-        16:(idaapi.owrdflag(), -1),
-    }
+    ## IDA 7.0 types
     if idaapi.__version__ >= 7.0:
-        del integermap[3]
-    if hasattr(idaapi, 'ywrdflag'): integermap[32] = getattr(idaapi, 'ywrdflag')(), -1
+        integermap = {
+            1:(idaapi.byte_flag(), -1),  2:(idaapi.word_flag(), -1),
+            4:(idaapi.dword_flag(), -1),  8:(idaapi.qword_flag(), -1), 10:(idaapi.tbyte_flag(), -1),
+            16:(idaapi.oword_flag(), -1),
+        }
+        if hasattr(idaapi, 'yword_flag'):
+            integermap[32] = getattr(idaapi, 'yword_flag')(), -1
 
-    decimalmap = {
-         4:(idaapi.floatflag(), -1),     8:(idaapi.doubleflag(), -1),
-        10:(idaapi.packrealflag(), -1), 12:(idaapi.packrealflag(), -1),
-    }
+        decimalmap = {
+             4:(idaapi.float_flag(), -1),     8:(idaapi.double_flag(), -1),
+            10:(idaapi.packreal_flag(), -1), 12:(idaapi.packreal_flag(), -1),
+        }
 
-    stringmap = {
-        chr:(idaapi.asciflag(), 0),
-        str:(idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
-        unicode:(idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
-    }
+        stringmap = {
+            chr:(idaapi.strlit_flag(), 0),
+            str:(idaapi.strlit_flag(), idaapi.STRTYPE_TERMCHR),
+            unicode:(idaapi.strlit_flag(), idaapi.STRTYPE_C_16),
+        }
 
-    ptrmap = { sz : (idaapi.offflag()|flg, tid) for sz, (flg, tid) in six.iteritems(integermap) }
-    nonemap = { None :(idaapi.alignflag(), -1) }
+        ptrmap = { sz : (idaapi.off_flag()|flg, tid) for sz, (flg, tid) in six.iteritems(integermap) }
+        nonemap = { None :(idaapi.align_flag(), -1) }
 
+    ## IDA 6.95 types
+    else:
+        integermap = {
+            1:(idaapi.byteflag(), -1),  2:(idaapi.wordflag(), -1),  3:(idaapi.tribyteflag(), -1),
+            4:(idaapi.dwrdflag(), -1),  8:(idaapi.qwrdflag(), -1), 10:(idaapi.tbytflag(), -1),
+            16:(idaapi.owrdflag(), -1),
+        }
+        if hasattr(idaapi, 'ywrdflag'):
+            integermap[32] = getattr(idaapi, 'ywrdflag')(), -1
+
+        decimalmap = {
+             4:(idaapi.floatflag(), -1),     8:(idaapi.doubleflag(), -1),
+            10:(idaapi.packrealflag(), -1), 12:(idaapi.packrealflag(), -1),
+        }
+
+        stringmap = {
+            chr:(idaapi.asciflag(), 0),
+            str:(idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
+            unicode:(idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
+        }
+
+        ptrmap = { sz : (idaapi.offflag()|flg, tid) for sz, (flg, tid) in six.iteritems(integermap) }
+        nonemap = { None :(idaapi.alignflag(), -1) }
+
+    # lookup table for type
     typemap = {
         int:integermap, long:integermap, float:decimalmap,
         str:stringmap, unicode:stringmap, chr:stringmap,
@@ -121,7 +147,7 @@ class typemap:
 
     # FIXME: this is a hack for dealing with structures that
     #        have the flag set but aren't actually structures..
-    inverted[idaapi.FF_STRU] = (int, 1)
+    inverted[idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU] = (int, 1)
 
     # defaults
     @classmethod
@@ -142,9 +168,10 @@ class typemap:
     @classmethod
     def dissolve(cls, flag, typeid, size):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         dt = flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
-        if dt == idaapi.FF_STRU and isinstance(typeid, six.integer_types):
+        if dt == FF_STRUCT and isinstance(typeid, six.integer_types):
             # FIXME: figure out how to fix this recursive module dependency
             t = sys.modules.get('structure', __import__('structure')).by_identifier(typeid)
             sz = t.size
