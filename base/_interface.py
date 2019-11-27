@@ -1247,7 +1247,7 @@ class architecture_t(object):
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
         # newer
         else:
-            dtype_by_size = idaapi.get_dtyp_by_size
+            dtype_by_size = idaapi.get_dtype_by_size
 
         dtype = next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
@@ -1269,7 +1269,7 @@ class architecture_t(object):
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
         # newer
         else:
-            dtype_by_size = idaapi.get_dtyp_by_size
+            dtype_by_size = idaapi.get_dtype_by_size
 
         dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         namespace = dict(register_t.__dict__)
@@ -1310,7 +1310,7 @@ class architecture_t(object):
 
     def by_indexsize(self, index, size):
         '''Lookup a register according to its `index` and `size`.'''
-        dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtyp_by_size
+        dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         dtype = dtype_by_size(size)
         return self.by_indextype(index, dtype)
     def promote(self, register, size=None):
