@@ -282,16 +282,16 @@ class functions(object):
 
         # find first function chunk
         ch = idaapi.get_fchunk(left) or idaapi.get_next_fchunk(left)
-        while ch and ch.startEA < right and (ch.flags & idaapi.FUNC_TAIL) != 0:
-            ui.navigation.procedure(ch.startEA)
-            ch = idaapi.get_next_fchunk(ch.startEA)
+        while ch and interface.range.start(ch) < right and (ch.flags & idaapi.FUNC_TAIL) != 0:
+            ui.navigation.procedure(interface.range.start(ch))
+            ch = idaapi.get_next_fchunk(interface.range.start(ch))
 
         # iterate through the rest of the functions in the database
-        while ch and ch.startEA < right:
-            ui.navigation.procedure(ch.startEA)
-            if function.within(ch.startEA):
-                yield ch.startEA
-            ch = idaapi.get_next_func(ch.startEA)
+        while ch and interface.range.start(ch) < right:
+            ui.navigation.procedure(interface.range.start(ch))
+            if function.within(interface.range.start(ch)):
+                yield interface.range.start(ch)
+            ch = idaapi.get_next_func(interface.range.start(ch))
         return
 
     @utils.multicase(string=basestring)
@@ -436,7 +436,7 @@ class segments(object):
     def __new__(cls):
         '''Yield the bounds of each segment within the current database.'''
         for seg in segment.__iterate__():
-            yield interface.bounds_t(seg.startEA, seg.endEA)
+            yield interface.range.bounds(seg)
         return
 
     @utils.multicase(name=basestring)
@@ -950,7 +950,7 @@ def name(ea, **flags):
     # figure out which name function to call
     if idaapi.__version__ < 6.8:
         # if get_true_name is going to return the function's name instead of a real one, then leave it as unnamed.
-        if fn and fn.startEA == ea and not flags:
+        if fn and interface.range.start(fn) == ea and not flags:
             return None
 
         aname = idaapi.get_true_name(ea) or idaapi.get_true_name(ea, ea)
@@ -1019,7 +1019,7 @@ def name(ea, string, *suffix, **flags):
         # check if our address does not point to a function beginning and if
         # our visible name does not match the requested one. If so, then this
         # might be a switch/jmptable of some sort that needs to be removed.
-        if func.startEA != ea and idaapi.get_visible_name(ea) != string:
+        if interface.range.start(func) != ea and idaapi.get_visible_name(ea) != string:
             idaapi.del_global_name(ea)
         return res
 
