@@ -91,7 +91,15 @@ class current(object):
     @classmethod
     def symbol(cls):
         '''Return the current highlighted symbol name.'''
-        return idaapi.get_highlighted_identifier()
+        if idaapi.__version__ < 7.0:
+            return idaapi.get_highlighted_identifier()
+
+        # IDA 7.0 way of getting the currently selected text
+        viewer = idaapi.get_current_viewer()
+        res = idaapi.get_highlight(viewer)
+        if res and res[1]:
+            return res[0]
+        return rese
     @classmethod
     def selection(cls):
         '''Return the current address range of whatever is selected'''
