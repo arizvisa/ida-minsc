@@ -1034,7 +1034,7 @@ class switch_t(object):
     def register(self):
         '''Return the register that the switch is based on.'''
         import instruction
-        ri, rt = self.object.regnum, self.object.regdtyp
+        ri, rt = (self.object.regnum, self.object.regdtyp) if idaapi.__version__ < 7.0 else (self.object.regnum, self.object.regdtype)
         return instruction.architecture.by_indextype(ri, rt)
     @property
     def base(self):
