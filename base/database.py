@@ -208,17 +208,19 @@ class config(object):
         @classmethod
         def segments(cls):
             '''Return all of the segment registers in the database.'''
+            sreg_first, sreg_last = (idaapi.ph_get_regFirstSreg, idaapi.ph_get_regLastSreg) if idaapi.__version__ < 7.0 else (idaapi.ph_get_reg_first_sreg, idaapi.ph_get_reg_last_sreg)
+
             names = cls.names()
-            return [names[i] for i in six.moves.range(idaapi.ph_get_regFirstSreg(), idaapi.ph_get_regLastSreg()+1)]
+            return [names[i] for i in six.moves.range(sreg_first(), sreg_last() + 1)]
         @classmethod
         def codesegment(cls):
             '''Return all of the code segment registers in the database.'''
-            res = idaapi.ph_get_regCodeSreg()
+            res = idaapi.ph_get_regCodeSreg() if idaapi.__version__ < 7.0 else idaapi.ph_get_reg_code_sreg()
             return cls.names()[res]
         @classmethod
         def datasegment(cls):
             '''Return all of the data segment registers in the database.'''
-            res = idaapi.ph_get_regDataSreg()
+            res = idaapi.ph_get_regDataSreg() if idaapi.__version__ < 7.0 else idaapi.ph_get_reg_data_sreg()
             return cls.names()[res]
         @classmethod
         def segmentsize(cls):
@@ -553,8 +555,10 @@ def read(size):
 @utils.multicase(ea=six.integer_types, size=six.integer_types)
 def read(ea, size):
     '''Return `size` number of bytes from address `ea`.'''
+    get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
+
     start, end = interface.address.within(ea, ea+size)
-    return idaapi.get_many_bytes(ea, end-start) or ''
+    return get_bytes(ea, end - start) or ''
 
 @utils.multicase(data=bytes)
 def write(data, **persist):
@@ -566,9 +570,11 @@ def write(ea, data, **persist):
 
     If the bool `persist` is specified, then modify what IDA considers the original bytes.
     """
+    patch_bytes, put_bytes = (idaapi.patch_many_bytes, idaapi.put_many_bytes) if idaapi.__version__ < 7.0 else (idaapi.patch_bytes, idaapi.put_bytes)
+
     ea, _ = interface.address.within(ea, ea + len(data))
     originalQ = builtins.next((persist[k] for k in ('original', 'persist', 'store', 'save') if k in persist), False)
-    return idaapi.patch_many_bytes(ea, data) if originalQ else idaapi.put_many_bytes(ea, data)
+    return patch_bytes(ea, data) if originalQ else put_bytes(ea, data)
 
 class names(object):
     """
@@ -2919,7 +2925,8 @@ class type(object):
     @staticmethod
     def is_align(ea):
         '''Return true if the address at `ea` is defined as an alignment.'''
-        return idaapi.isAlign(type.flags(ea))
+        is_align = idaapi.isAlign if idaapi.__version__ < 7.0 else idaapi.is_align
+        return is_align(type.flags(ea))
     alignQ = utils.alias(is_align, 'type')
 
     @utils.multicase()
@@ -4165,14 +4172,20 @@ class set(object):
     @classmethod
     def unknown(cls, ea):
         '''Set the data at address `ea` to undefined.'''
-        cb = idaapi.get_item_size(ea)
-        ok = idaapi.do_unknown_range(ea, cb, idaapi.DOUNK_SIMPLE)
-        return cb if ok else 0
+        size = idaapi.get_item_size(ea)
+        if idaapi.__version__ < 7.0:
+            ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
+        else:
+            ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
+        return size if ok else 0
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unknown(cls, ea, size):
         '''Set the data at address `ea` to undefined.'''
-        ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
+        if idaapi.__version__ < 7.0:
+            ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
+        else:
+            ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
         return size if ok else 0
     undef = undefine = undefined = utils.alias(unknown, 'set')
 
@@ -4208,6 +4221,7 @@ class set(object):
             }
 
             FF_STRUCT = idaapi.FF_STRUCT
+            create_data, create_struct, create_align = idaapi.create_data, idaapi.create_struct, idaapi.create_align
 
         # Set some constants for anything older than IDA 7.0
         else:
@@ -4216,6 +4230,7 @@ class set(object):
                 8 : idaapi.FF_QWRD
             }
             FF_STRUCT = idaapi.FF_STRU
+            create_data, create_struct, create_align = idaapi.do_data_ex, getattr(idaapi, 'doStruct', None), getattr(idaapi, 'doAlign', None)
 
             # Older versions of IDA might not define FF_OWRD, so we just
             # try and add if its available. We fall back to an array anyways.
@@ -4223,12 +4238,12 @@ class set(object):
 
         # Now we can apply the type to the given address
         res = type['type'] if 'type' in type else lookup[size]
-        if idaapi.__version__ < 7.0:
-            ok = idaapi.do_data_ex(ea, idaapi.FF_STRUCT if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
+        if idaapi.__version__ < 7.0 and any(f is None for f in [create_struct, create_align]):
+            ok = create_data(ea, idaapi.FF_STRUCT if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
         elif isinstance(res, _structure.structure_t):
-            ok = idaapi.create_struct(ea, size, res.id)
+            ok = create_struct(ea, size, res.id)
         elif res == idaapi.FF_ALIGN and hasattr(idaapi, 'create_align'):
-            ok = idaapi.create_align(ea, size, 0)
+            ok = create_align(ea, size, 0)
         else:
             ok = idaapi.create_data(ea, res, size, 0)
         return idaapi.get_item_size(ea) if ok else 0
@@ -4957,37 +4972,43 @@ class get(object):
         """
         @classmethod
         def __getlabel(cls, ea):
+            get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+
             f = type.flags(ea)
             if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
                 drefs = (ea for ea in xref.data_up(ea))
-                refs = (ea for ea in itertools.chain(*itertools.imap(xref.up, drefs)) if idaapi.get_switch_info_ex(ea) is not None)
+                refs = (ea for ea in itertools.chain(*itertools.imap(xref.up, drefs)) if get_switch_info(ea) is not None)
                 try:
                     ea = builtins.next(refs)
-                    res = idaapi.get_switch_info_ex(ea)
-                    if not res: raise StopIteration
-                    return interface.switch_t(res)
+                    si = get_switch_info(ea)
+                    if si:
+                        return interface.switch_t(si)
                 except StopIteration:
                     pass
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at target label.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
         def __getarray(cls, ea):
-            refs = (ea for ea in xref.up(ea) if idaapi.get_switch_info_ex(ea) is not None)
+            get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+
+            refs = (ea for ea in xref.up(ea) if get_switch_info(ea) is not None)
             try:
                 ea = builtins.next(refs)
-                res = idaapi.get_switch_info_ex(ea)
-                if not res: raise StopIteration
-                return interface.switch_t(res)
+                si = get_switch_info(ea)
+                if si:
+                    return interface.switch_t(si)
             except StopIteration:
                 pass
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at switch array.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @classmethod
         def __getinsn(cls, ea):
-            res = idaapi.get_switch_info_ex(ea)
-            if res is None:
+            get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
+
+            si = get_switch_info(ea)
+            if si is None:
                 raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
-            return interface.switch_t(res)
+            return interface.switch_t(si)
 
         @utils.multicase()
         def __new__(cls):
