@@ -506,7 +506,7 @@ def func_tail_appended(pfn, tail):
 def removing_func_tail(pfn, tail):
     global State
     if State != state.ready: return
-    # tail = area_t
+    # tail = range_t
     for ea in database.address.iterate(tail.startEA, tail.endEA):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=pfn.startEA)
