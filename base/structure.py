@@ -1355,12 +1355,12 @@ class member_t(object):
     @type.getter
     def typeinfo(self):
         '''Return the type info of the member.'''
-        res = idaapi.tinfo_t()
-        ok = idaapi.get_or_guess_member_tinfo2(self.ptr, res)
+        ti = idaapi.tinfo_t()
+        ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo2(ti, self.ptr)
         if not ok:
             cls = self.__class__
-            logging.fatal(u"{:s}.instance({!r}).member({:s}).typeinfo : Unable to determine `idaapi.tinfo_t()` for member {:#x}.".format('.'.join((__name__,cls.__name__)), self.__owner.name, self.name, self.id))
-        return res
+            logging.fatal(u"{:s}.instance({!r}).member({:s}).typeinfo : Unable to determine `idaapi.tinfo_t()` for member {:#x}.".format('.'.join((__name__, cls.__name__)), self.__owner.name, self.name, self.id))
+        return ti
 
     def __repr__(self):
         '''Display the member in a readable format.'''
