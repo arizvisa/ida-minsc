@@ -88,7 +88,8 @@ class __optype__(object):
     @classmethod
     def size(cls, op, processor=None):
         '''Return the size of the operand identified by `op` for the specified `processor`.'''
-        return idaapi.get_dtyp_size(op.dtyp)
+        get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+        return get_dtype_size(op.dtyp)
 
 ## general functions
 @utils.multicase()
@@ -221,8 +222,10 @@ def ops_size():
 @utils.multicase(ea=six.integer_types)
 def ops_size(ea):
     '''Returns a tuple with all the sizes of each operand for the instruction at the address `ea`.'''
+    get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+
     ea = interface.address.inside(ea)
-    f = utils.fcompose(functools.partial(operand, ea), operator.attrgetter('dtyp'), idaapi.get_dtyp_size, int)
+    f = utils.fcompose(functools.partial(operand, ea), operator.attrgetter('dtyp'), get_dtype_size, int)
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
 @utils.multicase()
@@ -342,8 +345,10 @@ def op_size(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_size(ea, opnum):
     '''Returns the size for the operand `opnum` belonging to the instruction at the address `ea`.'''
+    get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+
     res = operand(ea, opnum)
-    return 0 if res.type == idaapi.o_void else idaapi.get_dtyp_size(res.dtyp)
+    return 0 if res.type == idaapi.o_void else get_dtype_size(res.dtyp)
 @utils.multicase(opnum=six.integer_types)
 def op_bits(opnum):
     '''Returns the size (in bits) for the operand `opnum` belonging to the current instruction.'''
@@ -406,7 +411,7 @@ op_value = op_decode = utils.alias(op)
 #    '''Apply the specified type to a stack variable'''
 #    py_op = operand(ea, opnum)
 #    py_v = py_op.addr
-#    py_t = idc.ParseType("type string", flags)[1]
+#    py_t = idc.parse_decl("type string", flags)[1]
 #    py_name = "stack variable name"
 #    idaapi.apply_type_to_stkarg(py_op, py_v, py_t, py_name)
 
@@ -1004,7 +1009,9 @@ class operand_types:
     def immediate(ea, op):
         '''Operand type decoder for ``idaapi.o_imm`` which returns an integer.'''
         if op.type in {idaapi.o_imm, idaapi.o_phrase}:
-            bits = idaapi.get_dtyp_size(op.dtyp) * 8
+            get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+
+            bits = 8 * get_dtype_size(op.dtyp)
 
             # figure out the sign flag
             sf, res = 2 ** (bits - 1), op.value
@@ -1150,8 +1157,10 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
         '''Operand type decoder for returning a memory referece on ARM.'''
+        get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+
         # get the address and the operand size
-        addr, size = op.addr, idaapi.get_dtyp_size(op.dtyp)
+        addr, size = op.addr, get_dtype_size(op.dtyp)
         maxval = 1<<size*8
 
         # dereference the address and return its integer.
