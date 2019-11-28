@@ -151,8 +151,8 @@ class state(object):
     def refresh(cls):
         '''Refresh all of IDA's windows.'''
         global disassembly
-        idaapi.refresh_lists()
-        disassembly.refresh()
+        ok = idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
+        return ok and disassembly.refresh()
 
 wait, beep, refresh = internal.utils.alias(state.wait, 'state'), internal.utils.alias(state.beep, 'state'), internal.utils.alias(state.refresh, 'state')
 
@@ -209,7 +209,7 @@ class names(appwindow):
     @classmethod
     def refresh(cls):
         '''Refresh the names list.'''
-        return idaapi.refresh_lists()
+        return idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
     @classmethod
     def size(cls):
         '''Return the number of elements in the names list.'''
@@ -288,7 +288,7 @@ class strings(appwindow):
         config.strtypes = reduce(lambda t, c: t | (2**c), res, 0)
         if not idaapi.set_strlist_options(config):
             raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
-        #assert idaapi.refresh_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
+        #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
     # FIXME: I don't think that these callbacks are stackable
     #idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)
@@ -296,7 +296,7 @@ class strings(appwindow):
     @classmethod
     def refresh(cls):
         '''Refresh the strings list.'''
-        return idaapi.refresh_lists()
+        return idaapi.refresh_lists() if idaapi.__version__ < 7.0 else idaapi.refresh_choosers()
     @classmethod
     def size(cls):
         '''Return the number of elements in the strings list.'''
@@ -315,7 +315,8 @@ class strings(appwindow):
     def get(cls, index):
         '''Return the address and the string at the specified `index`.'''
         si = cls.at(index)
-        res = idaapi.get_ascii_contents(si.ea, si.length, si.type)
+        get_contents = idaapi.get_strlit_contents if hasattr(idaapi, 'get_strlit_contents') else idaapi.get_ascii_contents
+        res = get_contents(si.ea, si.length, si.type)
         return si.ea, internal.utils.string.of(res)
     @classmethod
     def iterate(cls):
