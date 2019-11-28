@@ -522,6 +522,61 @@ class address(object):
             return cls.__within2__(*args)
         return cls.__within1__(*args)
 
+class range(object):
+    """
+    This namespace provides tools that assist with interacting with IDA 6.x's
+    ``idaapi.area_t``, or IDA 7.x's ``idaapi.range_t`` in a generic manner
+    without needing to know which version of IDA is being used or if the IDA
+    6.95 compatibility layer is enabled.
+    """
+
+    # Define some classmethods for accessing area_t attributes in versions of IDA
+    # prior to IDA 7.0.
+    @classmethod
+    def start_6x(cls, area):
+        '''Return the "startEA" attribute of the specified `area`.'''
+        return area.startEA
+    @classmethod
+    def end_6x(cls, area):
+        '''Return the "endEA" attribute of the specified `area`.'''
+        return area.endEA
+
+    # Now we can do it for versions of IDA 7.0 and newer..
+    @classmethod
+    def start_7x(cls, area):
+        '''Return the "startEA" attribute of the specified `area`.'''
+        return area.start_ea
+    @classmethod
+    def end_7x(cls, area):
+        '''Return the "end_ea" attribute of the specified `area`.'''
+        return area.end_ea
+
+    # Assign them based on the IDA version
+    start, end = (start_6x, end_6x) if idaapi.__version__ < 7.0 else (start_7x, end_7x)
+
+    @classmethod
+    def unpack(cls, area):
+        '''Unpack the boundaries of the specified `area` as a tuple.'''
+        return cls.start(area), cls.end(area)
+
+    @classmethod
+    def bounds(cls, area):
+        '''Return the boundaries of the specified `area` as a ``bounds_t``.'''
+        res = cls.unpack(area)
+        return bounds_t(*res)
+
+    @classmethod
+    def within(cls, ea, area):
+        '''Return whether the address `ea` is contained by the specified `area`.'''
+        left, right = cls.unpack(area)
+        return left <= ea < right
+
+    @classmethod
+    def size(cls, area):
+        '''Return the size of the specified `area` by returning the difference of its boundaries.'''
+        left, right = cls.unpack(area)
+        return right - left
+
 class node(object):
     """
     This namespace contains a number of methods that extract information
