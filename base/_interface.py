@@ -1273,15 +1273,16 @@ class architecture_t(object):
         else:
             dtype_by_size = idaapi.get_dtype_by_size
 
-        dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
+        dtype = next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         namespace = dict(register_t.__dict__)
-        namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtyp, '__position__':position, '__size__':bits})
+        namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', set())
         namespace['architecture'] = self
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
-        self.__cache__[idaname or name, dtyp] = name
+        self.__cache__[idaname or name, dtype] = name
         parent.__children__[position] = res
         return res
 
