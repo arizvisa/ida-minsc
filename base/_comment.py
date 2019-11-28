@@ -638,17 +638,25 @@ class contents(tagging):
     """
 
     ## for each function's content
-    # netnode.blob[fn.startEA, btag] = marshal.dumps({'name', 'address'})
-    # netnode.sup[fn.startEA] = marshal.dumps({tagnames})
+    # netnode.blob[fn.start_ea, btag] = marshal.dumps({'name', 'address'})
+    # netnode.sup[fn.start_ea] = marshal.dumps({tagnames})
 
     #btag = idaapi.stag         # XXX: apparently 'S' is used for comments
     btag = idaapi.atag
 
-    @classmethod
-    def _key(cls, ea):
-        '''Converts the address `ea` to a key that's used to store contents data for the specified function.'''
-        res = idaapi.get_func(ea)
-        return res.startEA if res else None
+    if idaapi.__version__ < 7.0:
+        @classmethod
+        def _key(cls, ea):
+            '''Converts the address `ea` to a key that's used to store contents data for the specified function.'''
+            res = idaapi.get_func(ea)
+            return res.startEA if res else None
+
+    else:
+        @classmethod
+        def _key(cls, ea):
+            '''Converts the address `ea` to a key that's used to store contents data for the specified function.'''
+            res = idaapi.get_func(ea)
+            return res.start_ea if res else None
 
     @classmethod
     def _read_header(cls, target, ea):
