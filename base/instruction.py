@@ -88,8 +88,9 @@ class __optype__(object):
     @classmethod
     def size(cls, op, processor=None):
         '''Return the size of the operand identified by `op` for the specified `processor`.'''
-        get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
-        return get_dtype_size(op.dtyp)
+        if idaapi.__version__ < 7.0:
+            return idaapi.get_dtyp_size(op.dtyp)
+        return idaapi.get_dtype_size(op.dtype)
 
 ## general functions
 @utils.multicase()
@@ -222,10 +223,11 @@ def ops_size():
 @utils.multicase(ea=six.integer_types)
 def ops_size(ea):
     '''Returns a tuple with all the sizes of each operand for the instruction at the address `ea`.'''
+    get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
     get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
     ea = interface.address.inside(ea)
-    f = utils.fcompose(functools.partial(operand, ea), operator.attrgetter('dtyp'), get_dtype_size, int)
+    f = utils.fcompose(functools.partial(operand, ea), get_dtye_attribute, get_dtype_size, int)
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
 @utils.multicase()
@@ -345,10 +347,11 @@ def op_size(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_size(ea, opnum):
     '''Returns the size for the operand `opnum` belonging to the instruction at the address `ea`.'''
+    get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
     get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
     res = operand(ea, opnum)
-    return 0 if res.type == idaapi.o_void else get_dtype_size(res.dtyp)
+    return 0 if res.type == idaapi.o_void else get_dtype_size(get_dtype_attribute(res))
 @utils.multicase(opnum=six.integer_types)
 def op_bits(opnum):
     '''Returns the size (in bits) for the operand `opnum` belonging to the current instruction.'''
@@ -995,11 +998,13 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_reg)
     def register(ea, op):
         '''Operand type decoder for ``idaapi.o_reg`` which returns a ``register_t``.'''
+        get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
+
         global architecture
         dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         if op.type in {idaapi.o_reg}:
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
-            return architecture.by_indextype(res, op.dtyp)
+            return architecture.by_indextype(res, get_dtype_attribute(op))
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
         raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype, op.type))
 
@@ -1008,10 +1013,11 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
     def immediate(ea, op):
         '''Operand type decoder for ``idaapi.o_imm`` which returns an integer.'''
+        get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
         if op.type in {idaapi.o_imm, idaapi.o_phrase}:
-            bits = 8 * get_dtype_size(op.dtyp)
+            bits = 8 * get_dtype_size(get_dtype_attribute(op))
 
             # figure out the sign flag
             sf, res = 2 ** (bits - 1), op.value
@@ -1157,11 +1163,12 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
         '''Operand type decoder for returning a memory referece on ARM.'''
+        get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
         get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
 
         # get the address and the operand size
-        addr, size = op.addr, get_dtype_size(op.dtyp)
+        addr, size = op.addr, get_dtype_size(get_dtype_attribute(op))
         maxval = 1<<size*8
 
         # dereference the address and return its integer.
@@ -1464,7 +1471,7 @@ class Intel(interface.architecture_t):
         [ setitem(_+'l', self.child(self.by_name(_+'x'), _+'l', 0, 8)) for _ in ('a', 'c', 'd', 'b') ]
         [ setitem(_+'l', self.child(self.by_name(_), _+'l', 0, 8)) for _ in ('sp', 'bp', 'si', 'di') ]
         [ setitem(    _, self.new(_, 16)) for _ in ('es', 'cs', 'ss', 'ds', 'fs', 'gs') ]
-        setitem('fpstack', self.new('fptags', 80*8, dtyp=None))    # FIXME: is this the right IDA register name??
+        setitem('fpstack', self.new('fptags', 80*8, dtype=None))    # FIXME: is this the right IDA register name??
 
         # FIXME: rex-prefixed 32-bit registers are implicitly extended to the 64-bit regs which implies that 64-bit are children of 32-bit
         for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip'):
@@ -1479,18 +1486,18 @@ class Intel(interface.architecture_t):
 
         fpstack = self.__register__.fpstack
         # single precision
-        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtyp=idaapi.dt_float)) for _ in six.moves.range(8) ]
+        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float)) for _ in six.moves.range(8) ]
         # double precision
-        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtyp=idaapi.dt_double)) for _ in six.moves.range(8) ]
+        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(8) ]
         # umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
-        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtyp=idaapi.dt_tbyte)) for _ in six.moves.range(8) ]
+        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte)) for _ in six.moves.range(8) ]
 
         # not sure if the mmx registers trash the other 16 bits of an fp register
-        [ setitem("mm{:d}".format(_), self.child(fpstack, "mm{:d}".format(_), _*80, 64, dtyp=idaapi.dt_qword)) for _ in six.moves.range(8) ]
+        [ setitem("mm{:d}".format(_), self.child(fpstack, "mm{:d}".format(_), _*80, 64, dtype=idaapi.dt_qword)) for _ in six.moves.range(8) ]
 
         # sse1/sse2 simd registers
-        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtyp=idaapi.dt_byte16)) for _ in six.moves.range(16) ]
-        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 128, dtyp=idaapi.dt_ldbl)) for _ in six.moves.range(16) ]
+        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16)) for _ in six.moves.range(16) ]
+        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 128, dtype=idaapi.dt_ldbl)) for _ in six.moves.range(16) ]
 
         ##fpctrl, fpstat, fptags
         ##mxcsr
