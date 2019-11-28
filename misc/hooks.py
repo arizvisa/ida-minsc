@@ -13,7 +13,7 @@ import functools, operator, itertools, types
 
 import database, function, ui
 import internal
-from internal import comment, utils, exceptions as E
+from internal import comment, utils, interface, exceptions as E
 
 import idaapi
 
@@ -24,7 +24,7 @@ def noapi(*args):
         logging.fatal(u"{:s}.noapi() : Unexpected empty frame ({!s}) from caller. Continuing from {!s}..".format(__name__, utils.string.repr(sys._getframe()), utils.string.repr(sys._getframe().f_code)))
         return hook.CONTINUE
 
-    return internal.interface.priorityhook.CONTINUE if fr.f_back is None else internal.interface.priorityhook.STOP
+    return interface.priorityhook.CONTINUE if fr.f_back is None else interface.priorityhook.STOP
 
 def notify(name):
     def notification(*args):
@@ -157,26 +157,26 @@ class globals(comment):
     def _update_refs(cls, fn, old, new):
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
-                internal.comment.globals.dec(fn.startEA, key)
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
+                internal.comment.globals.dec(interface.range.start(fn), key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
-                internal.comment.globals.inc(fn.startEA, key)
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
+                internal.comment.globals.inc(interface.range.start(fn), key)
             continue
         return
 
     @classmethod
     def _create_refs(cls, fn, res):
         for key in res.viewkeys():
-            internal.comment.globals.inc(fn.startEA, key)
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(res.viewkeys())))
+            internal.comment.globals.inc(interface.range.start(fn), key)
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(res.viewkeys())))
         return
 
     @classmethod
     def _delete_refs(cls, fn, res):
         for key in res.viewkeys():
-            internal.comment.globals.dec(fn.startEA, key)
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), fn.startEA if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(res.viewkeys())))
+            internal.comment.globals.dec(interface.range.start(fn), key)
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(res.viewkeys())))
         return
 
     @classmethod
@@ -237,25 +237,35 @@ class globals(comment):
 
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
-        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', a.startEA))
-        fn = idaapi.get_func(a.startEA)
-        if fn is None and not cmt: return
+        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        fn = idaapi.get_func(interface.range.start(a))
+        if fn is None and not cmt:
+            return
+
         oldcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
-        try: cls.event.send((fn.startEA, bool(repeatable), utils.string.of(cmt)))
+        try:
+            cls.event.send((interface.range.start(fn), bool(repeatable), utils.string.of(cmt)))
+
         except StopIteration, e:
-            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable))
+            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
+        return
 
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
-        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', a.startEA))
-        fn = idaapi.get_func(a.startEA)
-        if fn is None and not cmt: return
+        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        fn = idaapi.get_func(interface.range.start(a))
+        if fn is None and not cmt:
+            return
+
         newcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
-        try: cls.event.send((fn.startEA, bool(repeatable), None))
+        try:
+            cls.event.send((interface.range.start(fn), bool(repeatable), None))
+
         except StopIteration, e:
-            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), a.startEA, utils.string.repr(cmt), repeatable))
+            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
+        return
 
 ### database scope
 class state(object):
@@ -450,7 +460,7 @@ def rename(ea, newname):
     fn = idaapi.get_func(ea)
 
     # figure out whether a global or function name is being changed, otherwise it's the function's contents
-    ctx = internal.comment.globals if not fn or (fn.startEA == ea) else internal.comment.contents
+    ctx = internal.comment.globals if not fn or (interface.range.start(fn) == ea) else internal.comment.contents
 
     # if a name is being removed
     if not newname:
@@ -495,11 +505,11 @@ def func_tail_appended(pfn, tail):
     global State
     if State != state.ready: return
     # tail = func_t
-    for ea in database.address.iterate(tail.startEA, tail.endEA):
+    for ea in database.address.iterate(*interface.range.unpack(tail)):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
-            internal.comment.contents.inc(ea, k, target=pfn.startEA)
-            logging.debug(u"{:s}.func_tail_appended({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, tail.startEA, utils.string.repr(k), utils.string.repr(k)))
+            internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
+            logging.debug(u"{:s}.func_tail_appended({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
@@ -507,24 +517,25 @@ def removing_func_tail(pfn, tail):
     global State
     if State != state.ready: return
     # tail = range_t
-    for ea in database.address.iterate(tail.startEA, tail.endEA):
+    for ea in database.address.iterate(*interface.range.unpack(tail)):
         for k in database.tag(ea):
-            internal.comment.contents.dec(ea, k, target=pfn.startEA)
+            internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
-            logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, tail.startEA, utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k)))
         continue
     return
 
 def add_func(pfn):
     global State
     if State != state.ready: return
+
     # convert all globals into contents
     for l, r in function.chunks(pfn):
         for ea in database.address.iterate(l, r):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
-                internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                logging.debug(u"{:s}.add_func({:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, utils.string.repr(k), utils.string.repr(k)))
+                internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
+                logging.debug(u"{:s}.add_func({:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
             continue
         continue
     return
@@ -532,44 +543,46 @@ def add_func(pfn):
 def del_func(pfn):
     global State
     if State != state.ready: return
+
     # convert all contents into globals
     for l, r in function.chunks(pfn):
         for ea in database.address.iterate(l, r):
             for k in database.tag(ea):
-                internal.comment.contents.dec(ea, k, target=pfn.startEA)
+                internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.del_func({:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.del_func({:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
             continue
         continue
 
     # remove all function tags
-    for k in function.tag(pfn.startEA):
-        internal.comment.globals.dec(pfn.startEA, k)
-        logging.debug(u"{:s}.del_func({:#x}) : Removing (global) tag {!s} from function.".format(__name__, pfn.startEA, utils.string.repr(k)))
+    for k in function.tag(interface.range.start(pfn)):
+        internal.comment.globals.dec(interface.range.start(pfn), k)
+        logging.debug(u"{:s}.del_func({:#x}) : Removing (global) tag {!s} from function.".format(__name__, interface.range.start(pfn), utils.string.repr(k)))
     return
 
 def set_func_start(pfn, new_start):
     global State
     if State != state.ready: return
+
     # new_start has removed addresses from function
     # replace contents with globals
-    if pfn.startEA > new_start:
-        for ea in database.address.iterate(new_start, pfn.startEA):
+    if interface.range.start(pfn) > new_start:
+        for ea in database.address.iterate(new_start, interface.range.start(pfn)):
             for k in database.tag(ea):
-                internal.comment.contents.dec(ea, k, target=pfn.startEA)
+                internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, new_start, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
 
     # new_start has added addresses to function
     # replace globals with contents
-    elif pfn.startEA < new_start:
-        for ea in database.address.iterate(pfn.startEA, new_start):
+    elif interface.range.start(pfn) < new_start:
+        for ea in database.address.iterate(interface.range.start(pfn), new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
-                internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, new_start, utils.string.repr(k), utils.string.repr(k)))
+                internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
+                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
     return
@@ -579,23 +592,23 @@ def set_func_end(pfn, new_end):
     if State != state.ready: return
     # new_end has added addresses to function
     # replace globals with contents
-    if new_end > pfn.endEA:
-        for ea in database.address.iterate(pfn.endEA, new_end):
+    if new_end > interface.range.end(pfn):
+        for ea in database.address.iterate(interface.range.end(pfn), new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
-                internal.comment.contents.inc(ea, k, target=pfn.startEA)
-                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, new_end, utils.string.repr(k), utils.string.repr(k)))
+                internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
+                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
 
     # new_end has removed addresses from function
     # replace contents with globals
-    elif new_end < pfn.endEA:
-        for ea in database.address.iterate(new_end, pfn.endEA):
+    elif new_end < interface.range.end(pfn):
+        for ea in database.address.iterate(new_end, interface.range.end(pfn)):
             for k in database.tag(ea):
-                internal.comment.contents.dec(ea, k, target=pfn.startEA)
+                internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, pfn.startEA, new_end, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
     return
