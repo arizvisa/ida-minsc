@@ -71,7 +71,10 @@ def mangledQ(string):
 class extract:
     @staticmethod
     def declaration(string):
-        res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames)
+        if idaapi.__version__ < 7.0:
+            res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames)
+        else:
+            res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames, idaapi.DQT_FULL)
         return string if res is None else internal.utils.string.of(res)
 
     @staticmethod
