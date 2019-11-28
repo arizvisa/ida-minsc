@@ -481,7 +481,7 @@ def op_structure(ea, opnum):
 
     # pathvar = idaapi.tid_array(length)
     # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
-    res = idaapi.get_opinfo(ea, opnum, fl, ti)
+    res = idaapi.get_opinfo(ea, opnum, fl, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, fl)
     if res is None:
         raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
@@ -647,8 +647,14 @@ def op_structure(ea, opnum, path, **delta):
     baseoffset = path[0].members.baseoffset
 
     # now we can finally apply the path to the specified operand
-    ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, ofs - baseoffset)
-    #ok = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, moff - ofs)
+    if idaapi.__version__ < 7.0:
+        ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, ofs - baseoffset)
+        #ok = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, moff - ofs)
+
+    # IDA 7.0 and later requires us to get the instruction here
+    else:
+        insn = at(ea)
+        ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, ofs - baseoffset)
 
     return True if ok else False
 op_struc = op_struct = utils.alias(op_structure)
@@ -667,7 +673,7 @@ def op_enumeration(ea, opnum):
     # XXX: is the following api call the proper way to do this?
     # idaapi.get_enum_id(*args):
 
-    res = idaapi.get_opinfo(ea, opnum, fl, ti)
+    res = idaapi.get_opinfo(ea, opnum, fl, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, fl)
     if res is None:
         raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
     return enumeration.by(res.ec.tid)
@@ -698,7 +704,7 @@ def op_string(ea, opnum):
     if fl & idaapi.FF_STRLIT == 0:
         raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
-    res = idaapi.get_opinfo(ea, opnum, fl, ti)
+    res = idaapi.get_opinfo(ea, opnum, fl, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, fl)
     if res is None:
         raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
