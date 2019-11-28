@@ -317,7 +317,7 @@ def bottom(func):
         interface.fc_block_type_t.fcb_enoret,
         interface.fc_block_type_t.fcb_error
     )
-    return tuple(database.address.prev(n.endEA) for n in fc if n.type in exit_types)
+    return tuple(database.address.prev(item.endEA) for item in fc if item.type in exit_types)
 
 @utils.multicase()
 def marks():
@@ -932,10 +932,12 @@ class block(object):
     @classmethod
     def color(cls, bb):
         '''Returns the color of the basic block `bb`.'''
-        fn, n = by_address(bb.startEA), idaapi.node_info_t()
-        ok = idaapi.get_node_info2(n, fn.startEA, bb.id)
-        if ok and n.valid_bg_color():
-            res = n.bg_color
+        get_node_info = idaapi.get_node_info2 if idaapi.__version__ < 7.0 else idaapi.get_node_info
+
+        fn, ni = by_address(bb.startEA), idaapi.node_info_t()
+        ok = get_node_info(ni, fn.startEA, bb.id)
+        if ok and ni.valid_bg_color():
+            res = ni.bg_color
             b, r = (res&0xff0000)>>16, res&0x0000ff
             return (r<<16) | (res&0x00ff00) | b
         return None
@@ -949,8 +951,10 @@ class block(object):
     @classmethod
     def color(cls, ea, none):
         '''Removes the color of the basic block at the address `ea`.'''
+        clr_node_info = idaapi.clr_node_info2 if idaapi.__version__ < 7.0 else idaapi.clr_node_info
+
         res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
-        try: idaapi.clr_node_info2(fn.startEA, bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+        try: clr_node_info(fn.startEA, bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
         finally: idaapi.refresh_idaview_anyway()
 
         # clear the color of each item too.
@@ -968,8 +972,10 @@ class block(object):
     @classmethod
     def color(cls, bb, none):
         '''Removes the color of the basic block `bb`.'''
+        clr_node_info = idaapi.clr_node_info2 if idaapi.__version__ < 7.0 else idaapi.clr_node_info
+
         res, fn = cls.color(bb), by_address(bb.startEA)
-        try: idaapi.clr_node_info2(fn.startEA, bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+        try: clr_node_info(fn.startEA, bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
         finally: idaapi.refresh_idaview_anyway()
 
         # clear the color of each item too.
@@ -985,51 +991,51 @@ class block(object):
         If the color `frame` is specified, set the frame to the specified color.
         """
         res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
-        n = idaapi.node_info_t()
+        ni = idaapi.node_info_t()
 
         # specify the bgcolor
         r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
-        n.bg_color = n.frame_color = (b<<16) | (rgb&0x00ff00) | r
+        ni.bg_color = ni.frame_color = (b<<16) | (rgb&0x00ff00) | r
 
         # now the frame color
         frgb = frame.get('frame', 0x000000)
         fr, fb = (frgb&0xff0000)>>16, frgb&0x0000ff
-        n.frame_color = (fb<<16) | (frgb&0x00ff00) | fr
+        ni.frame_color = (fb<<16) | (frgb&0x00ff00) | fr
 
         # set the node
         f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: idaapi.set_node_info2(fn.startEA, bb, n, f)
+        try: idaapi.set_node_info2(fn.startEA, bb, ni, f)
         finally: idaapi.refresh_idaview_anyway()
 
         # update the color of each item too
         for ea in block.iterate(ea):
             database.color(ea, rgb)
-            #internal.netnode.alt.set(ea, 0x14, n.bg_color)
+            #internal.netnode.alt.set(ea, 0x14, ni.bg_color)
         return res
     @utils.multicase(bb=idaapi.BasicBlock, rgb=six.integer_types)
     @classmethod
     def color(cls, bb, rgb, **frame):
         '''Sets the color of the basic block `bb` to `rgb`.'''
-        res, fn, n = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
+        res, fn, ni = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
 
         # specify the bg color
         r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
-        n.bg_color = n.frame_color = (b<<16) | (rgb&0x00ff00) | r
+        ni.bg_color = ni.frame_color = (b<<16) | (rgb&0x00ff00) | r
 
         # now the frame color
         frgb = frame.get('frame', 0x000000)
         fr, fb = (frgb&0xff0000)>>16, frgb&0x0000ff
-        n.frame_color = (fb<<16) | (frgb&0x00ff00) | fr
+        ni.frame_color = (fb<<16) | (frgb&0x00ff00) | fr
 
         # set the node
         f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: idaapi.set_node_info2(fn.startEA, bb.id, n, f)
+        try: idaapi.set_node_info2(fn.startEA, bb.id, ni, f)
         finally: idaapi.refresh_idaview_anyway()
 
         # update the colors of each item too.
         for ea in block.iterate(bb):
             database.color(ea, rgb)
-            #internal.netnode.alt.set(ea, 0x14, n.bg_color)
+            #internal.netnode.alt.set(ea, 0x14, ni.bg_color)
         return res
     @utils.multicase(bounds=types.TupleType, rgb=six.integer_types)
     @classmethod
@@ -1802,8 +1808,10 @@ class type(object):
     @classmethod
     def is_static(cls, func):
         '''Returns true if the function `func` is a static function.'''
+        FUNC_STATICDEF = idaapi.FUNC_STATICDEF if hasattr(idaapi, 'FUNC_STATICDEF') else idaapi.FUNC_STATIC
+
         fn = by(func)
-        return fn.flags & idaapi.FUNC_STATIC == idaapi.FUNC_STATIC
+        return fn.flags & FUNC_STATICDEF == FUNC_STATICDEF
     staticQ = utils.alias(is_static, 'type')
 
     @utils.multicase()
