@@ -990,6 +990,8 @@ class block(object):
 
         If the color `frame` is specified, set the frame to the specified color.
         """
+        set_node_info = idaapi.set_node_info2 if idaapi.__version__ < 7.0 else idaapi.set_node_info
+
         res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
         ni = idaapi.node_info_t()
 
@@ -1004,7 +1006,7 @@ class block(object):
 
         # set the node
         f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: idaapi.set_node_info2(fn.startEA, bb, ni, f)
+        try: set_node_info(fn.startEA, bb, ni, f)
         finally: idaapi.refresh_idaview_anyway()
 
         # update the color of each item too
@@ -1016,6 +1018,7 @@ class block(object):
     @classmethod
     def color(cls, bb, rgb, **frame):
         '''Sets the color of the basic block `bb` to `rgb`.'''
+        set_node_info = idaapi.set_node_info2 if idaapi.__version__ < 7.0 else idaapi.set_node_info
         res, fn, ni = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
 
         # specify the bg color
@@ -1029,7 +1032,7 @@ class block(object):
 
         # set the node
         f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: idaapi.set_node_info2(fn.startEA, bb.id, ni, f)
+        try: set_node_info(fn.startEA, bb.id, ni, f)
         finally: idaapi.refresh_idaview_anyway()
 
         # update the colors of each item too.
@@ -1701,9 +1704,10 @@ def switches():
 @utils.multicase()
 def switches(func):
     '''Yield each switch found in the function identifed by `func`.'''
+    get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
     for ea in iterate(func):
-        res = idaapi.get_switch_info_ex(ea)
-        if res: yield interface.switch_t(res)
+        si = get_switch_info(ea)
+        if si: yield interface.switch_t(si)
     return
 
 class type(object):
