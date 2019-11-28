@@ -53,17 +53,21 @@ __matcher__.attribute('identifier', 'name'), __matcher__.attribute('id', 'name')
 __matcher__.attribute('selector', 'sel')
 __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
 __matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
-__matcher__.boolean('greater', operator.le, 'endEA'), __matcher__.boolean('gt', operator.lt, 'endEA')
-__matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', operator.gt, 'startEA')
+if idaapi.__version__ < 7.0:
+    __matcher__.boolean('greater', operator.le, 'endEA'), __matcher__.boolean('gt', operator.lt, 'endEA')
+    __matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', operator.gt, 'startEA')
+else:
+    __matcher__.boolean('greater', operator.le, 'end_ea'), __matcher__.boolean('gt', operator.lt, 'end_ea')
+    __matcher__.boolean('less', operator.ge, 'start_ea'), __matcher__.boolean('lt', operator.gt, 'start_ea')
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def __iterate__(**type):
     '''Iterate through each segment defined in the database that match the keywords specified by `type`.'''
     def newsegment(index):
-        res = idaapi.getnseg(index)
-        res.index, _ = index, ui.navigation.set(res.startEA)
-        return res
+        seg = idaapi.getnseg(index)
+        seg.index, _ = index, ui.navigation.set(interface.range.start(seg))
+        return seg
     iterable = itertools.imap(newsegment, six.moves.range(idaapi.get_segm_qty()))
     for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
         iterable = builtins.list(__matcher__.match(key, value, iterable))
@@ -78,8 +82,9 @@ def list(string):
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all of the segments in the database that match the keyword specified by `type`.'''
-    listable = []
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
+
+    listable = []
 
     # Set some reasonable defaults
     maxindex = maxaddr = maxsize = maxname = 0
@@ -87,7 +92,7 @@ def list(**type):
     # First pass through our segments to grab lengths of displayed fields
     for seg in __iterate__(**type):
         maxindex = max(seg.index, maxindex)
-        maxaddr = max(seg.endEA, maxaddr)
+        maxaddr = max(interface.range.end(seg), maxaddr)
         maxsize = max(seg.size(), maxsize)
         maxname = max(len(get_segment_name(seg)), maxname)
 
@@ -100,8 +105,8 @@ def list(**type):
 
     # List all the fields for each segment that we've aggregated
     for seg in listable:
-        comment, _ = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1), ui.navigation.set(seg.startEA)
-        six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), seg.startEA, 2+int(caddr), seg.endEA, 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
+        comment, _ = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1), ui.navigation.set(interface.range.start(seg))
+        six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), interface.range.start(seg), 2+int(caddr), interface.range.end(seg), 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
     return
 
 ## searching
@@ -154,10 +159,10 @@ def by(**type):
 
     listable = builtins.list(__iterate__(**type))
     if len(listable) > 1:
-        maxaddr = max(builtins.map(operator.attrgetter('endEA'), listable) or [1])
+        maxaddr = max(builtins.map(interface.range.end, listable) or [1])
         caddr = math.ceil(math.log(maxaddr)/math.log(16))
-        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, seg.startEA, int(caddr), seg.endEA, int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
-        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, listable[0].startEA, int(caddr), listable[0].endEA, int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
+        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), int(caddr), interface.range.end(seg), int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
+        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), int(caddr), interface.range.end(listable[0]), int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
 
     res = six.next(iter(listable), None)
     if res is None:
@@ -182,12 +187,12 @@ def bounds():
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.bounds() : Unable to locate the current segment.".format(__name__))
-    return seg.startEA, seg.endEA
+    return interface.range.bounds(seg)
 @utils.multicase()
 def bounds(segment):
     '''Return the bounds of the segment specified by `segment`.'''
     seg = by(segment)
-    return seg.startEA, seg.endEA
+    return interface.range.bounds(seg)
 range = utils.alias(bounds)
 
 @utils.multicase()
@@ -205,7 +210,7 @@ def iterate(segment):
 @utils.multicase(segment=idaapi.segment_t)
 def iterate(segment):
     '''Iterate through all of the addresses within the ``idaapi.segment_t`` represented by `segment`.'''
-    for ea in database.address.iterate(segment.startEA, segment.endEA):
+    for ea in database.address.iterate(interface.range.start(segment), inteface.address.right(segment)):
         yield ea
     return
 
@@ -215,12 +220,12 @@ def size():
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.size() : Unable to locate the current segment.".format(__name__))
-    return seg.endEA - seg.startEA
+    return interface.address.size(seg)
 @utils.multicase()
 def size(segment):
     '''Return the size of the segment specified by `segment`.'''
     seg = by(segment)
-    return seg.endEA - seg.startEA
+    return interface.address.size(seg)
 
 @utils.multicase()
 def offset():
@@ -234,7 +239,7 @@ def offset(ea):
 def offset(segment, ea):
     '''Return the offset of the address `ea` from the beginning of `segment`.'''
     seg = by(segment)
-    return ea - segment.startEA
+    return ea - interface.range.start(seg)
 
 @utils.multicase(offset=six.integer_types)
 def go_offset(offset):
@@ -244,7 +249,7 @@ def go_offset(offset):
 def go_offset(segment, offset):
     '''Go to the `offset` of the specified `segment`.'''
     seg = by(segment)
-    return database.go(seg.startEA + offset)
+    return database.go(offset + interface.range.start(seg))
 goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
 
 @utils.multicase()
@@ -252,17 +257,17 @@ def read():
     '''Return the contents of the current segment.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
 
-    segment = ui.current.segment()
-    if segment is None:
+    seg = ui.current.segment()
+    if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.read() : Unable to locate the current segment.".format(__name__))
-    return get_bytes(segment.startEA, segment.endEA - segment.startEA)
+    return get_bytes(interface.range.start(seg), interface.address.size(seg))
 @utils.multicase()
 def read(segment):
     '''Return the contents of the segment identified by `segment`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
 
     seg = by(segment)
-    return get_bytes(seg.startEA, seg.endEA - seg.startEA)
+    return get_bytes(interface.range.start(seg), interface.address.size(seg))
 string = utils.alias(read)
 
 @utils.multicase()
@@ -275,22 +280,23 @@ def repr():
 @utils.multicase()
 def repr(segment):
     '''Return the specified `segment` in a printable form.'''
-    seg = by(segment)
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
-    return "{:s} {:s} {:#x}-{:#x} ({:+#x})".format(object.__repr__(seg), get_segment_name(seg), seg.startEA, seg.endEA, seg.endEA - seg.startEA)
+
+    seg = by(segment)
+    return "{:s} {:s} {:#x}-{:#x} ({:+#x})".format(object.__repr__(seg), get_segment_name(seg), interface.range.start(seg), interface.range.end(seg), interface.address.size(seg))
 
 @utils.multicase()
 def top():
     '''Return the top address of the current segment.'''
-    segment = ui.current.segment()
-    if segment is None:
+    seg = ui.current.segment()
+    if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.top() : Unable to locate the current segment.".format(__name__))
-    return segment.startEA
+    return interface.range.start(seg)
 @utils.multicase()
 def top(segment):
     '''Return the top address of the segment identified by `segment`.'''
     seg = by(segment)
-    return seg.startEA
+    return interface.range.start(seg)
 
 @utils.multicase()
 def bottom():
@@ -298,27 +304,29 @@ def bottom():
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.bottom() : Unable to locate the current segment.".format(__name__))
-    return seg.endEA
+    return interface.range.end(seg)
 @utils.multicase()
 def bottom(segment):
     '''Return the bottom address of the segment identified by `segment`.'''
     seg = by(segment)
-    return seg.endEA
+    return interface.range.end(seg)
 
 @utils.multicase()
 def name():
     '''Return the name of the current segment.'''
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
+
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.name() : Unable to locate the current segment.".format(__name__))
-    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
     res = get_segment_name(seg)
     return utils.string.of(res)
 @utils.multicase()
 def name(segment):
     '''Return the name of the segment identified by `segment`.'''
-    seg = by(segment)
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
+
+    seg = by(segment)
     res = get_segment_name(seg)
     return utils.string.of(res)
 
@@ -361,7 +369,7 @@ def within():
 @utils.multicase(ea=six.integer_types)
 def within(ea):
     '''Returns true if the address `ea` is within any segment.'''
-    return any(segment.startEA <= ea < segment.endEA for segment in __iterate__())
+    return any(interface.range.within(ea, seg) for seg in __iterate__())
 
 @utils.multicase(ea=six.integer_types)
 def contains(ea):
@@ -381,7 +389,7 @@ def contains(name, ea):
 @utils.multicase(segment=idaapi.segment_t, ea=six.integer_types)
 def contains(segment, ea):
     '''Returns true if the address `ea` is contained within the ``idaapi.segment_t`` specified by `segment`.'''
-    return segment.startEA <= ea < segment.endEA
+    return interface.range.within(ea, segment)
 
 ## functions
 # shamefully ripped from idc.py
@@ -497,10 +505,17 @@ def new(offset, size, name, **kwds):
         sel = idaapi.find_free_selector()
         idaapi.set_selector(sel, 1)
 
-    # populate the segment_t using code ripped from the idc module
-    seg = idaapi.segment_t()
-    seg.startEA = offset
-    seg.endEA = offset+size
+    # populate the segment_t for versions of IDA prior to 7.0
+    if idaapi.__version__ < 7.0:
+        seg = idaapi.segment_t()
+        seg.startEA, seg.endEA = offset, offset + size
+
+    # now for versions of IDA 7.0 and newer
+    else:
+        seg = idaapi.segment_t()
+        seg.start_ea, seg.end_ea = offset, offset + size
+
+    # assign the rest of the necessary attributes
     seg.sel = sel
     seg.bitness = {16:0,32:1,64:2}[bits]
     seg.comb = kwds.get('comb', idaapi.scPub)       # public
@@ -532,7 +547,7 @@ def remove(segment, contents=False):
         logging.warn(u"{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
 
     # remove the actual segment using the address in the segment_t
-    res = idaapi.del_segm(segment.startEA, idaapi.SEGMOD_KILL if contents else idaapi.SEGMOD_KEEP)
+    res = idaapi.del_segm(interface.range.start(segment), idaapi.SEGMOD_KILL if contents else idaapi.SEGMOD_KEEP)
     if res == 0:
         logging.warn(u"{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
     return res
@@ -545,7 +560,7 @@ def save(filename, segment, offset=0):
     If the int `offset` is specified, then begin writing into the file at the specified offset.
     """
     if isinstance(segment, idaapi.segment_t):
-        return __save_file(utils.string.to(filename), segment.startEA, size(segment), offset)
+        return __save_file(utils.string.to(filename), interface.range.start(segment), size(segment), offset)
     return save(filename, by(segment))
 export = utils.alias(save)
 
