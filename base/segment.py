@@ -250,15 +250,19 @@ goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
 @utils.multicase()
 def read():
     '''Return the contents of the current segment.'''
+    get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
+
     segment = ui.current.segment()
     if segment is None:
         raise E.SegmentNotFoundError(u"{:s}.read() : Unable to locate the current segment.".format(__name__))
-    return idaapi.get_many_bytes(segment.startEA, segment.endEA-segment.startEA)
+    return get_bytes(segment.startEA, segment.endEA - segment.startEA)
 @utils.multicase()
 def read(segment):
     '''Return the contents of the segment identified by `segment`.'''
+    get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
+
     seg = by(segment)
-    return idaapi.get_many_bytes(seg.startEA, seg.endEA-seg.startEA)
+    return get_bytes(seg.startEA, seg.endEA - seg.startEA)
 string = utils.alias(read)
 
 @utils.multicase()
