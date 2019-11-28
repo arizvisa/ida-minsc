@@ -85,25 +85,26 @@ class netnode(object):
 
     # now to fix up the version skew as a result of IDA 7.0
     if idaapi.__version__ < 7.0:
-        sup1st = _ida_netnode.netnode_sup1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_supfirst
-        supnxt = _ida_netnode.netnode_supnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_supnext
-        hashnxt = _ida_netnode.netnode_hashnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_hashnext
-        hash1st = _ida_netnode.netnode_hash1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_hashfirst
-        char1st = _ida_netnode.netnode_char1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_charfirst
-        charnxt = _ida_netnode.netnode_charnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_charnext
-        name = _ida_netnode.netnode_name if idaapi.__version__ < 7.0 else _ida_netnode.netnode_get_name
-        alt1st = _ida_netnode.netnode_alt1st if idaapi.__version__ < 7.0 else _ida_netnode.netnode_altfirst
-        altnxt = _ida_netnode.netnode_altnxt if idaapi.__version__ < 7.0 else _ida_netnode.netnode_altnext
+        supfirst = _ida_netnode.netnode_sup1st
+        supnext = _ida_netnode.netnode_supnxt
+        hashnext = _ida_netnode.netnode_hashnxt
+        hashfirst = _ida_netnode.netnode_hash1st
+        charfirst = _ida_netnode.netnode_char1st
+        charnext = _ida_netnode.netnode_charnxt
+        name = _ida_netnode.netnode_name
+        altfirst = _ida_netnode.netnode_alt1st
+        altnext = _ida_netnode.netnode_altnxt
+
     else:   # >= 7.0
-        sup1st = _ida_netnode.netnode_supfirst
-        supnxt = _ida_netnode.netnode_supnext
-        hashnxt = _ida_netnode.netnode_hashnext
-        hash1st = _ida_netnode.netnode_hashfirst
-        char1st = _ida_netnode.netnode_charfirst
-        charnxt = _ida_netnode.netnode_charnext
+        supfirst = _ida_netnode.netnode_supfirst
+        supnext = _ida_netnode.netnode_supnext
+        hashnext = _ida_netnode.netnode_hashnext
+        hashfirst = _ida_netnode.netnode_hashfirst
+        charfirst = _ida_netnode.netnode_charfirst
+        charnext = _ida_netnode.netnode_charnext
         name = _ida_netnode.netnode_get_name
-        alt1st = _ida_netnode.netnode_altfirst
-        altnxt = _ida_netnode.netnode_altnext
+        altfirst = _ida_netnode.netnode_altfirst
+        altnext = _ida_netnode.netnode_altnext
 
 class utils(object):
     @classmethod
@@ -189,45 +190,45 @@ class utils(object):
 
     @classmethod
     def falt(cls, node):
-        for res in cls.valfiter(node, netnode.alt1st, netnode.altlast, netnode.altnxt, netnode.altval):
+        for res in cls.valfiter(node, netnode.altfirst, netnode.altlast, netnode.altnext, netnode.altval):
             yield res
         return
     @classmethod
     def ralt(cls, node):
-        for res in cls.valriter(node, netnode.alt1st, netnode.altprev, netnode.altnxt, netnode.altval):
+        for res in cls.valriter(node, netnode.altfirst, netnode.altprev, netnode.altnext, netnode.altval):
             yield res
         return
 
     @classmethod
     def fsup(cls, node):
-        for res in cls.valfiter(node, netnode.sup1st, netnode.suplast, netnode.supnxt, netnode.supval):
+        for res in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, netnode.supval):
             yield res
         return
     @classmethod
     def rsup(cls, node):
-        for res in cls.valriter(node, netnode.sup1st, netnode.supprev, netnode.supnxt, netnode.supval):
+        for res in cls.valriter(node, netnode.supfirst, netnode.supprev, netnode.supnext, netnode.supval):
             yield res
         return
 
     @classmethod
     def fhash(cls, node):
-        for res in cls.hfiter(node, netnode.hash1st, netnode.hashlast, netnode.hashnxt, netnode.hashval):
+        for res in cls.hfiter(node, netnode.hashfirst, netnode.hashlast, netnode.hashnext, netnode.hashval):
             yield res
         return
     @classmethod
     def rhash(cls, node):
-        for res in cls.hriter(node, netnode.hash1st, netnode.hashprev, netnode.hashnxt, netnode.hashval):
+        for res in cls.hriter(node, netnode.hashfirst, netnode.hashprev, netnode.hashnext, netnode.hashval):
             yield res
         return
 
     @classmethod
     def fchar(cls, node):
-        for res in cls.valfiter(node, netnode.char1st, netnode.charlast, netnode.charnxt, netnode.charval):
+        for res in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, netnode.charval):
             yield res
         return
     @classmethod
     def rchar(cls, node):
-        for res in cls.valriter(node, netnode.char1st, netnode.charprev, netnode.charnxt, netnode.charval):
+        for res in cls.valriter(node, netnode.charfirst, netnode.charprev, netnode.charnext, netnode.charval):
             yield res
         return
 
