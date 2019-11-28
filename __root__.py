@@ -44,6 +44,10 @@ if idaapi.__version__ <= 6.9:
 if idaapi.__version__ >= 6.95:
     import ida_idaapi, ida_kernwin, ida_diskio
 
+## IDA 7.4 requires that this module exists in the global namespace
+if idaapi.__version__ >= 7.4:
+    import sys
+
 ### customize the root namespace
 import functools, operator, itertools, types
 from six.moves import builtins
