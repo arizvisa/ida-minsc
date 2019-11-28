@@ -247,7 +247,7 @@ def prototype(func):
 @utils.multicase()
 def bounds():
     '''Return a tuple containing the bounds of the first chunk of the current function.'''
-    return range(ui.current.function())
+    return bounds(ui.current.function())
 @utils.multicase()
 def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function `func`.'''
@@ -255,7 +255,7 @@ def bounds(func):
         fn = by(func)
     except E.ItemNotFoundError:
         raise E.FunctionNotFoundError(u"{:s}.bounds({!r}) : Unable to find function at the given location.".format(__name__, func))
-    return fn.startEA, fn.endEA
+    return interface.range.bounds(fn)
 range = utils.alias(bounds)
 
 @utils.multicase()
@@ -293,12 +293,12 @@ def address():
         res = ui.current.function()
     except E.ItemNotFoundError:
         raise E.FunctionNotFoundError(u"{:s}.address({:#x}) : Unable to locate the current function.".format(__name__, ui.current.address()))
-    return res.startEA
+    return interface.range.start(res)
 @utils.multicase()
 def address(func):
     '''Return the entry-point of the function identified by `func`.'''
     res = by(func)
-    return res.startEA
+    return interface.range.start(res)
 top = addr = utils.alias(address)
 
 @utils.multicase()
@@ -317,7 +317,7 @@ def bottom(func):
         interface.fc_block_type_t.fcb_enoret,
         interface.fc_block_type_t.fcb_error
     )
-    return tuple(database.address.prev(item.endEA) for item in fc if item.type in exit_types)
+    return tuple(database.address.prev(interface.range.end(item)) for item in fc if item.type in exit_types)
 
 @utils.multicase()
 def marks():
@@ -329,7 +329,7 @@ def marks(func):
     fn, res = by(func), []
     for ea, comment in database.marks():
         try:
-            if address(ea) == fn.startEA:
+            if address(ea) == interface.range.start(fn):
                 res.append((ea, comment))
         except E.FunctionNotFoundError:
             pass
@@ -362,7 +362,8 @@ def remove():
 def remove(func):
     '''Remove the definition of the function `func` from the database.'''
     fn = by(func)
-    return idaapi.del_func(fn.startEA)
+    ea = interface.range.start(fn)
+    return idaapi.del_func(ea)
 
 ## chunks
 class chunks(object):
@@ -385,13 +386,13 @@ class chunks(object):
     def __new__(cls, func):
         '''Yield the bounds of each chunk for the function `func`.'''
         fn = by(func)
-        fci = idaapi.func_tail_iterator_t(fn, fn.startEA)
+        fci = idaapi.func_tail_iterator_t(fn, interface.range.start(fn))
         if not fci.main():
-            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `idaapi.func_tail_iterator_t`.".format(__name__, fn.startEA))
+            raise E.DisassemblerError(u"{:s}.chunks({:#x}) : Unable to create an `idaapi.func_tail_iterator_t`.".format(__name__, interface.range.start(fn)))
 
         while True:
             ch = fci.chunk()
-            yield interface.bounds_t(ch.startEA, ch.endEA)
+            yield interface.range.bounds(ch)
             if not fci.next(): break
         return
 
@@ -430,7 +431,7 @@ class chunks(object):
             if left <= ea < right:
                 return interface.bounds_t(left, right)
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
@@ -639,7 +640,7 @@ class blocks(object):
     def __new__(cls, func):
         '''Returns the bounds of each basic block for the function `func`.'''
         for bb in cls.iterate(func):
-            yield interface.bounds_t(bb.startEA, bb.endEA)
+            yield interface.range.bounds(bb)
         return
     @utils.multicase()
     def __new__(cls, left, right):
@@ -647,8 +648,8 @@ class blocks(object):
         fn = by_address(left)
         (left, _), (_, right) = block(left), block(database.address.prev(right))
         for bb in cls.iterate(fn):
-            if (bb.startEA >= left and bb.endEA <= right):
-                yield interface.bounds_t(bb.startEA, bb.endEA)
+            if (interface.range.start(bb) >= left and interface.range.end(bb) <= right):
+                yield interface.range.bounds(bb)
             continue
         return
 
@@ -684,10 +685,10 @@ class blocks(object):
         '''Return the ``idaapi.BasicBlock`` in function `func` at address `ea`.'''
         fn = by(func)
         for bb in blocks.iterate(fn):
-            if bb.startEA <= ea < bb.endEA:
+            if interface.range.contains(ea, bb):
                 return bb
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, ea, ea, fn.startEA))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
     @utils.multicase()
     @classmethod
@@ -714,26 +715,27 @@ class blocks(object):
         Requires the ``networkx`` module in order to build the graph.
         """
         fn = by(func)
+        ea = interface.range.start(fn)
 
         # create digraph
         import networkx
-        attrs = tag(fn.startEA)
-        attrs.setdefault('__name__', database.name(fn.startEA))
-        attrs.setdefault('__address__', fn.startEA)
+        attrs = tag(ea)
+        attrs.setdefault('__name__', database.name(ea))
+        attrs.setdefault('__address__', ea)
         attrs.setdefault('__frame__', frame(fn))
-        res = networkx.DiGraph(name=name(fn.startEA), **attrs)
+        res = networkx.DiGraph(name=name(ea), **attrs)
 
         # create entry node
-        attrs = database.tag(fn.startEA)
-        operator.setitem(attrs, '__name__', name(fn.startEA))
-        operator.setitem(attrs, '__address__', fn.startEA)
-        operator.setitem(attrs, '__bounds__', block(fn.startEA))
-        block.color(fn.startEA) and operator.setitem(attrs, '__color__', block.color(fn.startEA))
-        res.add_node(fn.startEA, attrs)
+        attrs = database.tag(ea)
+        operator.setitem(attrs, '__name__', name(ea))
+        operator.setitem(attrs, '__address__', ea)
+        operator.setitem(attrs, '__bounds__', block(ea))
+        block.color(ea) and operator.setitem(attrs, '__color__', block.color(ea))
+        res.add_node(ea, attrs)
 
         # create a graph node for each basicblock
         for b, e in cls(fn):
-            if b == fn.startEA: continue
+            if b == ea: continue
             attrs = database.tag(b)
             operator.setitem(attrs, '__name__', database.name(b))
             operator.setitem(attrs, '__address__', b)
@@ -747,15 +749,15 @@ class blocks(object):
             for p in b.preds():
                 # FIXME: figure out more attributes to add
                 attrs = {}
-                operator.setitem(attrs, '__contiguous__', b.startEA == p.endEA)
-                res.add_edge(p.startEA, b.startEA, attrs)
+                operator.setitem(attrs, '__contiguous__', interface.range.start(b) == interface.range.end(p))
+                res.add_edge(interface.range.start(p), interface.range.start(b), attrs)
 
             # ...add an edge to its successors
             for s in b.succs():
                 # FIXME: figure out more attributes to add
                 attrs = {}
-                operator.setitem(attrs, '__contiguous__', b.endEA == s.startEA)
-                res.add_edge(b.startEA, s.startEA, attrs)
+                operator.setitem(attrs, '__contiguous__', interface.range.end(b) == interface.range.start(s))
+                res.add_edge(interface.range.start(b), interface.range.start(s), attrs)
             continue
         return res
     graph = utils.alias(digraph, 'blocks')
@@ -851,11 +853,11 @@ class block(object):
     def __new__(cls, func, ea):
         '''Returns the boundaries of the basic block at address `ea` in function `func`.'''
         res = blocks.at(func, ea)
-        return interface.bounds_t(res.startEA, res.endEA)
+        return interface.range.bounds(res)
     @utils.multicase(bb=idaapi.BasicBlock)
     def __new__(cls, bb):
         '''Returns the boundaries of the basic block `bb`.'''
-        return interface.bounds_t(bb.startEA, bb.endEA)
+        return interface.range.bounds(bb)
     @utils.multicase(bounds=types.TupleType)
     def __new__(cls, bounds):
         '''Return the boundaries of the basic block identified by `bounds`.'''
@@ -934,8 +936,8 @@ class block(object):
         '''Returns the color of the basic block `bb`.'''
         get_node_info = idaapi.get_node_info2 if idaapi.__version__ < 7.0 else idaapi.get_node_info
 
-        fn, ni = by_address(bb.startEA), idaapi.node_info_t()
-        ok = get_node_info(ni, fn.startEA, bb.id)
+        fn, ni = by_address(interface.range.start(bb)), idaapi.node_info_t()
+        ok = get_node_info(ni, interface.range.start(fn), bb.id)
         if ok and ni.valid_bg_color():
             res = ni.bg_color
             b, r = (res&0xff0000)>>16, res&0x0000ff
@@ -954,7 +956,7 @@ class block(object):
         clr_node_info = idaapi.clr_node_info2 if idaapi.__version__ < 7.0 else idaapi.clr_node_info
 
         res, fn, bb = cls.color(ea), by_address(ea), cls.id(ea)
-        try: clr_node_info(fn.startEA, bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+        try: clr_node_info(interface.range.start(fn), bb, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
         finally: idaapi.refresh_idaview_anyway()
 
         # clear the color of each item too.
@@ -974,8 +976,8 @@ class block(object):
         '''Removes the color of the basic block `bb`.'''
         clr_node_info = idaapi.clr_node_info2 if idaapi.__version__ < 7.0 else idaapi.clr_node_info
 
-        res, fn = cls.color(bb), by_address(bb.startEA)
-        try: clr_node_info(fn.startEA, bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
+        res, fn = cls.color(bb), by_address(interface.range.start(bb))
+        try: clr_node_info(interface.range.start(fn), bb.id, idaapi.NIF_BG_COLOR | idaapi.NIF_FRAME_COLOR)
         finally: idaapi.refresh_idaview_anyway()
 
         # clear the color of each item too.
@@ -1006,7 +1008,7 @@ class block(object):
 
         # set the node
         f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: set_node_info(fn.startEA, bb, ni, f)
+        try: set_node_info(interface.range.start(fn), bb, ni, f)
         finally: idaapi.refresh_idaview_anyway()
 
         # update the color of each item too
@@ -1019,7 +1021,7 @@ class block(object):
     def color(cls, bb, rgb, **frame):
         '''Sets the color of the basic block `bb` to `rgb`.'''
         set_node_info = idaapi.set_node_info2 if idaapi.__version__ < 7.0 else idaapi.set_node_info
-        res, fn, ni = cls.color(bb), by_address(bb.startEA), idaapi.node_info_t()
+        res, fn, ni = cls.color(bb), by_address(interface.range.start(bb)), idaapi.node_info_t()
 
         # specify the bg color
         r, b = (rgb&0xff0000) >> 16, rgb&0x0000ff
@@ -1032,7 +1034,7 @@ class block(object):
 
         # set the node
         f = (idaapi.NIF_BG_COLOR|idaapi.NIF_FRAME_COLOR) if frame else idaapi.NIF_BG_COLOR
-        try: set_node_info(fn.startEA, bb.id, ni, f)
+        try: set_node_info(interface.range.start(fn), bb.id, ni, f)
         finally: idaapi.refresh_idaview_anyway()
 
         # update the colors of each item too.
@@ -1068,7 +1070,7 @@ class block(object):
     @classmethod
     def before(cls, bb):
         '''Return the addresses of all the instructions that branch to the basic block `bb`.'''
-        return [database.address.prev(bb.endEA) for bb in bb.preds()]
+        return [database.address.prev(interface.range.start(bb)) for bb in bb.preds()]
     predecessors = preds = utils.alias(before, 'block')
 
     @utils.multicase()
@@ -1092,7 +1094,7 @@ class block(object):
     @classmethod
     def after(cls, bb):
         '''Return the addresses of all the instructions that branch to the basic block `bb`.'''
-        return [bb.startEA for bb in bb.succs()]
+        return [interface.range.start(bb) for bb in bb.succs()]
     successors = succs = utils.alias(after, 'block')
 
     @utils.multicase()
@@ -1116,7 +1118,7 @@ class block(object):
     @classmethod
     def iterate(cls, bb):
         '''Yield all the addresses in the basic block `bb`.'''
-        left, right = bb.startEA, bb.endEA
+        left, right = interface.range.unpack(bb)
         return database.address.iterate(left, right)
 
     @utils.multicase(reg=(basestring, interface.register_t))
@@ -1249,10 +1251,10 @@ class frame(object):
     def __new__(cls, func):
         '''Return the frame of the function `func`.'''
         fn = by(func)
-        res = idaapi.get_frame(fn.startEA)
+        res = idaapi.get_frame(interface.range.start(fn))
         if res is not None:
             return structure.by_identifier(res.id, offset=-fn.frsize)
-        raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
+        raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
 
     @utils.multicase()
     @classmethod
@@ -1282,7 +1284,7 @@ class frame(object):
         _r = database.config.bits() / 8
         ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join((__name__, cls.__name__)), fn.startEA, lvars, regs - _r, args, fn.startEA, lvars, regs - _r, args))
+            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), lvars, regs - _r, args, interface.range.start(fn), lvars, regs - _r, args))
         return cls(fn)
 
     @utils.multicase()
@@ -1366,11 +1368,11 @@ class frame(object):
             # grab from structure
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), fn.startEA))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), fn.startEA, cc))
+                logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), cc))
 
             base = frame.lvars.size(fn) + frame.regs.size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
@@ -1497,7 +1499,8 @@ def tag(func):
 
     # add the function's name to the result
     fname = name(fn)
-    if fname and database.type.flags(fn.startEA, idaapi.FF_NAME): res.setdefault('__name__', fname)
+    if fname and database.type.flags(interface.range.start(fn), idaapi.FF_NAME):
+        res.setdefault('__name__', fname)
 
     # ..and now hand it off.
     return res
@@ -1535,7 +1538,7 @@ def tag(func, key, value):
 
     # if we weren't able to find a key in the dict, then one was added and we need to update its reference
     if res is None:
-        internal.comment.globals.inc(fn.startEA, key)
+        internal.comment.globals.inc(interface.range.start(fn), key)
 
     # return what we fetched from the dict
     return res
@@ -1574,12 +1577,12 @@ def tag(func, key, none):
     # decode the comment, remove the key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
     if key not in state:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, fn.startEA, key, none, utils.string.escape(key, '"')))
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
     comment(fn, internal.comment.encode(state), repeatable=True)
 
     # if we got here without raising an exception, then the tag was stored so update the cache
-    internal.comment.globals.dec(fn.startEA, key)
+    internal.comment.globals.dec(interface.range.start(fn), key)
     return res
 
 @utils.multicase()
@@ -1589,7 +1592,8 @@ def tags():
 @utils.multicase()
 def tags(func):
     '''Returns all the content tags for the function `func`.'''
-    ea = by(func).startEA
+    fn = by(func)
+    ea = interface.range.start(fn)
     return internal.comment.contents.name(ea)
 
 # FIXME: consolidate this logic into the utils module
@@ -1634,7 +1638,7 @@ def select(func, **boolean):
 
     # nothing specific was queried, so just yield each tag
     if not boolean:
-        for ea in internal.comment.contents.address(fn.startEA):
+        for ea in internal.comment.contents.address(interface.range.start(fn)):
             ui.navigation.analyze(ea)
             res = database.tag(ea)
             if res: yield ea, res
@@ -1644,7 +1648,7 @@ def select(func, **boolean):
     Or, And = (set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
 
     # walk through every tagged address and cross-check it against query
-    for ea in internal.comment.contents.address(fn.startEA):
+    for ea in internal.comment.contents.address(interface.range.start(fn)):
         ui.navigation.analyze(ea)
         res, d = {}, database.tag(ea)
 
@@ -1674,11 +1678,11 @@ def down(func):
         for ea in iterate(fn):
             if len(database.down(ea)) == 0:
                 if database.type.is_code(ea) and instruction.type.is_call(ea):
-                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, fn.startEA, utils.string.escape(database.disassemble(ea), '"')))
+                    logging.info(u"{:s}.down({:#x}) : Discovered a dynamically resolved call that is unable to be resolved. The instruction is \"{:s}\".".format(__name__, interface.range.start(fn), utils.string.escape(database.disassemble(ea), '"')))
                     #code.append((ea, 0))
                 continue
             data.extend( (ea, x) for x in database.xref.data_down(ea) )
-            code.extend( (ea, x) for x in database.xref.code_down(ea) if fn.startEA == x or not contains(fn, x) )
+            code.extend( (ea, x) for x in database.xref.code_down(ea) if interface.range.start(fn) == x or not contains(fn, x) )
         return data, code
     fn = by(func)
     return sorted({d for _, d in codeRefs(fn)[1]})
