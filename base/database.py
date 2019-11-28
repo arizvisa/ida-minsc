@@ -1949,7 +1949,7 @@ class address(object):
             nextea = cls.next(ea)
 
             ## XXX: it seems that idaapi.is_basic_block_end requires the following to be called
-            # idaapi.decode_insn(ea)
+            # idaapi.decode_insn(insn, ea)
             ## XXX: for some reason is_basic_block_end will occasionally include some stray 'call' instructions
             # if idaapi.is_basic_block_end(ea):
             #     yield block, nextea
@@ -4198,7 +4198,10 @@ class set(object):
     @classmethod
     def code(cls, ea):
         '''Set the data at address `ea` to code.'''
-        return idaapi.create_insn(ea)
+        if idaapi.__version__ < 7.0:
+            return idaapi.create_insn(ea)
+        res = idaapi.insn_t()
+        return idaapi.create_insn(res, ea)
 
     @utils.multicase(size=six.integer_types)
     @classmethod
