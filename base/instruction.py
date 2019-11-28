@@ -88,7 +88,7 @@ class __optype__(object):
     @classmethod
     def size(cls, op, processor=None):
         '''Return the size of the operand identified by `op` for the specified `processor`.'''
-        get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+        get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
         return get_dtype_size(op.dtyp)
 
 ## general functions
@@ -222,7 +222,7 @@ def ops_size():
 @utils.multicase(ea=six.integer_types)
 def ops_size(ea):
     '''Returns a tuple with all the sizes of each operand for the instruction at the address `ea`.'''
-    get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+    get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
     ea = interface.address.inside(ea)
     f = utils.fcompose(functools.partial(operand, ea), operator.attrgetter('dtyp'), get_dtype_size, int)
@@ -345,7 +345,7 @@ def op_size(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_size(ea, opnum):
     '''Returns the size for the operand `opnum` belonging to the instruction at the address `ea`.'''
-    get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+    get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
     res = operand(ea, opnum)
     return 0 if res.type == idaapi.o_void else get_dtype_size(res.dtyp)
@@ -1008,9 +1008,9 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
     def immediate(ea, op):
         '''Operand type decoder for ``idaapi.o_imm`` which returns an integer.'''
-        if op.type in {idaapi.o_imm, idaapi.o_phrase}:
-            get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+        get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
+        if op.type in {idaapi.o_imm, idaapi.o_phrase}:
             bits = 8 * get_dtype_size(op.dtyp)
 
             # figure out the sign flag
@@ -1157,14 +1157,15 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
         '''Operand type decoder for returning a memory referece on ARM.'''
-        get_dtype_size = idaapi.get_dtype_size if hasattr(idaapi, 'get_dtype_size') else idaapi.get_dtyp_size
+        get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
+        get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
 
         # get the address and the operand size
         addr, size = op.addr, get_dtype_size(op.dtyp)
         maxval = 1<<size*8
 
         # dereference the address and return its integer.
-        res = idaapi.get_many_bytes(addr, size) or ''
+        res = get_bytes(addr, size) or ''
         res = reversed(res) if database.config.byteorder() == 'little' else iter(res)
         res = reduce(lambda agg, n: (agg*0x100)|n, six.iterbytes(res), 0)
         sf = bool(res & maxval>>1)
