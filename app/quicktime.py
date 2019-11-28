@@ -7,40 +7,40 @@ import function,database
 import app
 
 def nextMnemonic(ea, mnem, maxaddr=0xc0*0x1000000):
-    res = idc.GetMnem(ea)
+    res = idc.print_insn_mnem(ea)
     if res == "": return idc.BADADDR
     if res == mnem: return ea
-    return nextMnemonic( idc.NextHead(ea, maxaddr), mnem, maxaddr )
+    return nextMnemonic( idc.next_head(ea, maxaddr), mnem, maxaddr )
 
 def prevMnemonic(ea, mnem, minaddr=0):
-    res = idc.GetMnem(ea)
+    res = idc.print_insn_mnem(ea)
     #print "%x -> %s"% (ea, res)
     if res == "": return idc.BADADDR
     if res == mnem: return ea
-    return prevMnemonic( idc.PrevHead(ea, minaddr), mnem, minaddr )
+    return prevMnemonic( idc.prev_head(ea, minaddr), mnem, minaddr )
 
 def getMinorDispatchTableAddress(ea):
     """find address of last lea in function"""
-    start = idc.GetFunctionAttr(ea, idc.FUNCATTR_START)
-    end = idc.PrevHead( idc.GetFunctionAttr(ea, idc.FUNCATTR_END), start)
+    start = idc.get_func_attr(ea, idc.FUNCATTR_START)
+    end = idc.prev_head( idc.get_func_attr(ea, idc.FUNCATTR_END), start)
     res = prevMnemonic(end, 'lea', start)
     assert res != idc.BADADDR
-    return idc.GetOperandValue(res, 1)
+    return idc.get_operand_value(res, 1)
 
 def getMajorDispatchTableAddress():
     """find quicktime major dispatch table"""
-    res = idc.LocByName('theQuickTimeDispatcher')
-    res = nextMnemonic(res, 'lea', idc.GetFunctionAttr(res, idc.FUNCATTR_END))
+    res = idc.get_name_ea_simple('theQuickTimeDispatcher')
+    res = nextMnemonic(res, 'lea', idc.get_func_attr(res, idc.FUNCATTR_END))
     assert res != idc.BADADDR
-    return idc.GetOperandValue(res, 1)
+    return idc.get_operand_value(res, 1)
 
 def resolveDispatcher(code):
     major = (code & 0x00ff0000) >> 0x10
     minor = code & 0xff00ffff
 
     res = getMajorDispatchTableAddress() + major*8
-    majorFlag = idc.Dword(res)
-    majorAddress = idc.Dword(res+4)
+    majorFlag = idc.get_wide_dword(res)
+    majorAddress = idc.get_wide_dword(res+4)
     if majorFlag != 0:
         return majorAddress + (minor*0x10)
 
@@ -50,17 +50,17 @@ def resolveDispatcher(code):
 
 def getDispatchCode(ea):
     # get dispatch code out of an instruction
-    first, second = (idc.GetOpnd(ea, 0), idc.GetOperandValue(ea, 1))
+    first, second = (idc.print_operand(ea, 0), idc.get_operand_value(ea, 1))
     if first == 'eax':
         return second
-    raise ValueError("Search resulted in address %08x, but instruction '%s' does fulfill requested constraints"% (ea, idc.GetMnem(ea)))
+    raise ValueError("Search resulted in address %08x, but instruction '%s' does fulfill requested constraints"% (ea, idc.print_insn_mnem(ea)))
 
 def FindLastAssignment(ea, register):
     start,end = database.guessrange(ea)
     while ea > start:
         ea = database.prev(ea)
-        m = idc.GetMnem(ea)
-        r = idc.GetOpnd(ea, 0)
+        m = idc.print_insn_mnem(ea)
+        r = idc.print_operand(ea, 0)
 
         if m == 'mov' and r == register:
             return ea
