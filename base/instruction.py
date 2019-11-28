@@ -103,13 +103,22 @@ def at(ea):
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
         raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
-    length = idaapi.decode_insn(ea)
-    if idaapi.__version__ < 7.0:
-        return idaapi.cmd.copy()
 
-    tmp = idaapi.insn_t()
-    tmp.assign(idaapi.cmd)
-    return tmp
+    # If we're using backwards-compatiblity mode (which means decode_insn takes
+    # different parameters, then manage the result using idaapi.cmd
+    if hasattr(idaapi, 'cmd'):
+        length = idaapi.decode_insn(ea)
+        if idaapi.__version__ < 7.0:
+            return idaapi.cmd.copy()
+
+        tmp = idaapi.insn_t()
+        tmp.assign(idaapi.cmd)
+        return tmp
+
+    # Otherwise we can just use the API as we see fit
+    res = idaapi.insn_t()
+    length = idaapi.decode_insn(res, ea)
+    return res
 
 @utils.multicase()
 def size():
@@ -153,16 +162,31 @@ def operands(ea):
     '''Returns all of the ``idaapi.op_t`` instances for the instruction at the address `ea`.'''
     insn = at(ea)
 
-    # take operands until we encounter an idaapi.o_void
-    res = itertools.takewhile(utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), insn.Operands)
+    # if we're in compatibility mode, then old-fashioned IDA requires us to copy
+    # our operands into our new types.
+    if hasattr(idaapi, 'cmd'):
 
-    # if we're using IDA < 7.0, then make copies of each instruction and return it
-    if idaapi.__version__ < 7.0:
-        return tuple(op.copy() for op in res)
+        # take operands until we encounter an idaapi.o_void
+        iterable = itertools.takewhile(utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), insn.Operands)
 
-    # otherwise, we need to make an instance of it and then assign to make a copy
-    res = ((idaapi.op_t(), op) for op in res)
-    return tuple([n.assign(op), n][1] for n, op in res)
+        # if we're using IDA < 7.0, then make copies of each instruction and return it
+        if idaapi.__version__ < 7.0:
+            return tuple(op.copy() for op in iterable)
+
+        # otherwise, we need to make an instance of it and then assign to make a copy
+        iterable = ((idaapi.op_t(), op) for op in iterable)
+        return tuple([n.assign(op), n][1] for n, op in iterable)
+
+    # apparently idaapi is not increasing a reference count for our operands, so we
+    # need to make a copy of them quickly before we access them.
+    operands = [idaapi.op_t() for index in six.moves.range(idaapi.UA_MAXOP)]
+    [ op.assign(insn.ops[index]) for index, op in enumerate(operands)]
+
+    # now we can just fetch them until idaapi.o_void
+    iterable = itertools.takewhile(utils.fcompose(operator.attrgetter('type'), functools.partial(operator.ne, idaapi.o_void)), operands)
+
+    # and return it as a tuple
+    return tuple(iterable)
 
 @utils.multicase(opnum=six.integer_types)
 def operand(opnum):
@@ -173,13 +197,21 @@ def operand(ea, opnum):
     '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn = at(ea)
 
-    # IDA < 7.0 means we can just call .copy() to duplicate it
-    if idaapi.__version__ < 7.0:
-        return insn.Operands[opnum].copy()
+    # If we're using backwards-compatiblity mode then we need to assign the
+    # operand into our op_t.
+    if hasattr(idaapi, 'cmd'):
+        # IDA < 7.0 means we can just call .copy() to duplicate it
+        if idaapi.__version__ < 7.0:
+            return insn.Operands[opnum].copy()
 
-    # Otherwise we'll need to instantiate it, and then .assign() into it
+        # Otherwise we'll need to instantiate it, and then .assign() into it
+        res = idaapi.op_t()
+        res.assign(insn.Operands[opnum])
+        return res
+
+    # Otherwise we need to make a copy of it because IDA will crash if we don't
     res = idaapi.op_t()
-    res.assign(insn.Operands[opnum])
+    res.assign(insn.ops[opnum])
     return res
 
 ## functions vs all operands of an insn
@@ -856,12 +888,6 @@ class type(object):
         '''Returns true if the instruction at `ea` is a return-type instruction.'''
         ea = interface.address.inside(ea)
         returnQ = lambda ea: feature(ea) & idaapi.CF_STOP == idaapi.CF_STOP
-
-        # Older versions of IDA required idaapi.cmd to be populated for is_ret_insn to work.
-        if hasattr(idaapi, 'is_ret_insn'):
-            idaapi.decode_insn(ea)
-            returnQ = idaapi.is_ret_insn
-
         return database.is_code(ea) and returnQ(ea)
     isReturn = returnQ = retQ = utils.alias(is_return, 'type')
 
