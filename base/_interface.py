@@ -193,8 +193,9 @@ class typemap:
     @classmethod
     def resolve(cls, pythonType):
         '''Convert the provided `pythonType` into IDA's `(flag, typeid, size)`.'''
+        struc_flag = idaapi.struflag if idaapi.__version__ < 7.0 else idaapi.stru_flag
+
         sz, count = None, 1
-        # FIXME: figure out how to fix this recursive module dependency
 
         # figure out what format pythonType is in
         if isinstance(pythonType, ().__class__):
@@ -202,17 +203,18 @@ class typemap:
             table = cls.typemap[t]
             flag, typeid = table[abs(sz) if t in {int, long, float, type} else t]
 
+        # an array, which requires us to recurse...
         elif isinstance(pythonType, [].__class__):
-            # an array, which requires us to recurse...
             res, count = pythonType
             flag, typeid, sz = cls.resolve(res)
 
+        # if it's a structure, pass it through.
+        # FIXME: figure out how to fix this recursive module dependency
         elif isinstance(pythonType, sys.modules.get('structure', __import__('structure')).structure_t):
-            # it's a structure, pass it through.
-            flag, typeid, sz = idaapi.struflag(), pythonType.id, pythonType.size
+            flag, typeid, sz = struc_flag(), pythonType.id, pythonType.size
 
+        # default size that we can lookup in the typemap table
         else:
-            # default size that we can lookup in the typemap table
             table = cls.typemap[pythonType]
             flag, typeid = table[None]
 
