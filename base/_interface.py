@@ -1178,20 +1178,21 @@ def addressOfRuntimeOrStatic(func):
         return True, func
 
     # check if we're _not_ actually within a function (mis-defined external)
-    if not function.within(fn.startEA):
+    ea = range.start(fn)
+    if not function.within(ea):
         import database
 
         # ensure that we're an import, otherwise this is definitely not misdefined
         try:
-            database.imports.at(fn.startEA)
+            database.imports.at(ea)
         except internal.exceptions.MissingTypeOrAttribute:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}.addressOfRuntimeOrStatic({#x}) : Unable to locate function by address.".format(cls.__name__, fn.startEA))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}.addressOfRuntimeOrStatic({#x}) : Unable to locate function by address.".format(cls.__name__, ea))
 
         # ok, we found a mis-defined import
         return True, func
 
     # nope, we're just a function
-    return False, fn.startEA
+    return False, ea
 
 ## internal enumerations that idapython missed
 class fc_block_type_t:
