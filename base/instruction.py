@@ -259,7 +259,7 @@ def ops_size(ea):
     get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
     ea = interface.address.inside(ea)
-    f = utils.fcompose(functools.partial(operand, ea), get_dtye_attribute, get_dtype_size, int)
+    f = utils.fcompose(functools.partial(operand, ea), get_dtype_attribute, get_dtype_size, int)
     return tuple(map(f, six.moves.range(ops_count(ea))))
 
 @utils.multicase()
@@ -1031,12 +1031,13 @@ class operand_types:
     def register(ea, op):
         '''Operand type decoder for ``idaapi.o_reg`` which returns a ``register_t``.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
+        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
 
         global architecture
-        dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         if op.type in {idaapi.o_reg}:
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
             return architecture.by_indextype(res, get_dtype_attribute(op))
+
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
         raise E.InvalidTypeOrValueError(u"{:s}.register({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join((__name__, 'operand_types')), ea, op, optype, op.type))
 
