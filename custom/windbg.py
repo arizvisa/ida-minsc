@@ -145,7 +145,7 @@ def breakpoints(f=None, **kwargs):
             commands.extend(res)
         else:
             commands.append(res)
-            
+
         # escape all of the commands since we're going to join them together
         commands = map(escape, commands)
 
