@@ -521,7 +521,7 @@ def removing_func_tail(pfn, tail):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
-            logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k)))
+            logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
