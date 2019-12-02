@@ -3111,8 +3111,9 @@ class type(object):
         @classmethod
         def element(cls, ea):
             '''Return the size of the element in the array at the address specified by `ea`.'''
-            ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
             FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+
+            ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
             return _structure.size(type.structure.id(ea)) if T == FF_STRUCT else idaapi.get_full_data_elsize(ea, F)
 
         @utils.multicase()
@@ -3171,8 +3172,9 @@ class type(object):
         @classmethod
         def id(cls, ea):
             '''Return the identifier of the structure at address `ea`.'''
-            ea = interface.address.within(ea)
             FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+
+            ea = interface.address.within(ea)
 
             res = type.flags(ea, idaapi.DT_TYPE)
             if res != FF_STRUCT:
@@ -4216,39 +4218,54 @@ class set(object):
         If `type` is not specified, then choose the correct type based on the size.
         """
 
-        # Set some constants used for IDA 7.0
-        if idaapi.__version__ >= 7.0:
-            lookup = {
-                1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWORD,
-                8 : idaapi.FF_QWORD, 16 : idaapi.FF_OWORD
-            }
+        ## Set some constants for anything older than IDA 7.0
+        if idaapi.__version__ < 7.0:
+            FF_STRUCT = idaapi.FF_STRU
 
-            FF_STRUCT = idaapi.FF_STRUCT
-            create_data, create_struct, create_align = idaapi.create_data, idaapi.create_struct, idaapi.create_align
+            # Try and fetch some attributes..if we're unable to then we use None
+            # as a placeholder so that we know that we need to use the older way
+            # that IDA applies structures or alignment
+            create_data, create_struct, create_align = idaapi.do_data_ex, getattr(idaapi, 'doStruct', None), getattr(idaapi, 'doAlign', None)
 
-        # Set some constants for anything older than IDA 7.0
-        else:
             lookup = {
                 1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWRD,
                 8 : idaapi.FF_QWRD
             }
-            FF_STRUCT = idaapi.FF_STRU
-            create_data, create_struct, create_align = idaapi.do_data_ex, getattr(idaapi, 'doStruct', None), getattr(idaapi, 'doAlign', None)
 
             # Older versions of IDA might not define FF_OWRD, so we just
             # try and add if its available. We fall back to an array anyways.
             if hasattr(idaapi, 'FF_OWRD'): lookup[16] = idaapi.FF_OWRD
 
-        # Now we can apply the type to the given address
+        ## Set some constants used for IDA 7.0 and newer
+        else:
+            FF_STRUCT = idaapi.FF_STRUCT
+            create_data, create_struct, create_align = idaapi.create_data, idaapi.create_struct, idaapi.create_align
+
+            lookup = {
+                1 : idaapi.FF_BYTE, 2 : idaapi.FF_WORD, 4 : idaapi.FF_DWORD,
+                8 : idaapi.FF_QWORD, 16 : idaapi.FF_OWORD
+            }
+
+        ## Now we can apply the type to the given address
         res = type['type'] if 'type' in type else lookup[size]
+
+        # Check if we need to use older IDA logic by checking of any of our api calls are None
         if idaapi.__version__ < 7.0 and any(f is None for f in [create_struct, create_align]):
             ok = create_data(ea, idaapi.FF_STRUCT if isinstance(res, _structure.structure_t) else res, size, res.id if isinstance(res, _structure.structure_t) else 0)
+
+        # Otherwise we can create structures normally
         elif isinstance(res, _structure.structure_t):
             ok = create_struct(ea, size, res.id)
+
+        # Or apply alignment properly...
         elif res == idaapi.FF_ALIGN and hasattr(idaapi, 'create_align'):
             ok = create_align(ea, size, 0)
+
+        # Anything else is just regular data that we can fall back to
         else:
             ok = idaapi.create_data(ea, res, size, 0)
+
+        # Return our new size if we were successful
         return idaapi.get_item_size(ea) if ok else 0
 
     @utils.multicase()
@@ -4365,9 +4382,12 @@ class set(object):
             if cb != 1:
                 raise E.DisassemblerError(u"{:s}.byte({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
 
+            # Apply our data type after undefining it
             ok = set.data(ea, 1, type=idaapi.FF_BYTE)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.byte({:#x}) : Unable to assign a byte to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+
+            # Return our new size
             return get.unsigned(ea, 1)
         uint8_t = utils.alias(byte, 'set.integer')
 
@@ -4384,9 +4404,12 @@ class set(object):
             if cb != 2:
                 raise E.DisassemblerError(u"{:s}.word({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
+            # Apply our data type after undefining it
             ok = set.data(ea, 2, type=idaapi.FF_WORD)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.word({:#x}) : Unable to assign a word to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+
+            # Return our new size
             return get.unsigned(ea, 2)
         uint16_t = utils.alias(word, 'set.integer')
 
@@ -4399,15 +4422,19 @@ class set(object):
         @classmethod
         def dword(cls, ea):
             '''Set the data at address `ea` to a double-word.'''
+            FF_DWORD = idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD
+
+            # Undefine the data at the specified address
             cb = set.unknown(ea, 4)
             if cb != 4:
                 raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
-            FF_DWORD = idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD
-
-            ok = set.data(ea, 4, type=idaapi.FF_DWORD)
+            # Apply our new data type after undefining it
+            ok = set.data(ea, 4, type=FF_DWORD)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to assign a dword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+
+            # Now we can return our new size
             return get.unsigned(ea, 4)
         uint32_t = utils.alias(word, 'set.integer')
 
@@ -4420,15 +4447,19 @@ class set(object):
         @classmethod
         def qword(cls, ea):
             '''Set the data at address `ea` to a quad-word.'''
+            FF_QWORD = idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD
+
+            # Undefine the data at the specified address
             cb = set.unknown(ea, 8)
             if cb != 8:
                 raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
-            FF_QWORD = idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD
-
+            # Apply our new data type after undefining it
             ok = set.data(ea, 8, type=FF_QWORD)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+
+            # Now we can return our new size since everything worked
             return get.unsigned(ea, 8)
         uint64_t = utils.alias(word, 'set.integer')
 
@@ -4441,15 +4472,19 @@ class set(object):
         @classmethod
         def oword(cls, ea):
             '''Set the data at address `ea` to an octal-word.'''
+            FF_OWORD = idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD
+
+            # Undefine the data at the specified address
             cb = set.unknown(ea, 16)
             if cb != 16:
                 raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
-            FF_OWORD = idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD
-
+            # Apply our new data type after undefining it
             ok = set.data(ea, 16, type=FF_OWORD)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+
+            # Now we can return our new size if we succeeded
             return get.unsigned(ea, 16)
         uint128_t = utils.alias(word, 'set.integer')
 
