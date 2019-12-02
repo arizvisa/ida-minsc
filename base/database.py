@@ -3072,11 +3072,11 @@ class type(object):
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea):
             '''Return the `[type, length]` of the array at the address specified by `ea`.'''
-            F, op, cb = type.flags(ea), idaapi.opinfo_t(), idaapi.get_item_size(ea)
+            F, ti, cb = type.flags(ea), idaapi.opinfo_t(), idaapi.get_item_size(ea)
 
             # get the opinfo at the current address to verify if there's a structure or not
-            ok = idaapi.get_opinfo(op, ea, 0, F)
-            tid = op.tid if ok else idaapi.BADADDR
+            ok = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
+            tid = ti.tid if ok else idaapi.BADADDR
 
             # convert it to a pythonic type
             res = interface.typemap.dissolve(F, tid, cb)
@@ -3181,7 +3181,7 @@ class type(object):
                 raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified addresss is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, FF_STRUCT, res))
 
             ti, F = idaapi.opinfo_t(), type.flags(ea)
-            res = idaapi.get_opinfo(ea, 0, F, ti)
+            res = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
             if not res:
                 raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to `idaapi.get_opinfo()` failed at {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, ea))
             return ti.tid
