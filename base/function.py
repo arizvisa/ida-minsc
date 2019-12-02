@@ -247,7 +247,8 @@ def prototype(func):
 @utils.multicase()
 def bounds():
     '''Return a tuple containing the bounds of the first chunk of the current function.'''
-    return bounds(ui.current.function())
+    fn = ui.current.function()
+    return interface.range.bounds(fn)
 @utils.multicase()
 def bounds(func):
     '''Return a tuple containing the bounds of the first chunk of the function `func`.'''
@@ -685,7 +686,7 @@ class blocks(object):
         '''Return the ``idaapi.BasicBlock`` in function `func` at address `ea`.'''
         fn = by(func)
         for bb in blocks.iterate(fn):
-            if interface.range.contains(ea, bb):
+            if interface.range.within(ea, bb):
                 return bb
             continue
         raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), ea, ea, interface.range.start(fn)))
@@ -727,34 +728,36 @@ class blocks(object):
 
         # create entry node
         attrs = database.tag(ea)
-        operator.setitem(attrs, '__name__', name(ea))
-        operator.setitem(attrs, '__address__', ea)
-        operator.setitem(attrs, '__bounds__', block(ea))
-        block.color(ea) and operator.setitem(attrs, '__color__', block.color(ea))
+        attrs.setdefault('__name__', name(ea))
+        attrs.setdefault('__address__', ea)
+        attrs.setdefault('__bounds__', block(ea))
+        if block.color(ea) is not None:
+            attrs.setdefault('__color__', block.color(ea))
         res.add_node(ea, attrs)
 
         # create a graph node for each basicblock
         for b, e in cls(fn):
             if b == ea: continue
             attrs = database.tag(b)
-            operator.setitem(attrs, '__name__', database.name(b))
-            operator.setitem(attrs, '__address__', b)
-            operator.setitem(attrs, '__bounds__', (b, e))
-            block.color(b) and operator.setitem(attrs, '__color__', block.color(b))
+            attrs.setdefault('__name__', database.name(b))
+            attrs.setdefault('__address__', b)
+            attrs.setdefault('__bounds__', (b, e))
+            if block.color(b) is not None:
+                attrs.setdefault('__color__', block.color(b))
             res.add_node(b, attrs)
 
         # for every single block...
         for b in cls.iterate(fn):
             # ...add an edge to its predecessors
             for p in b.preds():
-                # FIXME: figure out more attributes to add
+                # FIXME: figure out some more attributes to add
                 attrs = {}
                 operator.setitem(attrs, '__contiguous__', interface.range.start(b) == interface.range.end(p))
                 res.add_edge(interface.range.start(p), interface.range.start(b), attrs)
 
             # ...add an edge to its successors
             for s in b.succs():
-                # FIXME: figure out more attributes to add
+                # FIXME: figure out some more attributes to add
                 attrs = {}
                 operator.setitem(attrs, '__contiguous__', interface.range.end(b) == interface.range.start(s))
                 res.add_edge(interface.range.start(b), interface.range.start(s), attrs)
@@ -1070,7 +1073,7 @@ class block(object):
     @classmethod
     def before(cls, bb):
         '''Return the addresses of all the instructions that branch to the basic block `bb`.'''
-        return [database.address.prev(interface.range.start(bb)) for bb in bb.preds()]
+        return [ database.address.prev(interface.range.end(bb)) for bb in bb.preds() ]
     predecessors = preds = utils.alias(before, 'block')
 
     @utils.multicase()
