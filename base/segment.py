@@ -210,7 +210,7 @@ def iterate(segment):
 @utils.multicase(segment=idaapi.segment_t)
 def iterate(segment):
     '''Iterate through all of the addresses within the ``idaapi.segment_t`` represented by `segment`.'''
-    for ea in database.address.iterate(interface.range.start(segment), interface.range.end(segment)):
+    for ea in database.address.iterate(*interface.range.unpack(segment)):
         yield ea
     return
 
@@ -220,12 +220,12 @@ def size():
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.size() : Unable to locate the current segment.".format(__name__))
-    return interface.address.size(seg)
+    return interface.range.size(seg)
 @utils.multicase()
 def size(segment):
     '''Return the size of the segment specified by `segment`.'''
     seg = by(segment)
-    return interface.address.size(seg)
+    return interface.range.size(seg)
 
 @utils.multicase()
 def offset():
@@ -260,14 +260,14 @@ def read():
     seg = ui.current.segment()
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.read() : Unable to locate the current segment.".format(__name__))
-    return get_bytes(interface.range.start(seg), interface.address.size(seg))
+    return get_bytes(interface.range.start(seg), interface.range.size(seg))
 @utils.multicase()
 def read(segment):
     '''Return the contents of the segment identified by `segment`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
 
     seg = by(segment)
-    return get_bytes(interface.range.start(seg), interface.address.size(seg))
+    return get_bytes(interface.range.start(seg), interface.range.size(seg))
 string = utils.alias(read)
 
 @utils.multicase()
@@ -283,7 +283,7 @@ def repr(segment):
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
 
     seg = by(segment)
-    return "{:s} {:s} {:#x}-{:#x} ({:+#x})".format(object.__repr__(seg), get_segment_name(seg), interface.range.start(seg), interface.range.end(seg), interface.address.size(seg))
+    return "{:s} {:s} {:#x}-{:#x} ({:+#x})".format(object.__repr__(seg), get_segment_name(seg), interface.range.start(seg), interface.range.end(seg), interface.range.size(seg))
 
 @utils.multicase()
 def top():
