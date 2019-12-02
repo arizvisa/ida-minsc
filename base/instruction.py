@@ -977,7 +977,7 @@ class type(object):
     def is_call(cls, ea):
         '''Returns true if the instruction at `ea` is a call.'''
         ea = interface.address.inside(ea)
-        if hasattr(idaapi, 'is_call_insn'):
+        if idaapi.__version__ < 7.0 and hasattr(idaapi, 'is_call_insn'):
             idaapi.decode_insn(ea)
             return idaapi.is_call_insn(ea)
 
