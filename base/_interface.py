@@ -1143,7 +1143,7 @@ def xiterate(ea, start, next):
     addr = start(ea)
     while addr != idaapi.BADADDR:
         yield addr
-        addr = six.next(ea, addr)
+        addr = next(ea, addr)
     return
 
 def addressOfRuntimeOrStatic(func):
