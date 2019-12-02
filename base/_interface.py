@@ -620,15 +620,15 @@ class node(object):
 
         # XXX: implement a parser for type_t in order to figure out idaapi.BT_COMPLEX types
         # return type_t
-        data = next(iterable)
+        data = six.next(iterable)
         base, flags, mods = six.byte2int(data) & idaapi.TYPE_BASE_MASK, six.byte2int(data) & idaapi.TYPE_FLAGS_MASK, six.byte2int(data) & idaapi.TYPE_MODIF_MASK
         if base == idaapi.BT_PTR:
-            data+= next(iterable)
+            data+= six.next(iterable)
         elif base == idaapi.BT_COMPLEX and flags == 0x30:
-            by = next(iterable)
+            by = six.next(iterable)
             skip, data = six.byte2int(by), data + by
             while skip > 1:
-                data+= next(iterable)
+                data+= six.next(iterable)
                 skip -= 1
         elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
@@ -699,7 +699,7 @@ class node(object):
         def id64(sup):
             iterable = iter(sup)
             #chunks = zip(*((iter(sup),)*3))
-            length = le((next(iterable), next(iterable), next(iterable)))
+            length = le((six.next(iterable), six.next(iterable), six.next(iterable)))
             chunks = zip(*((iterable,)*5))
             #length = le(chunks.pop(0))
             if len(chunks) != length:
@@ -759,7 +759,7 @@ class namedtypedtuple(tuple):
         '''Return the type for the field `name`.'''
         res = (t for n, t in zip(cls._fields, cls._types) if n == name)
         try:
-            result = next(res)
+            result = six.next(res)
         except StopIteration:
             raise NameError("Unable to locate the type for an unknown field {!r}.".format(name))
         return result
@@ -1143,7 +1143,7 @@ def xiterate(ea, start, next):
     addr = start(ea)
     while addr != idaapi.BADADDR:
         yield addr
-        addr = next(ea, addr)
+        addr = six.next(ea, addr)
     return
 
 def addressOfRuntimeOrStatic(func):
@@ -1307,8 +1307,9 @@ class architecture_t(object):
         else:
             dtype_by_size = idaapi.get_dtype_by_size
 
-        dtype = next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
+        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits})
         namespace['realname'] = idaname
@@ -1329,7 +1330,7 @@ class architecture_t(object):
         else:
             dtype_by_size = idaapi.get_dtype_by_size
 
-        dtype = next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits})
