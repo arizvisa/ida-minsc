@@ -4202,7 +4202,12 @@ class set(object):
         '''Set the data at address `ea` to code.'''
         if idaapi.__version__ < 7.0:
             return idaapi.create_insn(ea)
+
         res = idaapi.insn_t()
+        try:
+            return idaapi.create_insn(ea, res)
+        except TypeError:
+            pass
         return idaapi.create_insn(res, ea)
 
     @utils.multicase(size=six.integer_types)
