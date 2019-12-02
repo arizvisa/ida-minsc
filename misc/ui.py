@@ -99,7 +99,7 @@ class current(object):
         res = idaapi.get_highlight(viewer)
         if res and res[1]:
             return res[0]
-        return rese
+        return res
     @classmethod
     def selection(cls):
         '''Return the current address range of whatever is selected'''
