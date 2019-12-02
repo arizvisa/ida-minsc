@@ -4791,8 +4791,9 @@ class get(object):
         # long-numerics so we can read them
         if any(hasattr(idaapi, name) for name in {'FF_QWRD', 'FF_QWORD'}):
             name = six.next(name for name in {'FF_QWRD', 'FF_QWORD'} if hasattr(idaapi, name))
-            if getattr(idaapi, name) not in numerics:
-                lnumerics[idaapi.FF_QWRD] = 8
+            value = getattr(idaapi, name)
+            if value not in numerics:
+                lnumerics[value] = 8
             pass
 
         # FF_OWORD, FF_YWORD and FF_ZWORD might not exist in older versions
