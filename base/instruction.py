@@ -140,6 +140,16 @@ def feature(ea):
         return at(ea).get_canon_feature()
     return None
 
+@utils.multicase(opnum=six.integer_types)
+def opinfo(opnum):
+    '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
+    return opinfo(ui.current.address(), opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def opinfo(ea, opnum):
+    '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
+    ti, flags = idaapi.opinfo_t(), database.type.flags(ea)
+    return idaapi.get_opinfo(ea, opnum, flags, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, flags)
+
 @utils.multicase()
 def mnemonic():
     '''Returns the mnemonic of the instruction at the current address.'''
@@ -475,13 +485,13 @@ def op_structure(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
     '''Return the structure that operand `opnum` for instruction `ea` actually references.'''
-    ti, fl, op = idaapi.opinfo_t(), database.type.flags(ea), operand(ea, opnum)
+    fl, op = database.type.flags(ea), operand(ea, opnum)
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # pathvar = idaapi.tid_array(length)
     # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
-    res = idaapi.get_opinfo(ea, opnum, fl, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, fl)
+    res = opinfo(ea, opnum)
     if res is None:
         raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
@@ -496,7 +506,15 @@ def op_structure(ea, opnum):
         try:
             m = st.by(value)
 
-        # if we couldn't find one, then figure out whether to use
+            # we found a member that we can use as our path
+            path = [st.id, m.id]
+
+        # if we couldn't find one, then just use the structure id
+        # for the path
+        except E.MemberNotFoundError:
+            path = [st.id]
+
+        # if we were out of bounds, then figure out whether to use
         # the last or first member depending where we are
         except E.OutOfBoundsError:
             if value > st.members[-1].offset:
@@ -506,8 +524,9 @@ def op_structure(ea, opnum):
             else:
                 raise
 
-        # now to build the path that gets walked
-        path = [st.id, m.id]
+            # use the member we figured as part of the path
+            path = [st.id, m.id]
+        pass
 
     # if there's no path, then this is not a structure
     elif len(path) == 0:
@@ -666,14 +685,14 @@ def op_enumeration(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_enumeration(ea, opnum):
     '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
-    ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
+    fl = database.type.flags(ea)
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
         raise E.MissingTypeOrAttribute(u"{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
     # XXX: is the following api call the proper way to do this?
     # idaapi.get_enum_id(*args):
 
-    res = idaapi.get_opinfo(ea, opnum, fl, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, fl)
+    res = opinfo(ea, opnum)
     if res is None:
         raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
     return enumeration.by(res.ec.tid)
@@ -700,11 +719,11 @@ def op_string(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
-    ti, fl = idaapi.opinfo_t(), database.type.flags(ea)
-    if fl & idaapi.FF_STRLIT == 0:
+    fl = database.type.flags(ea)
+    if fl & (idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI) == 0:
         raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
-    res = idaapi.get_opinfo(ea, opnum, fl, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, fl)
+    res = opinfo(ea, opnum)
     if res is None:
         raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
@@ -714,12 +733,15 @@ def op_string(ea, opnum, strtype):
     '''Set the string type used by operand `opnum` for the instruction at `ea` to `strtype`.'''
     res, fl = idaapi.opinfo_t(), database.type.flags(ea)
 
-    fl |= idaapi.FF_STRLIT
+    # Update our flags for the instruction to include the string definition
+    fl |= idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
     res.strtype = strtype
 
+    # Now we can actually apply the opinfo_t
+    # TODO: extend the opinfo() function to allow writing an opinfo_t
     ok = idaapi.set_opinfo(ea, opnum, fl, res)
 
-    # FIXME: verify that set_opinfo was actually applied by checking via get_opinfo
+    # TODO: verify that set_opinfo was actually applied by checking via get_opinfo
     return True if ok else False
 
 ## flags
@@ -737,8 +759,7 @@ def op_refs(ea, opnum):
     ok = idaapi.op_adds_xrefs(F, opnum) ## FIXME: on tag:arm, this returns T for some operands
 
     # FIXME: gots to be a better way to determine operand representation
-    ti = idaapi.opinfo_t()
-    res = idaapi.get_opinfo(inst.ea, opnum, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, F)
+    res = opinfo(inst.ea, opnum)
 
     # FIXME: this is incorrect on ARM for the 2nd op in `ADD R7, SP, #0x430+lv_dest_41c`
     # stkvar
