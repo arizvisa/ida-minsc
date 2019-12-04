@@ -738,7 +738,7 @@ def op_refs(ea, opnum):
 
     # FIXME: gots to be a better way to determine operand representation
     ti = idaapi.opinfo_t()
-    res = idaapi.get_opinfo(inst.ea, opnum, F, ti)
+    res = idaapi.get_opinfo(inst.ea, opnum, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, F)
 
     # FIXME: this is incorrect on ARM for the 2nd op in `ADD R7, SP, #0x430+lv_dest_41c`
     # stkvar
