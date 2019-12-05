@@ -42,7 +42,7 @@ def list():
 def lvarNameQ(name):
     '''Determine whether a `name` is something that IDA named automatically.'''
     if any(name.startswith(n) for n in ('arg_', 'var_')):
-        res = name.split('_', 2)[-1]
+        res = name.split('_', 1)[-1]
         return all(n in string.hexdigits for n in res)
     elif name.startswith(' '):
         return name[1:] in {'s', 'r'}
