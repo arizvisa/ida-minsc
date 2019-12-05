@@ -346,7 +346,7 @@ class structure_t(object):
                 sptr = idaapi.get_member_struc(name)
 
                 # find out from mptr id if we're a function frame
-                frname, _ = name.split('.', 2)
+                frname, _ = name.split('.', 1)
                 frid = internal.netnode.get(frname)
                 ea = idaapi.get_func_by_frame(frid)
 
@@ -375,7 +375,22 @@ class structure_t(object):
                 mem = st.members.by_identifier(mptr.id)
                 res.append(mem)
 
-            # otherwise we just (strangely) got an address, so add it as a reference
+            # otherwise we just got an address, so figure out if it was code
+            elif database.type.is_code(ref):
+
+                # iterate through all of its operands figuring out the opinfo for it
+                for opnum, _ in enumerate(instruction.operands(ref)):
+                    opinfo = instruction.opinfo(ref, opnum)
+                    if opinfo is None:
+                        continue
+
+                    # check if we do have an opinfo.path, and our sid is contained in it
+                    if opinfo.path.len > 0 and operator.contains(opinfo.path.ids, sid):
+                        state = instruction.op_state(ref, opnum)
+                        res.append( interface.OREF(ref, opnum, interface.ref_t.of_state(state)) )   # using '*' to describe being applied to the an address
+                    continue
+
+            # anything else is data and we just need to add a reference in that case
             else:
                 res.append( interface.OREF(ref, None, interface.ref_t.of_state('*')) )   # using '*' to describe being applied to the an address
             continue
@@ -958,6 +973,9 @@ class members_t(object):
         min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.owner.ptr), idaapi.get_struc_last_offset(self.owner.ptr)))
 
         mptr = idaapi.get_member(self.owner.ptr, max - self.baseoffset)
+        if mptr is None:
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.owner.name, offset))
+
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max+msize):
             raise E.OutOfBoundsError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format(__name__, self.owner.name, offset, min, max+msize))
@@ -1388,7 +1406,7 @@ class member_t(object):
             sptr = idaapi.get_sptr(mptr)
 
             # get frame, func_t
-            frname, _ = name.split('.', 2)
+            frname, _ = name.split('.', 1)
             frid = internal.netnode.get(frname)
             ea = idaapi.get_func_by_frame(frid)
             f = idaapi.get_func(ea)
@@ -1457,7 +1475,7 @@ class member_t(object):
             # now we need to figure out which operand is the one.
             else:
                 fl = database.type.flags(ea)
-                iterable = ((opnum, get_opinfo(idaapi.opinfo_t(), ea, opnum, fl)) for opnum in six.moves.range(idaapi.UA_MAXOP))
+                iterable = ((opnum, instruction.opinfo(ea, opnum)) for opnum, _ in enumerate(instruction.operands(ea)))
                 iterable = ((opnum, info) for opnum, info in iterable if isinstance(info, idaapi.opinfo_t))
 
                 # now that we got all the opinfo_t for each operand, we need to
