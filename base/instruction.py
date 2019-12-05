@@ -380,7 +380,10 @@ def op_state(ea, opnum):
     """
     f = feature(ea)
     r, w = f&ops_state.read[opnum], f&ops_state.write[opnum]
-    return (r and 'r' or '') + (w and 'w' or '')
+    res = (r and 'r' or '') + (w and 'w' or '')
+    if res:
+        return interface.ref_t.of_state(res)
+    raise E.MissingTypeOrAttribute(u"{:s}.op_state({:#x}, {:d}) : The specified operand {:d} is not read from or written to and might be unused.".format(__name__, ea, opnum, opnum))
 
 @utils.multicase(opnum=six.integer_types)
 def op_size(opnum):
@@ -487,13 +490,13 @@ def op_structure(ea, opnum):
     '''Return the structure that operand `opnum` for instruction `ea` actually references.'''
     fl, op = database.type.flags(ea), operand(ea, opnum)
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # pathvar = idaapi.tid_array(length)
     # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
     res = opinfo(ea, opnum)
     if res is None:
-        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
     # get the path and the delta
     delta, path = res.path.delta, [res.path.ids[idx] for idx in six.moves.range(res.path.len)]
@@ -530,7 +533,7 @@ def op_structure(ea, opnum):
 
     # if there's no path, then this is not a structure
     elif len(path) == 0:
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:#x}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # collect all the path members
     moff, st = 0, structure.by(path.pop(0))
@@ -566,21 +569,21 @@ def op_structure(ea, opnum, id, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {:#x}{:s}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
 
     offset, sptr, name = 0, idaapi.get_struc(id), idaapi.get_member_fullname(id)
     if sptr is not None:
         offset = idaapi.get_struc_first_offset(sptr)
         sid, mptr = sptr.id, idaapi.get_member(sptr, offset)
         if mptr is None:
-            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
         mid = mptr.id
     elif name is not None:
         fn = idaapi.get_member_fullname(id)
         sptr = idaapi.get_member_struc(name)
         sid, mid = sptr.id, id
     else:
-        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
 
     # if an offset was specified such as if the first member of the structure
     # is not at offset 0, then adjust the delta by its value
@@ -598,14 +601,14 @@ def op_structure(ea, opnum, path, **delta):
     """
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # validate the path
     if len(path) == 0:
-        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring)+six.integer_types) for m in path):
-        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # ensure the path begins with a structure.structure_t
     if isinstance(path[0], structure.member_t):
@@ -617,7 +620,7 @@ def op_structure(ea, opnum, path, **delta):
         res.append(path[len(res)])
 
     if len(res) < len(path):
-        logging.warn(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
+        logging.warn(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
     path = res[:]
 
     # if the delta is in the path, move it into the delta kwarg
@@ -635,7 +638,7 @@ def op_structure(ea, opnum, path, **delta):
         elif isinstance(item, structure.member_t):
             m = item.ptr
         else:
-            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), i+1, item.__class__))
+            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), i+1, item.__class__))
         tids.append(m.id)
         moff += m.soff
 
@@ -649,7 +652,7 @@ def op_structure(ea, opnum, path, **delta):
 
     # check what was different
     if len(path) != len(tids) + 1:
-        logging.warn(u"{:s}.op_structure({:#x}, {:#x}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        logging.warn(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # build the list of member ids and prefix it with a structure id
     length = len(tids) + 1
@@ -687,14 +690,14 @@ def op_enumeration(ea, opnum):
     '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
     fl = database.type.flags(ea)
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
-        raise E.MissingTypeOrAttribute(u"{:s}.op_enumeration({:#x}, {:#x}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_enumeration({:#x}, {:d}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
     # XXX: is the following api call the proper way to do this?
     # idaapi.get_enum_id(*args):
 
     res = opinfo(ea, opnum)
     if res is None:
-        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
     return enumeration.by(res.ec.tid)
 @utils.multicase(opnum=six.integer_types, name=basestring)
 @utils.string.decorate_arguments('name')
@@ -721,11 +724,11 @@ def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
     fl = database.type.flags(ea)
     if fl & (idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI) == 0:
-        raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:#x}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:d}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
     res = opinfo(ea, opnum)
     if res is None:
-        raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:#x}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:d}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
     return res.strtype
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
