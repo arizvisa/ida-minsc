@@ -158,7 +158,8 @@ class config(object):
             return 64
         elif cls.info.is_32bit():
             return 32
-        raise E.UnsupportedCapability(u"{:s}.bits() : Unknown bit size.".format('.'.join((__name__, cls.__name__))))
+        # Anything else seems to be 16-bit
+        return 16
 
     @classmethod
     def byteorder(cls):
