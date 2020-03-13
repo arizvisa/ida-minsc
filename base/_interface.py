@@ -316,7 +316,9 @@ class priorityhook(object):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
-            raise NameError("{:s}.add({!r}, {!r}) : Unable to add a method to hooker for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name, callable))
+            target = self.object.__class__
+            method = '.'.join([target.__name__, name])
+            raise NameError("{:s}.discard({!r}, {!r}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, callable, method))
         if name not in self.__cache: return False
 
         res, found = [], 0
