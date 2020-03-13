@@ -349,12 +349,10 @@ class priorityhook(object):
                         res = func(*args)
                     except:
                         cls = self.__class__
-                        message = functools.partial("{:s}.callback : {:s}".format, '.'.join(('internal', __name__, cls.__name__)))
-
-                        logging.fatal(u"{:s}.callback : Callback for {:s} raised an exception.".format('.'.join(('internal', __name__, cls.__name__)), '.'.join((self.__type__.__name__, name))), exc_info=True)
+                        logging.fatal(u"{:s}.callback({:s}) : Callback for hook {:s} raised an exception with the following parameters : {!r}".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, args)), '.'.join((self.__type__.__name__, name)), args), exc_info=True)
 
                         res = traceback.format_list(self.__traceback[name, func])
-                        logging.warn(u"{:s}.callback : Hook originated from -> ".format('.'.join(('internal', __name__, cls.__name__))) + "\n{:s}".format(''.join(res)))
+                        logging.warn(u"{:s}.callback({:s}) : The callback for the hook was assigned at -> ".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, args))) + "\n{:s}".format(str().join(res)))
 
                         res = self.STOP
 
