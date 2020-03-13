@@ -335,7 +335,9 @@ class priorityhook(object):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
             cls = self.__class__
-            raise NameError("{:s}.apply({!r}) : Unable to apply the hook for an unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name))
+            target = self.object.__class__
+            method = '.'.join([target.__name__, name])
+            raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, method))
 
         def method(hookinstance, *args):
             if name in self.__cache and name not in self.__disabled:
