@@ -235,9 +235,8 @@ class priorityhook(object):
     CONTINUE = type('continue', (result,), {})()
     STOP = type('stop', (result,), {})()
 
-    def __init__(self, hooktype, **exclude):
+    def __init__(self, hooktype):
         '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
-        exclusions = set(exclude.get('exclude', ()))
         self.__type__ = hooktype
         self.__cache = collections.defaultdict(list)
         self.object = self.cycle(self.__type__())
