@@ -157,6 +157,31 @@ class address(comment):
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt))
             cls.event = cls._event(); next(cls.event)
 
+    @classmethod
+    def old_changed(cls, ea, repeatable_cmt):
+        cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
+        fn = idaapi.get_func(ea)
+
+        # if we're in a function, then clear our contents.
+        if fn:
+            internal.comment.contents.set_address(ea, 0)
+
+        # otherwise, just clear the tags globally
+        else:
+            internal.comment.globals.set_address(ea, 0)
+
+        # simply grab the comment and update its refs
+        res = internal.comment.decode(cmt)
+        if res:
+            cls._create_refs(ea, res)
+
+        # otherwise, there's nothing to do if its empty
+        else:
+            return
+
+        # and then re-write it back to its address
+        idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
+
 class globals(comment):
     @classmethod
     def _update_refs(cls, fn, old, new):
@@ -271,6 +296,31 @@ class globals(comment):
             logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
         return
+
+    @classmethod
+    def old_changed(cls, cb, a, cmt, repeatable):
+        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        ea = interface.range.start(a)
+
+        # if we're not a function, then this is a false alarm and we leave.
+        fn = idaapi.get_func(ea)
+        if fn is None:
+            return
+
+        # we're using an old version of ida here, so start out empty
+        internal.comment.globals.set_address(ea, 0)
+
+        # grab our comment here and re-create its refs
+        res = internal.comment.decode(utils.string.of(cmt))
+        if res:
+            cls._create_refs(fn, res)
+
+        # if it's empty, then there's nothing to do and we can leave
+        else:
+            return
+
+        # now we can simply re-write it it
+        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(res)), repeatable)
 
 ### database scope
 class state(object):
@@ -473,6 +523,18 @@ def __rebase_globals(old, new, size, iterable):
         yield i, ea
     return
 
+def segm_start_changed(s):
+    # XXX: not yet implemented
+    return
+
+def segm_end_changed(s):
+    # XXX: not yet implemented
+    return
+
+def segm_moved(source, destination, size):
+    # XXX: not yet implemented
+    return
+
 # address naming
 def rename(ea, newname):
     fl = database.type.flags(ea)
@@ -543,6 +605,42 @@ def removing_func_tail(pfn, tail):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
             logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
+        continue
+    return
+
+def func_tail_removed(pfn, ea):
+    # XXX: this is for older versions of IDA
+    global State
+    if State != state.ready: return
+
+    # first we'll grab the addresses from our refs
+    res = internal.comment.contents.address(ea, target=interface.range.start(pfn))
+
+    # these are sorted, so first we'll filter out what doesn't belong
+    missing = [ item for item in res if idaapi.get_func(item) != pfn ]
+
+    # now iterate through the min/max of the list as hopefully this is
+    # our event.
+    for ea in database.address.iterate(min(missing), max(missing)):
+        for k in database.tag(ea):
+            internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
+            internal.comment.globals.inc(ea, k)
+            logging.debug(u"{:s}.func_tail_removed({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), ea, utils.string.repr(k), utils.string.repr(k)))
+        continue
+    return
+
+def tail_owner_changed(tail, owner_func):
+    # XXX: this is for older versions of IDA
+    global State
+    if State != state.ready: return
+
+    # this is easy as we just need to walk through tail and add it
+    # to owner_func
+    for ea in database.address.iterate(*interface.range.unpack(tail)):
+        for k in database.tag(ea):
+            internal.comment.contents.dec(ea, k)
+            internal.comment.contents.inc(ea, k, target=owner_func)
+            logging.debug(u"{:s}.tail_owner_changed({:#x}, {:#x}) : Exchanging (increasing) refcount for contents tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(tail), owner_func, utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
