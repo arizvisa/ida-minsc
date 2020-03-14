@@ -166,6 +166,11 @@ class typemap:
         return cls.__newprc__(pnum)
 
     @classmethod
+    def __nw_newprc__(cls, nw_code, is_old_database):
+        pnum = idaapi.ph_get_id()
+        return cls.__newprc__(pnum)
+
+    @classmethod
     def dissolve(cls, flag, typeid, size):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
