@@ -1653,6 +1653,9 @@ class Mips(interface.architecture_t):
         [ setitem(i2s(_), self.new(i2s(_), 32)) for _ in itertools.chain([7, 31], six.moves.range(20, 26))]
 
 ## global initialization
+def __nw_newprc__(nw_code, is_old_database):
+    pnum = idaapi.ph_get_id()
+    return __newprc__(pnum)
 def __ev_newprc__(pnum, keep_cfg):
     return __newprc__(pnum)
 def __newprc__(id):
