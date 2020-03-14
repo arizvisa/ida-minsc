@@ -150,9 +150,7 @@ if idaapi.__version__ >= 7.0:
 elif idaapi.__version__ >= 6.9:
     [ ui.hook.idb.add(_, __import__('hooks').noapi, 40) for _ in ('changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed') ]
 else:
-    #raise NotImplementedError('changing_cmt')
     ui.hook.idb.add('cmt_changed', __import__('hooks').noapi, 40)
-    #raise NotImplementedError('changing_area_cmt')
     ui.hook.idb.add('area_cmt_changed', __import__('hooks').noapi, 40)
 
 if idaapi.__version__ >= 7.0:
@@ -204,8 +202,6 @@ else:
     ui.hook.idp.add('add_func', __import__('hooks').add_func, 40)
     ui.hook.idp.add('del_func', __import__('hooks').del_func, 40)
     ui.hook.idp.add('tail_owner_changed', __import__('hooks').tail_owner_changed, 40)
-    #raise NotImplementedError('set_func_start')
-    #raise NotImplementedError('set_func_end')
 
 [ ui.hook.idb.add(_, getattr(__import__('hooks'), _), 40) for _ in ('thunk_func_created', 'func_tail_appended') ]
 
