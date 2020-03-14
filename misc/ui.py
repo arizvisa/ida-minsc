@@ -298,9 +298,6 @@ class strings(appwindow):
             raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
         #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
-    # FIXME: I don't think that these callbacks are stackable
-    #idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)
-
     @classmethod
     def refresh(cls):
         '''Refresh the strings list.'''
