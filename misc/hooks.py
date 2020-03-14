@@ -41,6 +41,11 @@ class comment(object):
         cls.event = cls._event()
         next(cls.event)
 
+    @classmethod
+    def nw_database_init(cls, nw_code, is_old_database):
+        idp_modname = idaapi.get_idp_name()
+        return cls.database_init(idp_modname)
+
 class address(comment):
     @classmethod
     def _is_repeatable(cls, ea):
@@ -286,6 +291,10 @@ def on_init(idp_modname):
     else:
         logging.debug(u"{:s}.on_init({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(idp_modname), utils.string.repr(State)))
 
+def nw_on_init(nw_code, is_old_database):
+    idp_modname = idaapi.get_idp_name()
+    return on_init(idp_modname)
+
 def on_newfile(fname):
     '''IDP_Hooks.newfile'''
 
@@ -296,6 +305,12 @@ def on_newfile(fname):
     else:
         logging.debug(u"{:s}.on_newfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
     # FIXME: save current state like base addresses and such
+
+def nw_on_newfile(nw_code, is_old_database):
+    if is_old_database:
+        return
+    fname = idaapi.cvar.database_idb
+    return on_newfile(fname)
 
 def on_oldfile(fname):
     '''IDP_Hooks.oldfile'''
@@ -309,6 +324,12 @@ def on_oldfile(fname):
     else:
         logging.debug(u"{:s}.on_oldfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
     # FIXME: save current state like base addresses and such
+
+def nw_on_oldfile(nw_code, is_old_database):
+    if not is_old_database:
+        return
+    fname = idaapi.cvar.database_idb
+    return on_oldfile(fname)
 
 def __check_functions():
     # FIXME: check if tagcache needs to be created
