@@ -168,15 +168,13 @@ elif idaapi.__version__ >= 6.9:
 else:
     idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('hooks').address.nw_database_init, 15)
     idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('hooks').globals.nw_database_init, 15)
-    raise NotImplementedError('changing_area_cmt')
-    ui.hook.idb.add('area_cmt_changed', __import__('hooks').globals.changed, 45)
+    ui.hook.idb.add('area_cmt_changed', __import__('hooks').globals.old_changed, 45)
 
 if idaapi.__version__ >= 6.9:
     ui.hook.idb.add('changing_cmt', __import__('hooks').address.changing, 45)
     ui.hook.idb.add('cmt_changed', __import__('hooks').address.changed, 45)
 else:
-    raise NotImplementedError('changing_cmt')
-    ui.hook.idb.add('cmt_changed', __import__('hooks').address.changed, 45)
+    ui.hook.idb.add('cmt_changed', __import__('hooks').address.old_changed, 45)
 
 ## hook naming and "extra" comments to support updating the implicit tags
 if idaapi.__version__ >= 7.0:
@@ -187,7 +185,9 @@ else:
 if idaapi.__version__ >= 6.9:
     ui.hook.idb.add('extra_cmt_changed', __import__('hooks').extra_cmt_changed, 40)
 else:
-    raise NotImplementedError('extra_cmt_changed')
+    # earlier versions of IDAPython don't expose anything about "extra" comments
+    # so we can't do anything here.
+    pass
 
 ## hook function transformations so we can shuffle their tags between types
 if idaapi.__version__ >= 7.0:
@@ -200,9 +200,10 @@ elif idaapi.__version__ >= 6.9:
     ui.hook.idb.add('removing_func_tail', __import__('hooks').removing_func_tail, 40)
     [ ui.hook.idp.add(_, getattr(__import__('hooks'), _), 40) for _ in ('add_func', 'del_func', 'set_func_start', 'set_func_end') ]
 else:
-    #ui.hook.idb.add('func_tail_removed', __import__('hooks').removing_func_tail, 40)
+    ui.hook.idb.add('func_tail_removed', __import__('hooks').func_tail_removed, 40)
     ui.hook.idp.add('add_func', __import__('hooks').add_func, 40)
     ui.hook.idp.add('del_func', __import__('hooks').del_func, 40)
+    ui.hook.idp.add('tail_owner_changed', __import__('hooks').tail_owner_changed, 40)
     #raise NotImplementedError('set_func_start')
     #raise NotImplementedError('set_func_end')
 
@@ -212,9 +213,9 @@ else:
 if idaapi.__version__ >= 6.9:
     ui.hook.idb.add('allsegs_moved', __import__('hooks').rebase, 50)
 else:
-    raise NotImplementedError('segm_start_changed')
-    raise NotImplementedError('segm_end_changed')
-    raise NotImplementedError('segm_moved')
+    ui.hook.idb.add('segm_start_changed', __import__('hooks').segm_start_changed, 50)
+    ui.hook.idb.add('segm_end_changed', __import__('hooks').segm_end_changed, 50)
+    ui.hook.idb.add('segm_moved', __import__('hooks').segm_moved, 50)
 
 ## switch the instruction set when the processor is switched
 if idaapi.__version__ >= 7.0:
