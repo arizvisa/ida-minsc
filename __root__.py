@@ -115,7 +115,7 @@ if idaapi.__version__ >= 7.0:
 elif idaapi.__version__ >= 6.9:
     ui.hook.idp.add('newprc', __import__('internal').interface.typemap.__newprc__, 0)
 else:
-    raise NotImplementedError('newprc')
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('internal').interface.typemap.__nw_newprc__, 10)
 
 ## monitor when ida enters its various states
 if idaapi.__version__ >= 7.0:
@@ -131,9 +131,9 @@ elif idaapi.__version__ >= 6.9:
     ui.hook.idp.add('auto_empty', __import__('hooks').on_ready, 0)
 
 else:
-    raise NotImplementedError('init')
-    raise NotImplementedError('newfile')
-    raise NotImplementedError('oldfile')
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('hooks').nw_on_init, 0)
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('hooks').nw_on_newfile, 25)
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('hooks').nw_on_oldfile, 25)
     ui.hook.idp.add('auto_empty', __import__('hooks').on_ready, 0)
 
 ## create the tagcache netnode when a database is created
@@ -142,7 +142,7 @@ if idaapi.__version__ >= 7.0:
 elif idaapi.__version__ >= 6.9:
     ui.hook.idp.add('init', __import__('internal').comment.tagging.__init_tagcache__, 0)
 else:
-    raise NotImplementedError('init')
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('internal').comment.tagging.__nw_init_tagcache__, 10)
 
 ## hook any user-entered comments so that they will also update the tagcache
 if idaapi.__version__ >= 7.0:
@@ -150,10 +150,10 @@ if idaapi.__version__ >= 7.0:
 elif idaapi.__version__ >= 6.9:
     [ ui.hook.idb.add(_, __import__('hooks').noapi, 40) for _ in ('changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed') ]
 else:
-    raise NotImplementedError('changing_cmt')
-    raise NotImplementedError('cmt_changed')
-    raise NotImplementedError('changing_area_cmt')
-    raise NotImplementedError('area_cmt_changed')
+    #raise NotImplementedError('changing_cmt')
+    ui.hook.idb.add('cmt_changed', __import__('hooks').noapi, 40)
+    #raise NotImplementedError('changing_area_cmt')
+    ui.hook.idb.add('area_cmt_changed', __import__('hooks').noapi, 40)
 
 if idaapi.__version__ >= 7.0:
     ui.hook.idp.add('ev_init', __import__('hooks').address.database_init, 45)
@@ -166,16 +166,17 @@ elif idaapi.__version__ >= 6.9:
     ui.hook.idb.add('changing_area_cmt', __import__('hooks').globals.changing, 45)
     ui.hook.idb.add('area_cmt_changed', __import__('hooks').globals.changed, 45)
 else:
-    raise NotImplementedError('init')
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('hooks').address.nw_database_init, 15)
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, __import__('hooks').globals.nw_database_init, 15)
     raise NotImplementedError('changing_area_cmt')
-    raise NotImplementedError('area_cmt_changed')
+    ui.hook.idb.add('area_cmt_changed', __import__('hooks').globals.changed, 45)
 
 if idaapi.__version__ >= 6.9:
     ui.hook.idb.add('changing_cmt', __import__('hooks').address.changing, 45)
     ui.hook.idb.add('cmt_changed', __import__('hooks').address.changed, 45)
 else:
     raise NotImplementedError('changing_cmt')
-    raise NotImplementedError('cmt_changed')
+    ui.hook.idb.add('cmt_changed', __import__('hooks').address.changed, 45)
 
 ## hook naming and "extra" comments to support updating the implicit tags
 if idaapi.__version__ >= 7.0:
@@ -199,17 +200,21 @@ elif idaapi.__version__ >= 6.9:
     ui.hook.idb.add('removing_func_tail', __import__('hooks').removing_func_tail, 40)
     [ ui.hook.idp.add(_, getattr(__import__('hooks'), _), 40) for _ in ('add_func', 'del_func', 'set_func_start', 'set_func_end') ]
 else:
-    raise NotImplementedError('removing_func_tail')
+    #ui.hook.idb.add('func_tail_removed', __import__('hooks').removing_func_tail, 40)
     ui.hook.idp.add('add_func', __import__('hooks').add_func, 40)
     ui.hook.idp.add('del_func', __import__('hooks').del_func, 40)
-    raise NotImplementedError('set_func_start')
-    raise NotImplementedError('set_func_end')
+    #raise NotImplementedError('set_func_start')
+    #raise NotImplementedError('set_func_end')
 
 [ ui.hook.idb.add(_, getattr(__import__('hooks'), _), 40) for _ in ('thunk_func_created', 'func_tail_appended') ]
 
 ## rebase the entire tagcache when the entire database is rebased.
 if idaapi.__version__ >= 6.9:
     ui.hook.idb.add('allsegs_moved', __import__('hooks').rebase, 50)
+else:
+    raise NotImplementedError('segm_start_changed')
+    raise NotImplementedError('segm_end_changed')
+    raise NotImplementedError('segm_moved')
 
 ## switch the instruction set when the processor is switched
 if idaapi.__version__ >= 7.0:
@@ -217,7 +222,7 @@ if idaapi.__version__ >= 7.0:
 elif idaapi.__version__ >= 6.9:
     ui.hook.idp.add('newprc', instruction.__newprc__, 50)
 else:
-    raise NotImplementedError('newprc')
+    idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, 50)
 
 ## just some debugging notification hooks
 #[ ui.hook.ui.add(n, __import__('hooks').notify(n), -100) for n in ('range','idcstop','idcstart','suspend','resume','term','ready_to_run') ]
