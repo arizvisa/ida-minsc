@@ -409,10 +409,23 @@ class priorityhook(prioritybase):
         '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
         super(priorityhook, self).__init__()
 
-        class PriorityHookClass(hooktype):
-            pass
-        self.__type__ = PriorityHookClass
+        # construct a new class definition, but do it dynamically for SWIG
+        res = { name for name in hooktype.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
+        cls = type(hooktype.__name__, (hooktype, ), { name : self.__make_dummy_method(name) for name in res })
+
+        # now we can finally use it
+        self.__type__ = cls
         self.object = self.__type__()
+
+    @staticmethod
+    def __make_dummy_method(name):
+        '''Generate a method that calls the super method specified by `name`.'''
+        def method(self, *parameters, **keywords):
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            return supermethod(*parameters, **keywords)
+        return method
 
     def remove(self):
         '''Unhook the instance completely.'''
@@ -444,33 +457,36 @@ class priorityhook(prioritybase):
         self.object.hook()
 
     def hook(self):
+        '''Physically connect all of the hooks managed by this class.'''
         ok = super(priorityhook, self).hook()
         self.__hook()
         return ok
 
     def unhook(self):
+        '''Physically disconnect all of the hooks managed by this class.'''
         self.__unhook()
         return super(priorityhook, self).unhook()
 
-    def connect(self, name, closure):
-        callable = closure
-        def wrapped(instance, *parameters):
-            callable(*parameters)
-            cls = instance.__class__
-            supercls = super(cls, instance)
-            supermethod = getattr(supercls, name)
-            return supermethod(*parameters)
-
+    def connect(self, name, callable):
+        '''Connect the hook `callable` to the specified `name`.'''
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
             raise NameError("{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, method))
 
+        # create a closure that calls our callable, and its supermethod
+        supermethod = self.__make_dummy_method(name)
+        def closure(instance, *args, **kwargs):
+            callable(*args, **kwargs)
+            return supermethod(instance, *args, **kwargs)
+
+        # unhook, assign our new method, and then re-hook
         with self.__context__():
-            method = types.MethodType(wrapped, self.object, self.__type__)
+            method = types.MethodType(closure, self.object, self.__type__)
             setattr(self.object, name, method)
         return True
 
     def disconnect(self, name):
+        '''Disconnect the hook from the specified `name`.'''
         def closure(instance, *parameters):
             supermethod = getattr(super(cls, instance), name)
             return supermethod(*parameters)
