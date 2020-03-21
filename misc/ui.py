@@ -757,9 +757,10 @@ class hook(object):
         ]
         priorityhook = internal.interface.priorityhook
         for attr, hookcls in api:
+            instance = priorityhook(hookcls)
             if not hasattr(cls, attr):
-                setattr(cls, attr, priorityhook(hookcls))
-            continue
+                setattr(cls, attr, instance)
+            instance.hook()
         return
 
     @classmethod
@@ -772,7 +773,7 @@ class hook(object):
                 res.disable(name)
 
             # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
-            res.remove()
+            res.unhook()
         return
 
 ### Helper classes to use or inherit from
