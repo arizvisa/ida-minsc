@@ -349,15 +349,21 @@ class priorityhook(object):
             if name in self.__cache__ and name not in self.__disabled:
                 hookq = self.__cache__[name][:]
 
-                for _, func in heapq.nsmallest(len(hookq), hookq):
+                for priority, func in heapq.nsmallest(len(hookq), hookq):
+                    logging.debug(u"{:s}.method({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority {:+d}".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, args)), ', '.join(map("{!r}".format, args)), func, priority))
+
                     try:
                         res = func(*args)
                     except:
                         cls = self.__class__
-                        logging.fatal(u"{:s}.callback({:s}) : Callback for hook {:s} raised an exception with the following parameters : {!r}".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, args)), '.'.join((self.__type__.__name__, name)), args), exc_info=True)
+                        bt = traceback.format_list(self.__traceback[name, func])
+                        current = str().join(traceback.format_exception(*sys.exc_info()))
 
-                        res = traceback.format_list(self.__traceback[name, func])
-                        logging.warn(u"{:s}.callback({:s}) : The callback for the hook was assigned at -> ".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, args))) + "\n{:s}".format(str().join(res)))
+                        formatter = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, args)))
+                        logging.fatal(formatter(u"Callback for hook ({:s}) priority {:+d} raised an exception while executing {!r}".format('.'.join((self.__type__.__name__, name)), priority, func)))
+                        logging.warn(formatter('Traceback (hook was created at)'))
+                        [ logging.warn(formatter(item)) for item in str().join(bt).split('\n') ]
+                        [ logging.warn(formatter(item)) for item in current.split('\n') ]
 
                         res = self.STOP
 
@@ -368,7 +374,7 @@ class priorityhook(object):
                     cls = self.__class__
                     raise TypeError("{:s}.callback : Unable to determine the result type from {!r}.".format('.'.join(('internal', __name__, cls.__name__)), res))
 
-            supermethod = getattr(super(hookinstance.__class__, hookinstance), name)
+            supermethod = getattr(super(cls, hookinstance), name)
             return supermethod(*args)
         return types.MethodType(method, self.object, self.object.__class__)
 
@@ -498,7 +504,7 @@ class prioritynotification(object):
     def apply(self, notification):
         '''Return a closure that will execute all of the hooks for the specified `notification`.'''
         if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
-            cls = self.__class_
+            cls = self.__class__
             raise ValueError("{:s}.connect({:#x}): Unable to connect to the specified notification ({:#x}) due to the value being invalid.".format('.'.join(('internal', __name__, cls.__name__)), notification, notification))
 
         ## Define the closure that we'll hand off to idaapi.notify_when
@@ -510,16 +516,22 @@ class prioritynotification(object):
             # executing it with the parameters we received
             hookq = self.__cache__[notification][:]
             for priority, callable in heapq.nsmallest(len(hookq), hookq):
+                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority {:+d}".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
+
                 try:
                     result = callable(*parameters)
 
                 # if we caught an exception, then inform the user about it and stop processing our queue
                 except:
                     cls = self.__class__
-                    logging.fatal(u"{:s}.callback({:s}) : Callback for notification ({:#x}) raised an exception with the following parameters : {!r}.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)), notification, parameters), exc_info=True)
-
                     bt = traceback.format_list(self.__traceback[notification, callable])
-                    logging.warn(u"{:s}.callback({:s}) : Notification callback originated from -> ".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters))) + "\n{:s}".format(str().join(bt)))
+                    current = str().join(traceback.format_exception(*sys.exc_info()))
+
+                    formatter = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)))
+                    logging.fatal(formatter(u"Callback for notification ({:#x}) priority {:+d} raised an exception while executing {!r}".format(notification, priority, callable)))
+                    logging.warn(formatter('Traceback (notification was hooked at)'))
+                    [ logging.warn(formatter(item)) for item in str().join(bt).split('\n') ]
+                    [ logging.warn(formatter(item)) for item in current.split('\n') ]
 
                     result = self.STOP
 
