@@ -231,6 +231,167 @@ class typemap:
         typeid = idaapi.BADADDR if typeid < 0 else typeid
         return flag|(idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz)*count
 
+class prioritybase(object):
+    result = type('result', (object,), {})
+    CONTINUE = type('continue', (result,), {})()
+    STOP = type('stop', (result,), {})()
+
+    def __init__(self):
+        self.__cache__ = collections.defaultdict(list)
+        self.__disabled = set()
+        self.__traceback = {}
+
+    def __iter__(self):
+        '''Return the id of each target that is hooked by this object.'''
+        for target in self.__cache__:
+            yield target
+        return
+
+    def __formatter__(self, target):
+        raise NotImplementedError
+
+    def connect(self, *args):
+        raise NotImplementedError
+
+    def disconnect(self, *args):
+        raise NotImplementedError
+
+    def cycle(self):
+        cls = self.__class__
+
+        # First disconnect everything
+        for target in self.__cache__.viewkeys():
+            ok = self.disconnect(target)
+            if not ok:
+                logging.warn(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), self.__format__(target)))
+            continue
+
+        # That should've been it, so simply re-connect
+        for target in self.__cache__.viewkeys():
+            ok = self.connect(target)
+            if not ok:
+                logging.warn(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), self.__format__(target)))
+            continue
+        return True
+
+    def enable(self, target):
+        '''Enable any callables for the specified `target` that has been previously disabled.'''
+        if target not in self.__disabled:
+            cls = self.__class__
+            logging.fatal(u"{:s}.enable({:#x}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
+            return False
+        self.__disabled.discard(target)
+        return True
+
+    def disable(self, target):
+        '''Disable execution of all the callables for the specified `target`.'''
+        cls = self.__class__
+        if target not in self.__cache__:
+            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__cache__.viewkeys())))))
+            return False
+        if target in self.__disabled:
+            logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
+            return False
+        self.__disabled.add(target)
+        return True
+
+    def add(self, target, callable, priority):
+        '''Add the `callable` to our queue for the specified `target` with the provided `priority`.'''
+
+        # connect to the requested target if necessary
+        if target not in self.__cache__:
+            if not self.connect(target):
+                cls = self.__class__
+                logging.warn(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), notification, callable, priority, self.__formatter__(notification)))
+
+        # discard any callables already attached to the specified target
+        self.discard(target, callable)
+
+        # add the callable to our priority queue
+        res = self.__cache__[target]
+        heapq.heappush(self.__cache__[target], (priority, callable))
+
+        # preserve a backtrace so we can track where our callable is at
+        self.__traceback[(target, callable)] = traceback.extract_stack()[:-1]
+        return True
+
+    def get(self, target):
+        '''Return all of the callables that are attached to the specified `target`.'''
+        res = self.__cache__[target]
+        return tuple(callable for _, callable in res)
+
+    def discard(self, target, callable):
+        '''Discard the `callable` from our priority queue for the specified `target`.'''
+        if target not in self.__cache__:
+            return False
+
+        state = []
+
+        # Filter through our cache for the specified target, and collect
+        # each callable except for the one the user provided.
+        found = 0
+        for index, (priority, F) in enumerate(self.__cache__[target][:]):
+            if F == callable:
+                found += 1
+                continue
+            state.append((priority, F))
+
+        # If we aggregated some items, then replace our cache with everything
+        # except for the item the user discarded.
+        if state:
+            self.__cache__[target][:] = state
+
+        # Otherwise we found nothing and we can remove the entire target
+        # from our cache.
+        else:
+            self.__cache__.pop(target, [])
+
+        return True if found else False
+
+    def apply(self, target):
+        '''Return a closure that will execute all of the hooks for the specified `target`.'''
+
+        ## Define the closure that we'll hand off to connect
+        def closure(*parameters):
+            if target not in self.__cache__ or target in self.__disabled:
+                return
+
+            # Iterate through our priorityqueue extracting each callable and
+            # executing it with the parameters we received
+            hookq = self.__cache__[target][:]
+            for priority, callable in heapq.nsmallest(len(hookq), hookq):
+                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority {:+d}".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
+
+                try:
+                    result = callable(*parameters)
+
+                # if we caught an exception, then inform the user about it and stop processing our queue
+                except:
+                    cls = self.__class__
+                    bt = traceback.format_list(self.__traceback[target, callable])
+                    current = str().join(traceback.format_exception(*sys.exc_info()))
+
+                    format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)))
+                    logging.fatal(format(u"Callback for {:s} priority {:+d} raised an exception while executing {!r}".format(self.__formatter__(target), priority, callable)))
+                    logging.warn(format("Traceback ({:s} was hooked at)".format(formatter(target))))
+                    [ logging.warn(format(item)) for item in str().join(bt).split('\n') ]
+                    [ logging.warn(format(item)) for item in current.split('\n') ]
+
+                    result = self.STOP
+
+                if not isinstance(result, self.result) or result == self.CONTINUE:
+                    continue
+
+                elif result == self.STOP:
+                    break
+
+                cls = self.__class__
+                raise TypeError("{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)), result, callable))
+            return
+
+        # That's it!
+        return closure
+
 class priorityhook(object):
     """
     Helper class for allowing one to apply a number of hooks to the
@@ -378,25 +539,14 @@ class priorityhook(object):
             return supermethod(*args)
         return types.MethodType(method, self.object, self.object.__class__)
 
-class prioritynotification(object):
+class prioritynotification(prioritybase):
     """
     Helper class for allowing one to apply an arbitrary number of hooks to the
     different notification points within IDA.
     """
-    result = type('result', (object,), {})
-    CONTINUE = type('continue', (result,), {})()
-    STOP = type('stop', (result,), {})()
 
-    def __init__(self):
-        self.__cache__ = collections.defaultdict(list)
-        self.__disabled = set()
-        self.__traceback = {}
-
-    def __iter__(self):
-        '''Return the id of each notification that is hooked by this object.'''
-        for notification in self.__cache__:
-            yield notification
-        return
+    def __formatter__(self, notification):
+        return "notification ({:#x})".format(notification)
 
     def connect(self, notification):
         '''Connect to the specified `notification` in order to execute any callables provided by the user.'''
@@ -409,144 +559,13 @@ class prioritynotification(object):
             return True
         return idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
 
-    def cycle(self):
-        cls = self.__class__
-
-        # First disconnect everything
-        for notification in self.__cache__.viewkeys():
-            ok = self.disconnect(notification)
-            if not ok:
-                logging.warn(u"{:s}.cycle() : Error trying to disconnect from the specified notification ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), notification))
-            continue
-
-        # That should've been it, so simply re-connect
-        for notification in self.__cache__.viewkeys():
-            ok = self.connect(notification)
-            if not ok:
-                logging.warn(u"{:s}.cycle() : Error trying to connect to the specified notification ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), notification))
-            continue
-        return True
-
-    def enable(self, notification):
-        '''Enable any callables for the specified `notification` that has been previously disabled.'''
-        if notification not in self.__disabled:
-            cls = self.__class__
-            logging.fatal(u"{:s}.enable({:#x}) : The requested notification ({:#x}) is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), notification, notification, "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
-            return False
-        self.__disabled.discard(notification)
-        return True
-
-    def disable(self, notification):
-        '''Disable execution of all the callables for the specified `notification`.'''
-        cls = self.__class__
-        if notification not in self.__cache__:
-            logging.fatal(u"{:s}.disable({!r}) : The requested notification ({:#x}) does not exist. Available notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), notification, notification, "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__cache__.viewkeys())))))
-            return False
-        if notification in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : Notification {:#x} has already been disabled. Currently disabled notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), notification, notification, "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
-            return False
-        self.__disabled.add(notification)
-        return True
-
-    def add(self, notification, callable, priority=50):
-        '''Add the `callable` to our queue for the specified `notification` id with the provided `priority`.'''
-
-        # connect to the requested notification if necessary
-        if notification not in self.__cache__:
-            if not self.connect(notification):
-                cls = self.__class__
-                logging.warn(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified notification ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), notification, callable, priority, notification))
-
-        # discard any callables already attached to the specified notification
-        self.discard(notification, callable)
-
-        # add the callable to our priority queue
-        res = self.__cache__[notification]
-        heapq.heappush(self.__cache__[notification], (priority, callable))
-
-        # preserve a backtrace so we can track where our callable is at
-        self.__traceback[(notification, callable)] = traceback.extract_stack()[:-1]
-        return True
-
-    def get(self, notification):
-        '''Return all of the callables that are attached to the specified `notification`.'''
-        res = self.__cache__[notification]
-        return tuple(callable for _, callable in res)
-
-    def discard(self, notification, callable):
-        '''Discard the `callable` from our priority queue for the specified `notification` id.'''
-        if notification not in self.__cache__:
-            return False
-
-        state = []
-
-        # Filter through our cache for the specified notification, and collect
-        # each callable except for the one the user provided.
-        found = 0
-        for index, (priority, F) in enumerate(self.__cache__[notification][:]):
-            if F == callable:
-                found += 1
-                continue
-            state.append((priority, F))
-
-        # If we aggregated some items, then replace our cache with everything
-        # except for the item the user discarded.
-        if state:
-            self.__cache__[notification][:] = state
-
-        # Otherwise we found nothing and we can remove the entire notification
-        # from our cache.
-        else:
-            self.__cache__.pop(notification, [])
-
-        return True if found else False
-
     def apply(self, notification):
         '''Return a closure that will execute all of the hooks for the specified `notification`.'''
         if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
             cls = self.__class__
             raise ValueError("{:s}.connect({:#x}): Unable to connect to the specified notification ({:#x}) due to the value being invalid.".format('.'.join(('internal', __name__, cls.__name__)), notification, notification))
 
-        ## Define the closure that we'll hand off to idaapi.notify_when
-        def closure(*parameters):
-            if notification not in self.__cache__ or notification in self.__disabled:
-                return
-
-            # Iterate through our priorityqueue extracting each callable and
-            # executing it with the parameters we received
-            hookq = self.__cache__[notification][:]
-            for priority, callable in heapq.nsmallest(len(hookq), hookq):
-                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority {:+d}".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
-
-                try:
-                    result = callable(*parameters)
-
-                # if we caught an exception, then inform the user about it and stop processing our queue
-                except:
-                    cls = self.__class__
-                    bt = traceback.format_list(self.__traceback[notification, callable])
-                    current = str().join(traceback.format_exception(*sys.exc_info()))
-
-                    formatter = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)))
-                    logging.fatal(formatter(u"Callback for notification ({:#x}) priority {:+d} raised an exception while executing {!r}".format(notification, priority, callable)))
-                    logging.warn(formatter('Traceback (notification was hooked at)'))
-                    [ logging.warn(formatter(item)) for item in str().join(bt).split('\n') ]
-                    [ logging.warn(formatter(item)) for item in current.split('\n') ]
-
-                    result = self.STOP
-
-                if not isinstance(result, self.result) or result == self.CONTINUE:
-                    continue
-
-                elif result == self.STOP:
-                    break
-
-                cls = self.__class__
-                raise TypeError("{:s}.callback({:s}) : Unable to determine the result type from {!r}.".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)), result))
-            return
-
-        # That's it!
-        return closure
+        return super(prioritynotification, self).apply(notification)
 
 class address(object):
     """
