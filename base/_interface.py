@@ -368,7 +368,7 @@ class prioritybase(object):
             # executing it with the parameters we received
             hookq = self.__cache__[target][:]
             for priority, callable in heapq.nsmallest(len(hookq), hookq):
-                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority {:+d}".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
+                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority ({:+d})".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
 
                 try:
                     result = callable(*parameters)
@@ -380,7 +380,7 @@ class prioritybase(object):
                     current = str().join(traceback.format_exception(*sys.exc_info()))
 
                     format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)))
-                    logging.fatal(format(u"Callback for {:s} priority {:+d} raised an exception while executing {!r}".format(self.__formatter__(target), priority, callable)))
+                    logging.fatal(format(u"Callback for {:s} with priority ({:+d}) raised an exception while executing {!r}".format(self.__formatter__(target), priority, callable)))
                     logging.warn(format("Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
                     [ logging.warn(format(item)) for item in str().join(bt).split('\n') ]
                     [ logging.warn(format(item)) for item in current.split('\n') ]
@@ -432,7 +432,7 @@ class priorityhook(prioritybase):
         return self.object.unhook()
 
     def __formatter__(self, name):
-        return "\"{:s}.{:s}\"".format(self.object.__name__, name)
+        return "\"{:s}.{:s}\"".format(self.__type__.__name__, name)
 
     def __hook(self):
         if not self.object.hook():
