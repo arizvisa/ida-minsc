@@ -852,9 +852,8 @@ def make_ida_not_suck_cocks(nw_code):
 
     ## just some debugging notification hooks
     #[ ui.hook.ui.add(n, notify(n), -100) for n in ('range','idcstop','idcstart','suspend','resume','term','ready_to_run') ]
-    #[ ui.hook.idp.add(n, notify(n), -100) for n in ('newfile','oldfile','savebase','closebase','init','term','newprc','newasm','loader_finished','loader') ]
-    #[ ui.hook.idp.add(n, notify(n), -100) for n in ('auto_empty','auto_queue_empty') ]
-    #[ ui.hook.idb.add(n, notify(n), -100) for n in ('thunk_func_created','func_tail_appended','removing_func_tail') ]
+    #[ ui.hook.idp.add(n, notify(n), -100) for n in ('ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty') ]
+    #[ ui.hook.idb.add(n, notify(n), -100) for n in ('closebase','savebase','loader_finished', 'auto_empty', 'thunk_func_created','func_tail_appended') ]
     #[ ui.hook.idp.add(n, notify(n), -100) for n in ('add_func','del_func','set_func_start','set_func_end') ]
     #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
 
