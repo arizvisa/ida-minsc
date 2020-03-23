@@ -828,9 +828,9 @@ def make_ida_not_suck_cocks(nw_code):
         [ ui.hook.idp.add(_, getattr(__import__('hooks'), _), 40) for _ in ('add_func', 'del_func', 'set_func_start', 'set_func_end') ]
     else:
         ui.hook.idb.add('func_tail_removed', func_tail_removed, 40)
-        ui.hook.idp.add('add_func', add_func, 40)
-        ui.hook.idp.add('del_func', del_func, 40)
-        ui.hook.idp.add('tail_owner_changed', tail_owner_changed, 40)
+        ui.hook.idb.add('add_func', add_func, 40)
+        ui.hook.idb.add('del_func', del_func, 40)
+        ui.hook.idb.add('tail_owner_changed', tail_owner_changed, 40)
 
     [ ui.hook.idb.add(_, getattr(__import__('hooks'), _), 40) for _ in ('thunk_func_created', 'func_tail_appended') ]
 
