@@ -310,7 +310,7 @@ class prioritybase(object):
         if target not in self.__cache__:
             if not self.connect(target, self.apply(target)):
                 cls = self.__class__
-                logging.warn(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), notification, callable, priority, self.__formatter__(notification)))
+                logging.warn(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, callable, priority, self.__formatter__(target)))
 
         # discard any callables already attached to the specified target
         self.discard(target, callable)
