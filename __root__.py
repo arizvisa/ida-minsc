@@ -103,6 +103,19 @@ import ui, tools, custom, app
 __notification__ = __import__('internal').interface.prioritynotification()
 idaapi.__notification__ = __notification__
 
-# Now we can install our hooks that initialize/uninitialize MINSC
-idaapi.__notification__.add(idaapi.NW_INITIDA, __import__('hooks').make_ida_not_suck_cocks, -100)
-idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, -100)
+### Now we can install our hooks that initialize/uninitialize MINSC
+try:
+    idaapi.__notification__.add(idaapi.NW_INITIDA, __import__('hooks').make_ida_not_suck_cocks, -100)
+
+# If installing that hook failed, then manually perform our hooks and warn the user
+except NameError:
+    __import__('logging').warn("Unable to add notification for idaapi.NW_INITIDA ({:d}). Setting up hooks manually...".format(idaapi.NW_INITIDA))
+    __import__('hooks').make_ida_not_suck_cocks(idaapi.NW_INITIDA)
+
+try:
+    idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, -100)
+
+# If installing the termination hook failed, then use atexit to set our hooks and warn the user
+except NameError:
+    __import__('logging').warn("Unable to add notification for idaapi.NW_TERMIDA ({:d}). Termination might be unstable...".format(idaapi.NW_TERMIDA))
+    __import__('atexit').register(__import__('hooks').make_ida_suck_cocks, idaapi.NW_TERMIDA)
