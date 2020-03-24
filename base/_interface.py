@@ -306,11 +306,10 @@ class prioritybase(object):
     def add(self, target, callable, priority):
         '''Add the `callable` to our queue for the specified `target` with the provided `priority`.'''
 
-        # connect to the requested target if necessary
-        if target not in self.__cache__:
-            if not self.connect(target, self.apply(target)):
-                cls = self.__class__
-                logging.warn(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, callable, priority, self.__formatter__(target)))
+        # connect to the requested target if possible
+        if target not in self.__cache__ and not self.connect(target, self.apply(target)):
+            cls = self.__class__
+            raise NameError(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, callable, priority, self.__formatter__(target)))
 
         # discard any callables already attached to the specified target
         self.discard(target, callable)
