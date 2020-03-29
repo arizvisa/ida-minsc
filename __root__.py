@@ -105,17 +105,21 @@ idaapi.__notification__ = __notification__
 
 ### Now we can install our hooks that initialize/uninitialize MINSC
 try:
-    idaapi.__notification__.add(idaapi.NW_INITIDA, __import__('hooks').make_ida_not_suck_cocks, -100)
+    idaapi.__notification__.add(idaapi.NW_INITIDA, __import__('hooks').make_ida_not_suck_cocks, -1000)
 
-# If installing that hook failed, then manually perform our hooks and warn the user
+# If installing that hook failed, then register our hook with a timer, and warn
+# the user about this.
 except NameError:
-    __import__('logging').warn("Unable to add notification for idaapi.NW_INITIDA ({:d}). Setting up hooks manually...".format(idaapi.NW_INITIDA))
-    __import__('hooks').make_ida_not_suck_cocks(idaapi.NW_INITIDA)
+    TIMEOUT = 5
+    __import__('logging').warn("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
+    idaapi.register_timer(TIMEOUT, __import__('hooks').ida_is_busy_sucking_cocks)
+    del(TIMEOUT)
 
-try:
-    idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, -100)
+# If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
+else:
+    try:
+        idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, +1000)
 
-# If installing the termination hook failed, then use atexit to set our hooks and warn the user
-except NameError:
-    __import__('logging').warn("Unable to add notification for idaapi.NW_TERMIDA ({:d}). Termination might be unstable...".format(idaapi.NW_TERMIDA))
-    __import__('atexit').register(__import__('hooks').make_ida_suck_cocks, idaapi.NW_TERMIDA)
+    # Installing the termination hook failed, but it's not really too important...
+    except NameError:
+        __import__('logging').warn("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
