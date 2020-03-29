@@ -1668,7 +1668,7 @@ def __newprc__(id):
     elif plfm == idaapi.PLFM_MIPS:  # id == 12
         res = Mips()
     else:
-        iogging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
+        logging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
         return
 
     # assign our required globals
