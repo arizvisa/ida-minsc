@@ -17,6 +17,21 @@ from internal import comment, utils, interface, exceptions as E
 
 import idaapi
 
+def greeting():
+    barrier = 93
+    available = ['database', 'function', 'instruction', 'segment', 'structure', 'enumeration']
+
+    print '=' * barrier
+    print "Welcome to the ida-minsc plugin!"
+    print ""
+    print "You can find documentation at https://arizvisa.github.io/ida-minsc/"
+    print ""
+    print "The available namespaces are: {:s}".format(', '.join(available))
+    print "Please use `help(namespace)` for their usage."
+    print ""
+    print "Your globals have also been cleaned, use `dir()` to see your work."
+    print '-' * barrier
+
 ### general hooks
 def noapi(*args):
     fr = sys._getframe().f_back
@@ -826,14 +841,14 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idb.add('set_func_end', set_func_end, 0)
     elif idaapi.__version__ >= 6.9:
         ui.hook.idb.add('removing_func_tail', removing_func_tail, 0)
-        [ ui.hook.idp.add(_, getattr(__import__('hooks'), _), 0) for _ in ('add_func', 'del_func', 'set_func_start', 'set_func_end') ]
+        [ ui.hook.idp.add(item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
     else:
         ui.hook.idb.add('func_tail_removed', func_tail_removed, 0)
         ui.hook.idp.add('add_func', add_func, 0)
         ui.hook.idp.add('del_func', del_func, 0)
         ui.hook.idb.add('tail_owner_changed', tail_owner_changed, 0)
 
-    [ ui.hook.idb.add(_, getattr(__import__('hooks'), _), 0) for _ in ('thunk_func_created', 'func_tail_appended') ]
+    [ ui.hook.idb.add(item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
 
     ## rebase the entire tagcache when the entire database is rebased.
     if idaapi.__version__ >= 6.9:
@@ -858,13 +873,14 @@ def make_ida_not_suck_cocks(nw_code):
     #[ ui.hook.idp.add(n, notify(n), -100) for n in ('add_func','del_func','set_func_start','set_func_end') ]
     #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
 
-    ### ...and that's it for all the hooks
+    ### ...and that's it for all the hooks, so give out our greeting
+    return greeting()
 
 def make_ida_suck_cocks(nw_code):
     '''Unhook all of IDA's API.'''
     ui.hook.__stop_ida__()
 
 def ida_is_busy_sucking_cocks(*args, **kwargs):
-    import__('hooks').make_ida_not_suck_cocks(idaapi.NW_INITIDA)
-    __idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, +1000)
+    make_ida_not_suck_cocks(idaapi.NW_INITIDA)
+    __idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
     return -1
