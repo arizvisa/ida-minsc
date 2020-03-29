@@ -744,73 +744,74 @@ def make_ida_not_suck_cocks(nw_code):
     elif idaapi.__version__ >= 6.9:
         ui.hook.idp.add('newprc', interface.typemap.__newprc__, 0)
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, 10)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
 
-    ## monitor when ida enters its various states
+    ## monitor when ida enters its various states so we can pre-build the tag cache
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', on_init, 0)
-        ui.hook.idp.add('ev_newfile', on_newfile, 0)
-        ui.hook.idp.add('ev_oldfile', on_oldfile, 0)
-        ui.hook.idp.add('ev_auto_queue_empty', auto_queue_empty, 0)
+        ui.hook.idp.add('ev_init', on_init, -100)
+        ui.hook.idp.add('ev_newfile', on_newfile, -100)
+        ui.hook.idp.add('ev_oldfile', on_oldfile, -100)
+        ui.hook.idp.add('ev_auto_queue_empty', auto_queue_empty, -100)
 
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('init', on_init, 0)
-        ui.hook.idp.add('newfile', on_newfile, 0)
-        ui.hook.idp.add('oldfile', on_oldfile, 0)
-        ui.hook.idp.add('auto_empty', on_ready, 0)
+        ui.hook.idp.add('init', on_init, -100)
+        ui.hook.idp.add('newfile', on_newfile, -100)
+        ui.hook.idp.add('oldfile', on_oldfile, -100)
+        ui.hook.idp.add('auto_empty', on_ready, -100)
 
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_init, 0)
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_newfile, 25)
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, 25)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_init, -50)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
         ui.hook.idp.add('auto_empty', on_ready, 0)
 
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', comment.tagging.__init_tagcache__, 0)
+        ui.hook.idp.add('ev_init', comment.tagging.__init_tagcache__, -1)
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('init', comment.tagging.__init_tagcache__, 0)
+        ui.hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, 10)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
+
+    ## disable some of these hooks using the noapi callback
+    if idaapi.__version__ >= 7.0:
+        [ ui.hook.idb.add(_, noapi, -1) for _ in ('changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed') ]
+    elif idaapi.__version__ >= 6.9:
+        [ ui.hook.idb.add(_, noapi, -1) for _ in ('changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed') ]
+    else:
+        ui.hook.idb.add('cmt_changed', noapi, -1)
+        ui.hook.idb.add('area_cmt_changed', noapi, -1)
 
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
-        [ ui.hook.idb.add(_, noapi, 40) for _ in ('changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed') ]
+        ui.hook.idp.add('ev_init', address.database_init, 0)
+        ui.hook.idp.add('ev_init', globals.database_init, 0)
+        ui.hook.idb.add('changing_range_cmt', globals.changing, 0)
+        ui.hook.idb.add('range_cmt_changed', globals.changed, 0)
     elif idaapi.__version__ >= 6.9:
-        [ ui.hook.idb.add(_, noapi, 40) for _ in ('changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed') ]
+        ui.hook.idp.add('init', address.database_init, 0)
+        ui.hook.idp.add('init', globals.database_init, 0)
+        ui.hook.idb.add('changing_area_cmt', globals.changing, 0)
+        ui.hook.idb.add('area_cmt_changed', globals.changed, 0)
     else:
-        ui.hook.idb.add('cmt_changed', noapi, 40)
-        ui.hook.idb.add('area_cmt_changed', noapi, 40)
-
-    if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_init', address.database_init, 45)
-        ui.hook.idp.add('ev_init', globals.database_init, 45)
-        ui.hook.idb.add('changing_range_cmt', globals.changing, 45)
-        ui.hook.idb.add('range_cmt_changed', globals.changed, 45)
-    elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('init', address.database_init, 45)
-        ui.hook.idp.add('init', globals.database_init, 45)
-        ui.hook.idb.add('changing_area_cmt', globals.changing, 45)
-        ui.hook.idb.add('area_cmt_changed', globals.changed, 45)
-    else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, address.nw_database_init, 15)
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, globals.nw_database_init, 15)
-        ui.hook.idb.add('area_cmt_changed', globals.old_changed, 45)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
+        ui.hook.idb.add('area_cmt_changed', globals.old_changed, 0)
 
     if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('changing_cmt', address.changing, 45)
-        ui.hook.idb.add('cmt_changed', address.changed, 45)
+        ui.hook.idb.add('changing_cmt', address.changing, 0)
+        ui.hook.idb.add('cmt_changed', address.changed, 0)
     else:
-        ui.hook.idb.add('cmt_changed', address.old_changed, 45)
+        ui.hook.idb.add('cmt_changed', address.old_changed, 0)
 
     ## hook naming and "extra" comments to support updating the implicit tags
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_rename', rename, 40)
+        ui.hook.idp.add('ev_rename', rename, 0)
     else:
-        ui.hook.idp.add('rename', rename, 40)
+        ui.hook.idp.add('rename', rename, 0)
 
     if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('extra_cmt_changed', extra_cmt_changed, 40)
+        ui.hook.idb.add('extra_cmt_changed', extra_cmt_changed, 0)
     else:
         # earlier versions of IDAPython don't expose anything about "extra" comments
         # so we can't do anything here.
@@ -818,37 +819,37 @@ def make_ida_not_suck_cocks(nw_code):
 
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
-        ui.hook.idb.add('deleting_func_tail', removing_func_tail, 40)
-        ui.hook.idb.add('func_added', add_func, 40)
-        ui.hook.idb.add('deleting_func', del_func, 40)
-        ui.hook.idb.add('set_func_start', set_func_start, 40)
-        ui.hook.idb.add('set_func_end', set_func_end, 40)
+        ui.hook.idb.add('deleting_func_tail', removing_func_tail, 0)
+        ui.hook.idb.add('func_added', add_func, 0)
+        ui.hook.idb.add('deleting_func', del_func, 0)
+        ui.hook.idb.add('set_func_start', set_func_start, 0)
+        ui.hook.idb.add('set_func_end', set_func_end, 0)
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('removing_func_tail', removing_func_tail, 40)
-        [ ui.hook.idp.add(_, getattr(__import__('hooks'), _), 40) for _ in ('add_func', 'del_func', 'set_func_start', 'set_func_end') ]
+        ui.hook.idb.add('removing_func_tail', removing_func_tail, 0)
+        [ ui.hook.idp.add(_, getattr(__import__('hooks'), _), 0) for _ in ('add_func', 'del_func', 'set_func_start', 'set_func_end') ]
     else:
-        ui.hook.idb.add('func_tail_removed', func_tail_removed, 40)
-        ui.hook.idp.add('add_func', add_func, 40)
-        ui.hook.idp.add('del_func', del_func, 40)
-        ui.hook.idb.add('tail_owner_changed', tail_owner_changed, 40)
+        ui.hook.idb.add('func_tail_removed', func_tail_removed, 0)
+        ui.hook.idp.add('add_func', add_func, 0)
+        ui.hook.idp.add('del_func', del_func, 0)
+        ui.hook.idb.add('tail_owner_changed', tail_owner_changed, 0)
 
-    [ ui.hook.idb.add(_, getattr(__import__('hooks'), _), 40) for _ in ('thunk_func_created', 'func_tail_appended') ]
+    [ ui.hook.idb.add(_, getattr(__import__('hooks'), _), 0) for _ in ('thunk_func_created', 'func_tail_appended') ]
 
     ## rebase the entire tagcache when the entire database is rebased.
     if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('allsegs_moved', rebase, 50)
+        ui.hook.idb.add('allsegs_moved', rebase, 0)
     else:
-        ui.hook.idb.add('segm_start_changed', segm_start_changed, 50)
-        ui.hook.idb.add('segm_end_changed', segm_end_changed, 50)
-        ui.hook.idb.add('segm_moved', segm_moved, 50)
+        ui.hook.idb.add('segm_start_changed', segm_start_changed, 0)
+        ui.hook.idb.add('segm_end_changed', segm_end_changed, 0)
+        ui.hook.idb.add('segm_moved', segm_moved, 0)
 
     ## switch the instruction set when the processor is switched
     if idaapi.__version__ >= 7.0:
-        ui.hook.idp.add('ev_newprc', instruction.__ev_newprc__, 50)
+        ui.hook.idp.add('ev_newprc', instruction.__ev_newprc__, 0)
     elif idaapi.__version__ >= 6.9:
-        ui.hook.idp.add('newprc', instruction.__newprc__, 50)
+        ui.hook.idp.add('newprc', instruction.__newprc__, 0)
     else:
-        idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, 50)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
 
     ## just some debugging notification hooks
     #[ ui.hook.ui.add(n, notify(n), -100) for n in ('range','idcstop','idcstart','suspend','resume','term','ready_to_run') ]
@@ -862,3 +863,8 @@ def make_ida_not_suck_cocks(nw_code):
 def make_ida_suck_cocks(nw_code):
     '''Unhook all of IDA's API.'''
     ui.hook.__stop_ida__()
+
+def ida_is_busy_sucking_cocks(*args, **kwargs):
+    import__('hooks').make_ida_not_suck_cocks(idaapi.NW_INITIDA)
+    __idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, +1000)
+    return -1
