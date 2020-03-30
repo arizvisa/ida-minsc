@@ -882,5 +882,5 @@ def make_ida_suck_cocks(nw_code):
 
 def ida_is_busy_sucking_cocks(*args, **kwargs):
     make_ida_not_suck_cocks(idaapi.NW_INITIDA)
-    __idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
+    idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
     return -1
