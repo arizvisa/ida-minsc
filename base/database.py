@@ -4903,11 +4903,11 @@ class get(object):
         if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
             shift, f1 = 0, operator.methodcaller('rstrip', sentinels)
         elif sl == idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 1, utils.fpass
+            shift, f1 = 1, utils.fidentity
         elif sl == idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 2, utils.fpass
+            shift, f1 = 2, utils.fidentity
         elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 4, utils.fpass
+            shift, f1 = 4, utils.fidentity
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sl, ea))
 
