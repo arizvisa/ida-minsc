@@ -17,10 +17,10 @@ Software Requirements
 ---------------------
 
 This plugin requires IDA Pro to be installed along with the IDAPython plugin
-for the Python 2.x series. IDA versions 6.8 up to 7.4 are supported. The
-installation steps described within this document assume that you're not using
-the bundled Python instance and have instead installed a Python 2.x interpreter
-separately.
+for the Python 2.x series. IDA versions 6.8 up to 7.4.191112 (SP1) are
+supported. The installation steps described within this document assume that
+you're not using the bundled Python instance and have instead installed a
+Python 2.x interpreter separately.
 
 ----------------------------
 Installing the actual plugin
