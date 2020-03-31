@@ -27,8 +27,8 @@ to augment their reversing endeavors without distraction.
 
 This plugin is dependant upon IDAPython with Python 2.x, and supports all of
 the different platforms the IDA supports which includes Windows, Linux, and
-MacOS. At the present time, only IDA 6.8 up till IDA 7.4 are currently
-supported.
+MacOS. At the present time, only IDA 6.8 up till IDA 7.4.191112 (SP1) are
+currently supported.
 
 Table of Contents
 =================
