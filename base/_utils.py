@@ -17,12 +17,12 @@ import sys, heapq, collections
 import internal
 import idaapi
 
-__all__ = ['fbox','fboxed','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fpassthru','fdefault','fpass','fidentity','fid','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fmemo','fpartial','fapply','fcurry','frpartial','freverse','freversed','fexc','fexception','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
 # box any specified arguments
-fbox = fboxed = lambda *a: a
+fbox = lambda *a: a
 # return a closure that executes `f` with the arguments unboxed.
 funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **builtins.dict(k.items() + kp.items()))
 # return a closure that will check that `object` is an instance of `type`.
@@ -38,7 +38,7 @@ fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(objec
 # return a closure that always returns `object`.
 fconstant = fconst = falways = lambda object: lambda *a, **k: object
 # a closure that returns its argument always
-fpassthru = fpass = fidentity = fid = lambda object: object
+fidentity = lambda object: object
 # a closure that returns a default value if its object is false-y
 fdefault = lambda default: lambda object: object or default
 # return the first, second, or third item of a box.
@@ -48,7 +48,7 @@ fcompose = lambda *f: builtins.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), buil
 # return a closure that executes function `f` whilst discarding any extra arguments
 fdiscard = lambda f: lambda *a, **k: f()
 # return a closure that executes function `crit` and then returns/executes `f` or `t` based on whether or not it's successful.
-fcondition = fcond = lambda crit: lambda t, f: \
+fcondition = lambda crit: lambda t, f: \
     lambda *a, **k: (t(*a, **k) if builtins.callable(t) else t) if crit(*a, **k) else (f(*a, **k) if builtins.callable(f) else f)
 # return a closure that takes a list of functions to execute with the provided arguments
 fmap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
@@ -61,7 +61,6 @@ def flazy(f, *a, **k):
         A, K = a+ap, sortedtuple(k.items() + kp.items())
         return state[(A, K)] if (A, K) in state else state.setdefault((A, K), f(*A, **builtins.dict(k.items()+kp.items())))
     return lazy
-fmemo = flazy
 # return a closure with the function's arglist partially applied
 fpartial = functools.partial
 # return a closure that applies the provided arguments to the function `f`.
@@ -71,14 +70,13 @@ fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a+ap), **builtins.dict(k.items
 # return a closure that applies the initial arglist to the end of function `f`.
 frpartial = lambda f, *a, **k: lambda *ap, **kp: f(*(ap + builtins.tuple(builtins.reversed(a))), **builtins.dict(k.items() + kp.items()))
 # return a closure that applies the arglist to function `f` in reverse.
-freversed = freverse = lambda f, *a, **k: lambda *ap, **kp: f(*builtins.reversed(a + ap), **builtins.dict(k.items() + kp.items()))
+freverse = lambda f, *a, **k: lambda *ap, **kp: f(*builtins.reversed(a + ap), **builtins.dict(k.items() + kp.items()))
 # return a closure that executes function `f` and includes the caught exception (or None) as the first element in the boxed result.
 def fcatch(f, *a, **k):
     def fcatch(*a, **k):
         try: return builtins.None, f(*a, **k)
         except: return sys.exc_info()[1], builtins.None
     return functools.partial(fcatch, *a, **k)
-fexc = fexception = fcatch
 # boolean inversion of the result of a function
 fcomplement = fnot = frpartial(fcompose, operator.not_)
 # converts a list to an iterator, or an iterator to a list
