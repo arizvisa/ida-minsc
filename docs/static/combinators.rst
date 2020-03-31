@@ -51,8 +51,6 @@ Combinators
 
    Given any number of ``args``, box them into a tuple.
 
-   Aliases: ``fboxed``
-
    :param \*args: any number of objects to box as a tuple
    :return: a tuple containing the arguments that were boxed
 
@@ -126,12 +124,10 @@ Combinators
    :param \*default: an attribute returned by default if the ``object``
                      does not contain with specified ``attribute``
 
-.. py:function:: fpassthru(object)
+.. py:function:: fidentity(object)
 
    Given an ``object``, return it. This is the identity function
    and is typically used to ignore transforming an object.
-
-   Aliases: ``fpass``, ``fidentity``, ``fid``
 
    :param object: any kind of python object to return
 
@@ -169,8 +165,6 @@ Combinators
    the function returns a truthy value, or return ``false`` if it
    returns a false-y value.
 
-   Aliases: ``fcond``
-
    :param crit: a callable that takes an argument and returns true or false
    :type crit: `function`
    :param true: an object or a function to return (or execute) when value is true
@@ -189,16 +183,14 @@ Combinators
                        result returned
    :param object: any kind of python object to use
 
-.. py:function:: fmemo(callable, \*initial_args, \*\*initial_kwargs)(\*args, \*\*kwargs)
+.. py:function:: flazy(callable, \*initial_args, \*\*initial_kwargs)(\*args, \*\*kwargs)
 
    Given a ``callable``, and any ``initial_args`` and ``initial_kwargs``,
    return a closure that caches (memoizes) the result that is returned. The next
    time this closure is called with the same arguments, the cached version will
    be returned instead.
 
-   Aliases: ``flazy``
-
-   :param callable: any callable to memoize the results for
+   :param callable: any callable to execute lazily and memoize its result for
    :type callable: `function`
    :param \*initial_args: any initial arguments to prefix to the callable
    :param \*\*initial_kwargs: any initial keyword arguments to apply to the callable
@@ -260,15 +252,13 @@ Combinators
    :param \*args: the arguments to apply to the beginning of the ``callable``
    :param \*\*kwargs: any extra keyword arguments to apply to the ``callable``
 
-.. py:function:: freversed(callable, \*reverse_args, \*\*reverse_kwargs)(\*extra_args, \*\*extra_kwargs)
+.. py:function:: freverse(callable, \*reverse_args, \*\*reverse_kwargs)(\*extra_args, \*\*extra_kwargs)
 
    Given a ``callable``, the arguments ``reverse_args``, and the
    keyword arguments ``reverse_kwargs``, return a closure which applies
    these to the end of the ``callable``. If ``extra_args`` or
    ``extra_kwargs`` is provided, then continue to apply these to the
    ``callable`` but backwards.
-
-   Aliases: ``freverse``
 
    :param callable: the callable to apply the arguments to
    :type callable: `function`
@@ -287,8 +277,6 @@ Combinators
    second element of the tuple will be the result, and the first element will
    be the exception object if one was raised. If one wasn't raised, then the
    first element will be the value :py:obj:`None`.
-
-   Aliases: ``fexc``, ``fexception``
 
    :param callable: the callable to catch an exception in
    :type callable: `function`
