@@ -344,7 +344,8 @@ class functions(object):
             maxaddr, minaddr = max(max(map(operator.itemgetter(-1), res)), maxaddr), max(max(map(operator.itemgetter(0), res)), minaddr)
             chunks = max(len(res), chunks)
 
-            marks = max(len(builtins.list(function.marks(func))), marks)
+            # Prior to IDA 7.0, interacting with marks forces the mark window to appear...so we'll ignore them
+            marks = max(len([] if idaapi.__version__ < 7.0 else builtins.list(function.marks(func))), marks)
             blocks = max(len(builtins.list(function.blocks(func))), blocks)
             exits = max(len(builtins.list(function.bottom(func))), exits)
             lvars = max(len(builtins.list(flvars(func))) if func.frsize else lvars, lvars)
@@ -370,7 +371,7 @@ class functions(object):
         for index, ea in enumerate(listable):
             func, _ = function.by(ea), ui.navigation.procedure(ea)
             res = builtins.list(function.chunks(func))
-            six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} {:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d} marks:{:<{:d}d}".format(
+            six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} {:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
                 index, int(cindex),
                 offset(ea), int(cmaxoffset),
                 min(map(operator.itemgetter(0), res)), int(cminaddr), max(map(operator.itemgetter(-1), res)), int(cmaxaddr),
@@ -380,7 +381,7 @@ class functions(object):
                 len(list(flvars(func))), 1 + int(clvars),
                 len(list(function.blocks(func))), 1 + int(cblocks),
                 len(list(function.bottom(func))), 1 + int(cexits),
-                len(list(function.marks(func))), 1 + int(cmarks)
+                '' if idaapi.__version__ < 7.0 else " marks:{:<{:d}d}".format(len(list(function.marks(func))), 1 + int(cmarks))
             ))
         return
 

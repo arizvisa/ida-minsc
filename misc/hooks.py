@@ -11,11 +11,26 @@ import six
 import sys, logging
 import functools, operator, itertools, types
 
-import database, function, ui
+import database, function, instruction, ui
 import internal
 from internal import comment, utils, interface, exceptions as E
 
 import idaapi
+
+def greeting():
+    barrier = 93
+    available = ['database', 'function', 'instruction', 'segment', 'structure', 'enumeration']
+
+    print '=' * barrier
+    print "Welcome to the ida-minsc plugin!"
+    print ""
+    print "You can find documentation at https://arizvisa.github.io/ida-minsc/"
+    print ""
+    print "The available namespaces are: {:s}".format(', '.join(available))
+    print "Please use `help(namespace)` for their usage."
+    print ""
+    print "Your globals have also been cleaned, use `dir()` to see your work."
+    print '-' * barrier
 
 ### general hooks
 def noapi(*args):
@@ -33,7 +48,7 @@ def notify(name):
     return notification
 
 ### comment hooks
-class comment(object):
+class commentbase(object):
     @classmethod
     def database_init(cls, idp_modname):
         if hasattr(cls, 'event'):
@@ -41,7 +56,12 @@ class comment(object):
         cls.event = cls._event()
         next(cls.event)
 
-class address(comment):
+    @classmethod
+    def nw_database_init(cls, nw_code, is_old_database):
+        idp_modname = idaapi.get_idp_name()
+        return cls.database_init(idp_modname)
+
+class address(commentbase):
     @classmethod
     def _is_repeatable(cls, ea):
         f = idaapi.get_func(ea)
@@ -152,7 +172,32 @@ class address(comment):
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt))
             cls.event = cls._event(); next(cls.event)
 
-class globals(comment):
+    @classmethod
+    def old_changed(cls, ea, repeatable_cmt):
+        cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
+        fn = idaapi.get_func(ea)
+
+        # if we're in a function, then clear our contents.
+        if fn:
+            internal.comment.contents.set_address(ea, 0)
+
+        # otherwise, just clear the tags globally
+        else:
+            internal.comment.globals.set_address(ea, 0)
+
+        # simply grab the comment and update its refs
+        res = internal.comment.decode(cmt)
+        if res:
+            cls._create_refs(ea, res)
+
+        # otherwise, there's nothing to do if its empty
+        else:
+            return
+
+        # and then re-write it back to its address
+        idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
+
+class globals(commentbase):
     @classmethod
     def _update_refs(cls, fn, old, new):
         for key in old.viewkeys() ^ new.viewkeys():
@@ -267,6 +312,31 @@ class globals(comment):
             cls.event = cls._event(); next(cls.event)
         return
 
+    @classmethod
+    def old_changed(cls, cb, a, cmt, repeatable):
+        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        ea = interface.range.start(a)
+
+        # if we're not a function, then this is a false alarm and we leave.
+        fn = idaapi.get_func(ea)
+        if fn is None:
+            return
+
+        # we're using an old version of ida here, so start out empty
+        internal.comment.globals.set_address(ea, 0)
+
+        # grab our comment here and re-create its refs
+        res = internal.comment.decode(utils.string.of(cmt))
+        if res:
+            cls._create_refs(fn, res)
+
+        # if it's empty, then there's nothing to do and we can leave
+        else:
+            return
+
+        # now we can simply re-write it it
+        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(res)), repeatable)
+
 ### database scope
 class state(object):
     # database notification state
@@ -286,6 +356,10 @@ def on_init(idp_modname):
     else:
         logging.debug(u"{:s}.on_init({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(idp_modname), utils.string.repr(State)))
 
+def nw_on_init(nw_code, is_old_database):
+    idp_modname = idaapi.get_idp_name()
+    return on_init(idp_modname)
+
 def on_newfile(fname):
     '''IDP_Hooks.newfile'''
 
@@ -296,6 +370,12 @@ def on_newfile(fname):
     else:
         logging.debug(u"{:s}.on_newfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
     # FIXME: save current state like base addresses and such
+
+def nw_on_newfile(nw_code, is_old_database):
+    if is_old_database:
+        return
+    fname = idaapi.cvar.database_idb
+    return on_newfile(fname)
 
 def on_oldfile(fname):
     '''IDP_Hooks.oldfile'''
@@ -309,6 +389,12 @@ def on_oldfile(fname):
     else:
         logging.debug(u"{:s}.on_oldfile({!s}) : Received unexpected state transition from state ({!s}).".format(__name__, utils.string.repr(fname), utils.string.repr(State)))
     # FIXME: save current state like base addresses and such
+
+def nw_on_oldfile(nw_code, is_old_database):
+    if not is_old_database:
+        return
+    fname = idaapi.cvar.database_idb
+    return on_oldfile(fname)
 
 def __check_functions():
     # FIXME: check if tagcache needs to be created
@@ -452,6 +538,18 @@ def __rebase_globals(old, new, size, iterable):
         yield i, ea
     return
 
+def segm_start_changed(s):
+    # XXX: not yet implemented
+    return
+
+def segm_end_changed(s):
+    # XXX: not yet implemented
+    return
+
+def segm_moved(source, destination, size):
+    # XXX: not yet implemented
+    return
+
 # address naming
 def rename(ea, newname):
     fl = database.type.flags(ea)
@@ -522,6 +620,42 @@ def removing_func_tail(pfn, tail):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
             logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
+        continue
+    return
+
+def func_tail_removed(pfn, ea):
+    # XXX: this is for older versions of IDA
+    global State
+    if State != state.ready: return
+
+    # first we'll grab the addresses from our refs
+    res = internal.comment.contents.address(ea, target=interface.range.start(pfn))
+
+    # these are sorted, so first we'll filter out what doesn't belong
+    missing = [ item for item in res if idaapi.get_func(item) != pfn ]
+
+    # now iterate through the min/max of the list as hopefully this is
+    # our event.
+    for ea in database.address.iterate(min(missing), max(missing)):
+        for k in database.tag(ea):
+            internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
+            internal.comment.globals.inc(ea, k)
+            logging.debug(u"{:s}.func_tail_removed({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), ea, utils.string.repr(k), utils.string.repr(k)))
+        continue
+    return
+
+def tail_owner_changed(tail, owner_func):
+    # XXX: this is for older versions of IDA
+    global State
+    if State != state.ready: return
+
+    # this is easy as we just need to walk through tail and add it
+    # to owner_func
+    for ea in database.address.iterate(*interface.range.unpack(tail)):
+        for k in database.tag(ea):
+            internal.comment.contents.dec(ea, k)
+            internal.comment.contents.inc(ea, k, target=owner_func)
+            logging.debug(u"{:s}.tail_owner_changed({:#x}, {:#x}) : Exchanging (increasing) refcount for contents tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(tail), owner_func, utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
@@ -612,3 +746,141 @@ def set_func_end(pfn, new_end):
             continue
         return
     return
+
+def make_ida_not_suck_cocks(nw_code):
+    '''Start hooking all of IDA's API.'''
+
+    ## initialize the priorityhook api for all three of IDA's interfaces
+    ui.hook.__start_ida__()
+
+    ## setup default integer types for the typemapper once the loader figures everything out
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_newprc', interface.typemap.__ev_newprc__, 0)
+    elif idaapi.__version__ >= 6.9:
+        ui.hook.idp.add('newprc', interface.typemap.__newprc__, 0)
+    else:
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
+
+    ## monitor when ida enters its various states so we can pre-build the tag cache
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_init', on_init, -100)
+        ui.hook.idp.add('ev_newfile', on_newfile, -100)
+        ui.hook.idp.add('ev_oldfile', on_oldfile, -100)
+        ui.hook.idp.add('ev_auto_queue_empty', auto_queue_empty, -100)
+
+    elif idaapi.__version__ >= 6.9:
+        ui.hook.idp.add('init', on_init, -100)
+        ui.hook.idp.add('newfile', on_newfile, -100)
+        ui.hook.idp.add('oldfile', on_oldfile, -100)
+        ui.hook.idp.add('auto_empty', on_ready, -100)
+
+    else:
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_init, -50)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_newfile, -20)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, nw_on_oldfile, -20)
+        ui.hook.idp.add('auto_empty', on_ready, 0)
+
+    ## create the tagcache netnode when a database is created
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_init', comment.tagging.__init_tagcache__, -1)
+    elif idaapi.__version__ >= 6.9:
+        ui.hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
+    else:
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
+
+    ## disable some of these hooks using the noapi callback
+    if idaapi.__version__ >= 7.0:
+        [ ui.hook.idb.add(_, noapi, -1) for _ in ('changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed') ]
+    elif idaapi.__version__ >= 6.9:
+        [ ui.hook.idb.add(_, noapi, -1) for _ in ('changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed') ]
+    else:
+        ui.hook.idb.add('cmt_changed', noapi, -1)
+        ui.hook.idb.add('area_cmt_changed', noapi, -1)
+
+    ## hook any user-entered comments so that they will also update the tagcache
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_init', address.database_init, 0)
+        ui.hook.idp.add('ev_init', globals.database_init, 0)
+        ui.hook.idb.add('changing_range_cmt', globals.changing, 0)
+        ui.hook.idb.add('range_cmt_changed', globals.changed, 0)
+    elif idaapi.__version__ >= 6.9:
+        ui.hook.idp.add('init', address.database_init, 0)
+        ui.hook.idp.add('init', globals.database_init, 0)
+        ui.hook.idb.add('changing_area_cmt', globals.changing, 0)
+        ui.hook.idb.add('area_cmt_changed', globals.changed, 0)
+    else:
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
+        ui.hook.idb.add('area_cmt_changed', globals.old_changed, 0)
+
+    if idaapi.__version__ >= 6.9:
+        ui.hook.idb.add('changing_cmt', address.changing, 0)
+        ui.hook.idb.add('cmt_changed', address.changed, 0)
+    else:
+        ui.hook.idb.add('cmt_changed', address.old_changed, 0)
+
+    ## hook naming and "extra" comments to support updating the implicit tags
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_rename', rename, 0)
+    else:
+        ui.hook.idp.add('rename', rename, 0)
+
+    if idaapi.__version__ >= 6.9:
+        ui.hook.idb.add('extra_cmt_changed', extra_cmt_changed, 0)
+    else:
+        # earlier versions of IDAPython don't expose anything about "extra" comments
+        # so we can't do anything here.
+        pass
+
+    ## hook function transformations so we can shuffle their tags between types
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idb.add('deleting_func_tail', removing_func_tail, 0)
+        ui.hook.idb.add('func_added', add_func, 0)
+        ui.hook.idb.add('deleting_func', del_func, 0)
+        ui.hook.idb.add('set_func_start', set_func_start, 0)
+        ui.hook.idb.add('set_func_end', set_func_end, 0)
+    elif idaapi.__version__ >= 6.9:
+        ui.hook.idb.add('removing_func_tail', removing_func_tail, 0)
+        [ ui.hook.idp.add(item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
+    else:
+        ui.hook.idb.add('func_tail_removed', func_tail_removed, 0)
+        ui.hook.idp.add('add_func', add_func, 0)
+        ui.hook.idp.add('del_func', del_func, 0)
+        ui.hook.idb.add('tail_owner_changed', tail_owner_changed, 0)
+
+    [ ui.hook.idb.add(item.__name__, item, 0) for item in [thunk_func_created, func_tail_appended] ]
+
+    ## rebase the entire tagcache when the entire database is rebased.
+    if idaapi.__version__ >= 6.9:
+        ui.hook.idb.add('allsegs_moved', rebase, 0)
+    else:
+        ui.hook.idb.add('segm_start_changed', segm_start_changed, 0)
+        ui.hook.idb.add('segm_end_changed', segm_end_changed, 0)
+        ui.hook.idb.add('segm_moved', segm_moved, 0)
+
+    ## switch the instruction set when the processor is switched
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_newprc', instruction.__ev_newprc__, 0)
+    elif idaapi.__version__ >= 6.9:
+        ui.hook.idp.add('newprc', instruction.__newprc__, 0)
+    else:
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
+
+    ## just some debugging notification hooks
+    #[ ui.hook.ui.add(n, notify(n), -100) for n in ('range','idcstop','idcstart','suspend','resume','term','ready_to_run') ]
+    #[ ui.hook.idp.add(n, notify(n), -100) for n in ('ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty') ]
+    #[ ui.hook.idb.add(n, notify(n), -100) for n in ('closebase','savebase','loader_finished', 'auto_empty', 'thunk_func_created','func_tail_appended') ]
+    #[ ui.hook.idp.add(n, notify(n), -100) for n in ('add_func','del_func','set_func_start','set_func_end') ]
+    #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
+
+    ### ...and that's it for all the hooks, so give out our greeting
+    return greeting()
+
+def make_ida_suck_cocks(nw_code):
+    '''Unhook all of IDA's API.'''
+    ui.hook.__stop_ida__()
+
+def ida_is_busy_sucking_cocks(*args, **kwargs):
+    make_ida_not_suck_cocks(idaapi.NW_INITIDA)
+    idaapi.__notification__.add(idaapi.NW_TERMIDA, make_ida_suck_cocks, +1000)
+    return -1

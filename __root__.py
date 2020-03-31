@@ -36,6 +36,8 @@ idaapi.__version_major__, idaapi.__version_minor__, idaapi.__version__ = __versi
 ## now we can delete the function because we're done with it
 del __version__
 
+### Pre-populate the root namespace with a bunch of things that IDA requires
+
 ## IDA 6.9 requires the _idaapi module exists in the global namespace
 if idaapi.__version__ <= 6.9:
     import _idaapi
@@ -95,95 +97,29 @@ architecture_t, register_t, symbol_t = (getattr(__import__('internal').interface
 # other miscellaneous modules to expose to the user
 import ui, tools, custom, app
 
-### namespace customization stops here
+### Construct a priority notification handler, and inject into IDA because it
+### needs to exist for everything to initialize/deinitialize properly.
 
-### hooks for different parts of ida start here...
+__notification__ = __import__('internal').interface.prioritynotification()
+idaapi.__notification__ = __notification__
 
-## entire scope for execution queue and hooks
-ui.hook.__start_ida__()
-ui.hook.ui.add('term', ui.hook.__stop_ida__, 10000)
+### Now we can install our hooks that initialize/uninitialize MINSC
+try:
+    idaapi.__notification__.add(idaapi.NW_INITIDA, __import__('hooks').make_ida_not_suck_cocks, -1000)
 
-## setup default integer types for the typemapper once the loader figures everything out
-if idaapi.__version__ < 7.0:
-    ui.hook.idp.add('newprc', __import__('internal').interface.typemap.__newprc__, 0)
+# If installing that hook failed, then register our hook with a timer, and warn
+# the user about this.
+except NameError:
+    TIMEOUT = 5
+    __import__('logging').warn("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
+    idaapi.register_timer(TIMEOUT, __import__('hooks').ida_is_busy_sucking_cocks)
+    del(TIMEOUT)
+
+# If we were able to hook NW_INITIDA, then the NW_TERMIDA hook should also work.
 else:
-    ui.hook.idp.add('ev_newprc', __import__('internal').interface.typemap.__ev_newprc__, 0)
+    try:
+        idaapi.__notification__.add(idaapi.NW_TERMIDA, __import__('hooks').make_ida_suck_cocks, +1000)
 
-## monitor when ida enters its various states
-if idaapi.__version__ < 7.0:
-    ui.hook.idp.add('init', __import__('hooks').on_init, 0)
-    ui.hook.idp.add('newfile', __import__('hooks').on_newfile, 0)
-    ui.hook.idp.add('oldfile', __import__('hooks').on_oldfile, 0)
-    ui.hook.idp.add('auto_empty', __import__('hooks').on_ready, 0)
-else:
-    ui.hook.idp.add('ev_init', __import__('hooks').on_init, 0)
-    ui.hook.idp.add('ev_newfile', __import__('hooks').on_newfile, 0)
-    ui.hook.idp.add('ev_oldfile', __import__('hooks').on_oldfile, 0)
-    ui.hook.idp.add('ev_auto_queue_empty', __import__('hooks').auto_queue_empty, 0)
-
-## create the tagcache netnode when a database is created
-if idaapi.__version__ < 7.0:
-    ui.hook.idp.add('init', __import__('internal').comment.tagging.__init_tagcache__, 0)
-else:
-    ui.hook.idp.add('ev_init', __import__('internal').comment.tagging.__init_tagcache__, 0)
-
-## hook any user-entered comments so that they will also update the tagcache
-if idaapi.__version__ < 7.0:
-    [ ui.hook.idb.add(_, __import__('hooks').noapi, 40) for _ in ('changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed') ]
-else:
-    [ ui.hook.idb.add(_, __import__('hooks').noapi, 40) for _ in ('changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed') ]
-
-if idaapi.__version__ < 7.0:
-    ui.hook.idp.add('init', __import__('hooks').address.database_init, 45)
-    ui.hook.idp.add('init', __import__('hooks').globals.database_init, 45)
-    ui.hook.idb.add('changing_area_cmt', __import__('hooks').globals.changing, 45)
-    ui.hook.idb.add('area_cmt_changed', __import__('hooks').globals.changed, 45)
-else:
-    ui.hook.idp.add('ev_init', __import__('hooks').address.database_init, 45)
-    ui.hook.idp.add('ev_init', __import__('hooks').globals.database_init, 45)
-    ui.hook.idb.add('changing_range_cmt', __import__('hooks').globals.changing, 45)
-    ui.hook.idb.add('range_cmt_changed', __import__('hooks').globals.changed, 45)
-
-ui.hook.idb.add('changing_cmt', __import__('hooks').address.changing, 45)
-ui.hook.idb.add('cmt_changed', __import__('hooks').address.changed, 45)
-
-## hook naming and "extra" comments to support updating the implicit tags
-if idaapi.__version__ < 7.0:
-    ui.hook.idp.add('rename', __import__('hooks').rename, 40)
-else:
-    ui.hook.idp.add('ev_rename', __import__('hooks').rename, 40)
-ui.hook.idb.add('extra_cmt_changed', __import__('hooks').extra_cmt_changed, 40)
-
-## hook function transformations so we can shuffle their tags between types
-if idaapi.__version__ < 7.0:
-    ui.hook.idb.add('removing_func_tail', __import__('hooks').removing_func_tail, 40)
-    [ ui.hook.idp.add(_, getattr(__import__('hooks'), _), 40) for _ in ('add_func', 'del_func', 'set_func_start', 'set_func_end') ]
-else:
-    ui.hook.idb.add('deleting_func_tail', __import__('hooks').removing_func_tail, 40)
-    ui.hook.idb.add('func_added', __import__('hooks').add_func, 40)
-    ui.hook.idb.add('deleting_func', __import__('hooks').del_func, 40)
-    ui.hook.idb.add('set_func_start', __import__('hooks').set_func_start, 40)
-    ui.hook.idb.add('set_func_end', __import__('hooks').set_func_end, 40)
-[ ui.hook.idb.add(_, getattr(__import__('hooks'), _), 40) for _ in ('thunk_func_created', 'func_tail_appended') ]
-
-## rebase the entire tagcache when the entire database is rebased.
-ui.hook.idb.add('allsegs_moved', __import__('hooks').rebase, 50)
-
-## switch the instruction set when the processor is switched
-if idaapi.__version__ < 7.0:
-    ui.hook.idp.add('newprc', instruction.__newprc__, 50)
-else:
-    ui.hook.idp.add('ev_newprc', instruction.__ev_newprc__, 50)
-
-## just some debugging notification hooks
-#[ ui.hook.ui.add(n, __import__('hooks').notify(n), -100) for n in ('range','idcstop','idcstart','suspend','resume','term','ready_to_run') ]
-#[ ui.hook.idp.add(n, __import__('hooks').notify(n), -100) for n in ('newfile','oldfile','savebase','closebase','init','term','newprc','newasm','loader_finished','loader') ]
-#[ ui.hook.idp.add(n, __import__('hooks').notify(n), -100) for n in ('auto_empty','auto_queue_empty') ]
-#[ ui.hook.idb.add(n, __import__('hooks').notify(n), -100) for n in ('thunk_func_created','func_tail_appended','removing_func_tail') ]
-#[ ui.hook.idp.add(n, __import__('hooks').notify(n), -100) for n in ('add_func','del_func','set_func_start','set_func_end') ]
-#ui.hook.idb.add('allsegs_moved', __import__('hooks').notify('allsegs_moved'), -100)
-
-## delete the temporary variable we used for list comprehensions
-del _
-
-### ...and that's it for all the hooks
+    # Installing the termination hook failed, but it's not really too important...
+    except NameError:
+        __import__('logging').warn("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))

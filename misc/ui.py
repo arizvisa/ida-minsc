@@ -298,9 +298,6 @@ class strings(appwindow):
             raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
         #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
-    # FIXME: I don't think that these callbacks are stackable
-    #idaapi.notify_when(idaapi.NW_OPENIDB, __on_openidb__)
-
     @classmethod
     def refresh(cls):
         '''Refresh the strings list.'''
@@ -760,9 +757,10 @@ class hook(object):
         ]
         priorityhook = internal.interface.priorityhook
         for attr, hookcls in api:
+            instance = priorityhook(hookcls)
             if not hasattr(cls, attr):
-                setattr(cls, attr, priorityhook(hookcls))
-            continue
+                setattr(cls, attr, instance)
+            instance.hook()
         return
 
     @classmethod
@@ -775,7 +773,7 @@ class hook(object):
                 res.disable(name)
 
             # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
-            res.remove()
+            res.unhook()
         return
 
 ### Helper classes to use or inherit from

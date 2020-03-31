@@ -8,7 +8,7 @@ individuals to attempt to understand this craziness.
 """
 
 import six
-import sys, logging
+import sys, logging, contextlib
 import functools, operator, itertools, types
 import collections, heapq, traceback, ctypes
 import unicodedata as _unicodedata, string as _string
@@ -166,6 +166,11 @@ class typemap:
         return cls.__newprc__(pnum)
 
     @classmethod
+    def __nw_newprc__(cls, nw_code, is_old_database):
+        pnum = idaapi.ph_get_id()
+        return cls.__newprc__(pnum)
+
+    @classmethod
     def dissolve(cls, flag, typeid, size):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
@@ -226,145 +231,314 @@ class typemap:
         typeid = idaapi.BADADDR if typeid < 0 else typeid
         return flag|(idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz)*count
 
-class priorityhook(object):
-    """
-    Helper class for allowing one to apply a number of hooks to the
-    different hook points within IDA.
-    """
+class prioritybase(object):
     result = type('result', (object,), {})
     CONTINUE = type('continue', (result,), {})()
     STOP = type('stop', (result,), {})()
 
-    def __init__(self, hooktype, **exclude):
-        '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
-        exclusions = set(exclude.get('exclude', ()))
-        self.__type__ = hooktype
-        self.__cache = collections.defaultdict(list)
-        self.object = self.cycle(self.__type__())
+    def __init__(self):
+        self.__cache__ = collections.defaultdict(list)
         self.__disabled = set()
         self.__traceback = {}
+
+    def __iter__(self):
+        '''Return the id of each target that is hooked by this object.'''
+        for target in self.__cache__:
+            yield target
+        return
+
+    def __formatter__(self, target):
+        raise NotImplementedError
+
+    def connect(self, target, callable):
+        raise NotImplementedError
+
+    def disconnect(self, target):
+        raise NotImplementedError
+
+    def hook(self):
+        '''Physically connect all of the hooks controlled by this class.'''
+        notok = False
+
+        # Just iterate through each target and connect a closure for it
+        for target in self.__cache__.viewkeys():
+            ok = self.connect(target, self.apply(target))
+            if not ok:
+                logging.warn(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join(('internal', __name__, self.__class__.__name__)), self.__format__(target)))
+                notok = True
+            continue
+        return not notok
+
+    def unhook(self):
+        '''Physically disconnect all of the hooks controlled by this class.'''
+        notok = False
+
+        # Simply disconnect everything
+        for target in self.__cache__.viewkeys():
+            ok = self.disconnect(target)
+            if not ok:
+                logging.warn(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join(('internal', __name__, self.__class__.__name__)), self.__format__(target)))
+                notok = True
+            continue
+        return not notok
+
+    def enable(self, target):
+        '''Enable any callables for the specified `target` that has been previously disabled.'''
+        if target not in self.__disabled:
+            cls = self.__class__
+            logging.fatal(u"{:s}.enable({:#x}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
+            return False
+        self.__disabled.discard(target)
+        return True
+
+    def disable(self, target):
+        '''Disable execution of all the callables for the specified `target`.'''
+        cls = self.__class__
+        if target not in self.__cache__:
+            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__cache__.viewkeys())))))
+            return False
+        if target in self.__disabled:
+            logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
+            return False
+        self.__disabled.add(target)
+        return True
+
+    def add(self, target, callable, priority):
+        '''Add the `callable` to our queue for the specified `target` with the provided `priority`.'''
+
+        # connect to the requested target if possible
+        if target not in self.__cache__ and not self.connect(target, self.apply(target)):
+            cls = self.__class__
+            raise NameError(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, callable, priority, self.__formatter__(target)))
+
+        # discard any callables already attached to the specified target
+        self.discard(target, callable)
+
+        # add the callable to our priority queue
+        res = self.__cache__[target]
+        heapq.heappush(self.__cache__[target], (priority, callable))
+
+        # preserve a backtrace so we can track where our callable is at
+        self.__traceback[(target, callable)] = traceback.extract_stack()[:-1]
+        return True
+
+    def get(self, target):
+        '''Return all of the callables that are attached to the specified `target`.'''
+        res = self.__cache__[target]
+        return tuple(callable for _, callable in res)
+
+    def discard(self, target, callable):
+        '''Discard the `callable` from our priority queue for the specified `target`.'''
+        if target not in self.__cache__:
+            return False
+
+        state = []
+
+        # Filter through our cache for the specified target, and collect
+        # each callable except for the one the user provided.
+        found = 0
+        for index, (priority, F) in enumerate(self.__cache__[target][:]):
+            if F == callable:
+                found += 1
+                continue
+            state.append((priority, F))
+
+        # If we aggregated some items, then replace our cache with everything
+        # except for the item the user discarded.
+        if state:
+            self.__cache__[target][:] = state
+
+        # Otherwise we found nothing and we can remove the entire target
+        # from our cache.
+        else:
+            self.__cache__.pop(target, [])
+
+        return True if found else False
+
+    def apply(self, target):
+        '''Return a closure that will execute all of the hooks for the specified `target`.'''
+
+        ## Define the closure that we'll hand off to connect
+        def closure(*parameters):
+            if target not in self.__cache__ or target in self.__disabled:
+                return
+
+            # Iterate through our priorityqueue extracting each callable and
+            # executing it with the parameters we received
+            hookq = self.__cache__[target][:]
+            for priority, callable in heapq.nsmallest(len(hookq), hookq):
+                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority ({:+d})".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
+
+                try:
+                    result = callable(*parameters)
+
+                # if we caught an exception, then inform the user about it and stop processing our queue
+                except:
+                    cls = self.__class__
+                    bt = traceback.format_list(self.__traceback[target, callable])
+                    current = str().join(traceback.format_exception(*sys.exc_info()))
+
+                    format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)))
+                    logging.fatal(format(u"Callback for {:s} with priority ({:+d}) raised an exception while executing {!r}".format(self.__formatter__(target), priority, callable)))
+                    logging.warn(format("Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
+                    [ logging.warn(format(item)) for item in str().join(bt).split('\n') ]
+                    [ logging.warn(format(item)) for item in current.split('\n') ]
+
+                    result = self.STOP
+
+                if not isinstance(result, self.result) or result == self.CONTINUE:
+                    continue
+
+                elif result == self.STOP:
+                    break
+
+                cls = self.__class__
+                raise TypeError("{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)), result, callable))
+            return
+
+        # That's it!
+        return closure
+
+class priorityhook(prioritybase):
+    """
+    Helper class for allowing one to apply a number of hooks to the
+    different hook points within IDA.
+    """
+    def __init__(self, hooktype):
+        '''Construct an instance of a priority hook with the specified IDA hook type which can be one of ``idaapi.*_Hooks``.'''
+        super(priorityhook, self).__init__()
+
+        # construct a new class definition, but do it dynamically for SWIG
+        res = { name for name in hooktype.__dict__ if not name.startswith('__') and name not in {'hook', 'unhook'} }
+        cls = type(hooktype.__name__, (hooktype, ), { name : self.__make_dummy_method(name) for name in res })
+
+        # now we can finally use it
+        self.__type__ = cls
+        self.object = self.__type__()
+
+    @staticmethod
+    def __make_dummy_method(name):
+        '''Generate a method that calls the super method specified by `name`.'''
+        def method(self, *parameters, **keywords):
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            return supermethod(*parameters, **keywords)
+        return method
 
     def remove(self):
         '''Unhook the instance completely.'''
         return self.object.unhook()
 
-    def enable(self, name):
-        '''Enable any hooks for the `name` event that have been previously disabled.'''
-        if name not in self.__disabled:
+    def __formatter__(self, name):
+        return "\"{:s}.{:s}\"".format(self.__type__.__name__, name)
+
+    def __hook(self):
+        if not self.object.hook():
             cls = self.__class__
-            logging.fatal(u"{:s}.enable({!r}) : Hook \"{:s}\" is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
+            logging.debug(u"{:s}.hook(...) : Unable to hook with object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), self.object))
             return False
-        self.__disabled.discard(name)
-        return True
-    def disable(self, name):
-        '''Disable execution of all the hooks for the `name` event.'''
-        cls = self.__class__
-        if name not in self.__cache:
-            logging.fatal(u"{:s}.disable({!r}) : Hook \"{:s}\" does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__cache.viewkeys())+'}'))
-            return False
-        if name in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : Hook \"{:s}\" has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(name, '"'), '.'.join((self.__type__.__name__, name)), '{'+', '.join(self.__disabled)+'}'))
-            return False
-        self.__disabled.add(name)
-        return True
-    def __iter__(self):
-        '''Return the name of each event that is hooked by this object.'''
-        for name in self.__cache:
-            yield name
-        return
-
-    def cycle(self, object=None):
-        '''Cycle the hooks for this object with the ``idaapi.*_Hooks`` instance provided by `object`.'''
-        cls = self.__class__
-        object = object or self.object
-
-        # uhook previous object
-        ok = object.unhook()
-        if not ok:
-            logging.debug(u"{:s}.cycle(...) : Error trying to unhook object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), object))
-
-        namespace = { name : self.apply(name) for name in self.__cache.viewkeys() }
-        res = type(object.__class__.__name__, (self.__type__,), namespace)
-        object = res()
-
-        ok = object.hook()
-        if not ok:
-            logging.debug(u"{:s}.cycle(...) : Unable to hook with object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), object))
-        return object
-
-    def add(self, name, callable, priority=50):
-        '''Add a hook for the event `name` to call the requested `callable` at the given `priority` (lower is prioritized).'''
-        if name not in self.__cache:
-            res = self.apply(name)
-            setattr(self.object, name, res)
-        self.discard(name, callable)
-
-        # add callable to cache
-        res = self.__cache[name]
-        heapq.heappush(self.__cache[name], (priority, callable))
-
-        # save the backtrace in case callable errors out
-        self.__traceback[(name, callable)] = traceback.extract_stack()[:-1]
         return True
 
-    def get(self, name):
-        '''Return all the callables that are hooking the event `name`.'''
-        res = self.__cache[name]
-        return tuple(f for _, f in res)
+    def __unhook(self):
+        if not self.object.unhook():
+            cls = self.__class__
+            logging.debug(u"{:s}.unhook(...) : Error trying to unhook object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), self.object))
+            return False
+        return True
+
+    @contextlib.contextmanager
+    def __context__(self):
+        try:
+            yield self.object.unhook()
+        finally:
+            pass
+        self.object.hook()
+
+    def hook(self):
+        '''Physically connect all of the hooks managed by this class.'''
+        ok = super(priorityhook, self).hook()
+        self.__hook()
+        return ok
+
+    def unhook(self):
+        '''Physically disconnect all of the hooks managed by this class.'''
+        self.__unhook()
+        return super(priorityhook, self).unhook()
+
+    def connect(self, name, callable):
+        '''Connect the hook `callable` to the specified `name`.'''
+        if not hasattr(self.object, name):
+            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
+            raise NameError("{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, method))
+
+        # create a closure that calls our callable, and its supermethod
+        supermethod = self.__make_dummy_method(name)
+        def closure(instance, *args, **kwargs):
+            callable(*args, **kwargs)
+            return supermethod(instance, *args, **kwargs)
+
+        # unhook, assign our new method, and then re-hook
+        with self.__context__():
+            method = types.MethodType(closure, self.object, self.__type__)
+            setattr(self.object, name, method)
+        return True
+
+    def disconnect(self, name):
+        '''Disconnect the hook from the specified `name`.'''
+        def closure(instance, *parameters):
+            supermethod = getattr(super(cls, instance), name)
+            return supermethod(*parameters)
+        if not hasattr(self.object, name):
+            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
+            raise NameError("{:s}.disconnect({!r}, {!r}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, callable, method))
+        method = types.MethodType(closure, self.object, self.__type__)
+        setattr(self.object, name, method)
+        return True
 
     def discard(self, name, callable):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
-            cls = self.__class__
-            raise NameError("{:s}.add({!r}, {!r}) : Unable to add a method to hooker for unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name, callable))
-        if name not in self.__cache: return False
-
-        res, found = [], 0
-        for i, (p, f) in enumerate(self.__cache[name][:]):
-            if f != callable:
-                res.append((p, f))
-                continue
-            found += 1
-
-        if res: self.__cache[name][:] = res
-        else: self.__cache.pop(name, [])
-
-        return True if found else False
+            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
+            raise NameError("{:s}.discard({!r}, {!r}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, callable, method))
+        return super(priorityhook, self).discard(name, callable)
 
     def apply(self, name):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
+            cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
+            raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, method))
+        return super(priorityhook, self).apply(name)
+
+class prioritynotification(prioritybase):
+    """
+    Helper class for allowing one to apply an arbitrary number of hooks to the
+    different notification points within IDA.
+    """
+    def __init__(self):
+        super(prioritynotification, self).__init__()
+        self.hook()
+
+    def __formatter__(self, notification):
+        return "notification ({:#x})".format(notification)
+
+    def connect(self, notification, closure):
+        '''Connect to the specified `notification` in order to execute any callables provided by the user.'''
+        return idaapi.notify_when(notification, closure)
+
+    def disconnect(self, notification):
+        '''Disconnect from the specified `notification` so that nothing will execute.'''
+        def closure(*parameters):
+            return True
+        return idaapi.notify_when(notification | idaapi.NW_REMOVE, closure)
+
+    def apply(self, notification):
+        '''Return a closure that will execute all of the hooks for the specified `notification`.'''
+        if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
             cls = self.__class__
-            raise NameError("{:s}.apply({!r}) : Unable to apply the hook for an unknown method.".format('.'.join(('internal', __name__, cls.__name__)), name))
+            raise ValueError("{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join(('internal', __name__, cls.__name__)), notification, notification))
 
-        def method(hookinstance, *args):
-            if name in self.__cache and name not in self.__disabled:
-                hookq = self.__cache[name][:]
-
-                for _, func in heapq.nsmallest(len(hookq), hookq):
-                    try:
-                        res = func(*args)
-                    except:
-                        cls = self.__class__
-                        message = functools.partial("{:s}.callback : {:s}".format, '.'.join(('internal', __name__, cls.__name__)))
-
-                        logging.fatal(u"{:s}.callback : Callback for {:s} raised an exception.".format('.'.join(('internal', __name__, cls.__name__)), '.'.join((self.__type__.__name__, name))), exc_info=True)
-
-                        res = traceback.format_list(self.__traceback[name, func])
-                        logging.warn(u"{:s}.callback : Hook originated from -> ".format('.'.join(('internal', __name__, cls.__name__))) + "\n{:s}".format(''.join(res)))
-
-                        res = self.STOP
-
-                    if not isinstance(res, self.result) or res == self.CONTINUE:
-                        continue
-                    elif res == self.STOP:
-                        break
-                    cls = self.__class__
-                    raise TypeError("{:s}.callback : Unable to determine the result type from {!r}.".format('.'.join(('internal', __name__, cls.__name__)), res))
-
-            supermethod = getattr(super(hookinstance.__class__, hookinstance), name)
-            return supermethod(*args)
-        return types.MethodType(method, self.object, self.object.__class__)
+        return super(prioritynotification, self).apply(notification)
 
 class address(object):
     """

@@ -604,6 +604,11 @@ class tagging(object):
         logging.debug(u"{:s}.init_tagcache('{:s}') : Initialized tagcache with netnode \"{:s}\" and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(idp_modname, '\''), internal.utils.string.escape(cls.__node__, '"'), cls.__nodeid__))
 
     @classmethod
+    def __nw_init_tagcache__(cls, nw_code, is_old_database):
+        idp_modname = idaapi.get_idp_name()
+        return cls.__init_tagcache__(idp_modname)
+
+    @classmethod
     def node(cls):
         if hasattr(cls, '__nodeid__'):
             return cls.__nodeid__
