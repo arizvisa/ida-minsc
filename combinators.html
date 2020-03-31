@@ -98,7 +98,6 @@ string when undefined:</p>
 <dt id="fbox">
 <code class="descname">fbox</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#fbox" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given any number of <code class="docutils literal notranslate"><span class="pre">args</span></code>, box them into a tuple.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">fboxed</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -240,11 +239,10 @@ does not contain with specified <code class="docutils literal notranslate"><span
 </dd></dl>
 
 <dl class="function">
-<dt id="fpassthru">
-<code class="descname">fpassthru</code><span class="sig-paren">(</span><em>object</em><span class="sig-paren">)</span><a class="headerlink" href="#fpassthru" title="Permalink to this definition">¶</a></dt>
+<dt id="fidentity">
+<code class="descname">fidentity</code><span class="sig-paren">(</span><em>object</em><span class="sig-paren">)</span><a class="headerlink" href="#fidentity" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given an <code class="docutils literal notranslate"><span class="pre">object</span></code>, return it. This is the identity function
 and is typically used to ignore transforming an object.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">fpass</span></code>, <code class="docutils literal notranslate"><span class="pre">fidentity</span></code>, <code class="docutils literal notranslate"><span class="pre">fid</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -322,7 +320,6 @@ another closure that when passed an <code class="docutils literal notranslate"><
 the critiquing function (<code class="docutils literal notranslate"><span class="pre">crit</span></code>) and return <code class="docutils literal notranslate"><span class="pre">true</span></code> if
 the function returns a truthy value, or return <code class="docutils literal notranslate"><span class="pre">false</span></code> if it
 returns a false-y value.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">fcond</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -361,19 +358,18 @@ result returned</li>
 </dd></dl>
 
 <dl class="function">
-<dt id="fmemo">
-<code class="descname">fmemo</code><span class="sig-paren">(</span><em>callable</em>, <em>*initial_args</em>, <em>**initial_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#fmemo" title="Permalink to this definition">¶</a></dt>
+<dt id="flazy">
+<code class="descname">flazy</code><span class="sig-paren">(</span><em>callable</em>, <em>*initial_args</em>, <em>**initial_kwargs)(*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#flazy" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, and any <code class="docutils literal notranslate"><span class="pre">initial_args</span></code> and <code class="docutils literal notranslate"><span class="pre">initial_kwargs</span></code>,
 return a closure that caches (memoizes) the result that is returned. The next
 time this closure is called with the same arguments, the cached version will
 be returned instead.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">flazy</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>callable</strong> (<cite>function</cite>) – any callable to memoize the results for</li>
+<li><strong>callable</strong> (<cite>function</cite>) – any callable to execute lazily and memoize its result for</li>
 <li><strong>*initial_args</strong> – any initial arguments to prefix to the callable</li>
 <li><strong>**initial_kwargs</strong> – any initial keyword arguments to apply to the callable</li>
 <li><strong>*args</strong> – any arguments to apply to the callable</li>
@@ -481,14 +477,13 @@ the <code class="docutils literal notranslate"><span class="pre">callable</span>
 </dd></dl>
 
 <dl class="function">
-<dt id="freversed">
-<code class="descname">freversed</code><span class="sig-paren">(</span><em>callable</em>, <em>*reverse_args</em>, <em>**reverse_kwargs)(*extra_args</em>, <em>**extra_kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#freversed" title="Permalink to this definition">¶</a></dt>
+<dt id="freverse">
+<code class="descname">freverse</code><span class="sig-paren">(</span><em>callable</em>, <em>*reverse_args</em>, <em>**reverse_kwargs)(*extra_args</em>, <em>**extra_kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#freverse" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a <code class="docutils literal notranslate"><span class="pre">callable</span></code>, the arguments <code class="docutils literal notranslate"><span class="pre">reverse_args</span></code>, and the
 keyword arguments <code class="docutils literal notranslate"><span class="pre">reverse_kwargs</span></code>, return a closure which applies
 these to the end of the <code class="docutils literal notranslate"><span class="pre">callable</span></code>. If <code class="docutils literal notranslate"><span class="pre">extra_args</span></code> or
 <code class="docutils literal notranslate"><span class="pre">extra_kwargs</span></code> is provided, then continue to apply these to the
 <code class="docutils literal notranslate"><span class="pre">callable</span></code> but backwards.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">freverse</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -516,7 +511,6 @@ keyword arguments <code class="docutils literal notranslate"><span class="pre">i
 second element of the tuple will be the result, and the first element will
 be the exception object if one was raised. If one wasn’t raised, then the
 first element will be the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>.</p>
-<p>Aliases: <code class="docutils literal notranslate"><span class="pre">fexc</span></code>, <code class="docutils literal notranslate"><span class="pre">fexception</span></code></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

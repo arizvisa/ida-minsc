@@ -419,6 +419,22 @@ functions and aliases. For more information on this, please see
    :param ea: the address of an instruction
    :type ea: int or long
    
+.. py:function:: opinfo(opnum)
+   
+   Returns the :py:obj:`idaapi.opinfo_t` for the operand ``opnum`` belonging to the instruction at the current address.
+   
+   :param opnum:
+   :type opnum: int or long
+   
+.. py:function:: opinfo(ea, opnum)
+   
+   Returns the :py:obj:`idaapi.opinfo_t` for the operand ``opnum`` belonging to the instruction at the address ``ea``.
+   
+   :param ea:
+   :type ea: int or long
+   :param opnum:
+   :type opnum: int or long
+   
 .. py:function:: ops()
    
    Returns a tuple of all the operands for the instruction at the current address.

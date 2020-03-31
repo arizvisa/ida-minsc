@@ -740,6 +740,38 @@ whether the operand is being read from, written to, or modified (both).</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="instruction.opinfo">
+<code class="descclassname">instruction.</code><code class="descname">opinfo</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.opinfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.opinfo_t</span></code> for the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">opinfo</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.opinfo_t</span></code> for the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="instruction.ops">
 <code class="descclassname">instruction.</code><code class="descname">ops</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.ops" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns a tuple of all the operands for the instruction at the current address.</p>
