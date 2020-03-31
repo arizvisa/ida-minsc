@@ -51,10 +51,6 @@ if idaapi.__version__ >= 7.4:
     import sys
 
 ### customize the root namespace
-import functools, operator, itertools, types
-from six.moves import builtins
-
-## context modules from ida-minsc
 import segment, database, function, instruction
 import structure, enumeration
 
@@ -83,9 +79,10 @@ utils = __import__('internal').utils
 locals().update({name : item for name, item in utils.__dict__.iteritems() if name in utils.__all__})
 
 # construct some pattern matching types
-AnyRegister = AnyReg = utils.PatternAnyType(__import__('internal').interface.register_t)
-AnyInteger = AnyInt = utils.PatternAnyType(__import__('six').integer_types)
-AnyString = AnyStr = utils.PatternAnyType(basestring)
+AnyRegister = utils.PatternAnyType(__import__('internal').interface.register_t)
+AnyInteger = utils.PatternAnyType(__import__('six').integer_types)
+AnyString = utils.PatternAnyType(basestring)
+AnyBytes = utils.PatternAnyType(bytes)
 Any = utils.PatternAny()
 
 # ...and that's it for the utils
@@ -95,7 +92,7 @@ del(utils)
 architecture_t, register_t, symbol_t = (getattr(__import__('internal').interface, _) for _ in ('architecture_t', 'register_t', 'symbol_t'))
 
 # other miscellaneous modules to expose to the user
-import ui, tools, custom, app
+import ui, tools, custom
 
 ### Construct a priority notification handler, and inject into IDA because it
 ### needs to exist for everything to initialize/deinitialize properly.
