@@ -4510,6 +4510,20 @@ class set(object):
 
         """
         @utils.multicase()
+        def __new__(cls):
+            '''Sets the data at the current address to an IEEE-754 floating-point number based on its size.'''
+            return cls(ui.current.address())
+        @utils.multicase()
+        def __new__(cls, ea):
+            '''Sets the data at address `ea` to an IEEE-754 floating-point number based on its size.'''
+            size = type.size(ea)
+            if size == 4:
+                return cls.single(ea)
+            elif size == 8:
+                return cls.double(ea)
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}) : Unable to determine the type of floating-point number for the item's size ({:+#x}).".format('.'.join((__name__, 'set', cls.__name__)), ea, size))
+
+        @utils.multicase()
         @classmethod
         def single(cls):
             '''Set the data at the current address to an IEEE-754 single'''
@@ -4551,7 +4565,7 @@ class set(object):
             # Return our new value
             return get.float.double(ea)
 
-    f = float # XXX: ns alias
+    f = float   # XXX: ns alias
 
     @utils.multicase(type=_structure.structure_t)
     @classmethod
@@ -4816,7 +4830,7 @@ class get(object):
     class float(object):
         """
         This namespace contains a number of functions for fetching floating
-        point numbers out of the database. These floating point numbers are
+        point numbers out of the database. These floating-point numbers are
         encoded according to the IEEE-754 specification.
 
         This namespace is also aliased as ``database.get.f`` and can be used
@@ -4826,26 +4840,42 @@ class get(object):
             > res = database.get.f.single(ea)
             > res = database.get.f.double(ea)
 
-        If one needs to describe a non-standard encoding for a floating point
+        If one needs to describe a non-standard encoding for a floating-point
         number, one can use the ``database.float`` function. This function
         takes a tuple representing the number of bits for the different
-        components of a floating point number. This can be used as in the
+        components of a floating-point number. This can be used as in the
         following for reading a floating-point "half" from the database::
 
             > res = database.get.float(components=(10, 5, 1))
 
         This specifies 10-bits for the mantissa, 5 for the exponent, and 1
         bit for the signed flag. This allows one to specify arbitrary
-        encodings for different floating point numbers.
+        encodings for different floating-point numbers.
         """
+
+        @utils.multicase()
+        def __new__(cls, **byteorder):
+            '''Read a floating-number from the current address using the number type that matches its size.'''
+            return cls(ui.current.address(), **byteorder)
+        @utils.multicase(ea=six.integer_types)
+        def __new__(cls, ea, **byteorder):
+            '''Read a floating-number at the address `ea` using the number type that matches its size.'''
+            size = type.size(ea)
+            if size == 2:
+                return cls.half(ea, **byteorder)
+            elif size == 4:
+                return cls.single(ea, **byteorder)
+            elif size == 8:
+                return cls.double(ea, **byteorder)
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}) : Unable to determine the type of floating-point number for the item's size ({:+#x}).".format('.'.join((__name__, 'get', cls.__name__)), ea, size))
 
         @utils.multicase(components=tuple)
         def __new__(cls, components, **byteorder):
-            '''Read a floating point number at the current address encoded with the specified `components`.'''
+            '''Read a floating-point number at the current address encoded with the specified `components`.'''
             return cls(ui.current.address(), components, **byteorder)
         @utils.multicase(ea=six.integer_types, components=tuple)
         def __new__(cls, ea, components, **byteorder):
-            """Read a floating point number at the address `ea` that is encoded with the specified `components`.
+            """Read a floating-point number at the address `ea` that is encoded with the specified `components`.
 
             The `components` parameter is a tuple (mantissa, exponent, sign) representing the number of bits for each component of the floating-point number.
             If `byteorder` is 'big' then read in big-endian form.
@@ -4872,7 +4902,7 @@ class get(object):
             if position != bits:
                 logging.warn(u"{:s}.float({:#x}, {!s}) : Total size of bit components ({:d}) does not fit entirely within the size of the integer {:d}).".format('.'.join((__name__, cls.__name__)), ea, components, bits, 8 * size))
 
-            # Build the masks we will use to compose a floating point number
+            # Build the masks we will use to compose a floating-point number
             fraction_shift, exponent_shift, sign_shift = (2 ** item for item in shifts)
             bias = (2 ** exponent_bits) // 2 - 1
 
@@ -4936,6 +4966,8 @@ class get(object):
             '''Read a double from the address `ea`.'''
             bits = 52, 11, 1
             return cls(ea, bits, **byteorder)
+
+    f = float   # XXX: ns alias
 
     @utils.multicase()
     @classmethod
