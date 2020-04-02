@@ -4466,7 +4466,7 @@ class set(object):
             if not ok:
                 raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
 
-            # Now we can return our new size since everything worked
+            # Now we can return our new value since everything worked
             return get.unsigned(ea, 8)
         uint64_t = utils.alias(word, 'set.integer')
 
@@ -4491,11 +4491,67 @@ class set(object):
             if not ok:
                 raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
 
-            # Now we can return our new size if we succeeded
+            # Now we can return our new value if we succeeded
             return get.unsigned(ea, 16)
         uint128_t = utils.alias(word, 'set.integer')
 
     i = integer # XXX: ns alias
+
+    class float(object):
+        """
+        This namespace used for applying various sized floating-point types
+        to a particular address.
+
+        This namespace is aliased as ``database.set.f`` and can be used as
+        follows::
+
+            > database.set.f.single(ea)
+            > database.set.f.double(ea)
+
+        """
+        @utils.multicase()
+        @classmethod
+        def single(cls):
+            '''Set the data at the current address to an IEEE-754 single'''
+            return cls.single(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def single(cls, ea):
+            '''Set the data at address `ea` to an IEEE-754 single.'''
+            cb = set.unknown(ea, 4)
+            if cb != 4:
+                raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+
+            # Apply our data type after undefining it
+            ok = set.data(ea, 4, type=idaapi.FF_FLOAT & 0xf0000000)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to assign a single to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+
+            # Return our new value
+            return get.float.single(ea)
+
+        @utils.multicase()
+        @classmethod
+        def double(cls):
+            '''Set the data at the current address to an IEEE-754 double'''
+            return cls.double(ui.current.address())
+        @utils.multicase()
+        @classmethod
+        def double(cls, ea):
+            '''Set the data at address `ea` to an IEEE-754 double.'''
+            cb = set.unknown(ea, 8)
+            if cb != 8:
+                raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+
+            # Apply our data type after undefining it
+            ok = set.data(ea, 8, type=idaapi.FF_DOUBLE & 0xf0000000)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to assign a double to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+
+            # Return our new value
+            return get.float.double(ea)
+
+    f = float # XXX: ns alias
 
     @utils.multicase(type=_structure.structure_t)
     @classmethod
@@ -4756,6 +4812,130 @@ class get(object):
             return get.signed(ea, 16, **byteorder)
 
     i = integer # XXX: ns alias
+
+    class float(object):
+        """
+        This namespace contains a number of functions for fetching floating
+        point numbers out of the database. These floating point numbers are
+        encoded according to the IEEE-754 specification.
+
+        This namespace is also aliased as ``database.get.f`` and can be used
+        as in the following examples::
+
+            > res = database.get.f.half()
+            > res = database.get.f.single(ea)
+            > res = database.get.f.double(ea)
+
+        If one needs to describe a non-standard encoding for a floating point
+        number, one can use the ``database.float`` function. This function
+        takes a tuple representing the number of bits for the different
+        components of a floating point number. This can be used as in the
+        following for reading a floating-point "half" from the database::
+
+            > res = database.get.float(components=(10, 5, 1))
+
+        This specifies 10-bits for the mantissa, 5 for the exponent, and 1
+        bit for the signed flag. This allows one to specify arbitrary
+        encodings for different floating point numbers.
+        """
+
+        @utils.multicase(components=tuple)
+        def __new__(cls, components, **byteorder):
+            '''Read a floating point number at the current address encoded with the specified `components`.'''
+            return cls(ui.current.address(), components, **byteorder)
+        @utils.multicase(ea=six.integer_types, components=tuple)
+        def __new__(cls, ea, components, **byteorder):
+            """Read a floating point number at the address `ea` that is encoded with the specified `components`.
+
+            The `components` parameter is a tuple (mantissa, exponent, sign) representing the number of bits for each component of the floating-point number.
+            If `byteorder` is 'big' then read in big-endian form.
+            If `byteorder` is 'little' then read in little-endian form.
+
+            The default value of `byteorder` is the same as specified by the database architecture.
+            """
+
+            # Extract the number of bits for each of our components from the
+            # components argument, and then use it to calculate the total size.
+            fraction_bits, exponent_bits, sign_bits = components
+            bits = sum([sign_bits, exponent_bits, fraction_bits])
+            size = math.trunc(math.ceil(bits / 8))
+
+            # Read our data from the database as an integer, as we'll use this
+            # to decode our individual components.
+            integer = get.unsigned(ea, size, **byteorder)
+
+            position, shifts = 0, []
+            for cb in components:
+                shifts.append(position)
+                position += cb
+
+            if position != bits:
+                logging.warn(u"{:s}.float({:#x}, {!s}) : Total size of bit components ({:d}) does not fit entirely within the size of the integer {:d}).".format('.'.join((__name__, cls.__name__)), ea, components, bits, 8 * size))
+
+            # Build the masks we will use to compose a floating point number
+            fraction_shift, exponent_shift, sign_shift = (2 ** item for item in shifts)
+            bias = (2 ** exponent_bits) // 2 - 1
+
+            fraction_mask = fraction_shift * (2 ** fraction_bits - 1)
+            exponent_mask = exponent_shift * (2 ** exponent_bits - 1)
+            sign_mask = sign_shift * (2 ** sign_bits - 1)
+
+            # Now to decode our components...
+            mantissa = (integer & fraction_mask) // fraction_shift
+            exponent = (integer & exponent_mask) // exponent_shift
+            sign = (integer & sign_mask) // sign_shift
+
+            # ...and then convert it into a float
+            if exponent > 0 and exponent < 2 ** exponent_bits - 1:
+                s = -1 if sign else +1
+                e = exponent - bias
+                m = 1.0 + float(mantissa) / (2 ** fraction_bits)
+                return math.ldexp(math.copysign(m, s), e)
+
+            # check if we need to return any special constants
+            if exponent == 2 ** exponent_bits - 1 and mantissa == 0:
+                return float('-inf') if sign else float('+inf')
+            elif exponent in {0, 2 ** fraction_bits - 1} and mantissa != 0:
+                return float('-nan') if sign else float('+nan')
+            elif exponent == 0 and mantissa == 0:
+                return float('-0') if sign else float('+0')
+            raise ValueError((mantissa, exponent, sign))
+
+        @utils.multicase()
+        @classmethod
+        def half(cls, **byteorder):
+            '''Read a half from the current address.'''
+            return cls.half(ui.current.address(), **byteorder)
+        @utils.multicase()
+        @classmethod
+        def half(cls, ea, **byteorder):
+            '''Read a half from the address `ea`.'''
+            bits = 10, 5, 1
+            return cls(ea, bits, **byteorder)
+
+        @utils.multicase()
+        @classmethod
+        def single(cls, **byteorder):
+            '''Read a single from the current address.'''
+            return cls.single(ui.current.address(), **byteorder)
+        @utils.multicase()
+        @classmethod
+        def single(cls, ea, **byteorder):
+            '''Read a single from the address `ea`.'''
+            bits = 23, 8, 1
+            return cls(ea, bits, **byteorder)
+
+        @utils.multicase()
+        @classmethod
+        def double(cls, **byteorder):
+            '''Read a double from the current address.'''
+            return cls.double(ui.current.address(), **byteorder)
+        @utils.multicase()
+        @classmethod
+        def double(cls, ea, **byteorder):
+            '''Read a double from the address `ea`.'''
+            bits = 52, 11, 1
+            return cls(ea, bits, **byteorder)
 
     @utils.multicase()
     @classmethod
