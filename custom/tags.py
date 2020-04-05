@@ -516,7 +516,7 @@ class apply(object):
 class export(object):
     """
     This namespace contains tools that can be used to quickly
-    export specific tagss out of the database using the cache.
+    export specific tags out of the database using the cache.
 
     If `location` is specified as true, then read each contents tag
     according to its location rather than an address. This allows one
