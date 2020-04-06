@@ -3180,7 +3180,7 @@ class type(object):
 
             res = type.flags(ea, idaapi.DT_TYPE)
             if res != FF_STRUCT:
-                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified addresss is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, FF_STRUCT, res))
+                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join((__name__, 'type', 'structure')), ea, FF_STRUCT, res))
 
             ti, F = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
