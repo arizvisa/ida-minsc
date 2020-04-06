@@ -507,17 +507,13 @@ def op_structure(ea, opnum):
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
-    # pathvar = idaapi.tid_array(length)
-    # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
+    # Figure out the offset for the structure member
+    offset = op.addr if op.type in {idaapi.o_displ, idaapi.o_phrase} else op.value
 
-    # If we can't get the opinfo.. Then this might be a stack variable, and
-    # we need to check if we're within a function to verify it.
-    res = opinfo(ea, opnum)
-    if res is None and function.within(ea):
+    # Check to see if this is a stack variable, because we'll need to
+    # handle it differently if so.
+    if idaapi.is_stkvar(fl, opnum) and function.within(ea):
         fn, insn = function.by(ea), at(ea)
-
-        # Figure out the offset for the structure member
-        offset = op.addr if op.type in {idaapi.o_displ, idaapi.o_phrase} else op.value
 
         # Now we can ask IDA what's up with it.
         m, actval = idaapi.get_stkvar(insn, op, offset)
@@ -526,56 +522,79 @@ def op_structure(ea, opnum):
         frame = function.frame(fn)
         return frame.members.by_identifier(m.id)
 
-    elif res is None:
-        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+    # Otherwise, we have no idea what to do here since we need to know the opinfo_t
+    # in order to determine what structure is there.
+    elif not idaapi.is_stroff(fl, opnum):
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, fl))
 
-    # get the path and the delta
-    delta, path = res.path.delta, [res.path.ids[idx] for idx in six.moves.range(res.path.len)]
-    value = op.addr if op.type in {idaapi.o_displ, idaapi.o_phrase} else op.value
-
-    # if it's a single path, then convert it to a multiple entry path
-    if len(path) == 1:
-        # get the member offset of the operand
-        st = structure.by(path[0])
-        try:
-            m = st.by(value)
-
-            # we found a member that we can use as our path
-            path = [st.id, m.id]
-
-        # if we couldn't find one, then just use the structure id
-        # for the path
-        except E.MemberNotFoundError:
-            path = [st.id]
-
-        # if we were out of bounds, then figure out whether to use
-        # the last or first member depending where we are
-        except E.OutOfBoundsError:
-            if value > st.members[-1].offset:
-                m = st.members[-1]
-            elif value < st.members[0].offset:
-                m = st.members[0]
-            else:
-                raise
-
-            # use the member we figured as part of the path
-            path = [st.id, m.id]
-        pass
-
-    # if there's no path, then this is not a structure
-    elif len(path) == 0:
+    # We pretty much have to do this ourselves because idaapi.get_stroff_path
+    # will always only return the structure associatd with the member..
+    delta, path = idaapi.sval_pointer(), idaapi.tid_array(2)
+    delta.assign(0)
+    count = idaapi.get_stroff_path(ea, opnum, path.cast(), sval.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
+    if not count:
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
-    # collect all the path members
-    moff, st = 0, structure.by(path.pop(0))
-    res = [st]
-    for pid in path:
-        st = st.by_identifier(pid)
-        res.append(st)
-        moff, st = moff + st.offset, st.type
+    # If for some reason we get more than one result in our path, then IDA
+    # somehow worked this out...but we still can't trust it, so we rip the
+    # structure from it and calculate it ourselves.
+    if count > 1:
+        res = [ path[index] for index in six.moves.range(count) ]
+        logging.debug(u"{:s}.op_structure({:#x}, {:d}) : IDA unexpectedly returned {:d} path members ({:s}).".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(m.id) for m in res)))
 
-    ofs = delta - moff + value
-    return (res + [ofs]) if ofs != 0 else res
+    # Here's how we start our search...
+    st = structure.by_identifier(path[0])
+
+    # If there are no members, then we simply return the structure and the
+    # offset because the user put a structure there. They likely will want
+    # to know that it's still there..
+    if not len(st.members):
+        return st, offset
+
+    try:
+        m = st.by_realoffset(offset)
+
+    # If we couldn't find our first member, then we'll use the nearest member
+    # for the structure that IDA gave us and proceed as usual.
+    # our offset as the delta.
+    except (E.OutOfBoundsError, E.MemberNotFoundError):
+        m = st.near_realoffset(offset)
+
+    # Now we can keep descending until we get to the exact member..
+    result, offset = [m], offset - m.realoffset
+    while isinstance(m.type, structure.structure_t):
+        st = m.type
+
+        # Try and find the member based on our current offset
+        try:
+            m = st.by_realoffset(offset)
+
+        # We couldn't find shit, so we're done here.
+        except (E.OutOfBoundsError, E.MemberNotFoundError):
+            break
+
+        result.append(m)
+        offset -= m.realoffset
+
+    # Check if we're still pointing to within a structure, so we
+    # can adjust our offset to be relative to the nearest field.
+    if isinstance(m.type, structure.structure_t):
+        st = m.type
+
+        try:
+            m = st.by_realoffset(offset)
+
+        # We couldn't find a member, so find the nearest element and adjust
+        except (E.OutOfBoundsError, E.MemberNotFoundError):
+            m = st.near_realoffset(offset)
+
+        result.append(m)
+        offset -= m.realoffset
+
+    if offset:
+        return tuple(result + [offset])
+    return result if len(result) > 1 else result[0]
+
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
@@ -638,7 +657,7 @@ def op_structure(ea, opnum, path, **delta):
     if len(path) == 0:
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
-    if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring)+six.integer_types) for m in path):
+    if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring) + six.integer_types) for m in path):
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # ensure the path begins with a structure.structure_t
@@ -669,7 +688,7 @@ def op_structure(ea, opnum, path, **delta):
         elif isinstance(item, structure.member_t):
             m = item.ptr
         else:
-            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), i+1, item.__class__))
+            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item {:d} in the specified path is of an unsupported type ({!r}).".format(__name__, ea, opnum, path, delta.get('delta', 0), 1 + i, item.__class__))
         tids.append(m.id)
         moff += m.soff
 
@@ -686,7 +705,7 @@ def op_structure(ea, opnum, path, **delta):
         logging.warn(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # build the list of member ids and prefix it with a structure id
-    length = len(tids) + 1
+    length = 1 + len(tids)
     tid = idaapi.tid_array(length)
     tid[0] = sptr.id
     for i, id in enumerate(tids):
@@ -728,7 +747,7 @@ def op_enumeration(ea, opnum):
 
     res = opinfo(ea, opnum)
     if res is None:
-        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}) : Unable to get info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
     return enumeration.by(res.ec.tid)
 @utils.multicase(opnum=six.integer_types, name=basestring)
 @utils.string.decorate_arguments('name')
@@ -740,7 +759,7 @@ def op_enumeration(opnum, name):
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
     return op_enumeration(ea, opnum, enumeration.by(name))
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types+(types.TupleType,))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types + (types.TupleType,))
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration `id` to operand `opnum` of the instruction at `ea`.'''
     return idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
@@ -759,7 +778,7 @@ def op_string(ea, opnum):
 
     res = opinfo(ea, opnum)
     if res is None:
-        raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:d}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:d}) : Unable to get `idaapi.opinfo_t` for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
     return res.strtype
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
