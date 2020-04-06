@@ -755,25 +755,33 @@ class hook(object):
             ('idb', idaapi.IDB_Hooks),
             ('ui', idaapi.UI_Hooks),
         ]
+
+        # Create an alias so we save typing 19 chars..
         priorityhook = internal.interface.priorityhook
         for attr, hookcls in api:
+
+            # Attach a priority hooking queue to an instance of IDA's hooks
             instance = priorityhook(hookcls)
+
+            # Explicitly assign the priority instance into our object
             if not hasattr(cls, attr):
                 setattr(cls, attr, instance)
+
+            # Now we can enable all the hooks so the user can use them
             instance.hook()
         return
 
     @classmethod
     def __stop_ida__(cls):
         for api in ['idp', 'idb', 'ui']:
-            res = getattr(cls, api)
 
-            # disable every single hook
-            for name in res:
-                res.disable(name)
+            # grab the invidual class that was used to hook things
+            hooker = getattr(cls, api)
 
-            # unhook it completely, because IDA on linux seems to still dispatch to those hooks...even when the language extension is unloaded.
-            res.unhook()
+            # and then unhook it completely, because IDA on linux
+            # seems to still dispatch to those hooks...even when
+            # the language extension is unloaded.
+            hooker.unhook()
         return
 
 ### Helper classes to use or inherit from
