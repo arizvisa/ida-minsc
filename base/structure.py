@@ -969,24 +969,59 @@ class members_t(object):
     byfullname = byFullname = utils.alias(by_fullname, 'members_t')
 
     def by_offset(self, offset):
-        '''Return the member at the specified `offset`.'''
-        min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)))
+        '''Return the member at the specified `offset` from the base offset of the structure.'''
 
+        # Start out by getting our bounds, and translating them to our relative
+        # offset.
+        min, max = map(lambda offset: offset + self.baseoffset, (idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)))
+
+        # Guard against a potential OverflowError that would be raised by SWIG's typechecking
+        if self.baseoffset > max:
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.parent.name, offset))
+
+        # Look for the very last member so we can confirm our bounds.
         mptr = idaapi.get_member(self.parent.ptr, max - self.baseoffset)
         if mptr is None:
             raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.parent.name, offset))
 
+        # Get that member's size, so that way we can really confirm that this
+        # offset isn't pointing to anything.
         msize = idaapi.get_member_size(mptr)
-        if (offset < min) or (offset >= max+msize):
-            raise E.OutOfBoundsError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format(__name__, self.parent.name, offset, min, max+msize))
+        if (offset < min) or (offset >= max + msize):
+            raise E.OutOfBoundsError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format(__name__, self.parent.name, offset, min, max + msize))
 
-        mem = idaapi.get_member(self.parent.ptr, offset - self.baseoffset)
+        # Chain to the realoffset implementation.. This is just a wrapper.
+        return self.by_realoffset(offset - self.baseoffset)
+    byoffset = byOffset = utils.alias(by_offset, 'members_t')
+
+    def by_realoffset(self, offset):
+        '''Return the member at the specified `offset` of the structure.'''
+        min, max = idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)
+
+        # Guard against a potential OverflowError that would be raised by SWIG's typechecking
+        if max < 0:
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.parent.name, offset))
+
+        # Look for the very last member so we can confirm our bounds.
+        mptr = idaapi.get_member(self.parent.ptr, max)
+        if mptr is None:
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.parent.name, offset))
+
+        # Get that member's size, so that way we can really confirm that this
+        # offset isn't pointing to anything.
+        msize = idaapi.get_member_size(mptr)
+        if (offset < min) or (offset >= max + msize):
+            raise E.OutOfBoundsError(u"{:s}.instance({!r}).members.by_realoffset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format(__name__, self.parent.name, offset, min, max + msize))
+
+        # Now we can get a pointer to an actual member
+        mem = idaapi.get_member(self.parent.ptr, offset)
         if mem is None:
-            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.parent.name, offset))
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format(__name__, self.parent.name, offset))
 
+        # And then search for it in our structure to give back to the user
         index = self.index(mem)
         return self[index]
-    byoffset = byOffset = utils.alias(by_offset, 'members_t')
+    byrealoffset = byRealOffset = utils.alias(by_realoffset, 'members_t')
 
     def by_identifier(self, id):
         '''Return the member in the structure that has the specified `id`.'''
@@ -1003,23 +1038,47 @@ class members_t(object):
     by_id = byId = byIdentifier = utils.alias(by_identifier, 'members_t')
 
     def near_offset(self, offset):
-        '''Return the member nearest to the specified `offset`.'''
+        '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
         min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)))
         if (offset < min) or (offset >= max):
-            logging.warn(u"{:s}.instance({!r}).members.near_offset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format(__name__, self.parent.name, offset, min, max))
+            logging.info(u"{:s}.instance({!r}).members.near_offset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format(__name__, self.parent.name, offset, min, max))
 
-        res = offset - self.baseoffset
-        mem = idaapi.get_member(self.parent.ptr, res)
-        if mem is None:
-            logging.info(u"{:s}.instance({!r}).members.near_offset({:+#x}) : Unable to locate member near specified offset. Trying `idaapi.get_best_fit_member()` instead.".format(__name__, self.parent.name, res))
-            mem = idaapi.get_best_fit_member(self.parent.ptr, res)
+        # Chain to the realoffset implementation.. This is just a wrapper.
+        return self.near_realoffset(offset - self.baseoffset)
+    near = nearoffset = nearOffset = utils.alias(near_offset, 'members_t')
 
-        if mem is None:
-            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.near_offset({:+#x}) : Unable to find member near offset.".format(__name__, self.parent.name, offset))
+    def near_realoffset(self, offset):
+        '''Return the member nearest to the specified `offset`.'''
+        min, max = idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)
+        if (offset < min) or (offset >= max):
+            logging.info(u"{:s}.instance({!r}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format(__name__, self.parent.name, offset, min, max))
 
+        # Try and find the exact offset, because if we can..then we don't need
+        # to execute the rest of this function.
+        mem = idaapi.get_member(self.parent.ptr, offset)
+        if mem:
+            index = self.index(mem)
+            return self[index]
+
+        # If there aren't any elements in the structure, then there's no members
+        # to search through in here. So just raise an exception and bail.
+        if not len(self):
+            raise E.MemberNotFoundError(u"{:s}.instance({!r}).members.near_realoffset({:+#x}) : Unable to find member near offset.".format(__name__, self.parent.name, offset))
+
+        # We couldn't find the member, so now we'll try and search for the
+        # member that is nearest..
+        def recurse(offset, available):
+            if len(available) == 1:
+                return available[0]
+            index = len(available) // 2
+            return recurse(offset, available[:index]) if offset <= available[index].realoffset else recurse(offset, available[index:])
+
+        # This should already be sorted for us..
+        mem = recurse(offset, [item for item in self])
+
+        # Now we can return the member we found.
         index = self.index(mem)
         return self[index]
-    near = nearoffset = nearOffset = utils.alias(near_offset, 'members_t')
 
     # adding/removing members
     @utils.multicase(name=(basestring, tuple))
