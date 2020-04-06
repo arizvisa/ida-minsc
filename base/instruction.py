@@ -451,9 +451,6 @@ op_value = op_decode = utils.alias(op)
 ## XXX: figure out a useful name to implement the following to apply a data offset to an operand
 # def? op_offset(ea, opnum, type, target = BADADDR, base = 0, tdelta = 0) -> int
 
-## XXX: maybe we should figure out how to use this if we can distinguish between a structure_t and a frame's member_t
-# def op_stkvar(*args):
-
 ## old method for applying a complex type to an operand
 # def op_type(ea, opnum)
 #    '''Apply the specified type to a stack variable'''
@@ -482,20 +479,54 @@ def op_segment(ea, opnum):
 # FIXME: maybe use idaapi.op_seg(*args) to apply a segment to an operand?
 
 @utils.multicase(opnum=six.integer_types)
+def op_stkvar(opnum):
+    '''Set the type for operand `opnum` at the current instruction to a stack variable and return it.'''
+    return op_stkvar(ui.current.address(), opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_stkvar(ea, opnum):
+    '''Set the type for operand `opnum` belonging to the instruction at `ea` to a stack variable and return it.'''
+    if not function.within(ea):
+        raise E.FunctionNotFoundError(u"{:s}.op_stkvar({:#x}, {:d}) : The specified address ({:#x}) is not within a function.".format(__name__, ea, opnum, ea))
+
+    ok = idaapi.op_stkvar(ea, opnum)
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.op_stkvar({:#x}, {:d}) : Unable to set operand {:d} to a stack variable.".format(__name__, ea, opnum, opnum))
+
+    # Now that it's set, call into op_structure to return it.
+    return op_structure(ea, opnum)
+op_stack = op_stackvar = utils.alias(op_stkvar)
+
+@utils.multicase(opnum=six.integer_types)
 def op_structure(opnum):
-    '''Return the structure that operand `opnum` at the current instruction actually references.'''
+    '''Return the structure and members for operand `opnum` at the current instruction.'''
     return op_structure(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
-    '''Return the structure that operand `opnum` for instruction `ea` actually references.'''
+    '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
     fl, op = database.type.flags(ea), operand(ea, opnum)
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # pathvar = idaapi.tid_array(length)
     # idaapi.get_stroff_path(ea, opnum, pathvar.cast(), delta)
+
+    # If we can't get the opinfo.. Then this might be a stack variable, and
+    # we need to check if we're within a function to verify it.
     res = opinfo(ea, opnum)
-    if res is None:
+    if res is None and function.within(ea):
+        fn, insn = function.by(ea), at(ea)
+
+        # Figure out the offset for the structure member
+        offset = op.addr if op.type in {idaapi.o_displ, idaapi.o_phrase} else op.value
+
+        # Now we can ask IDA what's up with it.
+        m, actval = idaapi.get_stkvar(insn, op, offset)
+
+        # Grab our frame, then find the member by its id
+        frame = function.frame(fn)
+        return frame.members.by_identifier(m.id)
+
+    elif res is None:
         raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : Unable to get operand info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
 
     # get the path and the delta
@@ -544,7 +575,7 @@ def op_structure(ea, opnum):
         moff, st = moff + st.offset, st.type
 
     ofs = delta - moff + value
-    return tuple(res + [ofs]) if ofs != 0 else tuple(res)
+    return (res + [ofs]) if ofs != 0 else res
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
@@ -612,7 +643,7 @@ def op_structure(ea, opnum, path, **delta):
 
     # ensure the path begins with a structure.structure_t
     if isinstance(path[0], structure.member_t):
-        path[0:0] = [path[0].owner]
+        path[0:0] = [path[0].parent]
 
     # crop elements to valid ones in case the delta is specified at the end
     res = list(itertools.takewhile(lambda t: not isinstance(t, six.integer_types), path))
