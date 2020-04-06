@@ -305,6 +305,8 @@
       </ul></li>
       <li><a href="modules/structure.html#structure.members_t.by_offset">by_offset() (structure.members_t method)</a>
 </li>
+      <li><a href="modules/structure.html#structure.members_t.by_realoffset">by_realoffset() (structure.members_t method)</a>
+</li>
       <li><a href="modules/segment.html#segment.by_selector">by_selector() (in module segment)</a>
 </li>
   </ul></td>
@@ -673,6 +675,14 @@
 </li>
       <li><a href="modules/database.html#database.get.array">get.array() (in module database)</a>, <a href="modules/database.html#database.get.array">[1]</a>
 </li>
+      <li><a href="modules/database.html#database.get.float">get.float() (in module database)</a>, <a href="modules/database.html#database.get.float">[1]</a>, <a href="modules/database.html#database.get.float">[2]</a>, <a href="modules/database.html#database.get.float">[3]</a>
+</li>
+      <li><a href="modules/database.html#database.get.float.double">get.float.double() (in module database)</a>, <a href="modules/database.html#database.get.float.double">[1]</a>
+</li>
+      <li><a href="modules/database.html#database.get.float.half">get.float.half() (in module database)</a>, <a href="modules/database.html#database.get.float.half">[1]</a>
+</li>
+      <li><a href="modules/database.html#database.get.float.single">get.float.single() (in module database)</a>, <a href="modules/database.html#database.get.float.single">[1]</a>
+</li>
       <li><a href="modules/database.html#database.get.integer">get.integer() (in module database)</a>, <a href="modules/database.html#database.get.integer">[1]</a>, <a href="modules/database.html#database.get.integer">[2]</a>
 </li>
       <li><a href="modules/database.html#database.get.integer.sint128_t">get.integer.sint128_t() (in module database)</a>, <a href="modules/database.html#database.get.integer.sint128_t">[1]</a>
@@ -687,12 +697,12 @@
 </li>
       <li><a href="modules/database.html#database.get.integer.uint128_t">get.integer.uint128_t() (in module database)</a>, <a href="modules/database.html#database.get.integer.uint128_t">[1]</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/database.html#database.get.integer.uint16_t">get.integer.uint16_t() (in module database)</a>, <a href="modules/database.html#database.get.integer.uint16_t">[1]</a>
 </li>
       <li><a href="modules/database.html#database.get.integer.uint32_t">get.integer.uint32_t() (in module database)</a>, <a href="modules/database.html#database.get.integer.uint32_t">[1]</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/database.html#database.get.integer.uint64_t">get.integer.uint64_t() (in module database)</a>, <a href="modules/database.html#database.get.integer.uint64_t">[1]</a>
 </li>
       <li><a href="modules/database.html#database.get.integer.uint8_t">get.integer.uint8_t() (in module database)</a>, <a href="modules/database.html#database.get.integer.uint8_t">[1]</a>
@@ -1067,6 +1077,8 @@
 </li>
       <li><a href="modules/structure.html#structure.members_t.near_offset">near_offset() (structure.members_t method)</a>
 </li>
+      <li><a href="modules/structure.html#structure.members_t.near_realoffset">near_realoffset() (structure.members_t method)</a>
+</li>
       <li><a href="modules/enumeration.html#enumeration.new">new() (in module enumeration)</a>
 
       <ul>
@@ -1117,12 +1129,14 @@
 </li>
       <li><a href="modules/instruction.html#instruction.op_state">op_state() (in module instruction)</a>, <a href="modules/instruction.html#instruction.op_state">[1]</a>
 </li>
-      <li><a href="modules/instruction.html#instruction.op_string">op_string() (in module instruction)</a>, <a href="modules/instruction.html#instruction.op_string">[1]</a>, <a href="modules/instruction.html#instruction.op_string">[2]</a>
+      <li><a href="modules/instruction.html#instruction.op_stkvar">op_stkvar() (in module instruction)</a>, <a href="modules/instruction.html#instruction.op_stkvar">[1]</a>
 </li>
-      <li><a href="modules/instruction.html#instruction.op_structure">op_structure() (in module instruction)</a>, <a href="modules/instruction.html#instruction.op_structure">[1]</a>, <a href="modules/instruction.html#instruction.op_structure">[2]</a>, <a href="modules/instruction.html#instruction.op_structure">[3]</a>, <a href="modules/instruction.html#instruction.op_structure">[4]</a>, <a href="modules/instruction.html#instruction.op_structure">[5]</a>, <a href="modules/instruction.html#instruction.op_structure">[6]</a>, <a href="modules/instruction.html#instruction.op_structure">[7]</a>
+      <li><a href="modules/instruction.html#instruction.op_string">op_string() (in module instruction)</a>, <a href="modules/instruction.html#instruction.op_string">[1]</a>, <a href="modules/instruction.html#instruction.op_string">[2]</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/instruction.html#instruction.op_structure">op_structure() (in module instruction)</a>, <a href="modules/instruction.html#instruction.op_structure">[1]</a>, <a href="modules/instruction.html#instruction.op_structure">[2]</a>, <a href="modules/instruction.html#instruction.op_structure">[3]</a>, <a href="modules/instruction.html#instruction.op_structure">[4]</a>, <a href="modules/instruction.html#instruction.op_structure">[5]</a>, <a href="modules/instruction.html#instruction.op_structure">[6]</a>, <a href="modules/instruction.html#instruction.op_structure">[7]</a>
+</li>
       <li><a href="modules/misc-ui.html#ui.ConsoleProgress.open">open() (ui.ConsoleProgress method)</a>
 
       <ul>
@@ -1157,26 +1171,26 @@
 </li>
       <li><a href="modules/instruction.html#instruction.opts">opts() (in module instruction)</a>, <a href="modules/instruction.html#instruction.opts">[1]</a>
 </li>
-      <li><a href="modules/structure.html#structure.member_t.owner">owner (structure.member_t attribute)</a>
-
-      <ul>
-        <li><a href="modules/structure.html#structure.members_t.owner">(structure.members_t attribute)</a>
-</li>
-      </ul></li>
   </ul></td>
 </tr></table>
 
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/structure.html#structure.member_t.parent">parent (structure.member_t attribute)</a>
+
+      <ul>
+        <li><a href="modules/structure.html#structure.members_t.parent">(structure.members_t attribute)</a>
+</li>
+      </ul></li>
       <li><a href="modules/structure.html#structure.members_t.pop">pop() (structure.members_t method)</a>
 </li>
       <li><a href="modules/misc-ui.html#ui.Progress">Progress (class in ui)</a>
 </li>
-      <li><a href="modules/function.html#function.prototype">prototype() (in module function)</a>, <a href="modules/function.html#function.prototype">[1]</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/function.html#function.prototype">prototype() (in module function)</a>, <a href="modules/function.html#function.prototype">[1]</a>
+</li>
       <li><a href="modules/structure.html#structure.member_t.ptr">ptr (structure.member_t attribute)</a>
 
       <ul>
@@ -1301,6 +1315,12 @@
 </li>
       <li><a href="modules/database.html#database.set.data">set.data() (in module database)</a>, <a href="modules/database.html#database.set.data">[1]</a>
 </li>
+      <li><a href="modules/database.html#database.set.float">set.float() (in module database)</a>, <a href="modules/database.html#database.set.float">[1]</a>
+</li>
+      <li><a href="modules/database.html#database.set.float.double">set.float.double() (in module database)</a>, <a href="modules/database.html#database.set.float.double">[1]</a>
+</li>
+      <li><a href="modules/database.html#database.set.float.single">set.float.single() (in module database)</a>, <a href="modules/database.html#database.set.float.single">[1]</a>
+</li>
       <li><a href="modules/database.html#database.set.integer.byte">set.integer.byte() (in module database)</a>, <a href="modules/database.html#database.set.integer.byte">[1]</a>
 </li>
       <li><a href="modules/database.html#database.set.integer.dword">set.integer.dword() (in module database)</a>, <a href="modules/database.html#database.set.integer.dword">[1]</a>
@@ -1311,10 +1331,10 @@
 </li>
       <li><a href="modules/database.html#database.set.integer.word">set.integer.word() (in module database)</a>, <a href="modules/database.html#database.set.integer.word">[1]</a>
 </li>
-      <li><a href="modules/database.html#database.set.string">set.string() (in module database)</a>, <a href="modules/database.html#database.set.string">[1]</a>, <a href="modules/database.html#database.set.string">[2]</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/database.html#database.set.string">set.string() (in module database)</a>, <a href="modules/database.html#database.set.string">[1]</a>, <a href="modules/database.html#database.set.string">[2]</a>
+</li>
       <li><a href="modules/database.html#database.set.structure">set.structure() (in module database)</a>, <a href="modules/database.html#database.set.structure">[1]</a>
 </li>
       <li><a href="modules/database.html#database.set.unknown">set.unknown() (in module database)</a>, <a href="modules/database.html#database.set.unknown">[1]</a>, <a href="modules/database.html#database.set.unknown">[2]</a>

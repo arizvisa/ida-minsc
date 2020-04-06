@@ -413,9 +413,10 @@ member_t
    
    .. py:attribute:: offset
    
+   The offset of this ``member_t`` relative to the structure's base offset.
       :param getter: Return the offset of the member.
    
-   .. py:attribute:: owner
+   .. py:attribute:: parent
    
    The ``structure_t`` that owns this ``member_t``.
       :param getter: Return the structure_t that owns the member.
@@ -427,7 +428,7 @@ member_t
    
    .. py:attribute:: realoffset
    
-   The offset of this ``member_t``.
+   The real offset of this ``member_t``.
       :param getter: Return the real offset of the member.
    
    .. py:attribute:: right
@@ -522,7 +523,7 @@ members_t
        > iterable = st.members.iterate(like='p_*')
        > result = st.members.by(offset=0x2a)
    
-   .. py:attribute:: owner
+   .. py:attribute:: parent
    
    The ``structure_t`` that owns this ``members_t``.
       :param getter: Return the :py:obj:`structure_t` that owns this :py:obj:`members_t`.
@@ -605,11 +606,19 @@ members_t
       
    .. py:method:: by_offset(self, offset)
       
-      Return the member at the specified ``offset``.
+      Return the member at the specified ``offset`` from the base offset of the structure.
       
       Aliases: :py:func:`structure.members_t.byoffset<by_offset>`, :py:func:`structure.members_t.byOffset<by_offset>`
       
-      :param offset: the member of the offset to return
+      :param offset: the offset of the member to return
+      
+   .. py:method:: by_realoffset(self, offset)
+      
+      Return the member at the specified ``offset`` of the structure.
+      
+      Aliases: :py:func:`structure.members_t.byrealoffset<by_realoffset>`, :py:func:`structure.members_t.byRealOffset<by_realoffset>`
+      
+      :param offset: the real offset of the member to return
       
    .. py:method:: index(self, member)
       
@@ -638,11 +647,17 @@ members_t
       
    .. py:method:: near_offset(self, offset)
       
-      Return the member nearest to the specified ``offset``.
+      Return the member nearest to the specified ``offset`` from the base offset of the structure.
       
       Aliases: :py:func:`structure.members_t.nearoffset<near_offset>`, :py:func:`structure.members_t.near<near_offset>`, :py:func:`structure.members_t.nearOffset<near_offset>`
       
       :param offset: the offset nearest to the member to return
+      
+   .. py:method:: near_realoffset(self, offset)
+      
+      Return the member nearest to the specified ``offset``.
+      
+      :param offset: the real offset nearest to the member to return
       
    .. py:method:: pop(self, index)
       

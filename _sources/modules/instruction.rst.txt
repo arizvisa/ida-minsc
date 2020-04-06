@@ -263,6 +263,26 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
+.. py:function:: op_stkvar(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to a stack variable and return it.
+   
+   Aliases: :py:func:`instruction.op_stack<op_stkvar>`, :py:func:`instruction.op_stackvar<op_stkvar>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_stkvar(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to a stack variable and return it.
+   
+   Aliases: :py:func:`instruction.op_stack<op_stkvar>`, :py:func:`instruction.op_stackvar<op_stkvar>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
 .. py:function:: op_string(opnum)
    
    Return the string type of operand ``opnum`` for the current instruction.
@@ -292,7 +312,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_structure(opnum)
    
-   Return the structure that operand ``opnum`` at the current instruction actually references.
+   Return the structure and members for operand ``opnum`` at the current instruction.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
@@ -301,7 +321,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_structure(ea, opnum)
    
-   Return the structure that operand ``opnum`` for instruction ``ea`` actually references.
+   Return the structure and members for the operand ``opnum`` at the instruction ``ea``.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    

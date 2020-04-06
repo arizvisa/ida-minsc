@@ -478,6 +478,40 @@ whether the operand is being read from, written to, or modified (both).</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="instruction.op_stkvar">
+<code class="descclassname">instruction.</code><code class="descname">op_stkvar</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_stkvar" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the type for operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current instruction to a stack variable and return it.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_stkvar" title="instruction.op_stkvar"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_stack</span></code></a>, <a class="reference internal" href="#instruction.op_stkvar" title="instruction.op_stkvar"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_stackvar</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the current instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">op_stkvar</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the type for operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a stack variable and return it.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.op_stkvar" title="instruction.op_stkvar"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_stack</span></code></a>, <a class="reference internal" href="#instruction.op_stkvar" title="instruction.op_stkvar"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_stackvar</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="instruction.op_string">
 <code class="descclassname">instruction.</code><code class="descname">op_string</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_string" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the string type of operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> for the current instruction.</p>
@@ -531,7 +565,7 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt id="instruction.op_structure">
 <code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_structure" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the structure that operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current instruction actually references.</p>
+<dd><p>Return the structure and members for operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the current instruction.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -546,7 +580,7 @@ whether the operand is being read from, written to, or modified (both).</p>
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">op_structure</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the structure that operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> for instruction <code class="docutils literal notranslate"><span class="pre">ea</span></code> actually references.</p>
+<dd><p>Return the structure and members for the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> at the instruction <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struct</span></code></a>, <a class="reference internal" href="#instruction.op_structure" title="instruction.op_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_struc</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />

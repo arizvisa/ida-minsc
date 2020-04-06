@@ -3906,8 +3906,202 @@ If <code class="docutils literal notranslate"><span class="pre">byteorder</span>
 </table>
 </dd></dl>
 
+<div class="section" id="database-get-float">
+<span id="ns-database-get-float"></span><h4>3.1.1.2.6.1. database.get.float<a class="headerlink" href="#database-get-float" title="Permalink to this headline">¶</a></h4>
+<p>Aliases: <a class="reference internal" href="#ns-database-get-float"><span class="std std-ref">database.get.f</span></a></p>
+<p>This namespace contains a number of functions for fetching floating
+point numbers out of the database. These floating-point numbers are
+encoded according to the IEEE-754 specification.</p>
+<p>This namespace is also aliased as <code class="xref py py-obj docutils literal notranslate"><span class="pre">database.get.f</span></code> and can be used
+as in the following examples:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">f</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">f</span><span class="o">.</span><span class="n">single</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">f</span><span class="o">.</span><span class="n">double</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If one needs to describe a non-standard encoding for a floating-point
+number, one can use the <code class="xref py py-obj docutils literal notranslate"><span class="pre">database.float</span></code> function. This function
+takes a tuple representing the number of bits for the different
+components of a floating-point number. This can be used as in the
+following for reading a floating-point “half” from the database:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">float</span><span class="p">(</span><span class="n">components</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>This specifies 10-bits for the mantissa, 5 for the exponent, and 1
+bit for the signed flag. This allows one to specify arbitrary
+encodings for different floating-point numbers.</p>
+<dl class="function">
+<dt id="database.get.float">
+<code class="descclassname">get.</code><code class="descname">float</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.float" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a floating-number from the current address using the number type that matches its size.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">float</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
+<dd><p>Read a floating-number at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> using the number type that matches its size.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">float</code><span class="sig-paren">(</span><em>components</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
+<dd><p>Read a floating-point number at the current address encoded with the specified <code class="docutils literal notranslate"><span class="pre">components</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>components</strong> (<em>tuple</em>) – a tuple describing the component sizes for decoding the floating-point number</li>
+<li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">float</code><span class="sig-paren">(</span><em>ea</em>, <em>components</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
+<dd><p>Read a floating-point number at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> that is encoded with the specified <code class="docutils literal notranslate"><span class="pre">components</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">components</span></code> parameter is a tuple (mantissa, exponent, sign) representing the number of bits for each component of the floating-point number.
+If <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is ‘big’ then read in big-endian form.
+If <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is ‘little’ then read in little-endian form.</p>
+<p>The default value of <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is the same as specified by the database architecture.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>components</strong> (<em>tuple</em>) – a tuple describing the component sizes for decoding the floating-point number</li>
+<li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.get.float.double">
+<code class="descclassname">get.float.</code><code class="descname">double</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.float.double" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a double from the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.float.</code><code class="descname">double</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
+<dd><p>Read a double from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – an address in the database</li>
+<li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.get.float.half">
+<code class="descclassname">get.float.</code><code class="descname">half</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.float.half" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a half from the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.float.</code><code class="descname">half</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
+<dd><p>Read a half from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – an address in the database</li>
+<li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.get.float.single">
+<code class="descclassname">get.float.</code><code class="descname">single</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.float.single" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a single from the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.float.</code><code class="descname">single</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
+<dd><p>Read a single from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – an address in the database</li>
+<li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the floating-point number</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
 <div class="section" id="database-get-integer">
-<span id="ns-database-get-integer"></span><h4>3.1.1.2.6.1. database.get.integer<a class="headerlink" href="#database-get-integer" title="Permalink to this headline">¶</a></h4>
+<span id="ns-database-get-integer"></span><h4>3.1.1.2.6.2. database.get.integer<a class="headerlink" href="#database-get-integer" title="Permalink to this headline">¶</a></h4>
 <p>Aliases: <a class="reference internal" href="#ns-database-get-integer"><span class="std std-ref">database.get.i</span></a></p>
 <p>This namespace contains the different ISO standard integer types that
 can be used to read integers out of the database.</p>
@@ -4304,7 +4498,7 @@ like in the following examples:</p>
 
 </div>
 <div class="section" id="database-get-switch">
-<span id="ns-database-get-switch"></span><h4>3.1.1.2.6.2. database.get.switch<a class="headerlink" href="#database-get-switch" title="Permalink to this headline">¶</a></h4>
+<span id="ns-database-get-switch"></span><h4>3.1.1.2.6.3. database.get.switch<a class="headerlink" href="#database-get-switch" title="Permalink to this headline">¶</a></h4>
 <p>Function for fetching an instance of a <code class="xref py py-obj docutils literal notranslate"><span class="pre">switch_t</span></code> from a given address.
 Despite this being a namespace, by default it is intended to be used
 as a function against any known component of a switch. It will then
@@ -5561,8 +5755,80 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 </table>
 </dd></dl>
 
+<div class="section" id="database-set-float">
+<span id="ns-database-set-float"></span><h4>3.1.1.2.12.1. database.set.float<a class="headerlink" href="#database-set-float" title="Permalink to this headline">¶</a></h4>
+<p>Aliases: <a class="reference internal" href="#ns-database-set-float"><span class="std std-ref">database.set.f</span></a></p>
+<p>This namespace used for applying various sized floating-point types
+to a particular address.</p>
+<p>This namespace is aliased as <code class="xref py py-obj docutils literal notranslate"><span class="pre">database.set.f</span></code> and can be used as
+follows:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">f</span><span class="o">.</span><span class="n">single</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">f</span><span class="o">.</span><span class="n">double</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="database.set.float">
+<code class="descclassname">set.</code><code class="descname">float</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.float" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the data at the current address to an IEEE-754 floating-point number based on its size.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.</code><code class="descname">float</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Sets the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an IEEE-754 floating-point number based on its size.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.float.double">
+<code class="descclassname">set.float.</code><code class="descname">double</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.float.double" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to an IEEE-754 double</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.float.</code><code class="descname">double</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an IEEE-754 double.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.float.single">
+<code class="descclassname">set.float.</code><code class="descname">single</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.float.single" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to an IEEE-754 single</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.float.</code><code class="descname">single</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an IEEE-754 single.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
 <div class="section" id="database-set-integer">
-<span id="ns-database-set-integer"></span><h4>3.1.1.2.12.1. database.set.integer<a class="headerlink" href="#database-set-integer" title="Permalink to this headline">¶</a></h4>
+<span id="ns-database-set-integer"></span><h4>3.1.1.2.12.2. database.set.integer<a class="headerlink" href="#database-set-integer" title="Permalink to this headline">¶</a></h4>
 <p>Aliases: <a class="reference internal" href="#ns-database-set-integer"><span class="std std-ref">database.set.i</span></a></p>
 <p>This namespace used for applying various sized integer types to
 a particular address.</p>
@@ -6906,8 +7172,9 @@ also aliased as globals. Some of these are:</p>
 <li><a class="reference internal" href="#database-extra">3.1.1.2.4. database.extra</a></li>
 <li><a class="reference internal" href="#database-functions">3.1.1.2.5. database.functions</a></li>
 <li><a class="reference internal" href="#database-get">3.1.1.2.6. database.get</a><ul>
-<li><a class="reference internal" href="#database-get-integer">3.1.1.2.6.1. database.get.integer</a></li>
-<li><a class="reference internal" href="#database-get-switch">3.1.1.2.6.2. database.get.switch</a></li>
+<li><a class="reference internal" href="#database-get-float">3.1.1.2.6.1. database.get.float</a></li>
+<li><a class="reference internal" href="#database-get-integer">3.1.1.2.6.2. database.get.integer</a></li>
+<li><a class="reference internal" href="#database-get-switch">3.1.1.2.6.3. database.get.switch</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#database-imports">3.1.1.2.7. database.imports</a></li>
@@ -6916,7 +7183,8 @@ also aliased as globals. Some of these are:</p>
 <li><a class="reference internal" href="#database-search">3.1.1.2.10. database.search</a></li>
 <li><a class="reference internal" href="#database-segments">3.1.1.2.11. database.segments</a></li>
 <li><a class="reference internal" href="#database-set">3.1.1.2.12. database.set</a><ul>
-<li><a class="reference internal" href="#database-set-integer">3.1.1.2.12.1. database.set.integer</a></li>
+<li><a class="reference internal" href="#database-set-float">3.1.1.2.12.1. database.set.float</a></li>
+<li><a class="reference internal" href="#database-set-integer">3.1.1.2.12.2. database.set.integer</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#database-type">3.1.1.2.13. database.type</a><ul>

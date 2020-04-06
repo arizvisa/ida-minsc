@@ -2231,6 +2231,114 @@ following examples can be used::
    :type size: int or long
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
+.. _ns-database-get-float:
+
+^^^^^^^^^^^^^^^^^^
+database.get.float
+^^^^^^^^^^^^^^^^^^
+
+Aliases: :ref:`database.get.f<ns-database-get-float>`
+
+This namespace contains a number of functions for fetching floating
+point numbers out of the database. These floating-point numbers are
+encoded according to the IEEE-754 specification.
+
+This namespace is also aliased as :py:obj:`database.get.f` and can be used
+as in the following examples::
+
+    > res = database.get.f.half()
+    > res = database.get.f.single(ea)
+    > res = database.get.f.double(ea)
+
+If one needs to describe a non-standard encoding for a floating-point
+number, one can use the :py:obj:`database.float` function. This function
+takes a tuple representing the number of bits for the different
+components of a floating-point number. This can be used as in the
+following for reading a floating-point "half" from the database::
+
+    > res = database.get.float(components=(10, 5, 1))
+
+This specifies 10-bits for the mantissa, 5 for the exponent, and 1
+bit for the signed flag. This allows one to specify arbitrary
+encodings for different floating-point numbers.
+
+.. py:function:: get\.float(\*\*byteorder)
+   
+   Read a floating-number from the current address using the number type that matches its size.
+   
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float(ea, \*\*byteorder)
+   
+   Read a floating-number at the address ``ea`` using the number type that matches its size.
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float(components, \*\*byteorder)
+   
+   Read a floating-point number at the current address encoded with the specified ``components``.
+   
+   :param components: a tuple describing the component sizes for decoding the floating-point number
+   :type components: tuple
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float(ea, components, \*\*byteorder)
+   
+   Read a floating-point number at the address ``ea`` that is encoded with the specified ``components``.
+   
+   The ``components`` parameter is a tuple (mantissa, exponent, sign) representing the number of bits for each component of the floating-point number.
+   If ``byteorder`` is 'big' then read in big-endian form.
+   If ``byteorder`` is 'little' then read in little-endian form.
+   
+   The default value of ``byteorder`` is the same as specified by the database architecture.
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param components: a tuple describing the component sizes for decoding the floating-point number
+   :type components: tuple
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float\.double(\*\*byteorder)
+   
+   Read a double from the current address.
+   
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float\.double(ea, \*\*byteorder)
+   
+   Read a double from the address ``ea``.
+   
+   :param ea: an address in the database
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float\.half(\*\*byteorder)
+   
+   Read a half from the current address.
+   
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float\.half(ea, \*\*byteorder)
+   
+   Read a half from the address ``ea``.
+   
+   :param ea: an address in the database
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float\.single(\*\*byteorder)
+   
+   Read a single from the current address.
+   
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
+.. py:function:: get\.float\.single(ea, \*\*byteorder)
+   
+   Read a single from the address ``ea``.
+   
+   :param ea: an address in the database
+   :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the floating-point number
+   
 .. _ns-database-get-integer:
 
 ^^^^^^^^^^^^^^^^^^^^
@@ -3201,6 +3309,53 @@ This can be used as in the following examples::
    :type ea: int or long
    :param size: the amount of bytes to set
    :type size: int or long
+   
+.. _ns-database-set-float:
+
+^^^^^^^^^^^^^^^^^^
+database.set.float
+^^^^^^^^^^^^^^^^^^
+
+Aliases: :ref:`database.set.f<ns-database-set-float>`
+
+This namespace used for applying various sized floating-point types
+to a particular address.
+
+This namespace is aliased as :py:obj:`database.set.f` and can be used as
+follows::
+
+    > database.set.f.single(ea)
+    > database.set.f.double(ea)
+
+.. py:function:: set\.float()
+   
+   Sets the data at the current address to an IEEE-754 floating-point number based on its size.
+   
+.. py:function:: set\.float(ea)
+   
+   Sets the data at address ``ea`` to an IEEE-754 floating-point number based on its size.
+   
+   :param ea: an address in the database
+   
+.. py:function:: set\.float\.double()
+   
+   Set the data at the current address to an IEEE-754 double
+   
+.. py:function:: set\.float\.double(ea)
+   
+   Set the data at address ``ea`` to an IEEE-754 double.
+   
+   :param ea: an address in the database
+   
+.. py:function:: set\.float\.single()
+   
+   Set the data at the current address to an IEEE-754 single
+   
+.. py:function:: set\.float\.single(ea)
+   
+   Set the data at address ``ea`` to an IEEE-754 single.
+   
+   :param ea: an address in the database
    
 .. _ns-database-set-integer:
 
