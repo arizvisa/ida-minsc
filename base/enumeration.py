@@ -345,7 +345,7 @@ class members(object):
         '''Return the member of the enumeration specified by `enum` and its `mid`.'''
         eid = by(enum)
         if member.parent(mid) != eid:
-            raise E.MemberNotFoundError(u"{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by id.".format('.'.join((__name__, cls.__name__)), eid, mid))
+            raise E.MemberNotFoundError(u"{:s}.by_identifier({:#x}, {:d}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), eid, mid))
         return mid
 
     @classmethod
@@ -469,6 +469,8 @@ class member(object):
     @classmethod
     def name(cls, mid):
         '''Return the name of the enumeration member `mid`.'''
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.name({:#x}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), mid))
         res = idaapi.get_enum_member_name(mid)
         return utils.string.of(res)
     @utils.multicase()
@@ -502,6 +504,8 @@ class member(object):
 
         If the bool `repeatable` is specified, then return the repeatable comment.
         """
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.comment({:#x}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), mid))
         res = idaapi.get_enum_member_cmt(mid, repeatable.get('repeatable', True))
         return utils.string.of(res)
     @utils.multicase()
@@ -519,6 +523,8 @@ class member(object):
 
         If the bool `repeatable` is specified, then set the repeatable comment.
         """
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.comment({:#x}, {!r}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), mid, comment))
         res = utils.string.to(comment)
         return idaapi.set_enum_member_cmt(mid, res, repeatable.get('repeatable', True))
     @utils.multicase(comment=basestring)
@@ -534,6 +540,8 @@ class member(object):
     @classmethod
     def value(cls, mid):
         '''Return the value of the enumeration member `mid`.'''
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.value({:#x}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), mid))
         return idaapi.get_enum_member_value(mid)
     @utils.multicase()
     @classmethod
@@ -549,6 +557,8 @@ class member(object):
 
         If the integer `bitmask` is specified, then use it as a bitmask. Otherwise assume all bits are set.
         """
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.value({:#x}, {:#x}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), mid, value))
         bmask = bitmask.get('bitmask', idaapi.BADADDR & cls.mask(mid))
         return idaapi.set_enum_member_value(mid, value, bmask)
     @utils.multicase(value=six.integer_types)
@@ -566,6 +576,8 @@ class member(object):
     @classmethod
     def serial(cls, mid):
         '''Return the serial of the enumeration member `mid`.'''
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.serial({:#x}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), mid))
         return idaapi.get_enum_member_serial(mid)
     @utils.multicase()
     @classmethod
@@ -579,6 +591,8 @@ class member(object):
     @classmethod
     def mask(cls, mid):
         '''Return the bitmask for the enumeration member `mid`.'''
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to locate member by the specified identifier.".format('.'.join((__name__, cls.__name__)), mid))
         return idaapi.get_enum_member_bmask(mid)
     @utils.multicase()
     @classmethod
