@@ -4990,9 +4990,9 @@ class get(object):
         """
         ea = interface.address.within(ea)
         numerics = {
-            idaapi.FF_BYTE : 'B',
-            idaapi.FF_WORD : 'H',
-            idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : 'L',
+            idaapi.FF_BYTE : utils.get_array_typecode(1),
+            idaapi.FF_WORD : utils.get_array_typecode(2),
+            idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : utils.get_array_typecode(4),
             idaapi.FF_FLOAT : 'f',
             idaapi.FF_DOUBLE : 'd',
         }
@@ -5000,8 +5000,8 @@ class get(object):
         # Some 32-bit versions of python might not have array.array('Q')
         # and some versions of IDA also might not have FF_QWORD..
         try:
-            _array.array('Q')
-            numerics[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = 'Q'
+            _array.array(utils.get_array_typecode(8))
+            numerics[idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD] = utils.get_array_typecode(8)
         except (AttributeError, ValueError):
             pass
 
@@ -5064,11 +5064,15 @@ class get(object):
         # validate that our itemsize matches so we can warn the user
         # and fall back if necessary
         if res.itemsize != cb:
-            logging.warn(u"{:s}.array({:#x}{:s}) : Unable to decode array with the correct type as the size (+{:d}) for the DT_TYPE ({:#x}) at the given address does not match the element size for the array (+{:d}).".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', res.itemsize, T, cb))
+            logging.warn(u"{:s}.array({:#x}{:s}) : Refusing to decode array at address {:#x} using the array size ({:+d}) identified for DT_TYPE ({:#x}) due to the size of the DT_TYPE ({:#x}) not corresponding to the desired element size ({:+d}).".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.itemsize, T, T, cb))
 
             # fix the array so that it matches the expected itemsize
-            tlookup = { 1: 'B', 2: 'H', 4: 'L' }
-            res = _array.array(tlookup.get(cb, 1))
+            try:
+                res = _array.array(utils.get_array_typecode(cb, 1))
+
+            # if we can't use the discovered typecode, then decode as bytes
+            except ValueError:
+                res = _array.array(utils.get_array_typecode(1))
 
         # read our data, and use it to initialize the array
         data = read(ea, count * cb)
