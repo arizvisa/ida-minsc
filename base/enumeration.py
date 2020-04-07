@@ -82,11 +82,7 @@ byIndex = utils.alias(by_index)
 @utils.multicase(index=six.integer_types)
 def by(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
-    bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
-    highbyte = 0xff << (bits-8)
-    if index & highbyte == highbyte:
-        return index
-    return by_index(index)
+    return index if interface.node.is_identifier(index) else by_index(index)
 @utils.multicase(name=basestring)
 @utils.string.decorate_arguments('name')
 def by(name):
@@ -373,11 +369,7 @@ class members(object):
     @classmethod
     def by(cls, enum, n):
         '''Return the member belonging to `enum` identified by its index or id in `n`.'''
-        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
-        highbyte = 0xff << (bits-8)
-        if n & highbyte == highbyte:
-            return cls.by_identifier(enum, n)
-        return cls.by_index(enum, n)
+        return cls.by_identifier(enum, n) if interface.node.is_identifier(n) else cls.by_index(enum, n)
     @utils.multicase(member=basestring)
     @classmethod
     @utils.string.decorate_arguments('member')
