@@ -47,6 +47,12 @@ import idaapi
 # FIXME: complete this with more types similar to the 'structure' module.
 # FIXME: normalize the documentation.
 
+def has(enum):
+    '''Return truth if the enumeration `enum` exists within the database.'''
+    alts = {idaapi.BADADDR - item for item in [7, 4, 2]}
+    available = {idx for idx, _ in internal.netnode.alt.fiter(enum)}
+    return interface.node.is_identifier(enum) and available & alts == alts
+
 def count():
     '''Return the total number of enumerations in the database.'''
     return idaapi.get_enum_qty()
