@@ -39,7 +39,7 @@ from six.moves import builtins
 
 import functools, operator, itertools, types
 import sys, logging
-import math, re, fnmatch
+import re, fnmatch
 
 import database, instruction
 import ui, internal
@@ -154,12 +154,9 @@ def by(name, **options):
 @utils.multicase(id=six.integer_types)
 def by(id, **options):
     '''Return a structure by its index or id.'''
-    res = id
-    bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
-    highbyte = 0xff << (bits-8)
-    if res & highbyte == highbyte:
-        return __instance__(res, **options)
-    return by_index(res, **options)
+    if interface.node.is_identifier(id):
+        return __instance__(id, **options)
+    return by_index(id, **options)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
@@ -323,16 +320,12 @@ class structure_t(object):
         while x.next_to():
             refs.append((x.frm, x.iscode, x.type))
 
-        # calculate the high-byte which is used to differentiate an address from a structure
-        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR) / math.log(2.0)))
-        highbyte = 0xff << (bits-8)
-
         # iterate through figuring out if sid is applied to an address or another structure
         res = []
         for ref, _, _ in refs:
 
             # structure (probably a frame member)
-            if ref & highbyte == highbyte:
+            if interface.node.is_identifier(ref):
                 # get mptr and the member name
                 mpack = idaapi.get_member_by_id(ref)
                 if mpack is None:
@@ -1455,12 +1448,8 @@ class member_t(object):
         mid = self.id
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
-        # calculate the high-byte which is used to determine an address from a structure
-        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR)/math.log(2.0)))
-        highbyte = 0xff << (bits-8)
-
         # if structure is a frame..
-        if internal.netnode.name.get(self.__parent.id).startswith('$ '):
+        if interface.node.is_identifier(self.__parent.id) and internal.netnode.name.get(self.__parent.id).startswith('$ '):
             name, mptr = self.fullname, self.ptr
             sptr = idaapi.get_sptr(mptr)
 
