@@ -41,7 +41,7 @@ import six
 from six.moves import builtins
 
 import functools, operator, itertools, types
-import logging, collections
+import logging, collections, math
 
 import database, function
 import structure, enumeration
@@ -738,12 +738,27 @@ def op_enumeration(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_enumeration(ea, opnum):
     '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
+
+    # First we need to distinguish whether the operand number is actually an
+    # operand, or an identifier of some kind
+    highbyte = 0xff << (math.trunc(math.ceil(math.log(idaapi.BADADDR) / math.log(2.0))) - 8)
+    if opnum & highbyte == highbyte:
+
+        # Now we'll read the alts for the opnum, and check to see if it matches
+        # the known enumeration alts.
+        required_alts = {idaapi.BADADDR - item for item in [7, 4, 2]}
+        if {idx for idx, _ in internal.netnode.alt.fiter(opnum)} & required_alts == required_alts:
+
+            # Now we know it's an identifier, so shift the parameters and try again.
+            ea, opnum, id = ui.current.address(), ea, opnum
+            return op_enumeration(ea, opnum, id)
+
     fl = database.type.flags(ea)
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
         raise E.MissingTypeOrAttribute(u"{:s}.op_enumeration({:#x}, {:d}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
-    # XXX: is the following api call the proper way to do this?
-    # idaapi.get_enum_id(*args):
+    # Technically, the is the following call is the proper way to do this...
+    # node, opnum = idaapi.get_enum_id(ea, opnum):
 
     res = opinfo(ea, opnum)
     if res is None:
