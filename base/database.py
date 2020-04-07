@@ -910,26 +910,9 @@ def go(ea):
     idaapi.jumpto(interface.address.inside(ea))
     return ea
 
-# returns the offset of ea from the baseaddress
-@utils.multicase()
-def offset():
-    '''Return the current address converted to an offset from the base address of the database.'''
-    return offset(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def offset(ea):
-    '''Return the address `ea` converted to an offset from the base address of the database.'''
-    return interface.address.inside(ea) - config.baseaddress()
-getoffset = getOffset = o = utils.alias(offset)
-
-def translate(offset):
-    '''Translate the specified `offset` to an address in the database.'''
-    return config.baseaddress() + offset
-coof = convert_offset = convertOffset = utils.alias(translate)
-
 def go_offset(offset):
     '''Jump to the specified `offset` within the database.'''
-    res = ui.current.address() - config.baseaddress()
-    ea = coof(offset)
+    res, ea = address.offset(ui.current.address()), address.by_offset(offset)
     idaapi.jumpto(interface.address.inside(ea))
     return res
 goof = gooffset = gotooffset = goto_offset = utils.alias(go_offset)
@@ -2767,8 +2750,32 @@ class address(object):
     def nextunknown(cls, ea, count):
         return cls.nextF(ea, type.is_unknown, count)
 
+    # address translations
+    @classmethod
+    def by_offset(cls, offset):
+        '''Return the specified `offset` translated to an address in the database.'''
+        return config.baseaddress() + offset
+    byoffset = byOffset = utils.alias(by_offset, 'address')
+
+    @utils.multicase()
+    @classmethod
+    def offset(cls):
+        '''Return the current address translated to an offset relative to the base address of the database.'''
+        return offset(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def offset(cls, ea):
+        '''Return the address `ea` translated to an offset relative to the base address of the database.'''
+        return interface.address.inside(ea) - config.baseaddress()
+    getoffset = getOffset = utils.alias(offset, 'address')
+
 a = addr = address  # XXX: ns alias
 
+# address translations
+offset = byoffset = by_offset = byOffset = getoffset = get_offset = getOffset = utils.alias(address.offset, 'address')
+coof = convert_offset = convertOffset = utils.alias(address.by_offset, 'address')
+
+# datapoint navigation
 prev, next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'address')
 prevref, nextref = utils.alias(address.prevref, 'address'), utils.alias(address.nextref, 'address')
 prevreg, nextreg = utils.alias(address.prevreg, 'address'), utils.alias(address.nextreg, 'address')
