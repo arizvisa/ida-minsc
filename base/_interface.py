@@ -1137,7 +1137,7 @@ else:
 #    18 : 'Code_Far_Jump', 19 : 'Code_Near_Jump',
 #    20 : 'Code_User', 21 : 'Ordinary_Flow'
 #}
-class ref_t(set):
+class ref_t(object):
     """
     An object representing a reference type that allows one to easily extract
     semantics using set membership. This type uses "rwx" from posix file
@@ -1148,8 +1148,6 @@ class ref_t(set):
     execute. This makes it very easy to test whether a reference is reading
     and executing something, or it's writing to its target.
     """
-
-    F = 0
 
     if idaapi.__version__ < 7.0:
         __mapper__ = {
@@ -1166,25 +1164,44 @@ class ref_t(set):
         }
     __mapper__[31] = '*'        # code 31 used internally by ida-minsc
 
-    def __and__(self, type):
-        return type in self
+    def __operator__(self, F, item):
+        cls = self.__class__
+        if isinstance(item, cls):
+            res = F(self.S, item.S)
+        elif isinstance(item, six.integer_types):
+            res = F(self.S, cls.of(item))
+        else:
+            res = F(self.S, item)
+        return cls.of_state(str().join(res)) if isinstance(res, set) else res
 
-    def __str__(self):
-        return str().join(sorted(self))
+    def __or__(self, other):
+        return self.__operator__(operator.or_, other)
+    def __and__(self, other):
+        return self.__operator__(operator.and_, other)
+    def __eq__(self, other):
+        return self.__operator__(operator.eq, other)
+    def __contains__(self, type):
+        return operator.contains(self.S, type)
+
+    def __iter__(self):
+        for item in sorted(self.S):
+            yield item
+        return
+
     def __repr__(self):
-        return "ref_t({:s})".format(str().join(sorted(self)))
+        return "ref_t({:s})".format(str().join(sorted(self.S)))
 
     def __init__(self, xrtype, iterable):
         '''Construct a ``ref_t`` using `xrtype` and any semantics specified in `iterable`.'''
         self.F = xrtype
-        self.update(iterable)
+        self.S = { item for item in iterable }
 
     @classmethod
-    def of(cls, xrtype):
+    def of_type(cls, xrtype):
         '''Convert an IDA reference type in `xrtype` to a ``ref_t``.'''
         res = cls.__mapper__.get(xrtype, '')
         return cls(xrtype, res)
-    of_type = of
+    of = of_type
 
     @classmethod
     def of_state(cls, state):
@@ -1193,10 +1210,12 @@ class ref_t(set):
             return cls(31, '*')     # code 31 used internally by ida-minsc
         elif state == 'rw':
             state = 'w'
-        res = set(state)
+
+        # Search through our mapper for the correct contents of the ref_t
+        res = { item for item in state }
         for F, t in six.iteritems(cls.__mapper__):
-            if set(t) == res:
-                return cls(F, str().join(sorted(res)))
+            if { item for item in t } == res:
+                return cls(F, res)
             continue
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to find the cross-reference type that matches requested state.".format('.'.join(('internal', __name__, cls.__name__)), str().join(sorted(res))))
 
