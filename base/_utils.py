@@ -12,7 +12,7 @@ from six.moves import builtins
 
 import logging, types, weakref
 import functools, operator, itertools
-import sys, heapq, collections
+import sys, heapq, collections, array
 
 import internal
 import idaapi
@@ -991,3 +991,22 @@ def transform(translate, *names):
     def result(F):
         return wrap(F, wrapper)
     return result
+
+def get_array_typecode(size, *default):
+    '''Return the correct integer typecode for the given size.'''
+    if hasattr(get_array_typecode, 'lookup'):
+        L = getattr(get_array_typecode, 'lookup')
+        return L.get(size, L.get(*default)) if default else L[size]
+
+    # wow, wtf python...
+    dword = 'L' if len(array.array('I', 4 * b'\0')) > 1 else 'I'
+    qword = 'Q' if len(array.array('L', 8 * b'\0')) > 1 else 'L'
+
+    # assign out lookup dictionary
+    get_array_typecode.lookup = {
+        1 : 'B',
+        2 : 'H',
+        4 : dword,
+        8 : qword,
+    }
+    return get_array_typecode(size, *default)
