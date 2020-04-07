@@ -87,12 +87,12 @@ def by(name):
 def offset():
     '''Return the offset of the current function from the base of the database.'''
     ea = address()
-    return database.getoffset(ea)
+    return database.address.offset(ea)
 @utils.multicase()
 def offset(func):
     '''Return the offset of the function `func` from the base of the database.'''
     ea = address(func)
-    return database.getoffset(ea)
+    return database.address.offset(ea)
 
 ## properties
 @utils.multicase()
