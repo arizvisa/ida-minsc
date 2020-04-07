@@ -10,7 +10,7 @@ individuals to attempt to understand this craziness.
 import six
 import sys, logging, contextlib
 import functools, operator, itertools, types
-import collections, heapq, traceback, ctypes
+import collections, heapq, traceback, ctypes, math
 import unicodedata as _unicodedata, string as _string
 
 import ui, internal
@@ -759,6 +759,13 @@ class node(object):
 
     XXX: Hopefully these are correct!
     """
+    @staticmethod
+    def is_identifier(identifier):
+        '''Return truth if the specified `identifier` is valid.'''
+        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR) / math.log(2.0))) - 8
+        highbyte = 0xff << bits
+        return identifier & highbyte == highbyte
+
     @staticmethod
     def sup_functype(sup):
         """Given a supval, return the pointer size, model, and calling convention for a function.
