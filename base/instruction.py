@@ -739,19 +739,11 @@ def op_enumeration(opnum):
 def op_enumeration(ea, opnum):
     '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
 
-    # First we need to distinguish whether the operand number is actually an
-    # operand, or an identifier of some kind
-    highbyte = 0xff << (math.trunc(math.ceil(math.log(idaapi.BADADDR) / math.log(2.0))) - 8)
-    if opnum & highbyte == highbyte:
-
-        # Now we'll read the alts for the opnum, and check to see if it matches
-        # the known enumeration alts.
-        required_alts = {idaapi.BADADDR - item for item in [7, 4, 2]}
-        if {idx for idx, _ in internal.netnode.alt.fiter(opnum)} & required_alts == required_alts:
-
-            # Now we know it's an identifier, so shift the parameters and try again.
-            ea, opnum, id = ui.current.address(), ea, opnum
-            return op_enumeration(ea, opnum, id)
+    # If our operand number is actually an enumeration identifier, then shift
+    # our parameters, and try again with the current address.
+    if enumeration.has(opnum):
+        ea, opnum, id = ui.current.address(), ea, opnum
+        return op_enumeration(ea, opnum, id)
 
     fl = database.type.flags(ea)
     if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
