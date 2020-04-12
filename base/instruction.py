@@ -538,15 +538,23 @@ def op_structure(ea, opnum):
     if not count:
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
-    # If for some reason we get more than one result in our path, then IDA
-    # somehow worked this out...but we still can't trust it, so we rip the
-    # structure from it and calculate it ourselves.
-    if count > 1:
-        res = [ path[index] for index in six.moves.range(count) ]
-        logging.debug(u"{:s}.op_structure({:#x}, {:d}) : IDA unexpectedly returned {:d} path members ({:s}).".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(m.id) for m in res)))
-
     # Here's how we start our search...
     st = structure.by_identifier(path[0])
+
+    # If for some reason we get more than one result in our path, then we're
+    # shifted by fields within that path. So we'll seed our offset with the
+    # position of this field, and continue to calculate it ourselves...
+    if count > 1:
+        items = [ path[index] for index in six.moves.range(count) ]
+        logging.debug(u"{:s}.op_structure({:#x}, {:d}) : IDA returned {:d} path members ({:s}).".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(m) for m in items)))
+
+        t, position = structure.by_identifier(items.pop(0)), 0
+        for item in items:
+            m = t.members.by_identifier(item)
+            position += m.realoffset
+            t = m.type
+        logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Adjusted offset by {:+#x} due to {:d} path members ({:s}).".format(__name__, ea, opnum, position, count, ', '.join("{:#x}".format(m) for m in items)))
+        offset += position
 
     # If there are no members, then we simply return the structure and the
     # offset because the user put a structure there. They likely will want
