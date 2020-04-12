@@ -907,7 +907,7 @@ def op_refs(ea, opnum):
         res = []
         for ea, _, t in refs:
             ops = ((idx, internal.netnode.sup.get(ea, 0xf + idx)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
-            ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in ops)
+            ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())[1]) for idx, val in ops)
             ops = (idx for idx, ids in ops if st.id in ids)
             res.extend( interface.OREF(ea, int(op), interface.ref_t.of(t)) for op in ops)
         res = res

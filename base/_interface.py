@@ -832,7 +832,7 @@ class node(object):
 
     @staticmethod
     def sup_opstruct(sup, bit64Q):
-        """Given a supval, return the list of the encoded structure/field ids.
+        """Given a supval, return a tuple of the delta and a list of the encoded structure/field ids.
 
         This string is typically found in a supval[0xF+opnum] of the instruction.
         """
@@ -859,12 +859,17 @@ class node(object):
                     raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id32 : The count for the 16-bit identifier ({:d}) is larger than the expected count ({:d}).".format('.'.join(('internal', __name__)), sup.encode('hex'), count, 1))
                 return (0xff000000 | 0x8000 ^ le(res),)
 
+            if count & 0x8000:
+                offset, count, res = count ^ 0x8000, le(sup[2:3]), sup[2 + 1:]
+            else:
+                offset = 0
+
             chunks = zip(*((iter(res),) * 4))
             if len(chunks) != count:
                 raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id32 : The number of chunks ({:d}) does not match the count ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, 0x3f000000), res)
-            return tuple(res)
+            return offset, res
 
         # 64-bit
         # 000002 c000888e00 c000889900 -- KEVENT.Header.anonymous_0.anonymous_0.Type
@@ -879,15 +884,37 @@ class node(object):
 
         def id64(sup):
             iterable = iter(sup)
-            #chunks = zip(*((iter(sup),)*3))
-            length = le((six.next(iterable), six.next(iterable), six.next(iterable)))
-            chunks = zip(*((iterable,)*5))
+
+            # First consume the offset (FIXME: we only support 2 bytes for now...)
+            by = six.next(iterable)
+            if le(by) & 0x80:
+                offset = le([by] + [six.next(iterable)])
+                offset ^= 0x8000
+            else:
+                offset = 0
+
+            # Now we can grab our length
+            length = le((six.next(iterable), six.next(iterable)))
+            rest = list(iterable)
+
+            if len(rest) % 3 == 0:
+                count, mask = 3, 0x8000ff
+
+            elif len(rest) % 5 == 0:
+                count, mask = 5, 0xc0000000ff
+
+            else:
+                raise NotImplementedError(u"{:s}.op_id(\"{:s}\") -> id64 : Error decoding supval from parameter.".format('.'.join(('internal', __name__)), rest))
+
+            iterable = iter(rest)
+
+            chunks = zip(*((iterable,) * count))
             #length = le(chunks.pop(0))
             if len(chunks) != length:
                 raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), length, map(''.join, chunks)))
             res = map(le, chunks)
-            res = map(functools.partial(operator.xor, 0xc0000000ff), res)
-            return tuple(ror(n, 8, 64) for n in res)
+            res = map(functools.partial(operator.xor, mask), res)
+            return offset, [ror(item, 8, 64) for item in res]
 
         return id64(sup) if bit64Q else id32(sup)
 
