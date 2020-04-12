@@ -516,7 +516,10 @@ def op_structure(ea, opnum):
         fn, insn = function.by(ea), at(ea)
 
         # Now we can ask IDA what's up with it.
-        m, actval = idaapi.get_stkvar(insn, op, offset)
+        res = idaapi.get_stkvar(insn, op, offset)
+        if not res:
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, offset))
+        m, actval = res
 
         # Grab our frame, then find the member by its id
         frame = function.frame(fn)
