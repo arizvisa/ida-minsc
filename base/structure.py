@@ -1516,7 +1516,7 @@ class member_t(object):
             # check if we found any ops that point directly to this member
             if any(listable):
                 iterable = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in listable)
-                iterable = (idx for idx, ids in iterable if self.__parent.id in ids)    # sanity
+                iterable = (idx for idx, (_, ids) in iterable if self.__parent.id in ids)    # sanity
                 res.extend(interface.OREF(ea, int(opnum), interface.ref_t.of(t)) for opnum in iterable)
 
             # otherwise our reference is implicitly pointing to our member, so
