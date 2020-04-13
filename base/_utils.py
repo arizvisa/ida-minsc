@@ -632,7 +632,7 @@ class character(object):
                     0))
 
                 else:
-                    raise internal.exceptions.InvalidFormatError(u"{:s}.unescape({!s}) : An unknown character code was specified ('{:s}').".format('.'.join(('internal', __name__, cls.__name__)), result, string.escape(t, '\'')))
+                    result.send(t)
 
             # we haven't received a backslash, so there's nothing to unescape
             else:
