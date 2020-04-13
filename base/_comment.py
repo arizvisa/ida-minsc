@@ -397,9 +397,9 @@ class tag(object):
             unescape = internal.utils.character.unescape(agg); next(unescape)
 
             # first we'll skip the initial whitespace
-            ch = next(iterable, '')
+            ch = next(iterable)
             while ch != cls.prefix and internal.utils.character.whitespaceQ(ch):
-                ch = next(iterable, '')
+                ch = next(iterable)
 
             # check if it matches our prefix (which it should)
             if ch != cls.prefix:
@@ -407,7 +407,7 @@ class tag(object):
 
             # read each character up to the sentinel
             agg.reset()
-            ch = next(iterable, cls.suffix)
+            ch = next(iterable)
 
             # loop until we find our suffix
             while ch != cls.suffix:
@@ -521,7 +521,7 @@ class tag(object):
         return key.get(), value.get()
 
 ### Encoding and decoding of a comment
-def decode(data, default=''):
+def decode(data, default=u''):
     """Decode all the `(key, value)` pairs from the string `data` delimited by newlines.
 
     If unable to decode the key and value from a line in `data`, then use `default` as the key name.
@@ -536,20 +536,24 @@ def decode(data, default=''):
     key, value = internal.interface.collect_t(object, lambda _, key: key), internal.interface.collect_t(object, lambda _, value: value)
 
     # iterate through each line in the data
-    for line in data.split('\n'):
+    for line in data.split(u'\n'):
         iterable = iter(line)
 
         # try and decode the key and the value from the line
         try:
             k, v = tag.decode(iterable)
 
-        # if the key wasn't terminated properly, then key it by the default key
-        except StopIteration:
-            k, v = default, line
+        # if the key wasn't terminated properly, or formatted correctly,
+        # then append it to the default key separated by newlines
+        except (StopIteration, internal.exceptions.InvalidFormatError) as E:
+            items = filter(None, res.setdefault(default, u'').split(u'\n')) + [line]
+            k, v = default, u'\n'.join(items)
 
-        # if the key was formatted incorrectly, then do the same
-        except Exception as E:
-            k, v = default, line
+        # warn the user if we're overwriting a key in the tag that
+        # already exists.
+        else:
+            if operator.contains(res, k):
+                logging.warn(u"{:s}.decode(..., {!s}) : Overwriting key ({!s}) containing old value ({!r}) with new value ({!r}).".format('.'.join(('internal', __name__)), internal.utils.string.repr(default), internal.utils.string.repr(k), res[k], v))
 
         # add our item to the result dictionary
         res[k] = v
