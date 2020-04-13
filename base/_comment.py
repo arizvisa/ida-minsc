@@ -412,10 +412,14 @@ class tag(object):
             # loop until we find our suffix
             while ch != cls.suffix:
 
-                # submit our character to the unescape transformer
-                unescape.send(ch)
+                # submit our character to the unescape transformer while
+                # it's a backslash
+                while ch in u'\\':
+                    unescape.send(ch)
+                    ch = next(iterable, cls.suffix)
 
-                # try reading the next character again
+                # otherwise, continue to unescape it and look for a suffix
+                unescape.send(ch)
                 ch = next(iterable, cls.suffix)
 
             # the last character read should be our suffix, so fail if otherwise
