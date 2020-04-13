@@ -416,11 +416,11 @@ class tag(object):
                 # it's a backslash
                 while ch in u'\\':
                     unescape.send(ch)
-                    ch = next(iterable, cls.suffix)
+                    ch = next(iterable)
 
                 # otherwise, continue to unescape it and look for a suffix
                 unescape.send(ch)
-                ch = next(iterable, cls.suffix)
+                ch = next(iterable)
 
             # the last character read should be our suffix, so fail if otherwise
             if ch != cls.suffix:
@@ -543,8 +543,12 @@ def decode(data, default=''):
         try:
             k, v = tag.decode(iterable)
 
-        # if the key was formatted incorrectly, then key the whole line by the default key
-        except internal.exceptions.InvalidFormatError:
+        # if the key wasn't terminated properly, then key it by the default key
+        except StopIteration:
+            k, v = default, line
+
+        # if the key was formatted incorrectly, then do the same
+        except Exception as E:
             k, v = default, line
 
         # add our item to the result dictionary
