@@ -286,7 +286,7 @@ class prioritybase(object):
         '''Enable any callables for the specified `target` that has been previously disabled.'''
         if target not in self.__disabled:
             cls = self.__class__
-            logging.fatal(u"{:s}.enable({:#x}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
+            logging.fatal(u"{:s}.enable({!r}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
             return False
         self.__disabled.discard(target)
         return True
@@ -309,7 +309,7 @@ class prioritybase(object):
         # connect to the requested target if possible
         if target not in self.__cache__ and not self.connect(target, self.apply(target)):
             cls = self.__class__
-            raise NameError(u"{:s}.add({:#x}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, callable, priority, self.__formatter__(target)))
+            raise NameError(u"{:s}.add({!r}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, callable, priority, self.__formatter__(target)))
 
         # discard any callables already attached to the specified target
         self.discard(target, callable)
