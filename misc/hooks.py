@@ -345,7 +345,8 @@ class globals(commentbase):
         oldcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
-        [ ui.hook.idb.disable(event) for event in ['changing_area_cmt', 'area_cmt_changed'] ]
+        hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
+        [ ui.hook.idb.disable(event) for event in hooks ]
 
         # Now we can use our coroutine to begin the comment update, so that
         # later, the "changed" event can do the actual update.
@@ -361,7 +362,7 @@ class globals(commentbase):
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
-            [ ui.hook.idb.enable(event) for event in ['changing_area_cmt', 'area_cmt_changed'] ]
+            [ ui.hook.idb.enable(event) for event in hooks ]
 
         # And then we're ready for the "changed" event
         return
@@ -382,7 +383,8 @@ class globals(commentbase):
         newcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
-        [ ui.hook.idp.disable(event) for event in ['changing_area_cmt', 'area_cmt_changed'] ]
+        hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
+        [ ui.hook.idb.disable(event) for event in hooks ]
 
         # Now we can use our coroutine to update the comment state, so that the
         # coroutine will perform the final update.
@@ -398,7 +400,7 @@ class globals(commentbase):
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
-            [ ui.hook.idp.enable(event) for event in ['changing_area_cmt', 'area_cmt_changed'] ]
+            [ ui.hook.idb.enable(event) for event in hooks ]
 
         # We're done updating the comment, that should be it.
         return
