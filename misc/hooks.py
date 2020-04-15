@@ -147,10 +147,10 @@ class address(commentbase):
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Grab our old comment, because we're going to submit this later to a coro
-        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         oldcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
@@ -178,10 +178,10 @@ class address(commentbase):
     @classmethod
     def changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Grab our new comment, because we're going to submit this later to our coro
-        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         newcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
@@ -332,11 +332,11 @@ class globals(commentbase):
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
-        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
@@ -370,11 +370,11 @@ class globals(commentbase):
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
-        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
@@ -408,11 +408,11 @@ class globals(commentbase):
     @classmethod
     def old_changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # first thing to do is to identify whether we're in a function or not,
         # so we first grab the address from the area_t...
-        logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         ea = interface.range.start(a)
 
         # then we can use it to verify that we're in a function. if not, then
