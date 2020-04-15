@@ -65,10 +65,11 @@ import internal, idaapi
 import codecs
 
 ### cheap data structure for doing pattern matching with
-class trie(dict):
+class pattern(object):
     class star(tuple): pass
     class maybe(tuple): pass
 
+class trie(dict):
     id = 0
     def __missing__(self, token):
         res = trie()
@@ -81,7 +82,7 @@ class trie(dict):
         symbols = tuple(res)
 
         head = head if hasattr(head, '__iter__') or len(head) > 1 else (head,)
-        if isinstance(head, trie.star):
+        if isinstance(head, pattern.star):
             if len(symbols) <= 0:
                 raise ValueError('Refusing to register the STAR(*) pattern as the last symbol')
 
@@ -89,7 +90,7 @@ class trie(dict):
             self.assign(symbols, value)
             return
 
-        elif isinstance(head, trie.maybe):
+        elif isinstance(head, pattern.maybe):
             if len(symbols) <= 0:
                 raise ValueError('Refusing to register the MAYBE(?) pattern as the last symbol')
             head, res = tuple(head), trie()
@@ -190,7 +191,7 @@ class default(object):
 
 ### type encoder/decoder registration
 # FIXME: maybe figure out how to parse out an int from a long (which ends in 'L')
-@cache.register(object, trie.star(' \t'), trie.maybe('-+'), '0123456789')
+@cache.register(object, pattern.star(' \t'), pattern.maybe('-+'), '0123456789')
 class _int(default):
     @classmethod
     def type(cls, instance):
@@ -200,7 +201,7 @@ class _int(default):
     def encode(cls, instance):
         return "{:-#x}".format(instance)
 
-@cache.register(object, trie.star(' \t'), *'float(')
+@cache.register(object, pattern.star(' \t'), *'float(')
 class _float(default):
     @classmethod
     def type(cls, instance):
@@ -287,7 +288,7 @@ class _str(default):
         res = cls._escape(iter(instance))
         return unicode().join(res)
 
-@cache.register(unicode, trie.star(' \t'), *"u'")
+@cache.register(unicode, pattern.star(' \t'), *"u'")
 class _unicode(_str):
     """
     This encoder/decoder really just a wrapper around the ``_str``
@@ -308,7 +309,7 @@ class _unicode(_str):
         logging.warn(u"{:s}.decode({!s}) : Decoding a unicode string that was encoded using the old format.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.repr(data)))
         return eval(data)
 
-@cache.register(dict, trie.star(' \t'), '{')
+@cache.register(dict, pattern.star(' \t'), '{')
 class _dict(default):
     @classmethod
     def type(cls, instance):
@@ -318,7 +319,7 @@ class _dict(default):
         f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
         return '{' + ', '.join("{:s} : {!r}".format(f(key), instance[key]) for key in instance) + '}'
 
-@cache.register(list, trie.star(' \t'), '[')
+@cache.register(list, pattern.star(' \t'), '[')
 class _list(default):
     @classmethod
     def type(cls, instance):
@@ -328,7 +329,7 @@ class _list(default):
         f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
         return '[' + ', '.join(map(f, instance)) + ']'
 
-@cache.register(tuple, trie.star(' \t'), '(')
+@cache.register(tuple, pattern.star(' \t'), '(')
 class _tuple(default):
     @classmethod
     def type(cls, instance):
@@ -338,7 +339,7 @@ class _tuple(default):
         f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
         return '(' + ', '.join(map(f, instance)) + (', ' if len(instance) == 1 else '') + ')'
 
-@cache.register(set, trie.star(' \t'), *'set([')
+@cache.register(set, pattern.star(' \t'), *'set([')
 class _set(default):
     @classmethod
     def type(cls, instance):
