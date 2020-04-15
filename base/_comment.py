@@ -69,13 +69,16 @@ class pattern(object):
     class star(tuple): pass
     class maybe(tuple): pass
 
-class trie(dict):
+class node(dict):
     id = 0
     def __missing__(self, token):
-        res = trie()
+        cls = self.__class__
+
+        res = cls()
         res.id = self.id + len(self) + 1
         return self.setdefault(token, res)
 
+class trie(node):
     def assign(self, symbols, value):
         res = list(symbols)
         head = res.pop(0)
@@ -109,36 +112,36 @@ class trie(dict):
     def descend(self, symbols):
         yield self
         for i, symbol in enumerate(symbols):
-            if not isinstance(self, trie) or not operator.contains(self, symbol):
+            if not isinstance(self, node) or not operator.contains(self, symbol):
                 raise KeyError(i, symbol)    # raise KeyError for .get() and .find()
             self = self[symbol]
             yield self
         return
 
     def get(self, symbols):
-        for i, node in enumerate(self.descend(symbols)):
+        for i, symbol in enumerate(self.descend(symbols)):
             continue
-        if isinstance(node, trie):
-            raise KeyError(i, node)    # raise KeyError for our caller if we couldn't find anything
-        return node
+        if isinstance(symbol, node):
+            raise KeyError(i, symbol)    # raise KeyError for our caller if we couldn't find anything
+        return symbol
 
     def find(self, symbols):
-        for i, node in enumerate(self.descend(symbols)):
-            if not isinstance(node, trie):
-                return node
+        for i, symbol in enumerate(self.descend(symbols)):
+            if not isinstance(symbol, node):
+                return symbol
             continue
-        raise KeyError(i, node)    # raise KeyError for our caller if we couldn't find anything
+        raise KeyError(i, symbol)    # raise KeyError for our caller if we couldn't find anything
 
     def dump(self):
         cls = self.__class__
         # FIXME: doesn't support recursion
         def stringify(node, indent=0, tab='  '):
-            data = (k for k, v in six.viewitems(node) if not isinstance(v, trie))
+            data = (k for k, v in six.viewitems(node) if not isinstance(v, node))
             result = []
             for k in data:
                 result.append("{:s}{!r} -> {!r}".format(tab * indent, k, node[k]))
 
-            branches = [k for k, v in six.viewitems(node) if isinstance(v, trie)]
+            branches = [k for k, v in six.viewitems(node) if isinstance(v, node)]
             for k in branches:
                 result.append("{:s}{!r}".format(tab * indent, k))
                 branch_data = stringify(node[k], indent+1, tab=tab)
@@ -493,7 +496,7 @@ class tag(object):
                 value = t.decode(value_s)
 
             # if we weren't able to, then fall back to a string
-            except:
+            except Exception as E:
                 t = _str
                 logging.debug(u"{:s}.decode({!s}, {!s}) : Assuming value ({!s}) is of type {!s}.".format('.'.join(('internal', __name__, 'tag', cls.__name__)), iterable, result, internal.utils.string.repr(value_s), t))
                 value = t.decode(value_s)
@@ -594,7 +597,7 @@ def check(data):
     res = map(iter, (data or '').split('\n'))
     try:
         map(tag.decode, res)
-    except:
+    except Exception as E:
         return False
     return True
 
@@ -698,12 +701,12 @@ class contents(tagging):
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
                 raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
-        except:
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
-        except:
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
         return result
 
@@ -724,14 +727,16 @@ class contents(tagging):
 
         try:
             data = cls.marshaller.dumps(value)
-        except:
+
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, value))
 
         try:
             encdata, sz = cls.codec.encode(data)
             if sz != len(data):
                 raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
-        except:
+
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, data))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
@@ -758,12 +763,14 @@ class contents(tagging):
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
                 raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
-        except:
+
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
             result = cls.marshaller.loads(data)
-        except:
+
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
         return result
 
@@ -791,12 +798,14 @@ class contents(tagging):
         res = value
         try:
             data = cls.marshaller.dumps(res)
-        except:
+
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, res))
 
         try:
             encdata, sz = cls.codec.encode(data)
-        except:
+
+        except Exception as E:
             raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, data))
 
         if sz != len(data):
@@ -806,7 +815,8 @@ class contents(tagging):
         try:
             ok = internal.netnode.blob.set(key, cls.btag, encdata)
             if not ok: raise AssertionError # XXX: use an explicit exception
-        except:
+
+        except Exception as E:
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, encdata))
 
         # update sup cache with keys
@@ -814,7 +824,8 @@ class contents(tagging):
         try:
             ok = cls._write_header(target, ea, res)
             if not ok: raise AssertionError # XXX: use an explicit exception
-        except:
+
+        except Exception as E:
             logging.fatal(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
         return ok
 
