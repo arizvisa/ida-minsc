@@ -684,9 +684,18 @@ def rename(ea, newname):
     return
 
 def extra_cmt_changed(ea, line_idx, cmt):
-    # FIXME: persist state for extra_cmts in order to determine
-    #        what the original value was before modification
-    # XXX: IDA doesn't seem to have an extra_cmt_changing event and instead calls this hook twice for every insertion
+    # FIXME: persist state for extra_cmts in order to determine what the original
+    #        value was before modification. IDA doesn't seem to have an
+    #        extra_cmt_changing event and instead calls this hook twice for every
+    #        insertion.
+    # XXX: this function is now busted in later versions of IDA because for some
+    #      reason, Ilfak, is now updating the extra comment prior to dispatching
+    #      this event. unfortunately, our tag cache doesn't allow us to identify
+    #      the actual number of tags that are at an address, so there's no way
+    #      to identify the actual change to the extra comment that the user made,
+    #      which totally fucks up the refcount. in the current implementation, if
+    #      we can't distinguish between the old and new extra comments, then its
+    #      simply a no-op. this is okay for now...
 
     oldcmt = internal.netnode.sup.get(ea, line_idx)
     if oldcmt is not None: oldcmt = oldcmt.rstrip('\x00')
