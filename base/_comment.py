@@ -135,16 +135,16 @@ class trie(node):
     def dump(self):
         cls = self.__class__
         # FIXME: doesn't support recursion
-        def stringify(node, indent=0, tab='  '):
-            data = (k for k, v in six.viewitems(node) if not isinstance(v, node))
+        def stringify(layer, indent=0, tab='  '):
+            data = (k for k, v in six.viewitems(layer) if not isinstance(v, node))
             result = []
             for k in data:
-                result.append("{:s}{!r} -> {!r}".format(tab * indent, k, node[k]))
+                result.append("{:s}{!r} -> {!r}".format(tab * indent, k, layer[k]))
 
-            branches = [k for k, v in six.viewitems(node) if isinstance(v, node)]
+            branches = [k for k, v in six.viewitems(layer) if isinstance(v, node)]
             for k in branches:
                 result.append("{:s}{!r}".format(tab * indent, k))
-                branch_data = stringify(node[k], indent+1, tab=tab)
+                branch_data = stringify(layer[k], indent+1, tab=tab)
                 result.extend(branch_data)
             return result
         return '\n'.join(("{!r}({:d})".format(cls, self.id), '\n'.join(stringify(self))))
