@@ -897,15 +897,6 @@ def make_ida_not_suck_cocks(nw_code):
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
 
-    ### disable some of these hooks if they're not being legitimately called through the api
-    #if idaapi.__version__ >= 7.0:
-    #    [ ui.hook.idb.add(target, notfromapi, -1) for target in ['changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed'] ]
-    #elif idaapi.__version__ >= 6.9:
-    #    [ ui.hook.idb.add(target, notfromapi, -1) for target in ['changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed'] ]
-    #else:
-    #    ui.hook.idb.add('cmt_changed', notfromapi, -1)
-    #    ui.hook.idb.add('area_cmt_changed', notfromapi, -1)
-
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
         ui.hook.idp.add('ev_init', address.database_init, 0)
