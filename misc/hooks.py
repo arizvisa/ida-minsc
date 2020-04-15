@@ -111,16 +111,16 @@ class address(commentbase):
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                # delete it if it's the wrong type
-#                if nrpt != repeatable:
-#                    idaapi.set_cmt(ea, '', nrpt)
+                ## delete it if it's the wrong type
+                #if nrpt != repeatable:
+                #    idaapi.set_cmt(ea, '', nrpt)
 
-#                # write the tag back to the address
-#                if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), repeatable)
-#                # write the comment back if it's non-empty
-#                elif new: idaapi.set_cmt(ea, utils.string.to(new), repeatable)
-#                # otherwise, remove its reference since it's being deleted
-#                else: cls._delete_refs(ea, n)
+                ## write the tag back to the address
+                #if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), repeatable)
+                ## write the comment back if it's non-empty
+                #elif new: idaapi.set_cmt(ea, utils.string.to(new), repeatable)
+                ## otherwise, remove its reference since it's being deleted
+                #else: cls._delete_refs(ea, n)
 
                 if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), rpt)
                 elif new: idaapi.set_cmt(ea, utils.string.to(new), rpt)
@@ -295,16 +295,16 @@ class globals(commentbase):
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                # if it's non-repeatable, then fix it.
-#                if not nrpt:
-#                    idaapi.set_func_cmt(fn, '', nrpt)
+                ## if it's non-repeatable, then fix it.
+                #if not nrpt:
+                #    idaapi.set_func_cmt(fn, '', nrpt)
 
-#                # write the tag back to the function
-#                if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), True)
-#                # otherwise, write the comment back as long as it's valid
-#                elif new: idaapi.set_func_cmt(fn, utils.string.to(new), True)
-#                # otherwise, the user has deleted it..so update its refs.
-#                else: cls._delete_refs(fn, n)
+                ## write the tag back to the function
+                #if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), True)
+                ## otherwise, write the comment back as long as it's valid
+                #elif new: idaapi.set_func_cmt(fn, utils.string.to(new), True)
+                ## otherwise, the user has deleted it..so update its refs.
+                #else: cls._delete_refs(fn, n)
 
                 # write the tag back to the function
                 if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), rpt)
@@ -527,10 +527,20 @@ def on_ready():
         logging.debug(u"{:s}.on_ready() : Received unexpected transition from state ({!s}).".format(__name__, utils.string.repr(State)))
 
 def auto_queue_empty(type):
+    """This waits for the analysis queue to be empty.
+
+    If the database is ready to be tampered with, then we proceed by executing
+    the `on_ready` function which will perform any tasks required to be done
+    on the database at startup.
+    """
     if type == idaapi.AU_FINAL:
         on_ready()
 
 def __process_functions(percentage=0.10):
+    """This prebuilds the tag-cache for the entire database.
+
+    It's intended to be called once the database is ready to be tampered with.
+    """
     p = ui.Progress()
     globals = set(internal.comment.globals.address())
 
@@ -567,6 +577,12 @@ def __process_functions(percentage=0.10):
     p.close()
 
 def rebase(info):
+    """This is for when the user re-bases the entire database.
+
+    We update the entire database in two parts. First we iterate through all
+    the functions, and transform its cache to its new address. Next we iterate
+    through all of the known global tags and then transform those.
+    """
     functions, globals = map(utils.fcompose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
 
     p = ui.Progress()
@@ -661,6 +677,11 @@ def segm_moved(source, destination, size):
 
 # address naming
 def rename(ea, newname):
+    """This hook is when a user adds a name or removes it from the database.
+
+    We simply increase the refcount for the "__name__" key, or decrease it
+    if the name is being removed.
+    """
     fl = database.type.flags(ea)
     labelQ, customQ = (fl & n == n for n in {idaapi.FF_LABL, idaapi.FF_NAME})
     #r, fn = database.xref.up(ea), idaapi.get_func(ea)
@@ -718,6 +739,11 @@ def thunk_func_created(pfn):
     pass
 
 def func_tail_appended(pfn, tail):
+    """This hook is for when a chunk is appended to a function.
+
+    We simply iterate through the new chunk, decrease all of its tags in the
+    global context, and increase their reference within the function context.
+    """
     global State
     if State != state.ready: return
     # tail = func_t
@@ -730,6 +756,11 @@ def func_tail_appended(pfn, tail):
     return
 
 def removing_func_tail(pfn, tail):
+    """This hook is for when a chunk is removed from a function.
+
+    We simply iterate through the old chunk, decrease all of its tags in the
+    function context, and increase their reference within the global context.
+    """
     global State
     if State != state.ready: return
     # tail = range_t
@@ -742,7 +773,11 @@ def removing_func_tail(pfn, tail):
     return
 
 def func_tail_removed(pfn, ea):
-    # XXX: this is for older versions of IDA
+    """This hook is for when a chunk is removed from a function in older versions of IDA.
+
+    We simply iterate through the old chunk, decrease all of its tags in the
+    function context, and increase their reference within the global context.
+    """
     global State
     if State != state.ready: return
 
@@ -763,6 +798,12 @@ def func_tail_removed(pfn, ea):
     return
 
 def tail_owner_changed(tail, owner_func):
+    """This hook is for when a chunk is moved to another function and is for older versions of IDA.
+
+    We simply iterate through the new chunk, decrease all of its tags in its
+    previous function's context, and increase their reference within the new
+    function's context.
+    """
     # XXX: this is for older versions of IDA
     global State
     if State != state.ready: return
@@ -778,6 +819,12 @@ def tail_owner_changed(tail, owner_func):
     return
 
 def add_func(pfn):
+    """This is called when a new function is created.
+
+    When a new function is created, its entire area needs its tags transformed
+    from global tags to function tags. This iterates through each chunk belonging
+    to the function and does exactly that.
+    """
     global State
     if State != state.ready: return
 
@@ -793,6 +840,14 @@ def add_func(pfn):
     return
 
 def del_func(pfn):
+    """This is called when a function is removed/deleted.
+
+    When a function is removed, all of its tags get moved from the function back
+    into the database as global tags. We iterate through the entire function and
+    transform its tags by decreasing its refcount within the function, and then
+    increasing it for the database. Afterwards we simply remove the refcount
+    cache for the function.
+    """
     global State
     if State != state.ready: return
 
@@ -813,6 +868,12 @@ def del_func(pfn):
     return
 
 def set_func_start(pfn, new_start):
+    """This is called when the user changes the beginning of the function to another address.
+
+    If this happens, we simply walk from the new address to the old address of
+    the function that was changed. Then we can update the refcount for any
+    globals that were tagged by moving them into the function's tagcache.
+    """
     global State
     if State != state.ready: return
 
@@ -840,6 +901,12 @@ def set_func_start(pfn, new_start):
     return
 
 def set_func_end(pfn, new_end):
+    """This is called when the user changes the ending of the function to another address.
+
+    If this happens, we simply walk from the old end of the function to the new
+    end of the function that was changed. Then we can update the refcount for any
+    globals that were tagged by moving them into the function's tagcache.
+    """
     global State
     if State != state.ready: return
     # new_end has added addresses to function
