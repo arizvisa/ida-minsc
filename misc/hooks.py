@@ -111,21 +111,19 @@ class address(commentbase):
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                ## delete it if it's the wrong type
-                #if nrpt != repeatable:
-                #    idaapi.set_cmt(ea, '', nrpt)
+                ## if the comment is of the correct format, then we can simply
+                ## write the comment to the given address
+                if internal.comment.check(new):
+                    idaapi.set_cmt(ea, utils.string.to(new), repeatable)
 
-                ## write the tag back to the address
-                #if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), repeatable)
-                ## write the comment back if it's non-empty
-                #elif new: idaapi.set_cmt(ea, utils.string.to(new), repeatable)
-                ## otherwise, remove its reference since it's being deleted
-                #else: cls._delete_refs(ea, n)
+                ## if there's a comment to set, then assign it to the requested
+                ## address
+                elif new:
+                    idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
-                if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), rpt)
-                elif new: idaapi.set_cmt(ea, utils.string.to(new), rpt)
-                else: cls._delete_refs(ea, n)
-
+                ## otherwise, we can just delete all the references at the address
+                else:
+                    cls._delete_refs(ea, n)
                 continue
 
             # if the changed event doesn't happen in the right order
@@ -295,21 +293,20 @@ class globals(commentbase):
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                ## if it's non-repeatable, then fix it.
-                #if not nrpt:
-                #    idaapi.set_func_cmt(fn, '', nrpt)
+                ## if the comment is correctly formatted as a tag, then we
+                ## can simply write the comment at the given address
+                if internal.comment.check(new):
+                    idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
 
-                ## write the tag back to the function
-                #if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), True)
-                ## otherwise, write the comment back as long as it's valid
-                #elif new: idaapi.set_func_cmt(fn, utils.string.to(new), True)
-                ## otherwise, the user has deleted it..so update its refs.
-                #else: cls._delete_refs(fn, n)
+                ## if there's a comment to set, then assign it to the requested
+                ## function address
+                elif new:
+                    idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
 
-                # write the tag back to the function
-                if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), rpt)
-                elif new: idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
-                else: cls._delete_refs(fn, n)
+                ## otherwise, there's no comment there and we need to delete
+                ## all references at the address
+                else:
+                    cls._delete_refs(fn, n)
                 continue
 
             # if the changed event doesn't happen in the right order
