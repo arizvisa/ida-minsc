@@ -286,7 +286,7 @@ class prioritybase(object):
         '''Enable any callables for the specified `target` that has been previously disabled.'''
         if target not in self.__disabled:
             cls = self.__class__
-            logging.fatal(u"{:s}.enable({!r}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
+            logging.fatal(u"{:s}.enable({!r}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
         self.__disabled.discard(target)
         return True
@@ -295,10 +295,10 @@ class prioritybase(object):
         '''Disable execution of all the callables for the specified `target`.'''
         cls = self.__class__
         if target not in self.__cache__:
-            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__cache__.viewkeys())))))
+            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__.viewkeys())))))
             return False
         if target in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled notifications are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{:#x}".format, self.__disabled)))))
+            logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
         self.__disabled.add(target)
         return True
