@@ -32,21 +32,6 @@ def greeting():
     print "Your globals have also been cleaned, use `dir()` to see your work."
     print '-' * barrier
 
-### general hooks
-def noapi(*args):
-    fr = sys._getframe().f_back
-    if fr is None:
-        logging.fatal(u"{:s}.noapi() : Unexpected empty frame ({!s}) from caller. Continuing from {!s}..".format(__name__, utils.string.repr(sys._getframe()), utils.string.repr(sys._getframe().f_code)))
-        return hook.CONTINUE
-
-    return interface.priorityhook.CONTINUE if fr.f_back is None else interface.priorityhook.STOP
-
-def notify(name):
-    def notification(*args):
-        logging.warn(u"{:s}.notify({!s}) : Received notification for {!s} with args ({!s}).".format(__name__, utils.string.repr(name), utils.string.repr(name), utils.string.repr(args)))
-    notification.__name__ = "notify({:s})".format(name)
-    return notification
-
 ### comment hooks
 class commentbase(object):
     @classmethod
@@ -60,6 +45,11 @@ class commentbase(object):
     def nw_database_init(cls, nw_code, is_old_database):
         idp_modname = idaapi.get_idp_name()
         return cls.database_init(idp_modname)
+
+    @classmethod
+    def is_ready(cls):
+        global State
+        return State == state.ready
 
 class address(commentbase):
     @classmethod
@@ -121,16 +111,16 @@ class address(commentbase):
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                # delete it if it's the wrong type
-#                if nrpt != repeatable:
-#                    idaapi.set_cmt(ea, '', nrpt)
+                ## delete it if it's the wrong type
+                #if nrpt != repeatable:
+                #    idaapi.set_cmt(ea, '', nrpt)
 
-#                # write the tag back to the address
-#                if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), repeatable)
-#                # write the comment back if it's non-empty
-#                elif new: idaapi.set_cmt(ea, utils.string.to(new), repeatable)
-#                # otherwise, remove its reference since it's being deleted
-#                else: cls._delete_refs(ea, n)
+                ## write the tag back to the address
+                #if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), repeatable)
+                ## write the comment back if it's non-empty
+                #elif new: idaapi.set_cmt(ea, utils.string.to(new), repeatable)
+                ## otherwise, remove its reference since it's being deleted
+                #else: cls._delete_refs(ea, n)
 
                 if internal.comment.check(new): idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(n)), rpt)
                 elif new: idaapi.set_cmt(ea, utils.string.to(new), rpt)
@@ -156,24 +146,73 @@ class address(commentbase):
 
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
-        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+
+        # Grab our old comment, because we're going to submit this later to a coro
+        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         oldcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
-        try: cls.event.send((ea, bool(repeatable_cmt), utils.string.of(newcmt)))
-        except StopIteration, e:
+
+        # First disable our hooks so that we can prevent re-entrancy issues
+        [ ui.hook.idb.disable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+
+        # Now we can use our coroutine to begin the comment update, so that
+        # later, the "changed" event can do the actual update.
+        try:
+            cls.event.send((ea, bool(repeatable_cmt), utils.string.of(newcmt)))
+
+        # If a StopIteration was raised when submitting the comment to the
+        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
+        # with the hope that things are fixed.
+        except StopIteration, E:
             logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt)))
             cls.event = cls._event(); next(cls.event)
 
+        # Last thing to do is to re-enable the hooks that we disabled
+        finally:
+            [ ui.hook.idb.enable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+
+        # And then we can leave..
+        return
+
     @classmethod
     def changed(cls, ea, repeatable_cmt):
-        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+
+        # Grab our new comment, because we're going to submit this later to our coro
+        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         newcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
-        try: cls.event.send((ea, bool(repeatable_cmt), None))
-        except StopIteration, e:
+
+        # First disable our hooks so that we can prevent re-entrancy issues
+        [ ui.hook.idb.disable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+
+        # Now we can use our coroutine to update the comment state, so that the
+        # coroutine will perform the final update.
+        try:
+            cls.event.send((ea, bool(repeatable_cmt), None))
+
+        # If a StopIteration was raised when submitting the comment to the
+        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
+        # with the hope that things are fixed.
+        except StopIteration, E:
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt))
             cls.event = cls._event(); next(cls.event)
 
+        # Re-enable our hooks that we had prior disabled
+        finally:
+            [ ui.hook.idb.enable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+
+        # Updating the comment was complete, that should've been it.
+        return
+
     @classmethod
     def old_changed(cls, ea, repeatable_cmt):
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable, 'repeatable' if repeatable else 'non-repeatable', ea))
+
+        # first we'll grab our comment that the user updated
+        logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable, 'repeatable' if repeatable else 'non-repeatable', ea))
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         fn = idaapi.get_func(ea)
 
@@ -194,8 +233,18 @@ class address(commentbase):
         else:
             return
 
-        # and then re-write it back to its address
-        idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
+        # and then re-write it back to its address, but not before disabling
+        # our hooks that brought is here so that we can avoid any re-entrancy issues.
+        ui.hook.idb.disable('cmt_changed')
+        try:
+            idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
+
+        # now we can "finally" re-enable our hook
+        finally:
+            ui.hook.idb.enable('cmt_changed')
+
+        # and then leave because hopefully things were updated properly
+        return
 
 class globals(commentbase):
     @classmethod
@@ -246,16 +295,16 @@ class globals(commentbase):
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                # if it's non-repeatable, then fix it.
-#                if not nrpt:
-#                    idaapi.set_func_cmt(fn, '', nrpt)
+                ## if it's non-repeatable, then fix it.
+                #if not nrpt:
+                #    idaapi.set_func_cmt(fn, '', nrpt)
 
-#                # write the tag back to the function
-#                if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), True)
-#                # otherwise, write the comment back as long as it's valid
-#                elif new: idaapi.set_func_cmt(fn, utils.string.to(new), True)
-#                # otherwise, the user has deleted it..so update its refs.
-#                else: cls._delete_refs(fn, n)
+                ## write the tag back to the function
+                #if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), True)
+                ## otherwise, write the comment back as long as it's valid
+                #elif new: idaapi.set_func_cmt(fn, utils.string.to(new), True)
+                ## otherwise, the user has deleted it..so update its refs.
+                #else: cls._delete_refs(fn, n)
 
                 # write the tag back to the function
                 if internal.comment.check(new): idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(n)), rpt)
@@ -282,42 +331,92 @@ class globals(commentbase):
 
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
-        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+
+        # First we'll check to see if this is an actual function comment by confirming
+        # that we're in a function, and that our comment is not empty.
+        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
 
+        # Grab our old comment, because we're going to submit this later to a coro
         oldcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
+
+        # We need to disable our hooks so that we can prevent re-entrancy issues
+        hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
+        [ ui.hook.idb.disable(event) for event in hooks ]
+
+        # Now we can use our coroutine to begin the comment update, so that
+        # later, the "changed" event can do the actual update.
         try:
             cls.event.send((interface.range.start(fn), bool(repeatable), utils.string.of(cmt)))
 
-        except StopIteration, e:
+        # If a StopIteration was raised when submitting the comment to the
+        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
+        # with the hope that things are fixed.
+        except StopIteration, E:
             logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
+
+        # Last thing to do is to re-enable the hooks that we disabled
+        finally:
+            [ ui.hook.idb.enable(event) for event in hooks ]
+
+        # And then we're ready for the "changed" event
         return
 
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
-        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+
+        # First we'll check to see if this is an actual function comment by confirming
+        # that we're in a function, and that our comment is not empty.
+        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
 
+        # Grab our new comment, because we're going to submit this later to a coro
         newcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
+
+        # We need to disable our hooks so that we can prevent re-entrancy issues
+        hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
+        [ ui.hook.idb.disable(event) for event in hooks ]
+
+        # Now we can use our coroutine to update the comment state, so that the
+        # coroutine will perform the final update.
         try:
             cls.event.send((interface.range.start(fn), bool(repeatable), None))
 
-        except StopIteration, e:
+        # If a StopIteration was raised when submitting the comment to the
+        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
+        # with the hope that things are fixed.
+        except StopIteration, E:
             logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
+
+        # Last thing to do is to re-enable the hooks that we disabled
+        finally:
+            [ ui.hook.idb.enable(event) for event in hooks ]
+
+        # We're done updating the comment, that should be it.
         return
 
     @classmethod
     def old_changed(cls, cb, a, cmt, repeatable):
-        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+
+        # first thing to do is to identify whether we're in a function or not,
+        # so we first grab the address from the area_t...
+        logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         ea = interface.range.start(a)
 
-        # if we're not a function, then this is a false alarm and we leave.
+        # then we can use it to verify that we're in a function. if not, then
+        # this is a false alarm and we can leave.
         fn = idaapi.get_func(ea)
         if fn is None:
             return
@@ -334,8 +433,18 @@ class globals(commentbase):
         else:
             return
 
-        # now we can simply re-write it it
-        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(res)), repeatable)
+        # now we can simply re-write it it, but not before disabling our hooks
+        # that got us here, so that we can avoid any re-entrancy issues.
+        ui.hook.idb.disable('area_cmt_changed')
+        try:
+            idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(res)), repeatable)
+
+        # now we can "finally" re-enable our hook
+        finally:
+            ui.hook.idb.enable('area_cmt_changed')
+
+        # that should've been it, so we can now just leave
+        return
 
 ### database scope
 class state(object):
@@ -418,10 +527,20 @@ def on_ready():
         logging.debug(u"{:s}.on_ready() : Received unexpected transition from state ({!s}).".format(__name__, utils.string.repr(State)))
 
 def auto_queue_empty(type):
+    """This waits for the analysis queue to be empty.
+
+    If the database is ready to be tampered with, then we proceed by executing
+    the `on_ready` function which will perform any tasks required to be done
+    on the database at startup.
+    """
     if type == idaapi.AU_FINAL:
         on_ready()
 
 def __process_functions(percentage=0.10):
+    """This prebuilds the tag-cache for the entire database.
+
+    It's intended to be called once the database is ready to be tampered with.
+    """
     p = ui.Progress()
     globals = set(internal.comment.globals.address())
 
@@ -458,6 +577,12 @@ def __process_functions(percentage=0.10):
     p.close()
 
 def rebase(info):
+    """This is for when the user re-bases the entire database.
+
+    We update the entire database in two parts. First we iterate through all
+    the functions, and transform its cache to its new address. Next we iterate
+    through all of the known global tags and then transform those.
+    """
     functions, globals = map(utils.fcompose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
 
     p = ui.Progress()
@@ -552,6 +677,11 @@ def segm_moved(source, destination, size):
 
 # address naming
 def rename(ea, newname):
+    """This hook is when a user adds a name or removes it from the database.
+
+    We simply increase the refcount for the "__name__" key, or decrease it
+    if the name is being removed.
+    """
     fl = database.type.flags(ea)
     labelQ, customQ = (fl & n == n for n in {idaapi.FF_LABL, idaapi.FF_NAME})
     #r, fn = database.xref.up(ea), idaapi.get_func(ea)
@@ -575,9 +705,18 @@ def rename(ea, newname):
     return
 
 def extra_cmt_changed(ea, line_idx, cmt):
-    # FIXME: persist state for extra_cmts in order to determine
-    #        what the original value was before modification
-    # XXX: IDA doesn't seem to have an extra_cmt_changing event and instead calls this hook twice for every insertion
+    # FIXME: persist state for extra_cmts in order to determine what the original
+    #        value was before modification. IDA doesn't seem to have an
+    #        extra_cmt_changing event and instead calls this hook twice for every
+    #        insertion.
+    # XXX: this function is now busted in later versions of IDA because for some
+    #      reason, Ilfak, is now updating the extra comment prior to dispatching
+    #      this event. unfortunately, our tag cache doesn't allow us to identify
+    #      the actual number of tags that are at an address, so there's no way
+    #      to identify the actual change to the extra comment that the user made,
+    #      which totally fucks up the refcount. in the current implementation, if
+    #      we can't distinguish between the old and new extra comments, then its
+    #      simply a no-op. this is okay for now...
 
     oldcmt = internal.netnode.sup.get(ea, line_idx)
     if oldcmt is not None: oldcmt = oldcmt.rstrip('\x00')
@@ -600,6 +739,11 @@ def thunk_func_created(pfn):
     pass
 
 def func_tail_appended(pfn, tail):
+    """This hook is for when a chunk is appended to a function.
+
+    We simply iterate through the new chunk, decrease all of its tags in the
+    global context, and increase their reference within the function context.
+    """
     global State
     if State != state.ready: return
     # tail = func_t
@@ -612,6 +756,11 @@ def func_tail_appended(pfn, tail):
     return
 
 def removing_func_tail(pfn, tail):
+    """This hook is for when a chunk is removed from a function.
+
+    We simply iterate through the old chunk, decrease all of its tags in the
+    function context, and increase their reference within the global context.
+    """
     global State
     if State != state.ready: return
     # tail = range_t
@@ -624,7 +773,11 @@ def removing_func_tail(pfn, tail):
     return
 
 def func_tail_removed(pfn, ea):
-    # XXX: this is for older versions of IDA
+    """This hook is for when a chunk is removed from a function in older versions of IDA.
+
+    We simply iterate through the old chunk, decrease all of its tags in the
+    function context, and increase their reference within the global context.
+    """
     global State
     if State != state.ready: return
 
@@ -645,6 +798,12 @@ def func_tail_removed(pfn, ea):
     return
 
 def tail_owner_changed(tail, owner_func):
+    """This hook is for when a chunk is moved to another function and is for older versions of IDA.
+
+    We simply iterate through the new chunk, decrease all of its tags in its
+    previous function's context, and increase their reference within the new
+    function's context.
+    """
     # XXX: this is for older versions of IDA
     global State
     if State != state.ready: return
@@ -660,6 +819,12 @@ def tail_owner_changed(tail, owner_func):
     return
 
 def add_func(pfn):
+    """This is called when a new function is created.
+
+    When a new function is created, its entire area needs its tags transformed
+    from global tags to function tags. This iterates through each chunk belonging
+    to the function and does exactly that.
+    """
     global State
     if State != state.ready: return
 
@@ -675,6 +840,14 @@ def add_func(pfn):
     return
 
 def del_func(pfn):
+    """This is called when a function is removed/deleted.
+
+    When a function is removed, all of its tags get moved from the function back
+    into the database as global tags. We iterate through the entire function and
+    transform its tags by decreasing its refcount within the function, and then
+    increasing it for the database. Afterwards we simply remove the refcount
+    cache for the function.
+    """
     global State
     if State != state.ready: return
 
@@ -695,6 +868,12 @@ def del_func(pfn):
     return
 
 def set_func_start(pfn, new_start):
+    """This is called when the user changes the beginning of the function to another address.
+
+    If this happens, we simply walk from the new address to the old address of
+    the function that was changed. Then we can update the refcount for any
+    globals that were tagged by moving them into the function's tagcache.
+    """
     global State
     if State != state.ready: return
 
@@ -722,6 +901,12 @@ def set_func_start(pfn, new_start):
     return
 
 def set_func_end(pfn, new_end):
+    """This is called when the user changes the ending of the function to another address.
+
+    If this happens, we simply walk from the old end of the function to the new
+    end of the function that was changed. Then we can update the refcount for any
+    globals that were tagged by moving them into the function's tagcache.
+    """
     global State
     if State != state.ready: return
     # new_end has added addresses to function
@@ -787,15 +972,6 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
-
-    ## disable some of these hooks using the noapi callback
-    if idaapi.__version__ >= 7.0:
-        [ ui.hook.idb.add(_, noapi, -1) for _ in ('changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed') ]
-    elif idaapi.__version__ >= 6.9:
-        [ ui.hook.idb.add(_, noapi, -1) for _ in ('changing_cmt', 'cmt_changed', 'changing_area_cmt', 'area_cmt_changed') ]
-    else:
-        ui.hook.idb.add('cmt_changed', noapi, -1)
-        ui.hook.idb.add('area_cmt_changed', noapi, -1)
 
     ## hook any user-entered comments so that they will also update the tagcache
     if idaapi.__version__ >= 7.0:
@@ -872,6 +1048,7 @@ def make_ida_not_suck_cocks(nw_code):
     #[ ui.hook.idb.add(n, notify(n), -100) for n in ('closebase','savebase','loader_finished', 'auto_empty', 'thunk_func_created','func_tail_appended') ]
     #[ ui.hook.idp.add(n, notify(n), -100) for n in ('add_func','del_func','set_func_start','set_func_end') ]
     #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
+    #[ ui.hook.idb.add(n, notify(n), -100) for n in ('cmt_changed', 'changing_cmt', 'range_cmt_changed', 'changing_range_cmt') ]
 
     ### ...and that's it for all the hooks, so give out our greeting
     return greeting()
