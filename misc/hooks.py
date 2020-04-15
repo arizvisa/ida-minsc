@@ -211,8 +211,8 @@ class address(commentbase):
         if not cls.is_ready():
             return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable, 'repeatable' if repeatable else 'non-repeatable', ea))
 
+        # first we'll grab our comment that the user updated
         logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable, 'repeatable' if repeatable else 'non-repeatable', ea))
-
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         fn = idaapi.get_func(ea)
 
@@ -233,8 +233,18 @@ class address(commentbase):
         else:
             return
 
-        # and then re-write it back to its address
-        idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
+        # and then re-write it back to its address, but not before disabling
+        # our hooks that brought is here so that we can avoid any re-entrancy issues.
+        ui.hook.idb.disable('cmt_changed')
+        try:
+            idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
+
+        # now we can "finally" re-enable our hook
+        finally:
+            ui.hook.idb.enable('cmt_changed')
+
+        # and then leave because hopefully things were updated properly
+        return
 
 class globals(commentbase):
     @classmethod
@@ -398,10 +408,13 @@ class globals(commentbase):
         if not cls.is_ready():
             return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
+        # first thing to do is to identify whether we're in a function or not,
+        # so we first grab the address from the area_t...
         logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         ea = interface.range.start(a)
 
-        # if we're not a function, then this is a false alarm and we leave.
+        # then we can use it to verify that we're in a function. if not, then
+        # this is a false alarm and we can leave.
         fn = idaapi.get_func(ea)
         if fn is None:
             return
@@ -418,8 +431,18 @@ class globals(commentbase):
         else:
             return
 
-        # now we can simply re-write it it
-        idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(res)), repeatable)
+        # now we can simply re-write it it, but not before disabling our hooks
+        # that got us here, so that we can avoid any re-entrancy issues.
+        ui.hook.idb.disable('area_cmt_changed')
+        try:
+            idaapi.set_func_cmt(fn, utils.string.to(internal.comment.encode(res)), repeatable)
+
+        # now we can "finally" re-enable our hook
+        finally:
+            ui.hook.idb.enable('area_cmt_changed')
+
+        # that should've been it, so we can now just leave
+        return
 
 ### database scope
 class state(object):
