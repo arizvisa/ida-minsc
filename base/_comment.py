@@ -204,6 +204,20 @@ class _int(default):
     def encode(cls, instance):
         return "{:-#x}".format(instance)
 
+    @classmethod
+    def decode(cls, data):
+        if data.startswith('0x'):
+            return int(data, 16)
+        elif data.startswith('0o'):
+            return int(data, 8)
+        elif data.startswith('0o'):
+            return int(data, 8)
+        elif data.startswith('0b'):
+            return int(data, 2)
+        elif data.startswith('0y'):
+            return int(data[2:], 2)
+        return int(data)
+
 @cache.register(object, pattern.star(' \t'), *'float(')
 class _float(default):
     @classmethod
@@ -217,7 +231,7 @@ class _float(default):
 class _str(default):
     """
     This encoder/decoder actually supports both ``unicode`` and regular
-    ``str`` due to the ``type`` method returning ``basestring``. Also,
+    ``str`` due to the ``type`` method checking both string types. Also,
     we use this class as a superclass for ``_unicode`` so that any kind
     of string will be encoded into a unicode string which will be
     converted into UTF8 when written into IDA.
@@ -225,7 +239,7 @@ class _str(default):
 
     @classmethod
     def type(cls, instance):
-        return isinstance(instance, basestring)
+        return isinstance(instance, six.string_types)
 
     @classmethod
     def _unescape(cls, iterable):
@@ -291,7 +305,7 @@ class _str(default):
         res = cls._escape(iter(instance))
         return unicode().join(res)
 
-@cache.register(unicode, pattern.star(' \t'), *"u'")
+@cache.register(unicode, pattern.star(' \t'), 'u', "'\"")
 class _unicode(_str):
     """
     This encoder/decoder really just a wrapper around the ``_str``
