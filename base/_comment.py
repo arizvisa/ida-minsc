@@ -76,46 +76,57 @@ class trie(dict):
         return self.setdefault(token, res)
 
     def assign(self, symbols, value):
-        head = symbols[0]
+        res = list(symbols)
+        head = res.pop(0)
+        symbols = tuple(res)
+
         head = head if hasattr(head, '__iter__') or len(head) > 1 else (head,)
-        if len(symbols) > 1:
-            if isinstance(head, trie.star):
-                [ self.__setitem__(n, self) for n in head ]
-                self.assign(symbols[1:], value)
-                return
-            elif isinstance(head, trie.maybe):
-                head, res = tuple(head), trie()
-                res.assign(symbols[1:], value)
-                [ self.__setitem__(n, res) for n in head ]
-                self.assign(symbols[1:], value)
-                return
-            [ self[n].assign(symbols[1:], value) for n in head ]
+        if isinstance(head, trie.star):
+            if len(symbols) <= 0:
+                raise ValueError('Refusing to register the STAR(*) pattern as the last symbol')
+
+            [ self.__setitem__(item, self) for item in head ]
+            self.assign(symbols, value)
             return
-        [ self.__setitem__(n, value) for n in head ]
+
+        elif isinstance(head, trie.maybe):
+            if len(symbols) <= 0:
+                raise ValueError('Refusing to register the MAYBE(?) pattern as the last symbol')
+            head, res = tuple(head), trie()
+            res.assign(symbols, value)
+            [ self.__setitem__(item, res) for item in head ]
+            self.assign(symbols, value)
+            return
+
+        elif len(symbols) > 0:
+            [ self[item].assign(symbols, value) for item in head ]
+
+        else:
+            [ self.__setitem__(item, value) for item in head ]
         return
 
     def descend(self, symbols):
         yield self
-        for i, n in enumerate(symbols):
-            if not isinstance(self, trie) or (n not in self):
-                raise KeyError(i, n)    # raise KeyError for .get() and .find()
-            self = self[n]
+        for i, symbol in enumerate(symbols):
+            if not isinstance(self, trie) or not operator.contains(self, symbol):
+                raise KeyError(i, symbol)    # raise KeyError for .get() and .find()
+            self = self[symbol]
             yield self
         return
 
     def get(self, symbols):
-        for i, n in enumerate(self.descend(symbols)):
+        for i, node in enumerate(self.descend(symbols)):
             continue
-        if isinstance(n, trie):
-            raise KeyError(i, n)    # raise KeyError for our caller if we couldn't find anything
-        return n
+        if isinstance(node, trie):
+            raise KeyError(i, node)    # raise KeyError for our caller if we couldn't find anything
+        return node
 
     def find(self, symbols):
-        for i, n in enumerate(self.descend(symbols)):
-            if not isinstance(n, trie):
-                return n
+        for i, node in enumerate(self.descend(symbols)):
+            if not isinstance(node, trie):
+                return node
             continue
-        raise KeyError(i, n)    # raise KeyError for our caller if we couldn't find anything
+        raise KeyError(i, node)    # raise KeyError for our caller if we couldn't find anything
 
     def dump(self):
         cls = self.__class__
@@ -184,6 +195,7 @@ class _int(default):
     @classmethod
     def type(cls, instance):
         return isinstance(instance, six.integer_types)
+
     @classmethod
     def encode(cls, instance):
         return "{:-#x}".format(instance)
