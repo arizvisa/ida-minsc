@@ -4890,53 +4890,23 @@ class get(object):
 
             The default value of `byteorder` is the same as specified by the database architecture.
             """
-
-            # Extract the number of bits for each of our components from the
-            # components argument, and then use it to calculate the total size.
-            fraction_bits, exponent_bits, sign_bits = components
-            bits = sum([sign_bits, exponent_bits, fraction_bits])
-            size = math.trunc(math.ceil(bits / 8))
+            cb = sum(components) // 8
 
             # Read our data from the database as an integer, as we'll use this
             # to decode our individual components.
-            integer = get.unsigned(ea, size, **byteorder)
+            integer = get.unsigned(ea, cb, **byteorder)
 
-            position, shifts = 0, []
-            for cb in components:
-                shifts.append(position)
-                position += cb
+            # Unpack the components the user gave us.
+            fraction, exponent, sign = components
 
-            if position != bits:
-                logging.warn(u"{:s}.float({:#x}, {!s}) : Total size of bit components ({:d}) does not fit entirely within the size of the integer {:d}).".format('.'.join((__name__, cls.__name__)), ea, components, bits, 8 * size))
+            # Use the components to decode the floating point number
+            try:
+                res = utils.float_of_integer(integer, fraction, exponent, sign)
 
-            # Build the masks we will use to compose a floating-point number
-            fraction_shift, exponent_shift, sign_shift = (2 ** item for item in shifts)
-            bias = (2 ** exponent_bits) // 2 - 1
+            except ValueError as message:
+                raise ValueError(u"{:s}({:#x}, {!s}) : {!s}".format('.'.join((__name__, cls.__name__)), ea, components, message))
 
-            fraction_mask = fraction_shift * (2 ** fraction_bits - 1)
-            exponent_mask = exponent_shift * (2 ** exponent_bits - 1)
-            sign_mask = sign_shift * (2 ** sign_bits - 1)
-
-            # Now to decode our components...
-            mantissa = (integer & fraction_mask) // fraction_shift
-            exponent = (integer & exponent_mask) // exponent_shift
-            sign = (integer & sign_mask) // sign_shift
-
-            # ...and then convert it into a float
-            if exponent > 0 and exponent < 2 ** exponent_bits - 1:
-                s = -1 if sign else +1
-                e = exponent - bias
-                m = 1.0 + float(mantissa) / (2 ** fraction_bits)
-                return math.ldexp(math.copysign(m, s), e)
-
-            # check if we need to return any special constants
-            if exponent == 2 ** exponent_bits - 1 and mantissa == 0:
-                return float('-inf') if sign else float('+inf')
-            elif exponent in {0, 2 ** fraction_bits - 1} and mantissa != 0:
-                return float('-nan') if sign else float('+nan')
-            elif exponent == 0 and mantissa == 0:
-                return float('-0') if sign else float('+0')
-            raise ValueError((mantissa, exponent, sign))
+            return res
 
         @utils.multicase()
         @classmethod
