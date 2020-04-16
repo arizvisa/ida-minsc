@@ -12,7 +12,7 @@ from six.moves import builtins
 
 import logging, types, weakref
 import functools, operator, itertools
-import sys, heapq, collections, array
+import sys, heapq, collections, array, math
 
 import internal
 import idaapi
@@ -1010,3 +1010,58 @@ def get_array_typecode(size, *default):
         8 : qword,
     }
     return get_array_typecode(size, *default)
+
+def float_of_integer(integer, mantissa_bits, exponent_bits, sign_bits):
+    """Decode the specified `integer` using the sizes provided for `mantissa_bits`, `exponent_bits`, and `sign_bits`.
+
+    Each of the sizes are to be provided as the number of bits used to represent that component.
+    """
+
+    # Use the number of bits for each of our components to calculate the
+    # total number of bits.
+    fraction_bits, exponent_bits, sign_bits = mantissa_bits, exponent_bits, sign_bits
+    components = [fraction_bits, exponent_bits, sign_bits]
+    size = math.trunc(math.ceil(sum(components) / 8))
+
+    # This way we can use them to build an array of the shift to get to
+    # each individual position.
+    position, shifts = 0, []
+    for cb in components:
+        shifts.append(position)
+        position += cb
+
+    # Validate the sizes match.
+    if position != sum(components):
+        raise ValueError("The total number of bits for the components ({:d}) does not correspond to the size ({:d}) of the integer.".format(sum(components), 8 * size))
+
+    # Build the masks we will use to compose a floating-point number
+    fraction_shift, exponent_shift, sign_shift = (2 ** item for item in shifts)
+    bias = (2 ** exponent_bits) // 2 - 1
+
+    fraction_mask = fraction_shift * (2 ** fraction_bits - 1)
+    exponent_mask = exponent_shift * (2 ** exponent_bits - 1)
+    sign_mask = sign_shift * (2 ** sign_bits - 1)
+
+    # Now to decode our components...
+    mantissa = (integer & fraction_mask) // fraction_shift
+    exponent = (integer & exponent_mask) // exponent_shift
+    sign = (integer & sign_mask) // sign_shift
+
+    # ...and then convert it into a float
+    if exponent > 0 and exponent < 2 ** exponent_bits - 1:
+        s = -1 if sign else +1
+        e = exponent - bias
+        m = 1.0 + float(mantissa) / (2 ** fraction_bits)
+        return math.ldexp(math.copysign(m, s), e)
+
+    # Check if we need to return any special constants
+    if exponent == 2 ** exponent_bits - 1 and mantissa == 0:
+        return float('-inf') if sign else float('+inf')
+    elif exponent in {0, 2 ** fraction_bits - 1} and mantissa != 0:
+        return float('-nan') if sign else float('+nan')
+    elif exponent == 0 and mantissa == 0:
+        return float('-0') if sign else float('+0')
+
+    # Raise an exception as we weren't able to decode the semantics for
+    # each component.
+    raise ValueError("Unable to decode integer ({:#x}) using the values extracted for the mantissa ({:#x}), exponent ({:#x}), and sign flag ({:d}).".format(integer, mantissa, exponent, sign))
