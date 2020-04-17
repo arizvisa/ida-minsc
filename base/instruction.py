@@ -486,21 +486,26 @@ def op_num(opnum):
 def op_num(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a number and return it.'''
     t = idaapi.num_flag()
-    ok = idaapi.set_op_type(ea, t, opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_num({:#x}, {:d}) : Unable to restore the type of operand {:d} to a number.".format(__name__, ea, opnum, opnum))
 
-    # Figure out the maximum integer size of the database in case IDA gives us a
-    # signed value
+    # Extract the operand's op_t and its maximum value, as we'll use this to
+    # transform the value if necessary.
+    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+
+    # If this is an immediate value, then we can treat it normally.
+    if res.type in {idaapi.o_imm}:
+        integer = res.value & (max - 1)
+        return 0 if integer == 0 else (integer - max) if signed else integer
+
+    # If the signed-flag is set in our operand, then convert it into its actual
+    # signed value.
     maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
-    # Extract the operand's value and return it
-    res, bits = operand(ea, opnum), op_bits(ea, opnum)
-    integer = res.value if res.type in {idaapi.o_imm} else res.addr
-
-    # Return the difference of the integer if the signed flag is set, otherwise
-    # we can just return the integer as-is.
-    return (integer - maximum) if integer & (maximum // 2) else integer
+    # Now we can return the value transformed if the operand has an inverted sign
+    return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
 op_number = utils.alias(op_num)
 
 @utils.multicase(opnum=six.integer_types)
@@ -511,35 +516,11 @@ def op_chr(opnum):
 def op_chr(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a character and return it.'''
     t = idaapi.char_flag()
-    ok = idaapi.set_op_type(ea, t, opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_chr({:#x}, {:d}) : Unable to set the type of operand {:d} to a character.".format(__name__, ea, opnum, opnum))
 
-    # Figure out the maximum integer size of the database in case IDA gives us a
-    # signed value
-    maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
-
-    # Extract the operand's value and return it
-    res, bits = operand(ea, opnum), op_bits(ea, opnum)
-    integer = res.value if res.type in {idaapi.o_imm} else res.addr
-
-    # There's no such thing as a signed character, so if we do get a signed
-    # integer back from the operand, then we need to figure out its absolute
-    # value so we can return it.
-    res = (integer - maximum) if integer & (maximum // 2) else integer
-    absolute = abs(res)
-
-    # If this is a regular character, then we can simply use chr()
-    if absolute < 0x100:
-        return chr(absolute)
-
-    # If this turns out to be larger, then this must be a unicode chr()
-    elif absolute < 0x11000:
-        return six.unichr(absolute)
-
-    # Otherwise, this isn't convertible to a character, so raise an exception
-    raise E.InvalidTypeOrValueError(u"{:s}.op_chr({:#x}, {:d}) : Unable to return operand {:d} as a character due to its value ({:-#x}) being out-of-bounds.".format(__name__, ea, opnum, opnum, res))
-
+    raise NotImplementedError
 op_character = op_char = utils.alias(op_chr)
 
 @utils.multicase(opnum=six.integer_types)
@@ -550,21 +531,26 @@ def op_bin(opnum):
 def op_bin(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to binary and return it.'''
     t = idaapi.bin_flag()
-    ok = idaapi.set_op_type(ea, t, opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_bin({:#x}, {:d}) : Unable to set the type of operand {:d} to binary.".format(__name__, ea, opnum, opnum))
 
-    # Figure out the maximum integer size of the database in case IDA gives us a
-    # signed value
+    # Extract the operand's op_t and its maximum value, as we'll use this to
+    # transform the value if necessary.
+    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+
+    # If this is an immediate value, then we can treat it normally.
+    if res.type in {idaapi.o_imm}:
+        integer = res.value & (max - 1)
+        return 0 if integer == 0 else (integer - max) if signed else integer
+
+    # If the signed-flag is set in our operand, then convert it into its actual
+    # signed value.
     maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
-    # Extract the operand's value and return it
-    res, bits = operand(ea, opnum), op_bits(ea, opnum)
-    integer = res.value if res.type in {idaapi.o_imm} else res.addr
-
-    # Return the difference of the integer if the signed flag is set, otherwise
-    # we can just return the integer as-is.
-    return (integer - maximum) if integer & (maximum // 2) else integer
+    # Now we can return the value transformed if the operand has an inverted sign
+    return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
 op_binary = utils.alias(op_bin)
 
 @utils.multicase(opnum=six.integer_types)
@@ -575,21 +561,26 @@ def op_oct(opnum):
 def op_oct(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to octal and return it.'''
     t = idaapi.oct_flag()
-    ok = idaapi.set_op_type(ea, t, opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_oct({:#x}, {:d}) : Unable to set the type of operand {:d} to octal.".format(__name__, ea, opnum, opnum))
 
-    # Figure out the maximum integer size of the database in case IDA gives us a
-    # signed value
+    # Extract the operand's op_t and its maximum value, as we'll use this to
+    # transform the value if necessary.
+    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+
+    # If this is an immediate value, then we can treat it normally.
+    if res.type in {idaapi.o_imm}:
+        integer = res.value & (max - 1)
+        return 0 if integer == 0 else (integer - max) if signed else integer
+
+    # If the signed-flag is set in our operand, then convert it into its actual
+    # signed value.
     maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
-    # Extract the operand's value and return it
-    res, bits = operand(ea, opnum), op_bits(ea, opnum)
-    integer = res.value if res.type in {idaapi.o_imm} else res.addr
-
-    # Return the difference of the integer if the signed flag is set, otherwise
-    # we can just return the integer as-is.
-    return (integer - maximum) if integer & (maximum // 2) else integer
+    # Now we can return the value transformed if the operand has an inverted sign
+    return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
 op_octal = utils.alias(op_oct)
 
 @utils.multicase(opnum=six.integer_types)
@@ -600,21 +591,26 @@ def op_dec(opnum):
 def op_dec(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to decimal and return it.'''
     t = idaapi.dec_flag()
-    ok = idaapi.set_op_type(ea, t, opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_dec({:#x}, {:d}) : Unable to set the type of operand {:d} to decimal.".format(__name__, ea, opnum, opnum))
 
-    # Figure out the maximum integer size of the database in case IDA gives us a
-    # signed value
+    # Extract the operand's op_t and its maximum value, as we'll use this to
+    # transform the value if necessary.
+    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+
+    # If this is an immediate value, then we can treat it normally.
+    if res.type in {idaapi.o_imm}:
+        integer = res.value & (max - 1)
+        return 0 if integer == 0 else (integer - max) if signed else integer
+
+    # If the signed-flag is set in our operand, then convert it into its actual
+    # signed value.
     maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
-    # Extract the operand's value and return it
-    res, bits = operand(ea, opnum), op_bits(ea, opnum)
-    integer = res.value if res.type in {idaapi.o_imm} else res.addr
-
-    # Return the difference of the integer if the signed flag is set, otherwise
-    # we can just return the integer as-is.
-    return (integer - maximum) if integer & (maximum // 2) else integer
+    # Now we can return the value transformed if the operand has an inverted sign
+    return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
 op_decimal = utils.alias(op_dec)
 
 @utils.multicase(opnum=six.integer_types)
@@ -625,21 +621,26 @@ def op_hex(opnum):
 def op_hex(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to hexadecimal and return it.'''
     t = idaapi.hex_flag()
-    ok = idaapi.set_op_type(ea, t, opnum)
+    ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_hex({:#x}, {:d}) : Unable to set the type of operand {:d} to hexadecimal.".format(__name__, ea, opnum, opnum))
 
-    # Figure out the maximum integer size of the database in case IDA gives us a
-    # signed value
+    # Extract the operand's op_t and its maximum value, as we'll use this to
+    # transform the value if necessary.
+    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+
+    # If this is an immediate value, then we can treat it normally.
+    if res.type in {idaapi.o_imm}:
+        integer = res.value & (max - 1)
+        return 0 if integer == 0 else (integer - max) if signed else integer
+
+    # If the signed-flag is set in our operand, then convert it into its actual
+    # signed value.
     maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
-    # Extract the operand's value and return it
-    res, bits = operand(ea, opnum), op_bits(ea, opnum)
-    integer = res.value if res.type in {idaapi.o_imm} else res.addr
-
-    # Return the difference of the integer if the signed flag is set, otherwise
-    # we can just return the integer as-is.
-    return (integer - maximum) if integer & (maximum // 2) else integer
+    # Now we can return the value transformed if the operand has an inverted sign
+    return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
 op_hexadecimal = utils.alias(op_hex)
 
 @utils.multicase(opnum=six.integer_types)
