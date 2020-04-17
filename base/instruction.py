@@ -520,7 +520,38 @@ def op_chr(ea, opnum):
     if not ok:
         raise E.DisassemblerError(u"{:s}.op_chr({:#x}, {:d}) : Unable to set the type of operand {:d} to a character.".format(__name__, ea, opnum, opnum))
 
-    raise NotImplementedError
+    # Extract the operand's op_t and its maximum value, as we'll use this to
+    # transform the value if necessary.
+    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+
+    # If this is an immediate value, then we can treat it normally.
+    if res.type in {idaapi.o_imm}:
+        integer = res.value & (max - 1)
+        result = 0 if integer == 0 else (integer - max) if signed else integer
+
+    # If the signed-flag is set in our operand, then convert it into its actual
+    # signed value.
+    else:
+        maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+        integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
+
+        # Now we can use the value transformed if the operand has an inverted sign
+        result = 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
+
+    # There's no such thing as a signed character, so if we do get a signed
+    # value back from our above logic, then we need to figure out its absolute
+    # value so we can return it properly.
+    absolute = abs(result)
+
+    # IDA actually returns integers larger than a byte as a string, so we'll
+    # first chunk our integer into octets.
+    octets = []
+    while absolute > 0:
+        octets.append(absolute & 0xff)
+        absolute //= 0x100
+
+    # Last thing to do is to join each octet together back into some bytes
+    return bytes().join(map(six.int2byte, reversed(bytearray(octets))))
 op_character = op_char = utils.alias(op_chr)
 
 @utils.multicase(opnum=six.integer_types)
