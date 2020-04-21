@@ -1422,7 +1422,7 @@ class member_t(object):
         opinfo.tid = typeid
         return idaapi.set_member_type(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, flag, opinfo, nbytes)
 
-    @type.getter
+    @property
     def typeinfo(self):
         '''Return the type info of the member.'''
         ti = idaapi.tinfo_t()
@@ -1431,6 +1431,55 @@ class member_t(object):
             cls = self.__class__
             logging.fatal(u"{:s}.instance({!r}).member({:s}).typeinfo : Unable to determine `idaapi.tinfo_t()` for member {:#x}.".format('.'.join((__name__, cls.__name__)), self.__parent.name, self.name, self.id))
         return ti
+
+    @typeinfo.setter
+    def typeinfo(self, info):
+        '''Set the type info of the member to `info`.'''
+        til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
+
+        # Firstly we need to ';'-terminate the type the user provided in order
+        # for IDA's parser to understand it.
+        terminated = info if info.endswith(';') else "{:s};".format(info)
+
+        # Now that we've prepped everything, ask IDA to parse this into a
+        # tinfo_t for us. We pass the silent flag so that we can raise an
+        # exception if there's a parsing error of some sort.
+        res = idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL)
+        if res is None:
+            cls = self.__class__
+            raise E.InvalidTypeOrValueError(u"{:s}.instance({!r}).member({:s}).typeinfo : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), self.__parent.name, self.name, utils.string.repr(info)))
+
+        # Now we can pass our tinfo_t along with the member information to IDA.
+        res = idaapi.set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
+        if res == idaapi.SMT_OK:
+            return
+
+        # We failed, so just raise an exception for the user to handle.
+        elif res == idaapi.SMT_FAILED:
+            raise E.DisassemblerError(u"{:s}.instance({!r}).member({:s}).typeinfo : Unable to assign typeinfo ({!s}) for member {:#x}.".format('.'.join((__name__, cls.__name__)), self.__parent.name, self.name, utils.string.repr(info), self.id))
+
+        # If we received an alternative return code, then build a relevant
+        # message that we can raise with our exception.
+        cls = self.__class__
+        if res == idaapi.SMT_BADARG:
+            message = 'invalid parameters'
+        elif res == idaapi.SMT_NOCOMPAT:
+            message = 'incompatible type'
+        elif res == idaapi.SMT_WORSE:
+            message = 'worse type'
+        elif res == idaapi.SMT_SIZE:
+            message = 'invalid type for member size'
+        elif res == idaapi.SMT_ARRAY:
+            message = 'setting function argument as an array is illegal'
+        elif res == idaapi.SMT_OVERLAP:
+            message = 'the specified type would result in member overlap'
+        elif res == idaapi.SMT_KEEP:
+            message = 'the specified type is not ideal'
+        else:
+            message = "unknown error {:#x}".format(res)
+
+        # Finally we can raise our exception so that the user knows whats up.
+        raise E.DisassemblerError(u"{:s}.instance({!r}).member({:s}).typeinfo : Unable to assign typeinfo ({!s}) for member {:#x} ({:s}).".format('.'.join((__name__, cls.__name__)), self.__parent.name, self.name, utils.string.repr(info), self.id, message))
 
     def __repr__(self):
         '''Display the member in a readable format.'''
