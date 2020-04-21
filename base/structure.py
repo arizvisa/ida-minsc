@@ -24,6 +24,11 @@ methods of filtering are:
     `regex` - Filter the structure names according to a regular-expression
     `index` - Match the structures by its index
     `identifier` or `id` - Match the structure by its id which is a ``idaapi.uval_t``
+    `size` - Filter the structures for any matching the specified size
+    `greater` or `ge` - Match structures that are larger (inclusive) than the specified size
+    `gt` - Match structures that are larger (exclusive) than the specified size
+    `less` or `le` - Match structures that are smaller (inclusive) than the specified size
+    `lt` - Match structures that are smaller (exclusive) than the specified size
     `predicate` - Filter the structures by passing the id (``idaapi.uval_t``) to a callable
 
 Some examples of using these keywords are as follows::
@@ -73,6 +78,11 @@ __matcher__.mapping('index', idaapi.get_struc_idx, 'id')
 __matcher__.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
 __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), 'name')
 __matcher__.boolean('name', operator.eq, 'name')
+__matcher__.attribute('size', 'size')
+__matcher__.boolean('greater', operator.le, 'size'), __matcher__.boolean('ge', operator.le, 'size')
+__matcher__.boolean('gt', operator.lt, 'size')
+__matcher__.boolean('less', operator.ge, 'size'), __matcher__.boolean('le', operator.ge, 'size')
+__matcher__.boolean('lt', operator.gt, 'size')
 __matcher__.predicate('predicate')
 __matcher__.predicate('pred')
 
