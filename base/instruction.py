@@ -797,7 +797,7 @@ def op_structure(ea, opnum):
     # offset because the user put a structure there. They likely will want
     # to know that it's still there..
     if not len(st.members):
-        return st, offset
+        return (st, offset) if offset else st
 
     # Otherwise, iterate through the path that IDA gave us and grab every
     # member that was returned. Save our position so that we know what IDA
@@ -824,10 +824,25 @@ def op_structure(ea, opnum):
         position += m.realoffset
         st = m.type
 
-    # Now we need to calculate our delta from the position and offset
-    res = delta.value() + offset - position
-    if res:
-        return tuple(result + [res])
+    ## Now we need to calculate our delta from the position and offset, and use
+    ## it to calculate the actual last member.
+    last, res = result[-1], delta.value() + offset - position
+    p = last.parent
+
+    try:
+        m = p.by_realoffset(res + last.realoffset)
+
+    # We couldn't find the exact member, so just try and find the nearest one
+    except (E.OutOfBoundsError, E.MemberNotFoundError):
+        m = p.near_realoffset(res + last.realoffset)
+
+    # Adjust our offset, and fix the last member so it points to the correct one
+    result[-1], offset = m, res + last.realoffset - m.realoffset
+
+    # Last thing to do is to determine whether we include the offset in the
+    # result, the members, or just the first member.
+    if offset:
+        return tuple(result + [offset])
     return result if len(result) > 1 else result[0]
 
 @utils.multicase(opnum=six.integer_types, structure=structure.structure_t)
