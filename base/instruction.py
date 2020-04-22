@@ -923,13 +923,12 @@ def op_structure(ea, opnum, path, **delta):
 
     # now we can finally apply the path to the specified operand
     if idaapi.__version__ < 7.0:
-        ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
-        #ok = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, moff - ofs)
+        ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, moff + delta.get('delta', 0))
 
     # IDA 7.0 and later requires us to get the instruction here
     else:
         insn = at(ea)
-        ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, delta.get('delta', 0))
+        ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, moff + delta.get('delta', 0))
 
     return True if ok else False
 op_struc = op_struct = utils.alias(op_structure)
