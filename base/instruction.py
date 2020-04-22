@@ -748,8 +748,15 @@ def op_structure(ea, opnum):
     if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
-    # Figure out the offset for the structure member
-    offset = op.addr if op.type in {idaapi.o_displ, idaapi.o_phrase} else op.value
+    # Figure out the offset for the structure member if it's an immediate value
+    if op.type in {idaapi.o_imm}:
+        max = 2 ** op_bits(ea, opnum)
+        offset = op.value & (max - 1)
+
+    # Otherwise, this could be a signed operand and it needs to be converted.
+    else:
+        max = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+        offset = (op.addr - max) if op.addr & (max // 2) else op.addr
 
     # Check to see if this is a stack variable, because we'll need to
     # handle it differently if so.
@@ -775,27 +782,16 @@ def op_structure(ea, opnum):
     # will always only return the structure associatd with the member..
     delta, path = idaapi.sval_pointer(), idaapi.tid_array(2)
     delta.assign(0)
-    count = idaapi.get_stroff_path(ea, opnum, path.cast(), sval.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
+    count = idaapi.get_stroff_path(ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
     if not count:
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
-    # Here's how we start our search...
-    st = structure.by_identifier(path[0])
+    # First we'll collect all of the IDs in our path. Then we can start by
+    # grabbing the first structure id to see how we should search.
+    path = [ path[index] for index in six.moves.range(count) ]
+    logging.debug(u"{:s}.op_structure({:#x}, {:d}) : IDA returned {:d} path members ({:s}).".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(m) for m in path)))
 
-    # If for some reason we get more than one result in our path, then we're
-    # shifted by fields within that path. So we'll seed our offset with the
-    # position of this field, and continue to calculate it ourselves...
-    if count > 1:
-        items = [ path[index] for index in six.moves.range(count) ]
-        logging.debug(u"{:s}.op_structure({:#x}, {:d}) : IDA returned {:d} path members ({:s}).".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(m) for m in items)))
-
-        t, position = structure.by_identifier(items.pop(0)), 0
-        for item in items:
-            m = t.members.by_identifier(item)
-            position += m.realoffset
-            t = m.type
-        logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Adjusted offset by {:+#x} due to {:d} path members ({:s}).".format(__name__, ea, opnum, position, count, ', '.join("{:#x}".format(m) for m in items)))
-        offset += position
+    st = structure.by_identifier(path.pop(0))
 
     # If there are no members, then we simply return the structure and the
     # offset because the user put a structure there. They likely will want
@@ -803,48 +799,35 @@ def op_structure(ea, opnum):
     if not len(st.members):
         return st, offset
 
-    try:
-        m = st.by_realoffset(offset)
-
-    # If we couldn't find our first member, then we'll use the nearest member
-    # for the structure that IDA gave us and proceed as usual.
-    # our offset as the delta.
-    except (E.OutOfBoundsError, E.MemberNotFoundError):
-        m = st.near_realoffset(offset)
-
-    # Now we can keep descending until we get to the exact member..
-    result, offset = [m], offset - m.realoffset
-    while isinstance(m.type, structure.structure_t):
-        st = m.type
-
-        # Try and find the member based on our current offset
-        try:
-            m = st.by_realoffset(offset)
-
-        # We couldn't find shit, so we're done here.
-        except (E.OutOfBoundsError, E.MemberNotFoundError):
-            break
-
+    # Otherwise, iterate through the path that IDA gave us and grab every
+    # member that was returned. Save our position so that we know what IDA
+    # actually gave us as later we can use this to calculate the delta.
+    result, position = [], 0
+    for item in path:
+        m = st.by_identifier(item)
         result.append(m)
-        offset -= m.realoffset
+        position += m.realoffset
+        st = m.type
 
     # Check if we're still pointing to within a structure, so we
     # can adjust our offset to be relative to the nearest field.
-    if isinstance(m.type, structure.structure_t):
-        st = m.type
-
+    realposition = delta.value() + offset
+    while isinstance(st, structure.structure_t):
         try:
-            m = st.by_realoffset(offset)
+            m = st.by_realoffset(realposition)
 
         # We couldn't find a member, so find the nearest element and adjust
         except (E.OutOfBoundsError, E.MemberNotFoundError):
-            m = st.near_realoffset(offset)
+            m = st.near_realoffset(realposition)
 
         result.append(m)
-        offset -= m.realoffset
+        position += m.realoffset
+        st = m.type
 
-    if offset:
-        return tuple(result + [offset])
+    # Now we need to calculate our delta from the position and offset
+    res = delta.value() + offset - position
+    if res:
+        return tuple(result + [res])
     return result if len(result) > 1 else result[0]
 
 @utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
