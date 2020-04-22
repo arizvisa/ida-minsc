@@ -967,6 +967,7 @@ class members_t(object):
         '''Return the member at the specified `offset`.'''
         return self.by_offset(offset)
 
+    @utils.string.decorate_arguments('name')
     def by_name(self, name):
         '''Return the member with the specified `name`.'''
         res = utils.string.to(name)
@@ -1489,6 +1490,7 @@ class member_t(object):
         return ti
 
     @typeinfo.setter
+    @utils.string.decorate_arguments('info')
     def typeinfo(self, info):
         '''Set the type info of the member to `info`.'''
         til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
