@@ -798,8 +798,10 @@ class members_t(object):
         `fullname` - Filter the structure members by matching its full name according to a glob
         `comment` or `comments` - Filter the structure members by applying a glob to its comment
         `identifier` or `id` - Match the structure member by its identifier
-        `greater` or `gt` - Filter the structure members for any after the specified offset
-        `less` or `lt` - Filter the structure members for any before the specified offset
+        `greater` or `ge` - Filter the structure members for any after the specified offset (inclusive)
+        `gt` - Filter the structure members for any after the specified offset (exclusive)
+        `less` or `le` - Filter the structure members for any before the specified offset (inclusive)
+        `lt` - Filter the structure members for any before the specified offset (exclusive)
         `predicate` - Filter the structure members by passing the ``member_t`` to a callable
 
     Some examples of using these keywords are as follows::
@@ -893,8 +895,12 @@ class members_t(object):
     __member_matcher.boolean('fullname', lambda v, n: fnmatch.fnmatch(n, v), 'fullname')
     __member_matcher.boolean('comment', lambda v, n: fnmatch.fnmatch(n, v), 'comment')
     __member_matcher.boolean('comments', lambda v, n: fnmatch.fnmatch(n, v), 'comments')
-    __member_matcher.boolean('greater', operator.le, lambda m: m.offset+m.size), __member_matcher.boolean('gt', operator.lt, lambda m: m.offset+m.size)
-    __member_matcher.boolean('less', operator.ge, 'offset'), __member_matcher.boolean('lt', operator.gt, 'offset')
+    __member_matcher.boolean('greater', operator.le, lambda m: m.offset+m.size)
+    __member_matcher.boolean('ge', operator.le, lambda m: m.offset+m.size)
+    __member_matcher.boolean('gt', operator.lt, lambda m: m.offset+m.size)
+    __member_matcher.boolean('less', operator.ge, 'offset')
+    __member_matcher.boolean('le', operator.ge, 'offset')
+    __member_matcher.boolean('lt', operator.gt, 'offset')
     __member_matcher.predicate('predicate'), __member_matcher.predicate('pred')
 
     # searching members
