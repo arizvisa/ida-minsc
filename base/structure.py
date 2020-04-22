@@ -874,7 +874,7 @@ class members_t(object):
 
         if res is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({!r}) : Unable to find the member that was requested.".format('.'.join((__name__, cls.__name__)), self.parent.name, index))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({!r}) : Unable to find the member that was requested.".format('.'.join((__name__, cls.__name__)), self.parent.id, index))
         return res
 
     def index(self, member):
@@ -1023,7 +1023,7 @@ class members_t(object):
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max + msize):
             cls = self.__class__
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join((__name__, cls.__name__)), self.parent.name, offset, min, max + msize))
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset, min, max + msize))
 
         # Chain to the realoffset implementation.. This is just a wrapper.
         return self.by_realoffset(offset - self.baseoffset)
@@ -1042,14 +1042,14 @@ class members_t(object):
         mptr = idaapi.get_member(self.parent.ptr, max)
         if mptr is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format('.'.join((__name__, cls.__name__)), self.parent.name, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset))
 
         # Get that member's size, so that way we can really confirm that this
         # offset isn't pointing to anything.
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max + msize):
             cls = self.__class__
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join((__name__, cls.__name__)), self.parent.name, offset, min, max + msize))
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset, min, max + msize))
 
         # Now we can get a pointer to an actual member
         mem = idaapi.get_member(self.parent.ptr, offset)
