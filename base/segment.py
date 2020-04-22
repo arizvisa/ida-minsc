@@ -19,8 +19,10 @@ follows:
     `index` - Match the segment by its index
     `identifier` - Match the segment by its identifier
     `selector` - Match the segment by its selector
-    `greater` or `gt` - Filter the segments for any after the specified address
-    `less` or `lt` - Filter the segments for any before the specified address
+    `greater` or `ge` - Filter the segments for any after the specified address (inclusive)
+    `gt` - Filter the segments for any after the specified address (exclusive)
+    `less` or `le` - Filter the segments for any before the specified address (inclusive)
+    `lt` - Filter the segments for any before the specified address (exclusive)
     `predicate` - Filter the segments by passing their ``idaapi.segment_t`` to a callable
 
 Some examples of using these keywords are as follows::
@@ -54,11 +56,15 @@ __matcher__.attribute('selector', 'sel')
 __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
 __matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
 if idaapi.__version__ < 7.0:
-    __matcher__.boolean('greater', operator.le, 'endEA'), __matcher__.boolean('gt', operator.lt, 'endEA')
-    __matcher__.boolean('less', operator.ge, 'startEA'), __matcher__.boolean('lt', operator.gt, 'startEA')
+    __matcher__.boolean('greater', operator.le, 'endEA')
+    __matcher__.boolean('gt', operator.lt, 'endEA')
+    __matcher__.boolean('less', operator.ge, 'startEA')
+    __matcher__.boolean('lt', operator.gt, 'startEA')
 else:
-    __matcher__.boolean('greater', operator.le, 'end_ea'), __matcher__.boolean('gt', operator.lt, 'end_ea')
-    __matcher__.boolean('less', operator.ge, 'start_ea'), __matcher__.boolean('lt', operator.gt, 'start_ea')
+    __matcher__.boolean('greater', operator.le, 'end_ea')
+    __matcher__.boolean('gt', operator.lt, 'end_ea')
+    __matcher__.boolean('less', operator.ge, 'start_ea')
+    __matcher__.boolean('lt', operator.gt, 'start_ea')
 __matcher__.predicate('predicate'), __matcher__.predicate('pred')
 
 @utils.string.decorate_arguments('regex', 'like', 'name')
