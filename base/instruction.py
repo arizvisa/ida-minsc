@@ -921,22 +921,15 @@ def op_structure(ea, opnum, path, **delta):
     for i, id in enumerate(tids):
         tid[i + 1] = id
 
-    # figure out the real position (ida handles this actually)
-    # value = operand(ea, opnum).value if opt(ea, opnum) == 'immediate' else operand(ea, opnum).addr
-    ofs = moff + delta.get('delta', 0)
-
-    # grab the base offset to factor it into the calculation of the struct member
-    baseoffset = path[0].members.baseoffset
-
     # now we can finally apply the path to the specified operand
     if idaapi.__version__ < 7.0:
-        ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, ofs - baseoffset)
+        ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, delta.get('delta', 0))
         #ok = idaapi.set_stroff_path(ea, opnum, tid.cast(), length, moff - ofs)
 
     # IDA 7.0 and later requires us to get the instruction here
     else:
         insn = at(ea)
-        ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, ofs - baseoffset)
+        ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, delta.get('delta', 0))
 
     return True if ok else False
 op_struc = op_struct = utils.alias(op_structure)
