@@ -830,54 +830,26 @@ def op_structure(ea, opnum):
         return tuple(result + [res])
     return result if len(result) > 1 else result[0]
 
-@utils.multicase(opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
+@utils.multicase(opnum=six.integer_types, structure=structure.structure_t)
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, [structure], **delta)
-@utils.multicase(opnum=six.integer_types, id=six.integer_types)
-def op_structure(opnum, id, **delta):
-    '''Apply the structure identified by `id` to the instruction operand `opnum` at the current address.'''
-    return op_structure(ui.current.address(), opnum, id, **delta)
+@utils.multicase(opnum=six.integer_types, member=structure.member_t)
+def op_structure(opnum, member, **delta):
+    '''Apply the specified `member` to the instruction operand `opnum` at the current address.'''
+    return op_structure(ui.current.address(), opnum, [member.parent, member], **delta)
 @utils.multicase(opnum=six.integer_types, path=(types.TupleType, types.ListType))
 def op_structure(opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=(structure.structure_t, structure.member_t))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=structure.structure_t)
 def op_structure(ea, opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the address `ea`.'''
-    return op_structure(ea, opnum, structure.id, **delta)
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types)
-def op_structure(ea, opnum, id, **delta):
-    """Apply the structure identified by `id` to the instruction operand `opnum` at the address `ea`.
-
-    If the offset `delta` is specified, shift the structure by that amount.
-    """
-    ea = interface.address.inside(ea)
-    if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {:#x}{:s}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
-
-    offset, sptr, name = 0, idaapi.get_struc(id), idaapi.get_member_fullname(id)
-    if sptr is not None:
-        offset = idaapi.get_struc_first_offset(sptr)
-        sid, mptr = sptr.id, idaapi.get_member(sptr, offset)
-        if mptr is None:
-            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}{:s}) : Unable to locate the first member of the structure with the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
-        mid = mptr.id
-    elif name is not None:
-        fn = idaapi.get_member_fullname(id)
-        sptr = idaapi.get_member_struc(name)
-        sid, mid = sptr.id, id
-    else:
-        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}{:s}) : Unable to locate the structure member for the specified id.".format(__name__, ea, opnum, id, ", {:s}".format(utils.string.kwargs(delta)) if delta else ''))
-
-    # if an offset was specified such as if the first member of the structure
-    # is not at offset 0, then adjust the delta by its value
-    if offset:
-        delta['delta'] = delta.get('delta', 0) - offset
-
-    st = structure.by(sid)
-    m = st.by_identifier(mid)
-    return op_structure(ea, opnum, [st, m], **delta)
+    return op_structure(ea, opnum, [structure], **delta)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, member=structure.member_t)
+def op_structure(ea, opnum, member, **delta):
+    '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
+    return op_structure(ea, opnum, [member.parent, member], **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(types.TupleType, types.ListType))
 def op_structure(ea, opnum, path, **delta):
     """Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.
