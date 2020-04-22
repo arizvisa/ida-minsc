@@ -183,9 +183,14 @@ def by(**type):
         raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
+@utils.multicase(string=basestring)
 def search(string):
-    '''Search through all the structures using globbing.'''
+    '''Search through all the structure names matching the glob `string`.'''
     return by(like=string)
+@utils.multicase()
+def search(**type):
+    '''Search through all of the structures and return the first result matching the keyword specified by `type`.'''
+    return by(**type)
 
 @utils.string.decorate_arguments('name')
 def by_name(name, **options):
