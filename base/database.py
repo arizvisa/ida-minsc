@@ -1130,8 +1130,10 @@ class entries(object):
         `like` - Filter the entrypoint names according to a glob
         `regex` - Filter the entrypoint names according to a regular-expression
         `index` - Match according to the entrypoint's index (ordinal)
-        `greater` or `gt` - Filter the entrypoints for any after the specified address
-        `less` or `lt` - Filter the entrypoints for any before the specified address
+        `greater` or `ge` - Filter the entrypoints for any after the specified address (inclusive)
+        `gt` - Filter the entrypoints for any after the specified address (exclusive)
+        `less` or `le` - Filter the entrypoints for any before the specified address (inclusive)
+        `lt` - Filter the entrypoints for any before the specified address (exclusive)
         `predicate` - Filter the entrypoints by passing its index (ordinal) to a callable
 
     Some examples of using these keywords are as follows::
@@ -1145,8 +1147,12 @@ class entries(object):
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
     __matcher__.mapping('ea', utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.boolean('greater', operator.le, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('gt', operator.lt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.boolean('less', operator.ge, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)), __matcher__.boolean('lt', operator.gt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('greater', operator.le, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('ge', operator.le, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('gt', operator.lt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('less', operator.ge, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('le', operator.ge, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
+    __matcher__.boolean('lt', operator.gt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
     __matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
     __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
     __matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
