@@ -905,6 +905,9 @@ def op_structure(ea, opnum, path, **delta):
     if not database.type.is_code(ea):
         raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
+    # convert the path to a list
+    path = [item for item in path]
+
     # validate the path
     if len(path) == 0:
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
