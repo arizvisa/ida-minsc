@@ -862,7 +862,7 @@ class node(object):
             if count & 0x8000:
                 offset, count, res = count ^ 0x8000, le(sup[2:3]), sup[2 + 1:]
             else:
-                offset = 0
+                offset, count = le(sup[:1]), le(sup[1:2])
 
             chunks = zip(*((iter(res),) * 4))
             if len(chunks) != count:
