@@ -5003,30 +5003,52 @@ class get(object):
         except AttributeError:
             pass
 
-        strings = {
-            1 : 'c',
-            2 : 'u',
-        }
+        # Depending on the version of IDAPython, some of IDA's flags (FF_*) can
+        # be signed or unsigned. We're explicitly testing for them, so we need
+        # to actually convert them to unsigned in order for our tests to actually
+        # work.
+        numerics = { ff & idaapi.BADADDR : typecode for ff, typecode in numerics.items() }
+        lnumerics = { ff & idaapi.BADADDR : length for ff, typecode in lnumerics.items() }
+
+        # Now we can grab the flags (DT_TYPE) and any other flags in order to
+        # distinguish what type of array we need to convert this too. There's
+        # no util or anything to do this conversion in minsc, so we handle this
+        # ourselves by explicitly testing and handling it.
         F, T = type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
+
+        # If this is a string-literal, then figure out what string size we should use
         if T == idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI:
             elesize = idaapi.get_full_data_elsize(ea, F)
+            strings = { 1: 'c', 2: 'u'}
             t = strings[elesize]
+
+        # If we got a structure at this address, then we'll simply take the length
+        # and create a structure for each individual element
         elif T == idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU:
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
             # FIXME: this math doesn't work (of course) with dynamically sized structures
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ cls.structure(ea + i*cb, id=t) for i in six.moves.range(count) ]
+            return [ cls.structure(ea + index * cb, id=t) for index in six.moves.range(count) ]
+
+        # If the DT_TYPE was found in our numerics dictionary, then grab the
+        # typecode from it so we can use it.
         elif T in numerics:
             ch = numerics[T]
             # FIXME: return signed version of number
             t = ch.lower() if F & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
+
+        # If the DT_TYPE was found in our lnumerics (long) dictionary, then use
+        # that to figure out the actual type
         elif T in lnumerics:
             cb, total = lnumerics[T], idaapi.get_item_size(ea)
             # FIXME: return signed version of number
             t = get.signed if F & idaapi.FF_SIGN == idaapi.FF_SIGN else get.unsigned
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ t(ea + i*cb, cb) for i in six.moves.range(count) ]
+            return [ t(ea + index * cb, cb) for index in six.moves.range(count) ]
+
+        # Otherwise, the DT_TYPE was not found and we don't really know how to
+        # decode this without having a proper typesystem of some sort.
         else:
             raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the `idaapi.DT_TYPE` as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, F, T))
 
