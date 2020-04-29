@@ -636,9 +636,15 @@ class keyboard(object):
         else:
             res = None
 
-        # Now we can add the hotkey with the callable the user provided.
+        # Define a closure that calls the user's callable as it seems that IDA's
+        # hotkey functionality doesn't deal too well when the same callable is
+        # mapped to different hotkeys.
+        def closure(*args, **kwargs):
+            return callable(*args, **kwargs)
+
+        # Now we can add the hotkey to IDA using the closure that we generated.
         # XXX: I'm not sure if the key needs to be utf8 encoded or not
-        ctx = idaapi.add_hotkey(keystring, callable)
+        ctx = idaapi.add_hotkey(keystring, closure)
         if not ctx:
             raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to map the callable {!r} to the hotkey combination {!s}.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
 
