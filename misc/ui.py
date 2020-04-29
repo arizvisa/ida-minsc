@@ -19,7 +19,7 @@ window that they wish to expose to the user.
 """
 
 import six
-import sys, os, time
+import sys, os, time, functools
 import logging
 
 import idaapi, internal
@@ -536,24 +536,159 @@ class keyboard(object):
         q = application()
         return q.keyboardModifiers()
 
-    hotkey = {}
+    @classmethod
+    def __of_key__(cls, key):
+        '''Convert the normalized hotkey tuple in `key` into a format that IDA can comprehend.'''
+        Separators = {'-', '+', '_'}
+        Modifiers = {'ctrl', 'shift', 'alt'}
+
+        # Validate the type of our parameter
+        if not isinstance(key, tuple):
+            raise internal.exceptions.InvalidParameterError(u"{:s}.of_key({!r}) : A key combination of an invalid type was provided as a parameter.".format('.'.join((__name__, cls.__name__)), key))
+
+        # Find a separator that we can use, and use it to join our tuple into a
+        # string with each element capitalized. That way it looks good for the user.
+        separator = next(item for item in Separators)
+        modifiers, hotkey = key
+
+        components = [item.capitalize() for item in modifiers] + [hotkey.capitalize()]
+        return separator.join(components)
+
+    @classmethod
+    def __normalize_key__(cls, hotkey):
+        '''Normalize the string `key` to a tuple that can be used to lookup keymappings.'''
+        Separators = {'-', '+', '_'}
+        Modifiers = {'ctrl', 'shift', 'alt'}
+
+        # First check to see if we were given a tuple. If so, then we might've
+        # been given a valid hotkey. However, we still need to validate this. So,
+        # to do that we'll concatenate each component together back into a string
+        # and then recurse so we can validate using the same logic.
+        if isinstance(hotkey, tuple):
+            modifiers, key = hotkey
+            separator = next(item for item in Separators)
+
+            components = [item for item in modifiers] + [key]
+            return cls.__normalize_key__(separator.join(components))
+
+        # Next we need to normalize the separator used throughout the string by
+        # simply converting any characters we might consider a separator into
+        # a null-byte so we can split on it.
+        normalized = functools.reduce(lambda agg, item: agg.replace(item, '\0'), Separators, hotkey)
+
+        # Now we can split the normalized string so we can convert it into a
+        # set. We will then iterate through this set collecting all of our known
+        # key modifiers. Anything left must be a single key, so we can then
+        # validate the hotkey we were given.
+        components = { item.lower() for item in normalized.split('\0') }
+
+        modifiers = { item for item in components if item in Modifiers }
+        key = components ^ modifiers
+
+        # Now we need to verify that we were given just one key. If we were
+        # given any more, then this isn't a valid hotkey combination and we need
+        # to bitch about it.
+        if len(key) != 1:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : An invalid hotkey combination ({!s}) was provided as a parameter.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(hotkey), internal.utils.string.repr(hotkey)))
+
+        res = next(iter(key))
+        if len(res) != 1:
+            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : The hotkey combination {!s} contains the wrong number of keys ({:d}).".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(hotkey), internal.utils.string.repr(res), len(res)))
+
+        # That was it. Now to do the actual normalization, we need to sort our
+        # modifiers into a tuple, and return the single hotkey that we extracted.
+        res, = key
+        return tuple(sorted(modifiers)), res
+
+    # Create a cache to store the hotkey context, and the callable that was mapped to it
+    __cache__ = {}
+
     @classmethod
     def map(cls, key, callable):
-        '''Map a specific `key` to a python `callable`.'''
+        """Map the specified `key` combination to a python `callable` in IDA.
 
-        # check to see if the key is stored within our cache and remove it if so
-        if key in cls.hotkey:
-            idaapi.del_hotkey(cls.hotkey[key])
+        If the provided `key` is being re-mapped due to the mapping already existing, then return the previous callable that it was assigned to.
+        """
 
-        # now we can add the hotkey and stash it in our cache
+        # First we'll normalize the hotkey that we were given, and convert it
+        # back into a format that IDA can understand. This way we can prevent
+        # users from giving us a sloppy hotkey combination that we won't be
+        # able to search for in our cache.
+        hotkey = cls.__normalize_key__(key)
+        keystring = cls.__of_key__(hotkey)
+
+        # The hotkey we normalized is now a tuple, so check to see if it's
+        # already within our cache. If it is, then we need to unmap it prior to
+        # re-creating the mapping.
+        if hotkey in cls.__cache__:
+            logging.warn(u"{:s}.map({!s}, {!r}) : Remapping the hotkey combination {!s} with the callable {!r}.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring), callable))
+            ctx, _ = cls.__cache__[hotkey]
+
+            ok = idaapi.del_hotkey(ctx)
+            if not ok:
+                raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to remove the hotkey combination {!s} from the list of current keyboard mappings.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring)))
+
+            # Pop the callable that was mapped out of the cache so that we can
+            # return it to the user.
+            _, res = cls.__cache__.pop(hotkey)
+
+        # If the user is mapping a new key, then there's no callable to return.
+        else:
+            res = None
+
+        # Now we can add the hotkey with the callable the user provided.
         # XXX: I'm not sure if the key needs to be utf8 encoded or not
-        cls.hotkey[key] = res = idaapi.add_hotkey(key, callable)
+        ctx = idaapi.add_hotkey(keystring, callable)
+        if not ctx:
+            raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to map the callable {!r} to the hotkey combination {!s}.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
+
+        # Last thing to do is to stash it in our cache with the user's callable
+        # in order to keep track of it for removal.
+        cls.__cache__[hotkey] = ctx, callable
         return res
+
     @classmethod
     def unmap(cls, key):
-        '''Unmap the specified `key` from its callable.'''
-        idaapi.del_hotkey(cls.hotkey[key])
-        del(cls.hotkey[key])
+        '''Unmap the specified `key` from IDA and return the callable that it was assigned to.'''
+        frepr = lambda hotkey: internal.utils.string.repr(cls.__of_key__(hotkey))
+
+        # First check to see whether we were given a callable or a hotkey. If
+        # we were given a callable, then we need to look through our cache for
+        # the actual key that it was. Once found, then we normalize it like usual.
+        if callable(key):
+            try:
+                hotkey = cls.__normalize_key__(next(item for item, (_, fcallback) in cls.__cache__.items() if fcallback == key))
+
+            except StopIteration:
+                raise internal.exceptions.InvalidParameterError(u"{:s}.unmap({:s}) : Unable to locate the callable {!r} in the current list of keyboard mappings.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), key))
+
+            else:
+                logging.warn(u"{:s}.unmap({:s}) : Discovered the hotkey {!s} being currently mapped to the callable {!r}.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey), key))
+
+        # We need to normalize the hotkey we were given, and convert it back
+        # into IDA's format. This way we can locate it in our cache, and prevent
+        # sloppy user input from interfering.
+        else:
+            hotkey = cls.__normalize_key__(key)
+
+        # Check to see if the hotkey is cached and warn the user if it isn't.
+        if hotkey not in cls.__cache__:
+            logging.warn(u"{:s}.unmap({:s}) : Refusing to unmap the hotkey {!s} as it is not currently mapped to anything.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
+            return
+
+        # Grab the keymapping context from our cache, and then ask IDA to remove
+        # it for us. If we weren't successful, then raise an exception so the
+        # user knows what's up.
+        ctx, _ = cls.__cache__[hotkey]
+        ok = idaapi.del_hotkey(ctx)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}.unmap({:s}) : Unable to unmap the specified hotkey ({!s}) from the current list of keyboard mappings.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
+
+        # Now we can pop off the callable that was mapped to the hotkey context
+        # in order to return it, and remove the hotkey from our cache.
+        _, res = cls.__cache__.pop(hotkey)
+        return res
+
     add, rm = internal.utils.alias(map, 'keyboard'), internal.utils.alias(unmap, 'keyboard')
 
     @classmethod
