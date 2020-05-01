@@ -2778,8 +2778,8 @@ class address(object):
 a = addr = address  # XXX: ns alias
 
 # address translations
-offset = byoffset = by_offset = byOffset = getoffset = get_offset = getOffset = utils.alias(address.offset, 'address')
-coof = convert_offset = convertOffset = utils.alias(address.by_offset, 'address')
+offset = getoffset = get_offset = getOffset = utils.alias(address.offset, 'address')
+byoffset = by_offset = byOffset = utils.alias(address.by_offset, 'address')
 
 # datapoint navigation
 prev, next = utils.alias(address.prev, 'address'), utils.alias(address.next, 'address')
