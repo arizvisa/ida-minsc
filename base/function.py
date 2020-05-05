@@ -407,7 +407,7 @@ class chunks(object):
     def iterate(cls, func):
         '''Iterate through all the instructions for each chunk in the function `func`.'''
         for start, end in cls(func):
-            for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, end)):
+            for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, database.address.prev(end))):
                 yield ea
             continue
         return
@@ -493,7 +493,7 @@ class chunk(object):
     def iterate(cls, ea):
         '''Iterate through all the instructions for the function chunk containing the address ``ea``.'''
         start, end = cls(ea)
-        for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, end)):
+        for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, database.address.prev(end))):
             yield ea
         return
 
@@ -1110,7 +1110,7 @@ class block(object):
     def iterate(cls, ea):
         '''Yield all the addresses in the basic block at address `ea`.'''
         left, right = cls(ea)
-        return database.address.iterate(left, right)
+        return database.address.iterate(left, database.address.prev(right))
     @utils.multicase(bounds=types.TupleType)
     @classmethod
     def iterate(cls, bounds):
@@ -1122,7 +1122,7 @@ class block(object):
     def iterate(cls, bb):
         '''Yield all the addresses in the basic block `bb`.'''
         left, right = interface.range.unpack(bb)
-        return database.address.iterate(left, right)
+        return database.address.iterate(left, database.address.prev(right))
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
