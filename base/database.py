@@ -4390,6 +4390,27 @@ class set(object):
 
         """
         @utils.multicase()
+        def __new__(cls):
+            '''Set the data at the current address to an integer.'''
+            return cls(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        def __new__(cls, ea):
+            '''Set the data at address `ea` to an integer of a type determined by its size.'''
+            res = type.size(ea)
+            return cls(ea, res)
+        @utils.multicase(ea=six.integer_types, size=six.integer_types)
+        def __new__(cls, ea, size):
+            '''Set the data at the address `ea` to an integer of the specified `size`.'''
+            res = set.unknown(ea, size)
+            if res != size:
+                raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to undefine {:d} byte{:s} for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, size, '' if size == 1 else 's'))
+
+            ok = set.data(ea, size)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, size, 8 * size))
+            return get.signed(ea, size) if type.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, size)
+
+        @utils.multicase()
         @classmethod
         def uint8_t(cls):
             '''Set the data at the current address to a uint8_t.'''
@@ -4405,7 +4426,7 @@ class set(object):
             # Apply our data type after undefining it
             ok = set.data(ea, res, type=idaapi.FF_BYTE)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to set the specified address to a byte ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if type.flags(ea, idaapi.FF_SIGN):
@@ -4429,7 +4450,7 @@ class set(object):
             # Apply our data type after undefining it
             ok = set.data(ea, res, type=idaapi.FF_BYTE)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to set the specified address to a byte ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if not type.flags(ea, idaapi.FF_SIGN):
@@ -4455,7 +4476,7 @@ class set(object):
             # Apply our data type after undefining it
             ok = set.data(ea, res, type=idaapi.FF_WORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to set the specified address to a word ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if type.flags(ea, idaapi.FF_SIGN):
@@ -4479,7 +4500,7 @@ class set(object):
             # Apply our data type after undefining it
             ok = set.data(ea, res, type=idaapi.FF_WORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to set the specfied address to a word ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to set the specfied address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if not type.flags(ea, idaapi.FF_SIGN):
@@ -4508,7 +4529,7 @@ class set(object):
             # Apply our new data type after undefining it
             ok = set.data(ea, res, type=FF_DWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to a dword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if type.flags(ea, idaapi.FF_SIGN):
@@ -4535,7 +4556,7 @@ class set(object):
             # Apply our new data type after undefining it
             ok = set.data(ea, res, type=FF_DWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to a dword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if not type.flags(ea, idaapi.FF_SIGN):
@@ -4564,7 +4585,7 @@ class set(object):
             # Apply our new data type after undefining it
             ok = set.data(ea, res, type=FF_QWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to a qword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if type.flags(ea, idaapi.FF_SIGN):
@@ -4591,7 +4612,7 @@ class set(object):
             # Apply our new data type after undefining it
             ok = set.data(ea, res, type=FF_QWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to a qword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if not type.flags(ea, idaapi.FF_SIGN):
@@ -4620,7 +4641,7 @@ class set(object):
             # Apply our new data type after undefining it
             ok = set.data(ea, res, type=FF_OWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an oword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if type.flags(ea, idaapi.FF_SIGN):
@@ -4647,7 +4668,7 @@ class set(object):
             # Apply our new data type after undefining it
             ok = set.data(ea, res, type=FF_OWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an oword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an integer ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
 
             # Check if we need to flip the sign flag, and do it if necessary
             if not type.flags(ea, idaapi.FF_SIGN):
@@ -4870,13 +4891,16 @@ class get(object):
         """
         @utils.multicase()
         def __new__(cls, **byteorder):
-            return get.unsigned(**byteorder)
+            '''Read an integer from the current address.'''
+            return get.signed(**byteorder) if type.flags(ui.current.address(), idaapi.FF_SIGN) else get.unsigned(**byteorder)
         @utils.multicase(ea=six.integer_types)
         def __new__(cls, ea, **byteorder):
-            return get.unsigned(ea, **byteorder)
+            '''Read an integer from the address `ea`.'''
+            return get.signed(ea, **byteorder) if type.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, **byteorder)
         @utils.multicase(ea=six.integer_types, size=six.integer_types)
         def __new__(cls, ea, size, **byteorder):
-            return get.unsigned(ea, size, **byteorder)
+            '''Read an integer of the specified `size` from the address `ea`.'''
+            return get.signed(ea, size, **byteorder) if type.flags(ea, idaapi.FF_SIGN) else get.unsigned(ea, size, **byteorder)
 
         @utils.multicase()
         @classmethod
