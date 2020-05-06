@@ -4456,7 +4456,7 @@ class set(object):
 
             # Now we can return our new size
             return get.unsigned(ea, 4)
-        uint32_t = utils.alias(word, 'set.integer')
+        uint32_t = utils.alias(dword, 'set.integer')
 
         @utils.multicase()
         @classmethod
@@ -4481,7 +4481,7 @@ class set(object):
 
             # Now we can return our new value since everything worked
             return get.unsigned(ea, 8)
-        uint64_t = utils.alias(word, 'set.integer')
+        uint64_t = utils.alias(qword, 'set.integer')
 
         @utils.multicase()
         @classmethod
@@ -4506,7 +4506,7 @@ class set(object):
 
             # Now we can return our new value if we succeeded
             return get.unsigned(ea, 16)
-        uint128_t = utils.alias(word, 'set.integer')
+        uint128_t = utils.alias(oword, 'set.integer')
 
     i = integer # XXX: ns alias
 
@@ -4750,6 +4750,7 @@ class get(object):
             '''Read a sint8_t from the address `ea`.'''
             return get.signed(ea, 1, **byteorder)
         ubyte1, sbyte1 = utils.alias(uint8_t, 'get.integer'), utils.alias(sint8_t, 'get.integer')
+        byte = utils.alias(uint8_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
@@ -4772,6 +4773,7 @@ class get(object):
             '''Read a sint16_t from the address `ea`.'''
             return get.signed(ea, 2, **byteorder)
         uint2, sint2 = utils.alias(uint16_t, 'get.integer'), utils.alias(sint16_t, 'get.integer')
+        word = utils.alias(uint16_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
@@ -4794,6 +4796,7 @@ class get(object):
             '''Read a sint32_t from the address `ea`.'''
             return get.signed(ea, 4, **byteorder)
         uint4, sint4 = utils.alias(uint32_t, 'get.integer'), utils.alias(sint32_t, 'get.integer')
+        dword = utils.alias(uint32_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
@@ -4816,6 +4819,7 @@ class get(object):
             '''Read a sint64_t from the address `ea`.'''
             return get.signed(ea, 8, **byteorder)
         uint8, sint8 = utils.alias(uint64_t, 'get.integer'), utils.alias(sint64_t, 'get.integer')
+        qword = utils.alias(uint64_t, 'get.integer')
 
         @utils.multicase()
         @classmethod
@@ -4837,6 +4841,7 @@ class get(object):
         def sint128_t(cls, ea, **byteorder):
             '''Read a sint128_t from the address `ea`.'''
             return get.signed(ea, 16, **byteorder)
+        oword = utils.alias(uint128_t, 'get.integer')
 
     i = integer # XXX: ns alias
 
