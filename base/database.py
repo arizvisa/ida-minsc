@@ -4267,7 +4267,12 @@ class set(object):
             }
 
         ## Now we can apply the type to the given address
-        res = type['type'] if 'type' in type else lookup[size]
+        try:
+            res = type['type'] if 'type' in type else lookup[size]
+
+        # If the size doesn't exist, then let the user know that we don't know what to do
+        except KeyError:
+            raise E.InvalidTypeOrValueError("{:s}.data({:#x}, {:d}{:s}) : Unable to determine the correct type for the specified size ({:+d}) to assign to the data.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else '', size))
 
         # Check if we need to use older IDA logic by checking of any of our api calls are None
         if idaapi.__version__ < 7.0 and any(f is None for f in [create_struct, create_align]):
