@@ -4385,128 +4385,277 @@ class set(object):
         This namespace is also aliased as ``database.set.i`` and can be used
         as follows::
 
-            > database.set.i.byte(ea)
-            > database.set.i.qword(ea)
+            > database.set.i.uint8_t(ea)
+            > database.set.i.uint64_t(ea)
 
         """
         @utils.multicase()
         @classmethod
-        def byte(cls):
-            '''Set the data at the current address to a byte.'''
-            return cls.byte(ui.current.address())
+        def uint8_t(cls):
+            '''Set the data at the current address to a uint8_t.'''
+            return cls.uint8_t(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def byte(cls, ea):
-            '''Set the data at address `ea` to a byte.'''
-            cb = set.unknown(ea, 1)
-            if cb != 1:
-                raise E.DisassemblerError(u"{:s}.byte({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
+        def uint8_t(cls, ea):
+            '''Set the data at address `ea` to a uint8_t.'''
+            res = set.unknown(ea, 1)
+            if res != 1:
+                raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, 1, type=idaapi.FF_BYTE)
+            ok = set.data(ea, res, type=idaapi.FF_BYTE)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.byte({:#x}) : Unable to assign a byte to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to set the specified address to a byte ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
 
             # Return our new size
-            return get.unsigned(ea, 1)
-        uint8_t = utils.alias(byte, 'set.integer')
+            return get.unsigned(ea, res)
+        @utils.multicase()
+        @classmethod
+        def sint8_t(cls):
+            '''Set the data at the current address to a sint8_t.'''
+            return cls.sint8_t(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint8_t(cls, ea):
+            '''Set the data at address `ea` to a sint8_t.'''
+            res = set.unknown(ea, 1)
+            if res != 1:
+                raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
+
+            # Apply our data type after undefining it
+            ok = set.data(ea, res, type=idaapi.FF_BYTE)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to set the specified address to a byte ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if not type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
+
+            # Return our new size
+            return get.signed(ea, res)
+        byte = utils.alias(uint8_t, 'set.integer')
 
         @utils.multicase()
         @classmethod
-        def word(cls):
-            '''Set the data at the current address to a word.'''
-            return cls.word(ui.current.address())
+        def uint16_t(cls):
+            '''Set the data at the current address to a uint16_t.'''
+            return cls.uint16_t(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def word(cls, ea):
-            '''Set the data at address `ea` to a word.'''
-            cb = set.unknown(ea, 2)
-            if cb != 2:
-                raise E.DisassemblerError(u"{:s}.word({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+        def uint16_t(cls, ea):
+            '''Set the data at address `ea` to a uint16_t.'''
+            res = set.unknown(ea, 2)
+            if res != 2:
+                raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, 2, type=idaapi.FF_WORD)
+            ok = set.data(ea, res, type=idaapi.FF_WORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.word({:#x}) : Unable to assign a word to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to set the specified address to a word ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
 
             # Return our new size
-            return get.unsigned(ea, 2)
-        uint16_t = utils.alias(word, 'set.integer')
+            return get.unsigned(ea, res)
+        @utils.multicase()
+        @classmethod
+        def sint16_t(cls):
+            '''Set the data at the current address to a sint16_t.'''
+            return cls.sint16_t(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint16_t(cls, ea):
+            '''Set the data at address `ea` to a sint16_t.'''
+            res = set.unknown(ea, 2)
+            if res != 2:
+                raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+
+            # Apply our data type after undefining it
+            ok = set.data(ea, res, type=idaapi.FF_WORD)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to set the specfied address to a word ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if not type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
+
+            # Return our new size
+            return get.signed(ea, res)
+        word = utils.alias(uint16_t, 'set.integer')
 
         @utils.multicase()
         @classmethod
-        def dword(cls):
-            '''Set the data at the current address to a double-word.'''
-            return cls.dword(ui.current.address())
+        def uint32_t(cls):
+            '''Set the data at the current address to a uint32_t.'''
+            return cls.uint32_t(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def dword(cls, ea):
-            '''Set the data at address `ea` to a double-word.'''
+        def uint32_t(cls, ea):
+            '''Set the data at address `ea` to a uint32_t.'''
             FF_DWORD = idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD
 
             # Undefine the data at the specified address
-            cb = set.unknown(ea, 4)
-            if cb != 4:
-                raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
+            res = set.unknown(ea, 4)
+            if res != 4:
+                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, 4, type=FF_DWORD)
+            ok = set.data(ea, res, type=FF_DWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.dword({:#x}) : Unable to assign a dword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to a dword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new size
-            return get.unsigned(ea, 4)
-        uint32_t = utils.alias(dword, 'set.integer')
+            return get.unsigned(ea, res)
+        @utils.multicase()
+        @classmethod
+        def sint32_t(cls):
+            '''Set the data at the current address to a sint32_t.'''
+            return cls.sint32_t(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint32_t(cls, ea):
+            '''Set the data at address `ea` to a sint32_t.'''
+            FF_DWORD = idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD
+
+            # Undefine the data at the specified address
+            res = set.unknown(ea, 4)
+            if res != 4:
+                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
+
+            # Apply our new data type after undefining it
+            ok = set.data(ea, res, type=FF_DWORD)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to set the specified address to a dword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if not type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
+
+            # Now we can return our new size
+            return get.signed(ea, res)
+        dword = utils.alias(uint32_t, 'set.integer')
 
         @utils.multicase()
         @classmethod
-        def qword(cls):
-            '''Set the data at the current address to a quad-word.'''
-            return cls.qword(ui.current.address())
+        def uint64_t(cls):
+            '''Set the data at the current address to a uint64_t.'''
+            return cls.uint64_t(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def qword(cls, ea):
-            '''Set the data at address `ea` to a quad-word.'''
+        def uint64_t(cls, ea):
+            '''Set the data at address `ea` to a uint64_t.'''
             FF_QWORD = idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD
 
             # Undefine the data at the specified address
-            cb = set.unknown(ea, 8)
-            if cb != 8:
-                raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
+            res = set.unknown(ea, 8)
+            if res != 8:
+                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, 8, type=FF_QWORD)
+            ok = set.data(ea, res, type=FF_QWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.qword({:#x}) : Unable to assign a qword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to a qword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new value since everything worked
-            return get.unsigned(ea, 8)
-        uint64_t = utils.alias(qword, 'set.integer')
+            return get.unsigned(ea, res)
+        @utils.multicase()
+        @classmethod
+        def sint64_t(cls):
+            '''Set the data at the current address to a sint64_t.'''
+            return cls.sint64_t(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint64_t(cls, ea):
+            '''Set the data at address `ea` to a sint64_t.'''
+            FF_QWORD = idaapi.FF_QWORD if hasattr(idaapi, 'FF_QWORD') else idaapi.FF_QWRD
+
+            # Undefine the data at the specified address
+            res = set.unknown(ea, 8)
+            if res != 8:
+                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
+
+            # Apply our new data type after undefining it
+            ok = set.data(ea, res, type=FF_QWORD)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to set the specified address to a qword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if not type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
+
+            # Now we can return our new value since everything worked
+            return get.signed(ea, res)
+        qword = utils.alias(uint64_t, 'set.integer')
 
         @utils.multicase()
         @classmethod
-        def oword(cls):
-            '''Set the data at the current address to an octal-word.'''
-            return cls.owrd(ui.current.address())
+        def uint128_t(cls):
+            '''Set the data at the current address to an uint128_t.'''
+            return cls.uint128_t(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def oword(cls, ea):
-            '''Set the data at address `ea` to an octal-word.'''
+        def uint128_t(cls, ea):
+            '''Set the data at address `ea` to an uint128_t.'''
             FF_OWORD = idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD
 
             # Undefine the data at the specified address
-            cb = set.unknown(ea, 16)
-            if cb != 16:
-                raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
+            res = set.unknown(ea, 16)
+            if res != 16:
+                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
             # Apply our new data type after undefining it
-            ok = set.data(ea, 16, type=FF_OWORD)
+            ok = set.data(ea, res, type=FF_OWORD)
             if not ok:
-                raise E.DisassemblerError(u"{:s}.oword({:#x}) : Unable to assign a oword to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
+                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an oword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
 
             # Now we can return our new value if we succeeded
-            return get.unsigned(ea, 16)
-        uint128_t = utils.alias(oword, 'set.integer')
+            return get.signed(ea, res)
+        @utils.multicase()
+        @classmethod
+        def sint128_t(cls):
+            '''Set the data at the current address to a sint128_t.'''
+            return cls.sint128_t(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def sint128_t(cls, ea):
+            '''Set the data at address `ea` to an sint128_t.'''
+            FF_OWORD = idaapi.FF_OWORD if hasattr(idaapi, 'FF_OWORD') else idaapi.FF_OWRD
+
+            # Undefine the data at the specified address
+            res = set.unknown(ea, 16)
+            if res != 16:
+                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
+
+            # Apply our new data type after undefining it
+            ok = set.data(ea, res, type=FF_OWORD)
+            if not ok:
+                raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to set the specified address to an oword ({:d}-bit).".format('.'.join((__name__, 'set', cls.__name__)), ea, 8 * res))
+
+            # Check if we need to flip the sign flag, and do it if necessary
+            if not type.flags(ea, idaapi.FF_SIGN):
+                idaapi.toggle_sign(ea, 0)
+
+            # Now we can return our new value if we succeeded
+            return get.signed(ea, res)
+        oword = utils.alias(uint128_t, 'set.integer')
 
     i = integer # XXX: ns alias
 
@@ -4545,12 +4694,12 @@ class set(object):
         @classmethod
         def single(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 single.'''
-            cb = set.unknown(ea, 4)
-            if cb != 4:
-                raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+            res = set.unknown(ea, 4)
+            if res != 4:
+                raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, 4, type=idaapi.FF_FLOAT & 0xf0000000)
+            ok = set.data(ea, res, type=idaapi.FF_FLOAT & 0xf0000000)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to assign a single to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
 
@@ -4566,12 +4715,12 @@ class set(object):
         @classmethod
         def double(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 double.'''
-            cb = set.unknown(ea, 8)
-            if cb != 8:
-                raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
+            res = set.unknown(ea, 8)
+            if res != 8:
+                raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our data type after undefining it
-            ok = set.data(ea, 8, type=idaapi.FF_DOUBLE & 0xf0000000)
+            ok = set.data(ea, res, type=idaapi.FF_DOUBLE & 0xf0000000)
             if not ok:
                 raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to assign a double to the specified address.".format('.'.join((__name__, 'set', cls.__name__)), ea))
 
