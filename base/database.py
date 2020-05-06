@@ -4749,7 +4749,6 @@ class get(object):
         def sint8_t(cls, ea, **byteorder):
             '''Read a sint8_t from the address `ea`.'''
             return get.signed(ea, 1, **byteorder)
-        ubyte1, sbyte1 = utils.alias(uint8_t, 'get.integer'), utils.alias(sint8_t, 'get.integer')
         byte = utils.alias(uint8_t, 'get.integer')
 
         @utils.multicase()
@@ -4772,7 +4771,6 @@ class get(object):
         def sint16_t(cls, ea, **byteorder):
             '''Read a sint16_t from the address `ea`.'''
             return get.signed(ea, 2, **byteorder)
-        uint2, sint2 = utils.alias(uint16_t, 'get.integer'), utils.alias(sint16_t, 'get.integer')
         word = utils.alias(uint16_t, 'get.integer')
 
         @utils.multicase()
@@ -4795,7 +4793,6 @@ class get(object):
         def sint32_t(cls, ea, **byteorder):
             '''Read a sint32_t from the address `ea`.'''
             return get.signed(ea, 4, **byteorder)
-        uint4, sint4 = utils.alias(uint32_t, 'get.integer'), utils.alias(sint32_t, 'get.integer')
         dword = utils.alias(uint32_t, 'get.integer')
 
         @utils.multicase()
@@ -4818,7 +4815,6 @@ class get(object):
         def sint64_t(cls, ea, **byteorder):
             '''Read a sint64_t from the address `ea`.'''
             return get.signed(ea, 8, **byteorder)
-        uint8, sint8 = utils.alias(uint64_t, 'get.integer'), utils.alias(sint64_t, 'get.integer')
         qword = utils.alias(uint64_t, 'get.integer')
 
         @utils.multicase()
