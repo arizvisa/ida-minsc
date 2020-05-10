@@ -3300,7 +3300,7 @@ class xref(object):
         > for ea in database.x.down(): ...
         > for ea in database.x.cu(ea): ...
         > ok = database.x.add_code(ea, target)
-        > ok = database.x.del_data(ea)
+        > ok = database.x.rm_data(ea)
 
     """
 
@@ -3521,41 +3521,61 @@ class xref(object):
         return target in xref.data_down(ea)
     ad = utils.alias(add_data, 'xref')
 
+    @utils.multicase()
+    @staticmethod
+    def rm_code():
+        '''Delete _all_ the code references at the current address.'''
+        return xref.rm_code(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
-    def del_code(ea):
+    def rm_code(ea):
         '''Delete _all_ the code references at `ea`.'''
         ea = interface.address.inside(ea)
         [ idaapi.del_cref(ea, target, 0) for target in xref.code_down(ea) ]
         return False if len(xref.code_down(ea)) > 0 else True
     @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
-    def del_code(ea, target):
+    def rm_code(ea, target):
         '''Delete any code references at `ea` that point to address `target`.'''
         ea = interface.address.inside(ea)
         idaapi.del_cref(ea, target, 0)
         return target not in xref.code_down(ea)
+    rc = utils.alias(rm_code, 'xref')
 
+    @utils.multicase()
+    @staticmethod
+    def rm_data():
+        '''Delete _all_ the data references at the current address.'''
+        return xref.rm_data(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
-    def del_data(ea):
+    def rm_data(ea):
         '''Delete _all_ the data references at `ea`.'''
         ea = interface.address.inside(ea)
         [ idaapi.del_dref(ea, target) for target in xref.data_down(ea) ]
         return False if len(xref.data_down(ea)) > 0 else True
     @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
-    def del_data(ea, target):
+    def rm_data(ea, target):
         '''Delete any data references at `ea` that point to address `target`.'''
         ea = interface.address.inside(ea)
         idaapi.del_dref(ea, target)
         return target not in xref.data_down(ea)
+    rd = utils.alias(rm_data, 'xref')
 
+    @utils.multicase()
+    @staticmethod
+    def erase():
+        '''Clear all references at the current address.'''
+        return xref.erase(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
     @staticmethod
     def erase(ea):
         '''Clear all references at the address `ea`.'''
         ea = interface.address.inside(ea)
-        return all(ok for ok in (xref.del_code(ea), xref.del_data(ea)))
+        return all(ok for ok in (xref.rm_code(ea), xref.rm_data(ea)))
+    rx = utils.alias(rm_data, 'xref')
+
 x = xref    # XXX: ns alias
 
 drefs, crefs = utils.alias(xref.data, 'xref'), utils.alias(xref.code, 'xref')
