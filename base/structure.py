@@ -1497,9 +1497,12 @@ class member_t(object):
         '''Set the type info of the member to `info`.'''
         til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
 
+        # Convert info to a string if it's a tinfo_t
+        info_s = "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
+
         # Firstly we need to ';'-terminate the type the user provided in order
         # for IDA's parser to understand it.
-        terminated = info if info.endswith(';') else "{:s};".format(info)
+        terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
 
         # Now that we've prepped everything, ask IDA to parse this into a
         # tinfo_t for us. We pass the silent flag so that we can raise an
