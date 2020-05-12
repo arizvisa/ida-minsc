@@ -1519,11 +1519,11 @@ class member_t(object):
 
         # We failed, so just raise an exception for the user to handle.
         elif res == idaapi.SMT_FAILED:
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to assign typeinfo ({!s}) for member {:s}.".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info), self.name))
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to assign typeinfo ({!s}) to structure member {:s}.".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info), utils.string.repr(self.name)))
 
         # If we received an alternative return code, then build a relevant
         # message that we can raise with our exception.
-        cls = self.__class__
         if res == idaapi.SMT_BADARG:
             message = 'invalid parameters'
         elif res == idaapi.SMT_NOCOMPAT:
@@ -1542,7 +1542,8 @@ class member_t(object):
             message = "unknown error {:#x}".format(res)
 
         # Finally we can raise our exception so that the user knows whats up.
-        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to assign typeinfo ({!s}) for member {:s} ({:s}).".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info), self.name, message))
+        cls = self.__class__
+        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to assign typeinfo ({!s}) to structure member {:s} ({:s}).".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info), utils.string.repr(self.name), message))
 
     def __repr__(self):
         '''Display the member in a readable format.'''
