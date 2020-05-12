@@ -929,15 +929,15 @@ class members_t(object):
         '''List all the members within the structure that match the keyword specified by `type`.'''
         res = builtins.list(self.iterate(**type))
 
-        escape = repr
         maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) or [1])
         maxoffset = max(builtins.map(utils.fcompose(operator.attrgetter('offset'), "{:x}".format, len), res) or [1])
         maxsize = max(builtins.map(utils.fcompose(operator.attrgetter('size'), "{:+#x}".format, len), res) or [1])
-        maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), escape, len), res) or [1])
-        maxtype = max(builtins.map(utils.fcompose(operator.attrgetter('type'), repr, len), res) or [1])
+        maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), utils.string.repr, len), res) or [1])
+        maxtype = max(builtins.map(utils.fcompose(operator.attrgetter('type'), utils.string.repr, len), res) or [1])
+        maxtypeinfo = max(builtins.map(utils.fcompose(operator.attrgetter('typeinfo'), "{!s}".format, operator.methodcaller('replace', ' *', '*'), len), res) or [0])
 
         for m in res:
-            six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, escape(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
+            six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, "{!s}".format(m.typeinfo).replace(' *', '*'), int(maxtypeinfo), utils.string.repr(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
         return
 
     @utils.multicase()
@@ -949,8 +949,8 @@ class members_t(object):
         res = builtins.list(self.iterate(**type))
         if len(res) > 1:
             cls = self.__class__
-            map(logging.info, ((u"[{:d}] {:x}{:+#x} '{:s}' {!r}".format(m.index, m.offset, m.size, utils.string.escape(m.name, '\''), m.type)) for m in res))
-            logging.warn(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and type {!s}.".format('.'.join((__name__, cls.__name__)), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), res[0].type))
+            map(logging.info, ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in res))
+            logging.warn(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join((__name__, cls.__name__)), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), utils.string.escape("{!s}".format(res[0].typeinfo).replace(' *', '*'), '"')))
 
         res = next(iter(res), None)
         if res is None:
