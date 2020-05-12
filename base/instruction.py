@@ -814,11 +814,11 @@ def op_structure(ea, opnum):
     realposition = delta.value() + offset
     while isinstance(st, structure.structure_t):
         try:
-            m = st.by_realoffset(realposition)
+            m = st.by_realoffset(realposition - position)
 
         # We couldn't find a member, so find the nearest element and adjust
         except (E.OutOfBoundsError, E.MemberNotFoundError):
-            m = st.near_realoffset(realposition)
+            m = st.near_realoffset(realposition - position)
 
         result.append(m)
         position += m.realoffset
