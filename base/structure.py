@@ -245,7 +245,7 @@ class structure_t(object):
         self.__id__ = id
         if self.ptr is None:
             cls = self.__class__
-            raise E.StructureNotFoundError(u"{:s}({:#x}, offset={:+#x}) : Unable to locate the structure with the specified identifier.".format('.'.join((__name__, cls.__name__)), id, offset))
+            raise E.StructureNotFoundError(u"{:s}({:#x}, offset={:+#x}) : Unable to locate the structure with the specified identifier ({:#x}).".format('.'.join((__name__, cls.__name__)), id, offset, id))
         self.__members__ = members_t(self, baseoffset=offset)
 
     def up(self):
@@ -1010,13 +1010,13 @@ class members_t(object):
         # Guard against a potential OverflowError that would be raised by SWIG's typechecking
         if self.baseoffset > max:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join((__name__, cls.__name__)), self.parent.id, offset, offset))
 
         # Look for the very last member so we can confirm our bounds.
         mptr = idaapi.get_member(self.parent.ptr, max - self.baseoffset)
         if mptr is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join((__name__, cls.__name__)), self.parent.id, offset, offset))
 
         # Get that member's size, so that way we can really confirm that this
         # offset isn't pointing to anything.
@@ -1036,13 +1036,13 @@ class members_t(object):
         # Guard against a potential OverflowError that would be raised by SWIG's typechecking
         if max < 0:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join((__name__, cls.__name__)), self.parent.id, offset, offset))
 
         # Look for the very last member so we can confirm our bounds.
         mptr = idaapi.get_member(self.parent.ptr, max)
         if mptr is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join((__name__, cls.__name__)), self.parent.id, offset, offset))
 
         # Get that member's size, so that way we can really confirm that this
         # offset isn't pointing to anything.
@@ -1055,7 +1055,7 @@ class members_t(object):
         mem = idaapi.get_member(self.parent.ptr, offset)
         if mem is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset.".format('.'.join((__name__, cls.__name__)), self.parent.id, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join((__name__, cls.__name__)), self.parent.id, offset, offset))
 
         # And then search for it in our structure to give back to the user
         index = self.index(mem)
@@ -1067,7 +1067,7 @@ class members_t(object):
         res = idaapi.get_member_by_id(id)
         if res is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_id({:#x}) : Unable to find member with specified id.".format('.'.join((__name__, cls.__name__)), self.parent.id, id))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_id({:#x}) : Unable to find member with specified identifier ({:#x}).".format('.'.join((__name__, cls.__name__)), self.parent.id, id, id))
 
         # unpack the member out of the result
         mem, fn, st = res
