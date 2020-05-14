@@ -817,10 +817,19 @@ def op_structure(ea, opnum):
         try:
             m = st.by_realoffset(realposition - position)
 
-        # We couldn't find a member, so find the nearest element and adjust
+        # We couldn't find a member. So, we need figure out if we're still within
+        # bounds of the structure. If we're not, then we can simply break the
+        # loop because there aren't any members to get close to and so we'll
+        # need to include an offset to describe the location.
         except (E.OutOfBoundsError, E.MemberNotFoundError):
+            if position > realposition:
+                break
+
+            # Otherwise, since we're within bounds we'll just try and return
+            # the near member that IDA can give us.
             m = st.near_realoffset(realposition - position)
 
+        # Add the member that was discovered, and iterate to its next position.
         result.append(m)
         position += m.realoffset
         st = m.type
