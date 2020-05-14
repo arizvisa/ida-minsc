@@ -1185,6 +1185,7 @@ class ref_t(object):
 
     if idaapi.__version__ < 7.0:
         __mapper__ = {
+            0 : '',
             1 : '&r',
             2 : 'w', 3 : 'r'
         }
@@ -1195,6 +1196,7 @@ class ref_t(object):
             idaapi.fl_F : 'rx',
             idaapi.dr_O : '&r', idaapi.dr_I : '&r',
             idaapi.dr_R : 'r', idaapi.dr_W : 'w',
+            getattr(idaapi, 'fl_U', 0) : '',
         }
     __mapper__[31] = '*'        # code 31 used internally by ida-minsc
 
@@ -1233,8 +1235,10 @@ class ref_t(object):
     @classmethod
     def of_type(cls, xrtype):
         '''Convert an IDA reference type in `xrtype` to a ``ref_t``.'''
+        if not isinstance(xrtype, six.integer_types):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing coercion of a non-integral {!s} into the necessary type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), xrtype, xrtype.__class__, 'xrtype'))
         res = cls.__mapper__.get(xrtype, '')
-        return cls(xrtype, res)
+        return cls(xrtype, (item for item in res))
     of = of_type
 
     @classmethod
@@ -1245,13 +1249,21 @@ class ref_t(object):
         elif state == 'rw':
             state = 'w'
 
+        # Verify that the state we were given can be iterated through
+        try:
+            iter(state)
+
+        except TypeError:
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), state, state, cls.__name__))
+
         # Search through our mapper for the correct contents of the ref_t
         res = { item for item in state }
         for F, t in six.iteritems(cls.__mapper__):
             if { item for item in t } == res:
                 return cls(F, res)
             continue
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to find the cross-reference type that matches requested state.".format('.'.join(('internal', __name__, cls.__name__)), str().join(sorted(res))))
+        resP = str().join(sorted(res))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to to coerce the requested state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), resP, resP, cls.__name__))
 
 class AddressOpnumReftype(namedtypedtuple):
     """
