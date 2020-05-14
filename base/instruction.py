@@ -790,7 +790,7 @@ def op_structure(ea, opnum):
     # First we'll collect all of the IDs in our path. Then we can start by
     # grabbing the first structure id to see how we should search.
     path = [ path[index] for index in six.moves.range(count) ]
-    logging.debug(u"{:s}.op_structure({:#x}, {:d}) : IDA returned {:d} path members ({:s}).".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(m) for m in path)))
+    logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Processing {:d} members ({:s}) from path that was returned from `{:s}`.".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(mid) for mid in path), "{!s}({:#x}, {:d}, ...)".format('idaapi.get_stroff_path', ea, opnum)))
 
     st = structure.by_identifier(path.pop(0))
 
@@ -804,11 +804,21 @@ def op_structure(ea, opnum):
     # member that was returned. Save our position so that we know what IDA
     # actually gave us as later we can use this to calculate the delta.
     result, position = [], 0
-    for item in path:
-        m = st.by_identifier(item)
-        result.append(m)
-        position += m.realoffset
-        st = m.type
+    try:
+        for item in path:
+            m = st.by_identifier(item)
+            result.append(m)
+            position += m.realoffset
+            st = m.type
+
+    # If we weren't able to to find the member associated with the identifier
+    # that we were given in the path, then IDA has mistakenly given us a
+    # nonexisting member id. Fortunately, we were already planning on figuring
+    # out the path through the members ourselves. So, we can simply terminate
+    # this loop and continue collecting the relevant members as we strut our
+    # way to the target offset of the structure.
+    except E.MemberNotFoundError:
+        logging.info(u"{:s}.op_structure({:#x}, {:d}) : Ignoring the rest of the member path ({:s}) due to IDA returning a nonexisting member id ({:#x}).".format(__name__, ea, opnum, ', '.join("{:#x}".format(mid) for mid in path), item))
 
     # Check if we're still pointing to within a structure, so we
     # can adjust our offset to be relative to the nearest field.
