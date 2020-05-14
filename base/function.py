@@ -1837,6 +1837,20 @@ class type(object):
         fn = by(func)
         return fn.flags & idaapi.FUNC_HIDDEN == idaapi.FUNC_HIDDEN
     hiddenQ = utils.alias(is_hidden, 'type')
+
+    @utils.multicase()
+    @classmethod
+    def has_prototype(cls):
+        '''Returns true if the current function has a prototype associated with it.'''
+        return cls.has_prototype(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def has_prototype(cls, func):
+        '''Returns true if the function `func` has a prototype associated with it.'''
+        fn = by(func)
+        return False if idaapi.idc_get_type(fn.start_ea) is None else True
+    prototypeQ = utils.alias(has_prototype, 'type')
+
 t = type # XXX: ns alias
 
 # FIXME: document this
