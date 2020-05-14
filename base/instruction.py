@@ -381,9 +381,10 @@ def op_state(ea, opnum):
     f = feature(ea)
     r, w = f&ops_state.read[opnum], f&ops_state.write[opnum]
     res = (r and 'r' or '') + (w and 'w' or '')
-    if res:
-        return interface.ref_t.of_state(res)
-    raise E.MissingTypeOrAttribute(u"{:s}.op_state({:#x}, {:d}) : The specified operand {:d} is not read from or written to and might be unused.".format(__name__, ea, opnum, opnum))
+
+    # Make a ref_t from the state we determined. If we couldn't figure it out,
+    # then fallback to "r" as the operand still exists and it must be doing something.
+    return interface.ref_t.of_state(res or 'r')
 
 @utils.multicase(opnum=six.integer_types)
 def op_size(opnum):
