@@ -1507,7 +1507,7 @@ class collect_t(object):
 
     def __repr__(self):
         t = self.__cons__
-        return "{:s} {!s} -> {!r}".format(self.__class__, getattr(t, '__name__', t), self.__state__)
+        return "{!s} {!s} -> {!r}".format(self.__class__, getattr(t, '__name__', t), self.__state__)
 
 class architecture_t(object):
     """
