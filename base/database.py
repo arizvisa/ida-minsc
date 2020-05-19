@@ -3153,6 +3153,18 @@ class type(object):
 
         @utils.multicase()
         @classmethod
+        def typeinfo(cls):
+            '''Return the typeinfo of the element in the array at the current address.'''
+            return cls.typeinfo(ui.current.address())
+        @utils.multicase(ea=six.integer_types)
+        @classmethod
+        def typeinfo(cls, ea):
+            '''Return the typeinfo of the element in the array at the address specified by `ea`.'''
+            ti = type(ea)
+            return ti.get_array_element()
+
+        @utils.multicase()
+        @classmethod
         def element(cls):
             '''Return the size of the element in the array at the current address.'''
             return cls.element(ui.current.address())
@@ -4234,6 +4246,19 @@ class set(object):
         > database.set.structure(ea, structure.by('mystructure'))
 
     """
+
+    @utils.multicase(info=(basestring, idaapi.tinfo_t))
+    @classmethod
+    def info(cls, info):
+        '''Set the typeinfo at the current address to `info`.'''
+        return cls.info(ui.current.address(), info)
+    @utils.multicase(ea=six.integer_types, info=(basestring, idaapi.tinfo_t))
+    @classmethod
+    def info(cls, ea, info):
+        '''Set the typeinfo at the address `ea` to `info`.'''
+        return type(ea, info)
+    typeinfo = utils.alias(info, 'set')
+
     @utils.multicase()
     @classmethod
     def unknown(cls):
@@ -4882,6 +4907,18 @@ class get(object):
         > res = database.get.structure(ea, structure=structure.by('mystructure'))
 
     """
+    @utils.multicase()
+    @classmethod
+    def info(cls):
+        '''Return the typeinfo at the current address as an ``idaapi.tinfo_t``.'''
+        return cls.info(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def info(cls, ea):
+        '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
+        return type(ea)
+    typeinfo = utils.alias(info, 'get')
+
     @utils.multicase()
     @classmethod
     def unsigned(cls, **byteorder):
