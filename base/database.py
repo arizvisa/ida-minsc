@@ -2859,6 +2859,55 @@ class type(object):
         raise E.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated `idaapi.setFlags(...)`.".format('.'.join((__name__, cls.__name__)), ea, mask, value))
 
     @utils.multicase()
+    @classmethod
+    def info(cls):
+        '''Return the typeinfo at the current address as a ``idaapi.tinfo_t``.'''
+        return cls.info(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def info(cls, ea):
+        '''Return the typeinfo at the address `ea` as a ``idaapi.tinfo_t``.'''
+        ti = idaapi.tinfo_t()
+        res = idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
+        if res == idaapi.GUESS_FUNC_FAILED:
+            raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
+        return ti
+    @utils.multicase(info=basestring)
+    @classmethod
+    @utils.string.decorate_arguments('info')
+    def info(cls, info):
+        '''Apply the ``idaapi.tinfo_t`` in `info` to the current address.'''
+        return cls.info(ui.current.address(), info)
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    @utils.string.decorate_arguments('info')
+    def info(cls, ea, info):
+        '''Apply the ``idaapi.tinfo_t`` in `info` to the address `ea`.'''
+        til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
+
+        # Convert info to a string if it's a tinfo_t
+        info_s = "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
+
+        # Firstly we need to ';'-terminate the type the user provided in order
+        # for IDA's parser to understand it.
+        terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
+
+        # Now that we've prepped everything, ask IDA to parse this into a
+        # tinfo_t for us. We pass the silent flag so that we can raise an
+        # exception if there's a parsing error of some sort.
+        res = idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL)
+        if res is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
+
+        # Now we can use idaapi to apply our parsed tinfo_t to the address.
+        ok = idaapi.apply_tinfo(ea, ti, idaapi.TINFO_GUESSED)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.info({:#x}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info), ea))
+
+        # Return the idaapi.tinfo_t that was applied.
+        return cls.info(ea)
+
+    @utils.multicase()
     @staticmethod
     def is_initialized():
         '''Return true if the current address is initialized.'''
