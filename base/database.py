@@ -2861,51 +2861,51 @@ class type(object):
     @utils.multicase()
     @classmethod
     def info(cls):
-        '''Return the typeinfo at the current address as a ``idaapi.tinfo_t``.'''
+        '''Return the typeinfo at the current address as an ``idaapi.tinfo_t``.'''
         return cls.info(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def info(cls, ea):
-        '''Return the typeinfo at the address `ea` as a ``idaapi.tinfo_t``.'''
+        '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
         ti = idaapi.tinfo_t()
         res = idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
         if res == idaapi.GUESS_FUNC_FAILED:
             raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
         return ti
-    @utils.multicase(info=basestring)
+    @utils.multicase(info=(basestring, idaapi.tinfo_t))
     @classmethod
-    @utils.string.decorate_arguments('info')
     def info(cls, info):
-        '''Apply the ``idaapi.tinfo_t`` in `info` to the current address.'''
+        '''Apply the ``idaapi.tinfo_t`` typeinfo or typeinfo string in `info` to the current address.'''
         return cls.info(ui.current.address(), info)
-    @utils.multicase(ea=six.integer_types)
+    @utils.multicase(ea=six.integer_types, info=idaapi.tinfo_t)
+    @classmethod
+    def info(cls, ea, info):
+        '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the address `ea`.'''
+        info_s = "{!s}".format(info)
+
+        # All we need to do is to use idaapi to apply our parsed tinfo_t to the
+        # address we were given.
+        ok = idaapi.apply_tinfo(ea, info, idaapi.TINFO_GUESSED)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.info({:#x}, {!s}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
+
+        # Return the typeinfo that was applied to the specified address.
+        return cls.info(ea)
+    @utils.multicase(ea=six.integer_types, info=basestring)
     @classmethod
     @utils.string.decorate_arguments('info')
     def info(cls, ea, info):
-        '''Apply the ``idaapi.tinfo_t`` in `info` to the address `ea`.'''
-        til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
-
-        # Convert info to a string if it's a tinfo_t
-        info_s = "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
-
-        # Firstly we need to ';'-terminate the type the user provided in order
-        # for IDA's parser to understand it.
-        terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
+        '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
 
         # Now that we've prepped everything, ask IDA to parse this into a
-        # tinfo_t for us. We pass the silent flag so that we can raise an
-        # exception if there's a parsing error of some sort.
-        res = idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL)
-        if res is None:
+        # tinfo_t for us. If we received None, then raise an exception due
+        # to there being a parsing error of some sort.
+        ti = internal.declaration.parse(info)
+        if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
 
-        # Now we can use idaapi to apply our parsed tinfo_t to the address.
-        ok = idaapi.apply_tinfo(ea, ti, idaapi.TINFO_GUESSED)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.info({:#x}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info), ea))
-
-        # Return the idaapi.tinfo_t that was applied.
-        return cls.info(ea)
+        # Recurse into ourselves now that we have the actual typeinfo.
+        return cls.info(ea, ti)
 
     @utils.multicase()
     @staticmethod
