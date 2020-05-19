@@ -68,6 +68,13 @@ def parse(info):
     # Otherwise we return None because of the inability to parse it.
     return None if idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL) is None else ti
 
+def string(ti):
+    prefix = ''
+    name, indent = '', 4
+    cmt, cindent = '', 4
+    flags = idaapi.PRTYPE_DEF | idaapi.PRTYPE_MULTI
+    return idaapi.print_tinfo(prefix, indent, cindent, flags, ti, name, cmt)
+
 ## examples to test below code with
 #"??_U@YAPAXI@Z"
 #"?_BADOFF_func@std@@YAABJXZ"
