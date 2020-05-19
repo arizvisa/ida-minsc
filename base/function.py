@@ -1731,18 +1731,16 @@ class type(object):
 
     """
     @utils.multicase()
-    @classmethod
-    def info(cls):
+    def __new__(cls):
         '''Return the typeinfo for the current function as a ``idaapi.tinfo_t``.'''
-        return cls.info(ui.current.function())
+        return cls(ui.current.function())
     @utils.multicase()
-    @classmethod
-    def info(cls, func):
+    def __new__(cls, func):
         '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
         fn = by(func)
         ea = interface.range.start(fn)
         try:
-            ti = database.type.info(ea)
+            ti = database.type(ea)
 
         # If we caught an exception trying to get the typeinfo for the
         # function, then port it to our class.
@@ -1752,13 +1750,12 @@ class type(object):
         # Return it to the caller
         return ti
     @utils.multicase(info=idaapi.tinfo_t)
-    @classmethod
-    def info(cls, func, info):
+    def __new__(cls, func, info):
         '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the function `func`.'''
         fn = by(func)
         ea = interface.range.start(fn)
         try:
-            ti = database.type.info(ea, info)
+            ti = database.type(ea, info)
 
         # If we caught a disassembler error exception, then we couldn't apply
         # the user's type to the function.
@@ -1768,8 +1765,7 @@ class type(object):
         # Return the type info we received after the apply back to the caller.
         return ti
     @utils.multicase(info=basestring)
-    @classmethod
-    def info(cls, func, info):
+    def __new__(cls, func, info):
         '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
         fn = by(func)
         ea = interface.range.start(fn)
@@ -1783,7 +1779,7 @@ class type(object):
 
         # Recurse into ourselves now that we have the actual typeinfo so that
         # it can be applied to the function.
-        return cls.info(func, ti)
+        return cls(func, ti)
 
     @utils.multicase()
     @classmethod
