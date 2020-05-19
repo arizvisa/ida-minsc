@@ -50,6 +50,24 @@ def mangledQ(string):
     '''Return true if the provided `string` has been mangled.'''
     return any(string.startswith(n) for n in ('?', '__'))
 
+@internal.utils.string.decorate_arguments('info')
+def parse(info):
+    '''Parse the string `info` into an ``idaapi.tinfo_t``.'''
+    til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
+
+    # Convert info to a string if it's a tinfo_t
+    info_s = "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
+
+    # Firstly we need to ';'-terminate the type the user provided in order
+    # for IDA's parser to understand it.
+    terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
+
+    # Ask IDA to parse this into a tinfo_t for us. We pass the silent flag so
+    # that we're responsible for raising an exception if there's a parsing
+    # error of some sort. If it succeeds, then we can return our typeinfo.
+    # Otherwise we return None because of the inability to parse it.
+    return None if idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL) is None else ti
+
 ## examples to test below code with
 #"??_U@YAPAXI@Z"
 #"?_BADOFF_func@std@@YAABJXZ"
