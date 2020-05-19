@@ -567,6 +567,39 @@ class structure_t(object):
         '''Set the index of the structure to `idx`.'''
         return idaapi.set_struc_idx(self.ptr, idx)
 
+    @property
+    def typeinfo(self):
+        '''Return the type info of the member.'''
+        try:
+            ti = database.type.info(self.id)
+
+        # If we caught an exception trying to get the typeinfo for the
+        # structure, then port it to our class.
+        except E.DisassemblerError:
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to determine `idaapi.tinfo_t()` for structure {:s}.".format('.'.join((__name__, cls.__name__)), self.id, self.name))
+
+        # Return the structure type that we guessed back to the caller.
+        return ti
+    @typeinfo.setter
+    def typeinfo(self, info):
+        '''Sets the typeinfo of the structure to `info`.'''
+        try:
+            ti = database.type.info(self.id, info)
+
+        # If we caught a TypeError, then we received a parsing error that
+        # we should re-raise for the user.
+        except E.InvalidTypeOrValueError:
+            cls = self.__class__
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info)))
+
+        # If we caught an exception trying to get the typeinfo for the
+        # structure, then port it to our class and re-raise.
+        except E.DisassemblerError:
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to apply `idaapi.tinfo_t()` to structure {:s}.".format('.'.join((__name__, cls.__name__)), self.id, self.name))
+        return
+
     def destroy(self):
         '''Remove the structure from the database.'''
         return idaapi.del_struc(self.ptr)
