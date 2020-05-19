@@ -1732,6 +1732,49 @@ class type(object):
     """
     @utils.multicase()
     @classmethod
+    def info(cls):
+        '''Return the typeinfo for the current function as a ``idaapi.tinfo_t``.'''
+        return cls.info(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def info(cls, func):
+        '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
+        fn = by(func)
+        ea = interface.range.start(fn)
+        try:
+            ti = database.type.info(ea)
+
+        # If we caught an exception trying to get the typeinfo for the
+        # function, then port it to our class.
+        except E.DisassemblerError:
+            raise E.DisassemblerError(u"{:s}.info({:#x}) : Unable to determine `idaapi.tinfo_t()` for function.".format('.'.join((__name__, cls.__name__)), ea))
+
+        # Return it to the caller
+        return ti
+    @utils.multicase()
+    @classmethod
+    def info(cls, func, info):
+        '''Apply the ``idaapi.tinfo_t`` in `info` to the function `func`.'''
+        fn = by(func)
+        ea = interface.range.start(fn)
+        try:
+            ti = database.type.info(ea, info)
+
+        # If we caught a type error exception, then it was a parsing error that
+        # we need to raise for the user.
+        except E.InvalidTypeOrValueError:
+            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
+
+        # If we caught a disassembler error exception, then we couldn't apply
+        # the user's type to the function.
+        except E.DisassemblerError:
+            raise E.DisassemblerError(u"{:s}.info({:#x}) : Unable to apply `idaapi.tinfo_t()` to function.".format('.'.join((__name__, cls.__name__)), ea))
+
+        # Return the type info we applied back to the caller.
+        return ti
+
+    @utils.multicase()
+    @classmethod
     def has_frameptr(cls):
         '''Return true if the current function uses a frame pointer (register).'''
         return cls.has_frameptr(ui.current.function())
