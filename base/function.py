@@ -1751,27 +1751,39 @@ class type(object):
 
         # Return it to the caller
         return ti
-    @utils.multicase()
+    @utils.multicase(info=idaapi.tinfo_t)
     @classmethod
     def info(cls, func, info):
-        '''Apply the ``idaapi.tinfo_t`` in `info` to the function `func`.'''
+        '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the function `func`.'''
         fn = by(func)
         ea = interface.range.start(fn)
         try:
             ti = database.type.info(ea, info)
-
-        # If we caught a type error exception, then it was a parsing error that
-        # we need to raise for the user.
-        except E.InvalidTypeOrValueError:
-            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
 
         # If we caught a disassembler error exception, then we couldn't apply
         # the user's type to the function.
         except E.DisassemblerError:
             raise E.DisassemblerError(u"{:s}.info({:#x}) : Unable to apply `idaapi.tinfo_t()` to function.".format('.'.join((__name__, cls.__name__)), ea))
 
-        # Return the type info we applied back to the caller.
+        # Return the type info we received after the apply back to the caller.
         return ti
+    @utils.multicase(info=basestring)
+    @classmethod
+    def info(cls, func, info):
+        '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
+        fn = by(func)
+        ea = interface.range.start(fn)
+
+        # Now that we've got an address, we can ask IDA to parse this into a
+        # tinfo_t for us. If we received None, then raise an exception due
+        # to there being a parsing error of some sort.
+        ti = internal.declaration.parse(info)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
+
+        # Recurse into ourselves now that we have the actual typeinfo so that
+        # it can be applied to the function.
+        return cls.info(func, ti)
 
     @utils.multicase()
     @classmethod
