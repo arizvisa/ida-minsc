@@ -2810,13 +2810,47 @@ class type(object):
 
     @utils.multicase()
     def __new__(cls):
-        '''Return the type at the address specified at the current address.'''
-        ea = ui.current.address()
-        return cls(ea)
+        '''Return the typeinfo at the current address as an ``idaapi.tinfo_t``.'''
+        return cls(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     def __new__(cls, ea):
-        '''Return the type at the address specified by `ea`.'''
-        return cls.flags(ea, idaapi.DT_TYPE)
+        '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
+        ti = idaapi.tinfo_t()
+        res = idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
+        if res == idaapi.GUESS_FUNC_FAILED:
+            raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
+        return ti
+    @utils.multicase(info=(basestring, idaapi.tinfo_t))
+    def __new__(cls, info):
+        '''Apply the ``idaapi.tinfo_t`` typeinfo or typeinfo string in `info` to the current address.'''
+        return cls(ui.current.address(), info)
+    @utils.multicase(ea=six.integer_types, info=idaapi.tinfo_t)
+    def __new__(cls, ea, info):
+        '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the address `ea`.'''
+        info_s = "{!s}".format(info)
+
+        # All we need to do is to use idaapi to apply our parsed tinfo_t to the
+        # address we were given.
+        ok = idaapi.apply_tinfo(ea, info, idaapi.TINFO_GUESSED)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.info({:#x}, {!s}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
+
+        # Return the typeinfo that was applied to the specified address.
+        return cls(ea)
+    @utils.multicase(ea=six.integer_types, info=basestring)
+    @utils.string.decorate_arguments('info')
+    def __new__(cls, ea, info):
+        '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
+
+        # Now that we've prepped everything, ask IDA to parse this into a
+        # tinfo_t for us. If we received None, then raise an exception due
+        # to there being a parsing error of some sort.
+        ti = internal.declaration.parse(info)
+        if ti is None:
+            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
+
+        # Recurse into ourselves now that we have the actual typeinfo.
+        return cls(ea, ti)
 
     @utils.multicase()
     @classmethod
@@ -2857,55 +2891,6 @@ class type(object):
             idaapi.setFlags(ea, (res&~mask) | value)
             return res & mask
         raise E.UnsupportedVersion(u"{:s}.flags({:#x}, {:#x}, {:d}) : IDA 7.0 has unfortunately deprecated `idaapi.setFlags(...)`.".format('.'.join((__name__, cls.__name__)), ea, mask, value))
-
-    @utils.multicase()
-    @classmethod
-    def info(cls):
-        '''Return the typeinfo at the current address as an ``idaapi.tinfo_t``.'''
-        return cls.info(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @classmethod
-    def info(cls, ea):
-        '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
-        ti = idaapi.tinfo_t()
-        res = idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
-        if res == idaapi.GUESS_FUNC_FAILED:
-            raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
-        return ti
-    @utils.multicase(info=(basestring, idaapi.tinfo_t))
-    @classmethod
-    def info(cls, info):
-        '''Apply the ``idaapi.tinfo_t`` typeinfo or typeinfo string in `info` to the current address.'''
-        return cls.info(ui.current.address(), info)
-    @utils.multicase(ea=six.integer_types, info=idaapi.tinfo_t)
-    @classmethod
-    def info(cls, ea, info):
-        '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the address `ea`.'''
-        info_s = "{!s}".format(info)
-
-        # All we need to do is to use idaapi to apply our parsed tinfo_t to the
-        # address we were given.
-        ok = idaapi.apply_tinfo(ea, info, idaapi.TINFO_GUESSED)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.info({:#x}, {!s}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
-
-        # Return the typeinfo that was applied to the specified address.
-        return cls.info(ea)
-    @utils.multicase(ea=six.integer_types, info=basestring)
-    @classmethod
-    @utils.string.decorate_arguments('info')
-    def info(cls, ea, info):
-        '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
-
-        # Now that we've prepped everything, ask IDA to parse this into a
-        # tinfo_t for us. If we received None, then raise an exception due
-        # to there being a parsing error of some sort.
-        ti = internal.declaration.parse(info)
-        if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
-
-        # Recurse into ourselves now that we have the actual typeinfo.
-        return cls.info(ea, ti)
 
     @utils.multicase()
     @staticmethod
