@@ -571,7 +571,7 @@ class structure_t(object):
     def typeinfo(self):
         '''Return the type info of the member.'''
         try:
-            ti = database.type.info(self.id)
+            ti = database.type(self.id)
 
         # If we caught an exception trying to get the typeinfo for the
         # structure, then port it to our class.
@@ -585,7 +585,7 @@ class structure_t(object):
     def typeinfo(self, info):
         '''Sets the typeinfo of the structure to `info`.'''
         try:
-            ti = database.type.info(self.id, info)
+            ti = database.type(self.id, info)
 
         # If we caught a TypeError, then we received a parsing error that
         # we should re-raise for the user.
