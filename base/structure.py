@@ -874,9 +874,8 @@ class members_t(object):
         identifier = idaapi.get_struc_id(res)
         if identifier == idaapi.BADADDR:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}) : Failure trying to create a `members_t` for the `structure_t` \"{:s}\".".format('.'.join((__name__, cls.__name__)), self.parent.id, utils.string.escape(parentname, '"')))
-            #logging.warn(u"{:s}.instance({!r}).members.__setstate__ : Creating structure \"{:s}\" at offset {:+#x} with {:d} members.".format(__name__, self.parent.name, utils.string.escape(parentname, '"'), baseoffset, len(members)))
-            #identifier = idaapi.add_struc(idaapi.BADADDR, parentname)
+            logging.info(u"{:s}({:#x}) : Creating `members_t` for `structure_t` \"{:s}\" with no members.".format('.'.join((__name__, cls.__name__)), identifier, utils.string.escape(parentname, '"')))
+            identifier = idaapi.add_struc(idaapi.BADADDR, res)
 
         # assign the properties for our new member using the instance we figured out
         self.baseoffset = baseoffset
@@ -1248,10 +1247,13 @@ class members_t(object):
             mn = max(mn, len(name))
             ms = max(ms, len("{:+#x}".format(size)))
             mti = max(mti, len("{!s}".format(ti).replace(' *', '*')))
+
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
-        mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
-        print("{:x}".format(self.baseoffset + self[-1].size))
-        return "{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else c.encode('utf8')) if c else '') for i, n, t, ti, o, s, c, T in res))
+
+        if len(self):
+            mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
+            return "{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else c.encode('utf8')) if c else '') for i, n, t, ti, o, s, c, T in res))
+        return "{!r}".format(self.parent)
 
 class member_t(object):
     """
@@ -1291,7 +1293,7 @@ class member_t(object):
         identifier = idaapi.get_struc_id(res)
         if identifier == idaapi.BADADDR:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}) : Creating member for structure ({:s}) at offset {:+#x} named \"{:s}\" with the comment {!r}.".format('.'.join((__name__, cls.__name__)), self.id, parentname, ofs, utils.string.escape(name, '"'), cmtt or cmtf or ''))
+            logging.info(u"{:s}({:#x}) : Creating member for structure ({:s}) at offset {:+#x} named \"{:s}\" with the comment {!r}.".format('.'.join((__name__, cls.__name__)), identifier, parentname, ofs, utils.string.escape(name, '"'), cmtt or cmtf or ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, res)
         self.__parent = parent = __instance__(identifier, offset=0)
 
