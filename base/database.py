@@ -2816,9 +2816,25 @@ class type(object):
     def __new__(cls, ea):
         '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
         ti = idaapi.tinfo_t()
+
+        # Try and guess the typeinfo for the given address
         res = idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
+
+        # If we failed, then we'll try and hack around it using idaapi.print_type.
         if res == idaapi.GUESS_FUNC_FAILED:
-            raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
+            fl = idaapi.PRTYPE_1LINE
+            info_s = idaapi.print_type(ea, fl)
+
+            # If we couldn't get it, then just raise an exception.
+            if info_s is None:
+                raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
+
+            # Parse the typeinfo string that IDA gave us and return it.
+            ti = internal.declaration.parse(info_s)
+            if ti is None:
+                raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the returned type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info_s)))
+            return ti
+
         return ti
     @utils.multicase(info=(basestring, idaapi.tinfo_t))
     def __new__(cls, info):
