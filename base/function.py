@@ -1903,24 +1903,3 @@ class type(object):
     prototypeQ = utils.alias(has_prototype, 'type')
 
 t = type # XXX: ns alias
-
-# FIXME: document this
-#def refs(func, member):
-#    xl, fn = idaapi.xreflist_t(), by(func)
-#    idaapi.build_stkvar_xrefs(xl, fn, member.ptr)
-#    x.ea, x.opnum, x.type
-#    ref_types = {
-#        0  : 'Data_Unknown',
-#        1  : 'Data_Offset',
-#        2  : 'Data_Write',
-#        3  : 'Data_Read',
-#        4  : 'Data_Text',
-#        5  : 'Data_Informational',
-#        16 : 'Code_Far_Call',
-#        17 : 'Code_Near_Call',
-#        18 : 'Code_Far_Jump',
-#        19 : 'Code_Near_Jump',
-#        20 : 'Code_User',
-#        21 : 'Ordinary_Flow'
-#    }
-#    return [(x.ea, x.opnum) for x in xl]
