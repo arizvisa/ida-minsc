@@ -846,6 +846,8 @@ class node(object):
         # 0001 9ac1 -- _SYSTEMTIME
 
         # 32-bit
+        # 0001 50
+        # 0002 5051
         # 0001 c0006e92 -- ULARGE_INTEGER
         # 0002 c0006e92 c0006e98 -- ULARGE_INTEGER.quadpart
         # 0002 c0006e92 c0006e97 -- ULARGE_INTEGER.u.lowpart
@@ -853,23 +855,32 @@ class node(object):
         # (x ^ 0x3f000000)
 
         def id32(sup):
-            count, res = le(sup[:2]), sup[2:]
-            if len(res) == 2:
-                if count > 1:
-                    raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id32 : The count for the 16-bit identifier ({:d}) is larger than the expected count ({:d}).".format('.'.join(('internal', __name__)), sup.encode('hex'), count, 1))
-                return (0xff000000 | 0x8000 ^ le(res),)
+            iterable = iter(sup)
 
-            if count & 0x8000:
-                offset, count, res = count ^ 0x8000, le(sup[2:3]), sup[2 + 1:]
+            # First consume the offset (FIXME: we only support 2 bytes for now...)
+            by = six.next(iterable)
+            if le(by) & 0x80:
+                offset = le([by] + [six.next(iterable)])
+                offset ^= 0x8000
             else:
-                offset, count = le(sup[:1]), le(sup[1:2])
+                offset = 0
 
-            chunks = zip(*((iter(res),) * 4))
-            if len(chunks) != count:
-                raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id32 : The number of chunks ({:d}) does not match the count ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), count, map(''.join, chunks)))
-            res = map(le, chunks)
-            res = map(functools.partial(operator.xor, 0x3f000000), res)
-            return offset, res
+            count, rest = le([six.next(iterable)]), list(iterable)
+            itemsize = len(rest) / count
+            chunks = zip(*([iter(rest)] * itemsize))
+
+            if itemsize == 1:
+                return offset, [0xff000000 | le(item) for item in chunks]
+
+            elif itemsize == 2:
+                return offset, [0xff000000 | 0x8000 ^ le(item) for item in chunks]
+
+            elif itemsize == 4:
+                #res = map(le, chunks)
+                #res = map(functools.partial(operator.xor, 0x3f000000), res)
+                return offset, [0x3f000000 ^ le(item) for item in chunks]
+
+            raise NotImplementedError(offset, itemsize, count, chunks)
 
         # 64-bit
         # 000002 c000888e00 c000889900 -- KEVENT.Header.anonymous_0.anonymous_0.Type
