@@ -1171,7 +1171,7 @@ else:
 #    18 : 'Code_Far_Jump', 19 : 'Code_Near_Jump',
 #    20 : 'Code_User', 21 : 'Ordinary_Flow'
 #}
-class ref_t(object):
+class reftype_t(object):
     """
     An object representing a reference type that allows one to easily extract
     semantics using set membership. This type uses "rwx" from posix file
@@ -1208,7 +1208,7 @@ class ref_t(object):
             res = F(self.S, cls.of(item))
         else:
             res = F(self.S, item)
-        return cls.of_state(str().join(res)) if isinstance(res, set) else res
+        return cls.of_action(str().join(res)) if isinstance(res, set) else res
 
     def __or__(self, other):
         return self.__operator__(operator.or_, other)
@@ -1225,16 +1225,16 @@ class ref_t(object):
         return
 
     def __repr__(self):
-        return "ref_t({:s})".format(str().join(sorted(self.S)))
+        return "reftype_t({:s})".format(str().join(sorted(self.S)))
 
     def __init__(self, xrtype, iterable):
-        '''Construct a ``ref_t`` using `xrtype` and any semantics specified in `iterable`.'''
+        '''Construct a ``reftype_t`` using `xrtype` and any semantics specified in `iterable`.'''
         self.F = xrtype
         self.S = { item for item in iterable }
 
     @classmethod
     def of_type(cls, xrtype):
-        '''Convert an IDA reference type in `xrtype` to a ``ref_t``.'''
+        '''Convert an IDA reference type in `xrtype` to a ``reftype_t``.'''
         if not isinstance(xrtype, six.integer_types):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing coercion of a non-integral {!s} into the necessary type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), xrtype, xrtype.__class__, 'xrtype'))
         res = cls.__mapper__.get(xrtype, '')
@@ -1242,8 +1242,8 @@ class ref_t(object):
     of = of_type
 
     @classmethod
-    def of_state(cls, state):
-        '''Convert a ``ref_t`` in `state` back into an IDA reference type.'''
+    def of_action(cls, state):
+        '''Convert a ``reftype_t`` in `state` back into an IDA reference type.'''
         if state == '*':
             return cls(31, '*')     # code 31 used internally by ida-minsc
         elif state == 'rw':
@@ -1254,25 +1254,25 @@ class ref_t(object):
             iter(state)
 
         except TypeError:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), state, state, cls.__name__))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), state, state, cls.__name__))
 
-        # Search through our mapper for the correct contents of the ref_t
+        # Search through our mapper for the correct contents of the reftype_t
         res = { item for item in state }
         for F, t in six.iteritems(cls.__mapper__):
             if { item for item in t } == res:
                 return cls(F, res)
             continue
         resP = str().join(sorted(res))
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_state({!r}) : Unable to to coerce the requested state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), resP, resP, cls.__name__))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), resP, resP, cls.__name__))
 
 class AddressOpnumReftype(namedtypedtuple):
     """
     This tuple is used to represent references that include an operand number
-    and has the format `(address, opnum, ref_t)`. The operand number is
+    and has the format `(address, opnum, reftype_t)`. The operand number is
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
-    _types = (six.integer_types, (types.NoneType,) + six.integer_types, ref_t)
+    _types = (six.integer_types, (types.NoneType,) + six.integer_types, reftype_t)
 OREF = AddressOpnumReftype
 
 # XXX: is .startea always guaranteed to point to an instruction that modifies
