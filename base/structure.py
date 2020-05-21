@@ -267,7 +267,7 @@ class structure_t(object):
         for xrfrom, xriscode, xrtype in res:
             # if it's an address, then just create a regular reference
             if database.contains(xrfrom):
-                refs.append( interface.OREF(xrfrom, xriscode, interface.reftype_t.of(xrtype)) )
+                refs.append( interface.opref_t(xrfrom, xriscode, interface.reftype_t.of(xrtype)) )
                 continue
 
             # so it's not, which means this must be a member id
@@ -305,7 +305,7 @@ class structure_t(object):
         for xrto, xriscode, xrtype in res:
             # if it's  an address, then just create a regular reference
             if database.contains(xrto):
-                refs.append( interface.OREF(xrto, xriscode, interface.reftype_t.of(xrtype)) )
+                refs.append( interface.opref_t(xrto, xriscode, interface.reftype_t.of(xrtype)) )
                 continue
 
             # so it's not, which means this must be a member id
@@ -401,12 +401,12 @@ class structure_t(object):
                     # check if we do have an opinfo.path, and our sid is contained in it
                     if opinfo.path.len > 0 and operator.contains(opinfo.path.ids, sid):
                         state = instruction.op_state(ref, opnum)
-                        res.append( interface.OREF(ref, opnum, interface.reftype_t.of_action(state)) )   # using '*' to describe being applied to the an address
+                        res.append( interface.opref_t(ref, opnum, interface.reftype_t.of_action(state)) )   # using '*' to describe being applied to the an address
                     continue
 
             # anything else is data and we just need to add a reference in that case
             else:
-                res.append( interface.OREF(ref, None, interface.reftype_t.of_action('*')) )   # using '*' to describe being applied to the an address
+                res.append( interface.earef_t(ref, None, interface.reftype_t.of_action('*')) )   # using '*' to describe being applied to the an address
             continue
 
         return res
@@ -1615,7 +1615,7 @@ class member_t(object):
             res = []
             for xr in xl:
                 ea, opnum = xr.ea, int(xr.opnum)
-                ref = interface.OREF(ea, opnum, interface.reftype_t(xr.type, instruction.op_state(ea, opnum)))
+                ref = interface.opref_t(ea, opnum, interface.reftype_t(xr.type, instruction.op_state(ea, opnum)))
                 res.append(ref)
             return res
 
@@ -1665,7 +1665,7 @@ class member_t(object):
             if any(listable):
                 iterable = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in listable)
                 iterable = (idx for idx, (_, ids) in iterable if self.__parent.id in ids)    # sanity
-                res.extend(interface.OREF(ea, int(opnum), interface.reftype_t.of(t)) for opnum in iterable)
+                res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in iterable)
 
             # otherwise our reference is implicitly pointing to our member, so
             # now we need to figure out which operand is the one.
@@ -1694,7 +1694,7 @@ class member_t(object):
                     # of our structure identifiers
                     offset = interface.address.head(offset, silent=True)
                     if database.type.flags(offset, idaapi.DT_TYPE) == FF_STRUCT and database.type.structure.id(offset) in identifiers:
-                        res.append(interface.OREF(ea, opnum, interface.reftype_t.of(t)))
+                        res.append(interface.opref_t(ea, opnum, interface.reftype_t.of(t)))
                     continue
                 continue
             continue
