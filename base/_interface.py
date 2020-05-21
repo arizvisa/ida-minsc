@@ -1265,7 +1265,7 @@ class reftype_t(object):
         resP = str().join(sorted(res))
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), resP, resP, cls.__name__))
 
-class AddressOpnumReftype(namedtypedtuple):
+class ref_t(namedtypedtuple):
     """
     This tuple is used to represent references that include an operand number
     and has the format `(address, opnum, reftype_t)`. The operand number is
@@ -1273,7 +1273,22 @@ class AddressOpnumReftype(namedtypedtuple):
     """
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, (types.NoneType,) + six.integer_types, reftype_t)
-OREF = AddressOpnumReftype
+
+class earef_t(ref_t):
+    """
+    This tuple is used to represent references that don't include an operand
+    number and has the format `(address, None, reftype_t)`.
+    """
+    _fields = ('address', 'opnum', 'reftype')
+    _types = (six.integer_types, types.NoneType, reftype_t)
+
+class opref_t(ref_t):
+    """
+    This tuple is used to represent references that include an operand number
+    and has the format `(address, opnum, reftype_t)`.
+    """
+    _fields = ('address', 'opnum', 'reftype')
+    _types = (six.integer_types, six.integer_types, reftype_t)
 
 # XXX: is .startea always guaranteed to point to an instruction that modifies
 #      the switch's register? if so, then we can use this to calculate the
