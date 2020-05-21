@@ -382,9 +382,9 @@ def op_state(ea, opnum):
     r, w = f&ops_state.read[opnum], f&ops_state.write[opnum]
     res = (r and 'r' or '') + (w and 'w' or '')
 
-    # Make a ref_t from the state we determined. If we couldn't figure it out,
+    # Make a reftype_t from the state we determined. If we couldn't figure it out,
     # then fallback to "r" as the operand still exists and it must be doing something.
-    return interface.ref_t.of_state(res or 'r')
+    return interface.reftype_t.of_action(res or 'r')
 
 @utils.multicase(opnum=six.integer_types)
 def op_size(opnum):
@@ -1082,7 +1082,7 @@ def op_refs(ea, opnum):
         # build the xrefs
         xl = idaapi.xreflist_t()
         idaapi.build_stkvar_xrefs(xl, fn, member)
-        res = [ interface.OREF(x.ea, int(x.opnum), interface.ref_t.of(x.type)) for x in xl ]
+        res = [ interface.OREF(x.ea, int(x.opnum), interface.reftype_t.of(x.type)) for x in xl ]
         # FIXME: how do we handle the type for an LEA instruction which should include '&'...
 
     # struc member
@@ -1135,7 +1135,7 @@ def op_refs(ea, opnum):
             ops = ((idx, internal.netnode.sup.get(ea, 0xf + idx)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
             ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in ops)
             ops = (idx for idx, (_, ids) in ops if st.id in ids)
-            res.extend( interface.OREF(ea, int(op), interface.ref_t.of(t)) for op in ops)
+            res.extend( interface.OREF(ea, int(op), interface.reftype_t.of(t)) for op in ops)
         res = res
 
     # enums
@@ -1167,9 +1167,9 @@ def op_refs(ea, opnum):
             if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
                 ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in {idaapi.o_imm} else operand(ea, idx).addr) for idx in six.moves.range(ops_count(ea)))
                 ops = (idx for idx, val in ops if val == gid)
-                res.extend( interface.OREF(ea, int(op), interface.ref_t.of(t)) for op in ops)
+                res.extend( interface.OREF(ea, int(op), interface.reftype_t.of(t)) for op in ops)
             else:
-                res.append( interface.OREF(ea, None, interface.ref_t.of(t)) )
+                res.append( interface.OREF(ea, None, interface.reftype_t.of(t)) )
             continue
         res = res
     return res
