@@ -1018,3 +1018,79 @@ class Progress(object):
 
         cls.__appwindow__ = main
         return UIProgress(*args, **kwargs)
+
+### Re-implementation of IDAPython's displayhook that doesn't tamper with classes that inherit from base classes
+class DisplayHook(object):
+    def __init__(self, displayhook=None):
+        if displayhook:
+            self.orig_displayhook = displayhook
+
+        elif 'ida_idaapi' in sys.modules and '_IDAPython_displayhook' in sys.modules['ida_idaapi'].__dict__:
+            self.orig_displayhook = __import__('ida_idaapi')._IDAPython_displayhook.orig_displayhook
+
+        else:
+            self.orig_displayhook = sys.displayhook
+
+    def format_seq(self, num_printer, storage, item, opn, cls):
+        storage.append(opn)
+        for idx, el in enumerate(item):
+            if idx > 0:
+                storage.append(', ')
+            self.format_item(num_printer, storage, el)
+        storage.append(cls)
+
+    def format_basestring(self, string):
+        if 'ida_idaapi' in sys.modules:
+            return sys.modules['ida_idaapi'].format_basestring(string)
+        return u"{!s}".format(string)
+
+    def format_item(self, num_printer, storage, item):
+        if item is None or isinstance(item, bool):
+            storage.append("{!s}".format(item))
+        elif isinstance(item, six.string_types):
+            storage.append(self.format_basestring(item))
+        elif isinstance(item, six.integer_types):
+            storage.append(num_printer(item))
+        elif item.__class__ is list:
+            self.format_seq(num_printer, storage, item, '[', ']')
+        elif item.__class__ is tuple:
+            self.format_seq(num_printer, storage, item, '(', ')')
+        elif item.__class__ is set:
+            self.format_seq(num_printer, storage, item, 'set([', '])')
+        elif item.__class__ is dict:
+            storage.append('{')
+            for idx, pair in enumerate(item.items()):
+                if idx > 0:
+                    storage.append(', ')
+                self.format_item(num_printer, storage, pair[0])
+                storage.append(": ")
+                self.format_item(num_printer, storage, pair[1])
+            storage.append('}')
+        else:
+            storage.append("{!r}".format(item))
+
+    def _print_hex(self, x):
+        return "{:#x}".format(x)
+
+    def displayhook(self, item):
+        if item is None or item.__class__ is bool:
+            self.orig_displayhook(item)
+            return
+        try:
+            storage = []
+            import ida_idp
+            num_printer = self._print_hex
+            dn = ida_idp.ph_get_flag() & ida_idp.PR_DEFNUM
+            if dn == ida_idp.PRN_OCT:
+                num_printer = oct
+            elif dn == ida_idp.PRN_DEC:
+                num_printer = str
+            elif dn == ida_idp.PRN_BIN:
+                num_printer = bin
+            self.format_item(num_printer, storage, item)
+            sys.stdout.write("%s\n" % "".join(storage))
+        except:
+            import traceback
+            traceback.print_exc()
+            self.orig_displayhook(item)
+
