@@ -1130,24 +1130,44 @@ class members_t(object):
         if not isinstance(m.type, builtins.list):
             st = m.type
 
-            # If the member type is a structure, then we ask the type for the
-            # field that should be at our relative offset. We then shift the
-            # offset relative to us so that we can aggregate the final result.
-            if isinstance(st, structure_t):
-                res, nextoffset = st.members.__walk_to_realoffset__(offset - m.realoffset)
-                return [m] + res, m.realoffset + nextoffset
-
             # If the member type is not a structure, then return the offset
-            # relative to the member that we first discovered.
-            return [m], offset - m.realoffset
+            # relative to the member that we first discovered as a tuple.
+            if not isinstance(st, structure_t):
+                prefix = m,
+                return prefix, offset - m.realoffset
+
+            # If the member type is a structure, then we ask the structure for
+            # what field should be at its relative offset. We then shift the
+            # relative offset result back into a real offset so that we can
+            # aggregate it into the final result.
+            res, nextoffset = st.members.__walk_to_realoffset__(offset - m.realoffset)
+
+            # If we haven't encountered an array yet, then we're still prefixing
+            # our results with a tuple, so make sure its the correct type.
+            if isinstance(res, builtins.tuple):
+                prefix = m,
+
+            # Otherwise we've encountered an array and our result should be a list.
+            elif isinstance(res, builtins.list):
+                prefix = [m]
+
+            else:
+                raise TypeError(res)
+
+            # Concatenate our prefix to our results and return them to the caller
+            return prefix + res, m.realoffset + nextoffset
 
         # If the member type is actually an array, then we need to do some
-        # calculations to figure out what offset into the array we are, and
-        # then use that to determine how far into a field we are.
+        # special processing to figure out where we're at. This logic converts
+        # the results that are returned as a list. This way the caller can
+        # distinguish whether an array was encountered, or just straight-up
+        # structure members.
         st, count = m.type
         _, size = (st, st.size) if isinstance(st, structure_t) else st
 
-        # Calculate the position within the array.
+        # We need to do some calculations to figure out what offset into the
+        # array we are, and then use that to determine how far into a field
+        # our offset is.
         arrayoffset = offset - m.realoffset
         index, memberoffset = arrayoffset // (size or 1), arrayoffset % (size or 1)
 
@@ -1155,7 +1175,7 @@ class members_t(object):
         # next field and where it is relative to us.
         if isinstance(st, structure_t):
             res, nextoffset = st.members.__walk_to_realoffset__(memberoffset)
-            return [m] + res, arrayoffset - (memberoffset - nextoffset)
+            return [m] + [item for item in res], arrayoffset - (memberoffset - nextoffset)
 
         # Any other type means we can just add it as an offset since we don't
         # have any other way of representing these things.
