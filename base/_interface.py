@@ -1291,14 +1291,6 @@ class ref_t(namedtypedtuple):
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, (types.NoneType,) + six.integer_types, reftype_t)
 
-class earef_t(ref_t):
-    """
-    This tuple is used to represent references that don't include an operand
-    number and has the format `(address, None, reftype_t)`.
-    """
-    _fields = ('address', 'opnum', 'reftype')
-    _types = (six.integer_types, types.NoneType, reftype_t)
-
 class opref_t(ref_t):
     """
     This tuple is used to represent references that include an operand number
