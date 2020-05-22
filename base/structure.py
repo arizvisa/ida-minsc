@@ -406,7 +406,7 @@ class structure_t(object):
 
             # anything else is data and we just need to add a reference in that case
             else:
-                res.append( interface.earef_t(ref, None, interface.reftype_t.of_action('*')) )   # using '*' to describe being applied to the an address
+                res.append( interface.ref_t(ref, None, interface.reftype_t.of_action('*')) )   # using '*' to describe being applied to the an address
             continue
 
         return res
