@@ -621,9 +621,15 @@ class structure_t(object):
         return getattr(self.members, name)
 
     def contains(self, offset):
-        '''Return whether the specified offset is contained by the structure.'''
+        '''Return whether the specified `offset` is contained by the structure.'''
         res, cb = self.members.baseoffset, idaapi.get_struc_size(self.ptr)
         return res <= offset < res + cb
+
+    def __contains__(self, member):
+        '''Return whether the specified `member` is contained by this structure.'''
+        if not isinstance(member, member_t):
+            raise TypeError(member)
+        return member in self.members
 
 @utils.multicase()
 def name(id):
@@ -1235,6 +1241,20 @@ class members_t(object):
         '''Remove all the members from the structure from `offset` up to `size`.'''
         res = offset - self.baseoffset
         return idaapi.del_struc_members(self.parent.ptr, res, res + size)
+
+    def __contains__(self, member):
+        '''Return whether the specified `member` is contained by this structure.'''
+        if not isinstance(member, member_t):
+            raise TypeError(member)
+
+        # Just use members_t.by_identifier to see if it raises an exception.
+        try:
+            self.by_identifier(member.id)
+
+        # It raised an exception, so the member wasn't found.
+        except E.MemberNotFoundError:
+            return False
+        return True
 
     def __repr__(self):
         '''Display all the fields within the specified structure.'''
