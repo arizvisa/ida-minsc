@@ -1169,7 +1169,7 @@ def op_refs(ea, opnum):
                 ops = (idx for idx, val in ops if val == gid)
                 res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
             else:
-                res.append( interface.earef_t(ea, None, interface.reftype_t.of(t)) )
+                res.append( interface.ref_t(ea, None, interface.reftype_t.of(t)) )
             continue
         res = res
     return res
