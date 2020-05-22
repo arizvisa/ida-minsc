@@ -772,7 +772,49 @@ def op_structure(ea, opnum):
 
         # Grab our frame, then find the member by its id
         frame = function.frame(fn)
-        return frame.members.by_identifier(m.id)
+        m = frame.members.by_identifier(m.id)
+
+        # If we're not pointing at a structure, then we we need to figure out if
+        # we're pointing at an offset of the field so that we can include it.
+        t, count = m.type if isinstance(m.type, list) else (m.type, 1)
+        if not isinstance(t, structure.structure_t):
+            if offset != m.offset:
+                return m, offset - m.offset
+            return m
+
+        # Otherwise, we're pointing at a structure and it might be an array so
+        # we need to figure out which member we're pointing at so we can include
+        # it, and include the offset from that member.
+        st, result = t, [m]
+        position, realposition = 0, (offset - m.offset) % t.size
+        while isinstance(st, structure.structure_t):
+            try:
+                m = st.by_realoffset(realposition - position)
+
+            # We couldn't find a member. So, we need figure out if we're still within
+            # bounds of the structure. If we're not, then we can simply break the
+            # loop because there aren't any members to get close to and so we'll
+            # need to include an offset to describe the location.
+            except (E.OutOfBoundsError, E.MemberNotFoundError):
+                if position > realposition:
+                    break
+
+                # Otherwise, since we're within bounds we'll just try and return
+                # the near member that IDA can give us.
+                m = st.near_realoffset(realposition - position)
+
+            # Add the member that was discovered, and iterate to its next position.
+            result.append(m)
+            position += m.realoffset
+            st = m.type
+
+        # Figure out the offset from the fields that we determined. We do this by
+        # starting out at the first field, subtracting the offset from the operand
+        # and then adding the position we determined by walking the structure.
+        delta = result[0].offset - offset + realposition
+        if delta != position - realposition:
+            return tuple(result + [position - delta - realposition])
+        return result if len(result) > 1 else result[0]
 
     # Otherwise, we have no idea what to do here since we need to know the opinfo_t
     # in order to determine what structure is there.
