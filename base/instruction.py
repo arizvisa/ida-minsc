@@ -777,12 +777,19 @@ def op_structure(ea, opnum):
         # Figure out the real offset into the member so that we can figure
         # out which members we need to snag.
         realoffset = offset - m.offset + m.realoffset
-        result, position = m.parent.members.__walk_to_realoffset__(realoffset)
+        path, position = m.parent.members.__walk_to_realoffset__(realoffset)
 
+        # If we got a list as a result, then we encountered an array which
+        # requires us to return a list and include the offset.
+        if isinstance(path, builtins.list):
+            return path + [position]
+
+        # Otherwise it's just a regular path, and we need to determine whether
+        # to include the offset in the result or not.
         # Determine whether we need to include the offset in the result or not
         if position > 0:
-            return tuple(result + [position])
-        return tuple(result) if len(result) > 1 else result[0]
+            return path + (position,)
+        return tuple(path) if len(path) > 1 else path[0]
 
     # Otherwise, we have no idea what to do here since we need to know the opinfo_t
     # in order to determine what structure is there.
@@ -813,11 +820,11 @@ def op_structure(ea, opnum):
     # Otherwise, iterate through the path that IDA gave us and grab every
     # member that was returned. Save our position so that we know what IDA
     # actually gave us as later we can use this to calculate the delta.
-    result, position = [], 0
+    path_from_ida, position = [], 0
     try:
         for item in path:
             m = st.by_identifier(item)
-            result.append(m)
+            path_from_ida.append(m)
             position += m.realoffset
             st = m.type
 
@@ -830,15 +837,27 @@ def op_structure(ea, opnum):
     except E.MemberNotFoundError:
         logging.info(u"{:s}.op_structure({:#x}, {:d}) : Ignoring the rest of the member path ({:s}) due to IDA returning a nonexisting member id ({:#x}).".format(__name__, ea, opnum, ', '.join("{:#x}".format(mid) for mid in path), item))
 
+    # If we didn't start out with a structure type, then immediately return
+    # our current path and offset (if necessary).
+    if not isinstance(st, structure.structure_t):
+        return path_from_ida + [delta.value() + offset]
+
     # Figure out the real offset into the member so that we can figure out
     # where to start snagging members from.
     realposition = delta.value() + offset
-    result, position = st.members.__walk_to_realoffset__(realposition - position)
+    path, position = st.members.__walk_to_realoffset__(realposition - position)
 
-    # Determine whether we need to include the offset in the result or not.
+    # If we got a list, then we encountered an array and we need to make sure
+    # that we return a list.
+    if isinstance(path, builtins.list):
+        return path_from_ida + path + [position]
+
+    # Otherwise, we just got a regular member path. So we need to determine
+    # whether to include the offset in the result or not.
+    results = tuple(path_from_ida) + tuple(path)
     if position > 0:
-        return tuple(result + [position])
-    return tuple(result) if len(result) > 1 else result[0]
+        return results + (position,)
+    return results if len(results) > 1 else results[0]
 
 @utils.multicase(opnum=six.integer_types, structure=structure.structure_t)
 def op_structure(opnum, structure, **delta):
