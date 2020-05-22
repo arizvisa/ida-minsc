@@ -1115,6 +1115,52 @@ class members_t(object):
         return self[index]
     by_id = byId = byIdentifier = utils.alias(by_identifier, 'members_t')
 
+    def __walk_to_realoffset__(self, offset):
+        '''Descend into the structure collecting the fields to get to the specified `offset`.'''
+        try:
+            m = self.by_realoffset(offset)
+
+        # If we couldn't find the member, find the nearest one that IDA will
+        # give us. We'll use this member to begin our descent...
+        except (E.OutOfBoundsError, E.MemberNotFoundError):
+            m = self.near_realoffset(offset)
+
+        # If we aren't looking at an array, then we can act normally by
+        # asking the structure what the next member is going to be.
+        if not isinstance(m.type, builtins.list):
+            st = m.type
+
+            # If the member type is a structure, then we ask the type for the
+            # field that should be at our relative offset. We then shift the
+            # offset relative to us so that we can aggregate the final result.
+            if isinstance(st, structure_t):
+                res, nextoffset = st.members.__walk_to_realoffset__(offset - m.realoffset)
+                return [m] + res, m.realoffset + nextoffset
+
+            # If the member type is not a structure, then return the offset
+            # relative to the member that we first discovered.
+            return [m], offset - m.realoffset
+
+        # If the member type is actually an array, then we need to do some
+        # calculations to figure out what offset into the array we are, and
+        # then use that to determine how far into a field we are.
+        st, count = m.type
+        _, size = (st, st.size) if isinstance(st, structure_t) else st
+
+        # Calculate the position within the array.
+        arrayoffset = offset - m.realoffset
+        index, memberoffset = arrayoffset // (size or 1), arrayoffset % (size or 1)
+
+        # If the type is a structure, then we can recurse to figure out the
+        # next field and where it is relative to us.
+        if isinstance(st, structure_t):
+            res, nextoffset = st.members.__walk_to_realoffset__(memberoffset)
+            return [m] + res, arrayoffset - (memberoffset - nextoffset)
+
+        # Any other type means we can just add it as an offset since we don't
+        # have any other way of representing these things.
+        return [m], arrayoffset
+
     def near_offset(self, offset):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
         min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)))
