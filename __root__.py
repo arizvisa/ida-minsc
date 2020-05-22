@@ -46,6 +46,11 @@ if idaapi.__version__ <= 6.9:
 if idaapi.__version__ >= 6.95:
     import ida_idaapi, ida_kernwin, ida_diskio
 
+    ## Restore the displayhook that IDAPython obnoxiously replaces
+    if hasattr(ida_idaapi, '_IDAPython_displayhook'):
+        __import__('sys').displayhook = ida_idaapi._IDAPython_displayhook.orig_displayhook
+        del(ida_idaapi._IDAPython_displayhook)
+
 ## IDA 7.4 requires that this module exists in the global namespace
 if idaapi.__version__ >= 7.4:
     import sys
@@ -94,6 +99,10 @@ ref_t, earef_t, opref_t = (getattr(__import__('internal').interface, _) for _ in
 
 # other miscellaneous modules to expose to the user
 import ui, tools, custom
+
+### Replace sys.displayhook with our own so that IDAPython can't tamper with
+### our __repr__ implementations.
+__import__('sys').displayhook = ui.DisplayHook().displayhook
 
 ### Construct a priority notification handler, and inject into IDA because it
 ### needs to exist for everything to initialize/deinitialize properly.
