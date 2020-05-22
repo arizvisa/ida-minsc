@@ -1228,7 +1228,13 @@ class reftype_t(object):
     def __eq__(self, other):
         return self.__operator__(operator.eq, other)
     def __contains__(self, type):
-        return operator.contains(self.S, type)
+        if type.lower() == 'r':
+            return operator.contains(self.S, type.lower()) or operator.contains(self.S, 'w')
+        return operator.contains(self.S, type.lower())
+    def __getitem__(self, type):
+        if type.lower() == 'r':
+            return operator.contains(self.S, type.lower()) or operator.contains(self.S, 'w')
+        return operator.contains(self.S, type.lower())
 
     def __iter__(self):
         for item in sorted(self.S):
