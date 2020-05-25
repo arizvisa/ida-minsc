@@ -1051,6 +1051,8 @@ class DisplayHook(object):
             storage.append(self.format_basestring(item))
         elif isinstance(item, six.integer_types):
             storage.append(num_printer(item))
+        elif isinstance(item, idaapi.tinfo_t):
+            storage.append("{!s}".format(item))
         elif item.__class__ is list:
             self.format_seq(num_printer, storage, item, '[', ']')
         elif item.__class__ is tuple:
