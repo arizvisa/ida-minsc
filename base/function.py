@@ -1962,7 +1962,8 @@ class type(object):
     def has_prototype(cls, func):
         '''Returns true if the function `func` has a prototype associated with it.'''
         fn = by(func)
-        return False if idaapi.idc_get_type(fn.start_ea) is None else True
-    prototypeQ = utils.alias(has_prototype, 'type')
+        ea = interface.range.start(fn)
+        return database.type.has_typeinfo(ea)
+    prototypeQ = has_typeinfo = typeinfoQ = utils.alias(has_prototype, 'type')
 
 t = type # XXX: ns alias
