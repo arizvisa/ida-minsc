@@ -120,6 +120,12 @@ functions and aliases. For more information on this, please see
    :param mask: the bit mask to apply to the flags
    :type mask: int or long
    
+.. py:function:: has(enum)
+   
+   Return truth if the enumeration ``enum`` exists within the database.
+   
+   :param enum: the enumeration identifier to check
+   
 .. py:function:: iterate(\*\*type)
    
    Iterate through all of the enumerations in the database that match the keyword specified by ``type``.

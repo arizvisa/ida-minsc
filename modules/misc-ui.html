@@ -252,7 +252,8 @@ segment, clipboard, widget, or even the current window in use.</p>
 <dl class="function">
 <dt id="ui.keyboard.map">
 <code class="descclassname">keyboard.</code><code class="descname">map</code><span class="sig-paren">(</span><em>key</em>, <em>callable</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.map" title="Permalink to this definition">¶</a></dt>
-<dd><p>Map a specific <code class="docutils literal notranslate"><span class="pre">key</span></code> to a python <code class="docutils literal notranslate"><span class="pre">callable</span></code>.</p>
+<dd><p>Map the specified <code class="docutils literal notranslate"><span class="pre">key</span></code> combination to a python <code class="docutils literal notranslate"><span class="pre">callable</span></code> in IDA.</p>
+<p>If the provided <code class="docutils literal notranslate"><span class="pre">key</span></code> is being re-mapped due to the mapping already existing, then return the previous callable that it was assigned to.</p>
 <p>Aliases: <a class="reference internal" href="#ui.keyboard.map" title="ui.keyboard.map"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.keyboard.add</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -277,7 +278,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 <dl class="function">
 <dt id="ui.keyboard.unmap">
 <code class="descclassname">keyboard.</code><code class="descname">unmap</code><span class="sig-paren">(</span><em>key</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.keyboard.unmap" title="Permalink to this definition">¶</a></dt>
-<dd><p>Unmap the specified <code class="docutils literal notranslate"><span class="pre">key</span></code> from its callable.</p>
+<dd><p>Unmap the specified <code class="docutils literal notranslate"><span class="pre">key</span></code> from IDA and return the callable that it was assigned to.</p>
 <p>Aliases: <a class="reference internal" href="#ui.keyboard.unmap" title="ui.keyboard.unmap"><code class="xref py py-func docutils literal notranslate"><span class="pre">ui.keyboard.rm</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />

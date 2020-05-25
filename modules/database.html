@@ -313,6 +313,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <dt id="database.go_offset">
 <code class="descclassname">database.</code><code class="descname">go_offset</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#database.go_offset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Jump to the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> within the database.</p>
+<p>Aliases: <a class="reference internal" href="#database.go_offset" title="database.go_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.goof</span></code></a>, <a class="reference internal" href="#database.go_offset" title="database.go_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.gotooffset</span></code></a>, <a class="reference internal" href="#database.go_offset" title="database.go_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.gooffset</span></code></a>, <a class="reference internal" href="#database.go_offset" title="database.go_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.goto_offset</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -549,12 +550,14 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <dt id="database.offset">
 <code class="descclassname">database.</code><code class="descname">offset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.offset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the current address converted to an offset from the base address of the database.</p>
+<p>Aliases: <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.o</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> converted to an offset from the base address of the database.</p>
+<p>Aliases: <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.o</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -815,6 +818,7 @@ If <code class="docutils literal notranslate"><span class="pre">Or</span></code>
 <dt id="database.translate">
 <code class="descclassname">database.</code><code class="descname">translate</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#database.translate" title="Permalink to this definition">¶</a></dt>
 <dd><p>Translate the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> to an address in the database.</p>
+<p>Aliases: <a class="reference internal" href="#database.translate" title="database.translate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.convertOffset</span></code></a>, <a class="reference internal" href="#database.translate" title="database.translate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.coof</span></code></a>, <a class="reference internal" href="#database.translate" title="database.translate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.convert_offset</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -970,6 +974,21 @@ determining the next valid address. These are:</p>
 <li><strong>end</strong> (<em>int</em><em> or </em><em>long</em>) – the address to stop at</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.address.by_offset">
+<code class="descclassname">address.</code><code class="descname">by_offset</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#database.address.by_offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> translated to an address in the database.</p>
+<p>Aliases: <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.byoffset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.byOffset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.by_offset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.byOffset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.byoffset</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>offset</strong> – </td>
 </tr>
 </tbody>
 </table>
@@ -1919,6 +1938,28 @@ determining the next valid address. These are:</p>
 <li><strong>count</strong> (<em>int</em><em> or </em><em>long</em>) – the number of instructions to skip</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.address.offset">
+<code class="descclassname">address.</code><code class="descname">offset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address.offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current address translated to an offset relative to the base address of the database.</p>
+<p>Aliases: <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getOffset</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">address.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> translated to an offset relative to the base address of the database.</p>
+<p>Aliases: <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getOffset</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database to transform to an offset.</td>
 </tr>
 </tbody>
 </table>
@@ -2989,8 +3030,10 @@ of each entrypoint will be yielded.</p>
 <li><code class="docutils literal notranslate"><span class="pre">like</span></code> - Filter the entrypoint names according to a glob</li>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the entrypoint names according to a regular-expression</li>
 <li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match according to the entrypoint’s index (ordinal)</li>
-<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the entrypoints for any after the specified address</li>
-<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the entrypoints for any before the specified address</li>
+<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">ge</span></code> - Filter the entrypoints for any after the specified address (inclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the entrypoints for any after the specified address (exclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Filter the entrypoints for any before the specified address (inclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the entrypoints for any before the specified address (exclusive)</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the entrypoints by passing its index (ordinal) to a callable</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>
@@ -3741,6 +3784,28 @@ following examples can be used:</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="database.get.info">
+<code class="descclassname">get.</code><code class="descname">info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.get.info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the typeinfo at the current address as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.info" title="database.get.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.typeinfo</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">get.</code><code class="descname">info</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the typeinfo at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.info" title="database.get.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.typeinfo</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.get.signed">
 <code class="descclassname">get.</code><code class="descname">signed</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.signed" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a signed integer from the current address.</p>
@@ -4115,7 +4180,8 @@ like in the following examples:</p>
 <dl class="function">
 <dt id="database.get.integer">
 <code class="descclassname">get.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer" title="Permalink to this definition">¶</a></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>Read an integer from the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
@@ -4128,7 +4194,8 @@ like in the following examples:</p>
 <dl class="function">
 <dt>
 <code class="descclassname">get.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>Read an integer from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
@@ -4145,7 +4212,8 @@ like in the following examples:</p>
 <dl class="function">
 <dt>
 <code class="descclassname">get.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>ea</em>, <em>size</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
-<dd><table class="docutils field-list" frame="void" rules="none">
+<dd><p>Read an integer of the specified <code class="docutils literal notranslate"><span class="pre">size</span></code> from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
@@ -4196,7 +4264,6 @@ like in the following examples:</p>
 <dt id="database.get.integer.sint16_t">
 <code class="descclassname">get.integer.</code><code class="descname">sint16_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.sint16_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a sint16_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint16_t" title="database.get.integer.sint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sint2</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4211,7 +4278,6 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">sint16_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a sint16_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint16_t" title="database.get.integer.sint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sint2</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4230,7 +4296,6 @@ like in the following examples:</p>
 <dt id="database.get.integer.sint32_t">
 <code class="descclassname">get.integer.</code><code class="descname">sint32_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.sint32_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a sint32_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint32_t" title="database.get.integer.sint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sint4</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4245,7 +4310,6 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">sint32_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a sint32_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint32_t" title="database.get.integer.sint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sint4</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4264,7 +4328,6 @@ like in the following examples:</p>
 <dt id="database.get.integer.sint64_t">
 <code class="descclassname">get.integer.</code><code class="descname">sint64_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.sint64_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a sint64_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint64_t" title="database.get.integer.sint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sint8</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4279,7 +4342,6 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">sint64_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a sint64_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint64_t" title="database.get.integer.sint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sint8</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4298,7 +4360,6 @@ like in the following examples:</p>
 <dt id="database.get.integer.sint8_t">
 <code class="descclassname">get.integer.</code><code class="descname">sint8_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.sint8_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a sint8_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint8_t" title="database.get.integer.sint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sbyte1</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4313,7 +4374,6 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">sint8_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a sint8_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.sint8_t" title="database.get.integer.sint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.sbyte1</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4332,6 +4392,7 @@ like in the following examples:</p>
 <dt id="database.get.integer.uint128_t">
 <code class="descclassname">get.integer.</code><code class="descname">uint128_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.uint128_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a uint128_t from the current address.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint128_t" title="database.get.integer.uint128_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.oword</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4346,6 +4407,7 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">uint128_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a uint128_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint128_t" title="database.get.integer.uint128_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.oword</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4364,7 +4426,7 @@ like in the following examples:</p>
 <dt id="database.get.integer.uint16_t">
 <code class="descclassname">get.integer.</code><code class="descname">uint16_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.uint16_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a uint16_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint16_t" title="database.get.integer.uint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.uint2</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint16_t" title="database.get.integer.uint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.word</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4379,7 +4441,7 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">uint16_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a uint16_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint16_t" title="database.get.integer.uint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.uint2</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint16_t" title="database.get.integer.uint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.word</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4398,7 +4460,7 @@ like in the following examples:</p>
 <dt id="database.get.integer.uint32_t">
 <code class="descclassname">get.integer.</code><code class="descname">uint32_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.uint32_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a uint32_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint32_t" title="database.get.integer.uint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.uint4</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint32_t" title="database.get.integer.uint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.dword</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4413,7 +4475,7 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">uint32_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a uint32_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint32_t" title="database.get.integer.uint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.uint4</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint32_t" title="database.get.integer.uint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.dword</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4432,7 +4494,7 @@ like in the following examples:</p>
 <dt id="database.get.integer.uint64_t">
 <code class="descclassname">get.integer.</code><code class="descname">uint64_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.uint64_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a uint64_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint64_t" title="database.get.integer.uint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.uint8</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint64_t" title="database.get.integer.uint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.qword</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4447,7 +4509,7 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">uint64_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a uint64_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint64_t" title="database.get.integer.uint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.uint8</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint64_t" title="database.get.integer.uint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.qword</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4466,7 +4528,7 @@ like in the following examples:</p>
 <dt id="database.get.integer.uint8_t">
 <code class="descclassname">get.integer.</code><code class="descname">uint8_t</code><span class="sig-paren">(</span><em>**byteorder</em><span class="sig-paren">)</span><a class="headerlink" href="#database.get.integer.uint8_t" title="Permalink to this definition">¶</a></dt>
 <dd><p>Read a uint8_t from the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint8_t" title="database.get.integer.uint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.ubyte1</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint8_t" title="database.get.integer.uint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.byte</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4481,7 +4543,7 @@ like in the following examples:</p>
 <dt>
 <code class="descclassname">get.integer.</code><code class="descname">uint8_t</code><span class="sig-paren">(</span><em>ea</em>, <em>**byteorder</em><span class="sig-paren">)</span></dt>
 <dd><p>Read a uint8_t from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.get.integer.uint8_t" title="database.get.integer.uint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.ubyte1</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.get.integer.uint8_t" title="database.get.integer.uint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get.integer.byte</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4908,7 +4970,8 @@ within the database. By default the <code class="docutils literal notranslate"><
 <dl class="function">
 <dt id="database.names">
 <code class="descclassname">database.</code><code class="descname">names</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.names" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Iterate through all of the names in the database yielding a tuple of the address and its name.</p>
+</dd></dl>
 
 <dl class="function">
 <dt id="database.names.address">
@@ -5629,6 +5692,40 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 </dd></dl>
 
 <dl class="function">
+<dt id="database.set.info">
+<code class="descclassname">set.</code><code class="descname">info</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the typeinfo at the current address to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.info" title="database.set.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.typeinfo</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the typeinfo to assign to the address</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.</code><code class="descname">info</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the typeinfo at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.info" title="database.set.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.typeinfo</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the typeinfo to assign to the address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.set.string">
 <code class="descclassname">set.</code><code class="descname">string</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.string" title="Permalink to this definition">¶</a></dt>
 <dd><p>Set the data at the current address to a string with the specified <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
@@ -5834,22 +5931,58 @@ follows:</p>
 a particular address.</p>
 <p>This namespace is also aliased as <code class="xref py py-obj docutils literal notranslate"><span class="pre">database.set.i</span></code> and can be used
 as follows:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">i</span><span class="o">.</span><span class="n">byte</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">i</span><span class="o">.</span><span class="n">qword</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">i</span><span class="o">.</span><span class="n">uint8_t</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">set</span><span class="o">.</span><span class="n">i</span><span class="o">.</span><span class="n">uint64_t</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
-<dt id="database.set.integer.byte">
-<code class="descclassname">set.integer.</code><code class="descname">byte</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.byte" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to a byte.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.byte" title="database.set.integer.byte"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint8_t</span></code></a></p>
+<dt id="database.set.integer">
+<code class="descclassname">set.</code><code class="descname">integer</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to an integer.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.integer.</code><code class="descname">byte</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a byte.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.byte" title="database.set.integer.byte"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint8_t</span></code></a></p>
+<code class="descclassname">set.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an integer of a type determined by its size.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>ea</em>, <em>size</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an integer of the specified <code class="docutils literal notranslate"><span class="pre">size</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+<li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.integer.sint128_t">
+<code class="descclassname">set.integer.</code><code class="descname">sint128_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.sint128_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a sint128_t.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.integer.</code><code class="descname">sint128_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an sint128_t.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5861,17 +5994,15 @@ as follows:</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="database.set.integer.dword">
-<code class="descclassname">set.integer.</code><code class="descname">dword</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.dword" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to a double-word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.dword" title="database.set.integer.dword"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint32_t</span></code></a></p>
+<dt id="database.set.integer.sint16_t">
+<code class="descclassname">set.integer.</code><code class="descname">sint16_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.sint16_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a sint16_t.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.integer.</code><code class="descname">dword</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a double-word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.dword" title="database.set.integer.dword"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint32_t</span></code></a></p>
+<code class="descclassname">set.integer.</code><code class="descname">sint16_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a sint16_t.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5883,17 +6014,15 @@ as follows:</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="database.set.integer.oword">
-<code class="descclassname">set.integer.</code><code class="descname">oword</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.oword" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to an octal-word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.oword" title="database.set.integer.oword"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint128_t</span></code></a></p>
+<dt id="database.set.integer.sint32_t">
+<code class="descclassname">set.integer.</code><code class="descname">sint32_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.sint32_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a sint32_t.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.integer.</code><code class="descname">oword</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an octal-word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.oword" title="database.set.integer.oword"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint128_t</span></code></a></p>
+<code class="descclassname">set.integer.</code><code class="descname">sint32_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a sint32_t.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5905,17 +6034,15 @@ as follows:</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="database.set.integer.qword">
-<code class="descclassname">set.integer.</code><code class="descname">qword</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.qword" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to a quad-word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.qword" title="database.set.integer.qword"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint64_t</span></code></a></p>
+<dt id="database.set.integer.sint64_t">
+<code class="descclassname">set.integer.</code><code class="descname">sint64_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.sint64_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a sint64_t.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.integer.</code><code class="descname">qword</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a quad-word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.qword" title="database.set.integer.qword"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint64_t</span></code></a></p>
+<code class="descclassname">set.integer.</code><code class="descname">sint64_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a sint64_t.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5927,17 +6054,125 @@ as follows:</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="database.set.integer.word">
-<code class="descclassname">set.integer.</code><code class="descname">word</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.word" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to a word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.word" title="database.set.integer.word"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint16_t</span></code></a></p>
+<dt id="database.set.integer.sint8_t">
+<code class="descclassname">set.integer.</code><code class="descname">sint8_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.sint8_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a sint8_t.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.integer.</code><code class="descname">word</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a word.</p>
-<p>Aliases: <a class="reference internal" href="#database.set.integer.word" title="database.set.integer.word"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.uint16_t</span></code></a></p>
+<code class="descclassname">set.integer.</code><code class="descname">sint8_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a sint8_t.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.integer.uint128_t">
+<code class="descclassname">set.integer.</code><code class="descname">uint128_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.uint128_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to an uint128_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint128_t" title="database.set.integer.uint128_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.oword</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.integer.</code><code class="descname">uint128_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to an uint128_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint128_t" title="database.set.integer.uint128_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.oword</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.integer.uint16_t">
+<code class="descclassname">set.integer.</code><code class="descname">uint16_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.uint16_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a uint16_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint16_t" title="database.set.integer.uint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.word</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.integer.</code><code class="descname">uint16_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a uint16_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint16_t" title="database.set.integer.uint16_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.word</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.integer.uint32_t">
+<code class="descclassname">set.integer.</code><code class="descname">uint32_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.uint32_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a uint32_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint32_t" title="database.set.integer.uint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.dword</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.integer.</code><code class="descname">uint32_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a uint32_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint32_t" title="database.set.integer.uint32_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.dword</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.integer.uint64_t">
+<code class="descclassname">set.integer.</code><code class="descname">uint64_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.uint64_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a uint64_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint64_t" title="database.set.integer.uint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.qword</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.integer.</code><code class="descname">uint64_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a uint64_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint64_t" title="database.set.integer.uint64_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.qword</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.set.integer.uint8_t">
+<code class="descclassname">set.integer.</code><code class="descname">uint8_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.set.integer.uint8_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a uint8_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint8_t" title="database.set.integer.uint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.byte</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">set.integer.</code><code class="descname">uint8_t</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a uint8_t.</p>
+<p>Aliases: <a class="reference internal" href="#database.set.integer.uint8_t" title="database.set.integer.uint8_t"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.set.integer.byte</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5971,20 +6206,68 @@ specified address.</p>
 <dl class="function">
 <dt id="database.type">
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the type at the address specified at the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.type" title="database.type"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getType</span></code></a>, <a class="reference internal" href="#database.type" title="database.type"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_type</span></code></a></p>
+<dd><p>Return the typeinfo at the current address as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the type at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.type" title="database.type"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getType</span></code></a>, <a class="reference internal" href="#database.type" title="database.type"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_type</span></code></a></p>
+<dd><p>Return the typeinfo at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> typeinfo or typeinfo string in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the typeinfo to assign to the address</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> typeinfo in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to assign to the address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Parse the typeinfo string in <code class="docutils literal notranslate"><span class="pre">info</span></code> to an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>info</strong> (<em>str</em>) – the typeinfo string to assign to the address</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -6514,7 +6797,7 @@ that is defined within the database. By default this namespace
 will return the array’s element type and its number of elements
 as a list <code class="docutils literal notranslate"><span class="pre">[size,</span> <span class="pre">count]</span></code>.</p>
 <p>Some examples of using this namespace can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">type</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="n">databaes</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">type</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">element</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
@@ -6615,6 +6898,26 @@ as a list <code class="docutils literal notranslate"><span class="pre">[size,</s
 <dt>
 <code class="descclassname">type.array.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the type of the element in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing an array</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.type.array.typeinfo">
+<code class="descclassname">type.array.</code><code class="descname">typeinfo</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.typeinfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the typeinfo of the element in the array at the current address.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.array.</code><code class="descname">typeinfo</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the typeinfo of the element in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6727,7 +7030,7 @@ also aliased as globals. Some of these are:</p>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">down</span><span class="p">():</span> <span class="o">...</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">cu</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span> <span class="o">...</span>
 <span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">add_code</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">del_data</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">rm_data</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -7011,70 +7314,6 @@ also aliased as globals. Some of these are:</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="database.xref.del_code">
-<code class="descclassname">xref.</code><code class="descname">del_code</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#database.xref.del_code" title="Permalink to this definition">¶</a></dt>
-<dd><p>Delete _all_ the code references at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a code reference</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">xref.</code><code class="descname">del_code</code><span class="sig-paren">(</span><em>ea</em>, <em>target</em><span class="sig-paren">)</span></dt>
-<dd><p>Delete any code references at <code class="docutils literal notranslate"><span class="pre">ea</span></code> that point to address <code class="docutils literal notranslate"><span class="pre">target</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a code reference</li>
-<li><strong>target</strong> (<em>int</em><em> or </em><em>long</em>) – the target address that the reference points to</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="database.xref.del_data">
-<code class="descclassname">xref.</code><code class="descname">del_data</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#database.xref.del_data" title="Permalink to this definition">¶</a></dt>
-<dd><p>Delete _all_ the data references at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a data reference</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">xref.</code><code class="descname">del_data</code><span class="sig-paren">(</span><em>ea</em>, <em>target</em><span class="sig-paren">)</span></dt>
-<dd><p>Delete any data references at <code class="docutils literal notranslate"><span class="pre">ea</span></code> that point to address <code class="docutils literal notranslate"><span class="pre">target</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a data reference</li>
-<li><strong>target</strong> (<em>int</em><em> or </em><em>long</em>) – the target address that the reference points to</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="database.xref.down">
 <code class="descclassname">xref.</code><code class="descname">down</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.xref.down" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return all of the references that are referred by the current address.</p>
@@ -7098,13 +7337,103 @@ also aliased as globals. Some of these are:</p>
 
 <dl class="function">
 <dt id="database.xref.erase">
-<code class="descclassname">xref.</code><code class="descname">erase</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#database.xref.erase" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">xref.</code><code class="descname">erase</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.xref.erase" title="Permalink to this definition">¶</a></dt>
+<dd><p>Clear all references at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.erase" title="database.xref.erase"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rx</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">xref.</code><code class="descname">erase</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Clear all references at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.erase" title="database.xref.erase"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rx</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – an address containing an references</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing an references</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.xref.rm_code">
+<code class="descclassname">xref.</code><code class="descname">rm_code</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.xref.rm_code" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delete _all_ the code references at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.rm_code" title="database.xref.rm_code"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rc</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">xref.</code><code class="descname">rm_code</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Delete _all_ the code references at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.rm_code" title="database.xref.rm_code"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a code reference</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">xref.</code><code class="descname">rm_code</code><span class="sig-paren">(</span><em>ea</em>, <em>target</em><span class="sig-paren">)</span></dt>
+<dd><p>Delete any code references at <code class="docutils literal notranslate"><span class="pre">ea</span></code> that point to address <code class="docutils literal notranslate"><span class="pre">target</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.rm_code" title="database.xref.rm_code"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a code reference</li>
+<li><strong>target</strong> (<em>int</em><em> or </em><em>long</em>) – the target address that the reference points to</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.xref.rm_data">
+<code class="descclassname">xref.</code><code class="descname">rm_data</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.xref.rm_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delete _all_ the data references at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.rm_data" title="database.xref.rm_data"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rd</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">xref.</code><code class="descname">rm_data</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Delete _all_ the data references at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.rm_data" title="database.xref.rm_data"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rd</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a data reference</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">xref.</code><code class="descname">rm_data</code><span class="sig-paren">(</span><em>ea</em>, <em>target</em><span class="sig-paren">)</span></dt>
+<dd><p>Delete any data references at <code class="docutils literal notranslate"><span class="pre">ea</span></code> that point to address <code class="docutils literal notranslate"><span class="pre">target</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.xref.rm_data" title="database.xref.rm_data"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.xref.rd</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address containing a data reference</li>
+<li><strong>target</strong> (<em>int</em><em> or </em><em>long</em>) – the target address that the reference points to</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>

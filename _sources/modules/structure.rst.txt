@@ -26,6 +26,11 @@ methods of filtering are:
 - ``regex`` - Filter the structure names according to a regular-expression
 - ``index`` - Match the structures by its index
 - ``identifier`` or ``id`` - Match the structure by its id which is a :py:obj:`idaapi.uval_t`
+- ``size`` - Filter the structures for any matching the specified size
+- ``greater`` or ``ge`` - Match structures that are larger (inclusive) than the specified size
+- ``gt`` - Match structures that are larger (exclusive) than the specified size
+- ``less`` or ``le`` - Match structures that are smaller (inclusive) than the specified size
+- ``lt`` - Match structures that are smaller (exclusive) than the specified size
 - ``predicate`` - Filter the structures by passing the id (:py:obj:`idaapi.uval_t`) to a callable
 
 Some examples of using these keywords are as follows::
@@ -321,9 +326,16 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: search(string)
    
-   Search through all the structures using globbing.
+   Search through all the structure names matching the glob ``string``.
    
    :param string: the glob to match the structure name with
+   :type string: str
+   
+.. py:function:: search(\*\*type)
+   
+   Search through all of the structures and return the first result matching the keyword specified by ``type``.
+   
+   :param \*\*type: any keyword that can be used to filter the structures with
    
 .. py:function:: size(structure)
    
@@ -444,7 +456,7 @@ member_t
    .. py:attribute:: type
    
    The pythonic type of this ``member_t``.
-      :param getter: Return the type info of the member.
+      :param getter: Return the type of the member in its pythonic form.
       :param setter: Set the type of the member.
       :param type: the pythonic type to set the member type to
    
@@ -452,6 +464,12 @@ member_t
    
    The type identifier for this ``member_t``.
       :param getter: Return the identifier of the type of the member.
+   
+   .. py:attribute:: typeinfo
+   
+      :param getter: Return the type info of the member.
+      :param setter: Set the type info of the member to ``info``.
+      :param info: the typeinfo to set the member type to
    
    .. py:method:: refs(self)
       
@@ -513,8 +531,10 @@ members_t
    - ``fullname`` - Filter the structure members by matching its full name according to a glob
    - ``comment`` or ``comments`` - Filter the structure members by applying a glob to its comment
    - ``identifier`` or ``id`` - Match the structure member by its identifier
-   - ``greater`` or ``gt`` - Filter the structure members for any after the specified offset
-   - ``less`` or ``lt`` - Filter the structure members for any before the specified offset
+   - ``greater`` or ``ge`` - Filter the structure members for any after the specified offset (inclusive)
+   - ``gt`` - Filter the structure members for any after the specified offset (exclusive)
+   - ``less`` or ``le`` - Filter the structure members for any before the specified offset (inclusive)
+   - ``lt`` - Filter the structure members for any before the specified offset (exclusive)
    - ``predicate`` - Filter the structure members by passing the :py:obj:`member_t` to a callable
    
    Some examples of using these keywords are as follows::
@@ -746,9 +766,15 @@ structure_t
       :param setter: Expand the structure to the new ``size`` that is specified.
       :param size: an integer representing the new size to expand the structure to
    
+   .. py:attribute:: typeinfo
+   
+      :param getter: Return the type info of the member.
+      :param setter: Sets the typeinfo of the structure to ``info``.
+      :param info:
+   
    .. py:method:: contains(self, offset)
       
-      Return whether the specified offset is contained by the structure.
+      Return whether the specified ``offset`` is contained by the structure.
       
       :param offset: the offset to check
       

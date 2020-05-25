@@ -150,6 +150,8 @@ functions and aliases. For more information on this, please see
    
    Jump to the specified ``offset`` within the database.
    
+   Aliases: :py:func:`database.goof<go_offset>`, :py:func:`database.gotooffset<go_offset>`, :py:func:`database.gooffset<go_offset>`, :py:func:`database.goto_offset<go_offset>`
+   
    :param offset: an offset from the base address
    
 .. py:function:: here()
@@ -272,9 +274,13 @@ functions and aliases. For more information on this, please see
    
    Return the current address converted to an offset from the base address of the database.
    
+   Aliases: :py:func:`database.getOffset<offset>`, :py:func:`database.getoffset<offset>`, :py:func:`database.o<offset>`
+   
 .. py:function:: offset(ea)
    
    Return the address ``ea`` converted to an offset from the base address of the database.
+   
+   Aliases: :py:func:`database.getOffset<offset>`, :py:func:`database.getoffset<offset>`, :py:func:`database.o<offset>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -412,6 +418,8 @@ functions and aliases. For more information on this, please see
    
    Translate the specified ``offset`` to an address in the database.
    
+   Aliases: :py:func:`database.convertOffset<translate>`, :py:func:`database.coof<translate>`, :py:func:`database.convert_offset<translate>`
+   
    :param offset: an offset from the base address
    
 .. py:function:: within()
@@ -522,6 +530,14 @@ Some examples of using this namespace can be::
    :type start: int or long
    :param end: the address to stop at
    :type end: int or long
+   
+.. py:function:: address\.by_offset(offset)
+   
+   Return the specified ``offset`` translated to an address in the database.
+   
+   Aliases: :py:func:`database.address.byoffset<address\.by_offset>`, :py:func:`database.address.byOffset<address\.by_offset>`, :py:func:`database.by_offset<address\.by_offset>`, :py:func:`database.byOffset<address\.by_offset>`, :py:func:`database.byoffset<address\.by_offset>`
+   
+   :param offset:
    
 .. py:function:: address\.head()
    
@@ -1057,6 +1073,21 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param count: the number of instructions to skip
    :type count: int or long
+   
+.. py:function:: address\.offset()
+   
+   Return the current address translated to an offset relative to the base address of the database.
+   
+   Aliases: :py:func:`database.getOffset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`, :py:func:`database.get_offset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.address.getOffset<address\.offset>`
+   
+.. py:function:: address\.offset(ea)
+   
+   Return the address ``ea`` translated to an offset relative to the base address of the database.
+   
+   Aliases: :py:func:`database.getOffset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`, :py:func:`database.get_offset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.address.getOffset<address\.offset>`
+   
+   :param ea: an address in the database to transform to an offset.
+   :type ea: int or long
    
 .. py:function:: address\.prev()
    
@@ -1708,8 +1739,10 @@ The different types that one can match entrypoints with are the following:
 - ``like`` - Filter the entrypoint names according to a glob
 - ``regex`` - Filter the entrypoint names according to a regular-expression
 - ``index`` - Match according to the entrypoint's index (ordinal)
-- ``greater`` or ``gt`` - Filter the entrypoints for any after the specified address
-- ``less`` or ``lt`` - Filter the entrypoints for any before the specified address
+- ``greater`` or ``ge`` - Filter the entrypoints for any after the specified address (inclusive)
+- ``gt`` - Filter the entrypoints for any after the specified address (exclusive)
+- ``less`` or ``le`` - Filter the entrypoints for any before the specified address (inclusive)
+- ``lt`` - Filter the entrypoints for any before the specified address (exclusive)
 - ``predicate`` - Filter the entrypoints by passing its index (ordinal) to a callable
 
 Some examples of using these keywords are as follows::
@@ -2145,6 +2178,21 @@ following examples can be used::
    :type ea: int or long
    :param \*\*length: if ``length`` is specified, then use it as the length of the array instead of determining it automatically
    
+.. py:function:: get\.info()
+   
+   Return the typeinfo at the current address as an :py:obj:`idaapi.tinfo_t`.
+   
+   Aliases: :py:func:`database.get.typeinfo<get\.info>`
+   
+.. py:function:: get\.info(ea)
+   
+   Return the typeinfo at the address ``ea`` as an :py:obj:`idaapi.tinfo_t`.
+   
+   Aliases: :py:func:`database.get.typeinfo<get\.info>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
 .. py:function:: get\.signed(\*\*byteorder)
    
    Read a signed integer from the current address.
@@ -2359,15 +2407,21 @@ like in the following examples::
 
 .. py:function:: get\.integer(\*\*byteorder)
    
+   Read an integer from the current address.
+   
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer(ea, \*\*byteorder)
+   
+   Read an integer from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer(ea, size, \*\*byteorder)
+   
+   Read an integer of the specified ``size`` from the address ``ea``.
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2393,15 +2447,11 @@ like in the following examples::
    
    Read a sint16_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.sint2<get\.integer\.sint16_t>`
-   
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint16_t(ea, \*\*byteorder)
    
    Read a sint16_t from the address ``ea``.
-   
-   Aliases: :py:func:`database.get.integer.sint2<get\.integer\.sint16_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2411,15 +2461,11 @@ like in the following examples::
    
    Read a sint32_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.sint4<get\.integer\.sint32_t>`
-   
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint32_t(ea, \*\*byteorder)
    
    Read a sint32_t from the address ``ea``.
-   
-   Aliases: :py:func:`database.get.integer.sint4<get\.integer\.sint32_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2429,15 +2475,11 @@ like in the following examples::
    
    Read a sint64_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.sint8<get\.integer\.sint64_t>`
-   
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint64_t(ea, \*\*byteorder)
    
    Read a sint64_t from the address ``ea``.
-   
-   Aliases: :py:func:`database.get.integer.sint8<get\.integer\.sint64_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2447,15 +2489,11 @@ like in the following examples::
    
    Read a sint8_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.sbyte1<get\.integer\.sint8_t>`
-   
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.sint8_t(ea, \*\*byteorder)
    
    Read a sint8_t from the address ``ea``.
-   
-   Aliases: :py:func:`database.get.integer.sbyte1<get\.integer\.sint8_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2465,11 +2503,15 @@ like in the following examples::
    
    Read a uint128_t from the current address.
    
+   Aliases: :py:func:`database.get.integer.oword<get\.integer\.uint128_t>`
+   
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.integer\.uint128_t(ea, \*\*byteorder)
    
    Read a uint128_t from the address ``ea``.
+   
+   Aliases: :py:func:`database.get.integer.oword<get\.integer\.uint128_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2479,7 +2521,7 @@ like in the following examples::
    
    Read a uint16_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.uint2<get\.integer\.uint16_t>`
+   Aliases: :py:func:`database.get.integer.word<get\.integer\.uint16_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2487,7 +2529,7 @@ like in the following examples::
    
    Read a uint16_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.integer.uint2<get\.integer\.uint16_t>`
+   Aliases: :py:func:`database.get.integer.word<get\.integer\.uint16_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2497,7 +2539,7 @@ like in the following examples::
    
    Read a uint32_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.uint4<get\.integer\.uint32_t>`
+   Aliases: :py:func:`database.get.integer.dword<get\.integer\.uint32_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2505,7 +2547,7 @@ like in the following examples::
    
    Read a uint32_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.integer.uint4<get\.integer\.uint32_t>`
+   Aliases: :py:func:`database.get.integer.dword<get\.integer\.uint32_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2515,7 +2557,7 @@ like in the following examples::
    
    Read a uint64_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.uint8<get\.integer\.uint64_t>`
+   Aliases: :py:func:`database.get.integer.qword<get\.integer\.uint64_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2523,7 +2565,7 @@ like in the following examples::
    
    Read a uint64_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.integer.uint8<get\.integer\.uint64_t>`
+   Aliases: :py:func:`database.get.integer.qword<get\.integer\.uint64_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2533,7 +2575,7 @@ like in the following examples::
    
    Read a uint8_t from the current address.
    
-   Aliases: :py:func:`database.get.integer.ubyte1<get\.integer\.uint8_t>`
+   Aliases: :py:func:`database.get.integer.byte<get\.integer\.uint8_t>`
    
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
@@ -2541,7 +2583,7 @@ like in the following examples::
    
    Read a uint8_t from the address ``ea``.
    
-   Aliases: :py:func:`database.get.integer.ubyte1<get\.integer\.uint8_t>`
+   Aliases: :py:func:`database.get.integer.byte<get\.integer\.uint8_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -2825,6 +2867,8 @@ Some examples of using these keywords are as follows::
     > result = database.names.search(name='some_really_sick_symbol_name')
 
 .. py:function:: names()
+   
+   Iterate through all of the names in the database yielding a tuple of the address and its name.
    
 .. py:function:: names\.address(index)
    
@@ -3238,6 +3282,26 @@ This can be used as in the following examples::
    :type size: int or long
    :param \*\*type: if ``type`` is specified then as an IDA type (:py:obj:`idaapi.FF_\*`) or a :py:obj:`structure_t` then apply it to the given address
    
+.. py:function:: set\.info(info)
+   
+   Set the typeinfo at the current address to ``info``.
+   
+   Aliases: :py:func:`database.set.typeinfo<set\.info>`
+   
+   :param info: the typeinfo to assign to the address
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: set\.info(ea, info)
+   
+   Set the typeinfo at the address ``ea`` to ``info``.
+   
+   Aliases: :py:func:`database.set.typeinfo<set\.info>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param info: the typeinfo to assign to the address
+   :type info: str or idaapi.tinfo_t
+   
 .. py:function:: set\.string(\*\*type)
    
    Set the data at the current address to a string with the specified ``type``.
@@ -3371,80 +3435,155 @@ a particular address.
 This namespace is also aliased as :py:obj:`database.set.i` and can be used
 as follows::
 
-    > database.set.i.byte(ea)
-    > database.set.i.qword(ea)
+    > database.set.i.uint8_t(ea)
+    > database.set.i.uint64_t(ea)
 
-.. py:function:: set\.integer\.byte()
+.. py:function:: set\.integer()
    
-   Set the data at the current address to a byte.
+   Set the data at the current address to an integer.
    
-   Aliases: :py:func:`database.set.integer.uint8_t<set\.integer\.byte>`
+.. py:function:: set\.integer(ea)
    
-.. py:function:: set\.integer\.byte(ea)
+   Set the data at address ``ea`` to an integer of a type determined by its size.
    
-   Set the data at address ``ea`` to a byte.
+   :param ea:
+   :type ea: int or long
    
-   Aliases: :py:func:`database.set.integer.uint8_t<set\.integer\.byte>`
+.. py:function:: set\.integer(ea, size)
+   
+   Set the data at the address ``ea`` to an integer of the specified ``size``.
+   
+   :param ea:
+   :type ea: int or long
+   :param size:
+   :type size: int or long
+   
+.. py:function:: set\.integer\.sint128_t()
+   
+   Set the data at the current address to a sint128_t.
+   
+.. py:function:: set\.integer\.sint128_t(ea)
+   
+   Set the data at address ``ea`` to an sint128_t.
    
    :param ea: an address in the database
    :type ea: int or long
    
-.. py:function:: set\.integer\.dword()
+.. py:function:: set\.integer\.sint16_t()
    
-   Set the data at the current address to a double-word.
+   Set the data at the current address to a sint16_t.
    
-   Aliases: :py:func:`database.set.integer.uint32_t<set\.integer\.dword>`
+.. py:function:: set\.integer\.sint16_t(ea)
    
-.. py:function:: set\.integer\.dword(ea)
-   
-   Set the data at address ``ea`` to a double-word.
-   
-   Aliases: :py:func:`database.set.integer.uint32_t<set\.integer\.dword>`
+   Set the data at address ``ea`` to a sint16_t.
    
    :param ea: an address in the database
    :type ea: int or long
    
-.. py:function:: set\.integer\.oword()
+.. py:function:: set\.integer\.sint32_t()
    
-   Set the data at the current address to an octal-word.
+   Set the data at the current address to a sint32_t.
    
-   Aliases: :py:func:`database.set.integer.uint128_t<set\.integer\.oword>`
+.. py:function:: set\.integer\.sint32_t(ea)
    
-.. py:function:: set\.integer\.oword(ea)
-   
-   Set the data at address ``ea`` to an octal-word.
-   
-   Aliases: :py:func:`database.set.integer.uint128_t<set\.integer\.oword>`
+   Set the data at address ``ea`` to a sint32_t.
    
    :param ea: an address in the database
    :type ea: int or long
    
-.. py:function:: set\.integer\.qword()
+.. py:function:: set\.integer\.sint64_t()
    
-   Set the data at the current address to a quad-word.
+   Set the data at the current address to a sint64_t.
    
-   Aliases: :py:func:`database.set.integer.uint64_t<set\.integer\.qword>`
+.. py:function:: set\.integer\.sint64_t(ea)
    
-.. py:function:: set\.integer\.qword(ea)
-   
-   Set the data at address ``ea`` to a quad-word.
-   
-   Aliases: :py:func:`database.set.integer.uint64_t<set\.integer\.qword>`
+   Set the data at address ``ea`` to a sint64_t.
    
    :param ea: an address in the database
    :type ea: int or long
    
-.. py:function:: set\.integer\.word()
+.. py:function:: set\.integer\.sint8_t()
    
-   Set the data at the current address to a word.
+   Set the data at the current address to a sint8_t.
    
-   Aliases: :py:func:`database.set.integer.uint16_t<set\.integer\.word>`
+.. py:function:: set\.integer\.sint8_t(ea)
    
-.. py:function:: set\.integer\.word(ea)
+   Set the data at address ``ea`` to a sint8_t.
    
-   Set the data at address ``ea`` to a word.
+   :param ea: an address in the database
+   :type ea: int or long
    
-   Aliases: :py:func:`database.set.integer.uint16_t<set\.integer\.word>`
+.. py:function:: set\.integer\.uint128_t()
+   
+   Set the data at the current address to an uint128_t.
+   
+   Aliases: :py:func:`database.set.integer.oword<set\.integer\.uint128_t>`
+   
+.. py:function:: set\.integer\.uint128_t(ea)
+   
+   Set the data at address ``ea`` to an uint128_t.
+   
+   Aliases: :py:func:`database.set.integer.oword<set\.integer\.uint128_t>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
+.. py:function:: set\.integer\.uint16_t()
+   
+   Set the data at the current address to a uint16_t.
+   
+   Aliases: :py:func:`database.set.integer.word<set\.integer\.uint16_t>`
+   
+.. py:function:: set\.integer\.uint16_t(ea)
+   
+   Set the data at address ``ea`` to a uint16_t.
+   
+   Aliases: :py:func:`database.set.integer.word<set\.integer\.uint16_t>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
+.. py:function:: set\.integer\.uint32_t()
+   
+   Set the data at the current address to a uint32_t.
+   
+   Aliases: :py:func:`database.set.integer.dword<set\.integer\.uint32_t>`
+   
+.. py:function:: set\.integer\.uint32_t(ea)
+   
+   Set the data at address ``ea`` to a uint32_t.
+   
+   Aliases: :py:func:`database.set.integer.dword<set\.integer\.uint32_t>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
+.. py:function:: set\.integer\.uint64_t()
+   
+   Set the data at the current address to a uint64_t.
+   
+   Aliases: :py:func:`database.set.integer.qword<set\.integer\.uint64_t>`
+   
+.. py:function:: set\.integer\.uint64_t(ea)
+   
+   Set the data at address ``ea`` to a uint64_t.
+   
+   Aliases: :py:func:`database.set.integer.qword<set\.integer\.uint64_t>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
+.. py:function:: set\.integer\.uint8_t()
+   
+   Set the data at the current address to a uint8_t.
+   
+   Aliases: :py:func:`database.set.integer.byte<set\.integer\.uint8_t>`
+   
+.. py:function:: set\.integer\.uint8_t(ea)
+   
+   Set the data at address ``ea`` to a uint8_t.
+   
+   Aliases: :py:func:`database.set.integer.byte<set\.integer\.uint8_t>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3477,18 +3616,39 @@ Some examples of using this namespace can be::
 
 .. py:function:: type()
    
-   Return the type at the address specified at the current address.
-   
-   Aliases: :py:func:`database.getType<type>`, :py:func:`database.get_type<type>`
+   Return the typeinfo at the current address as an :py:obj:`idaapi.tinfo_t`.
    
 .. py:function:: type(ea)
    
-   Return the type at the address specified by ``ea``.
-   
-   Aliases: :py:func:`database.getType<type>`, :py:func:`database.get_type<type>`
+   Return the typeinfo at the address ``ea`` as an :py:obj:`idaapi.tinfo_t`.
    
    :param ea: an address in the database
    :type ea: int or long
+   
+.. py:function:: type(info)
+   
+   Apply the :py:obj:`idaapi.tinfo_t` typeinfo or typeinfo string in ``info`` to the current address.
+   
+   :param info: the typeinfo to assign to the address
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: type(ea, info)
+   
+   Apply the :py:obj:`idaapi.tinfo_t` typeinfo in ``info`` to the address ``ea``.
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param info: the ``idaapi.tinfo_t`` to assign to the address
+   :type info: idaapi.tinfo_t
+   
+.. py:function:: type(ea, info)
+   
+   Parse the typeinfo string in ``info`` to an :py:obj:`idaapi.tinfo_t` and apply it to the address ``ea``.
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param info: the typeinfo string to assign to the address
+   :type info: str
    
 .. py:function:: type\.flags()
    
@@ -3845,7 +4005,7 @@ as a list ``[size, count]``.
 
 Some examples of using this namespace can be::
 
-    > type, length = databaes.t.array()
+    > type, length = database.t.array()
     > print database.t.array.size(ea)
     > print database.t.array.type(ea)
     > print database.t.array.element(ea)
@@ -3910,6 +4070,17 @@ Some examples of using this namespace can be::
 .. py:function:: type\.array\.type(ea)
    
    Return the type of the element in the array at the address specified by ``ea``.
+   
+   :param ea: an address in the database containing an array
+   :type ea: int or long
+   
+.. py:function:: type\.array\.typeinfo()
+   
+   Return the typeinfo of the element in the array at the current address.
+   
+.. py:function:: type\.array\.typeinfo(ea)
+   
+   Return the typeinfo of the element in the array at the address specified by ``ea``.
    
    :param ea: an address in the database containing an array
    :type ea: int or long
@@ -4002,7 +4173,7 @@ Some ways to utilize this namespace can be::
     > for ea in database.x.down(): ...
     > for ea in database.x.cu(ea): ...
     > ok = database.x.add_code(ea, target)
-    > ok = database.x.del_data(ea)
+    > ok = database.x.rm_data(ea)
 
 .. py:function:: xref\.add_code(target, \*\*reftype)
    
@@ -4181,38 +4352,6 @@ Some ways to utilize this namespace can be::
    :param ea: an address in the database
    :type ea: int or long
    
-.. py:function:: xref\.del_code(ea)
-   
-   Delete _all_ the code references at ``ea``.
-   
-   :param ea: an address containing a code reference
-   :type ea: int or long
-   
-.. py:function:: xref\.del_code(ea, target)
-   
-   Delete any code references at ``ea`` that point to address ``target``.
-   
-   :param ea: an address containing a code reference
-   :type ea: int or long
-   :param target: the target address that the reference points to
-   :type target: int or long
-   
-.. py:function:: xref\.del_data(ea)
-   
-   Delete _all_ the data references at ``ea``.
-   
-   :param ea: an address containing a data reference
-   :type ea: int or long
-   
-.. py:function:: xref\.del_data(ea, target)
-   
-   Delete any data references at ``ea`` that point to address ``target``.
-   
-   :param ea: an address containing a data reference
-   :type ea: int or long
-   :param target: the target address that the reference points to
-   :type target: int or long
-   
 .. py:function:: xref\.down()
    
    Return all of the references that are referred by the current address.
@@ -4228,11 +4367,72 @@ Some ways to utilize this namespace can be::
    :param ea: an address in the database
    :type ea: int or long
    
+.. py:function:: xref\.erase()
+   
+   Clear all references at the current address.
+   
+   Aliases: :py:func:`database.xref.rx<xref\.erase>`
+   
 .. py:function:: xref\.erase(ea)
    
    Clear all references at the address ``ea``.
    
+   Aliases: :py:func:`database.xref.rx<xref\.erase>`
+   
    :param ea: an address containing an references
+   :type ea: int or long
+   
+.. py:function:: xref\.rm_code()
+   
+   Delete _all_ the code references at the current address.
+   
+   Aliases: :py:func:`database.xref.rc<xref\.rm_code>`
+   
+.. py:function:: xref\.rm_code(ea)
+   
+   Delete _all_ the code references at ``ea``.
+   
+   Aliases: :py:func:`database.xref.rc<xref\.rm_code>`
+   
+   :param ea: an address containing a code reference
+   :type ea: int or long
+   
+.. py:function:: xref\.rm_code(ea, target)
+   
+   Delete any code references at ``ea`` that point to address ``target``.
+   
+   Aliases: :py:func:`database.xref.rc<xref\.rm_code>`
+   
+   :param ea: an address containing a code reference
+   :type ea: int or long
+   :param target: the target address that the reference points to
+   :type target: int or long
+   
+.. py:function:: xref\.rm_data()
+   
+   Delete _all_ the data references at the current address.
+   
+   Aliases: :py:func:`database.xref.rd<xref\.rm_data>`
+   
+.. py:function:: xref\.rm_data(ea)
+   
+   Delete _all_ the data references at ``ea``.
+   
+   Aliases: :py:func:`database.xref.rd<xref\.rm_data>`
+   
+   :param ea: an address containing a data reference
+   :type ea: int or long
+   
+.. py:function:: xref\.rm_data(ea, target)
+   
+   Delete any data references at ``ea`` that point to address ``target``.
+   
+   Aliases: :py:func:`database.xref.rd<xref\.rm_data>`
+   
+   :param ea: an address containing a data reference
+   :type ea: int or long
+   :param target: the target address that the reference points to
+   :type target: int or long
    
 .. py:function:: xref\.up()
    

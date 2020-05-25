@@ -78,6 +78,11 @@ methods of filtering are:</p>
 <li><code class="docutils literal notranslate"><span class="pre">regex</span></code> - Filter the structure names according to a regular-expression</li>
 <li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match the structures by its index</li>
 <li><code class="docutils literal notranslate"><span class="pre">identifier</span></code> or <code class="docutils literal notranslate"><span class="pre">id</span></code> - Match the structure by its id which is a <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.uval_t</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">size</span></code> - Filter the structures for any matching the specified size</li>
+<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">ge</span></code> - Match structures that are larger (inclusive) than the specified size</li>
+<li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Match structures that are larger (exclusive) than the specified size</li>
+<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Match structures that are smaller (inclusive) than the specified size</li>
+<li><code class="docutils literal notranslate"><span class="pre">lt</span></code> - Match structures that are smaller (exclusive) than the specified size</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the structures by passing the id (<code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.uval_t</span></code>) to a callable</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>
@@ -629,12 +634,26 @@ comment.</p>
 <dl class="function">
 <dt id="structure.search">
 <code class="descclassname">structure.</code><code class="descname">search</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.search" title="Permalink to this definition">¶</a></dt>
-<dd><p>Search through all the structures using globbing.</p>
+<dd><p>Search through all the structure names matching the glob <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> – the glob to match the structure name with</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> (<em>str</em>) – the glob to match the structure name with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">search</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
+<dd><p>Search through all of the structures and return the first result matching the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**type</strong> – any keyword that can be used to filter the structures with</td>
 </tr>
 </tbody>
 </table>
@@ -953,7 +972,7 @@ database that references said member.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the type info of the member.</td>
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the type of the member in its pythonic form.</td>
 </tr>
 <tr class="field-even field"><th class="field-name">param setter:</th><td class="field-body">Set the type of the member.</td>
 </tr>
@@ -980,6 +999,24 @@ database that references said member.</p>
 </table>
 </dd>
 </dl>
+<dl class="attribute">
+<dt id="structure.member_t.typeinfo">
+<code class="descname">typeinfo</code><a class="headerlink" href="#structure.member_t.typeinfo" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>getter</strong> – Return the type info of the member.</li>
+<li><strong>setter</strong> – Set the type info of the member to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</li>
+<li><strong>info</strong> – the typeinfo to set the member type to</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="method">
 <dt id="structure.member_t.refs">
 <code class="descname">refs</code><span class="sig-paren">(</span><em>self</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.member_t.refs" title="Permalink to this definition">¶</a></dt>
@@ -1070,8 +1107,10 @@ specified. The keywords that are available to filter members are:</p>
 <li><code class="docutils literal notranslate"><span class="pre">fullname</span></code> - Filter the structure members by matching its full name according to a glob</li>
 <li><code class="docutils literal notranslate"><span class="pre">comment</span></code> or <code class="docutils literal notranslate"><span class="pre">comments</span></code> - Filter the structure members by applying a glob to its comment</li>
 <li><code class="docutils literal notranslate"><span class="pre">identifier</span></code> or <code class="docutils literal notranslate"><span class="pre">id</span></code> - Match the structure member by its identifier</li>
-<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the structure members for any after the specified offset</li>
-<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the structure members for any before the specified offset</li>
+<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">ge</span></code> - Filter the structure members for any after the specified offset (inclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the structure members for any after the specified offset (exclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Filter the structure members for any before the specified offset (inclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the structure members for any before the specified offset (exclusive)</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the structure members by passing the <a class="reference internal" href="#structure.member_t" title="structure.member_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">member_t</span></code></a> to a callable</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>
@@ -1590,10 +1629,28 @@ already existing one.</p>
 </table>
 </dd>
 </dl>
+<dl class="attribute">
+<dt id="structure.structure_t.typeinfo">
+<code class="descname">typeinfo</code><a class="headerlink" href="#structure.structure_t.typeinfo" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>getter</strong> – Return the type info of the member.</li>
+<li><strong>setter</strong> – Sets the typeinfo of the structure to <code class="docutils literal notranslate"><span class="pre">info</span></code>.</li>
+<li><strong>info</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="method">
 <dt id="structure.structure_t.contains">
 <code class="descname">contains</code><span class="sig-paren">(</span><em>self</em>, <em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#structure.structure_t.contains" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return whether the specified offset is contained by the structure.</p>
+<dd><p>Return whether the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> is contained by the structure.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

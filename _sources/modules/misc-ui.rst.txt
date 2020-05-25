@@ -195,7 +195,9 @@ Base namespace for interacting with the keyboard input.
    
 .. py:function:: keyboard\.map(key, callable)
    
-   Map a specific ``key`` to a python ``callable``.
+   Map the specified ``key`` combination to a python ``callable`` in IDA.
+   
+   If the provided ``key`` is being re-mapped due to the mapping already existing, then return the previous callable that it was assigned to.
    
    Aliases: :py:func:`ui.keyboard.add<keyboard\.map>`
    
@@ -208,7 +210,7 @@ Base namespace for interacting with the keyboard input.
    
 .. py:function:: keyboard\.unmap(key)
    
-   Unmap the specified ``key`` from its callable.
+   Unmap the specified ``key`` from IDA and return the callable that it was assigned to.
    
    Aliases: :py:func:`ui.keyboard.rm<keyboard\.unmap>`
    

@@ -1500,6 +1500,32 @@ Some simple ways of getting information about a function::
     > print function.type.has_noframe()
     > for ea in filter(function.type.is_library, database.functions()): ...
 
+.. py:function:: type()
+   
+   Return the typeinfo for the current function as a :py:obj:`idaapi.tinfo_t`.
+   
+.. py:function:: type(func)
+   
+   Return the typeinfo for the function ``func`` as a :py:obj:`idaapi.tinfo_t`.
+   
+   :param func: the function to get the typeinfo for
+   
+.. py:function:: type(func, info)
+   
+   Apply the :py:obj:`idaapi.tinfo_t` typeinfo in ``info`` to the function ``func``.
+   
+   :param func: the function to set the typeinfo for
+   :param info: the typeinfo string to assign to the function
+   :type info: idaapi.tinfo_t
+   
+.. py:function:: type(func, info)
+   
+   Parse the typeinfo string in ``info`` to an :py:obj:`idaapi.tinfo_t` and apply it to the function ``func``.
+   
+   :param func: the function to set the typeinfo for
+   :param info: the ``idaapi.tinfo_t`` to assign to the function
+   :type info: str
+   
 .. py:function:: type\.has_frameptr()
    
    Return true if the current function uses a frame pointer (register).
@@ -1528,6 +1554,20 @@ Some simple ways of getting information about a function::
    
    :param func: the function to check
    
+.. py:function:: type\.has_prototype()
+   
+   Returns true if the current function has a prototype associated with it.
+   
+   Aliases: :py:func:`function.type.prototypeQ<type\.has_prototype>`
+   
+.. py:function:: type\.has_prototype(func)
+   
+   Returns true if the function ``func`` has a prototype associated with it.
+   
+   Aliases: :py:func:`function.type.prototypeQ<type\.has_prototype>`
+   
+   :param func: the function to check
+   
 .. py:function:: type\.has_return()
    
    Return true if the current function returns.
@@ -1546,21 +1586,29 @@ Some simple ways of getting information about a function::
    
    Returns true if the current function is considered a "far" function by IDA or the user.
    
+   Aliases: :py:func:`function.type.farQ<type\.is_far>`
+   
 .. py:function:: type\.is_far(func)
    
    Returns true if the function ``func`` is considered a "far" function by IDA or the user.
    
-   :param func:
+   Aliases: :py:func:`function.type.farQ<type\.is_far>`
+   
+   :param func: the function to check
    
 .. py:function:: type\.is_hidden()
    
    Returns true if the current function is hidden.
    
+   Aliases: :py:func:`function.type.hiddenQ<type\.is_hidden>`
+   
 .. py:function:: type\.is_hidden(func)
    
    Returns true if the function ``func`` is hidden.
    
-   :param func:
+   Aliases: :py:func:`function.type.hiddenQ<type\.is_hidden>`
+   
+   :param func: the function to check
    
 .. py:function:: type\.is_library()
    
@@ -1580,11 +1628,15 @@ Some simple ways of getting information about a function::
    
    Returns true if the current function is a static function.
    
+   Aliases: :py:func:`function.type.staticQ<type\.is_static>`
+   
 .. py:function:: type\.is_static(func)
    
    Returns true if the function ``func`` is a static function.
    
-   :param func:
+   Aliases: :py:func:`function.type.staticQ<type\.is_static>`
+   
+   :param func: the function to check
    
 .. py:function:: type\.is_thunk()
    

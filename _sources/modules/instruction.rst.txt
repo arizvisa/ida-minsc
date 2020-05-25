@@ -103,6 +103,26 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
+.. py:function:: op_bin(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to binary and return it.
+   
+   Aliases: :py:func:`instruction.op_binary<op_bin>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_bin(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to binary and return it.
+   
+   Aliases: :py:func:`instruction.op_binary<op_bin>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
 .. py:function:: op_bits(opnum)
    
    Returns the size (in bits) for the operand ``opnum`` belonging to the current instruction.
@@ -113,6 +133,46 @@ functions and aliases. For more information on this, please see
 .. py:function:: op_bits(ea, opnum)
    
    Returns the size (in bits) for the operand ``opnum`` belonging to the instruction at the address ``ea``.
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
+.. py:function:: op_chr(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to a character and return it.
+   
+   Aliases: :py:func:`instruction.op_character<op_chr>`, :py:func:`instruction.op_char<op_chr>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_chr(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to a character and return it.
+   
+   Aliases: :py:func:`instruction.op_character<op_chr>`, :py:func:`instruction.op_char<op_chr>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
+.. py:function:: op_dec(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to decimal and return it.
+   
+   Aliases: :py:func:`instruction.op_decimal<op_dec>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_dec(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to decimal and return it.
+   
+   Aliases: :py:func:`instruction.op_decimal<op_dec>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -175,6 +235,86 @@ functions and aliases. For more information on this, please see
    :type opnum: int or long
    :param id: the identifer of an enumeration to apply
    :type id: int or long or tuple
+   
+.. py:function:: op_flt(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to floating-point and return it.
+   
+   Aliases: :py:func:`instruction.op_float<op_flt>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_flt(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to floating-point and return it.
+   
+   Aliases: :py:func:`instruction.op_float<op_flt>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
+.. py:function:: op_hex(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to hexadecimal and return it.
+   
+   Aliases: :py:func:`instruction.op_hexadecimal<op_hex>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_hex(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to hexadecimal and return it.
+   
+   Aliases: :py:func:`instruction.op_hexadecimal<op_hex>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
+.. py:function:: op_num(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to a number and return it.
+   
+   Aliases: :py:func:`instruction.op_number<op_num>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_num(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to a number and return it.
+   
+   Aliases: :py:func:`instruction.op_number<op_num>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
+.. py:function:: op_oct(opnum)
+   
+   Set the type for operand ``opnum`` at the current instruction to octal and return it.
+   
+   Aliases: :py:func:`instruction.op_octal<op_oct>`
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_oct(ea, opnum)
+   
+   Set the type for operand ``opnum`` belonging to the instruction at ``ea`` to octal and return it.
+   
+   Aliases: :py:func:`instruction.op_octal<op_oct>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
    
 .. py:function:: op_refs(opnum)
    
@@ -339,20 +479,20 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the current instruction
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
-   :type structure: structure_t or member_t
+   :type structure: structure_t
    :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
-.. py:function:: op_structure(opnum, id, \*\*delta)
+.. py:function:: op_structure(opnum, member, \*\*delta)
    
-   Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the current address.
+   Apply the specified ``member`` to the instruction operand ``opnum`` at the current address.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
-   :param opnum: the operand number of the current instruction
+   :param opnum: the operand number of the instruction
    :type opnum: int or long
-   :param id: the id of a structure
-   :type id: int or long
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   :param member: the :py:obj:`member_t` of a structure to apply
+   :type member: member_t
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the member by it
    
 .. py:function:: op_structure(opnum, path, \*\*delta)
    
@@ -377,14 +517,12 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    :param structure: the :py:obj:`structure_t` to apply
-   :type structure: structure_t or member_t
+   :type structure: structure_t
    :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
    
-.. py:function:: op_structure(ea, opnum, id, \*\*delta)
+.. py:function:: op_structure(ea, opnum, member, \*\*delta)
    
-   Apply the structure identified by ``id`` to the instruction operand ``opnum`` at the address ``ea``.
-   
-   If the offset ``delta`` is specified, shift the structure by that amount.
+   Apply the specified ``member`` to the instruction operand ``opnum`` at the address ``ea``.
    
    Aliases: :py:func:`instruction.op_struct<op_structure>`, :py:func:`instruction.op_struc<op_structure>`
    
@@ -392,9 +530,9 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param opnum: the operand number of the instruction
    :type opnum: int or long
-   :param id: the id of a structure
-   :type id: int or long
-   :param \*\*delta: if ``delta`` is specified as an integer, then offset the structure by it
+   :param member: the :py:obj:`member_t` of a structure to apply
+   :type member: member_t
+   :param \*\*delta: if ``delta`` is specified as an integer, then offset the member by it
    
 .. py:function:: op_structure(ea, opnum, path, \*\*delta)
    

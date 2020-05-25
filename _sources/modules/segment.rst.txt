@@ -21,8 +21,10 @@ follows:
 - ``index`` - Match the segment by its index
 - ``identifier`` - Match the segment by its identifier
 - ``selector`` - Match the segment by its selector
-- ``greater`` or ``gt`` - Filter the segments for any after the specified address
-- ``less`` or ``lt`` - Filter the segments for any before the specified address
+- ``greater`` or ``ge`` - Filter the segments for any after the specified address (inclusive)
+- ``gt`` - Filter the segments for any after the specified address (exclusive)
+- ``less`` or ``le`` - Filter the segments for any before the specified address (inclusive)
+- ``lt`` - Filter the segments for any before the specified address (exclusive)
 - ``predicate`` - Filter the segments by passing their :py:obj:`idaapi.segment_t` to a callable
 
 Some examples of using these keywords are as follows::

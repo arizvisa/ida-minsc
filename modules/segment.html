@@ -73,8 +73,10 @@ follows:</p>
 <li><code class="docutils literal notranslate"><span class="pre">index</span></code> - Match the segment by its index</li>
 <li><code class="docutils literal notranslate"><span class="pre">identifier</span></code> - Match the segment by its identifier</li>
 <li><code class="docutils literal notranslate"><span class="pre">selector</span></code> - Match the segment by its selector</li>
-<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the segments for any after the specified address</li>
-<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the segments for any before the specified address</li>
+<li><code class="docutils literal notranslate"><span class="pre">greater</span></code> or <code class="docutils literal notranslate"><span class="pre">ge</span></code> - Filter the segments for any after the specified address (inclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">gt</span></code> - Filter the segments for any after the specified address (exclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">less</span></code> or <code class="docutils literal notranslate"><span class="pre">le</span></code> - Filter the segments for any before the specified address (inclusive)</li>
+<li><code class="docutils literal notranslate"><span class="pre">lt</span></code> - Filter the segments for any before the specified address (exclusive)</li>
 <li><code class="docutils literal notranslate"><span class="pre">predicate</span></code> - Filter the segments by passing their <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.segment_t</span></code> to a callable</li>
 </ul>
 <p>Some examples of using these keywords are as follows:</p>

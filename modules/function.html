@@ -69,7 +69,7 @@ determine the relationships between functions.</p>
 <p>Some namespaces are provided for interacting with the different components
 that IDA associates with each function. This can be used to navigate
 to the different parts of a function. Some of the available namespaces
-are <code class="xref py py-obj docutils literal notranslate"><span class="pre">type</span></code>, <a class="reference internal" href="#function.block" title="function.block"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block</span></code></a>, <a class="reference internal" href="#function.chunk" title="function.chunk"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chunk</span></code></a>, <a class="reference internal" href="#function.blocks" title="function.blocks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">blocks</span></code></a>, <a class="reference internal" href="#function.chunks" title="function.chunks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chunks</span></code></a>, and <a class="reference internal" href="#function.frame" title="function.frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">frame</span></code></a>.</p>
+are <a class="reference internal" href="#function.type" title="function.type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">type</span></code></a>, <a class="reference internal" href="#function.block" title="function.block"><code class="xref py py-obj docutils literal notranslate"><span class="pre">block</span></code></a>, <a class="reference internal" href="#function.chunk" title="function.chunk"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chunk</span></code></a>, <a class="reference internal" href="#function.blocks" title="function.blocks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">blocks</span></code></a>, <a class="reference internal" href="#function.chunks" title="function.chunks"><code class="xref py py-obj docutils literal notranslate"><span class="pre">chunks</span></code></a>, and <a class="reference internal" href="#function.frame" title="function.frame"><code class="xref py py-obj docutils literal notranslate"><span class="pre">frame</span></code></a>.</p>
 <div class="section" id="function-list">
 <h2>3.1.3.1. Function list<a class="headerlink" href="#function-list" title="Permalink to this headline">¶</a></h2>
 <p>The functions that are available in this module use multicased
@@ -2635,6 +2635,62 @@ one to filter functions according to their particular attributes.</p>
 </pre></div>
 </div>
 <dl class="function">
+<dt id="function.type">
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the typeinfo for the current function as a <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the typeinfo for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> as a <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to get the typeinfo for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> typeinfo in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to set the typeinfo for</li>
+<li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the typeinfo string to assign to the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em>, <em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Parse the typeinfo string in <code class="docutils literal notranslate"><span class="pre">info</span></code> to an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> and apply it to the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to set the typeinfo for</li>
+<li><strong>info</strong> (<em>str</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to assign to the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.type.has_frameptr">
 <code class="descclassname">type.</code><code class="descname">has_frameptr</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.has_frameptr" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return true if the current function uses a frame pointer (register).</p>
@@ -2679,6 +2735,28 @@ one to filter functions according to their particular attributes.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="function.type.has_prototype">
+<code class="descclassname">type.</code><code class="descname">has_prototype</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.has_prototype" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns true if the current function has a prototype associated with it.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.prototypeQ</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">has_prototype</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
+<dd><p>Returns true if the function <code class="docutils literal notranslate"><span class="pre">func</span></code> has a prototype associated with it.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.prototypeQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="function.type.has_return">
 <code class="descclassname">type.</code><code class="descname">has_return</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.has_return" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return true if the current function returns.</p>
@@ -2704,17 +2782,19 @@ one to filter functions according to their particular attributes.</p>
 <dt id="function.type.is_far">
 <code class="descclassname">type.</code><code class="descname">is_far</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.is_far" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the current function is considered a “far” function by IDA or the user.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.is_far" title="function.type.is_far"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.farQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">is_far</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns true if the function <code class="docutils literal notranslate"><span class="pre">func</span></code> is considered a “far” function by IDA or the user.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.is_far" title="function.type.is_far"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.farQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check</td>
 </tr>
 </tbody>
 </table>
@@ -2724,17 +2804,19 @@ one to filter functions according to their particular attributes.</p>
 <dt id="function.type.is_hidden">
 <code class="descclassname">type.</code><code class="descname">is_hidden</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.is_hidden" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the current function is hidden.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.is_hidden" title="function.type.is_hidden"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.hiddenQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">is_hidden</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns true if the function <code class="docutils literal notranslate"><span class="pre">func</span></code> is hidden.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.is_hidden" title="function.type.is_hidden"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.hiddenQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check</td>
 </tr>
 </tbody>
 </table>
@@ -2766,17 +2848,19 @@ one to filter functions according to their particular attributes.</p>
 <dt id="function.type.is_static">
 <code class="descclassname">type.</code><code class="descname">is_static</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.is_static" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the current function is a static function.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.is_static" title="function.type.is_static"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.staticQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">is_static</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns true if the function <code class="docutils literal notranslate"><span class="pre">func</span></code> is a static function.</p>
+<p>Aliases: <a class="reference internal" href="#function.type.is_static" title="function.type.is_static"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.staticQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – </td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to check</td>
 </tr>
 </tbody>
 </table>
