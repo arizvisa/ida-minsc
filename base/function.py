@@ -22,7 +22,7 @@ import six
 from six.moves import builtins
 
 import functools, operator, itertools, types
-import logging
+import logging, string
 
 import database, instruction, structure
 import ui, internal
@@ -1505,6 +1505,61 @@ def tag(func):
     if fname and database.type.flags(interface.range.start(fn), idaapi.FF_NAME):
         res.setdefault('__name__', fname)
 
+    # add the function's typeinfo to the result
+    if type.has_prototype(fn):
+        ti, fname = type(fn), database.name(interface.range.start(fn))
+
+        # Check if our function name does not need to be demangled, because then
+        # we can just add the name to it.
+        if internal.declaration.demangle(fname) == fname:
+            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, "{!s}".format(fname), '')
+
+        # Otherwise our name needs demangling and we need to do some trickery
+        # in order to extract it to print in the prototype.
+        else:
+            # Demangle the string and check to see what we need to strip out.
+            fname_demangled = internal.declaration.demangle(fname)
+            has_parameters = any(item in fname_demangled for item in '()')
+            fname_noparameters = fname_demangled[:fname_demangled.find('(')] if has_parameters else fname_demangled
+
+            # Strip out all templates
+            fname_notemplates, count = '', 0
+            for item in fname_noparameters:
+                if item in '<>':
+                    count += +1 if item in '<' else -1
+                elif count == 0:
+                    fname_notemplates += item
+                continue
+
+            # Now we need to find the calling convention since and remove it
+            # since that's already in the typeinfo anyways.
+            items = fname_notemplates.split(' ')
+            conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
+            try:
+                ccindex = builtins.next(idx for idx, item in builtins.enumerate(items) if item in conventions)
+                items = items[1 + ccindex:]
+
+            # We couldn't find a calling convention, so leave everything alone.
+            except StopIteration:
+                items = items[:]
+
+            # Strip out any backticked components
+            foperatorQ = lambda s: s.startswith('operator') and any(s.endswith(invalid) for invalid in string.punctuation)
+            joined = ' '.join(items)
+            if '::' in joined:
+                components = joined.split('::')
+                components = (item for item in components if not item.startswith('`'))
+                components = ('operator' if foperatorQ(item) else item for item in components)
+                joined = '::'.join(components)
+
+            # Now we can strip out everything before the last space, and then
+            # use it as the typename.
+            funcname = joined.rsplit(' ', 1)[-1]
+            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, "{!s}".format(funcname), '')
+
+        # And then return it to the user
+        res.setdefault('__typeinfo__', fprototype)
+
     # ..and now hand it off.
     return res
 @utils.multicase(key=basestring)
@@ -1533,6 +1588,10 @@ def tag(func, key, value):
     # if the user wants to change the '__name__' tag then update the function's name.
     if key == '__name__':
         return name(fn, value)
+
+    # if the user wants to change the '__typeinfo__' tag, then apply it to the function's prototype
+    if key == '__typeinfo__':
+        return type(fn, value)
 
     # decode the comment, fetch the old key, re-assign the new key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
@@ -1734,7 +1793,11 @@ class type(object):
     def __new__(cls):
         '''Return the typeinfo for the current function as a ``idaapi.tinfo_t``.'''
         return cls(ui.current.function())
-    @utils.multicase()
+    @utils.multicase(info=(basestring, idaapi.tinfo_t))
+    def __new__(cls, info):
+        '''Apply the typeinfo in `info` to the current function.'''
+        return cls(ui.current.function(), info)
+    @utils.multicase(func=six.integer_types + (idaapi.func_t,))
     def __new__(cls, func):
         '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
         fn = by(func)
