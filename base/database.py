@@ -22,7 +22,7 @@ import six
 from six.moves import builtins
 
 import functools, operator, itertools, types
-import sys, os, logging
+import sys, os, logging, string
 import math, array as _array, fnmatch, re, ctypes
 
 import function, segment
@@ -1391,12 +1391,68 @@ def tag(ea):
     # modify the decoded dictionary with any implicit tags
     aname = name(ea)
     if aname and type.flags(ea, idaapi.FF_NAME): res.setdefault('__name__', aname)
+
     eprefix = extra.__get_prefix__(ea)
     if eprefix is not None: res.setdefault('__extra_prefix__', eprefix)
+
     esuffix = extra.__get_suffix__(ea)
     if esuffix is not None: res.setdefault('__extra_suffix__', esuffix)
+
     col = color(ea)
     if col is not None: res.setdefault('__color__', col)
+
+    # if there's some typeinfo then we need to figure out its name so we can
+    # format it.
+    if type.has_typeinfo(ea):
+        ti = type(ea)
+
+        # Check to see if our name is demangled. If so, then we need to do some
+        # trickery to extract the name for printing its type.
+        realname = aname
+        if realname and internal.declaration.demangle(aname) != realname:
+            demangled = internal.declaration.demangle(realname)
+            has_parameters = any(item in demangled for item in '()')
+            noparameters = demangled[:demangled.find('(')] if has_parameters else demangled
+
+            # Strip out all templates
+            notemplates, count = '', 0
+            for item in noparameters:
+                if item in '<>':
+                    count += +1 if item in '<' else -1
+                elif count == 0:
+                    notemplates += item
+                continue
+
+            # Now we need to remove the calling convention since that's already
+            # in the typeinfo anyways.
+            items = notemplates.split(' ')
+            conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
+            try:
+                ccindex = builtins.next(idx for idx, item in builtins.enumerate(items) if item in conventions)
+                items = items[1 + ccindex:]
+
+            # We couldn't find a calling convention, so there's no work to do.
+            except StopIteration:
+                items = items[:]
+
+            # Strip out any backticked components
+            foperatorQ = lambda s: s.startswith('operator') and any(s.endswith(invalid) for invalid in string.punctuation)
+            joined = ' '.join(items)
+            if '::' in joined:
+                components = joined.split('::')
+                components = (item for item in components if not item.startswith('`'))
+                components = ('operator' if foperatorQ(item) else item for item in components)
+                joined = '::'.join(components)
+
+            # Now we can strip out everything before the last space, and then
+            # use it as the typename.
+            realname = joined.rsplit(' ', 1)[-1]
+
+        else:
+            realname = aname or ''
+
+        ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, "{!s}".format(realname), '')
+        res.setdefault('__typeinfo__', ti_s)
 
     # now return what the user cares about
     return res
@@ -1434,6 +1490,8 @@ def tag(ea, key, value):
         return extra.__set_suffix__(ea, value)
     if key == '__color__':
         return color(ea, value)
+    if key == '__typeinfo__':
+        return type(ea, value)
 
     # if not within a function, then use a repeatable comment otherwise, use a non-repeatable one
     try:
@@ -3114,6 +3172,22 @@ class type(object):
         '''Return true if the address at `ea` has a label.'''
         return type.has_dummyname(ea) or type.has_customname(ea)
     labelQ = utils.alias(is_label, 'type')
+
+    @utils.multicase()
+    @staticmethod
+    def has_typeinfo():
+        '''Return true if the current address has some typeinfo associated with it.'''
+        return type.has_typeinfo(ui.current.address())
+    @utils.multicase()
+    @staticmethod
+    def has_typeinfo(ea):
+        '''Return true if the address at `ea` has some typeinfo associated with it.'''
+        try:
+            type(ea)
+        except Exception as E:
+            return False
+        return True
+    typeinfoQ = utils.alias(has_typeinfo, 'type')
 
     class array(object):
         """
