@@ -42,9 +42,14 @@ def size(string):
     f = idaapi.get_type_size0 if idaapi.__version__ < 6.8 else idaapi.calc_type_size
     return f(idaapi.cvar.idati, type)
 
+@internal.utils.string.decorate_arguments('string')
 def demangle(string):
     '''Given a mangled C++ `string`, demangle it back into a human-readable symbol.'''
-    return extract.declaration(string)
+    if idaapi.__version__ < 7.0:
+        res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames)
+    else:
+        res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames, idaapi.DQT_FULL)
+    return string if res is None else internal.utils.string.of(res)
 
 def mangledQ(string):
     '''Return true if the provided `string` has been mangled.'''
@@ -96,11 +101,7 @@ def string(ti):
 class extract:
     @staticmethod
     def declaration(string):
-        if idaapi.__version__ < 7.0:
-            res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames)
-        else:
-            res = idaapi.demangle_name(internal.utils.string.to(string), idaapi.cvar.inf.long_demnames, idaapi.DQT_FULL)
-        return string if res is None else internal.utils.string.of(res)
+        return demangle(string)
 
     @staticmethod
     def convention(string):
