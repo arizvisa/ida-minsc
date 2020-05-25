@@ -610,6 +610,7 @@ class names(object):
     __matcher__.attribute('index')
 
     def __new__(cls):
+        '''Iterate through all of the names in the database yielding a tuple of the address and its name.'''
         for index in six.moves.range(idaapi.get_nlist_size()):
             res = zip((idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)), (index,)*2)
             yield tuple(f(x) for f, x in res)
@@ -3123,7 +3124,7 @@ class type(object):
 
         Some examples of using this namespace can be::
 
-            > type, length = databaes.t.array()
+            > type, length = database.t.array()
             > print database.t.array.size(ea)
             > print database.t.array.type(ea)
             > print database.t.array.element(ea)
