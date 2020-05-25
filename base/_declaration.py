@@ -10,6 +10,7 @@ TODO: Implement parsers for some of the C++ symbol manglers in order to
 
 import function as fn, database as db
 import internal, idaapi
+import string as _string
 
 ### c declaration stuff
 def function(ea):
@@ -79,6 +80,54 @@ def string(ti):
     cmt, cindent = '', 4
     flags = idaapi.PRTYPE_DEF | idaapi.PRTYPE_MULTI
     return idaapi.print_tinfo(prefix, indent, cindent, flags, ti, name, cmt)
+
+def unmangle_name(name):
+    '''Return the function name from a prototype to be used for rendered an ``idaapi.tino_t``.'''
+
+    # Check to see if our name is demangled. If not, then we can just return it.
+    demangled = demangle(name)
+    if not name or demangled == name:
+        return demangled
+
+    # If so, then we need to do some trickery to extract the name.
+    has_parameters = any(item in demangled for item in '()')
+    noparameters = demangled[:demangled.find('(')] if has_parameters else demangled
+
+    # Strip out all templates
+    notemplates, count = '', 0
+    for item in noparameters:
+        if item in '<>':
+            count += +1 if item in '<' else -1
+        elif count == 0:
+            notemplates += item
+        continue
+
+    # Now we need to remove the calling convention as it should be in the typeinfo.
+    items = notemplates.split(' ')
+    conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
+    try:
+        ccindex = next(idx for idx, item in enumerate(items) if item in conventions)
+        items = items[1 + ccindex:]
+
+    # We couldn't find a calling convention, so there's no real work to do.
+    except StopIteration:
+        items = items[:]
+
+    # Strip out any backticked components, operators, and other weirdness.
+    foperatorQ = lambda s: s.startswith('operator') and any(s.endswith(invalid) for invalid in _string.punctuation)
+    joined = ' '.join(items)
+    if '::' in joined:
+        components = joined.split('::')
+        components = (item for item in components if not item.startswith('`'))
+        components = ('operator' if foperatorQ(item) else item for item in components)
+        joined = '::'.join(components)
+
+    # Check to see if this is some operator of some kind.
+    if joined.count(' ') > 0 and joined.rsplit(' ', 2)[-2] == 'operator':
+        return '_'.join(joined.rsplit(' ', 2)[-2:])
+
+    # Now we can drop everything before the last space, and then return it.
+    return joined.rsplit(' ', 1)[-1]
 
 ## examples to test below code with
 #"??_U@YAPAXI@Z"
