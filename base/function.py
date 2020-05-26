@@ -1509,53 +1509,9 @@ def tag(func):
     if type.has_prototype(fn):
         ti, fname = type(fn), database.name(interface.range.start(fn))
 
-        # Check if our function name does not need to be demangled, because then
-        # we can just add the name to it.
-        if internal.declaration.demangle(fname) == fname:
-            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, "{!s}".format(fname), '')
-
-        # Otherwise our name needs demangling and we need to do some trickery
-        # in order to extract it to print in the prototype.
-        else:
-            # Demangle the string and check to see what we need to strip out.
-            fname_demangled = internal.declaration.demangle(fname)
-            has_parameters = any(item in fname_demangled for item in '()')
-            fname_noparameters = fname_demangled[:fname_demangled.find('(')] if has_parameters else fname_demangled
-
-            # Strip out all templates
-            fname_notemplates, count = '', 0
-            for item in fname_noparameters:
-                if item in '<>':
-                    count += +1 if item in '<' else -1
-                elif count == 0:
-                    fname_notemplates += item
-                continue
-
-            # Now we need to find the calling convention since and remove it
-            # since that's already in the typeinfo anyways.
-            items = fname_notemplates.split(' ')
-            conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
-            try:
-                ccindex = builtins.next(idx for idx, item in builtins.enumerate(items) if item in conventions)
-                items = items[1 + ccindex:]
-
-            # We couldn't find a calling convention, so leave everything alone.
-            except StopIteration:
-                items = items[:]
-
-            # Strip out any backticked components
-            foperatorQ = lambda s: s.startswith('operator') and any(s.endswith(invalid) for invalid in string.punctuation)
-            joined = ' '.join(items)
-            if '::' in joined:
-                components = joined.split('::')
-                components = (item for item in components if not item.startswith('`'))
-                components = ('operator' if foperatorQ(item) else item for item in components)
-                joined = '::'.join(components)
-
-            # Now we can strip out everything before the last space, and then
-            # use it as the typename.
-            funcname = joined.rsplit(' ', 1)[-1]
-            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, "{!s}".format(funcname), '')
+        # Demangle the name if necessary, and render it to a string.
+        realname = internal.declaration.unmangle_name(fname)
+        fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
 
         # And then return it to the user
         res.setdefault('__typeinfo__', fprototype)
@@ -1572,12 +1528,13 @@ def tag(func, key, value):
     # Check to see if function tag is being applied to an import
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
+
+    # If we're not even in a function, then use a database tag.
     except E.FunctionNotFoundError:
-        # If we're not even in a function, then use a database tag.
         logging.warn(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
         return database.tag(func, key, value)
 
-    # If so, then write the tag to the import
+    # If we are a runtime-only function, then write the tag to the import
     if rt:
         logging.warn(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
         return database.tag(ea, key, value)
@@ -1635,6 +1592,8 @@ def tag(func, key, none):
         return name(fn, None)
     elif key == '__color__':
         return color(fn, None)
+    elif key == '__typeinfo__':
+        return type(fn, None)
 
     # decode the comment, remove the key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
@@ -1792,16 +1751,19 @@ class type(object):
     @utils.multicase()
     def __new__(cls):
         '''Return the typeinfo for the current function as a ``idaapi.tinfo_t``.'''
-        return cls(ui.current.function())
+        return cls(ui.current.address())
     @utils.multicase(info=(basestring, idaapi.tinfo_t))
     def __new__(cls, info):
         '''Apply the typeinfo in `info` to the current function.'''
-        return cls(ui.current.function(), info)
+        return cls(ui.current.address(), info)
+    @utils.multicase(none=types.NoneType)
+    def __new__(cls, none):
+        '''Remove the typeinfo for the current function.'''
+        return cls(ui.current.address(), None)
     @utils.multicase(func=six.integer_types + (idaapi.func_t,))
     def __new__(cls, func):
         '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
-        fn = by(func)
-        ea = interface.range.start(fn)
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
         try:
             ti = database.type(ea)
 
@@ -1815,34 +1777,96 @@ class type(object):
     @utils.multicase(info=idaapi.tinfo_t)
     def __new__(cls, func, info):
         '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the function `func`.'''
-        fn = by(func)
-        ea = interface.range.start(fn)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+
+        # In order to apply the typeinfo with idaapi.apply_cdecl, we need the
+        # typeinfo as a string. To accomplish this, we need need the typeinfo
+        # with its name attached.
+        fname = database.name(ea)
+        realname = internal.declaration.unmangle_name(fname)
+
+        # Filter out invalid characters from the function name since we're going
+        # to use this to render the declaration next.
+        valid = {item for item in string.digits}
+        valid |= {item for item in ':'}
+        filtered = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in realname)
+
+        # Now we have the name and its filtered, we can simply render it.
         try:
-            ti = database.type(ea, info)
+            tinfo_s = idaapi.print_tinfo('', 0, 0, 0, info, utils.string.to(filtered), '')
 
-        # If we caught a disassembler error exception, then we couldn't apply
-        # the user's type to the function.
-        except E.DisassemblerError:
-            raise E.DisassemblerError(u"{:s}.info({:#x}) : Unable to apply `idaapi.tinfo_t()` to function.".format('.'.join((__name__, cls.__name__)), ea))
+        # If we caught an error, then we couldn't render the string for some reason.
+        except Exception:
+            raise E.DisassemblerError(u"{:s}({:#x}, \"{:s}\") : Unable to render `idaapi.tinfo_t()` with name (\"{!s}\") to a string.".format('.'.join((__name__, cls.__name__)), ea, utils.string.escape("{!s}".format(info), '"'), utils.string.escape(realname, '"')))
 
-        # Return the type info we received after the apply back to the caller.
-        return ti
+        # Recurse back into ourselves in order to call idaapi.apply_cdecl
+        return cls(ea, tinfo_s)
     @utils.multicase(info=basestring)
     def __new__(cls, func, info):
         '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
+        til = idaapi.get_idati()
+        _, ea = interface.addressOfRuntimeOrStatic(func)
+        conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
+
+        # First extract the arguments that we were given, and use that to extract
+        # the name of the function (and possibly the usercall register)
+        parameters = internal.declaration.extract.arguments(info)
+        noparameters = info[:-len(parameters)]
+
+        # Figure out which part of `noparameters` contains the actual name
+        if any(item in noparameters for item in conventions):
+            components = noparameters.split(' ')
+            index = next(index for index, item in enumerate(components) if any(item.endswith(cc) for cc in conventions))
+            funcname = ' '.join(components[-index:])
+
+        # If nothing was found, then we have no choice but to chunk it out
+        # according to the first space.
+        else:
+            funcname = noparameters.rsplit(' ', 1)[-1]
+
+        # Filter out invalid characters from the name so that we can apply this
+        # as a declaration.
+        valid = {item for item in string.digits}
+        if '__usercall' in noparameters:
+            valid |= {item for item in '<>@'}
+        valid |= {item for item in ':'}
+        funcname_s = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in funcname)
+
+        # Filter out invalid characters from the parameters so that this can
+        # be applied as a declaration
+        valid |= {item for item in ', *&[]'}
+        parameters_s = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in parameters.lstrip('(').rstrip(')'))
+
+        # Now we can replace both the name and parameters in our typeinfo string
+        # with the filtered versions.
+        info_s = "{!s} {:s}({:s})".format(noparameters[:-len(funcname)].strip(), funcname_s, parameters_s)
+
+        # Terminate the typeinfo string with a ';' so that IDA can parse it.
+        terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
+
+        # Now we should just be able to apply it to the function.
+        ok = idaapi.apply_cdecl(idaapi.get_idati(), ea, terminated)
+        if not ok:
+            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to apply the specified type declaration (\"{!s}\").".format('.'.join((__name__, cls.__name__)), ea, utils.string.escape(info, '"')))
+
+        # Just return the type we applied to the user.
+        return cls(ea)
+    @utils.multicase(none=types.NoneType)
+    def __new__(cls, func, none):
+        '''Remove the typeinfo for the function `func`.'''
         fn = by(func)
-        ea = interface.range.start(fn)
+        ti, ea = idaapi.tinfo_t(), interface.range.start(fn)
 
-        # Now that we've got an address, we can ask IDA to parse this into a
-        # tinfo_t for us. If we received None, then raise an exception due
-        # to there being a parsing error of some sort.
-        ti = internal.declaration.parse(info)
-        if ti is None:
-            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
+        raise E.UnsupportedCapability(u"{:s}({:#x}, {!s}) : IDAPython does not allow one to remove the prototype of a function.`.".format('.'.join((__name__, cls.__name__)), ea, None))
 
-        # Recurse into ourselves now that we have the actual typeinfo so that
-        # it can be applied to the function.
-        return cls(func, ti)
+        # There really isn't a way to remove the prototype from a function,
+        # but it seems that there are some supvals and altvals which are
+        # created. So, we'll go through and remove this because it's the best
+        # that we've got.
+        internal.netnode.sup.remove(ea, 8)
+        internal.netnode.alt.remove(ea, 0x3000)
+
+        return cls(ui.current.function(), None)
 
     @utils.multicase()
     @classmethod
