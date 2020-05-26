@@ -1406,52 +1406,12 @@ def tag(ea):
     if type.has_typeinfo(ea):
         ti = type(ea)
 
-        # Check to see if our name is demangled. If so, then we need to do some
-        # trickery to extract the name for printing its type.
-        realname = aname
-        if realname and internal.declaration.demangle(aname) != realname:
-            demangled = internal.declaration.demangle(realname)
-            has_parameters = any(item in demangled for item in '()')
-            noparameters = demangled[:demangled.find('(')] if has_parameters else demangled
+        # Demangle the name if it's mangled in some way, and use it to render
+        # the typeinfo to return.
+        realname = internal.declaration.unmangle_name(aname)
+        ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
 
-            # Strip out all templates
-            notemplates, count = '', 0
-            for item in noparameters:
-                if item in '<>':
-                    count += +1 if item in '<' else -1
-                elif count == 0:
-                    notemplates += item
-                continue
-
-            # Now we need to remove the calling convention since that's already
-            # in the typeinfo anyways.
-            items = notemplates.split(' ')
-            conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
-            try:
-                ccindex = builtins.next(idx for idx, item in builtins.enumerate(items) if item in conventions)
-                items = items[1 + ccindex:]
-
-            # We couldn't find a calling convention, so there's no work to do.
-            except StopIteration:
-                items = items[:]
-
-            # Strip out any backticked components
-            foperatorQ = lambda s: s.startswith('operator') and any(s.endswith(invalid) for invalid in string.punctuation)
-            joined = ' '.join(items)
-            if '::' in joined:
-                components = joined.split('::')
-                components = (item for item in components if not item.startswith('`'))
-                components = ('operator' if foperatorQ(item) else item for item in components)
-                joined = '::'.join(components)
-
-            # Now we can strip out everything before the last space, and then
-            # use it as the typename.
-            realname = joined.rsplit(' ', 1)[-1]
-
-        else:
-            realname = aname or ''
-
-        ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, "{!s}".format(realname), '')
+        # Add it to our dictionary that we return to the user.
         res.setdefault('__typeinfo__', ti_s)
 
     # now return what the user cares about
@@ -1534,6 +1494,8 @@ def tag(ea, key, none):
         return extra.__del_prefix__(ea)
     if key == '__extra_suffix__':
         return extra.__del_suffix__(ea)
+    if key == '__typeinfo__':
+        return type(ea, None)
 
     # if not within a function, then fetch the repeatable comment otherwise update the non-repeatable one
     try:
@@ -2884,7 +2846,7 @@ class type(object):
             fl = idaapi.PRTYPE_1LINE
             info_s = idaapi.print_type(ea, fl)
 
-            # If we couldn't get it, then just raise an exception.
+            # If we still couldn't get it, then just raise an exception.
             if info_s is None:
                 raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
 
@@ -2893,8 +2855,11 @@ class type(object):
             if ti is None:
                 raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the returned type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info_s)))
             return ti
-
         return ti
+    @utils.multicase(none=types.NoneType)
+    def __new__(cls, none):
+        '''Remove the typeinfo from the current address.'''
+        return cls(ui.current.address(), None)
     @utils.multicase(info=(basestring, idaapi.tinfo_t))
     def __new__(cls, info):
         '''Apply the ``idaapi.tinfo_t`` typeinfo or typeinfo string in `info` to the current address.'''
@@ -2904,23 +2869,69 @@ class type(object):
         '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the address `ea`.'''
         info_s = "{!s}".format(info)
 
+        # Check if we're pointing at an export or directly at a function. If we
+        # are, then we need to use function.type.
+        try:
+            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            if rt or function.address(ea) == ea:
+                return function.type(ea, info)
+
+        except E.FunctionNotFoundError:
+            pass
+
         # All we need to do is to use idaapi to apply our parsed tinfo_t to the
         # address we were given.
-        ok = idaapi.apply_tinfo(ea, info, idaapi.TINFO_GUESSED)
+        ok = idaapi.apply_tinfo(ea, info, idaapi.TINFO_DEFINITE)
         if not ok:
             raise E.DisassemblerError(u"{:s}.info({:#x}, {!s}) : Unable to apply typeinfo ({!s}) to the address ({:#x}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info_s), utils.string.repr(info_s), ea))
 
         # Return the typeinfo that was applied to the specified address.
         return cls(ea)
+    @utils.multicase(none=types.NoneType)
+    def __new__(cls, ea, none):
+        '''Remove the typeinfo from the address `ea`.'''
+        ti = idaapi.tinfo_t()
+
+        # Grab the previous typeinfo if there was something there, and coerce
+        # it to None if we got an error of some sort.
+        try:
+            result = cls(ea)
+
+        except E.DisassemblerError:
+            result = None
+
+        # Clear the tinfo_t we created, and apply it to the given address. We
+        # discard the result because IDA will _always_ give us an error despite
+        # successfully clearing the typeinfo.
+        ti.clear()
+        _ = idaapi.apply_tinfo(ea, ti, idaapi.TINFO_DEFINITE)
+
+        return result
+
     @utils.multicase(ea=six.integer_types, info=basestring)
     @utils.string.decorate_arguments('info')
     def __new__(cls, ea, info):
         '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the address `ea`.'''
 
+        # Check if we're pointing at an export or directly at a function. If we
+        # are, then we need to use function.type.
+        try:
+            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            if rt or function.address(ea) == ea:
+                return function.type(ea, info)
+
+        except E.FunctionNotFoundError:
+            pass
+
+        # Strip out any invalid characters and replace them with '_'
+        # declaration next.
+        valid = {item for item in ': &*()[]@,' + string.digits}
+        info_s = str().join(item if item in valid or idaapi.is_valid_typename(utils.string.to(item)) else '_' for item in info)
+
         # Now that we've prepped everything, ask IDA to parse this into a
         # tinfo_t for us. If we received None, then raise an exception due
         # to there being a parsing error of some sort.
-        ti = internal.declaration.parse(info)
+        ti = internal.declaration.parse(info_s)
         if ti is None:
             raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(info)))
 
