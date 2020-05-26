@@ -106,7 +106,7 @@ def unmangle_name(name):
     items = notemplates.split(' ')
     conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
     try:
-        ccindex = next(idx for idx, item in enumerate(items) if item in conventions)
+        ccindex = next(idx for idx, item in enumerate(items) if any(item.endswith(cc) for cc in conventions))
         items = items[1 + ccindex:]
 
     # We couldn't find a calling convention, so there's no real work to do.
@@ -123,11 +123,55 @@ def unmangle_name(name):
         joined = '::'.join(components)
 
     # Check to see if this is some operator of some kind.
-    if joined.count(' ') > 0 and joined.rsplit(' ', 2)[-2] == 'operator':
+    if joined.count(' ') > 0 and joined.rsplit(' ', 2)[-2].endswith('operator'):
         return '_'.join(joined.rsplit(' ', 2)[-2:])
 
     # Now we can drop everything before the last space, and then return it.
     return joined.rsplit(' ', 1)[-1]
+
+def unmangle_arguments(ea):
+    info = fn.type(ea)
+    if not info.present():
+        raise ValueError(info)
+
+    # Grab the parameters from the idc type as it includes more information
+    parameters = extract.arguments("{!s}".format(idaapi.idc_get_type(ea))) or extract.arguments("{!s}".format(info))
+    param_s = parameters.lstrip('(').rstrip(')')
+
+    index, indices, iterable = 0, [], iter(enumerate(param_s))
+    for argi in range(info.get_nargs()):
+        arg = info.get_nth_arg(argi)
+        arg_s = "{!s}".format(arg)
+
+        index, ch = next(iterable, (1+index,','))
+        while ch in ' ':
+            index, ch = next(iterable)
+
+        while ch != ',':
+            for item in arg_s:
+                index, ch = next(iterable)
+                if ch != item: break
+
+            count = 0
+            while ch != ',' or count > 0:
+                index, ch = next(iterable, (1+index, ','))
+                if ch in '()':
+                    count += -1 if ch in ')' else +1
+                continue
+
+            indices.append(index)
+
+    pos, res = 0, []
+    for argi, index in enumerate(indices):
+        arg = info.get_nth_arg(argi)
+        arg_s = "{!s}".format(arg)
+
+        item = param_s[pos : index].strip()
+        pos = 1 + index
+
+        t, name = item[:len(arg_s)], item[len(arg_s):]
+        res.append((t.strip(), name.strip()))
+    return res
 
 ## examples to test below code with
 #"??_U@YAPAXI@Z"
@@ -170,8 +214,17 @@ class extract:
 
     @staticmethod
     def arguments(string):
-        decl = extract.declaration(string)
-        return map(str.strip, decl[decl.index('(')+1:decl.find(')')].split(',')) if '(' in decl else []
+        res, count = '', 0
+        for item in string[::-1]:
+            if item in '()':
+                count += +1 if item in ')' else -1
+                res += item
+            elif count > 0:
+                res += item
+            elif count == 0:
+                break
+            continue
+        return str().join(reversed(res))
 
     @staticmethod
     def result(string):
