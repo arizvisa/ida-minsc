@@ -1566,12 +1566,14 @@ class architecture_t(object):
         # older
         if idaapi.__version__ < 7.0:
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
+            dt_bitfield = idaapi.dt_bitfield
         # newer
         else:
             dtype_by_size = idaapi.get_dtype_by_size
+            dt_bitfield = idaapi.dt_bitfild
 
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
-        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
 
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits})
@@ -1589,11 +1591,13 @@ class architecture_t(object):
         # older
         if idaapi.__version__ < 7.0:
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
+            dt_bitfield = idaapi.dt_bitfield
         # newer
         else:
             dtype_by_size = idaapi.get_dtype_by_size
+            dt_bitfield = idaapi.dt_bitfild
 
-        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), idaapi.dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits})
