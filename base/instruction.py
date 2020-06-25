@@ -2135,7 +2135,7 @@ def __newprc__(id):
     elif plfm == idaapi.PLFM_ARM:   # id == 1
         res, description = AArch64() if database.config.bits() > 32 else AArch32(), "AArch{:d}".format(database.config.bits())
     elif plfm == idaapi.PLFM_MIPS:  # id == 12
-        res = Mips(), 'MIPS'
+        res, description = Mips(), "MIPS{:d}".format(database.config.bits())
     else:
         logging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
         return
