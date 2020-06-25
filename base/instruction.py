@@ -2131,7 +2131,7 @@ def __newprc__(id):
 
     plfm, m = idaapi.ph.id, __import__('sys').modules[__name__]
     if plfm == idaapi.PLFM_386:     # id == 15
-        res, description = Intel(), "Intel architecture ({:d}-bit)".format(database.config.bits())
+        res, description = Intel(), "Intel architecture {:d}-bit".format(database.config.bits())
     elif plfm == idaapi.PLFM_ARM:   # id == 1
         res, description = AArch64() if database.config.bits() > 32 else AArch32(), "AArch{:d}".format(database.config.bits())
     elif plfm == idaapi.PLFM_MIPS:  # id == 12
@@ -2140,8 +2140,7 @@ def __newprc__(id):
         logging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
         return
 
-    lookup = { getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('PLFM_') }
-    logging.warn("Received notification to use processor {:s}({:d}) -- {:s}".format(lookup[plfm], plfm, description))
+    logging.warn("Detected processor module : {:s} ({:d})".format(description, plfm))
 
     # assign our required globals
     m.architecture, m.register = res, res.r
