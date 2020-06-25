@@ -2125,16 +2125,23 @@ def __newprc__(id):
     Determine the architecture from the current processor and use it to initialize
     the globals (``architecture`` and ``register``) within this module.
     """
+    if not hasattr(database, 'config'):
+        # XXX: If this module hasn't been loaded properly, then this is because IDA hasn't actually started yet.
+        return
+
     plfm, m = idaapi.ph.id, __import__('sys').modules[__name__]
     if plfm == idaapi.PLFM_386:     # id == 15
-        res = Intel()
+        res, description = Intel(), "Intel architecture ({:d}-bit)".format(database.config.bits())
     elif plfm == idaapi.PLFM_ARM:   # id == 1
-        res = AArch64() if database.config.bits() > 32 else AArch32()
+        res, description = AArch64() if database.config.bits() > 32 else AArch32(), "AArch{:d}".format(database.config.bits())
     elif plfm == idaapi.PLFM_MIPS:  # id == 12
-        res = Mips()
+        res = Mips(), 'MIPS'
     else:
         logging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
         return
+
+    lookup = { getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('PLFM_') }
+    logging.warn("Received notification to use processor {:s}({:d}) -- {:s}".format(lookup[plfm], plfm, description))
 
     # assign our required globals
     m.architecture, m.register = res, res.r
