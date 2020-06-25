@@ -1547,9 +1547,19 @@ class operand_types:
             specval >>= 1
         return armops.list(res)
 
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
+    def extensionlist(ea, op):
+        '''Operand type decoder for AArch's ``idaapi.o_idpspec4`` which returns an extension register list.'''
+        # XXX: It seems that the op.value attribute is what distinguishes the list of registers here.
+        #      0x00000001 - D8
+        #      0x00000002 - D8-D9
+        raise NotImplementedError(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+
     @__optype__.define(idaapi.PLFM_ARM, 0xe)
-    def unknown(ea, op):
-        raise NotImplementedError(u"{:s}.unknown({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+    def condition(ea, op):
+        '''Operand type decoder for dealing with an undocumented operand type found on AArch64.'''
+        # XXX: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
+        raise NotImplementedError(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(ea, op):
