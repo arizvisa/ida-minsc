@@ -1547,6 +1547,10 @@ class operand_types:
             specval >>= 1
         return armops.list(res)
 
+    @__optype__.define(idaapi.PLFM_ARM, 0xe)
+    def unknown(ea, op):
+        raise NotImplementedError(u"{:s}.unknown({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(ea, op):
         '''Operand type decoder for returning a memory displacement on MIPS.'''
