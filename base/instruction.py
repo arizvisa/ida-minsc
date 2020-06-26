@@ -2051,7 +2051,7 @@ class AArch64(AArch):
     def __init__(self):
         return super(AArch64, self).__init__(64)
 
-class Mips(interface.architecture_t):
+class MIPS(interface.architecture_t):
     """
     An implementation of all the registers available on the MIPS architecture.
 
@@ -2062,57 +2062,85 @@ class Mips(interface.architecture_t):
     (or ``instruction.arch``) when the current architecture of the database is MIPS.
     """
     prefix = '$'
-    def __init__(self):
-        super(Mips, self).__init__()
+    def __init__(self, BITS):
+        super(MIPS, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
 
-        setitem('zero', self.new('zero', 32, idaname='$zero'))
-        setitem('at', self.new('at', 32, idaname='$at'))
-        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), 32, idaname="$v{:d}".format(_))) for _ in six.moves.range(2) ]
-        [ setitem("a{:d}".format(_), self.new("a{:d}".format(_), 32, idaname="$a{:d}".format(_))) for _ in six.moves.range(4) ]
-        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), 32, idaname="$t{:d}".format(_))) for _ in six.moves.range(8) ]
-        [ setitem("s{:d}".format(_), self.new("s{:d}".format(_), 32, idaname="$s{:d}".format(_))) for _ in six.moves.range(8) ]
-        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), 32, idaname="$t{:d}".format(_))) for _ in six.moves.range(8, 10) ]
-        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), 32, idaname="$k{:d}".format(_))) for _ in six.moves.range(2) ]
-        setitem('gp', self.new('gp', 32, idaname='$gp'))
-        setitem('sp', self.new('sp', 32, idaname='$sp'))
-        setitem('fp', self.new('fp', 32, idaname='$fp'))
-        setitem('ra', self.new('ra', 32, idaname='$ra'))
-        [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), 32, idaname="$f{:d}".format(_))) for _ in six.moves.range(32) ]
-        setitem('pc', self.new('pc', 32))
+        setitem('zero', self.new('zero', BITS, idaname='$zero'))
+        setitem('at', self.new('at', BITS, idaname='$at'))
+        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), BITS, idaname="$v{:d}".format(_))) for _ in six.moves.range(2) ]
+        [ setitem("a{:d}".format(_), self.new("a{:d}".format(_), BITS, idaname="$a{:d}".format(_))) for _ in six.moves.range(4) ]
+        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), BITS, idaname="$t{:d}".format(_))) for _ in six.moves.range(8) ]
+        [ setitem("s{:d}".format(_), self.new("s{:d}".format(_), BITS, idaname="$s{:d}".format(_))) for _ in six.moves.range(8) ]
+        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), BITS, idaname="$t{:d}".format(_))) for _ in six.moves.range(8, 10) ]
+        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), BITS, idaname="$k{:d}".format(_))) for _ in six.moves.range(2) ]
+        setitem('gp', self.new('gp', BITS, idaname='$gp'))
+        setitem('sp', self.new('sp', BITS, idaname='$sp'))
+        setitem('fp', self.new('fp', BITS, idaname='$fp'))
+        setitem('ra', self.new('ra', BITS, idaname='$ra'))
+        [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_))) for _ in six.moves.range(BITS) ]
+        setitem('pc', self.new('pc', BITS))
 
         # FIXME: add the register definitions for : cs, ds, mips16
 
         # coprocessor registers
-        setitem('Index', self.new('Index', 32, id=0))
-        setitem('Random', self.new('Random', 32, id=0))
-        setitem('EntryLo0', self.new('EntryLo0', 32, id=0))
-        setitem('EntryLo1', self.new('EntryLo1', 32, id=0))
-        setitem('Context', self.new('Context', 32, id=0))
-        setitem('PageMask', self.new('PageMask', 32, id=0))
-        setitem('Wired', self.new('Wired', 32, id=0))
-        setitem('BadVAddr', self.new('BadVAddr', 32, id=0))
-        setitem('Count', self.new('Count', 32, id=0))
-        setitem('EntryHi', self.new('EntryHi', 32, id=0))
-        setitem('Compare', self.new('Compare', 32, id=0))
-        setitem('SR', self.new('SR', 32, id=0))
-        setitem('Cause', self.new('Cause', 32, id=0))
-        setitem('EPC', self.new('EPC', 32, id=0))
-        setitem('PRId', self.new('PRId', 32, id=0))
-        setitem('Config', self.new('Config', 32, id=0))
-        setitem('LLAddr', self.new('LLAddr', 32, id=0))
-        setitem('WatchLo', self.new('WatchLo', 32, id=0))
-        setitem('WatchHi', self.new('WatchHi', 32, id=0))
-        setitem('XContext', self.new('XContext', 32, id=0))
-        setitem('ECC', self.new('ECC', 32, id=0))
-        setitem('CacheErr', self.new('CacheErr', 32, id=0))
-        setitem('TagLo', self.new('TagLo', 32, id=0))
-        setitem('TagHi', self.new('TagHi', 32, id=0))
-        setitem('ErrorEPC', self.new('ErrorEPC', 32, id=0))
+        setitem('Index', self.new('Index', BITS, id=0))
+        setitem('Random', self.new('Random', BITS, id=0))
+        setitem('EntryLo0', self.new('EntryLo0', BITS, id=0))
+        setitem('EntryLo1', self.new('EntryLo1', BITS, id=0))
+        setitem('Context', self.new('Context', BITS, id=0))
+        setitem('PageMask', self.new('PageMask', BITS, id=0))
+        setitem('Wired', self.new('Wired', BITS, id=0))
+        setitem('BadVAddr', self.new('BadVAddr', BITS, id=0))
+        setitem('Count', self.new('Count', BITS, id=0))
+        setitem('EntryHi', self.new('EntryHi', BITS, id=0))
+        setitem('Compare', self.new('Compare', BITS, id=0))
+        setitem('SR', self.new('SR', BITS, id=0))
+        setitem('Cause', self.new('Cause', BITS, id=0))
+        setitem('EPC', self.new('EPC', BITS, id=0))
+        setitem('PRId', self.new('PRId', BITS, id=0))
+        setitem('Config', self.new('Config', BITS, id=0))
+        setitem('LLAddr', self.new('LLAddr', BITS, id=0))
+        setitem('WatchLo', self.new('WatchLo', BITS, id=0))
+        setitem('WatchHi', self.new('WatchHi', BITS, id=0))
+        setitem('XContext', self.new('XContext', BITS, id=0))
+        setitem('ECC', self.new('ECC', BITS, id=0))
+        setitem('CacheErr', self.new('CacheErr', BITS, id=0))
+        setitem('TagLo', self.new('TagLo', BITS, id=0))
+        setitem('TagHi', self.new('TagHi', BITS, id=0))
+        setitem('ErrorEPC', self.new('ErrorEPC', BITS, id=0))
 
         # unmarked coprocessor registers
         i2s = "{:d}".format
-        [ setitem(i2s(_), self.new(i2s(_), 32)) for _ in itertools.chain([7, 31], six.moves.range(20, 26))]
+        [ setitem(i2s(_), self.new(i2s(_), BITS)) for _ in itertools.chain([7, 31], six.moves.range(20, 26))]
+
+class MIPS32(MIPS):
+    """
+    An implementation of all the registers available on the MIPS32 architecture.
+
+    This includes the different co-processor registers that are also available
+    but are treated as special instructions by IDA.
+
+    An instance of this class can be accessed as ``instruction.architecture``
+    (or ``instruction.arch``) when the current architecture of the database is MIPS.
+    """
+
+    def __init__(self):
+        return super(MIPS32, self).__init__(32)
+
+class MIPS64(MIPS):
+    """
+    An implementation of all the registers available on the MIPS64 architecture.
+
+    This includes the different co-processor registers that are also available
+    but are treated as special instructions by IDA.
+
+    An instance of this class can be accessed as ``instruction.architecture``
+    (or ``instruction.arch``) when the current architecture of the database is MIPS.
+    """
+
+    def __init__(self):
+        return super(MIPS64, self).__init__(64)
 
 ## global initialization
 def __nw_newprc__(nw_code, is_old_database):
@@ -2135,7 +2163,7 @@ def __newprc__(id):
     elif plfm == idaapi.PLFM_ARM:   # id == 1
         res, description = AArch64() if database.config.bits() > 32 else AArch32(), "AArch{:d}".format(database.config.bits())
     elif plfm == idaapi.PLFM_MIPS:  # id == 12
-        res, description = Mips(), "MIPS{:d}".format(database.config.bits())
+        res, description = MIPS64() if database.config.bits() > 32 else MIPS32(), "MIPS{:d}".format(database.config.bits())
     else:
         logging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
         return
