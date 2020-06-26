@@ -1547,6 +1547,20 @@ class operand_types:
             specval >>= 1
         return armops.list(res)
 
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
+    def extensionlist(ea, op):
+        '''Operand type decoder for AArch's ``idaapi.o_idpspec4`` which returns an extension register list.'''
+        # XXX: It seems that the op.value attribute is what distinguishes the list of registers here.
+        #      0x00000001 - D8
+        #      0x00000002 - D8-D9
+        raise NotImplementedError(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+
+    @__optype__.define(idaapi.PLFM_ARM, 0xe)
+    def condition(ea, op):
+        '''Operand type decoder for dealing with an undocumented operand type found on AArch64.'''
+        # XXX: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
+        raise NotImplementedError(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(ea, op):
         '''Operand type decoder for returning a memory displacement on MIPS.'''
@@ -1848,7 +1862,7 @@ class Intel(interface.architecture_t):
         ##mxcsr
         ## 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
 
-class AArch32(interface.architecture_t):
+class AArch(interface.architecture_t):
     """
     An implementation of all the registers available on the AArch32 (ARM) architecture.
 
@@ -1858,8 +1872,8 @@ class AArch32(interface.architecture_t):
     (or ``instruction.arch``) when the current architecture of the database is ARM.
     """
     prefix = '%'
-    def __init__(self):
-        super(AArch32, self).__init__()
+    def __init__(self, BITS):
+        super(AArch, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
 
         [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), 128, idaname="V{:d}".format(_))) for _ in six.moves.range(32) ]
@@ -1870,12 +1884,172 @@ class AArch32(interface.architecture_t):
             rv.alias, rq.alias = { rq }, { rv }
 
         [ setitem("r{:d}".format(_), self.new("r{:d}".format(_), 32, idaname="R{:d}".format(_))) for _ in six.moves.range(13) ]
-        [ setitem(_, self.new(_, 32, _.upper())) for _ in ('sp', 'lr', 'pc') ]
+        [ setitem("r{:d}h".format(_), self.child(getitem("r{:d}".format(_)), "r{:d}h".format(_), 0, 16, idaname="R{:d}".format(_))) for _ in six.moves.range(13) ]
+        [ setitem("r{:d}b".format(_), self.child(getitem("r{:d}".format(_)), "r{:d}b".format(_), 0, 8, idaname="R{:d}".format(_))) for _ in six.moves.range(13) ]
 
-        [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_))) for _ in six.moves.range(32) ]
-        [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_))) for _ in six.moves.range(32) ]
+        # Sub-registers that compose the V register (floating-point)
+        if BITS > 32:
+            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="V{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(32) ]
+        else:
+            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(32) ]
+        [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_), dtype=idaapi.dt_float)) for _ in six.moves.range(32) ]
+        [ setitem("h{:d}".format(_), self.child(getitem("s{:d}".format(_)), "h{:d}".format(_), 0, 16, idaname="X{:d}".format(_), dtype=getattr(idaapi, 'dt_half', idaapi.dt_word))) for _ in six.moves.range(32) ]
+        [ setitem("b{:d}".format(_), self.child(getitem("h{:d}".format(_)), "b{:d}".format(_), 0, 8, idaname="X{:d}".format(_))) for _ in six.moves.range(32) ]
 
-        # FIXME: include x registers
+        # General-purpose registers
+        [ setitem("x{:d}".format(_), self.new("x{:d}".format(_), BITS, idaname="X{:d}".format(_))) for _ in six.moves.range(31) ]
+        if BITS > 32:
+            [ setitem("w{:d}".format(_), self.child(self.by_name("x{:d}".format(_)), "w{:d}".format(_), 0, 32, idaname="X{:d}".format(_))) for _ in six.moves.range(31) ]
+        setitem('lr', self.new('lr', BITS, idaname='LR', alias={'x31'}))
+
+        # Zero registers and special regs
+        setitem('xzr', self.new('xzr', BITS, idaname='XZR'))
+        if BITS > 32:
+            setitem('wzr', self.new('wzr', 32, idaname='XZR'))
+        setitem('sp', self.new('sp', BITS, idaname='SP', alias={'r13'}))
+        if BITS > 32:
+            setitem('wsp', self.child(getitem('sp'), 'wsp', 0, 32))
+        setitem('pc', self.new('pc', BITS, idaname='PC'))
+        setitem('msp', self.child(getitem('sp'), 'msp', 0, BITS, idaname='MSP'))
+        setitem('psp', self.child(getitem('sp'), 'psp', 0, BITS, idaname='PSP'))
+
+        # Status registers (all)
+        # XXX: These registers are busted because they're actually individual
+        #      combinations of 3 registers.
+        setitem('xpsr', self.new('xpsr', 96, idaname='XPSR', alias={'psr'}))
+        setitem('iepsr', self.child(getitem('xpsr'), 'iepsr', 0, 96, idaname='IEPSR'))
+        setitem('iapsr', self.child(getitem('xpsr'), 'iapsr', 0, 96, idaname='IAPSR'))
+        setitem('eapsr', self.child(getitem('xpsr'), 'eapsr', 0, 96, idaname='EAPSR'))
+
+        # Status registers (application)
+        # XXX: We only define these registers as children of the parent
+        #      registers that can be written to.
+        setitem('apsr', self.child(getitem('xpsr'), 'apsr', 0, 32, idaname='APSR'))
+        setitem('q', self.child(getitem('apsr'), 'q', 27, 1))
+        setitem('vf', self.child(getitem('apsr'), 'vf', 28, 1, idaname='VF'))
+        setitem('cf', self.child(getitem('apsr'), 'cf', 29, 1, idaname='CF'))
+        setitem('zf', self.child(getitem('apsr'), 'zf', 30, 1, idaname='ZF'))
+        setitem('nf', self.child(getitem('apsr'), 'nf', 31, 1, idaname='NF'))
+
+        # Status registers (execution)
+        setitem('epsr', self.child(getitem('xpsr'), 'epsr', 32, 32, idaname='EPSR'))
+        setitem('ts', self.child(getitem('epsr'), 'Ts', 24, 1, idaname='T'))
+
+        # Status registers (interrupt)
+        setitem('ipsr', self.child(getitem('xpsr'), 'ipsr', 64, 32, idaname='IPSR'))
+
+        # Status registers (current program)
+        setitem('cpsr', self.new('cpsr', 32, idaname='CPSR'))
+        setitem('m', self.child(getitem('cpsr'), 'm', 0, 4))
+        setitem('res1', self.child(getitem('cpsr'), 'res1', 4, 1))
+        setitem('res0', self.child(getitem('cpsr'), 'res0', 5, 1))
+        setitem('f', self.child(getitem('cpsr'), 'f', 6, 1))
+        setitem('i', self.child(getitem('cpsr'), 'i', 7, 1))
+        setitem('a', self.child(getitem('cpsr'), 'a', 8, 1))
+        setitem('e', self.child(getitem('cpsr'), 'e', 9, 1))
+        [ setitem("it{:d}".format(2 + _), self.child(getitem('cpsr'), "it{:d}".format(2 + _), 10 + _, 1)) for _ in range(6) ]
+        setitem('ge', self.child(getitem('cpsr'), 'ge', 16, 3))
+        setitem('dit', self.child(getitem('cpsr'), 'dit', 21, 1))
+        setitem('pan', self.child(getitem('cpsr'), 'pan', 22, 1))
+        setitem('ssbs', self.child(getitem('cpsr'), 'ssbs', 23, 1))
+        setitem('j', self.child(getitem('cpsr'), 'j', 24, 1))
+        setitem('it0', self.child(getitem('cpsr'), 'it0', 25, 1))
+        setitem('it1', self.child(getitem('cpsr'), 'it1', 26, 1))
+        setitem('q', self.child(getitem('cpsr'), 'q', 27, 1))
+        setitem('v', self.child(getitem('cpsr'), 'v', 28, 1))
+        setitem('c', self.child(getitem('cpsr'), 'c', 29, 1))
+        setitem('z', self.child(getitem('cpsr'), 'z', 30, 1))
+        setitem('n', self.child(getitem('cpsr'), 'n', 31, 1))
+
+        setitem('spsr', self.child(getitem('cpsr'), 'spsr', 0, 32, idaname='SPSR'))
+        setitem('cpsr_flag', self.child(getitem('cpsr'), 'cpsr_flag', 27, 5, idaname='CPSR_flg'))
+        setitem('spsr_flag', self.child(getitem('spsr'), 'spsr_flag', 27, 5, idaname='SPSR_flg'))
+
+        # Status registers (floating point)
+        setitem('fpscr', self.new('fpscr', 32, idaname='FPSCR'))
+        setitem('ioc', self.child(getitem('fpscr'), 'ioc', 0, 1))
+        setitem('dzc', self.child(getitem('fpscr'), 'dzc', 1, 1))
+        setitem('ofc', self.child(getitem('fpscr'), 'ofc', 2, 1))
+        setitem('ufc', self.child(getitem('fpscr'), 'ufc', 3, 1))
+        setitem('ixc', self.child(getitem('fpscr'), 'ixc', 4, 1))
+        setitem('idc', self.child(getitem('fpscr'), 'idc', 7, 1))
+        setitem('ioe', self.child(getitem('fpscr'), 'ioe', 8, 1))
+        setitem('dze', self.child(getitem('fpscr'), 'dze', 9, 1))
+        setitem('ofe', self.child(getitem('fpscr'), 'ofe', 10, 1))
+        setitem('ufe', self.child(getitem('fpscr'), 'ufe', 11, 1))
+        setitem('ixe', self.child(getitem('fpscr'), 'ixe', 12, 1))
+        setitem('ide', self.child(getitem('fpscr'), 'ide', 15, 1))
+        setitem('len', self.child(getitem('fpscr'), 'Len', 16, 3))
+        setitem('stride', self.child(getitem('fpscr'), 'Stride', 20, 2))
+        setitem('rmode', self.child(getitem('fpscr'), 'Rmode', 22, 2))
+        setitem('fz', self.child(getitem('fpscr'), 'fz', 24, 1))
+        setitem('dn', self.child(getitem('fpscr'), 'dn', 25, 1))
+        setitem('ahp', self.child(getitem('fpscr'), 'ahp', 26, 1))
+        setitem('qc', self.child(getitem('fpscr'), 'qc', 27, 1))
+        setitem('Fv', self.child(getitem('fpscr'), 'Fv', 28, 1))
+        setitem('Fc', self.child(getitem('fpscr'), 'Fc', 29, 1))
+        setitem('Fz', self.child(getitem('fpscr'), 'Fz', 30, 1))
+        setitem('Fn', self.child(getitem('fpscr'), 'Fn', 31, 1))
+
+        # Media registers
+        setitem('mvfr0', self.new('mvfr0', 32, idaname='MVFR0'))
+        setitem('mvrb', self.child(getitem('mvfr0'), 'MVrb', 0, 4))
+        setitem('mvsp', self.child(getitem('mvfr0'), 'MVsp', 4, 4))
+        setitem('mvdp', self.child(getitem('mvfr0'), 'MVdp', 8, 4))
+        setitem('mvte', self.child(getitem('mvfr0'), 'MVte', 12, 4))
+        setitem('mvd', self.child(getitem('mvfr0'), 'MVd', 16, 4))
+        setitem('mvsr', self.child(getitem('mvfr0'), 'MVsr', 20, 4))
+        setitem('mvsv', self.child(getitem('mvfr0'), 'MVsv', 24, 4))
+        setitem('mvrm', self.child(getitem('mvfr0'), 'MVrm', 28, 4))
+
+        setitem('mvfr1', self.new('mvfr1', 32, idaname='MVFR1'))
+        setitem('mvfz', self.child(getitem('mvfr1'), 'MVfz', 0, 4))
+        setitem('mvdn', self.child(getitem('mvfr1'), 'MVdn', 0, 4))
+        setitem('mnls', self.child(getitem('mvfr1'), 'MNls', 0, 4))
+        setitem('mni', self.child(getitem('mvfr1'), 'MNi', 0, 4))
+        setitem('mnsp', self.child(getitem('mvfr1'), 'MNsp', 0, 4))
+
+        # Opaque registers
+        setitem('fpsid', self.new('fpsid', 32, idaname='FPSID'))
+        setitem('fpexc', self.new('fpexc', 32, idaname='FPEXC'))
+        setitem('fpinst', self.new('fpinst', 32, idaname='FPINST'))
+        setitem('fpinst2', self.new('fpinst2', 32, idaname='FPINST2'))
+        setitem('primask', self.new('primask', 32, idaname='PRIMASK'))
+        setitem('basepri', self.new('basepri', 32, idaname='BASEPRI'))
+        setitem('faultmask', self.new('faultmask', 32, idaname='FAULTMASK'))
+        setitem('control', self.new('control', 32, idaname='CONTROL'))
+        setitem('basepri_max', self.new('basepri_max', 32, idaname='BASEPRI_MAX'))
+
+        # XScale register(s?)
+        setitem('acc0', self.new('acc0', 32, idaname='acc0'))
+
+        # XXX: for some reason IDA defines the CS and DS registers??
+
+class AArch32(AArch):
+    """
+    An implementation of all the registers available on the AArch32 (ARM) architecture.
+
+    This is used to locate or manage the different registers that are available.
+
+    An instance of this class can be accessed as ``instruction.architecture``
+    (or ``instruction.arch``) when the current architecture of the database is ARM.
+    """
+
+    def __init__(self):
+        return super(AArch32, self).__init__(32)
+
+class AArch64(AArch):
+    """
+    An implementation of all the registers available on the AArch64 (ARM) architecture.
+
+    This is used to locate or manage the different registers that are available.
+
+    An instance of this class can be accessed as ``instruction.architecture``
+    (or ``instruction.arch``) when the current architecture of the database is ARM.
+    """
+
+    def __init__(self):
+        return super(AArch64, self).__init__(64)
 
 class Mips(interface.architecture_t):
     """
@@ -1951,16 +2125,22 @@ def __newprc__(id):
     Determine the architecture from the current processor and use it to initialize
     the globals (``architecture`` and ``register``) within this module.
     """
+    if not hasattr(database, 'config'):
+        # XXX: If this module hasn't been loaded properly, then this is because IDA hasn't actually started yet.
+        return
+
     plfm, m = idaapi.ph.id, __import__('sys').modules[__name__]
     if plfm == idaapi.PLFM_386:     # id == 15
-        res = Intel()
+        res, description = Intel(), "Intel architecture {:d}-bit".format(database.config.bits())
     elif plfm == idaapi.PLFM_ARM:   # id == 1
-        res = AArch32()
+        res, description = AArch64() if database.config.bits() > 32 else AArch32(), "AArch{:d}".format(database.config.bits())
     elif plfm == idaapi.PLFM_MIPS:  # id == 12
-        res = Mips()
+        res, description = Mips(), "MIPS{:d}".format(database.config.bits())
     else:
         logging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
         return
+
+    logging.warn("Detected processor module : {:s} ({:d})".format(description, plfm))
 
     # assign our required globals
     m.architecture, m.register = res, res.r
