@@ -61,7 +61,7 @@ class __optype__(object):
     cache = {}
     @classmethod
     def define(cls, processor, type):
-        '''Register the operand decoder for the specfied `processor` an `type`'''
+        '''Register the operand decoder for the specfied `processor` and `type`'''
         def decorator(fn):
             res = processor, type
             return cls.cache.setdefault(res, fn)
@@ -1574,15 +1574,16 @@ class operand_types:
         return mipsops.phrase(rt, imm)
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec0)
-    def coprocessor(ea, op):
-        '''Operand type decoder for coprocessor registers on MIPS.'''
-        return mipsops.coprocessor(op.reg)
+    def code(ea, op):
+        '''Operand type decoder for trap codes on MIPS.'''
+        res = op.value
+        return mipsops.trap(int(res))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
     def float(ea, op):
         '''Operand type decoder for floating-point registers on MIPS.'''
-        regnum = op.reg
-        return mipsops.float(regnum)
+        index = op.reg
+        return mipsops.float(index)
 del(operand_types)
 
 ## intel operands
@@ -1793,30 +1794,34 @@ class mipsops:
             r, _ = self
             yield r
 
+    class trap(interface.namedtypedtuple, interface.symbol_t):
+        """
+        A tuple for representing a trap code that can be encoded within
+        certain instructions on the MIPS architecture.
+
+        Simply wraps the encoded integer as a individual value in a tuple
+        with the format `(code)`.
+        """
+        _fields = ('code',)
+        _types = (six.integer_types,)
+
+        code = property(fget=operator.itemgetter(0))
+
+        @property
+        def symbols(self):
+            '''This operand type is not composed of any symbols.'''
+            raise StopIteration
+            yield   # so that this function is still treated as a generator
+
     @staticmethod
     def coprocessor(regnum):
         """
-        A callable that returns a co-processor for the MIPS architecture.
+        A callable that returns a co-processor register for the MIPS architecture.
 
         Takes a `regnum` argument which returns the correct register.
         """
-        global register, architecture
-
-        # FIXME: Should include _all_ of the coprocessor registers with their
-        #        selector versions too..
-        res = {
-            0x00 : register.Index,      0x01 : register.Random,     0x02 : register.EntryLo0,   0x03 : register.EntryLo1,
-            0x04 : register.Context,    0x05 : register.PageMask,   0x06 : register.Wired,      0x07 : register.HWREna,
-            0x08 : register.BadVAddr,   0x09 : register.Count,      0x0a : register.EntryHi,    0x0b : register.Compare,
-            0x0c : register.SR,         0x0d : register.Cause,      0x0e : register.EPC,        0x0f : register.PRId,
-            0x10 : register.Config,     0x11 : register.LLAddr,     0x12 : register.WatchLo,    0x13 : register.WatchHi,
-            0x14 : register.XContext,
-
-            0x17 : register.Debug,      0x18 : register.DEPC,       0x19 : register.PerfCtl,    0x1a : register.ECC,
-            0x1b : register.CacheErr,   0x1c : register.TagLo,      0x1d : register.TagHi,      0x1e : register.ErrorEPC,
-            0x1f : register.DESAVE,
-        }
-        return res[regnum] if regnum in res else architecture.by_name("{:d}".format(regnum))
+        global architecture
+        return architecture.by_coprocessor(regnum)
 
     @staticmethod
     def float(regnum):
@@ -1826,7 +1831,7 @@ class mipsops:
         Takes a `regnum` argument which returns the correct register.
         """
         global architecture
-        return architecture.by_name("$f{:d}".format(regnum))
+        return architecture.by_float(regnum)
 
 ## architecture registers
 class Intel(interface.architecture_t):
@@ -2162,6 +2167,33 @@ class MIPS(interface.architecture_t):
         setitem('DataHi', self.new('DataHi', BITS, id=0))       # 29.1
         setitem('ErrorEPC', self.new('ErrorEPC', BITS, id=0))   # 30
         setitem('DESAVE', self.new('DESAVE', BITS, id=0))       # 31
+
+    def by_coprocessor(self, index, selector=0):
+        '''Return the coprocessor register by the selected `index` and `selector`.'''
+        file = self.register
+
+        # FIXME: Should include _all_ of the coprocessor registers with their
+        #        selector versions too..
+        registers = {
+            0x00 : file.Index,      0x01 : file.Random,     0x02 : file.EntryLo0,   0x03 : file.EntryLo1,
+            0x04 : file.Context,    0x05 : file.PageMask,   0x06 : file.Wired,      0x07 : file.HWREna,
+            0x08 : file.BadVAddr,   0x09 : file.Count,      0x0a : file.EntryHi,    0x0b : file.Compare,
+            0x0c : file.SR,         0x0d : file.Cause,      0x0e : file.EPC,        0x0f : file.PRId,
+            0x10 : file.Config,     0x11 : file.LLAddr,     0x12 : file.WatchLo,    0x13 : file.WatchHi,
+            0x14 : file.XContext,
+
+            0x17 : file.Debug,      0x18 : file.DEPC,       0x19 : file.PerfCtl,    0x1a : file.ECC,
+            0x1b : file.CacheErr,   0x1c : file.TagLo,      0x1d : file.TagHi,      0x1e : file.ErrorEPC,
+            0x1f : file.DESAVE,
+        }
+
+        if index in registers:
+            return registers[index]
+        return self.by_name("{:d}".format(index))
+
+    def by_float(self, index):
+        '''Return the floating-point register by the selected `index`.'''
+        return self.by_name("$f{:d}".format(index))
 
 class MIPS32(MIPS):
     """
