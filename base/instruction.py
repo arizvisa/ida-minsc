@@ -2068,20 +2068,26 @@ class MIPS(interface.architecture_t):
 
         setitem('zero', self.new('zero', BITS, idaname='$zero'))
         setitem('at', self.new('at', BITS, idaname='$at'))
-        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), BITS, idaname="$v{:d}".format(_))) for _ in six.moves.range(2) ]
-        [ setitem("a{:d}".format(_), self.new("a{:d}".format(_), BITS, idaname="$a{:d}".format(_))) for _ in six.moves.range(4) ]
-        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), BITS, idaname="$t{:d}".format(_))) for _ in six.moves.range(8) ]
-        [ setitem("s{:d}".format(_), self.new("s{:d}".format(_), BITS, idaname="$s{:d}".format(_))) for _ in six.moves.range(8) ]
-        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), BITS, idaname="$t{:d}".format(_))) for _ in six.moves.range(8, 10) ]
-        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), BITS, idaname="$k{:d}".format(_))) for _ in six.moves.range(2) ]
+
         setitem('gp', self.new('gp', BITS, idaname='$gp'))
         setitem('sp', self.new('sp', BITS, idaname='$sp'))
         setitem('fp', self.new('fp', BITS, idaname='$fp'))
         setitem('ra', self.new('ra', BITS, idaname='$ra'))
-        [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_))) for _ in six.moves.range(BITS) ]
         setitem('pc', self.new('pc', BITS))
 
+        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), BITS, idaname="$v{:d}".format(_))) for _ in six.moves.range(2) ]
+        [ setitem("a{:d}".format(_), self.new("a{:d}".format(_), BITS, idaname="$a{:d}".format(_))) for _ in six.moves.range(8) ]
+        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), BITS, idaname="$t{:d}".format(_))) for _ in six.moves.range(0, 10) ]
+        [ setitem("s{:d}".format(_), self.new("s{:d}".format(_), BITS, idaname="$s{:d}".format(_))) for _ in six.moves.range(8) ]
+        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), BITS, idaname="$k{:d}".format(_))) for _ in six.moves.range(2) ]
+
         # FIXME: add the register definitions for : cs, ds, mips16
+
+        # floating-point registers
+        if BITS > 32:
+            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(32) ]
+        else:
+            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_float)) for _ in six.moves.range(32) ]
 
         # coprocessor registers
         setitem('Index', self.new('Index', BITS, id=0))
