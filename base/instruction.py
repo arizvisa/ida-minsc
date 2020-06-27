@@ -1550,29 +1550,39 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
     def extensionlist(ea, op):
         '''Operand type decoder for AArch's ``idaapi.o_idpspec4`` which returns an extension register list.'''
+
         # XXX: It seems that the op.value attribute is what distinguishes the list of registers here.
         #      0x00000001 - D8
         #      0x00000002 - D8-D9
+
         raise NotImplementedError(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_ARM, 0xe)
     def condition(ea, op):
         '''Operand type decoder for dealing with an undocumented operand type found on AArch64.'''
+
         # XXX: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
+
         raise NotImplementedError(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(ea, op):
-        '''Operand type decoder for returning a memory displacement on MIPS.'''
+        '''Operand type decoder for a memory displacement on MIPS.'''
         global architecture
 
         rt, imm = architecture.by_index(op.reg), op.addr
         return mipsops.phrase(rt, imm)
 
-    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec0)
     def coprocessor(ea, op):
-        '''Operand type decoder for returning a co-processor register on MIPS.'''
-        return mipsops.coproc(op.reg)
+        '''Operand type decoder for coprocessor registers on MIPS.'''
+        return mipsops.coprocessor(op.reg)
+
+    @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
+    def float(ea, op):
+        '''Operand type decoder for floating-point registers on MIPS.'''
+        regnum = op.reg
+        return mipsops.float(regnum)
 del(operand_types)
 
 ## intel operands
@@ -1784,7 +1794,7 @@ class mipsops:
             yield r
 
     @staticmethod
-    def coproc(regnum):
+    def coprocessor(regnum):
         """
         A callable that returns a co-processor for the MIPS architecture.
 
@@ -1801,6 +1811,16 @@ class mipsops:
             0x1e : register.ErrorEPC,
         }
         return res[regnum] if regnum in res else architecture.by_name("{:d}".format(regnum))
+
+    @staticmethod
+    def float(regnum):
+        """
+        A callable that returns a co-processor for the MIPS architecture.
+
+        Takes a `regnum` argument which returns the correct register.
+        """
+        global architecture
+        return architecture.by_name("$f{:d}".format(regnum))
 
 ## architecture registers
 class Intel(interface.architecture_t):
