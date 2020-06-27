@@ -1801,14 +1801,20 @@ class mipsops:
         Takes a `regnum` argument which returns the correct register.
         """
         global register, architecture
+
+        # FIXME: Should include _all_ of the coprocessor registers with their
+        #        selector versions too..
         res = {
-            0x00 : register.Index, 0x01 : register.Random, 0x02 : register.EntryLo0, 0x03 : register.EntryLo1,
-            0x04 : register.Context, 0x05 : register.PageMask, 0x06 : register.Wired, 0x08 : register.BadVAddr,
-            0x09 : register.Count, 0x0a : register.EntryHi, 0x0b : register.Compare, 0x0c : register.SR,
-            0x0d : register.Cause, 0x0e : register.EPC, 0x0f : register.PRId, 0x10 : register.Config,
-            0x11 : register.LLAddr, 0x12 : register.WatchLo, 0x13 : register.WatchHi, 0x14 : register.XContext,
-            0x1a : register.ECC, 0x1b : register.CacheErr, 0x1c : register.TagLo, 0x1d : register.TagHi,
-            0x1e : register.ErrorEPC,
+            0x00 : register.Index,      0x01 : register.Random,     0x02 : register.EntryLo0,   0x03 : register.EntryLo1,
+            0x04 : register.Context,    0x05 : register.PageMask,   0x06 : register.Wired,      0x07 : register.HWREna,
+            0x08 : register.BadVAddr,   0x09 : register.Count,      0x0a : register.EntryHi,    0x0b : register.Compare,
+            0x0c : register.SR,         0x0d : register.Cause,      0x0e : register.EPC,        0x0f : register.PRId,
+            0x10 : register.Config,     0x11 : register.LLAddr,     0x12 : register.WatchLo,    0x13 : register.WatchHi,
+            0x14 : register.XContext,
+
+            0x17 : register.Debug,      0x18 : register.DEPC,       0x19 : register.PerfCtl,    0x1a : register.ECC,
+            0x1b : register.CacheErr,   0x1c : register.TagLo,      0x1d : register.TagHi,      0x1e : register.ErrorEPC,
+            0x1f : register.DESAVE,
         }
         return res[regnum] if regnum in res else architecture.by_name("{:d}".format(regnum))
 
@@ -2109,36 +2115,53 @@ class MIPS(interface.architecture_t):
         else:
             [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_float)) for _ in six.moves.range(32) ]
 
-        # coprocessor registers
-        setitem('Index', self.new('Index', BITS, id=0))
-        setitem('Random', self.new('Random', BITS, id=0))
-        setitem('EntryLo0', self.new('EntryLo0', BITS, id=0))
-        setitem('EntryLo1', self.new('EntryLo1', BITS, id=0))
-        setitem('Context', self.new('Context', BITS, id=0))
-        setitem('PageMask', self.new('PageMask', BITS, id=0))
-        setitem('Wired', self.new('Wired', BITS, id=0))
-        setitem('BadVAddr', self.new('BadVAddr', BITS, id=0))
-        setitem('Count', self.new('Count', BITS, id=0))
-        setitem('EntryHi', self.new('EntryHi', BITS, id=0))
-        setitem('Compare', self.new('Compare', BITS, id=0))
-        setitem('SR', self.new('SR', BITS, id=0))
-        setitem('Cause', self.new('Cause', BITS, id=0))
-        setitem('EPC', self.new('EPC', BITS, id=0))
-        setitem('PRId', self.new('PRId', BITS, id=0))
-        setitem('Config', self.new('Config', BITS, id=0))
-        setitem('LLAddr', self.new('LLAddr', BITS, id=0))
-        setitem('WatchLo', self.new('WatchLo', BITS, id=0))
-        setitem('WatchHi', self.new('WatchHi', BITS, id=0))
-        setitem('XContext', self.new('XContext', BITS, id=0))
-        setitem('ECC', self.new('ECC', BITS, id=0))
-        setitem('CacheErr', self.new('CacheErr', BITS, id=0))
-        setitem('TagLo', self.new('TagLo', BITS, id=0))
-        setitem('TagHi', self.new('TagHi', BITS, id=0))
-        setitem('ErrorEPC', self.new('ErrorEPC', BITS, id=0))
-
-        # unmarked coprocessor registers
+        # FIXME: we should probably include all of the selector versions for the
+        #        coprocessor registers too...
         i2s = "{:d}".format
-        [ setitem(i2s(_), self.new(i2s(_), BITS)) for _ in itertools.chain([7, 31], six.moves.range(20, 26))]
+
+        # coprocessor registers (0 - 31)
+        setitem('Index', self.new('Index', BITS, id=0))         # 0
+        setitem('Random', self.new('Random', BITS, id=0))       # 1
+        setitem('EntryLo0', self.new('EntryLo0', BITS, id=0))   # 2
+        setitem('EntryLo1', self.new('EntryLo1', BITS, id=0))   # 3
+        setitem('Context', self.new('Context', BITS, id=0))     # 4
+        setitem('PageMask', self.new('PageMask', BITS, id=0))   # 5
+        setitem('Wired', self.new('Wired', BITS, id=0))         # 6
+        setitem('HWREna', self.new('HWREna', BITS, id=0))       # 7
+        setitem('BadVAddr', self.new('BadVAddr', BITS, id=0))   # 8
+        setitem('Count', self.new('Count', BITS, id=0))         # 9
+        setitem('EntryHi', self.new('EntryHi', BITS, id=0))     # 10
+        setitem('Compare', self.new('Compare', BITS, id=0))     # 11
+        setitem('SR', self.new('SR', BITS, id=0))               # 12.0
+        setitem('IntCtl', self.new('IntCtl', BITS, id=0))       # 12.1
+        setitem('SRSCtl', self.new('STSCtl', BITS, id=0))       # 12.2
+        setitem('SRSMap', self.new('STSMap', BITS, id=0))       # 12.3
+        setitem('Cause', self.new('Cause', BITS, id=0))         # 13
+        setitem('EPC', self.new('EPC', BITS, id=0))             # 14
+        setitem('PRId', self.new('PRId', BITS, id=0))           # 15.0
+        setitem('EBase', self.new('EBase', BITS, id=0))         # 15.1
+        setitem('Config', self.new('Config', BITS, id=0))       # 16.0
+        setitem('Config1', self.new('Config1', BITS, id=0))     # 16.1
+        setitem('Config2', self.new('Config2', BITS, id=0))     # 16.2
+        setitem('Config3', self.new('Config3', BITS, id=0))     # 16.3
+        setitem('LLAddr', self.new('LLAddr', BITS, id=0))       # 17
+        setitem('WatchLo', self.new('WatchLo', BITS, id=0))     # 18
+        setitem('WatchHi', self.new('WatchHi', BITS, id=0))     # 19
+        setitem('XContext', self.new('XContext', BITS, id=0))   # 20
+        setitem(i2s(21), self.new(i2s(21), BITS, id=0))         # 21
+        setitem(i2s(22), self.new(i2s(22), BITS, id=0))         # 22
+        setitem('Debug', self.new('Debug', BITS, id=0))         # 23
+        setitem('DEPC', self.new('DEPC', BITS, id=0))           # 24
+        setitem('PerfCtl', self.new('PerfCtl', BITS, id=0))     # 25.0
+        setitem('PerfCnt', self.new('PerfCnt', BITS, id=0))     # 25.1
+        setitem('ECC', self.new('ECC', BITS, id=0))             # 26
+        setitem('CacheErr', self.new('CacheErr', BITS, id=0))   # 27
+        setitem('TagLo', self.new('TagLo', BITS, id=0))         # 28.0
+        setitem('DataLo', self.new('TagLo', BITS, id=0))        # 28.1
+        setitem('TagHi', self.new('TagHi', BITS, id=0))         # 29.0
+        setitem('DataHi', self.new('DataHi', BITS, id=0))       # 29.1
+        setitem('ErrorEPC', self.new('ErrorEPC', BITS, id=0))   # 30
+        setitem('DESAVE', self.new('DESAVE', BITS, id=0))       # 31
 
 class MIPS32(MIPS):
     """
