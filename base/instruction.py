@@ -5,8 +5,8 @@ This module exposes a number of tools for interacting with an
 instruction defined within the database. There are three types
 of tools within this module and each can be distinguished by their
 prefixes which can be used to decode the operands for an instruction.
-At the present time, only the Intel, AArch32 (ARM), and MIPS
-architectures are supported.
+At the present time, only the Intel, AArch32/AArch64 (ARM), and the
+MIPS32/MIPS64 architectures are currently supported.
 
 Although IDA internally uses the ``idaapi.insn_t`` and ``idaapi.op_t``
 to represent an instruction and its operands, this module's base
@@ -1357,7 +1357,7 @@ class operand_types:
     @__optype__.define(idaapi.PLFM_386, idaapi.o_imm)
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_imm)
     def immediate(ea, op):
-        '''Operand type decoder for ``idaapi.o_imm`` which returns an integer.'''
+        '''Operand type decoder for ``idaapi.o_imm`` which returns an immediate integer.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
 
@@ -1386,35 +1386,44 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
     def trregister(ea, op):
-        '''Operand type decoder for Intel's ``idaapi.o_idpspec0`` which returns a trap register.'''
+        '''Operand type decoder for ``idaapi.o_idpspec0`` which returns a trap register on the Intel architecture.'''
+        global architecture
         raise E.UnsupportedCapability(u"{:s}.trregister({:#x}, ...) : Trap registers (`%trX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec1)
     def dbregister(ea, op):
-        '''Operand type decoder for Intel's ``idaapi.o_idpspec1`` which returns a db register.'''
+        '''Operand type decoder for ``idaapi.o_idpspec1`` which returns a Db register on the Intel architecture.'''
+        global architecture
         raise E.UnsupportedCapability(u"{:s}.dbregister({:#x}, ...) : Db registers (`%dbX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec2)
     def crregister(ea, op):
-        '''Operand type decoder for Intel's ``idaapi.o_idpspec2`` which returns a control reigster.'''
-        raise E.UnsupportedCapability(u"{:s}.crregister({:#x}, ...) : Cr registers (`%crX`) are not implemented for the Intel platform.".format('.'.join((__name__, 'operand_types')), ea))
-        return getattr(reg, "cr{:d}".format(op.reg)).id
+        '''Operand type decoder for ``idaapi.o_idpspec2`` which returns a control register on the Intel architecture.'''
+        global architecture
+        regnum = op.reg
+        return architecture.by_control(regnum)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec3)
     def fpregister(ea, op):
-        '''Operand type decoder for Intel's ``idaapi.o_idpspec3`` which returns an fpu register.'''
-        return getattr(reg, "st{:d}".format(op.reg)).id
+        '''Operand type decoder for ``idaapi.o_idpspec3`` which returns an FPU register on the Intel architecture.'''
+        global architecture
+        regnum = op.reg
+        return architecture.by_float(regnum)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec4)
     def mmxregister(ea, op):
-        '''Operand type decoder for Intel's ``idaapi.o_idpspec4`` which returns an mmx register.'''
-        return getattr(reg, "mm{:d}".format(op.reg)).id
+        '''Operand type decoder for ``idaapi.o_idpspec4`` which returns an MMX register on the Intel architecture.'''
+        global architecture
+        regnum = op.reg
+        return architecture.by_mmx(regnum)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec5)
     def xmmregister(ea, op):
-        '''Operand type decoder for Intel's ``idaapi.o_idpspec5`` which returns an xmm register.'''
-        return getattr(reg, "xmm{:d}".format(op.reg)).id
+        '''Operand type decoder for ``idaapi.o_idpspec5`` which returns an XMM register on the Intel architecture.'''
+        global architecture
+        regnum = op.reg
+        return architecture.by_xmm(regnum)
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_mem)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_displ)
     @__optype__.define(idaapi.PLFM_386, idaapi.o_phrase)
     def phrase(ea, op):
-        '''Operand type decoder for returning a memory phrase on Intel.'''
+        '''Operand type decoder for returning a memory phrase on the Intel architecture.'''
         F1, F2 = op.specflag1, op.specflag2
         if op.type in {idaapi.o_displ, idaapi.o_phrase}:
             if F1 == 0:
@@ -1493,21 +1502,21 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(ea, op):
-        '''Operand type decoder for returning a memory phrase on ARM.'''
+        '''Operand type decoder for returning a memory phrase on either the AArch32 or AArch64 architectures.'''
         global architecture
         Rn, Rm = architecture.by_index(op.reg), architecture.by_index(op.specflag1)
-        return armops.phrase(Rn, Rm)
+        return armops.registerphrase(Rn, Rm)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_displ)
-    def disp(ea, op):
-        '''Operand type decoder for returning a memory displacement on ARM.'''
+    def phrase(ea, op):
+        '''Operand type decoder for returning a memory displacement on either the AArch32 or AArch64 architectures.'''
         global architecture
         Rn = architecture.by_index(op.reg)
-        return armops.disp(Rn, long(op.addr))
+        return armops.immediatephrase(Rn, long(op.addr))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
-        '''Operand type decoder for returning a memory referece on ARM.'''
+        '''Operand type decoder for returning a memory reference on either the AArch32 or AArch64 architectures.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
         get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
@@ -1522,11 +1531,11 @@ class operand_types:
         res = reduce(lambda agg, n: (agg*0x100)|n, six.iterbytes(res), 0)
         sf = bool(res & maxval>>1)
 
-        return armops.mem(long(addr), long(res-maxval) if sf else long(res))
+        return armops.memory(long(addr), long(res-maxval) if sf else long(res))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
     def flex(ea, op):
-        '''Operand type decoder for returning a flexible operand (shift-op) on ARM.'''
+        '''Operand type decoder for returning a flexible operand (shift-op) on either the AArch32 or AArch64 architectures.'''
         global architecture
 
         Rn = architecture.by_index(op.reg)
@@ -1535,7 +1544,7 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
     def list(ea, op):
-        '''Operand type decoder for returning a register list on ARM.'''
+        '''Operand type decoder for returning a register list on either the AArch32 or AArch64 architectures.'''
         global architecture
         res = set()
 
@@ -1549,7 +1558,7 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
     def extensionlist(ea, op):
-        '''Operand type decoder for AArch's ``idaapi.o_idpspec4`` which returns an extension register list.'''
+        '''Operand type decoder for ``idaapi.o_idpspec4`` which returns an extension register list on either the AArch32 or AArch64 architectures.'''
 
         # XXX: It seems that the op.value attribute is what distinguishes the list of registers here.
         #      0x00000001 - D8
@@ -1567,7 +1576,7 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_displ)
     def phrase(ea, op):
-        '''Operand type decoder for a memory displacement on MIPS.'''
+        '''Operand type decoder for memory phrases on MIPS architecturs.'''
         global architecture
 
         rt, imm = architecture.by_index(op.reg), op.addr
@@ -1575,13 +1584,13 @@ class operand_types:
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec0)
     def code(ea, op):
-        '''Operand type decoder for trap codes on MIPS.'''
+        '''Operand type decoder for trap codes on MIPS architectures.'''
         res = op.value
         return mipsops.trap(int(res))
 
     @__optype__.define(idaapi.PLFM_MIPS, idaapi.o_idpspec1)
     def float(ea, op):
-        '''Operand type decoder for floating-point registers on MIPS.'''
+        '''Operand type decoder for floating-point registers on MIPS architectures.'''
         index = op.reg
         return mipsops.float(index)
 del(operand_types)
@@ -1594,7 +1603,7 @@ class intelops:
     """
     class SegmentOffset(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing an address with a segment register attached for Intel.
+        A tuple representing an address with a segment register attached on the Intel architecture.
 
         Has the format `(segment, offset)` where `segment` is a segment register.
         """
@@ -1609,15 +1618,14 @@ class intelops:
             '''Yield the `segment` register from the tuple if it is defined.'''
             s, _ = self
             if s is not None: yield s
-    SO = SegmentOffset
 
     class SegmentOffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing a memory phrase for the Intel architecture.
+        A tuple representing a memory phrase operand on the Intel architecture.
 
-        Has the format `(segment, offset, base, index, scale)` where
-        `segment` includes the segment register and `base` and
-        `index` are both optional registers.
+        Has the format `(segment, offset, base, index, scale)` where `segment`
+        includes the segment register and both the `base` and `index` registers
+        are both optional.
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
         _types = (
@@ -1635,7 +1643,6 @@ class intelops:
             if s is not None: yield s
             if b is not None: yield b
             if i is not None: yield i
-    SOBIS = SegmentOffsetBaseIndexScale
 
     class OffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -1658,18 +1665,17 @@ class intelops:
             _, b, i, _ = self
             if b is not None: yield b
             if i is not None: yield i
-    OBIS = OffsetBaseIndexScale
 
 ## arm operands
 class armops:
     """
     This internal namespace contains the different operand types that
-    can be returned for the ARM architecture.
+    can be returned for the AArch32 and AArch64 architectures.
     """
 
     class flex(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing a flexible operand as available on the ARM architecture.
+        A tuple representing a flexible operand type that can be decoded on either the AArch32 or AArch64 architectures.
 
         Has the format `(Rn, shift, n)` which allows the architecture to apply
         a binary shift or rotation to the value of a register `Rn`.
@@ -1693,10 +1699,10 @@ class armops:
 
     class list(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing a register list on the ARM architecture.
+        A tuple representing a register list operand on either the AArch32 or AArch64 architectures.
 
-        Has the simple format `(reglist,)` where `reglist` is a set of registers
-        that can be explicitly tested for membership.
+        Has the simple format `(reglist)` where `reglist` is a set of registers
+        that can be explicitly tested as a set for membership.
         """
         _fields = ('reglist', )
         _types = (set, )
@@ -1707,9 +1713,9 @@ class armops:
             res, = self
             for r in res: yield r
 
-    class disp(interface.namedtypedtuple, interface.symbol_t):
+    class immediatephrase(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple representing a memory displacement on the ARM architecture.
+        A tuple representing a memory displacement operand on either the AArch32 or AArch64 architectures.
 
         Has the format `(Rn, Offset)` where `Rn` is a register and `Offset` is
         the integer that is added to the register.
@@ -1729,12 +1735,12 @@ class armops:
             r, _ = self
             yield r
 
-    class phrase(interface.namedtypedtuple, interface.symbol_t):
+    class registerphrase(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple for representing a memory phrase on the ARM architecture
+        A tuple for representing a memory phrase on either the AArch32 or AArch64 architectures.
 
-        Has the format `(Rn, Rm)` where both are registers that compose the
-        phrase.
+        Has the format `(Rn, Rm)` where both values are registers that compose
+        the phrase.
         """
         _fields = ('Rn', 'Rm')
         _types = (
@@ -1752,12 +1758,12 @@ class armops:
             yield rn
             yield rm
 
-    class mem(interface.namedtypedtuple, interface.symbol_t):
+    class memory(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple for representing a memory operand on the ARM architecture.
+        A tuple for representing a memory operand on either the AArch32 or AArch64 architectures.
 
         Has the format `(address, value)` where `address` is the actual value
-        stored in the operand and `value` is the value that is dereferenced.
+        stored in the operand and `value` is the value that would be dereferenced.
         """
         _fields = ('address', 'value')
         _types = (six.integer_types, six.integer_types)
@@ -1772,15 +1778,15 @@ class armops:
 class mipsops:
     """
     This internal namespace contains the different operand types that
-    can be returned for the MIPS architecture.
+    are used by the MIPS architectures.
     """
 
     class phrase(interface.namedtypedtuple, interface.symbol_t):
         """
-        A tuple for representing a memory phrase on the MIPS architecture.
+        A tuple for representing a memory phrase operand on the MIPS architectures.
 
         Has the format `(Rn, Offset)` where `Rn` is the register and
-        `Offset` is the immediate that is added to the register.
+        `Offset` is the immediate that is added to the `Rn` register.
         """
         _fields = ('Rn', 'Offset')
         _types = (interface.register_t, six.integer_types)
@@ -1797,10 +1803,10 @@ class mipsops:
     class trap(interface.namedtypedtuple, interface.symbol_t):
         """
         A tuple for representing a trap code that can be encoded within
-        certain instructions on the MIPS architecture.
+        certain instructions on the MIPS architectures.
 
-        Simply wraps the encoded integer as a individual value in a tuple
-        with the format `(code)`.
+        Simply wraps the encoded integer in a single-element tuple with
+        the format of `(code)`.
         """
         _fields = ('code',)
         _types = (six.integer_types,)
@@ -1814,24 +1820,26 @@ class mipsops:
             yield   # so that this function is still treated as a generator
 
     @staticmethod
-    def coprocessor(regnum):
+    def coprocessor(index):
         """
-        A callable that returns a co-processor register for the MIPS architecture.
+        A callable that returns a coprocessor register on the MIPS architectures.
 
-        Takes a `regnum` argument which returns the correct register.
+        Takes an integer argument which returns the coprocessor register for
+        the requested `index`.
         """
         global architecture
-        return architecture.by_coprocessor(regnum)
+        return architecture.by_coprocessor(index)
 
     @staticmethod
-    def float(regnum):
+    def float(index):
         """
-        A callable that returns a co-processor for the MIPS architecture.
+        A callable that returns a floating-point register on the MIPS architectures.
 
-        Takes a `regnum` argument which returns the correct register.
+        Takes an integer representing the `index` of the desired floating-point
+        register to return.
         """
         global architecture
-        return architecture.by_float(regnum)
+        return architecture.by_float(index)
 
 ## architecture registers
 class Intel(interface.architecture_t):
@@ -1889,9 +1897,36 @@ class Intel(interface.architecture_t):
         [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16)) for _ in six.moves.range(16) ]
         [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 128, dtype=idaapi.dt_ldbl)) for _ in six.moves.range(16) ]
 
+        # control registers
+        [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in six.moves.range(8) ]
+
         ##fpctrl, fpstat, fptags
         ##mxcsr
         ## 'cf', 'zf', 'sf', 'of', 'pf', 'af', 'tf', 'if', 'df', 'efl',
+
+    def by_float(self, index):
+        '''Return the desired floating-point stack register by the specified `index`.'''
+        return self.by_name("st{:d}".format(index))
+
+    def by_control(self, index):
+        '''Return the desired control register by the specified `index`.'''
+        return self.by_name("cr{:d}".format(index))
+
+    def by_mmx(self, index):
+        '''Return the desired MultiMedia eXtension register of the specified `index`.'''
+        return self.by_name("mm{:d}".format(index))
+
+    def by_xmm(self, index):
+        '''Return the desired SSE vector register of the specified `index`.'''
+        return self.by_name("xmm{:d}".format(index))
+
+    def by_ymm(self, index):
+        '''Return the desired 256-bit Advanced Vector Extensions register of the specified `index`.'''
+        return self.by_name("ymm{:d}".format(index))
+
+    def by_zmm(self, index):
+        '''Return the desired 512-bit Advanced Vector Extensions register of the specified `index`.'''
+        return self.by_name("zmm{:d}".format(index))
 
 class AArch(interface.architecture_t):
     """
@@ -1900,7 +1935,8 @@ class AArch(interface.architecture_t):
     This is used to locate or manage the different registers that are available.
 
     An instance of this class can be accessed as ``instruction.architecture``
-    (or ``instruction.arch``) when the current architecture of the database is ARM.
+    (or ``instruction.arch``) when the current architecture of the database is either
+    AArch32 or AArch64.
     """
     prefix = '%'
     def __init__(self, BITS):
@@ -2063,7 +2099,7 @@ class AArch32(AArch):
     This is used to locate or manage the different registers that are available.
 
     An instance of this class can be accessed as ``instruction.architecture``
-    (or ``instruction.arch``) when the current architecture of the database is ARM.
+    (or ``instruction.arch``) when the current architecture of the database is AArch32.
     """
 
     def __init__(self):
@@ -2076,7 +2112,7 @@ class AArch64(AArch):
     This is used to locate or manage the different registers that are available.
 
     An instance of this class can be accessed as ``instruction.architecture``
-    (or ``instruction.arch``) when the current architecture of the database is ARM.
+    (or ``instruction.arch``) when the current architecture of the database is AArch64.
     """
 
     def __init__(self):
@@ -2084,7 +2120,7 @@ class AArch64(AArch):
 
 class MIPS(interface.architecture_t):
     """
-    An implementation of all the registers available on the MIPS architecture.
+    An implementation of all the registers available on the MIPS architectures.
 
     This includes the different co-processor registers that are also available
     but are treated as special instructions by IDA.
