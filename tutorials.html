@@ -158,7 +158,7 @@ feed an offset to our debugger instead. This will allow our
 breakpoint to be independent of our base address. To get our module
 name, we can use <a class="reference internal" href="modules/database.html#database.config.module" title="database.config.module"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.module()</span></code></a>,
 and to convert our address to an offset, we can use
-<a class="reference internal" href="modules/database.html#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code></a>.</li>
+<code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code>.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
@@ -329,7 +329,7 @@ to be useful to pass along to a debugger. With this we know which
 register to dump for a call instruction in order to calculate its
 target. Instead of calculating them though, let’s remain hacky and
 just output their results as a breakpoint. In the prior tutorial,
-we chose <a class="reference internal" href="modules/database.html#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code></a> in order to calculate the
+we chose <code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset()</span></code> in order to calculate the
 relative address. Instead of doing it that way, there’s a class in
 the <a class="reference internal" href="modules/misc-tools.html#module-tools" title="tools"><code class="xref py py-mod docutils literal notranslate"><span class="pre">tools</span></code></a> module that we can use to transform an address
 named <a class="reference internal" href="modules/misc-tools.html#tools.remote" title="tools.remote"><code class="xref py py-class docutils literal notranslate"><span class="pre">tools.remote</span></code></a>. So let’s use this instead. To

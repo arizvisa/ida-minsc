@@ -2642,13 +2642,41 @@ one to filter functions according to their particular attributes.</p>
 
 <dl class="function">
 <dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
+<dd><p>Apply the typeinfo in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>info</strong> (<em>str</em><em> or </em><em>idaapi.tinfo_t</em>) – the typeinfo to assign to the current function</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the typeinfo for the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the typeinfo for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> as a <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to get the typeinfo for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>idaapi.func_t</em>) – the function to get the typeinfo for</td>
 </tr>
 </tbody>
 </table>
@@ -2683,6 +2711,24 @@ one to filter functions according to their particular attributes.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to set the typeinfo for</li>
 <li><strong>info</strong> (<em>str</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to assign to the function</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">type</code><span class="sig-paren">(</span><em>func</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the typeinfo for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – </li>
+<li><strong>none</strong> (<em>None</em>) – </li>
 </ul>
 </td>
 </tr>
@@ -2738,14 +2784,14 @@ one to filter functions according to their particular attributes.</p>
 <dt id="function.type.has_prototype">
 <code class="descclassname">type.</code><code class="descname">has_prototype</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#function.type.has_prototype" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the current function has a prototype associated with it.</p>
-<p>Aliases: <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.prototypeQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.has_typeinfo</span></code></a>, <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.typeinfoQ</span></code></a>, <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.prototypeQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">has_prototype</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns true if the function <code class="docutils literal notranslate"><span class="pre">func</span></code> has a prototype associated with it.</p>
-<p>Aliases: <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.prototypeQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.has_typeinfo</span></code></a>, <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.typeinfoQ</span></code></a>, <a class="reference internal" href="#function.type.has_prototype" title="function.type.has_prototype"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.type.prototypeQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

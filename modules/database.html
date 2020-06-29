@@ -547,28 +547,6 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 </dd></dl>
 
 <dl class="function">
-<dt id="database.offset">
-<code class="descclassname">database.</code><code class="descname">offset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.offset" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the current address converted to an offset from the base address of the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.o</span></code></a></p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">database.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> converted to an offset from the base address of the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.offset" title="database.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.o</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="database.read">
 <code class="descclassname">database.</code><code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.read" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the bytes defined at the current address.</p>
@@ -812,21 +790,6 @@ If <code class="docutils literal notranslate"><span class="pre">Or</span></code>
 <dt id="database.top">
 <code class="descclassname">database.</code><code class="descname">top</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.top" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the very lowest address within the database.</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="database.translate">
-<code class="descclassname">database.</code><code class="descname">translate</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#database.translate" title="Permalink to this definition">¶</a></dt>
-<dd><p>Translate the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> to an address in the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.translate" title="database.translate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.convertOffset</span></code></a>, <a class="reference internal" href="#database.translate" title="database.translate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.coof</span></code></a>, <a class="reference internal" href="#database.translate" title="database.translate"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.convert_offset</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>offset</strong> – an offset from the base address</td>
-</tr>
-</tbody>
-</table>
 </dd></dl>
 
 <dl class="function">
@@ -2862,7 +2825,7 @@ for determining the type of the binary are also included.</p>
 <dl class="function">
 <dt id="database.config.bits">
 <code class="descclassname">config.</code><code class="descname">bits</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.bits" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return number of bits used by the database.</p>
+<dd><p>Return number of bits of the processor used by the database.</p>
 </dd></dl>
 
 <dl class="function">
@@ -6225,6 +6188,20 @@ specified address.</p>
 
 <dl class="function">
 <dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the typeinfo from the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>info</em><span class="sig-paren">)</span></dt>
 <dd><p>Apply the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> typeinfo or typeinfo string in <code class="docutils literal notranslate"><span class="pre">info</span></code> to the current address.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -6248,6 +6225,24 @@ specified address.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>info</strong> (<em>idaapi.tinfo_t</em>) – the <code class="docutils literal notranslate"><span class="pre">idaapi.tinfo_t</span></code> to assign to the address</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the typeinfo from the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – an address in the database</li>
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -6501,6 +6496,28 @@ specified address.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.type.has_typeinfo">
+<code class="descclassname">type.</code><code class="descname">has_typeinfo</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.has_typeinfo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return true if the current address has some typeinfo associated with it.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">has_typeinfo</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return true if the address at <code class="docutils literal notranslate"><span class="pre">ea</span></code> has some typeinfo associated with it.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – an address in the database</td>
 </tr>
 </tbody>
 </table>

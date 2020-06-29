@@ -719,6 +719,7 @@ structure_t
    
    The comment belonging to the ``structure_t``.
       :param getter: Return the repeatable comment for the structure.
+      :param repeatable:
       :param setter: Set the repeatable comment for the structure to ``value``.
       :param value: a string repesenting the comment to apply
       :param repeatable: whether the comment should be repeatable or not

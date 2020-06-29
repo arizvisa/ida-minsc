@@ -10,7 +10,7 @@ functions and objects entirely differently from the way Python is typically
 used.  Taking some ideas from Perl [:ref:`2<multicase-references>`], this project
 allows there to be multiple variations of a function depending on the types
 that are provided to a function as parameters. These are referred to as
-multi-cased functions. The author is grateful to Talos/Cisco [:ref:`3<multicase-references>`] 
+multi-cased functions. The author is grateful to Talos/Cisco [:ref:`3<multicase-references>`]
 for providing him the resources and time in order to develop this component.
 
 Typically when calling a function or an object in Python, the parameters and
@@ -145,7 +145,7 @@ as::
        myfunc(ea=int|long) -> Takes an integer
        myfunc(key=basestring) -> Takes a string
    >
-   
+
 Some examples of calling these types of functions are at :ref:`multicase-examples-functions`.
 
 .. _multicase-examples-namespace:
@@ -211,7 +211,7 @@ be removed::
    > print 'Name for the current address is %s'% res
    >
    > oldname = database.name(None)
-   > print 'Name at current address used to be: %s'% oldname 
+   > print 'Name at current address used to be: %s'% oldname
 
 If a user wants to fetch a function and they're not sure of the type of the
 parameter they received, the :py:func:`function.by` multicased function supports

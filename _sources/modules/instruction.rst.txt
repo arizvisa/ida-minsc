@@ -7,8 +7,8 @@ This module exposes a number of tools for interacting with an
 instruction defined within the database. There are three types
 of tools within this module and each can be distinguished by their
 prefixes which can be used to decode the operands for an instruction.
-At the present time, only the Intel, AArch32 (ARM), and MIPS
-architectures are supported.
+At the present time, only the Intel, AArch32/AArch64 (ARM), and the
+MIPS32/MIPS64 architectures are currently supported.
 
 Although IDA internally uses the :py:obj:`idaapi.insn_t` and :py:obj:`idaapi.op_t`
 to represent an instruction and its operands, this module's base
@@ -782,25 +782,8 @@ instruction.armops
 ******************
 
 This internal namespace contains the different operand types that
-can be returned for the ARM architecture.
+can be returned for the AArch32 and AArch64 architectures.
 
-^^^^^^^^^^^
-armops.disp
-^^^^^^^^^^^
-
-.. py:class:: armops.disp
-   
-   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
-   
-   A tuple representing a memory displacement on the ARM architecture.
-   
-   Has the format ``(Rn, Offset)`` where ``Rn`` is a register and ``Offset`` is
-   the integer that is added to the register.
-   
-   .. py:attribute:: symbols
-   
-      :param getter: Yield the ``Rn`` register from the tuple.
-   
 ^^^^^^^^^^^
 armops.flex
 ^^^^^^^^^^^
@@ -809,10 +792,27 @@ armops.flex
    
    Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
    
-   A tuple representing a flexible operand as available on the ARM architecture.
+   A tuple representing a flexible operand type that can be decoded on either the AArch32 or AArch64 architectures.
    
    Has the format ``(Rn, shift, n)`` which allows the architecture to apply
    a binary shift or rotation to the value of a register ``Rn``.
+   
+   .. py:attribute:: symbols
+   
+      :param getter: Yield the ``Rn`` register from the tuple.
+   
+^^^^^^^^^^^^^^^^^^^^^^
+armops.immediatephrase
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. py:class:: armops.immediatephrase
+   
+   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
+   
+   A tuple representing a memory displacement operand on either the AArch32 or AArch64 architectures.
+   
+   Has the format ``(Rn, Offset)`` where ``Rn`` is a register and ``Offset`` is
+   the integer that is added to the register.
    
    .. py:attribute:: symbols
    
@@ -826,44 +826,44 @@ armops.list
    
    Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
    
-   A tuple representing a register list on the ARM architecture.
+   A tuple representing a register list operand on either the AArch32 or AArch64 architectures.
    
-   Has the simple format ``(reglist,)`` where ``reglist`` is a set of registers
-   that can be explicitly tested for membership.
+   Has the simple format ``(reglist)`` where ``reglist`` is a set of registers
+   that can be explicitly tested as a set for membership.
    
    .. py:attribute:: symbols
    
       :param getter: Yield any of the registers within the ``reglist`` field belonging to the tuple.
    
-^^^^^^^^^^
-armops.mem
-^^^^^^^^^^
+^^^^^^^^^^^^^
+armops.memory
+^^^^^^^^^^^^^
 
-.. py:class:: armops.mem
+.. py:class:: armops.memory
    
    Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
    
-   A tuple for representing a memory operand on the ARM architecture.
+   A tuple for representing a memory operand on either the AArch32 or AArch64 architectures.
    
    Has the format ``(address, value)`` where ``address`` is the actual value
-   stored in the operand and ``value`` is the value that is dereferenced.
+   stored in the operand and ``value`` is the value that would be dereferenced.
    
    .. py:attribute:: symbols
    
       :param getter: This operand type is not composed of any symbols.
    
-^^^^^^^^^^^^^
-armops.phrase
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+armops.registerphrase
+^^^^^^^^^^^^^^^^^^^^^
 
-.. py:class:: armops.phrase
+.. py:class:: armops.registerphrase
    
    Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
    
-   A tuple for representing a memory phrase on the ARM architecture
+   A tuple for representing a memory phrase on either the AArch32 or AArch64 architectures.
    
-   Has the format ``(Rn, Rm)`` where both are registers that compose the
-   phrase.
+   Has the format ``(Rn, Rm)`` where both values are registers that compose
+   the phrase.
    
    .. py:attribute:: symbols
    
@@ -903,7 +903,7 @@ intelops.SegmentOffset
    
    Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
    
-   A tuple representing an address with a segment register attached for Intel.
+   A tuple representing an address with a segment register attached on the Intel architecture.
    
    Has the format ``(segment, offset)`` where ``segment`` is a segment register.
    
@@ -919,11 +919,11 @@ intelops.SegmentOffsetBaseIndexScale
    
    Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
    
-   A tuple representing a memory phrase for the Intel architecture.
+   A tuple representing a memory phrase operand on the Intel architecture.
    
-   Has the format ``(segment, offset, base, index, scale)`` where
-   ``segment`` includes the segment register and ``base`` and
-   ``index`` are both optional registers.
+   Has the format ``(segment, offset, base, index, scale)`` where ``segment``
+   includes the segment register and both the ``base`` and ``index`` registers
+   are both optional.
    
    .. py:attribute:: symbols
    
@@ -936,7 +936,7 @@ instruction.mipsops
 *******************
 
 This internal namespace contains the different operand types that
-can be returned for the MIPS architecture.
+are used by the MIPS architectures.
 
 ^^^^^^^^^^^^^^
 mipsops.phrase
@@ -946,14 +946,32 @@ mipsops.phrase
    
    Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
    
-   A tuple for representing a memory phrase on the MIPS architecture.
+   A tuple for representing a memory phrase operand on the MIPS architectures.
    
    Has the format ``(Rn, Offset)`` where ``Rn`` is the register and
-   ``Offset`` is the immediate that is added to the register.
+   ``Offset`` is the immediate that is added to the ``Rn`` register.
    
    .. py:attribute:: symbols
    
       :param getter: Yield the ``Rn`` register from this tuple.
+   
+^^^^^^^^^^^^
+mipsops.trap
+^^^^^^^^^^^^
+
+.. py:class:: mipsops.trap
+   
+   Bases: :py:class:`namedtuple`, :py:class:`symbol_t`
+   
+   A tuple for representing a trap code that can be encoded within
+   certain instructions on the MIPS architectures.
+   
+   Simply wraps the encoded integer in a single-element tuple with
+   the format of ``(code)``.
+   
+   .. py:attribute:: symbols
+   
+      :param getter: This operand type is not composed of any symbols.
    
 .. _ns-instruction-type:
 
@@ -1120,14 +1138,29 @@ AArch32
 
 .. py:class:: AArch32
    
-   Bases: :py:class:`architecture_t`
+   Bases: :py:class:`AArch`
    
    An implementation of all the registers available on the AArch32 (ARM) architecture.
    
    This is used to locate or manage the different registers that are available.
    
    An instance of this class can be accessed as :py:obj:`instruction.architecture`
-   (or :py:obj:`instruction.arch`) when the current architecture of the database is ARM.
+   (or :py:obj:`instruction.arch`) when the current architecture of the database is AArch32.
+   
+*******
+AArch64
+*******
+
+.. py:class:: AArch64
+   
+   Bases: :py:class:`AArch`
+   
+   An implementation of all the registers available on the AArch64 (ARM) architecture.
+   
+   This is used to locate or manage the different registers that are available.
+   
+   An instance of this class can be accessed as :py:obj:`instruction.architecture`
+   (or :py:obj:`instruction.arch`) when the current architecture of the database is AArch64.
    
 *****
 Intel
@@ -1145,17 +1178,69 @@ Intel
    An instance of this class can be accessed as :py:obj:`instruction.architecture`
    (or :py:obj:`instruction.arch`) when the current architecture of the database is Intel.
    
-****
-Mips
-****
+   .. py:method:: by_control(self, index)
+      
+      Return the desired control register by the specified ``index``.
+      
+      :param index: the index of the control register
+      
+   .. py:method:: by_float(self, index)
+      
+      Return the desired floating-point stack register by the specified ``index``.
+      
+      :param index: the index of the floating-point register
+      
+   .. py:method:: by_mmx(self, index)
+      
+      Return the desired MultiMedia eXtension register of the specified ``index``.
+      
+      :param index: the index of the MMX register
+      
+   .. py:method:: by_xmm(self, index)
+      
+      Return the desired SSE vector register of the specified ``index``.
+      
+      :param index: the index of the XMM register
+      
+   .. py:method:: by_ymm(self, index)
+      
+      Return the desired 256-bit Advanced Vector Extensions register of the specified ``index``.
+      
+      :param index: the index of the YMM register
+      
+   .. py:method:: by_zmm(self, index)
+      
+      Return the desired 512-bit Advanced Vector Extensions register of the specified ``index``.
+      
+      :param index: the index of the ZMM register
+      
+******
+MIPS32
+******
 
-.. py:class:: Mips
+.. py:class:: MIPS32
    
-   Bases: :py:class:`architecture_t`
+   Bases: :py:class:`MIPS`
    
-   An implementation of all the registers available on the MIPS architecture.
+   An implementation of all the registers available on the MIPS32 architecture.
    
-   This includes the different co-processor registers that are also available
+   This includes the different coprocessor registers that are also available
+   but are treated as special instructions by IDA.
+   
+   An instance of this class can be accessed as :py:obj:`instruction.architecture`
+   (or :py:obj:`instruction.arch`) when the current architecture of the database is MIPS.
+   
+******
+MIPS64
+******
+
+.. py:class:: MIPS64
+   
+   Bases: :py:class:`MIPS`
+   
+   An implementation of all the registers available on the MIPS64 architecture.
+   
+   This includes the different coprocessor registers that are also available
    but are treated as special instructions by IDA.
    
    An instance of this class can be accessed as :py:obj:`instruction.architecture`

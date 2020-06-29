@@ -61,8 +61,8 @@
 instruction defined within the database. There are three types
 of tools within this module and each can be distinguished by their
 prefixes which can be used to decode the operands for an instruction.
-At the present time, only the Intel, AArch32 (ARM), and MIPS
-architectures are supported.</p>
+At the present time, only the Intel, AArch32/AArch64 (ARM), and the
+MIPS32/MIPS64 architectures are currently supported.</p>
 <p>Although IDA internally uses the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.insn_t</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.op_t</span></code>
 to represent an instruction and its operands, this module’s base
 argument type is typically an address or an operand index. When
@@ -1338,19 +1338,19 @@ functions or aliases, please see <a class="reference internal" href="../multicas
 <div class="section" id="instruction-armops">
 <span id="ns-instruction-armops"></span><h3>3.1.4.2.1. instruction.armops<a class="headerlink" href="#instruction-armops" title="Permalink to this headline">¶</a></h3>
 <p>This internal namespace contains the different operand types that
-can be returned for the ARM architecture.</p>
-<div class="section" id="armops-disp">
-<h4>3.1.4.2.1.1. armops.disp<a class="headerlink" href="#armops-disp" title="Permalink to this headline">¶</a></h4>
+can be returned for the AArch32 and AArch64 architectures.</p>
+<div class="section" id="armops-flex">
+<h4>3.1.4.2.1.1. armops.flex<a class="headerlink" href="#armops-flex" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
-<dt id="instruction.armops.disp">
-<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">disp</code><a class="headerlink" href="#instruction.armops.disp" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.flex">
+<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">flex</code><a class="headerlink" href="#instruction.armops.flex" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple representing a memory displacement on the ARM architecture.</p>
-<p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">Offset)</span></code> where <code class="docutils literal notranslate"><span class="pre">Rn</span></code> is a register and <code class="docutils literal notranslate"><span class="pre">Offset</span></code> is
-the integer that is added to the register.</p>
+<p>A tuple representing a flexible operand type that can be decoded on either the AArch32 or AArch64 architectures.</p>
+<p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">shift,</span> <span class="pre">n)</span></code> which allows the architecture to apply
+a binary shift or rotation to the value of a register <code class="docutils literal notranslate"><span class="pre">Rn</span></code>.</p>
 <dl class="attribute">
-<dt id="instruction.armops.disp.symbols">
-<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.disp.symbols" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.flex.symbols">
+<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.flex.symbols" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1364,18 +1364,18 @@ the integer that is added to the register.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="armops-flex">
-<h4>3.1.4.2.1.2. armops.flex<a class="headerlink" href="#armops-flex" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="armops-immediatephrase">
+<h4>3.1.4.2.1.2. armops.immediatephrase<a class="headerlink" href="#armops-immediatephrase" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
-<dt id="instruction.armops.flex">
-<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">flex</code><a class="headerlink" href="#instruction.armops.flex" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.immediatephrase">
+<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">immediatephrase</code><a class="headerlink" href="#instruction.armops.immediatephrase" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple representing a flexible operand as available on the ARM architecture.</p>
-<p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">shift,</span> <span class="pre">n)</span></code> which allows the architecture to apply
-a binary shift or rotation to the value of a register <code class="docutils literal notranslate"><span class="pre">Rn</span></code>.</p>
+<p>A tuple representing a memory displacement operand on either the AArch32 or AArch64 architectures.</p>
+<p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">Offset)</span></code> where <code class="docutils literal notranslate"><span class="pre">Rn</span></code> is a register and <code class="docutils literal notranslate"><span class="pre">Offset</span></code> is
+the integer that is added to the register.</p>
 <dl class="attribute">
-<dt id="instruction.armops.flex.symbols">
-<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.flex.symbols" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.immediatephrase.symbols">
+<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.immediatephrase.symbols" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1395,9 +1395,9 @@ a binary shift or rotation to the value of a register <code class="docutils lite
 <dt id="instruction.armops.list">
 <em class="property">class </em><code class="descclassname">armops.</code><code class="descname">list</code><a class="headerlink" href="#instruction.armops.list" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple representing a register list on the ARM architecture.</p>
-<p>Has the simple format <code class="docutils literal notranslate"><span class="pre">(reglist,)</span></code> where <code class="docutils literal notranslate"><span class="pre">reglist</span></code> is a set of registers
-that can be explicitly tested for membership.</p>
+<p>A tuple representing a register list operand on either the AArch32 or AArch64 architectures.</p>
+<p>Has the simple format <code class="docutils literal notranslate"><span class="pre">(reglist)</span></code> where <code class="docutils literal notranslate"><span class="pre">reglist</span></code> is a set of registers
+that can be explicitly tested as a set for membership.</p>
 <dl class="attribute">
 <dt id="instruction.armops.list.symbols">
 <code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.list.symbols" title="Permalink to this definition">¶</a></dt>
@@ -1414,18 +1414,18 @@ that can be explicitly tested for membership.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="armops-mem">
-<h4>3.1.4.2.1.4. armops.mem<a class="headerlink" href="#armops-mem" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="armops-memory">
+<h4>3.1.4.2.1.4. armops.memory<a class="headerlink" href="#armops-memory" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
-<dt id="instruction.armops.mem">
-<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">mem</code><a class="headerlink" href="#instruction.armops.mem" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.memory">
+<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">memory</code><a class="headerlink" href="#instruction.armops.memory" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple for representing a memory operand on the ARM architecture.</p>
+<p>A tuple for representing a memory operand on either the AArch32 or AArch64 architectures.</p>
 <p>Has the format <code class="docutils literal notranslate"><span class="pre">(address,</span> <span class="pre">value)</span></code> where <code class="docutils literal notranslate"><span class="pre">address</span></code> is the actual value
-stored in the operand and <code class="docutils literal notranslate"><span class="pre">value</span></code> is the value that is dereferenced.</p>
+stored in the operand and <code class="docutils literal notranslate"><span class="pre">value</span></code> is the value that would be dereferenced.</p>
 <dl class="attribute">
-<dt id="instruction.armops.mem.symbols">
-<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.mem.symbols" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.memory.symbols">
+<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.memory.symbols" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1439,18 +1439,18 @@ stored in the operand and <code class="docutils literal notranslate"><span class
 </dd></dl>
 
 </div>
-<div class="section" id="armops-phrase">
-<h4>3.1.4.2.1.5. armops.phrase<a class="headerlink" href="#armops-phrase" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="armops-registerphrase">
+<h4>3.1.4.2.1.5. armops.registerphrase<a class="headerlink" href="#armops-registerphrase" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
-<dt id="instruction.armops.phrase">
-<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">phrase</code><a class="headerlink" href="#instruction.armops.phrase" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.registerphrase">
+<em class="property">class </em><code class="descclassname">armops.</code><code class="descname">registerphrase</code><a class="headerlink" href="#instruction.armops.registerphrase" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple for representing a memory phrase on the ARM architecture</p>
-<p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">Rm)</span></code> where both are registers that compose the
-phrase.</p>
+<p>A tuple for representing a memory phrase on either the AArch32 or AArch64 architectures.</p>
+<p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">Rm)</span></code> where both values are registers that compose
+the phrase.</p>
 <dl class="attribute">
-<dt id="instruction.armops.phrase.symbols">
-<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.phrase.symbols" title="Permalink to this definition">¶</a></dt>
+<dt id="instruction.armops.registerphrase.symbols">
+<code class="descname">symbols</code><a class="headerlink" href="#instruction.armops.registerphrase.symbols" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1500,7 +1500,7 @@ can be returned for the Intel architecture.</p>
 <dt id="instruction.intelops.SegmentOffset">
 <em class="property">class </em><code class="descclassname">intelops.</code><code class="descname">SegmentOffset</code><a class="headerlink" href="#instruction.intelops.SegmentOffset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple representing an address with a segment register attached for Intel.</p>
+<p>A tuple representing an address with a segment register attached on the Intel architecture.</p>
 <p>Has the format <code class="docutils literal notranslate"><span class="pre">(segment,</span> <span class="pre">offset)</span></code> where <code class="docutils literal notranslate"><span class="pre">segment</span></code> is a segment register.</p>
 <dl class="attribute">
 <dt id="instruction.intelops.SegmentOffset.symbols">
@@ -1524,10 +1524,10 @@ can be returned for the Intel architecture.</p>
 <dt id="instruction.intelops.SegmentOffsetBaseIndexScale">
 <em class="property">class </em><code class="descclassname">intelops.</code><code class="descname">SegmentOffsetBaseIndexScale</code><a class="headerlink" href="#instruction.intelops.SegmentOffsetBaseIndexScale" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple representing a memory phrase for the Intel architecture.</p>
-<p>Has the format <code class="docutils literal notranslate"><span class="pre">(segment,</span> <span class="pre">offset,</span> <span class="pre">base,</span> <span class="pre">index,</span> <span class="pre">scale)</span></code> where
-<code class="docutils literal notranslate"><span class="pre">segment</span></code> includes the segment register and <code class="docutils literal notranslate"><span class="pre">base</span></code> and
-<code class="docutils literal notranslate"><span class="pre">index</span></code> are both optional registers.</p>
+<p>A tuple representing a memory phrase operand on the Intel architecture.</p>
+<p>Has the format <code class="docutils literal notranslate"><span class="pre">(segment,</span> <span class="pre">offset,</span> <span class="pre">base,</span> <span class="pre">index,</span> <span class="pre">scale)</span></code> where <code class="docutils literal notranslate"><span class="pre">segment</span></code>
+includes the segment register and both the <code class="docutils literal notranslate"><span class="pre">base</span></code> and <code class="docutils literal notranslate"><span class="pre">index</span></code> registers
+are both optional.</p>
 <dl class="attribute">
 <dt id="instruction.intelops.SegmentOffsetBaseIndexScale.symbols">
 <code class="descname">symbols</code><a class="headerlink" href="#instruction.intelops.SegmentOffsetBaseIndexScale.symbols" title="Permalink to this definition">¶</a></dt>
@@ -1548,16 +1548,16 @@ can be returned for the Intel architecture.</p>
 <div class="section" id="instruction-mipsops">
 <span id="ns-instruction-mipsops"></span><h3>3.1.4.2.3. instruction.mipsops<a class="headerlink" href="#instruction-mipsops" title="Permalink to this headline">¶</a></h3>
 <p>This internal namespace contains the different operand types that
-can be returned for the MIPS architecture.</p>
+are used by the MIPS architectures.</p>
 <div class="section" id="mipsops-phrase">
 <h4>3.1.4.2.3.1. mipsops.phrase<a class="headerlink" href="#mipsops-phrase" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
 <dt id="instruction.mipsops.phrase">
 <em class="property">class </em><code class="descclassname">mipsops.</code><code class="descname">phrase</code><a class="headerlink" href="#instruction.mipsops.phrase" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
-<p>A tuple for representing a memory phrase on the MIPS architecture.</p>
+<p>A tuple for representing a memory phrase operand on the MIPS architectures.</p>
 <p>Has the format <code class="docutils literal notranslate"><span class="pre">(Rn,</span> <span class="pre">Offset)</span></code> where <code class="docutils literal notranslate"><span class="pre">Rn</span></code> is the register and
-<code class="docutils literal notranslate"><span class="pre">Offset</span></code> is the immediate that is added to the register.</p>
+<code class="docutils literal notranslate"><span class="pre">Offset</span></code> is the immediate that is added to the <code class="docutils literal notranslate"><span class="pre">Rn</span></code> register.</p>
 <dl class="attribute">
 <dt id="instruction.mipsops.phrase.symbols">
 <code class="descname">symbols</code><a class="headerlink" href="#instruction.mipsops.phrase.symbols" title="Permalink to this definition">¶</a></dt>
@@ -1566,6 +1566,32 @@ can be returned for the MIPS architecture.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Yield the <code class="docutils literal notranslate"><span class="pre">Rn</span></code> register from this tuple.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="mipsops-trap">
+<h4>3.1.4.2.3.2. mipsops.trap<a class="headerlink" href="#mipsops-trap" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="instruction.mipsops.trap">
+<em class="property">class </em><code class="descclassname">mipsops.</code><code class="descname">trap</code><a class="headerlink" href="#instruction.mipsops.trap" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">namedtuple</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">symbol_t</span></code></p>
+<p>A tuple for representing a trap code that can be encoded within
+certain instructions on the MIPS architectures.</p>
+<p>Simply wraps the encoded integer in a single-element tuple with
+the format of <code class="docutils literal notranslate"><span class="pre">(code)</span></code>.</p>
+<dl class="attribute">
+<dt id="instruction.mipsops.trap.symbols">
+<code class="descname">symbols</code><a class="headerlink" href="#instruction.mipsops.trap.symbols" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – This operand type is not composed of any symbols.</td>
 </tr>
 </tbody>
 </table>
@@ -1787,16 +1813,29 @@ information on aliases, please see <a class="reference internal" href="../multic
 <dl class="class">
 <dt id="instruction.AArch32">
 <em class="property">class </em><code class="descclassname">instruction.</code><code class="descname">AArch32</code><a class="headerlink" href="#instruction.AArch32" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">architecture_t</span></code></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">AArch</span></code></p>
 <p>An implementation of all the registers available on the AArch32 (ARM) architecture.</p>
 <p>This is used to locate or manage the different registers that are available.</p>
 <p>An instance of this class can be accessed as <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.architecture</span></code>
-(or <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.arch</span></code>) when the current architecture of the database is ARM.</p>
+(or <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.arch</span></code>) when the current architecture of the database is AArch32.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="aarch64">
+<h3>3.1.4.3.2. AArch64<a class="headerlink" href="#aarch64" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="instruction.AArch64">
+<em class="property">class </em><code class="descclassname">instruction.</code><code class="descname">AArch64</code><a class="headerlink" href="#instruction.AArch64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">AArch</span></code></p>
+<p>An implementation of all the registers available on the AArch64 (ARM) architecture.</p>
+<p>This is used to locate or manage the different registers that are available.</p>
+<p>An instance of this class can be accessed as <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.architecture</span></code>
+(or <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.arch</span></code>) when the current architecture of the database is AArch64.</p>
 </dd></dl>
 
 </div>
 <div class="section" id="intel">
-<h3>3.1.4.3.2. Intel<a class="headerlink" href="#intel" title="Permalink to this headline">¶</a></h3>
+<h3>3.1.4.3.3. Intel<a class="headerlink" href="#intel" title="Permalink to this headline">¶</a></h3>
 <dl class="class">
 <dt id="instruction.Intel">
 <em class="property">class </em><code class="descclassname">instruction.</code><code class="descname">Intel</code><a class="headerlink" href="#instruction.Intel" title="Permalink to this definition">¶</a></dt>
@@ -1806,17 +1845,115 @@ information on aliases, please see <a class="reference internal" href="../multic
 promote or demote a register to the different sizes that are available.</p>
 <p>An instance of this class can be accessed as <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.architecture</span></code>
 (or <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.arch</span></code>) when the current architecture of the database is Intel.</p>
+<dl class="method">
+<dt id="instruction.Intel.by_control">
+<code class="descname">by_control</code><span class="sig-paren">(</span><em>self</em>, <em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.Intel.by_control" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the desired control register by the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the control register</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="instruction.Intel.by_float">
+<code class="descname">by_float</code><span class="sig-paren">(</span><em>self</em>, <em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.Intel.by_float" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the desired floating-point stack register by the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the floating-point register</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="instruction.Intel.by_mmx">
+<code class="descname">by_mmx</code><span class="sig-paren">(</span><em>self</em>, <em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.Intel.by_mmx" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the desired MultiMedia eXtension register of the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the MMX register</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="instruction.Intel.by_xmm">
+<code class="descname">by_xmm</code><span class="sig-paren">(</span><em>self</em>, <em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.Intel.by_xmm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the desired SSE vector register of the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the XMM register</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="instruction.Intel.by_ymm">
+<code class="descname">by_ymm</code><span class="sig-paren">(</span><em>self</em>, <em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.Intel.by_ymm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the desired 256-bit Advanced Vector Extensions register of the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the YMM register</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="instruction.Intel.by_zmm">
+<code class="descname">by_zmm</code><span class="sig-paren">(</span><em>self</em>, <em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.Intel.by_zmm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the desired 512-bit Advanced Vector Extensions register of the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>index</strong> – the index of the ZMM register</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </dd></dl>
 
 </div>
-<div class="section" id="mips">
-<h3>3.1.4.3.3. Mips<a class="headerlink" href="#mips" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="mips32">
+<h3>3.1.4.3.4. MIPS32<a class="headerlink" href="#mips32" title="Permalink to this headline">¶</a></h3>
 <dl class="class">
-<dt id="instruction.Mips">
-<em class="property">class </em><code class="descclassname">instruction.</code><code class="descname">Mips</code><a class="headerlink" href="#instruction.Mips" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">architecture_t</span></code></p>
-<p>An implementation of all the registers available on the MIPS architecture.</p>
-<p>This includes the different co-processor registers that are also available
+<dt id="instruction.MIPS32">
+<em class="property">class </em><code class="descclassname">instruction.</code><code class="descname">MIPS32</code><a class="headerlink" href="#instruction.MIPS32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MIPS</span></code></p>
+<p>An implementation of all the registers available on the MIPS32 architecture.</p>
+<p>This includes the different coprocessor registers that are also available
+but are treated as special instructions by IDA.</p>
+<p>An instance of this class can be accessed as <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.architecture</span></code>
+(or <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.arch</span></code>) when the current architecture of the database is MIPS.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="mips64">
+<h3>3.1.4.3.5. MIPS64<a class="headerlink" href="#mips64" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="instruction.MIPS64">
+<em class="property">class </em><code class="descclassname">instruction.</code><code class="descname">MIPS64</code><a class="headerlink" href="#instruction.MIPS64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">MIPS</span></code></p>
+<p>An implementation of all the registers available on the MIPS64 architecture.</p>
+<p>This includes the different coprocessor registers that are also available
 but are treated as special instructions by IDA.</p>
 <p>An instance of this class can be accessed as <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.architecture</span></code>
 (or <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.arch</span></code>) when the current architecture of the database is MIPS.</p>
@@ -1854,11 +1991,11 @@ but are treated as special instructions by IDA.</p>
 <li><a class="reference internal" href="#function-list">3.1.4.1. Function list</a></li>
 <li><a class="reference internal" href="#namespace-list">3.1.4.2. Namespace list</a><ul>
 <li><a class="reference internal" href="#instruction-armops">3.1.4.2.1. instruction.armops</a><ul>
-<li><a class="reference internal" href="#armops-disp">3.1.4.2.1.1. armops.disp</a></li>
-<li><a class="reference internal" href="#armops-flex">3.1.4.2.1.2. armops.flex</a></li>
+<li><a class="reference internal" href="#armops-flex">3.1.4.2.1.1. armops.flex</a></li>
+<li><a class="reference internal" href="#armops-immediatephrase">3.1.4.2.1.2. armops.immediatephrase</a></li>
 <li><a class="reference internal" href="#armops-list">3.1.4.2.1.3. armops.list</a></li>
-<li><a class="reference internal" href="#armops-mem">3.1.4.2.1.4. armops.mem</a></li>
-<li><a class="reference internal" href="#armops-phrase">3.1.4.2.1.5. armops.phrase</a></li>
+<li><a class="reference internal" href="#armops-memory">3.1.4.2.1.4. armops.memory</a></li>
+<li><a class="reference internal" href="#armops-registerphrase">3.1.4.2.1.5. armops.registerphrase</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#instruction-intelops">3.1.4.2.2. instruction.intelops</a><ul>
@@ -1869,6 +2006,7 @@ but are treated as special instructions by IDA.</p>
 </li>
 <li><a class="reference internal" href="#instruction-mipsops">3.1.4.2.3. instruction.mipsops</a><ul>
 <li><a class="reference internal" href="#mipsops-phrase">3.1.4.2.3.1. mipsops.phrase</a></li>
+<li><a class="reference internal" href="#mipsops-trap">3.1.4.2.3.2. mipsops.trap</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#instruction-type">3.1.4.2.4. instruction.type</a></li>
@@ -1876,8 +2014,10 @@ but are treated as special instructions by IDA.</p>
 </li>
 <li><a class="reference internal" href="#class-list">3.1.4.3. Class list</a><ul>
 <li><a class="reference internal" href="#aarch32">3.1.4.3.1. AArch32</a></li>
-<li><a class="reference internal" href="#intel">3.1.4.3.2. Intel</a></li>
-<li><a class="reference internal" href="#mips">3.1.4.3.3. Mips</a></li>
+<li><a class="reference internal" href="#aarch64">3.1.4.3.2. AArch64</a></li>
+<li><a class="reference internal" href="#intel">3.1.4.3.3. Intel</a></li>
+<li><a class="reference internal" href="#mips32">3.1.4.3.4. MIPS32</a></li>
+<li><a class="reference internal" href="#mips64">3.1.4.3.5. MIPS64</a></li>
 </ul>
 </li>
 </ul>

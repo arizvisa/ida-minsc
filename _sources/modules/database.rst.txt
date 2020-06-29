@@ -270,21 +270,6 @@ functions and aliases. For more information on this, please see
    :type none: None
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to set the name
    
-.. py:function:: offset()
-   
-   Return the current address converted to an offset from the base address of the database.
-   
-   Aliases: :py:func:`database.getOffset<offset>`, :py:func:`database.getoffset<offset>`, :py:func:`database.o<offset>`
-   
-.. py:function:: offset(ea)
-   
-   Return the address ``ea`` converted to an offset from the base address of the database.
-   
-   Aliases: :py:func:`database.getOffset<offset>`, :py:func:`database.getoffset<offset>`, :py:func:`database.o<offset>`
-   
-   :param ea: an address in the database
-   :type ea: int or long
-   
 .. py:function:: read()
    
    Return the bytes defined at the current address.
@@ -413,14 +398,6 @@ functions and aliases. For more information on this, please see
 .. py:function:: top()
    
    Return the very lowest address within the database.
-   
-.. py:function:: translate(offset)
-   
-   Translate the specified ``offset`` to an address in the database.
-   
-   Aliases: :py:func:`database.convertOffset<translate>`, :py:func:`database.coof<translate>`, :py:func:`database.convert_offset<translate>`
-   
-   :param offset: an offset from the base address
    
 .. py:function:: within()
    
@@ -1607,7 +1584,7 @@ for determining the type of the binary are also included.
    
 .. py:function:: config\.bits()
    
-   Return number of bits used by the database.
+   Return number of bits of the processor used by the database.
    
 .. py:function:: config\.bounds()
    
@@ -3625,6 +3602,13 @@ Some examples of using this namespace can be::
    :param ea: an address in the database
    :type ea: int or long
    
+.. py:function:: type(none)
+   
+   Remove the typeinfo from the current address.
+   
+   :param none: the value :py:obj:`None`
+   :type none: None
+   
 .. py:function:: type(info)
    
    Apply the :py:obj:`idaapi.tinfo_t` typeinfo or typeinfo string in ``info`` to the current address.
@@ -3640,6 +3624,14 @@ Some examples of using this namespace can be::
    :type ea: int or long
    :param info: the ``idaapi.tinfo_t`` to assign to the address
    :type info: idaapi.tinfo_t
+   
+.. py:function:: type(ea, none)
+   
+   Remove the typeinfo from the address ``ea``.
+   
+   :param ea: an address in the database
+   :param none: the value :py:obj:`None`
+   :type none: None
    
 .. py:function:: type(ea, info)
    
@@ -3800,6 +3792,20 @@ Some examples of using this namespace can be::
    
    :param ea: an address in the database
    :type ea: int or long
+   
+.. py:function:: type\.has_typeinfo()
+   
+   Return true if the current address has some typeinfo associated with it.
+   
+   Aliases: :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
+   
+.. py:function:: type\.has_typeinfo(ea)
+   
+   Return true if the address at ``ea`` has some typeinfo associated with it.
+   
+   Aliases: :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
+   
+   :param ea: an address in the database
    
 .. py:function:: type\.has_weakname()
    

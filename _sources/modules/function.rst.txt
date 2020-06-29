@@ -1504,11 +1504,26 @@ Some simple ways of getting information about a function::
    
    Return the typeinfo for the current function as a :py:obj:`idaapi.tinfo_t`.
    
+.. py:function:: type(info)
+   
+   Apply the typeinfo in ``info`` to the current function.
+   
+   :param info: the typeinfo to assign to the current function
+   :type info: str or idaapi.tinfo_t
+   
+.. py:function:: type(none)
+   
+   Remove the typeinfo for the current function.
+   
+   :param none: the value :py:obj:`None`
+   :type none: None
+   
 .. py:function:: type(func)
    
    Return the typeinfo for the function ``func`` as a :py:obj:`idaapi.tinfo_t`.
    
    :param func: the function to get the typeinfo for
+   :type func: int or long or idaapi.func_t
    
 .. py:function:: type(func, info)
    
@@ -1525,6 +1540,14 @@ Some simple ways of getting information about a function::
    :param func: the function to set the typeinfo for
    :param info: the ``idaapi.tinfo_t`` to assign to the function
    :type info: str
+   
+.. py:function:: type(func, none)
+   
+   Remove the typeinfo for the function ``func``.
+   
+   :param func:
+   :param none:
+   :type none: None
    
 .. py:function:: type\.has_frameptr()
    
@@ -1558,13 +1581,13 @@ Some simple ways of getting information about a function::
    
    Returns true if the current function has a prototype associated with it.
    
-   Aliases: :py:func:`function.type.prototypeQ<type\.has_prototype>`
+   Aliases: :py:func:`function.type.has_typeinfo<type\.has_prototype>`, :py:func:`function.type.typeinfoQ<type\.has_prototype>`, :py:func:`function.type.prototypeQ<type\.has_prototype>`
    
 .. py:function:: type\.has_prototype(func)
    
    Returns true if the function ``func`` has a prototype associated with it.
    
-   Aliases: :py:func:`function.type.prototypeQ<type\.has_prototype>`
+   Aliases: :py:func:`function.type.has_typeinfo<type\.has_prototype>`, :py:func:`function.type.typeinfoQ<type\.has_prototype>`, :py:func:`function.type.prototypeQ<type\.has_prototype>`
    
    :param func: the function to check
    
