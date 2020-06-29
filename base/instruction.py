@@ -2122,7 +2122,7 @@ class MIPS(interface.architecture_t):
     """
     An implementation of all the registers available on the MIPS architectures.
 
-    This includes the different co-processor registers that are also available
+    This includes the different coprocessor registers that are also available
     but are treated as special instructions by IDA.
 
     An instance of this class can be accessed as ``instruction.architecture``
@@ -2235,7 +2235,7 @@ class MIPS32(MIPS):
     """
     An implementation of all the registers available on the MIPS32 architecture.
 
-    This includes the different co-processor registers that are also available
+    This includes the different coprocessor registers that are also available
     but are treated as special instructions by IDA.
 
     An instance of this class can be accessed as ``instruction.architecture``
@@ -2249,7 +2249,7 @@ class MIPS64(MIPS):
     """
     An implementation of all the registers available on the MIPS64 architecture.
 
-    This includes the different co-processor registers that are also available
+    This includes the different coprocessor registers that are also available
     but are treated as special instructions by IDA.
 
     An instance of this class can be accessed as ``instruction.architecture``
