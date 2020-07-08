@@ -5466,11 +5466,18 @@ class get(object):
         If the integer `length` is defined, then use it as the length of the array.
         """
 
-        # Fetch the string type at the given address
+        # For older versions of IDA, we get the strtype from the opinfo
         if idaapi.__version__ < 7.0:
-            strtype = idc.GetStringType(ea)
+            ti, F = idaapi.opinfo_t(), type.flags(ea)
+            strtype = ti.strtype if idaapi.get_opinfo(ea, 0, F, ti) else idaapi.BADADDR
+
+            # and cast the result from idaapi.get_str_type_code to an integer
+            get_str_type_code = utils.fcompose(idaapi.get_str_type_code, six.byte2int)
+
+        # Fetch the string type at the given address using the newer API
         else:
             strtype = idaapi.get_str_type(ea)
+            get_str_type_code = idaapi.get_str_type_code
 
         # If no string was found, then try to treat it as a plain old array
         # XXX: idaapi.get_str_type() seems to return 0xffffffff on failure instead of idaapi.BADADDR
@@ -5492,18 +5499,18 @@ class get(object):
         sentinels = idaapi.get_str_term1(strtype) + idaapi.get_str_term2(strtype)
 
         # Extract the fields out of the string type code
-        res = idaapi.get_str_type_code(strtype)
-        sl, sw = ord(res) & idaapi.STRLYT_MASK, ord(res) & idaapi.STRWIDTH_MASK
+        res = get_str_type_code(strtype)
+        sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
 
         # Figure out the STRLYT field
         if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
             shift, f1 = 0, operator.methodcaller('rstrip', sentinels)
         elif sl == idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 1, utils.fpass
+            shift, f1 = 1, utils.fidentity
         elif sl == idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 2, utils.fpass
+            shift, f1 = 2, utils.fidentity
         elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 4, utils.fpass
+            shift, f1 = 4, utils.fidentity
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sl, ea))
 
