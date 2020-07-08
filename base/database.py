@@ -5467,7 +5467,10 @@ class get(object):
         """
 
         # Fetch the string type at the given address
-        strtype = idaapi.get_str_type(ea)
+        if idaapi.__version__ < 7.0:
+            strtype = idc.GetStringType(ea)
+        else:
+            strtype = idaapi.get_str_type(ea)
 
         # If no string was found, then try to treat it as a plain old array
         # XXX: idaapi.get_str_type() seems to return 0xffffffff on failure instead of idaapi.BADADDR
@@ -5490,17 +5493,17 @@ class get(object):
 
         # Extract the fields out of the string type code
         res = idaapi.get_str_type_code(strtype)
-        sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
+        sl, sw = ord(res) & idaapi.STRLYT_MASK, ord(res) & idaapi.STRWIDTH_MASK
 
         # Figure out the STRLYT field
         if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
             shift, f1 = 0, operator.methodcaller('rstrip', sentinels)
         elif sl == idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 1, utils.fidentity
+            shift, f1 = 1, utils.fpass
         elif sl == idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 2, utils.fidentity
+            shift, f1 = 2, utils.fpass
         elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 4, utils.fidentity
+            shift, f1 = 4, utils.fpass
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sl, ea))
 
@@ -5524,7 +5527,6 @@ class get(object):
 
         # ..and then process it.
         return f1(f2(res))
-
     @utils.multicase()
     @classmethod
     def structure(cls):
