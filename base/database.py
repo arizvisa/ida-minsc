@@ -5466,8 +5466,18 @@ class get(object):
         If the integer `length` is defined, then use it as the length of the array.
         """
 
-        # Fetch the string type at the given address
-        strtype = idaapi.get_str_type(ea)
+        # For older versions of IDA, we get the strtype from the opinfo
+        if idaapi.__version__ < 7.0:
+            ti, F = idaapi.opinfo_t(), type.flags(ea)
+            strtype = ti.strtype if idaapi.get_opinfo(ea, 0, F, ti) else idaapi.BADADDR
+
+            # and cast the result from idaapi.get_str_type_code to an integer
+            get_str_type_code = utils.fcompose(idaapi.get_str_type_code, six.byte2int)
+
+        # Fetch the string type at the given address using the newer API
+        else:
+            strtype = idaapi.get_str_type(ea)
+            get_str_type_code = idaapi.get_str_type_code
 
         # If no string was found, then try to treat it as a plain old array
         # XXX: idaapi.get_str_type() seems to return 0xffffffff on failure instead of idaapi.BADADDR
@@ -5489,7 +5499,7 @@ class get(object):
         sentinels = idaapi.get_str_term1(strtype) + idaapi.get_str_term2(strtype)
 
         # Extract the fields out of the string type code
-        res = idaapi.get_str_type_code(strtype)
+        res = get_str_type_code(strtype)
         sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
 
         # Figure out the STRLYT field
@@ -5524,7 +5534,6 @@ class get(object):
 
         # ..and then process it.
         return f1(f2(res))
-
     @utils.multicase()
     @classmethod
     def structure(cls):
