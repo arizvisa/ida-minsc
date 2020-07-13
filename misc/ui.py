@@ -1040,9 +1040,22 @@ class DisplayHook(object):
         storage.append(cls)
 
     def format_basestring(self, string):
+        # FIXME: rather than automatically evaluating the string as we're
+        #        currently doing, it'd be much cleaner if we just format the
+        #        result from a function with some sort of wrapper object. This
+        #        way we can check its type, and then choose whether to unwrap it
+        #        or not. This can be done with a decorator of some sort that
+        #        communicates to this implementation that it will need to
+        #        distinguish between printable strings that we can output and
+        #        strings that should be processed by the user.
+        # XXX: maybe we can even use this wrapper object to allow this class to
+        #      handle aligning columns in a table automatically such as when
+        #      more than one element in a row is being returned.
         if 'ida_idaapi' in sys.modules:
-            return sys.modules['ida_idaapi'].format_basestring(string)
-        return u"{!s}".format(string)
+            formatted = sys.modules['ida_idaapi'].format_basestring(string)
+        else:
+            formatted = u"{!r}".format(string)
+        return u"{!s}".format(formatted)
 
     def format_item(self, num_printer, storage, item):
         if item is None or isinstance(item, bool):
