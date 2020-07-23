@@ -207,10 +207,10 @@ class address(commentbase):
     @classmethod
     def old_changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable, 'repeatable' if repeatable else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # first we'll grab our comment that the user updated
-        logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable, 'repeatable' if repeatable else 'non-repeatable', ea))
+        logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         fn = idaapi.get_func(ea)
 
