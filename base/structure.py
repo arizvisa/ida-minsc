@@ -1613,26 +1613,13 @@ class member_t(object):
         return ti
 
     @typeinfo.setter
-    @utils.string.decorate_arguments('info')
     def typeinfo(self, info):
         '''Set the type info of the member to `info`.'''
-        if idaapi.__version__ < 7.0:
-            til, ti = idaapi.cvar.idati, idaapi.tinfo_t(),
-        else:
-            til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
 
-        # Convert info to a string if it's a tinfo_t
-        info_s = "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
-
-        # Firstly we need to ';'-terminate the type the user provided in order
-        # for IDA's parser to understand it.
-        terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
-
-        # Now that we've prepped everything, ask IDA to parse this into a
-        # tinfo_t for us. We pass the silent flag so that we can raise an
-        # exception if there's a parsing error of some sort.
-        res = idaapi.parse_decl2(til, terminated, ti, idaapi.PT_SIL) if idaapi.__version__ < 7.0 else idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL)
-        if res is None:
+        # Parse our into parameter into a tinfo_t for us, so that we can assign it t the
+        # typeinfo for the member.
+        ti = internal.declaration.parse(info)
+        if ti is None:
             cls = self.__class__
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info)))
 
