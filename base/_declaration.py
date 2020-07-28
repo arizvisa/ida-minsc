@@ -77,7 +77,9 @@ def parse(info):
     # that we're responsible for raising an exception if there's a parsing
     # error of some sort. If it succeeds, then we can return our typeinfo.
     # Otherwise we return None because of the inability to parse it.
-    if idaapi.__version__ < 7.0:
+    if idaapi.__version__ < 6.9:
+        return None if idaapi.parse_decl2(til, terminated, None, ti, idaapi.PT_SIL) is None else ti
+    elif idaapi.__version__ < 7.0:
         return None if idaapi.parse_decl2(til, terminated, ti, idaapi.PT_SIL) is None else ti
     return None if idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL) is None else ti
 
