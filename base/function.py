@@ -1804,7 +1804,8 @@ class type(object):
     @utils.multicase(info=basestring)
     def __new__(cls, func, info):
         '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
-        til = idaapi.get_idati()
+        til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
+
         _, ea = interface.addressOfRuntimeOrStatic(func)
         conventions = {'__cdecl', '__stdcall', '__fastcall', '__thiscall', '__pascal', '__usercall', '__userpurge'}
 
@@ -1845,7 +1846,7 @@ class type(object):
         terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
 
         # Now we should just be able to apply it to the function.
-        ok = idaapi.apply_cdecl(idaapi.get_idati(), ea, terminated)
+        ok = idaapi.apply_cdecl(til, ea, terminated)
         if not ok:
             raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to apply the specified type declaration (\"{!s}\").".format('.'.join((__name__, cls.__name__)), ea, utils.string.escape(info, '"')))
 
