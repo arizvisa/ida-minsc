@@ -1094,7 +1094,11 @@ class DisplayHook(object):
     @classmethod
     def format_storage(cls, item):
         storage = []
-        import ida_idp
+        if idaapi.__version__ < 7.0:
+            import idaapi as ida_idp
+        else:
+            import ida_idp
+
         num_printer = cls._print_hex
         dn = ida_idp.ph_get_flag() & ida_idp.PR_DEFNUM
         if dn == ida_idp.PRN_OCT:
@@ -1118,3 +1122,17 @@ class DisplayHook(object):
             traceback.print_exc()
             self.orig_displayhook(item)
 
+class IDAPythonStdOut:
+    """
+    Dummy file-like class that receives stout and stderr
+    """
+    def write(self, text):
+        # NB: in case 'text' is Unicode, msg() will decode it
+        # and call umsg() to print it
+        idaapi.msg(text if isinstance(text, six.string_types) else DisplayHook.format_storage(text))
+
+    def flush(self):
+        pass
+
+    def isatty(self):
+        return False
