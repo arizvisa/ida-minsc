@@ -1031,15 +1031,17 @@ class DisplayHook(object):
         else:
             self.orig_displayhook = sys.displayhook
 
-    def format_seq(self, num_printer, storage, item, opn, cls):
+    @classmethod
+    def format_seq(cls, num_printer, storage, item, opn, klass):
         storage.append(opn)
         for idx, el in enumerate(item):
             if idx > 0:
                 storage.append(', ')
-            self.format_item(num_printer, storage, el)
-        storage.append(cls)
+            cls.format_item(num_printer, storage, el)
+        storage.append(klass)
 
-    def format_basestring(self, string):
+    @classmethod
+    def format_basestring(cls, string):
         # FIXME: rather than automatically evaluating the string as we're
         #        currently doing, it'd be much cleaner if we just format the
         #        result from a function with some sort of wrapper object. This
@@ -1057,53 +1059,60 @@ class DisplayHook(object):
             formatted = u"{!r}".format(string)
         return u"{!s}".format(formatted)
 
-    def format_item(self, num_printer, storage, item):
+    @classmethod
+    def format_item(cls, num_printer, storage, item):
         if item is None or isinstance(item, bool):
             storage.append("{!s}".format(item))
         elif isinstance(item, six.string_types):
-            storage.append(self.format_basestring(item))
+            storage.append(cls.format_basestring(item))
         elif isinstance(item, six.integer_types):
             storage.append(num_printer(item))
         elif isinstance(item, idaapi.tinfo_t):
             storage.append("{!s}".format(item))
         elif item.__class__ is list:
-            self.format_seq(num_printer, storage, item, '[', ']')
+            cls.format_seq(num_printer, storage, item, '[', ']')
         elif item.__class__ is tuple:
-            self.format_seq(num_printer, storage, item, '(', ')')
+            cls.format_seq(num_printer, storage, item, '(', ')')
         elif item.__class__ is set:
-            self.format_seq(num_printer, storage, item, 'set([', '])')
+            cls.format_seq(num_printer, storage, item, 'set([', '])')
         elif item.__class__ is dict:
             storage.append('{')
             for idx, pair in enumerate(item.items()):
                 if idx > 0:
                     storage.append(', ')
-                self.format_item(num_printer, storage, pair[0])
+                cls.format_item(num_printer, storage, pair[0])
                 storage.append(": ")
-                self.format_item(num_printer, storage, pair[1])
+                cls.format_item(num_printer, storage, pair[1])
             storage.append('}')
         else:
             storage.append("{!r}".format(item))
 
-    def _print_hex(self, x):
+    @classmethod
+    def _print_hex(cls, x):
         return "{:#x}".format(x)
+
+    @classmethod
+    def format_storage(cls, item):
+        storage = []
+        import ida_idp
+        num_printer = cls._print_hex
+        dn = ida_idp.ph_get_flag() & ida_idp.PR_DEFNUM
+        if dn == ida_idp.PRN_OCT:
+            num_printer = oct
+        elif dn == ida_idp.PRN_DEC:
+            num_printer = str
+        elif dn == ida_idp.PRN_BIN:
+            num_printer = bin
+        cls.format_item(num_printer, storage, item)
+        return str().join(storage)
 
     def displayhook(self, item):
         if item is None or item.__class__ is bool:
             self.orig_displayhook(item)
             return
         try:
-            storage = []
-            import ida_idp
-            num_printer = self._print_hex
-            dn = ida_idp.ph_get_flag() & ida_idp.PR_DEFNUM
-            if dn == ida_idp.PRN_OCT:
-                num_printer = oct
-            elif dn == ida_idp.PRN_DEC:
-                num_printer = str
-            elif dn == ida_idp.PRN_BIN:
-                num_printer = bin
-            self.format_item(num_printer, storage, item)
-            sys.stdout.write("%s\n" % "".join(storage))
+            res = self.format_storage(item)
+            sys.stdout.write("%s\n" % res)
         except:
             import traceback
             traceback.print_exc()
