@@ -1616,6 +1616,11 @@ class member_t(object):
     def typeinfo(self, info):
         '''Set the type info of the member to `info`.'''
 
+        if idaapi.__version__ < 7.0:
+            set_member_tinfo = idaapi.set_member_tinfo2
+        else:
+            set_member_tinfo = idaapi.set_member_tinfo
+
         # Parse our into parameter into a tinfo_t for us, so that we can assign it t the
         # typeinfo for the member.
         ti = internal.declaration.parse(info)
@@ -1624,7 +1629,7 @@ class member_t(object):
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info)))
 
         # Now we can pass our tinfo_t along with the member information to IDA.
-        res = idaapi.set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
+        res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
         if res == idaapi.SMT_OK:
             return
 
