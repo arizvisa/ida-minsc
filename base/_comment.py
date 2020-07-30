@@ -716,6 +716,7 @@ class contents(tagging):
             if len(encdata) != sz:
                 raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
         except Exception as E:
+            logging.warn(u"{:s}._read_header({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, key, ea), exc_info=True)
             raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
@@ -751,6 +752,7 @@ class contents(tagging):
                 raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         except Exception as E:
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : An exception ({!s}) was raised while trying to encode contents for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), E, key, ea), exc_info=True)
             raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, data))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
@@ -779,6 +781,7 @@ class contents(tagging):
                 raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
 
         except Exception as E:
+            logging.warn(u"{:s}._read({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, key, ea), exc_info=True)
             raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
 
         try:
@@ -826,21 +829,15 @@ class contents(tagging):
             raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         # write blob
-        try:
-            ok = internal.netnode.blob.set(key, cls.btag, encdata)
-            if not ok: raise AssertionError # XXX: use an explicit exception
-
-        except Exception as E:
+        ok = internal.netnode.blob.set(key, cls.btag, encdata)
+        if not ok:
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, encdata))
 
         # update sup cache with keys
         res = set(six.viewkeys(value))
-        try:
-            ok = cls._write_header(target, ea, res)
-            if not ok: raise AssertionError # XXX: use an explicit exception
-
-        except Exception as E:
-            logging.fatal(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
+        ok = cls._write_header(target, ea, res)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
         return ok
 
     @classmethod
@@ -946,10 +943,13 @@ class contents(tagging):
         else:
             state.pop(cls.__tags__, None)
 
-        ok = cls._write(key, address, state)
-        if ok:
-            return state
-        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
+        try:
+            ok = cls._write(key, address, state)
+            if ok:
+                return state
+        except Exception as E:
+            logging.warn(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : An exception ({!s}) was raised while trying to update cache for name at address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', E, address), exc_info=True)
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to update cache for name at address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
 
     @classmethod
     def set_address(cls, address, count, **target):
@@ -971,10 +971,13 @@ class contents(tagging):
         else:
             state.pop(cls.__address__, None)
 
-        ok = cls._write(key, address, state)
-        if ok:
-            return state
-        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
+        try:
+            ok = cls._write(key, address, state)
+            if ok:
+                return state
+        except Exception as E:
+            logging.warn(u"{:s}.set_address({:#x}, {:d}{:s}) : An exception ({!s}) was raised while trying update cache for address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', E, address), exc_info=True)
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write to cache for address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
 
 class globals(tagging):
     """
