@@ -808,8 +808,13 @@ class contents(tagging):
                 ok = cls._write_header(target, ea, None)
                 if not ok:
                     logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
+
             finally:
-                return internal.netnode.blob.remove(key, cls.btag)
+                count = internal.netnode.blob.remove(key, cls.btag)
+                if not count:
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Ignoring failed removal of non-existent blob ({!s}) for the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), cls.btag, key))
+
+            return True
 
         # update blob for given address
         res = value
