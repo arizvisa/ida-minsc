@@ -862,7 +862,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         state[name] = refs = state.get(name, 0) + 1
@@ -874,7 +875,7 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: del res[cls.__address__]
 
-        cls._write(target.get('target', None), address, res)
+        cls._write(key, address, res)
         return refs
 
     @classmethod
@@ -883,7 +884,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         refs, count = state.pop(name, 0) - 1, cache.pop(address, 0) - 1
@@ -899,7 +901,7 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: res.pop(cls.__address__, None)
 
-        cls._write(target.get('target', None), address, res)
+        cls._write(key, address, res)
         return refs
 
     @classmethod
@@ -908,7 +910,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         res = res.get(cls.__tags__, {})
         return set(six.viewkeys(res))
 
@@ -918,7 +921,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         res = res.get(cls.__address__, {})
         return sorted(six.viewkeys(res))
 
@@ -928,7 +932,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        state = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        state = cls._read(key, address) or {}
 
         res = state.get(cls.__tags__, {})
         if count > 0:
@@ -941,7 +946,7 @@ class contents(tagging):
         else:
             state.pop(cls.__tags__, None)
 
-        ok = cls._write(target.get('target', None), address, state)
+        ok = cls._write(key, address, state)
         if ok:
             return state
         raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
@@ -952,7 +957,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        state = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        state = cls._read(key, address) or {}
 
         res = state.get(cls.__address__, {})
         if count > 0:
@@ -965,7 +971,7 @@ class contents(tagging):
         else:
             state.pop(cls.__address__, None)
 
-        ok = cls._write(target.get('target', None), address, state)
+        ok = cls._write(key, address, state)
         if ok:
             return state
         raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
