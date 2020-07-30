@@ -779,10 +779,10 @@ def func_tail_removed(pfn, ea):
     if State != state.ready: return
 
     # first we'll grab the addresses from our refs
-    res = internal.comment.contents.address(ea, target=interface.range.start(pfn))
+    listable = internal.comment.contents.address(ea, target=interface.range.start(pfn))
 
     # these are sorted, so first we'll filter out what doesn't belong
-    missing = [ item for item in res if idaapi.get_func(item) != pfn ]
+    missing = [ item for item in listable if not idaapi.get_func(item) or idaapi.get_func(item) != pfn ]
 
     # if there was nothing found, then we can simply exit the hook early
     if not missing:
