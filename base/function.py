@@ -116,6 +116,11 @@ def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
     fn = ui.current.function()
     return comment(fn, string, **repeatable)
+@utils.multicase(none=types.NoneType)
+def comment(none, **repeatable):
+    '''Remove the comment for the current function.'''
+    fn = ui.current.function()
+    return comment(fn, none or '', **repeatable)
 @utils.multicase(string=basestring)
 @utils.string.decorate_arguments('string')
 def comment(func, string, **repeatable):
@@ -129,6 +134,13 @@ def comment(func, string, **repeatable):
     if not ok:
         raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.to(string), repeatable.get('repeatable', True)))
     return res
+@utils.multicase(none=types.NoneType)
+def comment(func, none, **repeatable):
+    """Remove the comment for the function `func`.
+
+    If the bool `repeatable` is specified, then remove the repeatable comment.
+    """
+    return comment(func, none or '', **repeatable)
 
 @utils.multicase()
 def name():
