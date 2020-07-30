@@ -784,6 +784,10 @@ def func_tail_removed(pfn, ea):
     # these are sorted, so first we'll filter out what doesn't belong
     missing = [ item for item in res if idaapi.get_func(item) != pfn ]
 
+    # if there was nothing found, then we can simply exit the hook early
+    if not missing:
+        return
+
     # now iterate through the min/max of the list as hopefully this is
     # our event.
     for ea in database.address.iterate(min(missing), max(missing)):
