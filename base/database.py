@@ -1103,10 +1103,14 @@ def comment(ea, **repeatable):
 def comment(string, **repeatable):
     '''Set the comment at the current address to `string`.'''
     return comment(ui.current.address(), string, **repeatable)
+@utils.multicase(none=types.NoneType)
+def comment(none, **repeatable):
+    '''Remove the comment at the current address.'''
+    return comment(ui.current.address(), none or '', **repeatable)
 @utils.multicase(ea=six.integer_types, string=basestring)
 @utils.string.decorate_arguments('string')
 def comment(ea, string, **repeatable):
-    """Set the comment at address `ea` to `string`.
+    """Set the comment at the address `ea` to `string`.
 
     If the bool `repeatable` is specified, then modify the repeatable comment.
     """
@@ -1115,6 +1119,13 @@ def comment(ea, string, **repeatable):
     if not ok:
         raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_cmt({:#x}, \"{:s}\", {!s})`.".format(__name__, ea, string, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.escape(string, '"'), repeatable.get('repeatable', False)))
     return res
+@utils.multicase(ea=six.integer_types, none=types.NoneType)
+def comment(ea, none, **repeatable):
+    """Remove the comment at the address `ea`.
+
+    If the bool `repeatable` is specified, then remove the repeatable comment.
+    """
+    return comment(ea, none or '', **repeatable)
 
 class entries(object):
     """
