@@ -1065,7 +1065,7 @@ class DisplayHook(object):
         elif isinstance(item, six.integer_types):
             storage.append(num_printer(item))
         elif isinstance(item, idaapi.tinfo_t):
-            storage.append("{!s}".format(item))
+            storage.append("{!s}".format(item.dstr()))
         elif item.__class__ is list:
             self.format_seq(num_printer, storage, item, '[', ']')
         elif item.__class__ is tuple:
@@ -1093,7 +1093,10 @@ class DisplayHook(object):
             return
         try:
             storage = []
-            import ida_idp
+            if idaapi.__version__ < 7.0:
+                import idaapi as ida_idp
+            else:
+                import ida_idp
             num_printer = self._print_hex
             dn = ida_idp.ph_get_flag() & ida_idp.PR_DEFNUM
             if dn == ida_idp.PRN_OCT:

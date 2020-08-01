@@ -975,7 +975,7 @@ class members_t(object):
         maxtypeinfo = max(builtins.map(utils.fcompose(operator.attrgetter('typeinfo'), "{!s}".format, operator.methodcaller('replace', ' *', '*'), len), res) or [0])
 
         for m in res:
-            six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, "{!s}".format(m.typeinfo).replace(' *', '*'), int(maxtypeinfo), utils.string.repr(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
+            six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), int(maxtypeinfo), utils.string.repr(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
         return
 
     @utils.multicase()
@@ -987,8 +987,8 @@ class members_t(object):
         res = builtins.list(self.iterate(**type))
         if len(res) > 1:
             cls = self.__class__
-            map(logging.info, ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in res))
-            logging.warn(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join((__name__, cls.__name__)), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), utils.string.escape("{!s}".format(res[0].typeinfo).replace(' *', '*'), '"')))
+            map(logging.info, ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.str()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in res))
+            logging.warn(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join((__name__, cls.__name__)), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), utils.string.escape("{!s}".format(res[0].typeinfo.dstr()).replace(' *', '*'), '"')))
 
         res = next(iter(res), None)
         if res is None:
@@ -1332,13 +1332,13 @@ class members_t(object):
             res.append((i, name, t, ti, ofs, size, comment or '', tag))
             mn = max(mn, len(name))
             ms = max(ms, len("{:+#x}".format(size)))
-            mti = max(mti, len("{!s}".format(ti).replace(' *', '*')))
+            mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
 
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
         if len(self):
             mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
-            return "{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else c.encode('utf8')) if c else '') for i, n, t, ti, o, s, c, T in res))
+            return "{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else c.encode('utf8')) if c else '') for i, n, t, ti, o, s, c, T in res))
         return "{!r}".format(self.parent)
 
 class member_t(object):
@@ -1613,28 +1613,23 @@ class member_t(object):
         return ti
 
     @typeinfo.setter
-    @utils.string.decorate_arguments('info')
     def typeinfo(self, info):
         '''Set the type info of the member to `info`.'''
-        til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
 
-        # Convert info to a string if it's a tinfo_t
-        info_s = "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
+        if idaapi.__version__ < 7.0:
+            set_member_tinfo = idaapi.set_member_tinfo2
+        else:
+            set_member_tinfo = idaapi.set_member_tinfo
 
-        # Firstly we need to ';'-terminate the type the user provided in order
-        # for IDA's parser to understand it.
-        terminated = info_s if info_s.endswith(';') else "{:s};".format(info_s)
-
-        # Now that we've prepped everything, ask IDA to parse this into a
-        # tinfo_t for us. We pass the silent flag so that we can raise an
-        # exception if there's a parsing error of some sort.
-        res = idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL)
-        if res is None:
+        # Parse our into parameter into a tinfo_t for us, so that we can assign it t the
+        # typeinfo for the member.
+        ti = internal.declaration.parse(info)
+        if ti is None:
             cls = self.__class__
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo : Unable to parse the specified type declaration ({!s}).".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info)))
 
         # Now we can pass our tinfo_t along with the member information to IDA.
-        res = idaapi.set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
+        res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
         if res == idaapi.SMT_OK:
             return
 
@@ -1668,7 +1663,7 @@ class member_t(object):
 
     def __repr__(self):
         '''Display the member in a readable format.'''
-        id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo).replace(' *', '*')
+        id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
         return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}> {:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
 
     def refs(self):

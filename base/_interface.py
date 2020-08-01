@@ -1566,7 +1566,7 @@ class architecture_t(object):
         # older
         if idaapi.__version__ < 7.0:
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
-            dt_bitfield = idaapi.dt_bitfield
+            dt_bitfield = idaapi.dt_bitfild
         # newer
         else:
             dtype_by_size = idaapi.get_dtype_by_size
@@ -1591,7 +1591,7 @@ class architecture_t(object):
         # older
         if idaapi.__version__ < 7.0:
             dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int)
-            dt_bitfield = idaapi.dt_bitfield
+            dt_bitfield = idaapi.dt_bitfild
         # newer
         else:
             dtype_by_size = idaapi.get_dtype_by_size

@@ -28,20 +28,22 @@ def arguments(ea):
 
 def size(string):
     '''Returns the size of a type described by a C declaration in `string`.'''
+    til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
+
     string = string.strip()
     if string.lower() == 'void':
         return 0
     elif string.startswith('class') and string.endswith('&'):
-        res = idaapi.idc_parse_decl(idaapi.cvar.idati, 'void*;', 0)
+        res = idaapi.idc_parse_decl(til, 'void*;', 0)
     else:
         semicoloned = string if string.endswith(';') else "{:s};".format(string)
-        res = idaapi.idc_parse_decl(idaapi.cvar.idati, internal.utils.string.to(semicoloned), 0)
+        res = idaapi.idc_parse_decl(til, internal.utils.string.to(semicoloned), 0)
 
     if res is None:
         raise internal.exceptions.DisassemblerError(u"Unable to parse the specified C declaration (\"{:s}\").".format(internal.utils.string.escape(string, '"')))
     _, type, _ = res
     f = idaapi.get_type_size0 if idaapi.__version__ < 6.8 else idaapi.calc_type_size
-    return f(idaapi.cvar.idati, type)
+    return f(til, type)
 
 @internal.utils.string.decorate_arguments('string')
 def demangle(string):
@@ -59,7 +61,10 @@ def mangledQ(string):
 @internal.utils.string.decorate_arguments('info')
 def parse(info):
     '''Parse the string `info` into an ``idaapi.tinfo_t``.'''
-    til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
+    if idaapi.__version__ < 7.0:
+        til, ti = idaapi.cvar.idati, idaapi.tinfo_t(),
+    else:
+        til, ti = idaapi.get_idati(), idaapi.tinfo_t(),
 
     # Convert info to a string if it's a tinfo_t
     info_s = "{!s}".format(info) if isinstance(info, idaapi.tinfo_t) else info
@@ -72,6 +77,10 @@ def parse(info):
     # that we're responsible for raising an exception if there's a parsing
     # error of some sort. If it succeeds, then we can return our typeinfo.
     # Otherwise we return None because of the inability to parse it.
+    if idaapi.__version__ < 6.9:
+        return None if idaapi.parse_decl2(til, terminated, None, ti, idaapi.PT_SIL) is None else ti
+    elif idaapi.__version__ < 7.0:
+        return None if idaapi.parse_decl2(til, terminated, ti, idaapi.PT_SIL) is None else ti
     return None if idaapi.parse_decl(ti, til, terminated, idaapi.PT_SIL) is None else ti
 
 def string(ti):
