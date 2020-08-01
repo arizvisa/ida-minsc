@@ -642,8 +642,9 @@ class tagging(object):
 
     @classmethod
     def __init_tagcache__(cls, idp_modname):
-        cls.node()
-        logging.debug(u"{:s}.init_tagcache('{:s}') : Initialized tagcache with netnode \"{:s}\" and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(idp_modname, '\''), internal.utils.string.escape(cls.__node__, '"'), cls.__nodeid__))
+        '''Hook to create a new netnode that will contain our tag-cache.'''
+        res = cls.node(cached=False)
+        logging.debug(u"{:s}.init_tagcache('{:s}') : Initialized tag-cache with netnode \"{:s}\" and node id {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.escape(idp_modname, '\''), internal.utils.string.escape(cls.__node__, '"'), res))
 
     @classmethod
     def __nw_init_tagcache__(cls, nw_code, is_old_database):
@@ -651,13 +652,22 @@ class tagging(object):
         return cls.__init_tagcache__(idp_modname)
 
     @classmethod
-    def node(cls):
-        if hasattr(cls, '__nodeid__'):
-            return cls.__nodeid__
+    def node(cls, cached=True):
+        '''Fetch the netnode containing the tag-cache which should be named "$ tagcache".
+
+        If `cached` is changed to False, then always update the node's identifier.
+        '''
+        if cached and hasattr(cls, '__cache_id__'):
+            return cls.__cache_id__
+
+        # Explicitly try to fetch the netnode containing the tag-cache. If we were
+        # unable to find it, then create it and use that instead.
         node = internal.netnode.get(cls.__node__)
         if node == idaapi.BADADDR:
             node = internal.netnode.new(cls.__node__)
-        cls.__nodeid__ = node
+
+        # Cache the identifier for the netnode inside a class attribute
+        cls.__cache_id__ = node
         return node
 
 class contents(tagging):
