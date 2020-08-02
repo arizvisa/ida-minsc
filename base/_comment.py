@@ -714,15 +714,15 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
         except Exception as E:
-            logging.warn(u"{:s}._read_header({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, key, ea), exc_info=True)
-            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
+            logging.warn(u"{:s}._read_header({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents from sup cache at {:#x} associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, ea, key), exc_info=True)
+            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to decode contents from sup cache at {:#x} associated with key {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, ea, key, encdata))
 
         try:
             result = cls.marshaller.loads(data)
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to unmarshal contents from sup cache at {:#x} associated with key {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, ea, key, data))
         return result
 
     @classmethod
@@ -744,19 +744,19 @@ class contents(tagging):
             data = cls.marshaller.dumps(value)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, value))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to marshal contents for sup cache at {:#x} associated with key {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key, value))
 
         try:
             encdata, sz = cls.codec.encode(data)
             if sz != len(data):
-                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         except Exception as E:
-            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : An exception ({!s}) was raised while trying to encode contents for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), E, key, ea), exc_info=True)
-            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, data))
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : An exception ({!s}) was raised while trying to encode contents for sup cache at {:#x} associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), E, ea, key), exc_info=True)
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents for sup cache at {:#x} associated with key {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key, data))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
-            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), len(encdata), internal.netnode.sup.MAX_SIZE))
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : Reached tag limit size within function ({:+#x} > {:+#x})...possible tag-cache corruption.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), len(encdata), internal.netnode.sup.MAX_SIZE))
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
@@ -778,17 +778,17 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
 
         except Exception as E:
-            logging.warn(u"{:s}._read({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents for {:#x} at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, key, ea), exc_info=True)
-            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
+            logging.warn(u"{:s}._read({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents from blob ({!s}) at {:#x} associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, cls.btag, ea, key), exc_info=True)
+            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode contents from blob ({!s}) at {:#x} associated with key {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, cls.btag, ea, key, encdata))
 
         try:
             result = cls.marshaller.loads(data)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to unmarshal contents from blob ({!s}) at {:#x} associated with key {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, cls.btag, ea, key, data))
         return result
 
     @classmethod
@@ -807,12 +807,11 @@ class contents(tagging):
             try:
                 ok = cls._write_header(target, ea, None)
                 if not ok:
-                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove address {:#x} from sup cache associated with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key))
 
             finally:
                 count = internal.netnode.blob.remove(key, cls.btag)
-                if not count:
-                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Ignoring failed removal of non-existent blob ({!s}) for the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), cls.btag, key))
+                logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed {:d} blob{:s} ({!s}) associated with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), count, '' if count == 1 else 's', cls.btag, key))
 
             return True
 
@@ -822,27 +821,27 @@ class contents(tagging):
             data = cls.marshaller.dumps(res)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, res))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to marshal contents for blob ({!s}) at {:#x} associated with key {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), cls.btag, ea, key, res))
 
         try:
             encdata, sz = cls.codec.encode(data)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to encode contents for blob ({!s}) at {:#x} associated with key {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), cls.btag, ea, key, data))
 
         if sz != len(data):
-            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
+            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         # write blob
         ok = internal.netnode.blob.set(key, cls.btag, encdata)
         if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, encdata))
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for blob ({!s}) at {:#x} associated with the key {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), cls.btag, ea, key, encdata))
 
         # update sup cache with keys
         res = set(six.viewkeys(value))
         ok = cls._write_header(target, ea, res)
         if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set address on sup cache associated with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
         return ok
 
     @classmethod
@@ -853,7 +852,7 @@ class contents(tagging):
             encdata = internal.netnode.sup.get(node, ea)
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                logging.warn(u"{:s}.iterate() : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
+                logging.warn(u"{:s}.iterate() : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:+#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
             res = cls.marshaller.loads(data)
             yield ea, res
         return
