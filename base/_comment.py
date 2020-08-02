@@ -740,8 +740,7 @@ class contents(tagging):
 
         # If our header is empty, then we just need to remove the supvalue
         if not value:
-            ok = internal.netnode.sup.remove(node, key)
-            return bool(ok)
+            return bool(internal.netnode.sup.remove(node, key))
 
         try:
             data = cls.marshaller.dumps(value)
