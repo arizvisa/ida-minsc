@@ -779,10 +779,19 @@ def func_tail_removed(pfn, ea):
     if State != state.ready: return
 
     # first we'll grab the addresses from our refs
-    res = internal.comment.contents.address(ea, target=interface.range.start(pfn))
+    listable = internal.comment.contents.address(ea, target=interface.range.start(pfn))
 
-    # these are sorted, so first we'll filter out what doesn't belong
-    missing = [ item for item in res if idaapi.get_func(item) != pfn ]
+    # these should already be sorted, so our first step is to filter out what
+    # doesn't belong. in order to work around one of the issues posed in the
+    # issue arizvisa/ida-minsc#61, we need to explicitly check that each item is
+    # not None prior to their comparison against `pfn`. this is needed in order
+    # to work around a null-pointer exception raised by SWIG when it calls the
+    # area_t.__ne__ method to do the comparison.
+    missing = [ item for item in listable if not idaapi.get_func(item) or idaapi.get_func(item) != pfn ]
+
+    # if there was nothing found, then we can simply exit the hook early
+    if not missing:
+        return
 
     # now iterate through the min/max of the list as hopefully this is
     # our event.

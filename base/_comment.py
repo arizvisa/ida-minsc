@@ -724,14 +724,17 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to be decoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
+            logging.warn(u"{:s}._read_header({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode the header for address {:#x} from sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, ea, key), exc_info=True)
+            logging.info(u"{:s}._read_header({!r}, {:#x}) : Failure decoding the following data from sup cache: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, encdata))
+            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to decode the header for address {:#x} from sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, ea, key))
 
         try:
             result = cls.marshaller.loads(data)
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
+            logging.info(u"{:s}._read_header({!r}, {:#x}) : Failed unmarshalling the following data from sup cache: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._read_header({!r}, {:#x}) : Unable to unmarshal the header for address {:#x} from sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, ea, key))
         return result
 
     @classmethod
@@ -743,28 +746,31 @@ class contents(tagging):
         """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to find key for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), target, ea))
 
+        # If our header is empty, then we just need to remove the supvalue
         if not value:
-            ok = internal.netnode.sup.remove(node, key)
-            return bool(ok)
+            return bool(internal.netnode.sup.remove(node, key))
 
         try:
             data = cls.marshaller.dumps(value)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, value))
+            logging.info(u"{:s}._write_header({!r}, {:#x}, {!s}) : Failed marshalling the following data for header: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), value))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to marshal the header at address {:#x} for sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key))
 
         try:
             encdata, sz = cls.codec.encode(data)
             if sz != len(data):
-                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, data))
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : An exception ({!s}) was raised while trying to encode the header at address {:#x} for sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), E, ea, key), exc_info=True)
+            logging.info(u"{:s}._write_header({!r}, {:#x}, {!s}) : Failed encoding the following data for the header: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), data))
+            raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents at {:#x} for sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
-            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : Too many tags within function. The size {:#x} must be < {:#x}. Ignoring it.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), len(encdata), internal.netnode.sup.MAX_SIZE))
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : Reached tag limit size ({:#x}>{:#x}) in function with key {:#x}. Possible tag-cache corruption encountered.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), len(encdata), internal.netnode.sup.MAX_SIZE, key))
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
@@ -777,7 +783,7 @@ class contents(tagging):
         """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._read({!r}, {:#x}) : Unable to find key for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, target, ea))
 
         encdata = internal.netnode.blob.get(key, cls.btag)
         if encdata is None:
@@ -786,16 +792,19 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode contents for {:#x} at {:#x}. The data that failed to decode is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, encdata))
+            logging.warn(u"{:s}._read({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents for address {:#x} from blob ({!s}) associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, ea, cls.btag, key), exc_info=True)
+            logging.info(u"{:s}._read({!r}, {:#x}) : Failed decoding the following data from blob: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, encdata))
+            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to decode contents for address {:#x} from blob ({!s}) associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, ea, cls.btag, key))
 
         try:
             result = cls.marshaller.loads(data)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to unmarshal contents for {:#x} at {:#x}. The data that failed to be unmarshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, key, ea, data))
+            logging.info(u"{:s}._read({!r}, {:#x}) : Failed unmarshalling the following data from blob: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, data))
+            raise internal.exceptions.SerializationError(u"{:s}._read({!r}, {:#x}) : Unable to unmarshal contents for address {:#x} from blob ({!s}) associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, ea, cls.btag, key))
         return result
 
     @classmethod
@@ -807,16 +816,20 @@ class contents(tagging):
         """
         node, key = tagging.node(), cls._key(ea) if target is None else target
         if key is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to find a function for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, key, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}._write({!r}, {:#x}, {!r}) : Unable to find key for target ({!r}) at {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, value, target, ea))
 
         # erase cache and blob if no data is specified
         if not value:
             try:
                 ok = cls._write_header(target, ea, None)
                 if not ok:
-                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove address from sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
+                    logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to remove address {:#x} from header associated with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key))
+
             finally:
-                return internal.netnode.blob.remove(key, cls.btag)
+                count = internal.netnode.blob.remove(key, cls.btag)
+                logging.debug(u"{:s}._write({!r}, {:#x}, {!s}) : Removed {:d} blob{:s} ({!s}) associated with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), count, '' if count == 1 else 's', cls.btag, key))
+
+            return True
 
         # update blob for given address
         res = value
@@ -824,33 +837,30 @@ class contents(tagging):
             data = cls.marshaller.dumps(res)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to marshal contents for {:#x} at {:#x}. The data that failed to be marshalled is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, res))
+            logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Failed unmarshalling the following data for blob: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), res))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to marshal contents at address {:#x} for blob ({!s}) associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
 
         try:
             encdata, sz = cls.codec.encode(data)
 
         except Exception as E:
-            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to encode contents for {:#x} at {:#x}. The data that failed to be encoded is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, data))
+            logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Failed encoding the following data for blob: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), data))
+            raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to encode contents at address {:#x} for blob ({!s}) associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
 
         if sz != len(data):
-            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
+            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         # write blob
-        try:
-            ok = internal.netnode.blob.set(key, cls.btag, encdata)
-            if not ok: raise AssertionError # XXX: use an explicit exception
-
-        except Exception as E:
-            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for {:#x} at {:#x}. The data that failed to be set is {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key, ea, encdata))
+        ok = internal.netnode.blob.set(key, cls.btag, encdata)
+        if not ok:
+            logging.info(u"{:s}._write({!r}, {:#x}, {!s}) : Failed setting the following data for blob: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), encdata))
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set contents for address {:#x} to blob ({!s}) associated with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
 
         # update sup cache with keys
         res = set(six.viewkeys(value))
-        try:
-            ok = cls._write_header(target, ea, res)
-            if not ok: raise AssertionError # XXX: use an explicit exception
-
-        except Exception as E:
-            logging.fatal(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to set address to sup cache with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), key))
+        ok = cls._write_header(target, ea, res)
+        if not ok:
+            raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to write header at address {:#x} associated with the key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key))
         return ok
 
     @classmethod
@@ -861,7 +871,7 @@ class contents(tagging):
             encdata = internal.netnode.sup.get(node, ea)
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                logging.warn(u"{:s}.iterate() : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
+                logging.warn(u"{:s}.iterate() : Failed decoding tag names out of sup cache for address {:#x} due to the length of encoded data not matching the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
             res = cls.marshaller.loads(data)
             yield ea, res
         return
@@ -872,7 +882,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         state[name] = refs = state.get(name, 0) + 1
@@ -884,7 +895,7 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: del res[cls.__address__]
 
-        cls._write(target.get('target', None), address, res)
+        cls._write(key, address, res)
         return refs
 
     @classmethod
@@ -893,7 +904,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         state, cache = res.get(cls.__tags__, {}), res.get(cls.__address__, {})
 
         refs, count = state.pop(name, 0) - 1, cache.pop(address, 0) - 1
@@ -909,7 +921,7 @@ class contents(tagging):
         if cache: res[cls.__address__] = cache
         else: res.pop(cls.__address__, None)
 
-        cls._write(target.get('target', None), address, res)
+        cls._write(key, address, res)
         return refs
 
     @classmethod
@@ -918,7 +930,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         res = res.get(cls.__tags__, {})
         return set(six.viewkeys(res))
 
@@ -928,7 +941,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        res = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        res = cls._read(key, address) or {}
         res = res.get(cls.__address__, {})
         return sorted(six.viewkeys(res))
 
@@ -938,7 +952,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        state = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        state = cls._read(key, address) or {}
 
         res = state.get(cls.__tags__, {})
         if count > 0:
@@ -951,10 +966,13 @@ class contents(tagging):
         else:
             state.pop(cls.__tags__, None)
 
-        ok = cls._write(target.get('target', None), address, state)
-        if ok:
-            return state
-        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
+        try:
+            ok = cls._write(key, address, state)
+            if ok:
+                return state
+        except Exception as E:
+            logging.warn(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : An exception ({!s}) was raised while trying to update cache for name at address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', E, address), exc_info=True)
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_name({:#x}, {!r}, {:d}{:s}) : Unable to update cache for name at address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, name, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
 
     @classmethod
     def set_address(cls, address, count, **target):
@@ -962,7 +980,8 @@ class contents(tagging):
 
         If `target` is undefined or ``None`` then use `address` to locate the function.
         """
-        state = cls._read(target.get('target', None), address) or {}
+        key = target.get('target', None)
+        state = cls._read(key, address) or {}
 
         res = state.get(cls.__address__, {})
         if count > 0:
@@ -975,10 +994,13 @@ class contents(tagging):
         else:
             state.pop(cls.__address__, None)
 
-        ok = cls._write(target.get('target', None), address, state)
-        if ok:
-            return state
-        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write name to address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
+        try:
+            ok = cls._write(key, address, state)
+            if ok:
+                return state
+        except Exception as E:
+            logging.warn(u"{:s}.set_address({:#x}, {:d}{:s}) : An exception ({!s}) was raised while trying update cache for address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', E, address), exc_info=True)
+        raise internal.exceptions.ReadOrWriteError(u"{:s}.set_address({:#x}, {:d}{:s}) : Unable to write to cache for address {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), address, count, ', {:s}'.format(internal.utils.string.kwargs(target)) if target else '', address))
 
 class globals(tagging):
     """
