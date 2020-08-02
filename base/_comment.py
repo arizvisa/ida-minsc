@@ -714,7 +714,7 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read_header({!r}, {:#x}) : The number of bytes that was decoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
         except Exception as E:
             logging.warn(u"{:s}._read_header({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode the header for address {:#x} from sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, ea, key), exc_info=True)
             logging.info(u"{:s}._read_header({!r}, {:#x}) : Failure decoding the following data from sup cache: {!r}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, encdata))
@@ -752,7 +752,7 @@ class contents(tagging):
         try:
             encdata, sz = cls.codec.encode(data)
             if sz != len(data):
-                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._write_header({!r}, {:#x}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         except Exception as E:
             logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : An exception ({!s}) was raised while trying to encode the header at address {:#x} for sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), E, ea, key), exc_info=True)
@@ -760,7 +760,7 @@ class contents(tagging):
             raise internal.exceptions.SerializationError(u"{:s}._write_header({!r}, {:#x}, {!s}) : Unable to encode contents at {:#x} for sup cache associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, key))
 
         if len(encdata) > internal.netnode.sup.MAX_SIZE:
-            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : Reached tag limit size ({:+#x} > {:+#x}) in function with key {:#x}. Possible tag-cache corruption encountered.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), len(encdata), internal.netnode.sup.MAX_SIZE, key))
+            logging.warn(u"{:s}._write_header({!r}, {:#x}, {!s}) : Reached tag limit size ({:#x}>{:#x}) in function with key {:#x}. Possible tag-cache corruption encountered.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), len(encdata), internal.netnode.sup.MAX_SIZE, key))
 
         ok = internal.netnode.sup.set(node, key, encdata)
         return bool(ok)
@@ -782,7 +782,7 @@ class contents(tagging):
         try:
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}._read({!r}, {:#x}) : The number of bytes that was decoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, sz, len(encdata)))
 
         except Exception as E:
             logging.warn(u"{:s}._read({!r}, {:#x}) : An exception ({!s}) was raised while trying to decode contents for address {:#x} from blob ({!s}) associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, E, ea, cls.btag, key), exc_info=True)
@@ -838,7 +838,7 @@ class contents(tagging):
             raise internal.exceptions.SerializationError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to encode contents at address {:#x} for blob ({!s}) associated with key {:#x}.".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
 
         if sz != len(data):
-            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded ({:+#x}) did not match the expected size ({:+#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
+            raise internal.exceptions.SizeMismatchError(u"{:s}._write({!r}, {:#x}, {!s}) : The number of bytes that was encoded did not match the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), target, ea, internal.utils.string.repr(value), sz, len(data)))
 
         # write blob
         ok = internal.netnode.blob.set(key, cls.btag, encdata)
@@ -861,7 +861,7 @@ class contents(tagging):
             encdata = internal.netnode.sup.get(node, ea)
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
-                logging.warn(u"{:s}.iterate() : Failed decoding tag names out of sup cache for {:#x} due to the length of encoded data ({:+#x}) not matching the expected size ({:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
+                logging.warn(u"{:s}.iterate() : Failed decoding tag names out of sup cache for address {:#x} due to the length of encoded data not matching the expected size ({:#x}<>{:#x}).".format('.'.join(('internal', __name__, cls.__name__)), ea, len(encdata), sz))
             res = cls.marshaller.loads(data)
             yield ea, res
         return
