@@ -346,6 +346,24 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
+<code class="descclassname">function.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment for the current function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**repeatable</strong> – whether the repeatable comment should be removed instead of the non-repeatable one</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">function.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>func</em>, <em>string</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the comment for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then modify the repeatable comment.</p>
@@ -357,6 +375,26 @@ functions and aliases. For more information on this, please see
 <li><strong>func</strong> – the function to assign the comment to</li>
 <li><strong>string</strong> (<em>str</em>) – the comment to apply</li>
 <li><strong>**repeatable</strong> – whether to assign as a repeatable or non-repeatable comment</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">function.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>func</em>, <em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment for the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then remove the repeatable comment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to remove the comment from</li>
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**repeatable</strong> – whether the repeatable comment should be removed instead of the non-repeatable one</li>
 </ul>
 </td>
 </tr>

@@ -98,9 +98,17 @@ functions and aliases. For more information on this, please see
    :type string: str
    :param \*\*repeatable: whether the comment should be repeatable or not
    
+.. py:function:: comment(none, \*\*repeatable)
+   
+   Remove the comment at the current address.
+   
+   :param none: the value :py:obj:`None`
+   :type none: None
+   :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
+   
 .. py:function:: comment(ea, string, \*\*repeatable)
    
-   Set the comment at address ``ea`` to ``string``.
+   Set the comment at the address ``ea`` to ``string``.
    
    If the bool ``repeatable`` is specified, then modify the repeatable comment.
    
@@ -109,6 +117,18 @@ functions and aliases. For more information on this, please see
    :param string: the comment to apply
    :type string: str
    :param \*\*repeatable: whether the comment should be repeatable or not
+   
+.. py:function:: comment(ea, none, \*\*repeatable)
+   
+   Remove the comment at the address ``ea``.
+   
+   If the bool ``repeatable`` is specified, then remove the repeatable comment.
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param none: the value :py:obj:`None`
+   :type none: None
+   :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: disassemble(\*\*options)
    

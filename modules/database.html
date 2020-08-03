@@ -222,8 +222,26 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
+<code class="descclassname">database.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment at the current address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**repeatable</strong> – whether the repeatable comment should be removed instead of the non-repeatable one</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">database.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the comment at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<dd><p>Set the comment at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then modify the repeatable comment.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -233,6 +251,26 @@ functions and aliases. For more information on this, please see
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>string</strong> (<em>str</em>) – the comment to apply</li>
 <li><strong>**repeatable</strong> – whether the comment should be repeatable or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>ea</em>, <em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then remove the repeatable comment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**repeatable</strong> – whether the repeatable comment should be removed instead of the non-repeatable one</li>
 </ul>
 </td>
 </tr>

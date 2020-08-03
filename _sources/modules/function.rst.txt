@@ -167,6 +167,14 @@ functions and aliases. For more information on this, please see
    :type string: str
    :param \*\*repeatable: whether to assign as a repeatable or non-repeatable comment
    
+.. py:function:: comment(none, \*\*repeatable)
+   
+   Remove the comment for the current function.
+   
+   :param none: the value :py:obj:`None`
+   :type none: None
+   :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
+   
 .. py:function:: comment(func, string, \*\*repeatable)
    
    Set the comment for the function ``func`` to ``string``.
@@ -177,6 +185,17 @@ functions and aliases. For more information on this, please see
    :param string: the comment to apply
    :type string: str
    :param \*\*repeatable: whether to assign as a repeatable or non-repeatable comment
+   
+.. py:function:: comment(func, none, \*\*repeatable)
+   
+   Remove the comment for the function ``func``.
+   
+   If the bool ``repeatable`` is specified, then remove the repeatable comment.
+   
+   :param func: the function to remove the comment from
+   :param none: the value :py:obj:`None`
+   :type none: None
+   :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: contains()
    
