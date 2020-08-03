@@ -424,6 +424,40 @@ class priorityhook(prioritybase):
             supercls = super(cls, self)
             supermethod = getattr(supercls, name)
             return supermethod(*parameters, **keywords)
+
+        def ev_set_idp_options(self, keyword, value_type, value, idb_loaded):
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            if value_type == idaapi.IDPOPT_STR:     # string constant (char*)
+                res = idaapi.uchar_array(1 + len(value))
+                for index, item in enumerate(bytearray(value + b'\0')):
+                    res[index] = item
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_NUM:   # number (uval_t*)
+                res = idaapi.uvalvec_t()
+                res.push_back(value)
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_BIT:   # bit, yes/no (int*)
+                res = idaapi.intvec_t()
+                res.push_back(value)
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_FLT:   # float, yes/no (double*)
+                # FIXME: is there a proper way to get a double* type?
+                res = idaapi.uint64vec_t()
+                res.push_back(internal.utils.float_to_integer(value, 52, 11, 1))
+                pvalue = res
+            elif value_type == idaapi.IDPOPT_I64:   # 64bit number (int64*)
+                res = idaapi.int64vec_t()
+                res.push_back(value)
+                pvalue = res
+            else:
+                raise ValueError("ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
+            return supermethod(keyword, value_type, pvalue, idb_loaded)
+
+        # patch-methods because IDAPython is fucking stupid
+        if idaapi.__version__ == 7.5 and name == 'ev_set_idp_options':
+            return ev_set_idp_options
         return method
 
     def remove(self):
