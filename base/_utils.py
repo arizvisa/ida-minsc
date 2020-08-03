@@ -1065,3 +1065,49 @@ def float_of_integer(integer, mantissa_bits, exponent_bits, sign_bits):
     # Raise an exception as we weren't able to decode the semantics for
     # each component.
     raise ValueError("Unable to decode integer ({:#x}) using the values extracted for the mantissa ({:#x}), exponent ({:#x}), and sign flag ({:d}).".format(integer, mantissa, exponent, sign))
+
+def float_to_integer(float, mantissa_bits, exponent_bits, sign_bits):
+    """Encode the specified `float` using the sizes provided for `mantissa_bits`, `exponent_bits`, and `sign_bits`.
+
+    Each of the sizes are to be provided as the number of bits used to represent that component.
+    """
+    exponentbias = (2 ** exponent_bits) // 2 - 1
+
+    # Figure out what type of floating-point number this is
+    if math.isnan(float):
+        sign, exponent, mantissa = 0, 2 ** exponent_bits - 1, ~0
+    elif math.isinf(float):
+        sign, exponent, mantissa = 1 if float < 0 else 0, 2 ** exponent_bits - 1, 0
+    elif float == 0.0 and math.atan2(float, float) < 0.0:
+        sign, exponent, mantissa = 1, 0, 0
+    elif float == 0.0 and math.atan2(float, float) == 0.0:
+        sign, exponent, mantissa = 0, 0, 0
+    else:
+        # First extract the exponent and the mantissa
+        m, e = math.frexp(float)
+
+        # Now we need to copy out the sign flag
+        sign = 1 if math.copysign(1.0, m) < 0 else 0
+
+        # Adjust the exponent so that we can remove the implicit bit
+        exponent = e + exponentbias - 1
+        m = abs(m) * 2.0 - 1.0 if exponent else abs(m)
+
+        # Finally we need to convert the fractional mantissa into an integer
+        mantissa = math.trunc(m * (2 ** mantissa_bits))
+
+    # Calculate the shift and mask for each component of the encoded float
+    components = [mantissa_bits, exponent_bits, sign_bits]
+    position, shifts = 0, []
+    for cb in components:
+        shifts.append(position)
+        position += cb
+    mantissa_shift, exponent_shift, sign_shift = (2 ** item for item in shifts)
+    mantissa_mask, exponent_mask, sign_mask = (2 ** item - 1 for item in components)
+
+    # Now to store each component into an integer that we can return
+    res = 0
+    res += (sign & sign_mask) * sign_shift
+    res += (exponent & exponent_mask) * exponent_shift
+    res += (mantissa & mantissa_mask) * mantissa_shift
+    return res
