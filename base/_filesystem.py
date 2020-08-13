@@ -442,9 +442,22 @@ class Index(object):
 
             # If we found it, then update the current item by popping
             # off a position from our free_blocks.
-            if available and len(free_blocks[available]):
-                update[index] = found = free_blocks[available].pop(0), uname, ucontent
+            if available:
+                found = free_blocks[available].pop(0)
                 logging.warn("{:s}.__update_table__({:#x}): Found free-block ({:d}) for index #{:d} at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, available, index, found))
+                update[index] = found, uname, ucontent
+
+                # If we emptied our free_blocks, then we need to remove the entry
+                if len(free_blocks[available]) == 0:
+                    free_sizes.remove(available)
+
+                # Update our free_blocks with any leftover slackspace that we
+                # aren't going to end up using.
+                if available > utotal:
+                    leftover, tail = available - utotal, position.new(found.int() + utotal)
+                    logging.warn("{:s}.__update_table__({:#x}): Some space was left ({:d} bytes) in free-block at {!s} from index #{:d} at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, leftover, tail, index, found))
+                    free_blocks.setdefault(leftover, []).append(tail)
+                    free_sizes = sorted([leftover] + free_sizes)
 
             # If we didn't find anything, then we need to allocate
             # space. We use None as a place-holder for that.
