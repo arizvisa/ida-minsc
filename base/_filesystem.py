@@ -493,7 +493,7 @@ class Index(object):
         logging.warn("{:s}.__update_table__({:#x}): Need to allocate {:d} bytes at {:#x} to change {:d} to {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, needed, start, current-needed, current))
         return needed, update
 
-    def update(self):
+    def commit(self):
         '''Update the name table'''
         cls, cache = self.__class__, {}
 
