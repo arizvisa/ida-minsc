@@ -159,7 +159,7 @@ class Index(object):
         # Read the number of items that we'll need to load.
         icount = internal.netnode.blob.size(self.__cache_id__, Index.itag)
         count = icount // index_item.size()
-        logging.warn("{:s}.__read_index__({:#x}): Found {:d} items in index of size {:+#x} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, count, icount))
+        logging.warn("{:s}.__read_index__({:#x}): Found {:d} items in index that have the size {:+d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, count, icount))
 
         # Read the actual blob data that contains our index, and then
         # chunk it out by each item's size.
@@ -192,7 +192,7 @@ class Index(object):
             # up being used.
             totalsz = namesz + contentsz
             count = totalsz // SECTOR
-            logging.warn("{:s}.__read_table__({:#x}): Found entry #{:d} in index with name (+{:#x}) and contents (+{:#x}) in {:d} sectors ({:d} bytes).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, namesz, contentsz, count, totalsz))
+            logging.warn("{:s}.__read_table__({:#x}): Found entry #{:d} in index with name ({:d}) and contents ({:d}) in {:d} sectors ({:d} bytes).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, namesz, contentsz, count, totalsz))
 
             # Now to try and fetch our blocks of data. If it's not
             # found in our cache, then we need to read them from the
@@ -227,10 +227,10 @@ class Index(object):
             # the index.
             except Exception as E:
                 name = i
-                logging.warn("{:s}.__read_table__({:#x}): Unable to decode name for file entry #{:d} from index. Using index {!s} instead.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, name))
+                logging.warn("{:s}.__read_table__({:#x}): Unable to decode name for file entry #{:d} from index. Using index {!s} instead.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, name), exc_info=True)
 
             # Then finally add it to our result list.
-            logging.warn("{:s}.__read_table__({:#x}): Added entry #{:d} at position ({!s}) with name ({!s}).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, position, name))
+            logging.warn("{:s}.__read_table__({:#x}): Added entry #{:d} at {!s} with name ({!r}).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, position, name))
             result.append((position, i, name, content))
 
         # Last thing we need to do is to now sort our list of items
@@ -365,16 +365,29 @@ class Index(object):
         raise ValueError(size)
 
     @classmethod
-    def __find_free_blocks__(cls, index):
+    def __find_free_blocks__(cls, index, update):
         '''Return a dict of lists containing all available positions in `index`.'''
-        bounds = [(0, 0)]
-        for pos, name, content in index:
-            bounds.append((pos.int(), name + content))
+        result = {}
+
+        # First go through our updates and gather all open slots that are from
+        # to an object being removed.
+        for i, (pos, name, content) in update.items():
+            if pos and len(name) == 0:
+                result.setdefault(len(name.encode('utf-8')) + len(content.tobytes()), []).append(pos)
+            continue
+
+        # Go through the index, gather all the boundaries.
+        bounds = []
+        for i, (pos, namesz, contentsz) in enumerate(index):
+            bounds.append((pos.int(), namesz + contentsz))
+
+        # Now we need to sort them and prefix them with an empty boundary (0,0)
+        # so that we can grab any slack-space at the beginning
+        bounds = [(0, 0)] + sorted(bounds, key=operator.itemgetter(0))
 
         # Now that we've figured out our boundaries from the index, go
         # through and determine whether there's any free space we can reuse.
-        result = {}
-        for i in range(1, len(index)):
+        for i in range(1, len(bounds)):
             offset, sz = bounds[i - 1]
 
             # Calculate the bounds between the previous fragment and the
@@ -391,37 +404,35 @@ class Index(object):
             continue
         return result
 
-    def __update_index__(self, index, items):
-        '''Update the provided `items` in `index` and write them to the netnode.'''
+    def __update_index__(self, index, update):
+        '''Update the provided `update` in `index` and write them to the netnode.'''
         cls, result = self.__class__, {}
-        logging.warn("{:s}.__update_index__({:#x}): Calculating new index for {:d} items.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, len(items)))
+        logging.warn("{:s}.__update_index__({:#x}): Updating the index using {:d} changes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, len(update)))
 
         # Iterate through all our items that need to be updated, and
         # create an `index_item` for each one.
-        for idx, (position, name, content) in items.items():
-            result[idx] = index_item(position, len(content), len(name))
+        for idx, (position, name, content) in update.items():
+            if name:
+                ename, econtent = name.encode('utf-8'), content.tobytes()
+                result[idx] = index_item(position, len(econtent), len(ename))
+            continue
 
         # Now we can return the amount to adjust our index size by, and
         # the new index that we need to use.
         logging.warn("{:s}.__update_index__({:#x}): Index will change from {:d} elements to {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, len(index), len(result)))
         return len(result) - len(index), result
 
-    def __update_table__(self, index, table, items):
-        '''Update the provided `table` using the specified `items` and write them to the netnode.'''
+    def __update_table__(self, index, table, update):
+        '''Update the provided `table` using the specified `update` and write them to the netnode.'''
         cls = self.__class__
 
         # Pre-cache a lookup table for identifying free fragments using
         # our current index. Take our keys and sort them so that we can
         # quickly find the size that we're looking for.
-        free_blocks = self.__find_free_blocks__(index)
+        free_blocks = self.__find_free_blocks__(index, update)
         free_sizes = sorted(free_blocks)
 
-        # First go through and marshal/encode the items we're going to update
-        update = {}
-        for index, (pos, name, content) in items.items():
-            encname, enccontent = name.encode('utf-8'), content.tobytes()
-            update[index] = pos, encname, enccontent
-            logging.warn("{:s}.__update_table__({:#x}): Encoded name ({!s}) for index #{:d} and contents ({!s}) with {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, name, index, content, len(encname)+len(enccontent)))
+        logging.warn("{:s}.__update_table__({:#x}): Found the following free blocks for sizes ({:s}) : {!r}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, ','.join(map("{:d}".format, free_sizes)), free_blocks))
 
         # Now we need to go through and check sizes to find out what actually
         # needs to be changed versus can be left-in-place.
@@ -429,7 +440,10 @@ class Index(object):
 
             # Read our items that we need to update
             upos, uname, ucontent = item
-            utotal = len(uname) + len(ucontent)
+            name, content = uname.encode('utf-8'), ucontent.tobytes()
+            utotal = len(name) + len(content)
+
+            logging.warn("{:s}.__update_table__({:#x}): Encoded name ({!r}) for index #{:d} and contents ({!s}) with {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, uname, index, ucontent, utotal))
 
             # Read the original items so that we can check sizes
             if index < len(table):
@@ -443,7 +457,7 @@ class Index(object):
             # If our new total is smaller than the original, then
             # we're good and we don't need to re-allocate anything.
             if utotal <= ototal:
-                logging.warn("{:s}.__update_table__({:#x}): Reusing block for index #{:d} ({!s}) at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, name, upos))
+                logging.warn("{:s}.__update_table__({:#x}): Reusing block for index #{:d} ({!r}) at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, uname, upos))
                 continue
 
             logging.warn("{:s}.__update_table__({:#x}): Re-allocating for index #{:d} due to change in size from {:d} to {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, ototal, utotal))
@@ -462,19 +476,19 @@ class Index(object):
             # If we didn't find anything, then we need to allocate
             # space. We use None as a place-holder for that.
             else:
-                logging.warn("{:s}.__update_table__({:#x}): Allocation is needed for index #{:d} with size {:d} ({:d} + {:d}).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, len(ucontent) + len(uname), len(ucontent), len(uname)))
+                logging.warn("{:s}.__update_table__({:#x}): Allocation is needed for index #{:d} with size {:d} ({:d}{:+d}).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, utotal, len(content), len(name)))
                 update[index] = None, uname, ucontent
             continue
 
         # Before we actually update the table, we need to pre-allocate
         # space in our netnode and fix our pointers so that they point
         # into it.
-        current = sum(len(pos.tobytes()) + len(name.encode('utf-8')) for pos, _, name, _ in table)
-        needed = sum(len(name) + len(content) for pos, name, content in update.values() if pos is None)
+        current = start = sum(len(content.tobytes()) + len(name.encode('utf-8')) for _, _, name, content in table)
+        needed = sum(len(content.tobytes()) + len(name.encode('utf-8')) for pos, name, content in update.values() if pos is None)
 
         for index, (pos, name, content) in update.items():
             if pos is not None:
-                logging.warn("{:s}.__update_table__({:#x}): Index #{:d} ({!s}) is reusing {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, name, pos))
+                logging.warn("{:s}.__update_table__({:#x}): Index #{:d} ({!r}) is reusing {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, name, pos))
                 continue
 
             # Calculate our new position from the current netnode size,
@@ -482,15 +496,15 @@ class Index(object):
             newpos = position.new(current)
             update[index] = newpos, name, content
 
-            logging.warn("{:s}.__update_table__({:#x}): Index #{:d} ({!s}) will allocate at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, name, newpos))
+            logging.warn("{:s}.__update_table__({:#x}): Index #{:d} ({!r}) will be allocated at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, name, newpos))
 
             # Shift to the end of our current position.
-            current += len(content)
-            current += len(name)
+            current += len(content.tobytes())
+            current += len(name.encode('utf-8'))
 
         # Finally we can return our adjustment size, and the update
         # dictionary that we just fixed up.
-        logging.warn("{:s}.__update_table__({:#x}): Need to allocate {:d} bytes to change {:d} to {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, needed, current-needed, current))
+        logging.warn("{:s}.__update_table__({:#x}): Need to allocate {:d} bytes at {:#x} to change {:d} to {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, needed, start, current-needed, current))
         return needed, update
 
     def update(self):
@@ -509,19 +523,18 @@ class Index(object):
         # Next we need to figure out whether we need to resize the table,
         # and then how it needs to be updated.
         needed, updates = self.__update_table__(self._index, self._table, dirty)
-        logging.warn("{:s}.update({:#x}): Found the following table items to update: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, updates))
+        logging.warn("{:s}.update({:#x}): Successfully updated the table to the following: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, updates))
 
         # Last thing to do is to figure out how the index needs to change.
         delta, newindex = self.__update_index__(self._index, updates)
-        logging.warn("{:s}.update({:#x}): Using the following table index: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, newindex))
+        logging.warn("{:s}.update({:#x}): Successfully updated the index to the following: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, newindex))
 
         # Now we can update our blobs with our new data starting with
         # resizing the name table.
-        #size = internal.netnode.blob.size(self.__cache_id__, Index.ntag)
         size = sum(len(bytearray(internal.netnode.sup.get(self.__cache_id__, index) or b'')) for index in internal.netnode.sup.fiter(self.__cache_id__))
         oldcount, oldoffset = size // SECTOR, size & (SECTOR - 1)
 
-        logging.warn("{:s}.update({:#x}): Resizing name table from {:+#x} ({:d}, {:d}) to add {:#x} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, size, oldcount, oldoffset, needed))
+        logging.warn("{:s}.update({:#x}): Performing allocations in name table from {:+d} ({:d}, {:d}) to add {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, size, oldcount, oldoffset, needed))
 
         # Grab our last sector which is at index `oldcount` to allocate on top
         # of, and pad `needed` zeroes at its end.
@@ -538,12 +551,14 @@ class Index(object):
             needed -= SECTOR
             count += 1
 
-        logging.warn("{:s}.update({:#x}): Allocated under {:d} sectors starting at sector {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, count, oldcount))
+        logging.warn("{:s}.update({:#x}): Padded sectors {:d} to {:d} ({:d}{:+d}).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, oldcount, oldcount + count, oldcount, count))
 
         # Update our sups with the new data that we were given.
         for index, (pos, name, content) in updates.items():
-            total = sum(len(item) for item in [name, content])
-            logging.warn("{:s}.update({:#x}): Updating {:d} bytes for index #{:#d} ({!s}) starting from sector {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, total, index, name, pos.sector))
+            ename, econtent = name.encode('utf-8'), content.tobytes()
+
+            total = sum(len(item) for item in [ename, econtent])
+            logging.warn("{:s}.update({:#x}): Need to write {:d} bytes to sector {:d} at offset {:#x} for index #{:#d} ({!r}).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, total, pos.sector, pos.offset, index, name))
 
             # Grab the sectors we need to update
             sectors = []
@@ -556,12 +571,15 @@ class Index(object):
             # Consolidate them so we can use slices to update them, and then
             # we can update our content, and then its name.
             offset, data = pos.offset, functools.reduce(operator.add, sectors, bytearray())
-            data[offset : offset + len(content)] = content
-            offset += len(content)
-            data[offset : offset + len(name)] = name
+
+            offset += 0
+            data[offset : offset + len(econtent)] = econtent
+
+            offset += len(econtent)
+            data[offset : offset + len(ename)] = ename
 
             # Now we need to break the data back into sectors, and write them back
-            logging.warn("{:s}.update({:#x}): Writing {:d} sectors for index #{:#d} ({!s}) starting at sector {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, len(sectors), index, name, pos.sector))
+            logging.warn("{:s}.update({:#x}): Writing {:d} sectors for index #{:#d} ({!r}) to sector {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, len(sectors), index, name, pos.sector))
             for i, item in enumerate(sectors):
                 sector = cache[pos.sector + i] = data[i * SECTOR : i * SECTOR + SECTOR]
                 internal.netnode.sup.set(self.__cache_id__, pos.sector + i, memoryview(sector).tobytes())
@@ -579,18 +597,32 @@ class Index(object):
 
         data = []
         for idx in sorted(newindex):
+
+            # If this name has been removed, then don't include this object
+            # in our new index.
+            if operator.contains(updates, idx):
+                _, name, _ = updates[idx]
+                if len(name) == 0:
+                    continue
+                pass
+
             item = newindex[idx]
             data.append(item.tobytes())
+
         internal.netnode.blob.set(self.__cache_id__, Index.itag, bytes().join(data))
 
         # XXX: Originally I didn't know that blobs would trash the rest of the blob in
         #      the netnode when setting them...were blobs always like that? Does IDA
         #      really expect you to read the whole damned blob into memory?
 
-        # Final thing to do is to update our name table...
-        result = []
+        # Final thing to do is to update our name table whilst ensuring we don't add
+        # items that have been removed. Update the cache at the same time.
+        self._cache, result = {}, []
         for index, (pos, name, content) in updates.items():
-            result.append((pos, index, name.decode('utf-8'), content_item.ofbytes(content)))
+            if len(name) > 0:
+                self._cache[name] = len(result)
+                result.append((pos, index, name, content))
+            continue
         self._table[:] = result
 
         # ...and then reset our index
