@@ -191,14 +191,13 @@ class Index(object):
             # Figure out how many slots in our cache that will end
             # up being used.
             totalsz = namesz + contentsz
-            count = totalsz // SECTOR
-            logging.warn("{:s}.__read_table__({:#x}): Found entry #{:d} in index with name ({:d}) and contents ({:d}) in {:d} sectors ({:d} bytes).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, namesz, contentsz, count, totalsz))
+            logging.warn("{:s}.__read_table__({:#x}): Found entry #{:d} in index with name ({:d}) and contents ({:d}) in {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, i, namesz, contentsz, totalsz))
 
             # Now to try and fetch our blocks of data. If it's not
             # found in our cache, then we need to read them from the
             # netnode's supval.
             items = []
-            for si in range(position.sector, 1 + position.sector + count):
+            for si in range(position.sector, position.sector + (position.offset + totalsz + SECTOR - 1) // SECTOR):
                 item = cache.setdefault(si, bytearray(internal.netnode.sup.get(self.__cache_id__, si) or b''))
                 items.append(item)
 
@@ -338,42 +337,16 @@ class Index(object):
         return result
 
     @classmethod
-    def __find_free_block__(cls, index, size):
-        '''Return an available position that contains up to `size` bytes worth of free space.'''
-        bounds = [(0, 0)]
-        for pos, name, content in index:
-            bounds.append((pos.int(), name + content))
-
-        # Now that we've figured out our boundaries from the index, go
-        # through and determine whether there's any free space we can reuse.
-        for i in range(len(index)):
-            offset, sz = bounds[i - 1]
-
-            # Calculate the bounds between the previous fragment and the
-            # present one that we're iterating through.
-            left = offset + sz
-            right, _ = bounds[i]
-
-            # Get the size of the space in between our fragments, and see
-            # if the requested size will actually fit.
-            if right - left <= size:
-                return position.new(left)
-            continue
-
-        # We were unable to find squat, so raise an exception so that the
-        # caller can figure out what it wants to do.
-        raise ValueError(size)
-
-    @classmethod
     def __find_free_blocks__(cls, index, update):
         '''Return a dict of lists containing all available positions in `index`.'''
         result = {}
 
         # First go through our updates and gather all open slots that are from
-        # to an object being removed.
+        # an object being removed.
         for i, (pos, name, content) in update.items():
             if pos and len(name) == 0:
-                result.setdefault(len(name.encode('utf-8')) + len(content.tobytes()), []).append(pos)
+                _, namesz, contentsz = index[i]
+                result.setdefault(namesz + contentsz, []).append(pos)
             continue
 
         # Go through the index, gather all the boundaries.
@@ -469,7 +442,7 @@ class Index(object):
 
             # If we found it, then update the current item by popping
             # off a position from our free_blocks.
-            if available:
+            if available and len(free_blocks[available]):
                 update[index] = found = free_blocks[available].pop(0), uname, ucontent
                 logging.warn("{:s}.__update_table__({:#x}): Found free-block ({:d}) for index #{:d} at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, available, index, found))
 
@@ -513,12 +486,14 @@ class Index(object):
 
         # First grab our dirty cache. If any names have been removed,
         # then we'll just re-create the entire cache from it instead.
-        logging.warn("{:s}.update({:#x}): Building the cache of dirty objects.".format('.'.join([__name__, cls.__name__]), self.__cache_id__))
         dirty = self.__build_dirty_cache__()
+        logging.warn("{:s}.update({:#x}): Discovered the dirty object index: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, dirty))
+
         if True or any(len(name) == 0 for _, name, _ in dirty.values()):
+            logging.warn("{:s}.update({:#x}): Re-building the entire object index.".format('.'.join([__name__, cls.__name__]), self.__cache_id__))
             dirty = self.__build_entire_cache__()
 
-        logging.warn("{:s}.update({:#x}): Found the following objects that are dirty: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, dirty))
+        logging.warn("{:s}.update({:#x}): Using the object index: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, dirty))
 
         # Next we need to figure out whether we need to resize the table,
         # and then how it needs to be updated.
@@ -534,22 +509,22 @@ class Index(object):
         size = sum(len(bytearray(internal.netnode.sup.get(self.__cache_id__, index) or b'')) for index in internal.netnode.sup.fiter(self.__cache_id__))
         oldcount, oldoffset = size // SECTOR, size & (SECTOR - 1)
 
-        logging.warn("{:s}.update({:#x}): Performing allocations in name table from {:+d} ({:d}, {:d}) to add {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, size, oldcount, oldoffset, needed))
+        logging.warn("{:s}.update({:#x}): Performing allocations in name table at offset {:#x} (sectors {:d}, bytes {:d}) to add {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, size, oldcount, oldoffset, needed))
 
         # Grab our last sector which is at index `oldcount` to allocate on top
         # of, and pad `needed` zeroes at its end.
-        data = bytearray(internal.netnode.sup.get(self.__cache_id__, oldcount) or b'')
+        count, data = 0, bytearray(internal.netnode.sup.get(self.__cache_id__, oldcount) or b'')
         padding = b'\0' * min(needed, SECTOR - oldoffset)
+        logging.warn("{:s}.update({:#x}): Padding sector #{:d} at {:d} with {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, count, oldcount + count, len(padding)))
         internal.netnode.sup.set(self.__cache_id__, oldcount, memoryview(cache.setdefault(oldcount, data + padding)).tobytes())
-        needed -= len(padding)
+        count, needed = count + 1, needed - len(padding)
         logging.warn("{:s}.update({:#x}): Successfully allocated {:d} bytes, only {:d} bytes left.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, len(padding), needed))
 
         # Now to continue padding out sectors in order to finish allocating space
-        count = 0
-        while needed >= 0:
-            internal.netnode.sup.set(self.__cache_id__, oldcount + count, memoryview(cache.setdefault(oldcount, b'\0' * min(needed, SECTOR))).tobytes())
-            needed -= SECTOR
-            count += 1
+        while needed > 0:
+            logging.warn("{:s}.update({:#x}): Padding sector #{:d} at {:d} with {:d} bytes.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, count, oldcount + count, min(needed, SECTOR)))
+            internal.netnode.sup.set(self.__cache_id__, oldcount + count, memoryview(cache.setdefault(oldcount + count, b'\0' * min(needed, SECTOR))).tobytes())
+            count, needed = count + 1, needed - SECTOR
 
         logging.warn("{:s}.update({:#x}): Padded sectors {:d} to {:d} ({:d}{:+d}).".format('.'.join([__name__, cls.__name__]), self.__cache_id__, oldcount, oldcount + count, oldcount, count))
 
@@ -562,11 +537,11 @@ class Index(object):
 
             # Grab the sectors we need to update
             sectors = []
-            for si in range(pos.sector, 1 + pos.sector + (pos.offset + total) // SECTOR):
-                data = bytearray(internal.netnode.sup.get(self.__cache_id__, si))
+            for si in range(pos.sector, pos.sector + (pos.offset + total + SECTOR - 1) // SECTOR):
+                data = internal.netnode.sup.get(self.__cache_id__, si)
                 if data is None:
                     raise AssertionError(data)
-                sectors.append(cache.setdefault(si, data))
+                sectors.append(cache.setdefault(si, bytearray(data)))
 
             # Consolidate them so we can use slices to update them, and then
             # we can update our content, and then its name.
