@@ -285,8 +285,12 @@ class Index(object):
         if not isinstance(item, content_item):
             raise TypeError(item)
 
+        # Check if the name is a duplicate so we can complain.
+        if operator.contains(self._cache, name):
+            raise KeyError(name)
+
         # Figure out what the next index should likely be.
-        index = max(len(self._table), max([index for index in self._dirty] or [0]))
+        index = max(len(self._table), 1 + max([index for index in self._dirty]) if self._dirty else 0)
 
         # Now we need to update our dirty cache for the index.
         self._dirty[index] = None, index, name, item
