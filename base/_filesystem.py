@@ -1,4 +1,4 @@
-import six, functools, operator, logging, codecs, array, collections
+import six, functools, operator, logging, string, array, collections
 import internal, idaapi
 
 SECTOR = 1024
@@ -125,9 +125,13 @@ class index_item(namedtypedtuple):
         return position.tobytes() + memoryview(buffer(res)).tobytes()
 
 class Index(object):
-    __node__ = '$ filesystem.index'
-
-    itag = six.byte2int(b'I')
+    """
+    This class is responsible for reading the filesystem index from a
+    netnode in the database, and then loading its contents. It can
+    mostly be treated as a dictionary where each value is a tuple of
+    the type `content_item`.
+    """
+    itag, __node__ = six.byte2int(b'I'), '$ filesystem.index'
 
     def __init__(self):
         # Try and fetch our netnode first. If we can't then we need to
@@ -238,9 +242,48 @@ class Index(object):
         return sorted(result, key=operator.itemgetter(0))
 
     def __iter__(self):
+        '''Iterate through all of the names within the Index.'''
         for name in self._cache:
             yield name
         return
+
+    def __getitem__(self, name):
+        '''Return the content-item in the Index associated with the specified `name`.'''
+        index = self.find(name)
+        _, _, _, item = self.get(index)
+        return item
+
+    def __setitem__(self, name, content):
+        '''Assign the specified `content` to the provided `name` in the Index.'''
+        index = self.find(name)
+        return self.set(index, content)
+
+    def __repr__(self):
+        result = [object.__repr__(self.__class__)]
+
+        # Aggregate all changes within the current table.
+        used = {item for item in []}
+        for idx, (pos, _, name, content) in enumerate(self._table):
+            name_s = name if all(operator.contains(string.printable, ch) for ch in name) else "{!r}".format(name)
+            if operator.contains(self._dirty, idx):
+                _, _, newname, newcontent = self._dirty[idx]
+                newname_s = newname if all(operator.contains(string.printable, ch) for ch in name) else "{!r}".format(newname)
+                namecomponent = "{!s}".format(name_s) if name == newname else "{!s} -> {!s}".format(name_s, newname_s)
+                contentcomponent = "{!s}".format(content) if content == newcontent else "{!s} -> {!s}".format(content, newcontent)
+                result.append("(dirty) {:s} : {:s}".format(namecomponent, contentcomponent))
+            else:
+                result.append("{!s} : {!s}".format(name_s, content))
+
+            # Collect the index that we've just used.
+            used.add(idx)
+
+        # Go through our dirty cache, and aggregate everything that's new.
+        for idx in six.viewkeys(self._dirty) - used:
+            _, _, newname, newcontent = self._dirty[idx]
+            newname_s = newname if all(operator.contains(string.printable, ch) for ch in name) else "{!r}".format(newname)
+            result.append("(new) {!s} : {!s}".format(newname_s, newcontent))
+
+        return '\n'.join(result)
 
     def find(self, name):
         '''Return the index in the table for the specified `name`.'''
@@ -252,7 +295,12 @@ class Index(object):
             return self._dirty[index]
         return self._table[index]
 
-    def rename(self, index, newname):
+    def rename(self, name, newname):
+        '''Rename of the entry for `name` in the Index to `newname`.'''
+        index = self.find(name)
+        return self._rename(index, newname)
+
+    def _rename(self, index, newname):
         '''Modify the name of the table entry at `index` to `newname`.'''
         position, i, name, content = self.get(index)
 
@@ -279,6 +327,7 @@ class Index(object):
         return index
 
     def add(self, name, item):
+        '''Add the contents in `item` to the Index for the specified `name`.'''
         if not isinstance(name, six.string_types):
             raise TypeError(name)
         if not isinstance(item, content_item):
@@ -296,7 +345,12 @@ class Index(object):
         self._cache[name] = index
         return index
 
-    def remove(self, index):
+    def remove(self, name):
+        '''Remove the specified `name` from the Index.'''
+        index = self.find(name)
+        return self._remove(index)
+
+    def _remove(self, index):
         '''Remove the table entry at `index`.'''
         position, i, name, content = self._table[index]
 
@@ -494,7 +548,7 @@ class Index(object):
         return needed, update
 
     def commit(self):
-        '''Update the name table'''
+        '''Commit all changes in the index back to the netnode.'''
         cls, cache = self.__class__, {}
 
         # First grab our dirty cache. If any names have been removed,
@@ -571,7 +625,7 @@ class Index(object):
             for i, item in enumerate(sectors):
                 sector = cache[pos.sector + i] = data[i * SECTOR : i * SECTOR + SECTOR]
                 internal.netnode.sup.set(self.__cache_id__, pos.sector + i, memoryview(sector).tobytes())
-            
+
             self._dirty.pop(index, None)
 
         # Now we can update the index and then we're done.
