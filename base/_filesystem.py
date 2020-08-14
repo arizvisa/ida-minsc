@@ -208,7 +208,7 @@ class Index(object):
             # Join our data together, and then chop out the segment
             # that contains our two components.
             data = functools.reduce(operator.add, items, bytearray())[position.offset:]
-            econtent, ename = map(bytes, [data[:contentsz], data[contentsz : contentsz + namesz]])
+            ename, econtent = map(bytes, [data[:namesz], data[namesz : namesz + contentsz]])
 
             # First we'll need to unmarshal the content (content_item),
             # because if we can't decode this then we won't be able to
@@ -523,8 +523,8 @@ class Index(object):
         # Before we actually update the table, we need to pre-allocate
         # space in our netnode and fix our pointers so that they point
         # into it.
-        current = start = sum(len(content.tobytes()) + len(name.encode('utf-8')) for _, _, name, content in table)
-        needed = sum(len(content.tobytes()) + len(name.encode('utf-8')) for pos, name, content in update.values() if pos is None)
+        current = start = sum(len(name.encode('utf-8')) + len(content.tobytes()) for _, _, name, content in table)
+        needed = sum(len(name.encode('utf-8')) + len(content.tobytes()) for pos, name, content in update.values() if pos is None)
 
         for index, (pos, name, content) in update.items():
             if pos is not None:
@@ -539,8 +539,8 @@ class Index(object):
             logging.info("{:s}.__update_table__({:#x}): Index #{:d} ({!r}) will be allocated at {!s}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, index, name, newpos))
 
             # Shift to the end of our current position.
-            current += len(content.tobytes())
             current += len(name.encode('utf-8'))
+            current += len(content.tobytes())
 
         # Finally we can return our adjustment size, and the update
         # dictionary that we just fixed up.
@@ -572,7 +572,7 @@ class Index(object):
         logging.debug("{:s}.update({:#x}): Successfully updated the index to the following: {!r}".format('.'.join([__name__, cls.__name__]), self.__cache_id__, newindex))
 
         # Now we can update our blobs with our new data starting with
-        # resizing the name table.
+        # resizing the table in the netnode.
         size = sum(len(bytearray(internal.netnode.sup.get(self.__cache_id__, index) or b'')) for index in internal.netnode.sup.fiter(self.__cache_id__))
         oldcount, oldoffset = size // SECTOR, size & (SECTOR - 1)
 
@@ -615,10 +615,10 @@ class Index(object):
             offset, data = pos.offset, functools.reduce(operator.add, sectors, bytearray())
 
             offset += 0
-            data[offset : offset + len(econtent)] = econtent
+            data[offset : offset + len(ename)] = ename
 
             offset += len(econtent)
-            data[offset : offset + len(ename)] = ename
+            data[offset : offset + len(econtent)] = econtent
 
             # Now we need to break the data back into sectors, and write them back
             logging.info("{:s}.update({:#x}): Writing {:d} sectors for index #{:#d} ({!r}) to sector {:d}.".format('.'.join([__name__, cls.__name__]), self.__cache_id__, len(sectors), index, name, pos.sector))
@@ -673,7 +673,7 @@ class Index(object):
 
 class content_item(namedtypedtuple):
     _fields = 'position', 'meta', 'content'
-    _types = position, six.integer_types
+    _types = position, six.integer_types, list
 
     @classmethod
     def size(self):
