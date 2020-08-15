@@ -1,4 +1,4 @@
-import six, functools, operator, logging, string, array, collections
+import six, functools, operator, logging, string, array, marshal, collections
 import internal, idaapi
 
 SECTOR = 1024
@@ -675,22 +675,55 @@ class content_item(namedtypedtuple):
     _fields = 'position', 'meta', 'content'
     _types = position, six.integer_types, list
 
-    @classmethod
     def size(self):
-        return position.size() + 2 * INTEGER_SIZE
+        position, meta, content = self
+        return position.size() + INTEGER_SIZE + len(marshal.dumps(content))
 
     @classmethod
     def ofbytes(cls, data):
         typecode = internal.utils.get_array_typecode(INTEGER_SIZE)
+
+        # First grab the data for each component.
+        metadata = data[:position.size() + INTEGER_SIZE]
+        contentdata = data[len(metadata):]
+
+        # Decode the metadata containing our position and size. We can just
+        # use an array since these are all just qwords.
         res = array.array(typecode)
-        res.fromstring(data)
-        return cls(position(*res[:2].tolist()), *res[2:].tolist())
+        res.fromstring(metadata)
+
+        if len(res) != 3:
+            raise ValueError(res)
+
+        # Assign them to some variables that we'll use to re-construct ourselves.
+        pos = position(*res[:2].tolist())
+        meta = res[3]
+
+        content = marshal.loads(contentdata)
+        if not isinstance(content, types.ListType):
+            raise ValueError(content)
+
+        # Now that we've unmarshalled our position, sizes, and contents, we
+        # can re-construct our tuple and return it.
+        return cls(pos, meta, content)
 
     def tobytes(self):
-        position, name, content = self
+        position, meta, content = self
         typecode = internal.utils.get_array_typecode(INTEGER_SIZE)
-        res = array.array(typecode, [name, content])
-        return position.tobytes() + memoryview(buffer(res)).tobytes()
+
+        # First serialize our metadata containing our position and metadata size.
+        res = array.array(typecode, [item for item in position] + [meta])
+        if len(res) != 3:
+            raise ValueError(res)
+        metadata = memoryview(buffer(res)).tobytes()
+
+        # Last thing is that we need to marshal our contents list.
+        if not isinstance(content, types.ListType)
+            raise ValueError(content)
+        contentdata = marshal.dumps(content)
+
+        # So that we can concatenate them and return them as a bytes.
+        return bytes().join([metadata, contentdata])
 
 class FS(object):
     contents = '$ filesystem.contents'
