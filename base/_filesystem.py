@@ -259,7 +259,7 @@ class Index(object):
         return self.set(index, content)
 
     def __repr__(self):
-        result = [object.__repr__(self.__class__)]
+        result = [object.__repr__(self)]
 
         # Aggregate all changes within the current table.
         used = {item for item in []}
@@ -280,7 +280,7 @@ class Index(object):
         # Go through our dirty cache, and aggregate everything that's new.
         for idx in six.viewkeys(self._dirty) - used:
             _, _, newname, newcontent = self._dirty[idx]
-            newname_s = newname if all(operator.contains(string.printable, ch) for ch in name) else "{!r}".format(newname)
+            newname_s = newname if all(operator.contains(string.printable, ch) for ch in newname) else "{!r}".format(newname)
             result.append("(new) {!s} : {!s}".format(newname_s, newcontent))
 
         return '\n'.join(result)
