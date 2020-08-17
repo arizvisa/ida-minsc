@@ -1,4 +1,7 @@
-import six, functools, operator, logging, string, types, array, marshal, collections
+import functools, itertools, types, builtins, operator, six
+import string, array, collections
+import marshal, logging
+
 import internal, idaapi
 
 SECTOR = 1024
@@ -102,6 +105,111 @@ class position(namedtypedtuple):
     def int(self):
         sector, offset = self
         return sector * SECTOR + offset
+
+class OrderedTree(collections.Container):
+    def __init__(self, items=None):
+        self._value = []
+        [ self.add(item) for item in items or [] ]
+    def forward(self, flt=lambda item: True):
+        def walk(node):
+            left, listable, right = node
+            for item in walk(left) if left else []:
+                yield item
+            item = listable[0]
+            if flt(item):
+                yield node
+            else:
+                return
+            for item in walk(right) if right else []:
+                yield item
+            return
+        for item in walk(self._value) if self._value else []:
+            yield item
+        return
+    def backward(self, flt=lambda item: True):
+        def moonwalk(node):
+            left, listable, right = node
+            for item in moonwalk(right) if right else []:
+                yield item
+            item = listable[0]
+            if flt(item):
+                yield node
+            else:
+                return
+            for item in moonwalk(left) if left else []:
+                yield item
+            return
+        for item in moonwalk(self._value) if self._value else []:
+            yield item
+        return
+    def item(self, value):
+        def search(node):
+            left, listable, right = node
+            item = listable[0]
+            if value < item:
+                return search(left) if left else node
+            elif value > item:
+                return search(right) if right else node
+            return node
+        return search(self._value) if self._value else self._value
+    def leaf(self, value):
+        node = self.item(value)
+        if node:
+            left, listable, right = node
+            item = listable[0]
+            if value < item:
+                return left
+            elif value > item:
+                return right
+        return node
+    def add(self, value):
+        node = self.leaf(value)
+        if node:
+            left, items, right = node
+            return operator.setitem(node, slice(None), (left, items + [value], right))
+        return operator.setitem(node, slice(None), ([], [value], []))
+    def __iter__(self):
+        for _, items, _ in self.forward():
+            for item in items:
+                yield item
+            continue
+        return
+    def __reversed__(self):
+        for _, items, _ in self.backward():
+            for item in reversed(items):
+                yield item
+            continue
+        return
+    def __repr__(self):
+        res = [ item for item in self ]
+        return "{!s} {!r}".format(object.__repr__(self), res)
+    def __len__(self):
+        return sum(len(listable) for _, listable, _ in self.forward())
+    def less(self, value):
+        return functools.reduce(operator.add, (listable for _, listable, _ in self.forward(lambda item: item < value)), [])
+    def __contains__(self, value):
+        return bool(self.leaf(value))
+    def remove(self, value):
+        def find_right(node):
+            _, listable, right = node
+            return find_right(right) if right else node
+        node = self.item(value)
+        if not node:
+            raise KeyError(value)
+        left, listable, right = node
+        item = listable[0]
+        if item != value:
+            raise KeyError(value)
+        result = listable.pop(-1)
+        if listable:
+            return result
+        if left:
+            _, _, rbranch = find_right(left)
+            operator.setitem(rbranch, slice(None), right)
+            operator.setitem(node, slice(None), left)
+        else:
+            operator.setitem(node, slice(None), right)
+        return result
 
 class index_item(namedtypedtuple):
     _fields = 'position', 'content', 'name'
@@ -724,5 +832,24 @@ class content_item(namedtypedtuple):
         # So that we can concatenate both of them and return them as bytes.
         return bytes().join([generaldata, tabledata])
 
-class FS(object):
-    contents = '$ filesystem.contents'
+class Contents(object):
+    xtag, __node__ = six.byte2int(b'X'), '$ filesystem.contents'
+
+    def __init__(self):
+
+        # Try and fetch our netnode first. If we can't then we need to
+        # create it and use that one instead.
+        res = internal.netnode.get(self.__node__)
+        if res == idaapi.BADADDR:
+            res = internal.netnode.new(self.__node__)
+        self.__cache_id__ = res
+
+    def info(self, item):
+        '''Return the metadata for the `item` that was provided.'''
+        meta, content, table = item
+        raise NotImplementedError
+
+    def read(self, item, offset=0, size=None):
+        '''Read the `size` bytes of data from the `offset` of the specified `item`.'''
+        meta, content, table = item
+        raise NotImplementedError
