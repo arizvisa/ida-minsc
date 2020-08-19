@@ -1345,6 +1345,13 @@ class operand_types:
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         dtype_by_size = utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
 
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # On PLFM_ARM, op.specflag1 specifies the SIMD vector element size (0=scalar, 1=8 bits, 2=16 bits, 3=32 bits, 4=64 bits, 5=128 bits)
+        # On PLFM_ARM, op.specflag3 specifies the SIMD scalar index + 1 (Vn.H[i])
+        # On PLFM_ARM, if the APSR register is specified, then op.specflag1 contains flags (1=APSR_nzcv, 2=APSR_q, 4=APSR_g)
+        # On PLFM_ARM, if the SPSR/CPSR register is specified, then op.specflag1 contains flags (1=CPSR_c, 2=CPSR_x, 4=CPSR_s, 8=CPSR_f)
+        # On PLFM_ARM, if a banked register is specified, then op.specflag1 has its high bit (0x80) set
+
         global architecture
         if op.type in {idaapi.o_reg}:
             res, dt = op.reg, dtype_by_size(database.config.bits()//8)
@@ -1360,6 +1367,10 @@ class operand_types:
         '''Operand type decoder for ``idaapi.o_imm`` which returns an immediate integer.'''
         get_dtype_attribute = operator.attrgetter('dtyp' if idaapi.__version__ < 7.0 else 'dtype')
         get_dtype_size = idaapi.get_dtyp_size if idaapi.__version__ < 7.0 else idaapi.get_dtype_size
+
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # On PLFM_ARM, op.specflag2 specifies a shift type
+        # On PLFM_ARM, op.specval specifies a shift counter
 
         if op.type in {idaapi.o_imm, idaapi.o_phrase}:
             bits = 8 * get_dtype_size(get_dtype_attribute(op))
@@ -1504,6 +1515,10 @@ class operand_types:
     def phrase(ea, op):
         '''Operand type decoder for returning a memory phrase on either the AArch32 or AArch64 architectures.'''
         global architecture
+
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # op.specflag3 specifies the NEON alignment by power-of-two
+
         Rn, Rm = architecture.by_index(op.reg), architecture.by_index(op.specflag1)
         return armops.registerphrase(Rn, Rm)
 
@@ -1538,9 +1553,13 @@ class operand_types:
         '''Operand type decoder for returning a flexible operand (shift-op) on either the AArch32 or AArch64 architectures.'''
         global architecture
 
-        raise NotImplementedError
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # op.specflag2 = shift-type
+        # op.specflag1 = shift register to use
+        # op.value = shift count
+
         Rn = architecture.by_index(op.reg)
-        shift = 0   # FIXME: find out where the shift "type" is stored
+        shift = 0                                           # XXX: This should be implemented using the above information
         return armops.flex(Rn, int(shift), int(op.value))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec1)
@@ -1548,6 +1567,8 @@ class operand_types:
         '''Operand type decoder for returning a register list on either the AArch32 or AArch64 architectures.'''
         global architecture
         res = set()
+
+        # FIXME: op.specflag1 specifies the PSR and force-user bit, which has the ^ suffix
 
         # op.specval represents a bitmask specifying which registers are included
         specval = op.specval
@@ -1557,21 +1578,52 @@ class operand_types:
             specval >>= 1
         return armops.list(res)
 
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec2)
+    def coprocessorlist(ea, op):
+        '''Operand type decoder for the coprocessor register list (CDP) on either the AArch32 or AArch64 architectures.'''
+
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # op.reg == CRd
+        # op.specflag1 == CRn
+        # op.specflag2 == CRm
+
+        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec3)
+    def coprocessorlist(ea, op):
+        '''Operand type decoder for the coprocessor register list (LDC/STC) on either the AArch32 or AArch64 architectures.'''
+
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # op.specflag1 == processor number
+        raise NotImplementedError(u"{:s}.coprocessorlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec4)
     def extensionlist(ea, op):
-        '''Operand type decoder for ``idaapi.o_idpspec4`` which returns an extension register list on either the AArch32 or AArch64 architectures.'''
+        '''Operand type decoder for ``idaapi.o_idpspec4`` which returns a floating-point register list on either the AArch32 or AArch64 architectures.'''
 
-        # XXX: It seems that the op.value attribute is what distinguishes the list of registers here.
-        #      0x00000001 - D8
-        #      0x00000002 - D8-D9
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # op.reg == first floating-point register
+        # op.value == number of floating-point registers
+        # op.specflag2 == spacing between registers (0: {Dd, Dd+1,... }, 1: {Dd, Dd+2, ...} etc)
+        # op.specflag3 == neon scalar index + 1 (Dd[x]). if index is 254, then this represents the entire set (Dd[...])
 
         raise NotImplementedError(u"{:s}.extensionlist({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
 
-    @__optype__.define(idaapi.PLFM_ARM, 0xe)
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5)
+    def text(ea, op):
+        '''Operand type decoder for ``idaapi.o_idpspec5`` which returns arbitrary text on either the AArch32 or AArch64 architectures.'''
+
+        # FIXME: This information was found in the sdk by @BrunoPujos.
+        # The entire op_t structure contains the designated text starting at op.value
+
+        raise NotImplementedError(u"{:s}.text({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
+
+    @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec5 + 1)
     def condition(ea, op):
         '''Operand type decoder for dealing with an undocumented operand type found on AArch64.'''
 
-        # XXX: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
+        # FIXME: There's a couple of attributes here that seem relevant: op.value, op.reg, op.n
+        # op.value == condition
 
         raise NotImplementedError(u"{:s}.condition({:#x}, {:d}) : An undocumented operand type ({:d}) was found at the specified address.".format('.'.join((__name__, 'operand_types')), ea, op.type, op.type))
 
