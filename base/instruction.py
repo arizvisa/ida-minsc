@@ -1538,6 +1538,7 @@ class operand_types:
         '''Operand type decoder for returning a flexible operand (shift-op) on either the AArch32 or AArch64 architectures.'''
         global architecture
 
+        raise NotImplementedError
         Rn = architecture.by_index(op.reg)
         shift = 0   # FIXME: find out where the shift "type" is stored
         return armops.flex(Rn, int(shift), int(op.value))

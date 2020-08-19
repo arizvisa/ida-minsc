@@ -494,12 +494,23 @@ def instruction(ea):
     insn = idaapi.generate_disasm_line(interface.address.inside(ea))
     unformatted = idaapi.tag_remove(insn)
 
-    # produce a version that doesn't have a comment
-    comment = unformatted.rfind(cmnt1)
-    nocomment = unformatted[:comment] if comment != -1 else unformatted
+    # if there's a terminating comment character, locate it, and then slice out just the comment
+    if cmnt2:
+        lindex = unformatted.rfind(cmnt1)
+        rindex = lindex + unformatted[lindex:].find(cmnt2) + len(cmnt2)
+        nocomment = unformatted if lindex < 0 else unformatted[:lindex] if rindex < 0 else (nocomment[:lindex] + nocomment[rindex:])
+
+    # there's no terminating comment character, so we just need to cull out everything after cmnt1
+    elif cmnt1:
+        index = unformatted.rfind(cmnt1)
+        nocomment = unformatted if index < 0 else unformatted[:index]
+
+    # if the starting cmnt1 character isn't defined, then we don't do anything.
+    else:
+        nocomment = unformatted
 
     # combine any multiple spaces into just a single space and return it
-    res = utils.string.of(nocomment)
+    res = utils.string.of(nocomment.strip())
     return reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), res, '')
 
 @utils.multicase()
@@ -527,15 +538,46 @@ def disassemble(ea, **options):
         insn = idaapi.generate_disasm_line(ea) or ''
         unformatted = idaapi.tag_remove(insn)
 
-        # convert it into one that doesn't have a comment
-        comment = unformatted.rfind(cmnt1)
-        nocomment = unformatted[:comment] if comment != -1 and not commentQ else unformatted
+        # check if the terminating char (cmnt2) is defined
+        if cmnt2:
+            lindex = unformatted.rfind(cmnt1)
+            rindex = lindex + unformatted[lindex:].find(cmnt2) + len(cmnt2)
+
+            # so that we can separate the comment out of it
+            nocomment = unformatted if lindex < 0 else unformatted[:lindex] if rindex < 0 else (nocomment[:lindex] + nocomment[rindex:])
+            comment = r'' if lindex < 0 else unformatted[lindex:] if rindex < 0 else comment[lindex : rindex]
+
+        # if it's not, then just use the starting char (cmnt1) to find the comment
+        elif cmnt1:
+            index = unformatted.rfind(cmnt1)
+            nocomment, comment = unformatted if index < 0 and commentQ else unformatted[:index], unformatted[index:]
+
+        # if this comment is undefined, then there ain't shit we can do with it,
+        # and we need to just append it as-is
+        else:
+            res.append(u"{:x}: {:s}".format(ea, unformatted.strip()))
+
+        # remove any surrounding spaces from the instruction
+        stripped = nocomment.strip()
 
         # combine all multiple spaces together so it's single-spaced
-        noextraspaces = reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), utils.string.of(nocomment), '')
+        noextraspaces = reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), utils.string.of(stripped), '')
 
-        # append it to our result with the address in front
-        res.append(u"{:x}: {:s}".format(ea, noextraspaces) )
+        # if we've been asked to include the comment, then first we need to clean
+        # it up a bit.
+        if commentQ:
+            cleaned = comment[len(cmnt1) : -len(cmnt2)] if cmnt2 else comment[len(cmnt1):]
+            stripped = cleaned.strip()
+
+            # then we can concatenate it with our instruction and its comment characters
+            withcharacters = u''.join([u"{:s} ".format(cmnt1) if cmnt1 else u'', stripped, u" {:s}".format(cmnt2) if cmnt2 else u''])
+
+            # and then we can append it to our result
+            res.append(u"{:x}: {:s}{:s}".format(ea, noextraspaces, u" {:s}".format(withcharacters) if stripped else ''))
+
+        # otherwise we cna simply append it to our result with the address in front
+        else:
+            res.append(u"{:x}: {:s}".format(ea, noextraspaces))
 
         # move on to the next iteration
         ea = address.next(ea)
