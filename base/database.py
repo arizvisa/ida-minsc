@@ -487,13 +487,15 @@ def instruction():
 @utils.multicase(ea=six.integer_types)
 def instruction(ea):
     '''Return the instruction at the address `ea` as a string.'''
+    ash = idaapi.cvar.ash if idaapi.__version__ < 7.5 else idaapi.get_ash()
+    cmnt1, cmnt2 = ash.cmnt, ash.cmnt2
 
     # first grab the disassembly and then remove all of IDA's tag information from it
     insn = idaapi.generate_disasm_line(interface.address.inside(ea))
     unformatted = idaapi.tag_remove(insn)
 
     # produce a version that doesn't have a comment
-    comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
+    comment = unformatted.rfind(cmnt1)
     nocomment = unformatted[:comment] if comment != -1 else unformatted
 
     # combine any multiple spaces into just a single space and return it
@@ -514,6 +516,10 @@ def disassemble(ea, **options):
     ea = interface.address.inside(ea)
     commentQ = builtins.next((options[k] for k in ('comment', 'comments') if k in options), False)
 
+    # grab the values we need in order to distinguish a comment
+    ash = idaapi.cvar.ash if idaapi.__version__ < 7.5 else idaapi.get_ash()
+    cmnt1, cmnt2 = ash.cmnt, ash.cmnt2
+
     # enter a loop that goes through the number of line items requested by the user
     res, count = [], options.get('count', 1)
     while count > 0:
@@ -522,7 +528,7 @@ def disassemble(ea, **options):
         unformatted = idaapi.tag_remove(insn)
 
         # convert it into one that doesn't have a comment
-        comment = unformatted.rfind(idaapi.cvar.ash.cmnt)
+        comment = unformatted.rfind(cmnt1)
         nocomment = unformatted[:comment] if comment != -1 and not commentQ else unformatted
 
         # combine all multiple spaces together so it's single-spaced
