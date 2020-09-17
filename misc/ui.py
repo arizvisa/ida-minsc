@@ -1051,11 +1051,13 @@ class DisplayHook(object):
         # XXX: maybe we can even use this wrapper object to allow this class to
         #      handle aligning columns in a table automatically such as when
         #      more than one element in a row is being returned.
-        if 'ida_idaapi' in sys.modules:
-            formatted = sys.modules['ida_idaapi'].format_basestring(string)
-        else:
-            formatted = u"{!r}".format(string)
-        return u"{!s}".format(formatted)
+        try:
+            result = u"{!r}".format(string)
+        except UnicodeDecodeError:
+            import codecs
+            encoded, _ = codecs.escape_encode(string)
+            result = u"'{!s}'".format(encoded)
+        return result
 
     def format_item(self, num_printer, storage, item):
         if item is None or isinstance(item, bool):
