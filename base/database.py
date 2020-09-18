@@ -2999,6 +2999,24 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def refinfo(cls):
+        '''Returns the ``idaapi.refinfo_t`` for the item at the current address.'''
+        return cls.refinfo(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def refinfo(cls, ea):
+        '''Returns the ``idaapi.refinfo_t`` for the item at the address `ea`.'''
+        OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
+
+        # Grab the refinfo_t for all the operands at the specified address.
+        ri = idaapi.refinfo_t()
+        if idaapi.get_refinfo(ri, ea, OPND_ALL):
+            return ri
+
+        raise E.MissingTypeOrAttribute(u"{:s}.ref({:#x}) : The specified address ({:#x}) does not have a refinfo_t.".format('.'.join((__name__, 'type', 'structure')), ea, ea))
+
+    @utils.multicase()
+    @classmethod
     def size(cls):
         '''Returns the size of the item at the current address.'''
         return size(ui.current.address())
@@ -5458,7 +5476,7 @@ class get(object):
         elif T == idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU:
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
-            # FIXME: this math doesn't work (of course) with dynamically sized structures
+            # FIXME: this math doesn't work with dynamically sized structures (of course)
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
             return [ cls.structure(ea + index * cb, id=t) for index in six.moves.range(count) ]
 
