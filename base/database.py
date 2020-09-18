@@ -2005,6 +2005,11 @@ class address(object):
                 yield res
                 res = step(res)
         except E.OutOfBoundsError: pass
+    @utils.multicase(bounds=interface.bounds_t)
+    @classmethod
+    def iterate(cls, bounds):
+        '''Iterate through all of the addresses defined within `bounds`.'''
+        return cls.iterate(bounds.left, cls.prev(bounds.right))
 
     @classmethod
     @utils.multicase(end=six.integer_types)
