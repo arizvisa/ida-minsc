@@ -545,12 +545,12 @@ def disassemble(ea, **options):
 
             # so that we can separate the comment out of it
             nocomment = unformatted if lindex < 0 else unformatted[:lindex] if rindex < 0 else (nocomment[:lindex] + nocomment[rindex:])
-            comment = r'' if lindex < 0 else unformatted[lindex:] if rindex < 0 else comment[lindex : rindex]
+            comment = unformatted[lindex : lindex] if lindex < 0 else unformatted[lindex:] if rindex < 0 else comment[lindex : rindex]
 
         # if it's not, then just use the starting char (cmnt1) to find the comment
         elif cmnt1:
             index = unformatted.rfind(cmnt1)
-            nocomment, comment = unformatted if index < 0 and commentQ else unformatted[:index], unformatted[index:]
+            nocomment, comment = (unformatted, unformatted[index : index]) if index < 0 else (unformatted[:index], unformatted[index:])
 
         # if this comment is undefined, then there ain't shit we can do with it,
         # and we need to just append it as-is
