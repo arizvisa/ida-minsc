@@ -730,51 +730,82 @@ class blocks(object):
         fn = by(func)
         ea = interface.range.start(fn)
 
+        # assign some default values and create some tools to use when creating the graph
+        availableChunks = [item for item in chunks(ea)]
+
         # create digraph
         import networkx
         attrs = tag(ea)
         attrs.setdefault('__name__', database.name(ea))
         attrs.setdefault('__address__', ea)
         attrs.setdefault('__frame__', frame(fn))
-        res = networkx.DiGraph(name=name(ea), **attrs)
+        attrs.setdefault('__chunks__', availableChunks)
+        if color(fn) is not None:
+            operator.setitem(attrs, '__color__', color(fn))
+        G = networkx.DiGraph(name=name(ea), **attrs)
 
-        # create entry node
-        attrs = database.tag(ea)
-        attrs.setdefault('__name__', name(ea))
-        attrs.setdefault('__address__', ea)
-        attrs.setdefault('__bounds__', block(ea))
-        if block.color(ea) is not None:
-            attrs.setdefault('__color__', block.color(ea))
-        res.add_node(ea, attrs)
+        # assign some default values, and create some tools to use when adding nodes
+        empty = {item for item in []}
+        fVisibleTags = lambda items: {tag for tag in items if not tag.startswith('__')}
 
-        # create a graph node for each basicblock
-        for b, e in cls(fn):
-            if b == ea: continue
-            attrs = database.tag(b)
-            attrs.setdefault('__name__', database.name(b))
-            attrs.setdefault('__address__', b)
-            attrs.setdefault('__bounds__', (b, e))
-            if block.color(b) is not None:
-                attrs.setdefault('__color__', block.color(b))
-            res.add_node(b, attrs)
+        # create a node for each block
+        for bounds in cls(fn):
+            items = [item for item in database.address.iterate(bounds)]
+            tags = [database.tag(item) for item in items]
+            last = database.address.prev(bounds.right)
 
-        # for every single block...
-        for b in cls.iterate(fn):
-            # ...add an edge to its predecessors
-            for p in b.preds():
-                # FIXME: figure out some more attributes to add
+            attrs = database.tag(bounds.left)
+            attrs.setdefault('__count__', len(items))
+            attrs.setdefault('__bounds__', bounds)
+            attrs.setdefault('__address__', bounds.left)
+            attrs.setdefault('__edge__', database.address.prev(bounds.right))
+            attrs.setdefault('__size__', bounds.right - bounds.left)
+
+            attrs.setdefault('__entry__', bounds.left == ea)
+            attrs.setdefault('__sentinel__', instruction.type.is_return(last))
+            attrs.setdefault('__branch__', any(f(last) for f in [instruction.type.is_jmp, instruction.type.is_jmpi]))
+            attrs.setdefault('__cbranch__', instruction.type.is_jxx(last))
+
+            attrs.setdefault('__chunk_index__', next((idx for idx, ch in enumerate(availableChunks) if ch.left <= bounds.left < ch.right), None))
+            if bounds.left in {item.left for item in availableChunks}:
+                attrs.setdefault('__chunk_start__', True)
+            if bounds.right in {item.right for item in availableChunks}:
+                attrs.setdefault('__chunk_stop__', True)
+
+            if block.color(bounds) is not None:
+                operator.setitem(attrs, '__color__', block.color(bounds))
+
+            visibletags = [fVisibleTags(t) for t in tags]
+            attrs.setdefault('__tags__', functools.reduce(operator.or_, visibletags, empty))
+
+            G.add_node(bounds.left, **attrs)
+
+        # for every single basic-block from the flowchart...
+        for B in cls.iterate(fn):
+
+            # ...add an edge for its predecessors
+            for Bp in B.preds():
+                source, target = database.address.prev(interface.range.end(Bp)), interface.range.start(B)
+
+                # FIXME: figure out some more default attributes to include
                 attrs = {}
-                operator.setitem(attrs, '__contiguous__', interface.range.start(b) == interface.range.end(p))
-                res.add_edge(interface.range.start(p), interface.range.start(b), attrs)
+                operator.setitem(attrs, '__contiguous__', interface.range.end(Bp) == target)
+                operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
+                operator.setitem(attrs, '__conditional__', instruction.type.is_jxx(source))
+                G.add_edge(interface.range.start(Bp), target, **attrs)
 
-            # ...add an edge to its successors
-            for s in b.succs():
-                # FIXME: figure out some more attributes to add
+            # ...add an edge for its successors
+            for Bs in B.succs():
+                source, target = database.address.prev(interface.range.end(B)), interface.range.start(Bs)
+
+                # FIXME: figure out some more default attributes to include
                 attrs = {}
-                operator.setitem(attrs, '__contiguous__', interface.range.end(b) == interface.range.start(s))
-                res.add_edge(interface.range.start(b), interface.range.start(s), attrs)
+                operator.setitem(attrs, '__contiguous__', interface.range.end(B) == target)
+                operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
+                operator.setitem(attrs, '__conditional__', instruction.type.is_jxx(source))
+                G.add_edge(interface.range.start(B), target, **attrs)
             continue
-        return res
+        return G
     graph = utils.alias(digraph, 'blocks')
 
     # XXX: Implement .register for filtering blocks
@@ -1145,8 +1176,8 @@ class block(object):
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
-        blk = blocks.at(ea)
-        return cls.register(blk, reg, *regs, **modifiers)
+        bb = cls.at(ea)
+        return cls.register(B, reg, *regs, **modifiers)
     @utils.multicase(bounds=types.TupleType, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
