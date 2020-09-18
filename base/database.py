@@ -5500,19 +5500,27 @@ class get(object):
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
 
-        # figure out if the array has a refinfo_t as in that case we'll
-        # need to lowercase its type in order to get signed values.
-        try:
-            ri = type.refinfo(ea)
-            res = _array.array(t.lower())
+        # if the array has a refinfo_t at its address, then we need to
+        # lowercase the typecode to get signed values from the array.
+        if type.refinfo(ea):
+            typecode = t.lower()
 
-        # otherwise we figured out the size of the array's elements, and
-        # we just need to determine if it's marked as signed or not.
-        except E.MissingTypeOrAttribute:
+        # if the FF_SIGN flag is set, then our array is signed and we need to
+        # tamper with the typecode.
+        elif F & idaapi.FF_SIGN == idaapi.FF_SIGN:
 
-            # FIXME: instead of decoding the array, honor the flags that the user
-            #        has set so that negative values are actually returned.
-            res = _array.array(t.lower() if F & idaapi.FF_SIGN == idaapi.FF_SIGN else t)
+            # FIXME: if the user has set the signed flag, then we need to return
+            #        the negative values displayed instead of decoding the array's
+            #        integers as signed.
+            typecode = t.lower()
+
+        # otherwise, we can just trust the typecode that was determined by the size.
+        else:
+            typecode = t
+
+        # create the array using the determined typecode so that we can decode it
+        # and then return it to the caller.
+        res = _array.array(typecode)
 
         # validate that our itemsize matches so we can warn the user
         # and fall back if necessary
