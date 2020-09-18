@@ -3010,10 +3010,7 @@ class type(object):
 
         # Grab the refinfo_t for all the operands at the specified address.
         ri = idaapi.refinfo_t()
-        if idaapi.get_refinfo(ri, ea, OPND_ALL):
-            return ri
-
-        raise E.MissingTypeOrAttribute(u"{:s}.ref({:#x}) : The specified address ({:#x}) does not have a refinfo_t.".format('.'.join((__name__, 'type', 'structure')), ea, ea))
+        return ri if idaapi.get_refinfo(ri, ea, OPND_ALL) else None
 
     @utils.multicase()
     @classmethod
@@ -5512,6 +5509,9 @@ class get(object):
         # otherwise we figured out the size of the array's elements, and
         # we just need to determine if it's marked as signed or not.
         except E.MissingTypeOrAttribute:
+
+            # FIXME: instead of decoding the array, honor the flags that the user
+            #        has set so that negative values are actually returned.
             res = _array.array(t.lower() if F & idaapi.FF_SIGN == idaapi.FF_SIGN else t)
 
         # validate that our itemsize matches so we can warn the user
