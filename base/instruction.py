@@ -1905,7 +1905,7 @@ class Intel(interface.architecture_t):
     An instance of this class can be accessed as ``instruction.architecture``
     (or ``instruction.arch``) when the current architecture of the database is Intel.
     """
-    prefix = ''
+    prefix = '%'
     def __init__(self):
         super(Intel, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
