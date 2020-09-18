@@ -5483,9 +5483,7 @@ class get(object):
         # If the DT_TYPE was found in our numerics dictionary, then grab the
         # typecode from it so we can use it.
         elif T in numerics:
-            ch = numerics[T]
-            # FIXME: return signed version of number
-            t = ch.lower() if F & idaapi.FF_SIGN == idaapi.FF_SIGN else ch
+            t = numerics[T]
 
         # If the DT_TYPE was found in our lnumerics (long) dictionary, then use
         # that to figure out the actual type
@@ -5505,8 +5503,16 @@ class get(object):
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
 
-        # now we can construct our array
-        res = _array.array(t)
+        # figure out if the array has a refinfo_t as in that case we'll
+        # need to lowercase its type in order to get signed values.
+        try:
+            ri = type.refinfo(ea)
+            res = _array.array(t.lower())
+
+        # otherwise we figured out the size of the array's elements, and
+        # we just need to determine if it's marked as signed or not.
+        except E.MissingTypeOrAttribute:
+            res = _array.array(t.lower() if F & idaapi.FF_SIGN == idaapi.FF_SIGN else t)
 
         # validate that our itemsize matches so we can warn the user
         # and fall back if necessary
