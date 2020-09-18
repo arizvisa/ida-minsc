@@ -1029,7 +1029,7 @@ class namedtypedtuple(tuple):
 
     def __repr__(self):
         cls = self.__class__
-        res = ("{!s}={!s}".format(internal.utils.string.escape(name, ''), internal.utils.string.repr(value)) for name, value in zip(self._fields, self))
+        res = ("{!s}={!s}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     def _replace(self, **fields):
@@ -1692,7 +1692,7 @@ class architecture_t(object):
 
     def by_name(self, name):
         '''Lookup a register according to its `name`.'''
-        if any(name.startswith(prefix) for prefix in ('%', '$')):        # at&t, mips
+        if any(name.startswith(prefix) for prefix in {'%', '$'}):        # at&t, mips
             return getattr(self.__register__, name[1:].lower())
         if name.lower() in self.__register__:
             return getattr(self.__register__, name.lower())
