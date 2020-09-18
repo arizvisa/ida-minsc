@@ -11,7 +11,7 @@ import six
 import sys, logging, contextlib
 import functools, operator, itertools, types
 import collections, heapq, traceback, ctypes, math
-import unicodedata as _unicodedata, string as _string
+import unicodedata as _unicodedata, string as _string, array as _array
 
 import ui, internal
 import idaapi
@@ -1369,19 +1369,48 @@ class switch_t(object):
     def branch(self):
         '''Return the contents of the branch table.'''
         import database
+
+        # if we're an indirect switch, then we can grab our length from
+        # the jcases property.
         if self.indirectQ():
             ea, count = self.object.jumps, self.object.jcases
-            return database.get.array(ea, length=count)
-        ea, count = self.object.jumps, self.object.ncases
-        return database.get.array(ea, length=count)
+            items = database.get.array(ea, length=count)
+
+        # otherwise, we'll need to use the ncases property for the count.
+        else:
+            ea, count = self.object.jumps, self.object.ncases
+            items = database.get.array(ea, length=count)
+
+        # check that the result is a proper array with a typecode, and use
+        # it to recreate an array with unsigned elements.
+        if not hasattr(items, 'typecode'):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.branch() : An invalid type ({!s}) was returned from the switch table at address {:#x}.".format(cls.__name__, items.__class__, ea))
+        result = _array.array(items.typecode.upper())
+
+        # last thing to do is to adjust each element from our items to
+        # correspond to the what's described in its refinfo_t.
+        ri = database.type.refinfo(ea)
+
+        # the refinfo_t's flags determine whether we need to subtract or
+        # add the value from the refinfo_t.base.
+        f = operator.sub if ri.is_subtract() else operator.add
+
+        # now that we know what type of operation the refinfo_t is, use
+        # it to translate the array's values into addresses.
+        result.fromlist( [f(ri.base, item) for item in items] )
+        return result
     @property
     def index(self):
         '''Return the contents of the case or index table.'''
         import database
-        if self.indirectQ():
-            ea, count = self.object.lowcase, self.object.ncases
-            return database.get.array(ea, length=count)
-        return database.get.array(self.object.jumps, length=0)
+
+        # if we're not an indirect switch, then the index table is empty.
+        if not self.indirectQ():
+            return database.get.array(self.object.jumps, length=0)
+
+        # otherwise, we can simply read the array and return it.
+        ea, count = self.object.lowcase, self.object.ncases
+        return database.get.array(ea, length=count)
     @property
     def register(self):
         '''Return the register that the switch is based on.'''
