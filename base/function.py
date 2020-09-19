@@ -178,25 +178,29 @@ def name(func):
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
 @utils.multicase(none=types.NoneType)
-def name(none):
+def name(none, **flags):
     '''Remove the custom-name from the current function.'''
     # we use ui.current.address() instead of ui.current.function()
     # in case the user might be hovering over an import table
     # function and wanting to rename that instead.
-    return name(ui.current.address(), none or '')
+    return name(ui.current.address(), none or '', **flags)
 @utils.multicase(string=basestring)
 @utils.string.decorate_arguments('string', 'suffix')
-def name(string, *suffix):
+def name(string, *suffix, **flags):
     '''Set the name of the current function to `string`.'''
-    return name(ui.current.address(), string, *suffix)
+    return name(ui.current.address(), string, *suffix, **flags)
 @utils.multicase(none=types.NoneType)
-def name(func, none):
+def name(func, none, **flags):
     '''Remove the custom-name from the function `func`.'''
-    return name(func, none or '')
+    return name(func, none or '', **flags)
 @utils.multicase(string=basestring)
 @utils.string.decorate_arguments('string', 'suffix')
-def name(func, string, *suffix):
-    '''Set the name of the function `func` to `string`.'''
+def name(func, string, *suffix, **flags):
+    """Set the name of the function `func` to `string`.
+
+    If `flags` is specified, then use the specified value as the flags.
+    If the boolean `listed` is specified, then specify whether to add the label to the Names list or not.
+    """
 
     # combine name with its suffix
     res = (string,) + suffix
@@ -205,13 +209,22 @@ def name(func, string, *suffix):
     # figure out if address is a runtime or static function
     rt, ea = interface.addressOfRuntimeOrStatic(func)
 
-    # now we can assign the name depending on whether it's a function or a runtime-linked function
-    # FIXME: mangle the name and shuffle it into the prototype if possible
+    # set the default flags that we'll use based on whether the
+    # listed parameter was set.
+    res = 0 if flags.get('listed', idaapi.is_in_nlist(ea)) else idaapi.SN_NOLIST
+
+    # if it's a runtime-linked function, then it's not a public name.
     if rt:
-        res = database.name(ea, string)
+        flags.setdefault('flags', res | idaapi.SN_NON_PUBLIC)
+
+    # if it's a static function, then we need to preserve its flags.
     else:
-        res = database.name(ea, string, flags=idaapi.SN_PUBLIC)
-    return res
+        res |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+        res |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
+        flags.setdefault('flags', res)
+
+    # FIXME: mangle the name and shuffle it into the prototype if possible
+    return database.name(ea, string, **flags)
 
 @utils.multicase()
 def convention():
