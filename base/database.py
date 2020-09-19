@@ -1001,7 +1001,7 @@ def name(string, *suffix, **flags):
 @utils.multicase(none=types.NoneType)
 def name(none, **flags):
     '''Removes the name at the current address.'''
-    return name(ui.current.address(), '', **flags)
+    return name(ui.current.address(), none or '', **flags)
 @utils.multicase(ea=six.integer_types, string=basestring)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(ea, string, *suffix, **flags):
@@ -1021,8 +1021,8 @@ def name(ea, string, *suffix, **flags):
 
     ## define some closures that perform the different tasks necessary to
     ## apply a name to a given address
-    def apply_name(ea, string, fl):
-        '''Apply the given ``string`` to the address ``ea`` with the specified ``fl``.'''
+    def apply_name(ea, string, flag):
+        '''Apply the given ``string`` to the address ``ea`` with the specified ``flag``.'''
 
         # convert the specified string into a form that IDA can handle
         ida_string = utils.string.to(string)
@@ -1033,52 +1033,71 @@ def name(ea, string, *suffix, **flags):
             logging.info(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Stripping invalid chars from specified name resulted in \"{:s}\".".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', utils.string.escape(utils.string.of(res), '"')))
             ida_string = res
 
-        # set the name and use the value of 'fl' if it was explicit
-        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", fl)
+        # set the name and use the value of 'flag' if it was explicit
+        res, ok = name(ea), idaapi.set_name(ea, ida_string or "", flag)
 
         if not ok:
-            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), fl))
+            raise E.DisassemblerError(u"{:s}.name({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_name({:#x}, \"{:s}\", {:#x})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(flags)) if flags else '', ea, utils.string.escape(string, '"'), flag))
         return res
 
-    def name_within(ea, string, fl):
+    def name_within(ea, string, flag):
         '''Add or rename a label named ``string`` at the address ``ea`` with the specified ``flags``.'''
-        func = idaapi.get_func(ea)
+        func, realname, localname = idaapi.get_func(ea), idaapi.get_visible_name(ea), idaapi.get_visible_name(ea, idaapi.GN_LOCAL)
 
-        # if we're within a function, then we simply make all labels local
-        fl |= idaapi.SN_LOCAL
+        # if there's a public name at this address then use the flag to determine
+        # how to update the public name.
+        if idaapi.is_public_name(ea) or any(flag & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
+            flag |= idaapi.SN_PUBLIC if flag & idaapi.SN_PUBLIC else idaapi.SN_NON_PUBLIC
 
-        # nothing left to do, so apply the name with the flags we figured
-        res = apply_name(ea, string, fl)
+        # if we're pointing to the start of the function, then unless public was explicitly
+        # specified we need to set the local name.
+        elif interface.range.start(func) == ea and not all(flag & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
+            flag |= idaapi.SN_LOCAL
 
-        # check if our address does not point to a function beginning and if
-        # our visible name does not match the requested one. If so, then this
-        # might be a switch/jmptable of some sort that needs to be removed.
-        if interface.range.start(func) != ea and idaapi.get_visible_name(ea) != string:
-            idaapi.del_global_name(ea)
-        return res
+        # if the name is supposed to be in the list, then we need to check if there's a
+        # local name.
+        elif not flag & idaapi.SN_NOLIST:
+            if localname and realname != localname:
+                idaapi.del_local_name(ea), idaapi.set_name(ea, localname, idaapi.SN_NOLIST)
+            flag &= ~idaapi.SN_LOCAL
 
-    def name_outside(ea, string, fl):
+        # if a regular name is defined, but not a local one, then we need to set the local
+        # one first.
+        elif realname and realname == localname:
+            flag |= idaapi.SN_NOLIST
+
+        # otherwise we're using a local name because we're inside a function.
+        else:
+            flag |= idaapi.SN_LOCAL
+
+        # now we can apply the name with the flags that we determined.
+        return apply_name(ea, string, flag)
+
+    def name_outside(ea, string, flag):
         '''Add or rename a global named ``string`` at the address ``ea`` with the specified ``flags``.'''
+        realname, localname = idaapi.get_visible_name(ea), idaapi.get_visible_name(ea, idaapi.GN_LOCAL)
 
-        # if 'listed' wasn't explicitly specified then ensure it's not listed as
-        # requested
+        # preserve the name if its public
+        flag |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+
+        # if 'listed' wasn't explicitly specified then ensure it's not listed as requested.
         if 'listed' not in flags:
-            fl &= ~idaapi.SN_NOLIST
+            flag |= idaapi.SN_NOLIST
 
-        return apply_name(ea, string, fl)
+        # then finally apply the name.
+        return apply_name(ea, string, flag)
 
     ## now we can define the actual logic for naming the given address
-    fl = idaapi.SN_NON_AUTO
-    fl |= idaapi.SN_NOCHECK
+    flag = idaapi.SN_NON_AUTO
+    flag |= idaapi.SN_NOCHECK
 
     # preserve any flags that were previously applied
-    fl |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
-    fl |= idaapi.SN_WEAK if idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
-    fl |= idaapi.SN_PUBLIC if idaapi.is_public_name(ea) else idaapi.SN_NON_PUBLIC
+    flag |= 0 if idaapi.is_in_nlist(ea) else idaapi.SN_NOLIST
+    flag |= idaapi.SN_WEAK if idaapi.is_public_name(ea) and idaapi.is_weak_name(ea) else idaapi.SN_NON_WEAK
 
     # if the bool `listed` is True, then ensure that it's added to the name list.
     if 'listed' in flags:
-        fl = (fl & ~idaapi.SN_NOLIST) if flags.get('listed', False) else (fl | idaapi.SN_NOLIST)
+        flag = (flag & ~idaapi.SN_NOLIST) if flags.get('listed', False) else (flag | idaapi.SN_NOLIST)
 
     # if custom flags were specified, then just use those as they should get
     # priority
@@ -1087,15 +1106,15 @@ def name(ea, string, *suffix, **flags):
 
     # if we're within a function, then use the name_within closure to apply the name
     elif function.within(ea):
-        return name_within(ea, string, fl)
+        return name_within(ea, string, flag)
 
     # otherwise, we use the name_without closure to apply it
-    return name_outside(ea, string, fl)
+    return name_outside(ea, string, flag)
 
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
     '''Removes the name defined at the address `ea`.'''
-    return name(ea, '', **flags)
+    return name(ea, none or '', **flags)
 
 @utils.multicase()
 def erase():
