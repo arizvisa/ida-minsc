@@ -751,10 +751,14 @@ class blocks(object):
         attrs = tag(ea)
         attrs.setdefault('__name__', database.name(ea))
         attrs.setdefault('__address__', ea)
-        attrs.setdefault('__frame__', frame(fn))
         attrs.setdefault('__chunks__', availableChunks)
+
+        try:
+            attrs.setdefault('__frame__', frame(fn))
+        except E.MissingTypeOrAttribute: pass
         if color(fn) is not None:
             operator.setitem(attrs, '__color__', color(fn))
+
         G = networkx.DiGraph(name=name(ea), **attrs)
 
         # assign some default values, and create some tools to use when adding nodes
