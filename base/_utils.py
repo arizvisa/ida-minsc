@@ -17,7 +17,7 @@ import sys, heapq, collections, array, math
 import internal
 import idaapi
 
-__all__ = ['fbox','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','funbox','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -25,6 +25,10 @@ __all__ = ['fbox','funbox','finstance','fhasitem','fitemQ','fgetitem','fitem','f
 fbox = lambda *a: a
 # return a closure that executes `f` with the arguments unboxed.
 funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **builtins.dict(k.items() + kp.items()))
+# return the first argument
+fcar = lambda *a: a[:1][0]
+# return the rest of the arguments
+fcdr = lambda *a: a[1:]
 # return a closure that will check that `object` is an instance of `type`.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item `key`.
