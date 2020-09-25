@@ -17,7 +17,7 @@ import sys, heapq, collections, array, math
 import internal
 import idaapi
 
-__all__ = ['fbox','funbox','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fhasattr','fattributeQ','fgetattr','fattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','funbox','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
@@ -32,13 +32,17 @@ fcdr = lambda *a: a[1:]
 # return a closure that will check that `object` is an instance of `type`.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item `key`.
-fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), iter, next, fpartial(operator.eq, None))
+fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), builtins.iter, builtins.next, fpartial(operator.eq, builtins.None))
 # return a closure that will get a particular element from an object
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
+# return a closure that will set a particular element on an object
+fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, item, value) or object
 # return a closure that will check if its argument has an `attribute`.
 fhasattr = fattributeQ = lambda attribute: frpartial(hasattr, attribute)
 # return a closure that will get a particular attribute from an object
 fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(object, attribute, *default)
+# return a closure that will set a particular attribute on an object
+fsetattr = fsetattribute = lambda attribute: lambda value: lambda object: builtins.setattr(object, attribute, value) or object
 # return a closure that always returns `object`.
 fconstant = fconst = falways = lambda object: lambda *a, **k: object
 # a closure that returns its argument always
