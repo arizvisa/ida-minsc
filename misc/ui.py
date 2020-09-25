@@ -1090,7 +1090,7 @@ class DisplayHook(object):
         return "{:#x}".format(x)
 
     def displayhook(self, item):
-        if item is None or item.__class__ is bool:
+        if item is None or not hasattr(item, '__class__') or item.__class__ is bool:
             self.orig_displayhook(item)
             return
         try:
