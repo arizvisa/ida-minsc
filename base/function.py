@@ -1554,8 +1554,8 @@ def tag(func):
     res = comment(fn, repeatable=True)
     d2 = internal.comment.decode(res)
 
-    if d1.viewkeys() & d2.viewkeys():
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+    if six.viewkeys(d1) & six.viewkeys(d2):
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
     res = {}
     map(res.update, (d1, d2) if repeatable else (d2, d1))
@@ -1688,22 +1688,22 @@ def select(**boolean):
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(tag, *Or, **boolean):
     '''Query the contents of the current function for the specified `tag` and any others specified as `Or`.'''
-    res = (tag,) + Or
-    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
+    res = {tag} | {item for item in Or}
+    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return select(ui.current.function(), **boolean)
 @utils.multicase(tag=basestring)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *Or, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
-    res = (tag,) + Or
-    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
+    res = {tag} | {item for item in Or}
+    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return select(func, **boolean)
 @utils.multicase(tag=(builtins.set, builtins.list))
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *Or, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
-    res = tuple(iter(tag)) + Or
-    boolean['Or'] = tuple(set(iter(boolean.get('Or', ()))) | set(res))
+    res = {item for item in tag} | {item for item in Or}
+    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return select(func, **boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1715,7 +1715,7 @@ def select(func, **boolean):
     """
     fn = by(func)
     containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {k : set(v if isinstance(v, containers) else {v}) for k, v in boolean.viewitems()}
+    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in six.viewitems(boolean)}
 
     # nothing specific was queried, so just yield each tag
     if not boolean:
@@ -1727,6 +1727,7 @@ def select(func, **boolean):
 
     # collect the keys to query as specified by the user
     Or, And = (set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
+    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
     # walk through every tagged address and cross-check it against query
     for ea in internal.comment.contents.address(interface.range.start(fn)):
