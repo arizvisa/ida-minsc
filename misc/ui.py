@@ -23,7 +23,7 @@ import sys, os, time, functools
 import logging
 
 import idaapi, internal
-import database as _database
+import database as _database, segment as _segment
 
 ## TODO:
 # locate window under current cursor position
@@ -36,24 +36,129 @@ def application():
     '''Return the current instance of the IDA Application.'''
     raise internal.exceptions.MissingMethodError
 
-def ask(string, **default):
-    """Ask the user a question providing the option to choose "yes", "no", or "cancel".
-
-    If any of the options are specified as a boolean, then it is
-    assumed that this option will be the default. If the user
-    chooses "cancel", then this value will be returned instead of
-    the value ``None``.
+class ask(object):
     """
-    state = {'no': 0, 'yes': 1, 'cancel': -1}
-    results = {0: False, 1: True}
-    if default:
-        keys = {n for n in default.viewkeys()}
-        keys = {n.lower() for n in keys if default.get(n, False)}
-        dflt = next((k for k in keys), 'cancel')
-    else:
-        dflt = 'cancel'
-    res = idaapi.ask_yn(state[dflt], internal.utils.string.to(string))
-    return results.get(res, None)
+    This namespace contains utilities for asking the user for some
+    particular type of information. These will typically require a
+    user-interface of some sort and will block while waiting for the
+    user to respond.
+
+    If the `default` parameter is specified to any of the functions
+    within this namespace, then its value will be used by default
+    in the inbox that is displayed to the user.
+    """
+    def __new__(cls, string, **default):
+        '''Ask the user a question providing the option to choose "yes", "no", or "cancel".'''
+        return cls.yn(string, **default)
+
+    @classmethod
+    def yn(cls, string, **default):
+        """Ask the user a question providing the option to choose "yes", "no", or "cancel".
+
+        If any of the options are specified as a boolean, then it is
+        assumed that this option will be the default. If the user
+        chooses "cancel", then this value will be returned instead of
+        the value ``None``.
+        """
+        state = {'no': getattr(idaapi, 'ASKBTN_NO', 0), 'yes': getattr(idaapi, 'ASKBTN_YES', 1), 'cancel': getattr(idaapi, 'ASKBTN_CANCEL', -1)}
+        results = {state['no']: False, state['yes']: True}
+        if default:
+            keys = {n for n in default.viewkeys()}
+            keys = {n.lower() for n in keys if default.get(n, False)}
+            dflt = next((k for k in keys), 'cancel')
+        else:
+            dflt = 'cancel'
+        res = idaapi.ask_yn(state[dflt], internal.utils.string.to(string))
+        return results.get(res, None)
+
+    @classmethod
+    def address(cls, string, **default):
+        """Ask the user for an address using the provided parameter `string` as its prompt.
+
+        If the `valid` parameter is specified, then verify that the
+        address is within the bounds of the database. If the `bounds`
+        parameter is specified, then verify that the address chosen
+        by the user is within the provided bounds.
+        """
+        dflt = next((default[k] for k in ['default', 'address', 'ea', 'addr'] if k in default), current.address())
+
+        # Ask the user for an address...
+        ea = idaapi.ask_addr(dflt, internal.utils.string.to(string))
+
+        # If we received idaapi.BADADDR, then the user gave us a bogus
+        # value that we need to return None for.
+        if ea == idaapi.BADADDR:
+            return None
+
+        # Grab the bounds that we'll need to compare the address to from
+        # the parameters or the database configuration.
+        bounds = next((default[k] for k in ['bounds'] if k in default), _database.config.bounds())
+
+        # If we were asked to verify the address, or we were given some
+        # boundaries to check it against..then do that here.
+        if default.get('verify', 'bounds' in default):
+            l, r = bounds
+            return ea if l <= ea < r else None
+
+        # Otherwise, we can just return the address here.
+        return ea
+
+    @classmethod
+    def integer(cls, string, **default):
+        '''Ask the user for an integer using the provided parameter `string` as its prompt.'''
+        dflt = next((default[k] for k in ['default', 'integer', 'long', 'int'] if k in default), getattr(cls, '__last_integer__', 0))
+
+        # Ask the user for some kind of integer...
+        integer = idaapi.ask_long(dflt, internal.utils.string.to(string))
+
+        # If we actually received an integer, then cache it so that we can
+        # reuse it as the default the next time this function gets called.
+        if res is not None:
+            cls.__last_integer__ = integer
+
+        return integer
+
+    @classmethod
+    def segment(cls, string, **default):
+        '''Ask the user for a segment using the provided parameter `string` as its prompt.'''
+        dflt = next((default[k] for k in ['default', 'segment', 'seg'] if k in default), internal.interface.address.start(current.segment()))
+        ea = idaapi.ask_seg(dflt, internal.utils.string.to(string))
+
+        # Try and convert whatever it was that we were given into an actual segment.
+        try:
+            seg = _segment.by(ea)
+
+        # If we got an exception, then just set our result to None so that we can
+        # let the caller figure out how much they really want it.
+        except Exception:
+            return None
+
+        # Return the segment_t back to the caller.
+        return seg
+
+    @classmethod
+    def string(cls, string, **default):
+        '''Ask the user for a string using the provided parameter `string` as its prompt.'''
+        dflt = next((default[k] for k in ['default', 'string'] if k in default), None) or u''
+
+        # FIXME: we should totally expose the history id to the caller in some
+        #        way.. but after some fiddling around with it, I can't seem to
+        #        make it actually do anything.
+
+        string = idaapi.ask_str(dflt, idaapi.HIST_IDENT, internal.utils.string.to(string))
+        return internal.utils.string.of(string)
+
+    @classmethod
+    def note(cls, string, **default):
+        """Ask the user for a multi-lined string using the provided parameter `string` as its prompt.
+
+        If the `length` parameter is provided as an integer, then restrict
+        the length of the user's input to the integer that was specified.
+        """
+        dflt = next((default[k] for k in ['default', 'text'] if k in default), None) or u''
+        length = next((default[k] for k in ['length', 'max', 'maxlength'] if k in default), 0)
+        string = idaapi.ask_text(length, internal.utils.string.to(dflt), internal.utils.string.to(string))
+        return internal.utils.string.of(string)
 
 class current(object):
     """
