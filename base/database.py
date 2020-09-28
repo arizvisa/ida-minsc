@@ -1459,8 +1459,8 @@ def tag(ea):
     d2 = internal.comment.decode(res)
 
     # check to see if they're not overwriting each other
-    if d1.viewkeys() & d2.viewkeys():
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+    if six.viewkeys(d1) & six.viewkeys(d2):
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
     # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
@@ -1607,8 +1607,8 @@ def tag(ea, key, none):
 @utils.string.decorate_arguments('And', 'Or')
 def select(tag, *And, **boolean):
     '''Query all of the global tags in the database for the specified `tag` and any others specified as `And`.'''
-    res = (tag,) + And
-    boolean['And'] = tuple(builtins.set(iter(boolean.get('And', ()))) | builtins.set(res))
+    res = {tag} | {item for item in And}
+    boolean['And'] = {item for item in boolean.get('And', [])} | res
     return select(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1619,7 +1619,7 @@ def select(**boolean):
     If `Or` contains an iterable then include any other tags that are specified.
     """
     containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
+    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in six.viewitems(boolean)}
 
     # nothing specific was queried, so just yield all the tags
     if not boolean:
@@ -1630,7 +1630,7 @@ def select(**boolean):
         return
 
     # collect the keys to query as specified by the user
-    Or, And = (builtins.set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
+    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
     # walk through all tags so we can cross-check them with the query
     for ea in internal.comment.globals.address():
@@ -1642,7 +1642,7 @@ def select(**boolean):
 
         # And(&) includes any tags that match all of the queried tagnames
         if And:
-            if And & d.viewkeys() == And:
+            if And & six.viewkeys(d) == And:
                 res.update({key : value  for key, value in six.iteritems(d) if key in And})
             else: continue
 
@@ -1656,8 +1656,8 @@ def select(**boolean):
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def selectcontents(tag, *Or, **boolean):
     '''Query all function contents for the specified `tag` or any others specified as `Or`.'''
-    res = (tag,) + Or
-    boolean['Or'] = tuple(builtins.set(iter(boolean.get('Or', ()))) | builtins.set(res))
+    res = {tag} | {item for item in Or}
+    boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return selectcontents(**boolean)
 @utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
@@ -1668,7 +1668,7 @@ def selectcontents(**boolean):
     If `Or` contains an iterable then include any other tags that are specified.
     """
     containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {k : builtins.set(v if isinstance(v, containers) else (v,)) for k, v in boolean.viewitems()}
+    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in six.viewitems(boolean)}
 
     # nothing specific was queried, so just yield all tagnames
     if not boolean:
@@ -1679,21 +1679,21 @@ def selectcontents(**boolean):
         return
 
     # collect the keys to query as specified by the user
-    Or, And = (builtins.set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
+    Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
     # walk through all tagnames so we can cross-check them against the query
     for ea, res in internal.comment.contents.iterate():
         ui.navigation.procedure(ea)
-        res, d = builtins.set(res), internal.comment.contents._read(None, ea) or {}
+        res, d = {item for item in res}, internal.comment.contents._read(None, ea) or {}
 
         # check to see that the dict's keys match
-        if builtins.set(d.viewkeys()) != res:
+        if {key for key in d} != res:
             # FIXME: include query in warning
             q = utils.string.kwargs(boolean)
             logging.warn(u"{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
 
         # now start aggregating the keys that the user is looking for
-        res, d = builtins.set(), internal.comment.contents.name(ea)
+        res, d = {item for item in []}, internal.comment.contents.name(ea)
 
         # Or(|) includes any of the tagnames being queried
         res.update(Or & d)
