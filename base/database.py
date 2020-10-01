@@ -5489,7 +5489,7 @@ class get(object):
         # If this is a string-literal, then figure out what string size we should use
         if T == idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI:
             elesize = idaapi.get_full_data_elsize(ea, F)
-            strings = { 1: 'c', 2: 'u'}
+            strings = { 1: 'c', 2: utils.get_array_typecode(2), 4: utils.get_array_typecode(4) }
             t = strings[elesize]
 
         # If we got a structure at this address, then we'll simply take the length
