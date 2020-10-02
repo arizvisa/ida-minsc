@@ -4632,34 +4632,64 @@ class set(object):
 
     @utils.multicase()
     @classmethod
-    def string(cls, **type):
-        '''Set the data at the current address to a string with the specified `type`.'''
-        return cls.string(ui.current.address(), **type)
+    def string(cls, **strtype):
+        '''Set the data at the current address to a string with the specified `strtype`.'''
+        return cls.string(ui.current.address(), **strtype)
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def string(cls, ea, **type):
-        '''Set the data at address `ea` to a string with the specified `type`.'''
-        strtype = type.get('type', (idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT) | idaapi.STRWIDTH_1B)
-        ok = idaapi.make_ascii_string(ea, 0, strtype) if idaapi.__version__ < 7.0 else idaapi.create_strlit(ea, 0, strtype)
-        if not ok:
-            raise E.DisassemblerError(u"{:s}.string({:#x}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(type)) if type else ''))
-        return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
-    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    def string(cls, ea, **strtype):
+        '''Set the data at address `ea` to a string with the specified `strtype`.'''
+        return cls.string(ea, strtype.pop('length', 0), **strtype)
+    @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
-    def string(cls, ea, size, **type):
-        """Set the data at address `ea` to a string with the specified `size`.
+    def string(cls, ea, length, **strtype):
+        """Set the data at address `ea` to a string with the specified `length`.
 
-        If `type` is specified, use a string of the specified type.
+        If the integer `strtype` is specified, then apply a string of the specified character width.
+        If the tuple `strtype` is specified, the first item is the string's character width and the second item is the size of the length prefix.
         """
-        strtype = type.get('type', (idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT) | idaapi.STRWIDTH_1B)
-        cb = cls.unknown(ea, size)
-        if cb != size:
-            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else '', size))
+        widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
+        lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
 
-        ok = idaapi.make_ascii_string(ea, size, strtype) if idaapi.__version__ < 7.0 else idaapi.create_strlit(ea, size, strtype)
+        # First grab the type that the user gave us.
+        res = strtype.get('strtype', (1, 0))
+
+        # If it's not tuple, then convert it to one that uses a null-terminator.
+        if not isinstance(res, (types.ListType, types.TupleType)):
+            res = (res, 0)
+
+        # Now we can extract the width and the length size so we can validate them.
+        width_t, length_t = res
+        if not operator.contains(widthtype, width_t):
+            raise E.InvalidTypeOrValueError("{:s}.string({:#x}, {:d}{:s}) : The requested character width ({:d}) is unsupported.".format('.'.join([__name__, cls.__name__]), ea, length, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', width_t))
+        if not operator.contains(lengthtype, length_t):
+            raise E.InvalidTypeOrValueError("{:s}.string({:#x}, {:d}{:s}) : An invalid size ({:d}) was provided for the string length prefix.".format('.'.join([__name__, cls.__name__]), ea, length, u", {!s}".format(utils.string.kwargs(strtype)) if strtype else '', length_t))
+
+        # Convert the width and length into an actual size.
+        size = width_t * length
+
+        # Now we can combine them into the string type that IDA actually understands.
+        res = (lengthtype[length_t] << idaapi.STRLYT_SHIFT) & idaapi.STRLYT_MASK
+        res|= widthtype[width_t] & idaapi.STRWIDTH_MASK
+
+        # If the size is larger than 0, then the user knows what they want and we
+        # need to undefine that number of bytes first. The value of length_t is
+        # added because we need to undefine the length prefix as well.
+        if size > 0 and not type.is_unknown(ea):
+            cb = cls.unknown(ea, length_t + size)
+            if cb != length_t + size:
+                raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to undefine {:d} bytes for the requested string.".format('.'.join((__name__, cls.__name__)), ea, length, u", {:s}".format(utils.string.kwargs(strtype)) if strtype else '', length_t + size))
+
+        # Make a string at the specified address of the suggested size with
+        # the desired string type.
+        ok = idaapi.make_ascii_string(ea, size and (size + length_t), res) if idaapi.__version__ < 7.0 else idaapi.create_strlit(ea, size and (size + length_t), res)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to make the specified address a string.".format('.'.join((__name__, cls.__name__)), ea, size, u", {:s}".format(utils.string.kwargs(type)) if type else ''))
-        return get.array(ea, length=idaapi.get_item_size(ea)).tostring()
+            raise E.DisassemblerError(u"{:s}.string({:#x}, {:d}{:s}) : Unable to define the specified address as a string of the requested strtype {:#04x}.".format('.'.join((__name__, cls.__name__)), ea, length, u", {:s}".format(utils.string.kwargs(strtype)) if strtype else '', res))
+
+        # In order to determine the correct length, we need to subtract the
+        # length prefix the size, and divide the total by the character width.
+        res = idaapi.get_item_size(ea) - length_t
+        return get.string(ea, length=res // width_t)
 
     class integer(object):
         """
@@ -5578,7 +5608,7 @@ class get(object):
     def string(cls, ea, **length):
         """Return the array at the address specified by `ea` as a string.
 
-        If the integer `length` is defined, then use it as the length of the array.
+        If the integer `length` is defined, then use it explicitly as the string's length when reading.
         """
 
         # For older versions of IDA, we get the strtype from the opinfo
