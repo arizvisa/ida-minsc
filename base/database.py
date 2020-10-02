@@ -5629,23 +5629,43 @@ class get(object):
         if strtype in {idaapi.BADADDR, 0xffffffff}:
             res = cls.array(ea, **length)
 
-            # It wasn't an array and was probably a structure, so we'll just complain to the user about it
+            # It ended up not being an array type, and was probably a structure. So,
+            # we can only complain to the user about it and let them sort it out.
             if not isinstance(res, _array.array):
-                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The type at address {:#x} cannot be treated as an unformatted array and as such is not convertible to a string.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
+                raise E.InvalidTypeOrValueError(u"{:s}.string({:#x}{:s}) : The data at address {:#x} cannot be read as an integer array and thus is unable to be converted to a string.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
 
-            # Warn the user and convert it into a string
-            logging.warn(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type at address {:#x}. Treating as an unformatted array instead.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
-            return res.tostring()
+            # Warn the user what we're doing before we start figuring out
+            # the element size of the string.
+            logging.warn(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type code for address {:#x}. Reading it as an integer array and converting it to a string instead.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
 
-        # Get the string encoding (not used)
-        encoding = idaapi.get_str_encoding_idx(strtype)
+            # We can't figure out the shift.. So, since that's a dead end we
+            # have to assume that the terminator is a null byte.
+            sentinels, sl = '\0', idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT
 
-        # Get the terminal characters that can terminate the string
-        sentinels = idaapi.get_str_term1(strtype) + idaapi.get_str_term2(strtype)
+            # However, we can still figure out the character width from the itemsize.
+            sizelookup = {
+                1: idaapi.STRWIDTH_1B,
+                2: idaapi.STRWIDTH_2B,
+                4: idaapi.STRWIDTH_4B,
+            }
 
-        # Extract the fields out of the string type code
-        res = get_str_type_code(strtype)
-        sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
+            # But we still need to make sure that the itemsize is something we support.
+            if not operator.contains(sizelookup, res.itemsize):
+                raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported character width ({:d}) found for string in the array at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', res.itemsize, ea))
+
+            sw = sizelookup[res.itemsize]
+
+        # Otherwise we can extract the string's characteristics directly from the strtype code.
+        else:
+            # Get the string encoding (not actually used)
+            encoding = idaapi.get_str_encoding_idx(strtype)
+
+            # Get the terminal characters that can terminate the string
+            sentinels = idaapi.get_str_term1(strtype) + idaapi.get_str_term2(strtype)
+
+            # Extract the fields out of the string type code
+            res = get_str_type_code(strtype)
+            sl, sw = res & idaapi.STRLYT_MASK, res & idaapi.STRWIDTH_MASK
 
         # Figure out the STRLYT field
         if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
