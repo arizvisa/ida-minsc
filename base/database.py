@@ -4651,8 +4651,8 @@ class set(object):
         widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
         lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
 
-        # First grab the type that the user gave us.
-        res = strtype.get('strtype', (1, 0))
+        # First grab the type that the user gave us from either the old or new parameter.
+        res = six.next((strtype[item] for item in ['strtype', 'type'] if item in strtype), (1, 0))
 
         # If it's not tuple, then convert it to one that uses a null-terminator.
         if not isinstance(res, (types.ListType, types.TupleType)):
