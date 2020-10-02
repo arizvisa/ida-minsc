@@ -5619,23 +5619,23 @@ class get(object):
 
         # Figure out the STRLYT field
         if sl == idaapi.STRLYT_TERMCHR << idaapi.STRLYT_SHIFT:
-            shift, f1 = 0, operator.methodcaller('rstrip', sentinels)
+            shift, fterminate = 0, operator.methodcaller('rstrip', sentinels)
         elif sl == idaapi.STRLYT_PASCAL1 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 1, utils.fidentity
+            shift, fterminate = 1, utils.fidentity
         elif sl == idaapi.STRLYT_PASCAL2 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 2, utils.fidentity
+            shift, fterminate = 2, utils.fidentity
         elif sl == idaapi.STRLYT_PASCAL4 << idaapi.STRLYT_SHIFT:
-            shift, f1 = 4, utils.fidentity
+            shift, fterminate = 4, utils.fidentity
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRLYT({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sl, ea))
 
         # Figure out the STRWIDTH field
         if sw == idaapi.STRWIDTH_1B:
-            f2 = operator.methodcaller('decode', 'utf-8')
+            fdecode = operator.methodcaller('decode', 'utf-8', 'replace')
         elif sw == idaapi.STRWIDTH_2B:
-            f2 = operator.methodcaller('decode', 'utf-16')
+            fdecode = operator.methodcaller('decode', 'utf-16', 'replace')
         elif sw == idaapi.STRWIDTH_4B:
-            f2 = operator.methodcaller('decode', 'utf-32')
+            fdecode = operator.methodcaller('decode', 'utf-32', 'replace')
         else:
             raise E.UnsupportedCapability(u"{:s}.string({:#x}{:s}) : Unsupported STRWIDTH({:d}) found in string at address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', sw, ea))
 
@@ -5648,7 +5648,7 @@ class get(object):
         res = cls.array(ea + shift, **length).tostring()
 
         # ..and then process it.
-        return f1(f2(res))
+        return fterminate(fdecode(res))
     @utils.multicase()
     @classmethod
     def structure(cls):
