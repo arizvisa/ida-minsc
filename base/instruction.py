@@ -1036,6 +1036,26 @@ def op_string(ea, opnum, strtype):
     return True if ok else False
 
 ## flags
+@utils.multicase()
+def ops_refinfo():
+    '''Returns the ``idaapi.refinfo_t`` for the instruction at the current address.'''
+    OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
+    return op_refinfo(ui.current.address(), OPND_ALL)
+@utils.multicase(ea=six.integer_types)
+def ops_refinfo(ea):
+    '''Returns the ``idaapi.refinfo_t`` for the instruction at the address `ea`.'''
+    OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
+    return op_refinfo(ea, OPND_ALL)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_refinfo(opnum):
+    '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
+    return op_refinfo(ui.current.address(), opnum)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+def op_refinfo(ea, opnum):
+    '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
+    ri = idaapi.refinfo_t()
+    return ri if idaapi.get_refinfo(ri, ea, opnum) else None
+
 @utils.multicase(opnum=six.integer_types)
 def op_refs(opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the current instruction.'''
@@ -1143,7 +1163,7 @@ def op_refs(ea, opnum):
     # FIXME: is this supposed to execute if ok == T? or not?
     # global
     else:
-        # anything that's just a reference is a single-byte supval at index 0x9+opnum
+        # anything that's just a reference is a single-byte supval at index 0x9 + opnum
         # 9 -- '\x02' -- offset to segment 2
         gid = operand(inst.ea, opnum).value if operand(inst.ea, opnum).type in {idaapi.o_imm} else operand(inst.ea, opnum).addr
         x = idaapi.xrefblk_t()
