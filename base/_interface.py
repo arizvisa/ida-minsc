@@ -1368,7 +1368,7 @@ class switch_t(object):
     @property
     def branch(self):
         '''Return the contents of the branch table.'''
-        import database
+        import database, instruction
 
         # if we're an indirect switch, then we can grab our length from
         # the jcases property.
@@ -1389,7 +1389,7 @@ class switch_t(object):
 
         # last thing to do is to adjust each element from our items to
         # correspond to the what's described in its refinfo_t.
-        ri = database.type.refinfo(ea)
+        ri = instruction.ops_refinfo(ea)
 
         # the refinfo_t's flags determine whether we need to subtract or
         # add the value from the refinfo_t.base.
