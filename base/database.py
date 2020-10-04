@@ -3287,7 +3287,7 @@ class type(object):
     def has_typeinfo():
         '''Return true if the current address has some typeinfo associated with it.'''
         return type.has_typeinfo(ui.current.address())
-    @utils.multicase()
+    @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_typeinfo(ea):
         '''Return true if the address at `ea` has some typeinfo associated with it.'''
@@ -5465,6 +5465,9 @@ class get(object):
         If the integer `length` is defined, then use it as the number of elements for the array.
         """
         ea = interface.address.within(ea)
+
+        # This numerics table is responsible for mapping an idaapi.DT_TYPE
+        # type to a typecode for the _array class.
         numerics = {
             idaapi.FF_BYTE : utils.get_array_typecode(1),
             idaapi.FF_WORD : utils.get_array_typecode(2),
@@ -5481,11 +5484,14 @@ class get(object):
         except (AttributeError, ValueError):
             pass
 
-        # lookup table for long-numerics that require manually reading
+        # This long-numerics table is a mapping-type for converting an
+        # idaapi.DT_TYPE to a length. This way we can manually read the
+        # elements of the array into a list that we can return to the user.
         lnumerics = {}
 
-        # if we have FF_QWRD defined but its not in _array, then add it to our
-        # long-numerics so we can read them
+        # If we have FF_QWORD defined but it cannot be represented by the
+        # _array class, then we'll need to add its size to our long-numerics
+        # table so that we can still read its elements manually.
         if any(hasattr(idaapi, name) for name in {'FF_QWRD', 'FF_QWORD'}):
             name = six.next(name for name in {'FF_QWRD', 'FF_QWORD'} if hasattr(idaapi, name))
             value = getattr(idaapi, name)
@@ -5504,26 +5510,33 @@ class get(object):
             pass
 
         # Depending on the version of IDAPython, some of IDA's flags (FF_*) can
-        # be signed or unsigned. We're explicitly testing for them, so we need
-        # to actually convert them to unsigned in order for our tests to actually
-        # work.
+        # be signed or unsigned. Since we're explicitly testing for them by using
+        # container membership, we'll need to ensure that they're unsigned when
+        # storing them into their lookup tables. This way our membership tests
+        # will actually work when determining the types to use.
         numerics = { ff & idaapi.BADADDR : typecode for ff, typecode in numerics.items() }
-        lnumerics = { ff & idaapi.BADADDR : length for ff, typecode in lnumerics.items() }
+        lnumerics = { ff & idaapi.BADADDR : length for ff, length in lnumerics.items() }
 
         # Now we can grab the flags (DT_TYPE) and any other flags in order to
-        # distinguish what type of array we need to convert this too. There's
-        # no util or anything to do this conversion in minsc, so we handle this
-        # ourselves by explicitly testing and handling it.
+        # distinguish what type of array we need to convert this to. There's
+        # no utilities or anything for performing this conversion in minsc, so
+        # we have to support all of the element types ourselves by explicitly
+        # testing each possible case and then handling it.
         F, T = type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
 
-        # If this is a string-literal, then figure out what string size we should use
+        # If this is a string-literal, then we need to figure out the element
+        # size in order to figure out which character width to use.
         if T == idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI:
             elesize = idaapi.get_full_data_elsize(ea, F)
+
+            # Python's "u" typecode for their _array can actually change sizes. So
+            # we have no choice here other than to just use the integer typecodes
+            # for both 16-bit and 32-bit wide-character strings.
             strings = { 1: 'c', 2: utils.get_array_typecode(2), 4: utils.get_array_typecode(4) }
             t = strings[elesize]
 
-        # If we got a structure at this address, then we'll simply take the length
-        # and create a structure for each individual element
+        # If we found a structure at this address, then we'll simply take the
+        # length and create a structure for each individual element.
         elif T == idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU:
             t, total = type.structure.id(ea), idaapi.get_item_size(ea)
             cb = _structure.size(t)
@@ -5531,69 +5544,75 @@ class get(object):
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
             return [ cls.structure(ea + index * cb, id=t) for index in six.moves.range(count) ]
 
-        # If the DT_TYPE was found in our numerics dictionary, then grab the
-        # typecode from it so we can use it.
+        # If the DT_TYPE was found in our numerics dictionary, then we're good
+        # to just fallthrough after selecting the typecode that we get from it.
         elif T in numerics:
             t = numerics[T]
 
         # If the DT_TYPE was found in our lnumerics (long) dictionary, then use
-        # that to figure out the actual type
+        # that to figure out the element size, and read each integer as a list.
         elif T in lnumerics:
             cb, total = lnumerics[T], idaapi.get_item_size(ea)
-            # FIXME: return signed version of number
-            t = get.signed if F & idaapi.FF_SIGN == idaapi.FF_SIGN else get.unsigned
+            # FIXME: Instead of returning the signed version of an integer, we
+            #        need to return IDA's signed representation of the integer
+            #        so that it directly corresponds to the user's view.
+            Fgetinteger = get.signed if F & idaapi.FF_SIGN == idaapi.FF_SIGN else get.unsigned
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ t(ea + index * cb, cb) for index in six.moves.range(count) ]
+            return [ Fgetinteger(ea + index * cb, cb) for index in six.moves.range(count) ]
 
-        # Otherwise, the DT_TYPE was not found and we don't really know how to
-        # decode this without having a proper typesystem of some sort.
+        # Otherwise the DT_TYPE is unsupported, and we don't have a clue on how
+        # this should be properly decoded...
         else:
             raise E.UnsupportedCapability(u"{:s}.array({:#x}{:s}) : Unknown DT_TYPE found in flags at address {:#x}. The flags {:#x} have the `idaapi.DT_TYPE` as {:#x}.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, F, T))
 
-        # grab the sizes of all our array components
+        # Grab all the necessary sizes and lengths that we need to read the array.
         total, cb = type.array.size(ea), type.array.element(ea)
         count = length.get('length', type.array.length(ea))
 
-        # if the array has a refinfo_t at its address, then we need to
-        # lowercase the typecode to get signed values from the array.
+        # If the array has a refinfo_t at its address, then we need to lowercase
+        # the typecode to get signed (relative) values from the array.
         if type.refinfo(ea):
             typecode = t.lower()
 
-        # if the FF_SIGN flag is set, then our array is signed and we need to
-        # tamper with the typecode.
+        # If the FF_SIGN flag is set, then our array is signed and we need to
+        # tamper with the typecode to ensure it's signed.
         elif F & idaapi.FF_SIGN == idaapi.FF_SIGN:
 
-            # FIXME: if the user has set the signed flag, then we need to return
-            #        the negative values displayed instead of decoding the array's
-            #        integers as signed.
+            # FIXME: If the user has set the signed flag, then we need to return
+            #        the negative values that are displayed instead of just
+            #        decoding the array's integers as signed.
             typecode = t.lower()
 
-        # otherwise, we can just trust the typecode that was determined by the size.
+        # Otherwise, we can simply trust the previous typecode that we've already
+        # determined when examining the array's size.
         else:
             typecode = t
 
-        # create the array using the determined typecode so that we can decode it
-        # and then return it to the caller.
+        # Create an _array using the typecode that we figured out so that it can
+        # be decoded and then returned to the caller.
         res = _array.array(typecode)
 
-        # validate that our itemsize matches so we can warn the user
-        # and fall back if necessary
+        # If our _array's itemsize doesn't match the element size that we expected,
+        # then we need to warn the user that something fucked up and that we're
+        # hijacking the array decoding with our own hardcoded unsigned length.
         if res.itemsize != cb:
             logging.warn(u"{:s}.array({:#x}{:s}) : Refusing to decode array at address {:#x} using the array size ({:+d}) identified for DT_TYPE ({:#x}) due to the size of the DT_TYPE ({:#x}) not corresponding to the desired element size ({:+d}).".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.itemsize, T, T, cb))
 
-            # fix the array so that it matches the expected itemsize
+            # Reconstruct the array but with the expected element size.
             try:
                 res = _array.array(utils.get_array_typecode(cb, 1))
 
-            # if we can't use the discovered typecode, then decode as bytes
+            # If we can't use the typecode determined by the element size, then
+            # just assume that the elements are just individual bytes.
             except ValueError:
                 res = _array.array(utils.get_array_typecode(1))
 
-        # read our data, and use it to initialize the array
+        # Read our data from the database, and feed its contents to initialize
+        # the _array that we're going to return to the user.
         data = read(ea, count * cb)
         res.fromstring(data)
 
-        # check the length and warn the user if it's wrong
+        # Validate the _array's length so that we can warn the user if it's wrong.
         if len(res) != count:
             logging.warn(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', len(res), count))
         return res
