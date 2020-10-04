@@ -3023,21 +3023,6 @@ class type(object):
 
     @utils.multicase()
     @classmethod
-    def refinfo(cls):
-        '''Returns the ``idaapi.refinfo_t`` for the item at the current address.'''
-        return cls.refinfo(ui.current.address())
-    @utils.multicase()
-    @classmethod
-    def refinfo(cls, ea):
-        '''Returns the ``idaapi.refinfo_t`` for the item at the address `ea`.'''
-        OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
-
-        # Grab the refinfo_t for all the operands at the specified address.
-        ri = idaapi.refinfo_t()
-        return ri if idaapi.get_refinfo(ri, ea, OPND_ALL) else None
-
-    @utils.multicase()
-    @classmethod
     def size(cls):
         '''Returns the size of the item at the current address.'''
         return size(ui.current.address())
@@ -5597,7 +5582,7 @@ class get(object):
 
         # If the array has a refinfo_t at its address, then we need to lowercase
         # the typecode to get signed (relative) values from the array.
-        if type.refinfo(ea):
+        if _instruction.ops_refinfo(ea):
             typecode = t.lower()
 
         # If the FF_SIGN flag is set, then our array is signed and we need to
