@@ -598,15 +598,14 @@ def read():
     '''Return the bytes defined at the current address.'''
     res = ui.current.address()
     return read(res, type.size(res))
-@utils.multicase(size=six.integer_types)
-def read(size):
-    '''Return `size` number of bytes from the current address.'''
-    return read(ui.current.address(), size)
+@utils.multicase(ea=six.integer_types)
+def read(ea):
+    '''Return the number of bytes associated with the address `ea`.'''
+    return read(ea, type.size(ea))
 @utils.multicase(ea=six.integer_types, size=six.integer_types)
 def read(ea, size):
     '''Return `size` number of bytes from address `ea`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
-
     start, end = interface.address.within(ea, ea+size)
     return get_bytes(ea, end - start) or ''
 
