@@ -3309,6 +3309,19 @@ class type(object):
         return type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
     structQ = is_struc = is_struct = utils.alias(is_structure, 'type')
 
+    @utils.multicase()
+    @staticmethod
+    def is_reference():
+        '''Return true if the data at the current address is referenced.'''
+        return type.is_reference(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @staticmethod
+    def is_reference(ea):
+        '''Return true if the data at the address `ea` is referenced.'''
+        X, flags = idaapi.xrefblk_t(), idaapi.XREF_FAR | idaapi.XREF_DATA
+        return X.first_to(ea, flags)
+    is_ref = is_referenced = utils.alias(is_reference, 'type')
+
     class array(object):
         """
         This namespace is for returning type information about an array
