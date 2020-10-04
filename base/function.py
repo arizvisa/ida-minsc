@@ -689,8 +689,7 @@ class blocks(object):
     def iterate(cls, func):
         '''Returns each ``idaapi.BasicBlock`` for the function `func`.'''
         fn = by(func)
-        fc = idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS)
-        for bb in fc:
+        for bb in idaapi.FlowChart(f=fn, flags=idaapi.FC_PREDS):
             yield bb
         return
 
@@ -926,6 +925,37 @@ class block(object):
         '''Return the boundaries of the basic block identified by `bounds`.'''
         left, _ = bounds
         return cls(left)
+
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def contains(cls, ea):
+        '''Return whether the address `ea` is within the current basic block.'''
+        left, right = cls()
+        return left <= ea < right
+    @utils.multicase(address=six.integer_types, ea=six.integer_types)
+    @classmethod
+    def contains(cls, address, ea):
+        '''Return whether the address `ea` is within the basic block at the specified `address`.'''
+        left, right = cls(address)
+        return left <= ea < right
+    @utils.multicase(address=six.integer_types, ea=six.integer_types)
+    @classmethod
+    def contains(cls, func, address, ea):
+        '''Return whether the address `ea` is within the basic block for the function `func` at the specified `address`.'''
+        left, right = cls(func, address)
+        return left <= ea < right
+    @utils.multicase(bb=idaapi.BasicBlock, ea=six.integer_types)
+    @classmethod
+    def contains(cls, bb, ea):
+        '''Return whether the address `ea` is within the basic block `bb`.'''
+        left, right = cls(bb)
+        return left <= ea < right
+    @utils.multicase(bounds=types.TupleType, ea=six.integer_types)
+    @classmethod
+    def contains(cls, bounds, ea):
+        '''Return whether the address `ea` is within the basic block identified by `bounds`.'''
+        left, right = cls(bounds)
+        return left <= ea < right
 
     @utils.multicase()
     @classmethod
