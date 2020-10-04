@@ -3298,6 +3298,32 @@ class type(object):
         return True
     typeinfoQ = utils.alias(has_typeinfo, 'type')
 
+    @utils.multicase()
+    @staticmethod
+    def is_string():
+        '''Return true if the current address is defined as a string.'''
+        return type.is_string(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @staticmethod
+    def is_string(ea):
+        '''Return true if the address at `ea` is defined as a string.'''
+        FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+        return type.flags(ea, idaapi.DT_TYPE) == FF_STRLIT
+    stringQ = utils.alias(is_string, 'type')
+
+    @utils.multicase()
+    @staticmethod
+    def is_structure():
+        '''Return true if the current address is defined as a structure.'''
+        return type.is_structure(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @staticmethod
+    def is_structure(ea):
+        '''Return true if the address at `ea` is defined as a structure.'''
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
+        return type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
+    structQ = is_struc = is_struct = utils.alias(is_structure, 'type')
+
     class array(object):
         """
         This namespace is for returning type information about an array
