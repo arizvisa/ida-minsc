@@ -81,28 +81,6 @@ functions and aliases. For more information on this, please see
 <dd><p>Return the current instance of the IDA Application.</p>
 </dd></dl>
 
-<dl class="function">
-<dt id="ui.ask">
-<code class="descclassname">ui.</code><code class="descname">ask</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user a question providing the option to choose “yes”, “no”, or “cancel”.</p>
-<p>If any of the options are specified as a boolean, then it is
-assumed that this option will be the default. If the user
-chooses “cancel”, then this value will be returned instead of
-the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the string to ask the user</li>
-<li><strong>**default</strong> – if <code class="docutils literal notranslate"><span class="pre">yes</span></code>, <code class="docutils literal notranslate"><span class="pre">no</span></code>, or <code class="docutils literal notranslate"><span class="pre">cancel</span></code> is set to true, then use that value as the default</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
 </div>
 <div class="section" id="namespace-list">
 <h2>3.2.1.2. Namespace list<a class="headerlink" href="#namespace-list" title="Permalink to this headline">¶</a></h2>
@@ -136,8 +114,154 @@ functions or aliases, please see <a class="reference internal" href="../multicas
 </dd></dl>
 
 </div>
+<div class="section" id="ui-ask">
+<span id="ns-ui-ask"></span><h3>3.2.1.2.2. ui.ask<a class="headerlink" href="#ui-ask" title="Permalink to this headline">¶</a></h3>
+<p>This namespace contains utilities for asking the user for some
+particular type of information. These will typically require a
+user-interface of some sort and will block while waiting for the
+user to respond.</p>
+<p>If the <code class="docutils literal notranslate"><span class="pre">default</span></code> parameter is specified to any of the functions
+within this namespace, then its value will be used by default
+in the inbox that is displayed to the user.</p>
+<dl class="function">
+<dt id="ui.ask">
+<code class="descclassname">ui.</code><code class="descname">ask</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user a question providing the option to choose “yes”, “no”, or “cancel”.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>**default</strong> – if <code class="docutils literal notranslate"><span class="pre">yes</span></code>, <code class="docutils literal notranslate"><span class="pre">no</span></code>, or <code class="docutils literal notranslate"><span class="pre">cancel</span></code> is set to true, then use that value as the default</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.ask.address">
+<code class="descclassname">ask.</code><code class="descname">address</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.address" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user for an address using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<p>If the <code class="docutils literal notranslate"><span class="pre">valid</span></code> parameter is specified, then verify that the
+address is within the bounds of the database. If the <code class="docutils literal notranslate"><span class="pre">bounds</span></code>
+parameter is specified, then verify that the address chosen
+by the user is within the provided bounds.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>**default</strong> – the default address for the user to change. if one was not specified, then use the current address.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.ask.integer">
+<code class="descclassname">ask.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.integer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user for an integer using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>**default</strong> – the default integer for the user to change. if one was not specified, then use the previous integer that the user input.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.ask.note">
+<code class="descclassname">ask.</code><code class="descname">note</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.note" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user for a multi-lined string using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<p>If the <code class="docutils literal notranslate"><span class="pre">length</span></code> parameter is provided as an integer, then restrict
+the length of the user’s input to the integer that was specified.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>**default</strong> – the default string for the user to change</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.ask.segment">
+<code class="descclassname">ask.</code><code class="descname">segment</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.segment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user for a segment using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>**default</strong> – the default segment for the user to change. if one was not specified, then use the address of the current segment.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.ask.string">
+<code class="descclassname">ask.</code><code class="descname">string</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.string" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user for a string using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>**default</strong> – the default string for the user to change</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.ask.yn">
+<code class="descclassname">ask.</code><code class="descname">yn</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.yn" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ask the user a question providing the option to choose “yes”, “no”, or “cancel”.</p>
+<p>If any of the options are specified as a boolean, then it is
+assumed that this option will be the default. If the user
+chooses “cancel”, then this value will be returned instead of
+the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>**default</strong> – if <code class="docutils literal notranslate"><span class="pre">yes</span></code>, <code class="docutils literal notranslate"><span class="pre">no</span></code>, or <code class="docutils literal notranslate"><span class="pre">cancel</span></code> is set to true, then use that value as the default</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
 <div class="section" id="ui-clipboard">
-<span id="ns-ui-clipboard"></span><h3>3.2.1.2.2. ui.clipboard<a class="headerlink" href="#ui-clipboard" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-clipboard"></span><h3>3.2.1.2.3. ui.clipboard<a class="headerlink" href="#ui-clipboard" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the current clipboard state.</p>
 <dl class="function">
 <dt id="ui.clipboard">
@@ -147,7 +271,7 @@ functions or aliases, please see <a class="reference internal" href="../multicas
 
 </div>
 <div class="section" id="ui-current">
-<span id="ns-ui-current"></span><h3>3.2.1.2.3. ui.current<a class="headerlink" href="#ui-current" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-current"></span><h3>3.2.1.2.4. ui.current<a class="headerlink" href="#ui-current" title="Permalink to this headline">¶</a></h3>
 <p>This namespace contains tools for fetching information about the
 current selection state. This can be used to get the state of
 thigns that are currently selected such as the address, function,
@@ -215,7 +339,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-disassembly">
-<span id="ns-ui-disassembly"></span><h3>3.2.1.2.4. ui.disassembly<a class="headerlink" href="#ui-disassembly" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-disassembly"></span><h3>3.2.1.2.5. ui.disassembly<a class="headerlink" href="#ui-disassembly" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Disassembly window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -226,22 +350,22 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-exports">
-<span id="ns-ui-exports"></span><h3>3.2.1.2.5. ui.exports<a class="headerlink" href="#ui-exports" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-exports"></span><h3>3.2.1.2.6. ui.exports<a class="headerlink" href="#ui-exports" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Exports window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-functions">
-<span id="ns-ui-functions"></span><h3>3.2.1.2.6. ui.functions<a class="headerlink" href="#ui-functions" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-functions"></span><h3>3.2.1.2.7. ui.functions<a class="headerlink" href="#ui-functions" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Functions window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-imports">
-<span id="ns-ui-imports"></span><h3>3.2.1.2.7. ui.imports<a class="headerlink" href="#ui-imports" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-imports"></span><h3>3.2.1.2.8. ui.imports<a class="headerlink" href="#ui-imports" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Imports window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-keyboard">
-<span id="ns-ui-keyboard"></span><h3>3.2.1.2.8. ui.keyboard<a class="headerlink" href="#ui-keyboard" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-keyboard"></span><h3>3.2.1.2.9. ui.keyboard<a class="headerlink" href="#ui-keyboard" title="Permalink to this headline">¶</a></h3>
 <p>Base namespace for interacting with the keyboard input.</p>
 <dl class="function">
 <dt id="ui.keyboard.input">
@@ -292,7 +416,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-menu">
-<span id="ns-ui-menu"></span><h3>3.2.1.2.9. ui.menu<a class="headerlink" href="#ui-menu" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-menu"></span><h3>3.2.1.2.10. ui.menu<a class="headerlink" href="#ui-menu" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for registering items in IDA’s menu system.</p>
 <dl class="function">
 <dt id="ui.menu.add">
@@ -342,7 +466,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-mouse">
-<span id="ns-ui-mouse"></span><h3>3.2.1.2.10. ui.mouse<a class="headerlink" href="#ui-mouse" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-mouse"></span><h3>3.2.1.2.11. ui.mouse<a class="headerlink" href="#ui-mouse" title="Permalink to this headline">¶</a></h3>
 <p>Base namespace for interacting with the mouse input.</p>
 <dl class="function">
 <dt id="ui.mouse.buttons">
@@ -358,7 +482,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-names">
-<span id="ns-ui-names"></span><h3>3.2.1.2.11. ui.names<a class="headerlink" href="#ui-names" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-names"></span><h3>3.2.1.2.12. ui.names<a class="headerlink" href="#ui-names" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Names window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -451,7 +575,7 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-navigation">
-<span id="ns-ui-navigation"></span><h3>3.2.1.2.12. ui.navigation<a class="headerlink" href="#ui-navigation" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-navigation"></span><h3>3.2.1.2.13. ui.navigation<a class="headerlink" href="#ui-navigation" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for updating the state of the colored navigation band.</p>
 <dl class="function">
 <dt id="ui.navigation.analyze">
@@ -618,17 +742,17 @@ segment, clipboard, widget, or even the current window in use.</p>
 
 </div>
 <div class="section" id="ui-notepad">
-<span id="ns-ui-notepad"></span><h3>3.2.1.2.13. ui.notepad<a class="headerlink" href="#ui-notepad" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-notepad"></span><h3>3.2.1.2.14. ui.notepad<a class="headerlink" href="#ui-notepad" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Notepad window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-segments">
-<span id="ns-ui-segments"></span><h3>3.2.1.2.14. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-segments"></span><h3>3.2.1.2.15. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Segments window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-state">
-<span id="ns-ui-state"></span><h3>3.2.1.2.15. ui.state<a class="headerlink" href="#ui-state" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-state"></span><h3>3.2.1.2.16. ui.state<a class="headerlink" href="#ui-state" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for fetching or interacting with the current
 state of IDA’s interface. These are things such as waiting for
 IDA’s analysis queue, or determining whether the function is
@@ -662,7 +786,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-strings">
-<span id="ns-ui-strings"></span><h3>3.2.1.2.16. ui.strings<a class="headerlink" href="#ui-strings" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-strings"></span><h3>3.2.1.2.17. ui.strings<a class="headerlink" href="#ui-strings" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Strings window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 <dl class="function">
@@ -713,12 +837,12 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-structures">
-<span id="ns-ui-structures"></span><h3>3.2.1.2.17. ui.structures<a class="headerlink" href="#ui-structures" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-structures"></span><h3>3.2.1.2.18. ui.structures<a class="headerlink" href="#ui-structures" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Structures window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
 </div>
 <div class="section" id="ui-timer">
-<span id="ns-ui-timer"></span><h3>3.2.1.2.18. ui.timer<a class="headerlink" href="#ui-timer" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-timer"></span><h3>3.2.1.2.19. ui.timer<a class="headerlink" href="#ui-timer" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for registering a python callable to a timer in IDA.</p>
 <dl class="function">
 <dt id="ui.timer.register">
@@ -761,7 +885,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-widget">
-<span id="ns-ui-widget"></span><h3>3.2.1.2.19. ui.widget<a class="headerlink" href="#ui-widget" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-widget"></span><h3>3.2.1.2.20. ui.widget<a class="headerlink" href="#ui-widget" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for selecting a specific or particular widget.</p>
 <dl class="function">
 <dt id="ui.widget">
@@ -815,7 +939,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-window">
-<span id="ns-ui-window"></span><h3>3.2.1.2.20. ui.window<a class="headerlink" href="#ui-window" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-window"></span><h3>3.2.1.2.21. ui.window<a class="headerlink" href="#ui-window" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for selecting a specific or particular window.</p>
 <dl class="function">
 <dt id="ui.window.main">
@@ -831,7 +955,7 @@ being viewed in graph view or not.</p>
 
 </div>
 <div class="section" id="ui-windows">
-<span id="ns-ui-windows"></span><h3>3.2.1.2.21. ui.windows<a class="headerlink" href="#ui-windows" title="Permalink to this headline">¶</a></h3>
+<span id="ns-ui-windows"></span><h3>3.2.1.2.22. ui.windows<a class="headerlink" href="#ui-windows" title="Permalink to this headline">¶</a></h3>
 <p>Interact with any or all of the top-level windows for the application.</p>
 <dl class="function">
 <dt id="ui.windows">
@@ -1076,26 +1200,27 @@ based on what is presently available.</p>
 <li><a class="reference internal" href="#function-list">3.2.1.1. Function list</a></li>
 <li><a class="reference internal" href="#namespace-list">3.2.1.2. Namespace list</a><ul>
 <li><a class="reference internal" href="#ui-appwindow">3.2.1.2.1. ui.appwindow</a></li>
-<li><a class="reference internal" href="#ui-clipboard">3.2.1.2.2. ui.clipboard</a></li>
-<li><a class="reference internal" href="#ui-current">3.2.1.2.3. ui.current</a></li>
-<li><a class="reference internal" href="#ui-disassembly">3.2.1.2.4. ui.disassembly</a></li>
-<li><a class="reference internal" href="#ui-exports">3.2.1.2.5. ui.exports</a></li>
-<li><a class="reference internal" href="#ui-functions">3.2.1.2.6. ui.functions</a></li>
-<li><a class="reference internal" href="#ui-imports">3.2.1.2.7. ui.imports</a></li>
-<li><a class="reference internal" href="#ui-keyboard">3.2.1.2.8. ui.keyboard</a></li>
-<li><a class="reference internal" href="#ui-menu">3.2.1.2.9. ui.menu</a></li>
-<li><a class="reference internal" href="#ui-mouse">3.2.1.2.10. ui.mouse</a></li>
-<li><a class="reference internal" href="#ui-names">3.2.1.2.11. ui.names</a></li>
-<li><a class="reference internal" href="#ui-navigation">3.2.1.2.12. ui.navigation</a></li>
-<li><a class="reference internal" href="#ui-notepad">3.2.1.2.13. ui.notepad</a></li>
-<li><a class="reference internal" href="#ui-segments">3.2.1.2.14. ui.segments</a></li>
-<li><a class="reference internal" href="#ui-state">3.2.1.2.15. ui.state</a></li>
-<li><a class="reference internal" href="#ui-strings">3.2.1.2.16. ui.strings</a></li>
-<li><a class="reference internal" href="#ui-structures">3.2.1.2.17. ui.structures</a></li>
-<li><a class="reference internal" href="#ui-timer">3.2.1.2.18. ui.timer</a></li>
-<li><a class="reference internal" href="#ui-widget">3.2.1.2.19. ui.widget</a></li>
-<li><a class="reference internal" href="#ui-window">3.2.1.2.20. ui.window</a></li>
-<li><a class="reference internal" href="#ui-windows">3.2.1.2.21. ui.windows</a></li>
+<li><a class="reference internal" href="#ui-ask">3.2.1.2.2. ui.ask</a></li>
+<li><a class="reference internal" href="#ui-clipboard">3.2.1.2.3. ui.clipboard</a></li>
+<li><a class="reference internal" href="#ui-current">3.2.1.2.4. ui.current</a></li>
+<li><a class="reference internal" href="#ui-disassembly">3.2.1.2.5. ui.disassembly</a></li>
+<li><a class="reference internal" href="#ui-exports">3.2.1.2.6. ui.exports</a></li>
+<li><a class="reference internal" href="#ui-functions">3.2.1.2.7. ui.functions</a></li>
+<li><a class="reference internal" href="#ui-imports">3.2.1.2.8. ui.imports</a></li>
+<li><a class="reference internal" href="#ui-keyboard">3.2.1.2.9. ui.keyboard</a></li>
+<li><a class="reference internal" href="#ui-menu">3.2.1.2.10. ui.menu</a></li>
+<li><a class="reference internal" href="#ui-mouse">3.2.1.2.11. ui.mouse</a></li>
+<li><a class="reference internal" href="#ui-names">3.2.1.2.12. ui.names</a></li>
+<li><a class="reference internal" href="#ui-navigation">3.2.1.2.13. ui.navigation</a></li>
+<li><a class="reference internal" href="#ui-notepad">3.2.1.2.14. ui.notepad</a></li>
+<li><a class="reference internal" href="#ui-segments">3.2.1.2.15. ui.segments</a></li>
+<li><a class="reference internal" href="#ui-state">3.2.1.2.16. ui.state</a></li>
+<li><a class="reference internal" href="#ui-strings">3.2.1.2.17. ui.strings</a></li>
+<li><a class="reference internal" href="#ui-structures">3.2.1.2.18. ui.structures</a></li>
+<li><a class="reference internal" href="#ui-timer">3.2.1.2.19. ui.timer</a></li>
+<li><a class="reference internal" href="#ui-widget">3.2.1.2.20. ui.widget</a></li>
+<li><a class="reference internal" href="#ui-window">3.2.1.2.21. ui.window</a></li>
+<li><a class="reference internal" href="#ui-windows">3.2.1.2.22. ui.windows</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#class-list">3.2.1.3. Class list</a><ul>

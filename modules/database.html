@@ -480,7 +480,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.GN_*</span></code> flags to fetch the name</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.GN_*</span></code> flags to use when fetching the name</td>
 </tr>
 </tbody>
 </table>
@@ -497,7 +497,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.GN_*</span></code> flags to fetch the name</li>
+<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.GN_*</span></code> flags to use when fetching the name</li>
 </ul>
 </td>
 </tr>
@@ -516,7 +516,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
 <li><strong>*suffix</strong> – any other strings to append to the name</li>
-<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to set the name</li>
+<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when setting the name</li>
 </ul>
 </td>
 </tr>
@@ -534,7 +534,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
-<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to set the name</li>
+<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when setting the name</li>
 </ul>
 </td>
 </tr>
@@ -557,7 +557,7 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>string</strong> (<em>str</em>) – a string to use as the name</li>
 <li><strong>*suffix</strong> – any other strings to append to the name</li>
-<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to set the name</li>
+<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when setting the name</li>
 </ul>
 </td>
 </tr>
@@ -576,7 +576,7 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
-<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to set the name</li>
+<li><strong>**flags</strong> – any number of <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.SN_*</span></code> flags to use when removing the name</li>
 </ul>
 </td>
 </tr>
@@ -592,13 +592,13 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 
 <dl class="function">
 <dt>
-<code class="descclassname">database.</code><code class="descname">read</code><span class="sig-paren">(</span><em>size</em><span class="sig-paren">)</span></dt>
-<dd><p>Return <code class="docutils literal notranslate"><span class="pre">size</span></code> number of bytes from the current address.</p>
+<code class="descclassname">database.</code><code class="descname">read</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the number of bytes associated with the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to read</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to read bytes from</td>
 </tr>
 </tbody>
 </table>
@@ -613,7 +613,7 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to read from</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to read bytes from</li>
 <li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the number of bytes to read</li>
 </ul>
 </td>
@@ -1079,6 +1079,20 @@ determining the next valid address. These are:</p>
 <li><strong>step</strong> (<em>callable</em>) – a callable that seeks to the next address such as <a class="reference internal" href="#database.address.next" title="database.address.next"><code class="xref py py-obj docutils literal notranslate"><span class="pre">address.next</span></code></a></li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">address.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Iterate through all of the addresses defined within <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>interface.bounds_t</em>) – the <code class="docutils literal notranslate"><span class="pre">interface.bounds_t</span></code> to iterate through</td>
 </tr>
 </tbody>
 </table>
@@ -3878,7 +3892,7 @@ If <code class="docutils literal notranslate"><span class="pre">byteorder</span>
 <dt>
 <code class="descclassname">get.</code><code class="descname">string</code><span class="sig-paren">(</span><em>ea</em>, <em>**length</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> as a string.</p>
-<p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it as the length of the array.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it explicitly as the string’s length when reading.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4569,7 +4583,7 @@ return a class that allows one to query the different attributes of
 an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.switch_info_t</span></code>.</p>
 <p>This namespace can be used as in the following example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">sw</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">sw</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">sw</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -5728,13 +5742,13 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 
 <dl class="function">
 <dt id="database.set.string">
-<code class="descclassname">set.</code><code class="descname">string</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.string" title="Permalink to this definition">¶</a></dt>
-<dd><p>Set the data at the current address to a string with the specified <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<code class="descclassname">set.</code><code class="descname">string</code><span class="sig-paren">(</span><em>**strtype</em><span class="sig-paren">)</span><a class="headerlink" href="#database.set.string" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the data at the current address to a string with the specified <code class="docutils literal notranslate"><span class="pre">strtype</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**type</strong> – if <code class="docutils literal notranslate"><span class="pre">type</span></code> is specified as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.ASCSTR_*</span></code> then use it as the string type to assign</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**strtype</strong> – if <code class="docutils literal notranslate"><span class="pre">strtype</span></code> is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix</td>
 </tr>
 </tbody>
 </table>
@@ -5742,15 +5756,15 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.</code><code class="descname">string</code><span class="sig-paren">(</span><em>ea</em>, <em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a string with the specified <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+<code class="descclassname">set.</code><code class="descname">string</code><span class="sig-paren">(</span><em>ea</em>, <em>**strtype</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a string with the specified <code class="docutils literal notranslate"><span class="pre">strtype</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>**type</strong> – if <code class="docutils literal notranslate"><span class="pre">type</span></code> is specified as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.ASCSTR_*</span></code> then use it as the string type to assign</li>
+<li><strong>**strtype</strong> – if <code class="docutils literal notranslate"><span class="pre">strtype</span></code> is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix</li>
 </ul>
 </td>
 </tr>
@@ -5760,17 +5774,18 @@ If <code class="docutils literal notranslate"><span class="pre">size</span></cod
 
 <dl class="function">
 <dt>
-<code class="descclassname">set.</code><code class="descname">string</code><span class="sig-paren">(</span><em>ea</em>, <em>size</em>, <em>**type</em><span class="sig-paren">)</span></dt>
-<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a string with the specified <code class="docutils literal notranslate"><span class="pre">size</span></code>.</p>
-<p>If <code class="docutils literal notranslate"><span class="pre">type</span></code> is specified, use a string of the specified type.</p>
+<code class="descclassname">set.</code><code class="descname">string</code><span class="sig-paren">(</span><em>ea</em>, <em>length</em>, <em>**strtype</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the data at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> to a string with the specified <code class="docutils literal notranslate"><span class="pre">length</span></code>.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">strtype</span></code> is specified, then apply a string of the specified character width.
+If the tuple <code class="docutils literal notranslate"><span class="pre">strtype</span></code> is specified, the first item is the string’s character width and the second item is the size of the length prefix.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
-<li><strong>size</strong> (<em>int</em><em> or </em><em>long</em>) – the length of the string</li>
-<li><strong>**type</strong> – if <code class="docutils literal notranslate"><span class="pre">type</span></code> is specified as an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.ASCSTR_*</span></code> then use it as the string type to assign</li>
+<li><strong>length</strong> (<em>int</em><em> or </em><em>long</em>) – the length of the string</li>
+<li><strong>**strtype</strong> – if <code class="docutils literal notranslate"><span class="pre">strtype</span></code> is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix</li>
 </ul>
 </td>
 </tr>
@@ -6197,9 +6212,9 @@ different locations within the database.</p>
 <p>By default, this namespace will return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.DT_TYPE</span></code> of the
 specified address.</p>
 <p>Some examples of using this namespace can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_data</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_data</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">length</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">structure</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
@@ -6555,7 +6570,7 @@ specified address.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> – an address in the database</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
 </tr>
 </tbody>
 </table>
@@ -6760,6 +6775,72 @@ specified address.</p>
 </dd></dl>
 
 <dl class="function">
+<dt id="database.type.is_reference">
+<code class="descclassname">type.</code><code class="descname">is_reference</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_reference" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return true if the data at the current address is referenced.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_reference" title="database.type.is_reference"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_referenced</span></code></a>, <a class="reference internal" href="#database.type.is_reference" title="database.type.is_reference"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_ref</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_reference</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return true if the data at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is referenced.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_reference" title="database.type.is_reference"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_referenced</span></code></a>, <a class="reference internal" href="#database.type.is_reference" title="database.type.is_reference"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_ref</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.type.is_string">
+<code class="descclassname">type.</code><code class="descname">is_string</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_string" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return true if the current address is defined as a string.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_string" title="database.type.is_string"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.stringQ</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_string</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return true if the address at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is defined as a string.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_string" title="database.type.is_string"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.stringQ</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.type.is_structure">
+<code class="descclassname">type.</code><code class="descname">is_structure</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_structure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return true if the current address is defined as a structure.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_structure" title="database.type.is_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_struct</span></code></a>, <a class="reference internal" href="#database.type.is_structure" title="database.type.is_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.structQ</span></code></a>, <a class="reference internal" href="#database.type.is_structure" title="database.type.is_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_struc</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">is_structure</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return true if the address at <code class="docutils literal notranslate"><span class="pre">ea</span></code> is defined as a structure.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_structure" title="database.type.is_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_struct</span></code></a>, <a class="reference internal" href="#database.type.is_structure" title="database.type.is_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.structQ</span></code></a>, <a class="reference internal" href="#database.type.is_structure" title="database.type.is_structure"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_struc</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.type.is_tail">
 <code class="descclassname">type.</code><code class="descname">is_tail</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_tail" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return true if the current address is not-aligned to a definition in the database.</p>
@@ -6853,10 +6934,10 @@ will return the array’s element type and its number of elements
 as a list <code class="docutils literal notranslate"><span class="pre">[size,</span> <span class="pre">count]</span></code>.</p>
 <p>Some examples of using this namespace can be:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">type</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">element</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">element</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -6992,7 +7073,7 @@ that is defined within the database. By default this namespace
 will return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> at the given address.</p>
 <p>Some of the ways to use this namespace are:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">struct</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">struct</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">struct</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">id</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
 </pre></div>
 </div>
@@ -7081,7 +7162,7 @@ also aliased as globals. Some of these are:</p>
 <li><code class="xref py py-obj docutils literal notranslate"><span class="pre">database.cxdown</span></code> - Return all the code references that an address references</li>
 </ul>
 <p>Some ways to utilize this namespace can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">up</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">up</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">down</span><span class="p">():</span> <span class="o">...</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">cu</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span> <span class="o">...</span>
 <span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">add_code</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>

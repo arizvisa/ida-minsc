@@ -236,7 +236,7 @@ functions and aliases. For more information on this, please see
    
    Returns the name at the current address.
    
-   :param \*\*flags: any number of :py:obj:`idaapi.GN_\*` flags to fetch the name
+   :param \*\*flags: any number of :py:obj:`idaapi.GN_\*` flags to use when fetching the name
    
 .. py:function:: name(ea, \*\*flags)
    
@@ -246,7 +246,7 @@ functions and aliases. For more information on this, please see
    
    :param ea: an address in the database
    :type ea: int or long
-   :param \*\*flags: any number of :py:obj:`idaapi.GN_\*` flags to fetch the name
+   :param \*\*flags: any number of :py:obj:`idaapi.GN_\*` flags to use when fetching the name
    
 .. py:function:: name(string, \*suffix, \*\*flags)
    
@@ -255,7 +255,7 @@ functions and aliases. For more information on this, please see
    :param string: a string to use as the name
    :type string: str
    :param \*suffix: any other strings to append to the name
-   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to set the name
+   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(none, \*\*flags)
    
@@ -263,7 +263,7 @@ functions and aliases. For more information on this, please see
    
    :param none: the value :py:obj:`None`
    :type none: None
-   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to set the name
+   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(ea, string, \*suffix, \*\*flags)
    
@@ -278,7 +278,7 @@ functions and aliases. For more information on this, please see
    :param string: a string to use as the name
    :type string: str
    :param \*suffix: any other strings to append to the name
-   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to set the name
+   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(ea, none, \*\*flags)
    
@@ -288,24 +288,24 @@ functions and aliases. For more information on this, please see
    :type ea: int or long
    :param none: the value :py:obj:`None`
    :type none: None
-   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to set the name
+   :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when removing the name
    
 .. py:function:: read()
    
    Return the bytes defined at the current address.
    
-.. py:function:: read(size)
+.. py:function:: read(ea)
    
-   Return ``size`` number of bytes from the current address.
+   Return the number of bytes associated with the address ``ea``.
    
-   :param size: the number of bytes to read
-   :type size: int or long
+   :param ea: the address to read bytes from
+   :type ea: int or long
    
 .. py:function:: read(ea, size)
    
    Return ``size`` number of bytes from address ``ea``.
    
-   :param ea: the address to read from
+   :param ea: the address to read bytes from
    :type ea: int or long
    :param size: the number of bytes to read
    :type size: int or long
@@ -582,6 +582,13 @@ Some examples of using this namespace can be::
    :type end: int or long
    :param step: a callable that seeks to the next address such as :py:obj:`address.next`
    :type step: callable
+   
+.. py:function:: address\.iterate(bounds)
+   
+   Iterate through all of the addresses defined within ``bounds``.
+   
+   :param bounds: the ``interface.bounds_t`` to iterate through
+   :type bounds: interface.bounds_t
    
 .. py:function:: address\.next()
    
@@ -2228,7 +2235,7 @@ following examples can be used::
    
    Return the array at the address specified by ``ea`` as a string.
    
-   If the integer ``length`` is defined, then use it as the length of the array.
+   If the integer ``length`` is defined, then use it explicitly as the string's length when reading.
    
    :param ea:
    :type ea: int or long
@@ -3299,31 +3306,32 @@ This can be used as in the following examples::
    :param info: the typeinfo to assign to the address
    :type info: str or idaapi.tinfo_t
    
-.. py:function:: set\.string(\*\*type)
+.. py:function:: set\.string(\*\*strtype)
    
-   Set the data at the current address to a string with the specified ``type``.
+   Set the data at the current address to a string with the specified ``strtype``.
    
-   :param \*\*type: if ``type`` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
+   :param \*\*strtype: if ``strtype`` is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix
    
-.. py:function:: set\.string(ea, \*\*type)
+.. py:function:: set\.string(ea, \*\*strtype)
    
-   Set the data at address ``ea`` to a string with the specified ``type``.
-   
-   :param ea: an address in the database
-   :type ea: int or long
-   :param \*\*type: if ``type`` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
-   
-.. py:function:: set\.string(ea, size, \*\*type)
-   
-   Set the data at address ``ea`` to a string with the specified ``size``.
-   
-   If ``type`` is specified, use a string of the specified type.
+   Set the data at address ``ea`` to a string with the specified ``strtype``.
    
    :param ea: an address in the database
    :type ea: int or long
-   :param size: the length of the string
-   :type size: int or long
-   :param \*\*type: if ``type`` is specified as an :py:obj:`idaapi.ASCSTR_\*` then use it as the string type to assign
+   :param \*\*strtype: if ``strtype`` is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix
+   
+.. py:function:: set\.string(ea, length, \*\*strtype)
+   
+   Set the data at address ``ea`` to a string with the specified ``length``.
+   
+   If the integer ``strtype`` is specified, then apply a string of the specified character width.
+   If the tuple ``strtype`` is specified, the first item is the string's character width and the second item is the size of the length prefix.
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   :param length: the length of the string
+   :type length: int or long
+   :param \*\*strtype: if ``strtype`` is specified as an integer, then use the integer as the character width of the string. if a tuple is specified, then the second item represents how many bytes to use for the length prefix
    
 .. py:function:: set\.structure(type)
    
@@ -3826,6 +3834,7 @@ Some examples of using this namespace can be::
    Aliases: :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
    
    :param ea: an address in the database
+   :type ea: int or long
    
 .. py:function:: type\.has_weakname()
    
@@ -3958,6 +3967,51 @@ Some examples of using this namespace can be::
    Return true if the address at ``ea`` has a label.
    
    Aliases: :py:func:`database.type.labelQ<type\.is_label>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
+.. py:function:: type\.is_reference()
+   
+   Return true if the data at the current address is referenced.
+   
+   Aliases: :py:func:`database.type.is_referenced<type\.is_reference>`, :py:func:`database.type.is_ref<type\.is_reference>`
+   
+.. py:function:: type\.is_reference(ea)
+   
+   Return true if the data at the address ``ea`` is referenced.
+   
+   Aliases: :py:func:`database.type.is_referenced<type\.is_reference>`, :py:func:`database.type.is_ref<type\.is_reference>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
+.. py:function:: type\.is_string()
+   
+   Return true if the current address is defined as a string.
+   
+   Aliases: :py:func:`database.type.stringQ<type\.is_string>`
+   
+.. py:function:: type\.is_string(ea)
+   
+   Return true if the address at ``ea`` is defined as a string.
+   
+   Aliases: :py:func:`database.type.stringQ<type\.is_string>`
+   
+   :param ea: an address in the database
+   :type ea: int or long
+   
+.. py:function:: type\.is_structure()
+   
+   Return true if the current address is defined as a structure.
+   
+   Aliases: :py:func:`database.type.is_struct<type\.is_structure>`, :py:func:`database.type.structQ<type\.is_structure>`, :py:func:`database.type.is_struc<type\.is_structure>`
+   
+.. py:function:: type\.is_structure(ea)
+   
+   Return true if the address at ``ea`` is defined as a structure.
+   
+   Aliases: :py:func:`database.type.is_struct<type\.is_structure>`, :py:func:`database.type.structQ<type\.is_structure>`, :py:func:`database.type.is_struc<type\.is_structure>`
    
    :param ea: an address in the database
    :type ea: int or long

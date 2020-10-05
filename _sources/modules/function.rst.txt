@@ -262,37 +262,44 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to return the name for
    
-.. py:function:: name(none)
+.. py:function:: name(none, \*\*flags)
    
    Remove the custom-name from the current function.
    
    :param none: the value :py:obj:`None`
    :type none: None
+   :param \*\*flags: any extra flags to use when removing the name
    
-.. py:function:: name(string, \*suffix)
+.. py:function:: name(string, \*suffix, \*\*flags)
    
    Set the name of the current function to ``string``.
    
    :param string: the name to rename the current function to
    :type string: str
    :param \*suffix: any extra names to append to the name
+   :param \*\*flags: any extra flags to use when setting the name. if ``listed`` is set to true, then include the name into the \\"names\\" list
    
-.. py:function:: name(func, none)
+.. py:function:: name(func, none, \*\*flags)
    
    Remove the custom-name from the function ``func``.
    
    :param func: the function to remove the name for
    :param none: the value :py:obj:`None`
    :type none: None
+   :param \*\*flags: any extra flags to use when removing the name
    
-.. py:function:: name(func, string, \*suffix)
+.. py:function:: name(func, string, \*suffix, \*\*flags)
    
    Set the name of the function ``func`` to ``string``.
+   
+   If ``flags`` is specified, then use the specified value as the flags.
+   If the boolean ``listed`` is specified, then specify whether to add the label to the Names list or not.
    
    :param func: the function to set the name for
    :param string: the name to rename the current function to
    :type string: str
    :param \*suffix: any extra names to append to the name
+   :param \*\*flags: any extra flags to use when setting the name. if ``listed`` is set to true, then include the name into the \\"names\\" list
    
 .. py:function:: new()
    
@@ -770,6 +777,50 @@ Some examples of this functionality can be::
    :param rgb: the color as a red, green, and blue integer (``0x00RRGGBB``)
    :type rgb: int or long
    :param \*\*frame: if ``frame`` is specified, then set the frame of the basic block to this color
+   
+.. py:function:: block\.contains(ea)
+   
+   Return whether the address ``ea`` is within the current basic block.
+   
+   :param ea: the address to check if within the current basic block
+   :type ea: int or long
+   
+.. py:function:: block\.contains(address, ea)
+   
+   Return whether the address ``ea`` is within the basic block at the specified ``address``.
+   
+   :param address: the address of the basic block to check
+   :type address: int or long
+   :param ea: the address to check within the basic block
+   :type ea: int or long
+   
+.. py:function:: block\.contains(func, address, ea)
+   
+   Return whether the address ``ea`` is within the basic block for the function ``func`` at the specified ``address``.
+   
+   :param func: the function containing the basic block
+   :param address: the address of the basic block to check
+   :type address: int or long
+   :param ea: the address to check within the basic block
+   :type ea: int or long
+   
+.. py:function:: block\.contains(bb, ea)
+   
+   Return whether the address ``ea`` is within the basic block ``bb``.
+   
+   :param bb: the basic block to use when checking
+   :type bb: idaapi.BasicBlock
+   :param ea: the address to check within the basic block
+   :type ea: int or long
+   
+.. py:function:: block\.contains(bounds, ea)
+   
+   Return whether the address ``ea`` is within the basic block identified by ``bounds``.
+   
+   :param bounds: the bounds of the basic block to use when checking
+   :type bounds: tuple
+   :param ea: the address to check within the basic block
+   :type ea: int or long
    
 .. py:function:: block\.decompile()
    

@@ -316,6 +316,22 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    
+.. py:function:: op_refinfo(opnum)
+   
+   Return the :py:obj:`idaapi.refinfo_t` for the operand ``opnum`` belonging to the instruction at the current address.
+   
+   :param opnum: the operand number of the current instruction
+   :type opnum: int or long
+   
+.. py:function:: op_refinfo(ea, opnum)
+   
+   Return the :py:obj:`idaapi.refinfo_t` for the operand ``opnum`` belonging to the instruction at the address ``ea``.
+   
+   :param ea: the address of an instruction to fetch the :py:obj:`idaapi.refinfo_t` from
+   :type ea: int or long
+   :param opnum: the operand number of the instruction
+   :type opnum: int or long
+   
 .. py:function:: op_refs(opnum)
    
    Returns the ``(address, opnum, type)`` of all the instructions that reference the operand ``opnum`` for the current instruction.
@@ -643,6 +659,17 @@ functions and aliases. For more information on this, please see
    Returns the indices of any operands that are being read from by the instruction at the address ``ea``.
    
    :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: ops_refinfo()
+   
+   Returns the :py:obj:`idaapi.refinfo_t` for the instruction at the current address.
+   
+.. py:function:: ops_refinfo(ea)
+   
+   Returns the :py:obj:`idaapi.refinfo_t` for the instruction at the address ``ea``.
+   
+   :param ea: the address in the database to fetch the :py:obj:`idaapi.refinfo_t` from
    :type ea: int or long
    
 .. py:function:: ops_register(reg, \*regs, \*\*modifiers)
@@ -1005,13 +1032,13 @@ Some examples of using this namespace are::
    
    Returns true if the current instruction is any kind of branch.
    
-   Aliases: :py:func:`instruction.isBranch<type\.is_branch>`, :py:func:`instruction.type.branchQ<type\.is_branch>`, :py:func:`instruction.branchQ<type\.is_branch>`, :py:func:`instruction.is_branch<type\.is_branch>`, :py:func:`instruction.type.isBranch<type\.is_branch>`
+   Aliases: :py:func:`instruction.type.branchQ<type\.is_branch>`, :py:func:`instruction.branchQ<type\.is_branch>`, :py:func:`instruction.is_branch<type\.is_branch>`, :py:func:`instruction.type.isBranch<type\.is_branch>`
    
 .. py:function:: type\.is_branch(ea)
    
    Returns true if the instruction at ``ea`` is any kind of branch.
    
-   Aliases: :py:func:`instruction.isBranch<type\.is_branch>`, :py:func:`instruction.type.branchQ<type\.is_branch>`, :py:func:`instruction.branchQ<type\.is_branch>`, :py:func:`instruction.is_branch<type\.is_branch>`, :py:func:`instruction.type.isBranch<type\.is_branch>`
+   Aliases: :py:func:`instruction.type.branchQ<type\.is_branch>`, :py:func:`instruction.branchQ<type\.is_branch>`, :py:func:`instruction.is_branch<type\.is_branch>`, :py:func:`instruction.type.isBranch<type\.is_branch>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -1020,13 +1047,13 @@ Some examples of using this namespace are::
    
    Returns true if the current instruction is a call.
    
-   Aliases: :py:func:`instruction.callQ<type\.is_call>`, :py:func:`instruction.is_call<type\.is_call>`, :py:func:`instruction.type.isCall<type\.is_call>`, :py:func:`instruction.isCall<type\.is_call>`, :py:func:`instruction.type.callQ<type\.is_call>`
+   Aliases: :py:func:`instruction.callQ<type\.is_call>`, :py:func:`instruction.is_call<type\.is_call>`, :py:func:`instruction.type.isCall<type\.is_call>`, :py:func:`instruction.type.callQ<type\.is_call>`
    
 .. py:function:: type\.is_call(ea)
    
    Returns true if the instruction at ``ea`` is a call.
    
-   Aliases: :py:func:`instruction.callQ<type\.is_call>`, :py:func:`instruction.is_call<type\.is_call>`, :py:func:`instruction.type.isCall<type\.is_call>`, :py:func:`instruction.isCall<type\.is_call>`, :py:func:`instruction.type.callQ<type\.is_call>`
+   Aliases: :py:func:`instruction.callQ<type\.is_call>`, :py:func:`instruction.is_call<type\.is_call>`, :py:func:`instruction.type.isCall<type\.is_call>`, :py:func:`instruction.type.callQ<type\.is_call>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -1035,13 +1062,13 @@ Some examples of using this namespace are::
    
    Return true if the current instruction is an indirect call.
    
-   Aliases: :py:func:`instruction.is_calli<type\.is_calli>`, :py:func:`instruction.type.calliQ<type\.is_calli>`, :py:func:`instruction.calliQ<type\.is_calli>`, :py:func:`instruction.isCalli<type\.is_calli>`, :py:func:`instruction.type.isCalli<type\.is_calli>`
+   Aliases: :py:func:`instruction.is_calli<type\.is_calli>`, :py:func:`instruction.type.calliQ<type\.is_calli>`, :py:func:`instruction.calliQ<type\.is_calli>`, :py:func:`instruction.type.isCalli<type\.is_calli>`
    
 .. py:function:: type\.is_calli(ea)
    
    Returns true if the instruction at ``ea`` is an indirect call.
    
-   Aliases: :py:func:`instruction.is_calli<type\.is_calli>`, :py:func:`instruction.type.calliQ<type\.is_calli>`, :py:func:`instruction.calliQ<type\.is_calli>`, :py:func:`instruction.isCalli<type\.is_calli>`, :py:func:`instruction.type.isCalli<type\.is_calli>`
+   Aliases: :py:func:`instruction.is_calli<type\.is_calli>`, :py:func:`instruction.type.calliQ<type\.is_calli>`, :py:func:`instruction.calliQ<type\.is_calli>`, :py:func:`instruction.type.isCalli<type\.is_calli>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -1050,13 +1077,13 @@ Some examples of using this namespace are::
    
    Returns true if the current instruction is an immediate and indirect branch.
    
-   Aliases: :py:func:`instruction.type.isJmp<type\.is_jmp>`, :py:func:`instruction.isJmp<type\.is_jmp>`, :py:func:`instruction.type.jmpQ<type\.is_jmp>`, :py:func:`instruction.is_jmp<type\.is_jmp>`, :py:func:`instruction.jmpQ<type\.is_jmp>`
+   Aliases: :py:func:`instruction.type.isJmp<type\.is_jmp>`, :py:func:`instruction.jmpQ<type\.is_jmp>`, :py:func:`instruction.type.jmpQ<type\.is_jmp>`, :py:func:`instruction.is_jmp<type\.is_jmp>`
    
 .. py:function:: type\.is_jmp(ea)
    
-   Returns true if the instruction at ``ea`` is an immediate and indrect branch.
+   Returns true if the instruction at ``ea`` is an immediate and indirect branch.
    
-   Aliases: :py:func:`instruction.type.isJmp<type\.is_jmp>`, :py:func:`instruction.isJmp<type\.is_jmp>`, :py:func:`instruction.type.jmpQ<type\.is_jmp>`, :py:func:`instruction.is_jmp<type\.is_jmp>`, :py:func:`instruction.jmpQ<type\.is_jmp>`
+   Aliases: :py:func:`instruction.type.isJmp<type\.is_jmp>`, :py:func:`instruction.jmpQ<type\.is_jmp>`, :py:func:`instruction.type.jmpQ<type\.is_jmp>`, :py:func:`instruction.is_jmp<type\.is_jmp>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -1065,13 +1092,13 @@ Some examples of using this namespace are::
    
    Returns true if the instruction at the current address is an indirect branch.
    
-   Aliases: :py:func:`instruction.jmpiQ<type\.is_jmpi>`, :py:func:`instruction.type.isJmpi<type\.is_jmpi>`, :py:func:`instruction.isJmpi<type\.is_jmpi>`, :py:func:`instruction.is_jmpi<type\.is_jmpi>`, :py:func:`instruction.type.jmpiQ<type\.is_jmpi>`
+   Aliases: :py:func:`instruction.jmpiQ<type\.is_jmpi>`, :py:func:`instruction.type.isJmpi<type\.is_jmpi>`, :py:func:`instruction.is_jmpi<type\.is_jmpi>`, :py:func:`instruction.type.jmpiQ<type\.is_jmpi>`
    
 .. py:function:: type\.is_jmpi(ea)
    
    Returns true if the instruction at ``ea`` is an indirect branch.
    
-   Aliases: :py:func:`instruction.jmpiQ<type\.is_jmpi>`, :py:func:`instruction.type.isJmpi<type\.is_jmpi>`, :py:func:`instruction.isJmpi<type\.is_jmpi>`, :py:func:`instruction.is_jmpi<type\.is_jmpi>`, :py:func:`instruction.type.jmpiQ<type\.is_jmpi>`
+   Aliases: :py:func:`instruction.jmpiQ<type\.is_jmpi>`, :py:func:`instruction.type.isJmpi<type\.is_jmpi>`, :py:func:`instruction.is_jmpi<type\.is_jmpi>`, :py:func:`instruction.type.jmpiQ<type\.is_jmpi>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -1080,13 +1107,13 @@ Some examples of using this namespace are::
    
    Returns true if the current instruction is a conditional branch.
    
-   Aliases: :py:func:`instruction.type.jxxQ<type\.is_jxx>`, :py:func:`instruction.is_jxx<type\.is_jxx>`, :py:func:`instruction.jxxQ<type\.is_jxx>`, :py:func:`instruction.type.isJxx<type\.is_jxx>`, :py:func:`instruction.isJxx<type\.is_jxx>`
+   Aliases: :py:func:`instruction.type.jxxQ<type\.is_jxx>`, :py:func:`instruction.is_jxx<type\.is_jxx>`, :py:func:`instruction.jxxQ<type\.is_jxx>`, :py:func:`instruction.type.isJxx<type\.is_jxx>`
    
 .. py:function:: type\.is_jxx(ea)
    
    Returns true if the instruction at ``ea`` is a conditional branch.
    
-   Aliases: :py:func:`instruction.type.jxxQ<type\.is_jxx>`, :py:func:`instruction.is_jxx<type\.is_jxx>`, :py:func:`instruction.jxxQ<type\.is_jxx>`, :py:func:`instruction.type.isJxx<type\.is_jxx>`, :py:func:`instruction.isJxx<type\.is_jxx>`
+   Aliases: :py:func:`instruction.type.jxxQ<type\.is_jxx>`, :py:func:`instruction.is_jxx<type\.is_jxx>`, :py:func:`instruction.jxxQ<type\.is_jxx>`, :py:func:`instruction.type.isJxx<type\.is_jxx>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -1095,13 +1122,28 @@ Some examples of using this namespace are::
    
    Returns true if the current instruction is a return-type instruction.
    
-   Aliases: :py:func:`instruction.type.returnQ<type\.is_return>`, :py:func:`instruction.type.retQ<type\.is_return>`, :py:func:`instruction.is_return<type\.is_return>`, :py:func:`instruction.retQ<type\.is_return>`, :py:func:`instruction.returnQ<type\.is_return>`, :py:func:`instruction.isReturn<type\.is_return>`, :py:func:`instruction.type.isReturn<type\.is_return>`
+   Aliases: :py:func:`instruction.type.returnQ<type\.is_return>`, :py:func:`instruction.type.retQ<type\.is_return>`, :py:func:`instruction.is_return<type\.is_return>`, :py:func:`instruction.returnQ<type\.is_return>`, :py:func:`instruction.retQ<type\.is_return>`, :py:func:`instruction.type.isReturn<type\.is_return>`
    
 .. py:function:: type\.is_return(ea)
    
    Returns true if the instruction at ``ea`` is a return-type instruction.
    
-   Aliases: :py:func:`instruction.type.returnQ<type\.is_return>`, :py:func:`instruction.type.retQ<type\.is_return>`, :py:func:`instruction.is_return<type\.is_return>`, :py:func:`instruction.retQ<type\.is_return>`, :py:func:`instruction.returnQ<type\.is_return>`, :py:func:`instruction.isReturn<type\.is_return>`, :py:func:`instruction.type.isReturn<type\.is_return>`
+   Aliases: :py:func:`instruction.type.returnQ<type\.is_return>`, :py:func:`instruction.type.retQ<type\.is_return>`, :py:func:`instruction.is_return<type\.is_return>`, :py:func:`instruction.returnQ<type\.is_return>`, :py:func:`instruction.retQ<type\.is_return>`, :py:func:`instruction.type.isReturn<type\.is_return>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: type\.is_sentinel()
+   
+   Returns true if the current instruction is a sentinel-type instruction.
+   
+   Aliases: :py:func:`instruction.type.isSentinel<type\.is_sentinel>`, :py:func:`instruction.type.sentinelQ<type\.is_sentinel>`
+   
+.. py:function:: type\.is_sentinel(ea)
+   
+   Returns true if the instruction at ``ea`` is a sentinel-type instruction.
+   
+   Aliases: :py:func:`instruction.type.isSentinel<type\.is_sentinel>`, :py:func:`instruction.type.sentinelQ<type\.is_sentinel>`
    
    :param ea: the address of an instruction
    :type ea: int or long
@@ -1110,13 +1152,13 @@ Some examples of using this namespace are::
    
    Returns true if the current instruction is a bit-shifting instruction.
    
-   Aliases: :py:func:`instruction.type.shiftQ<type\.is_shift>`, :py:func:`instruction.isShift<type\.is_shift>`, :py:func:`instruction.shiftQ<type\.is_shift>`, :py:func:`instruction.is_shift<type\.is_shift>`, :py:func:`instruction.type.isShift<type\.is_shift>`
+   Aliases: :py:func:`instruction.type.shiftQ<type\.is_shift>`, :py:func:`instruction.shiftQ<type\.is_shift>`, :py:func:`instruction.is_shift<type\.is_shift>`, :py:func:`instruction.type.isShift<type\.is_shift>`
    
 .. py:function:: type\.is_shift(ea)
    
    Returns true if the instruction at ``ea`` is a bit-shifting instruction.
    
-   Aliases: :py:func:`instruction.type.shiftQ<type\.is_shift>`, :py:func:`instruction.isShift<type\.is_shift>`, :py:func:`instruction.shiftQ<type\.is_shift>`, :py:func:`instruction.is_shift<type\.is_shift>`, :py:func:`instruction.type.isShift<type\.is_shift>`
+   Aliases: :py:func:`instruction.type.shiftQ<type\.is_shift>`, :py:func:`instruction.shiftQ<type\.is_shift>`, :py:func:`instruction.is_shift<type\.is_shift>`, :py:func:`instruction.type.isShift<type\.is_shift>`
    
    :param ea: the address of an instruction
    :type ea: int or long

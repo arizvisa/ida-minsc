@@ -67,14 +67,14 @@ function is called so often, however, that its been imported into
 the default namespace of this plugin. So we can literally just call
 <a class="reference internal" href="modules/database.html#database.here" title="database.here"><code class="xref py py-func docutils literal notranslate"><span class="pre">h()</span></code></a>.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
 <li>To disassemble this instruction, we’ll rely on the <a class="reference internal" href="modules/database.html#database.disassemble" title="database.disassemble"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.disassemble()</span></code></a>
 function that is aliased as <a class="reference internal" href="modules/database.html#database.disassemble" title="database.disassemble"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.disasm</span></code></a>.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="3">
@@ -82,7 +82,7 @@ function that is aliased as <a class="reference internal" href="modules/database
 variation which refers to the current address. Therefore another
 way of accomplishing this can be the following.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">()</span>
 </pre></div>
 </div>
 </div>
@@ -104,8 +104,8 @@ store its address for now.</li>
 <a class="reference internal" href="modules/database.html#database.type.has_label" title="database.type.has_label"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.has_label()</span></code></a> for that. Let’s navigate to
 a label and make sure it works (of course it works).</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">db</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">has_label</span><span class="p">()</span>
-<span class="bp">True</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">db</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">has_label</span><span class="p">()</span>
+<span class="kc">True</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -145,7 +145,7 @@ write to a file that we can then use <cite>$$&lt;</cite> to execute).</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
-          <span class="k">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit label </span><span class="si">%s</span><span class="s1">\n\&quot;&quot;&#39;</span><span class="o">%</span><span class="p">(</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">]</span> <span class="p">)</span>
+          <span class="nb">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit label </span><span class="si">%s</span><span class="s1">\n\&quot;&quot;&#39;</span><span class="o">%</span><span class="p">(</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">]</span> <span class="p">)</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -162,7 +162,7 @@ and to convert our address to an offset, we can use
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
-          <span class="k">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%s</span><span class="s1">+</span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit label </span><span class="si">%s</span><span class="s1">\n\&quot;&quot;&#39;</span><span class="o">%</span><span class="p">(</span> <span class="n">db</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">db</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">])</span>
+          <span class="nb">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%s</span><span class="s1">+</span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit label </span><span class="si">%s</span><span class="s1">\n\&quot;&quot;&#39;</span><span class="o">%</span><span class="p">(</span> <span class="n">db</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">db</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;labels_to_get&#39;</span><span class="p">])</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -248,8 +248,8 @@ up giving us the subset of the results we care about.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;is-memory-function&#39;</span><span class="p">,</span> <span class="s1">&#39;calls-memory-function&#39;</span><span class="p">)):</span>
       <span class="k">for</span> <span class="n">tagname</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
-          <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tagname</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
-          <span class="k">print</span> <span class="s2">&quot;Removing tag </span><span class="si">%s</span><span class="s2"> from function </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tagname</span><span class="p">,</span> <span class="n">ea</span><span class="p">,</span> <span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+          <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tagname</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+          <span class="nb">print</span> <span class="s2">&quot;Removing tag </span><span class="si">%s</span><span class="s2"> from function </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tagname</span><span class="p">,</span> <span class="n">ea</span><span class="p">,</span> <span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -269,10 +269,10 @@ We’ll also keep things clean again, by removing the previous tag,
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;indirect-call&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="o">*</span><span class="n">res</span><span class="p">):</span>
-          <span class="k">print</span> <span class="s2">&quot;Tagging address </span><span class="si">%x</span><span class="s2"> with </span><span class="si">%d</span><span class="s2"> operands&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">ops_count</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+          <span class="nb">print</span> <span class="s2">&quot;Tagging address </span><span class="si">%x</span><span class="s2"> with </span><span class="si">%d</span><span class="s2"> operands&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">ops_count</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
           <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;call-optypes&#39;</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">opts</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
-          <span class="k">print</span> <span class="s2">&quot;Removing old </span><span class="se">\&quot;</span><span class="si">%s</span><span class="se">\&quot;</span><span class="s2"> tag from </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="s1">&#39;indirect-call&#39;</span><span class="p">,</span> <span class="n">ea</span><span class="p">)</span>
-          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;indirect-call&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+          <span class="nb">print</span> <span class="s2">&quot;Removing old </span><span class="se">\&quot;</span><span class="si">%s</span><span class="se">\&quot;</span><span class="s2"> tag from </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="s1">&#39;indirect-call&#39;</span><span class="p">,</span> <span class="n">ea</span><span class="p">)</span>
+          <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;indirect-call&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -288,10 +288,10 @@ passing the <code class="xref py py-obj docutils literal notranslate"><span clas
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
           <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">])</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
-              <span class="k">print</span> <span class="s2">&quot;Unknown operand count </span><span class="si">%d</span><span class="s2"> for instruction: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">]),</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+              <span class="nb">print</span> <span class="s2">&quot;Unknown operand count </span><span class="si">%d</span><span class="s2"> for instruction: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">]),</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
               <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;calli-unknown&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-              <span class="k">print</span> <span class="s2">&quot;Removing old tag </span><span class="se">\&quot;</span><span class="si">%s</span><span class="se">\&quot;</span><span class="s2"> from </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">,</span> <span class="n">ea</span><span class="p">)</span>
-              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;calli-optypes&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+              <span class="nb">print</span> <span class="s2">&quot;Removing old tag </span><span class="se">\&quot;</span><span class="si">%s</span><span class="se">\&quot;</span><span class="s2"> from </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="s1">&#39;call-optypes&#39;</span><span class="p">,</span> <span class="n">ea</span><span class="p">)</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;calli-optypes&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
           <span class="k">continue</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
@@ -317,7 +317,7 @@ address of the branch instructions that we’ve selected.</li>
           <span class="n">regnames</span> <span class="o">=</span> <span class="p">[]</span>
           <span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="n">op</span><span class="o">.</span><span class="n">symbols</span><span class="p">:</span>
               <span class="n">regnames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">symbol</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-          <span class="k">print</span> <span class="s2">&quot;Tagging </span><span class="si">%x</span><span class="s2"> with </span><span class="si">%s</span><span class="s2"> containing the regs </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;call-opregs&#39;</span><span class="p">,</span> <span class="n">regnames</span><span class="p">)</span>
+          <span class="nb">print</span> <span class="s2">&quot;Tagging </span><span class="si">%x</span><span class="s2"> with </span><span class="si">%s</span><span class="s2"> containing the regs </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;call-opregs&#39;</span><span class="p">,</span> <span class="n">regnames</span><span class="p">)</span>
           <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;call-opregs&#39;</span><span class="p">,</span> <span class="n">regnames</span><span class="p">)</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
@@ -337,7 +337,7 @@ construct this class, we’ll need to pass our remote base address
 as a parameter.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">R</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">remote</span><span class="p">(</span><span class="n">remote_base_address</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span> <span class="n">R</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">h</span><span class="p">())</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">hex</span><span class="p">(</span> <span class="n">R</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">h</span><span class="p">())</span> <span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="9">
@@ -353,7 +353,7 @@ breakpoint for each one. Let’s do that.</li>
 
           <span class="c1"># &quot;put&quot; our address into the debugger</span>
           <span class="n">remote_ea</span> <span class="o">=</span> <span class="n">R</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-          <span class="k">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit call </span><span class="si">%s</span><span class="s1">\n\&quot;;</span><span class="si">%s</span><span class="s1">;g&quot;&#39;</span><span class="o">%</span> <span class="p">(</span><span class="n">remote_ea</span><span class="p">,</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="n">emit_registers</span><span class="p">)</span>
+          <span class="nb">print</span> <span class="sa">r</span><span class="s1">&#39;bp </span><span class="si">%x</span><span class="s1"> &quot;.printf \&quot;Hit call </span><span class="si">%s</span><span class="s1">\n\&quot;;</span><span class="si">%s</span><span class="s1">;g&quot;&#39;</span><span class="o">%</span> <span class="p">(</span><span class="n">remote_ea</span><span class="p">,</span> <span class="n">db</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="n">emit_registers</span><span class="p">)</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -392,10 +392,10 @@ them the “break-calli” tags which can be exported via the following code.</l
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">pickle</span><span class="o">,</span> <span class="nn">os.path</span>
 <span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">with</span> <span class="nb">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output</span><span class="p">:</span>
+<span class="o">&gt;</span> <span class="k">with</span> <span class="n">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output</span><span class="p">:</span>
       <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;Dumped breakpoints to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">filename</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;Dumped breakpoints to </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">filename</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="12">
@@ -404,7 +404,7 @@ then can simply unpickle the object and then use the functionality
 available within the <a class="reference internal" href="modules/custom-tags.html#module-tags" title="tags"><code class="xref py py-mod docutils literal notranslate"><span class="pre">custom.tags</span></code></a> module to do this.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">path</span><span class="p">(),</span> <span class="s1">&#39;breakpoints.pickle&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">with</span> <span class="nb">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="nb">input</span><span class="p">:</span>
+<span class="o">&gt;</span> <span class="k">with</span> <span class="n">file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="nb">input</span><span class="p">:</span>
       <span class="n">data</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
@@ -437,10 +437,10 @@ function calls other functions or not.</li>
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">has_children</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
       <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">down</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-          <span class="k">return</span> <span class="bp">True</span>
-      <span class="k">return</span> <span class="bp">False</span>
+          <span class="k">return</span> <span class="kc">True</span>
+      <span class="k">return</span> <span class="kc">False</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">has_children</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">has_children</span><span class="p">(</span><span class="n">h</span><span class="p">())</span>
 <span class="mi">13</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -457,7 +457,7 @@ Let’s improve this by looking for any call via the following variation.</li>
           <span class="k">if</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
               <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
           <span class="k">continue</span>
-      <span class="k">return</span> <span class="bp">True</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="bp">False</span>
+      <span class="k">return</span> <span class="kc">True</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">res</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">False</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -466,7 +466,7 @@ Let’s improve this by looking for any call via the following variation.</li>
 (<cite>lambda</cite>) and a list comprehension. This would look like the
 following code.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">has_children</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">ea</span><span class="p">:</span> <span class="bp">True</span> <span class="k">if</span> <span class="nb">len</span><span class="p">([</span><span class="n">ea</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="k">if</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">)])</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="bp">False</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">has_children</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">ea</span><span class="p">:</span> <span class="kc">True</span> <span class="k">if</span> <span class="nb">len</span><span class="p">([</span><span class="n">ea</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="k">if</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">)])</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">False</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="4">
@@ -479,25 +479,25 @@ via Python’s <code class="xref py py-mod docutils literal notranslate"><span c
 combinator we can implement our prior 2 implementations of the
 <code class="xref py py-func docutils literal notranslate"><span class="pre">has_children()</span></code> function with the following code.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;first we need to iterate through all addresses in function&quot;</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;first we need to iterate through all addresses in function&quot;</span>
 <span class="o">&gt;</span> <span class="n">func_iterator</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;now we&#39;ll filter for all call instructions&quot;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;now we&#39;ll filter for all call instructions&quot;</span>
 <span class="o">&gt;</span> <span class="n">func_callFilter</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_iterator</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">ifilter</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">))</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;now we&#39;ll convert our ifilter into a list so we can count them&quot;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;now we&#39;ll convert our ifilter into a list so we can count them&quot;</span>
 <span class="o">&gt;</span> <span class="n">func_callLister</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_callFilter</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;convert our list of call instructions into a count&quot;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;convert our list of call instructions into a count&quot;</span>
 <span class="o">&gt;</span> <span class="n">func_callCounter</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_callLister</span><span class="p">,</span> <span class="nb">len</span><span class="p">)</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;now we want to return true if operator.lt(0, len(list( call_instructions )))&quot;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;now we want to return true if operator.lt(0, len(list( call_instructions )))&quot;</span>
 <span class="o">&gt;</span> <span class="n">func_callComparison</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func_callCounter</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;this will now return true is the number of call instructions is &gt; 0&quot;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;this will now return true is the number of call instructions is &gt; 0&quot;</span>
 <span class="o">&gt;</span> <span class="n">has_children</span> <span class="o">=</span> <span class="n">func_callComparison</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s1">&#39;combined we have&#39;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s1">&#39;combined we have&#39;</span>
 <span class="o">&gt;</span> <span class="n">has_children</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">ifilter</span><span class="p">,</span> <span class="n">ins</span><span class="o">.</span><span class="n">is_call</span><span class="p">),</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">len</span><span class="p">,</span> <span class="n">fpartial</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
 </pre></div>
 </div>
@@ -535,11 +535,11 @@ along <a class="reference internal" href="modules/misc-tools.html#tools.map" tit
 </ol>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">def</span> <span class="nf">tag_if_leaf</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">ea</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
       <span class="n">total</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;total&#39;</span><span class="p">]</span>
-      <span class="k">print</span> <span class="s2">&quot;Percentage complete: </span><span class="si">%f</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">index</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">total</span><span class="p">))</span>
+      <span class="nb">print</span> <span class="s2">&quot;Percentage complete: </span><span class="si">%f</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">index</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">total</span><span class="p">))</span>
       <span class="k">if</span> <span class="ow">not</span> <span class="n">has_children</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
           <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;function-type&#39;</span><span class="p">,</span> <span class="s1">&#39;leaf&#39;</span><span class="p">)</span>
-          <span class="k">return</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="bp">False</span><span class="p">)</span>
-      <span class="k">return</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="bp">True</span><span class="p">)</span>
+          <span class="k">return</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+      <span class="k">return</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -595,49 +595,49 @@ object the user is working with can be identifed with the
 functionality within the plugin in order to automate a large aspect
 of the reverser’s chores.</li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">help</span><span class="p">(</span><span class="n">ui</span><span class="o">.</span><span class="n">current</span><span class="p">)</span>
-<span class="n">Help</span> <span class="n">on</span> <span class="k">class</span> <span class="nc">current</span> <span class="ow">in</span> <span class="n">module</span> <span class="n">ui</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>&gt; help(ui.current)
+Help on class current in module ui:
 
-<span class="k">class</span> <span class="nc">current</span><span class="p">(</span><span class="n">__builtin__</span><span class="o">.</span><span class="n">object</span><span class="p">)</span>
- <span class="o">|</span>  <span class="n">This</span> <span class="n">namespace</span> <span class="n">contains</span> <span class="n">tools</span> <span class="k">for</span> <span class="n">fetching</span> <span class="n">information</span> <span class="n">about</span> <span class="n">the</span>
- <span class="o">|</span>  <span class="n">current</span> <span class="n">selection</span> <span class="n">state</span><span class="o">.</span> <span class="n">This</span> <span class="n">can</span> <span class="n">be</span> <span class="n">used</span> <span class="n">to</span> <span class="n">get</span> <span class="n">the</span> <span class="n">state</span> <span class="n">of</span>
- <span class="o">|</span>  <span class="n">thigns</span> <span class="n">that</span> <span class="n">are</span> <span class="n">currently</span> <span class="n">selected</span> <span class="n">such</span> <span class="k">as</span> <span class="n">the</span> <span class="n">address</span><span class="p">,</span> <span class="n">function</span><span class="p">,</span>
- <span class="o">|</span>  <span class="n">segment</span><span class="p">,</span> <span class="n">clipboard</span><span class="p">,</span> <span class="n">widget</span><span class="p">,</span> <span class="ow">or</span> <span class="n">even</span> <span class="n">the</span> <span class="n">current</span> <span class="n">window</span> <span class="ow">in</span> <span class="n">use</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">Class</span> <span class="n">methods</span> <span class="n">defined</span> <span class="n">here</span><span class="p">:</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">address</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">current</span> <span class="n">address</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">color</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">color</span> <span class="n">of</span> <span class="n">the</span> <span class="n">current</span> <span class="n">item</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">function</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">current</span> <span class="n">function</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">opnum</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">currently</span> <span class="n">selected</span> <span class="n">operand</span> <span class="n">number</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">segment</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">current</span> <span class="n">segment</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">selected</span> <span class="o">=</span> <span class="n">selection</span><span class="p">(</span><span class="o">*</span><span class="n">arguments</span><span class="p">,</span> <span class="o">**</span><span class="n">keywords</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Alias</span> <span class="k">for</span> <span class="sb">`ui.current.selection`</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">selection</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">current</span> <span class="n">address</span> <span class="nb">range</span> <span class="n">of</span> <span class="n">whatever</span> <span class="ow">is</span> <span class="n">selected</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">status</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">IDA</span> <span class="n">status</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">symbol</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">current</span> <span class="n">highlighted</span> <span class="n">symbol</span> <span class="n">name</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">widget</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">current</span> <span class="n">widget</span> <span class="n">that</span> <span class="n">the</span> <span class="n">mouse</span> <span class="ow">is</span> <span class="n">hovering</span> <span class="n">over</span><span class="o">.</span>
- <span class="o">|</span>
- <span class="o">|</span>  <span class="n">window</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">__builtin__.type</span>
- <span class="o">|</span>      <span class="n">Return</span> <span class="n">the</span> <span class="n">current</span> <span class="n">window</span> <span class="n">that</span> <span class="ow">is</span> <span class="n">being</span> <span class="n">used</span><span class="o">.</span>
+class current(__builtin__.object)
+ |  This namespace contains tools for fetching information about the
+ |  current selection state. This can be used to get the state of
+ |  thigns that are currently selected such as the address, function,
+ |  segment, clipboard, widget, or even the current window in use.
+ |
+ |  Class methods defined here:
+ |
+ |  address(cls) from __builtin__.type
+ |      Return the current address.
+ |
+ |  color(cls) from __builtin__.type
+ |      Return the color of the current item.
+ |
+ |  function(cls) from __builtin__.type
+ |      Return the current function.
+ |
+ |  opnum(cls) from __builtin__.type
+ |      Return the currently selected operand number.
+ |
+ |  segment(cls) from __builtin__.type
+ |      Return the current segment.
+ |
+ |  selected = selection(*arguments, **keywords) from __builtin__.type
+ |      Alias for `ui.current.selection`.
+ |
+ |  selection(cls) from __builtin__.type
+ |      Return the current address range of whatever is selected
+ |
+ |  status(cls) from __builtin__.type
+ |      Return the IDA status.
+ |
+ |  symbol(cls) from __builtin__.type
+ |      Return the current highlighted symbol name.
+ |
+ |  widget(cls) from __builtin__.type
+ |      Return the current widget that the mouse is hovering over.
+ |
+ |  window(cls) from __builtin__.type
+ |      Return the current window that is being used.
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">

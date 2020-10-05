@@ -294,7 +294,7 @@ writing a particular tag to the database. If a tag is being overwritten, this
 variation will return the original value. Some examples of what this can
 look like for <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;synopsis&#39;</span><span class="p">,</span> <span class="s1">&#39;this function is recursive&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">oldvalue</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">oldvalue</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;object&#39;</span><span class="p">,</span> <span class="s1">&#39;TList&#39;</span><span class="p">)</span>
 <span class="o">&gt;</span>
@@ -306,7 +306,7 @@ will return the value of the tag at a given address and is thus used for
 reading a particular tag from the databasee. This looks like the following for
 <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">value</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;mytagname&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The third variation is responsible for removing a tag at a given address.
@@ -314,14 +314,14 @@ This is done by providing a tag name along with the python type <code class="xre
 When removing a tag name, the value of the tag name is always returned. This
 allows a user to save the tag name in case they wish to re-apply it elsewhere.
 Here’s how this can look like for the <a class="reference internal" href="modules/database.html#database.tag" title="database.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.tag()</span></code></a> function:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;removethis&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;removethis&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;object-type&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">oldvalue</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;object-type&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">iterate</span><span class="p">():</span>
-      <span class="n">res</span><span class="p">[</span><span class="n">ea</span><span class="p">]</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+      <span class="n">res</span><span class="p">[</span><span class="n">ea</span><span class="p">]</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The final variation is responsible for returning all of the tags at a given
@@ -331,14 +331,14 @@ which a user can use to enumerate all of the tags for an address or to even
 check for membership of a tag. Using <a class="reference internal" href="modules/function.html#function.tag" title="function.tag"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.tag()</span></code></a>, this can look
 like:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;Current function&#39;s tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">res</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;Current function&#39;s tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">res</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">functions</span><span class="p">():</span>
       <span class="n">res</span><span class="p">[</span><span class="n">ea</span><span class="p">]</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;All the tags in the world: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">res</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;All the tags in the world: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">res</span>
 </pre></div>
 </div>
 </div>
@@ -381,7 +381,7 @@ user. Apologies in advance.)</p>
 <p>Return all of the global addresses and functions that have the tag “note” applied
 to it and output them to the IDAPython console:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">):</span>
-      <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="s2">&quot;note: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
+      <span class="nb">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">ea</span><span class="p">),</span> <span class="s2">&quot;note: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -390,17 +390,17 @@ optional tag “note” applied to it:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;synopsis&#39;</span><span class="p">,</span> <span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">,)):</span>
       <span class="n">synopsis</span> <span class="o">=</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;synopsis&#39;</span><span class="p">]</span>
       <span class="n">note</span> <span class="o">=</span> <span class="n">tags</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">,</span> <span class="s1">&#39;no notes found!&#39;</span><span class="p">)</span>
-      <span class="k">print</span> <span class="s2">&quot;Function: </span><span class="si">%x</span><span class="s2"> -- </span><span class="si">%s</span><span class="s2"> (note: </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">synopsis</span><span class="p">,</span> <span class="n">note</span><span class="p">)</span>
+      <span class="nb">print</span> <span class="s2">&quot;Function: </span><span class="si">%x</span><span class="s2"> -- </span><span class="si">%s</span><span class="s2"> (note: </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">synopsis</span><span class="p">,</span> <span class="n">note</span><span class="p">)</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
 <p>Return all addresses that have both the required tags “object-name”, and “object-size”,
 and include any tags that have “object-note” defined:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">And</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;object-name&#39;</span><span class="p">,</span> <span class="s1">&#39;object-size&#39;</span><span class="p">),</span> <span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;object-note&#39;</span><span class="p">,)):</span>
-      <span class="k">print</span> <span class="s2">&quot;Address: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">ea</span>
-      <span class="k">print</span> <span class="s2">&quot;Name/Size: </span><span class="si">%s</span><span class="s2">/</span><span class="si">%d</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-name&#39;</span><span class="p">],</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-size&#39;</span><span class="p">])</span>
+      <span class="nb">print</span> <span class="s2">&quot;Address: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">ea</span>
+      <span class="nb">print</span> <span class="s2">&quot;Name/Size: </span><span class="si">%s</span><span class="s2">/</span><span class="si">%d</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-name&#39;</span><span class="p">],</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-size&#39;</span><span class="p">])</span>
       <span class="k">if</span> <span class="s1">&#39;object-note&#39;</span> <span class="ow">in</span> <span class="n">tags</span><span class="p">:</span>
-          <span class="k">print</span> <span class="s2">&quot;Comment: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-note&#39;</span><span class="p">]</span>
+          <span class="nb">print</span> <span class="s2">&quot;Comment: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;object-note&#39;</span><span class="p">]</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -408,8 +408,8 @@ and include any tags that have “object-note” defined:</p>
 <p>Return all the comments defined globally within the database that are not specially formatted,
 by querying the “empty” tag:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">):</span>
-      <span class="k">print</span> <span class="s2">&quot;Address: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">ea</span>
-      <span class="k">print</span> <span class="s2">&quot;Comment: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">]</span>
+      <span class="nb">print</span> <span class="s2">&quot;Address: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">ea</span>
+      <span class="nb">print</span> <span class="s2">&quot;Comment: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">]</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -418,13 +418,13 @@ by querying the “empty” tag:</p>
 <span id="tagging-examples-querying-content"></span><h3>2.2.8.2. Examples – Querying “Contents” tags<a class="headerlink" href="#examples-querying-contents-tags" title="Permalink to this headline">¶</a></h3>
 <p>Return all of the contents tags defined within the current function:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">():</span>
-      <span class="k">print</span> <span class="s2">&quot;Ea: </span><span class="si">%x</span><span class="s2"> Tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
+      <span class="nb">print</span> <span class="s2">&quot;Ea: </span><span class="si">%x</span><span class="s2"> Tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">)</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
 <p>Return any instances of the “note” tag defined with a particular function at <code class="xref py py-data docutils literal notranslate"><span class="pre">ea</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;note&#39;</span><span class="p">):</span>
-      <span class="k">print</span> <span class="s2">&quot;Ea: </span><span class="si">%x</span><span class="s2"> Note: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
+      <span class="nb">print</span> <span class="s2">&quot;Ea: </span><span class="si">%x</span><span class="s2"> Note: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -432,7 +432,7 @@ by querying the “empty” tag:</p>
 tag “mark”:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;mark&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="o">*</span><span class="n">result</span><span class="p">):</span>
-          <span class="k">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;mark&#39;</span><span class="p">])</span>
+          <span class="nb">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;mark&#39;</span><span class="p">])</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -441,7 +441,7 @@ tag “mark”:</p>
 being the same as the input to <a class="reference internal" href="modules/function.html#function.select" title="function.select"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.select()</span></code></a>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">(</span><span class="s1">&#39;mark&#39;</span><span class="p">):</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">tags</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
-          <span class="k">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;mark&#39;</span><span class="p">])</span>
+          <span class="nb">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">tags</span><span class="p">[</span><span class="s1">&#39;mark&#39;</span><span class="p">])</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
@@ -450,16 +450,16 @@ being the same as the input to <a class="reference internal" href="modules/funct
 include any “note” tags:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">And</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;mark&#39;</span><span class="p">,),</span> <span class="n">Or</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;note&#39;</span><span class="p">,)):</span>
       <span class="k">if</span> <span class="s1">&#39;note&#39;</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
-          <span class="k">print</span> <span class="s2">&quot;Noted mark found at </span><span class="si">%x</span><span class="s2"> -&gt; </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
+          <span class="nb">print</span> <span class="s2">&quot;Noted mark found at </span><span class="si">%x</span><span class="s2"> -&gt; </span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">[</span><span class="s1">&#39;note&#39;</span><span class="p">])</span>
       <span class="k">else</span><span class="p">:</span>
-          <span class="k">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+          <span class="nb">print</span> <span class="s2">&quot;Mark found at </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">)</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
 <p>To list all of the contents tags that have been used in the database:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">():</span>
-      <span class="k">print</span> <span class="s2">&quot;Function </span><span class="si">%x</span><span class="s2"> has the tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
+      <span class="nb">print</span> <span class="s2">&quot;Function </span><span class="si">%x</span><span class="s2"> has the tags: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -467,7 +467,7 @@ include any “note” tags:</p>
 within the <code class="xref py py-mod docutils literal notranslate"><span class="pre">custom</span></code> namespace:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">custom</span>
 <span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">custom</span><span class="o">.</span><span class="n">tags</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -485,7 +485,7 @@ functionality is performed by either <a class="reference internal" href="modules
 </div>
 <p>To fetch the empty tag at the current address and then print it:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">repr</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>To export all of the tags for anything tagged “synopsis” in the database:</p>
@@ -498,7 +498,7 @@ functionality is performed by either <a class="reference internal" href="modules
 <p>To rename all of the “empty” tags in a function to “comment”:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">iterate</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
       <span class="k">if</span> <span class="s1">&#39;&#39;</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
-          <span class="n">old</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+          <span class="n">old</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
           <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s1">&#39;comment&#39;</span><span class="p">,</span> <span class="n">old</span><span class="p">)</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
@@ -514,23 +514,23 @@ functionality is performed by either <a class="reference internal" href="modules
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="kn">import</span> <span class="nn">getpass</span>
 <span class="o">&gt;</span> <span class="n">username</span> <span class="o">=</span> <span class="n">getpass</span><span class="o">.</span><span class="n">getuser</span><span class="p">()</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;transforming global tags&quot;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;transforming global tags&quot;</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">select</span><span class="p">():</span>
       <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">iteritems</span><span class="p">():</span>
           <span class="k">if</span> <span class="n">func</span><span class="o">.</span><span class="n">within</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
-              <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+              <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
               <span class="n">func</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
           <span class="k">else</span><span class="p">:</span>
-              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
               <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
           <span class="k">continue</span>
       <span class="k">continue</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s2">&quot;transforming contents tags&quot;</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s2">&quot;transforming contents tags&quot;</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">db</span><span class="o">.</span><span class="n">selectcontents</span><span class="p">():</span>
       <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
           <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">func</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="n">res</span><span class="p">):</span>
-              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+              <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
               <span class="n">db</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="n">res</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
           <span class="k">continue</span>
       <span class="k">continue</span>

@@ -525,13 +525,17 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>none</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>none</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Remove the custom-name from the current function.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**flags</strong> – any extra flags to use when removing the name</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -539,7 +543,7 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>string</em>, <em>*suffix</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the name of the current function to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -548,6 +552,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>string</strong> (<em>str</em>) – the name to rename the current function to</li>
 <li><strong>*suffix</strong> – any extra names to append to the name</li>
+<li><strong>**flags</strong> – any extra flags to use when setting the name. if <code class="docutils literal notranslate"><span class="pre">listed</span></code> is set to true, then include the name into the &quot;names&quot; list</li>
 </ul>
 </td>
 </tr>
@@ -557,7 +562,7 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>func</em>, <em>none</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>func</em>, <em>none</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Remove the custom-name from the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -566,6 +571,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>func</strong> – the function to remove the name for</li>
 <li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**flags</strong> – any extra flags to use when removing the name</li>
 </ul>
 </td>
 </tr>
@@ -575,8 +581,10 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>func</em>, <em>string</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<code class="descclassname">function.</code><code class="descname">name</code><span class="sig-paren">(</span><em>func</em>, <em>string</em>, <em>*suffix</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the name of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">flags</span></code> is specified, then use the specified value as the flags.
+If the boolean <code class="docutils literal notranslate"><span class="pre">listed</span></code> is specified, then specify whether to add the label to the Names list or not.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -585,6 +593,7 @@ functions and aliases. For more information on this, please see
 <li><strong>func</strong> – the function to set the name for</li>
 <li><strong>string</strong> (<em>str</em>) – the name to rename the current function to</li>
 <li><strong>*suffix</strong> – any extra names to append to the name</li>
+<li><strong>**flags</strong> – any extra flags to use when setting the name. if <code class="docutils literal notranslate"><span class="pre">listed</span></code> is set to true, then include the name into the &quot;names&quot; list</li>
 </ul>
 </td>
 </tr>
@@ -998,11 +1007,11 @@ namespace.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">B</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">bid</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="n">c</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">color</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">rgb</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">before</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">iterate</span><span class="p">():</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">before</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">iterate</span><span class="p">():</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">st</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;eax&#39;</span><span class="p">,</span> <span class="n">read</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span> <span class="o">...</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;hex&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;hex&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -1456,6 +1465,93 @@ namespace.</p>
 <li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to set the color for</li>
 <li><strong>rgb</strong> (<em>int</em><em> or </em><em>long</em>) – the color as a red, green, and blue integer (<code class="docutils literal notranslate"><span class="pre">0x00RRGGBB</span></code>)</li>
 <li><strong>**frame</strong> – if <code class="docutils literal notranslate"><span class="pre">frame</span></code> is specified, then set the frame of the basic block to this color</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.block.contains">
+<code class="descclassname">block.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span><a class="headerlink" href="#function.block.contains" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is within the current basic block.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check if within the current basic block</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>address</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is within the basic block at the specified <code class="docutils literal notranslate"><span class="pre">address</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>address</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to check</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check within the basic block</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>func</em>, <em>address</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is within the basic block for the function <code class="docutils literal notranslate"><span class="pre">func</span></code> at the specified <code class="docutils literal notranslate"><span class="pre">address</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function containing the basic block</li>
+<li><strong>address</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to check</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check within the basic block</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>bb</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is within the basic block <code class="docutils literal notranslate"><span class="pre">bb</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bb</strong> (<em>idaapi.BasicBlock</em>) – the basic block to use when checking</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check within the basic block</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">block.</code><code class="descname">contains</code><span class="sig-paren">(</span><em>bounds</em>, <em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return whether the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> is within the basic block identified by <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>bounds</strong> (<em>tuple</em>) – the bounds of the basic block to use when checking</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check within the basic block</li>
 </ul>
 </td>
 </tr>
@@ -2388,8 +2484,8 @@ function’s frame. By default, this namespace will return a
 <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> representing the frame belonging to the specified
 function.</p>
 <p>Some ways of using this can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">id</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">id</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
 <span class="o">&gt;</span> <span class="n">sp</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">delta</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -2549,8 +2645,8 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 <p>At the moment, register-based calling conventions are not
 supported.</p>
 <p>Some ways of using this are:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -2603,7 +2699,7 @@ supported.</p>
 <p>This namespace provides information about the local variables
 defined within a function’s frame.</p>
 <p>Some ways to get this information can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">lvars</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">lvars</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -2634,7 +2730,7 @@ defined within a function’s frame.</p>
 <p>This namespace provides information about the registers that
 are saved when a function constructs its frame.</p>
 <p>An example of using this namespace:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">regs</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">regs</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -2668,7 +2764,7 @@ specified function. This allows one to get any attributes that IDA
 or a user has applied to a function within the database. This alows
 one to filter functions according to their particular attributes.</p>
 <p>Some simple ways of getting information about a function:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">has_noframe</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">has_noframe</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="nb">filter</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_library</span><span class="p">,</span> <span class="n">database</span><span class="o">.</span><span class="n">functions</span><span class="p">()):</span> <span class="o">...</span>
 </pre></div>
 </div>

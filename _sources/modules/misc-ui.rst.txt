@@ -31,18 +31,6 @@ functions and aliases. For more information on this, please see
    
    Return the current instance of the IDA Application.
    
-.. py:function:: ask(string, \*\*default)
-   
-   Ask the user a question providing the option to choose "yes", "no", or "cancel".
-   
-   If any of the options are specified as a boolean, then it is
-   assumed that this option will be the default. If the user
-   chooses "cancel", then this value will be returned instead of
-   the value :py:obj:`None`.
-   
-   :param string: the string to ask the user
-   :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
-   
 --------------
 Namespace list
 --------------
@@ -71,6 +59,83 @@ Base namespace used for interacting with the windows provided by IDA.
    Open or show the window belonging to the namespace.
    
    :param \*args: any options or arguments to pass to the windows open function
+   
+.. _ns-ui-ask:
+
+******
+ui.ask
+******
+
+This namespace contains utilities for asking the user for some
+particular type of information. These will typically require a
+user-interface of some sort and will block while waiting for the
+user to respond.
+
+If the ``default`` parameter is specified to any of the functions
+within this namespace, then its value will be used by default
+in the inbox that is displayed to the user.
+
+.. py:function:: ask(string, \*\*default)
+   
+   Ask the user a question providing the option to choose "yes", "no", or "cancel".
+   
+   :param string: the message to display when asking the user for input
+   :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
+   
+.. py:function:: ask\.address(string, \*\*default)
+   
+   Ask the user for an address using the provided parameter ``string`` as its prompt.
+   
+   If the ``valid`` parameter is specified, then verify that the
+   address is within the bounds of the database. If the ``bounds``
+   parameter is specified, then verify that the address chosen
+   by the user is within the provided bounds.
+   
+   :param string: the message to display when asking the user for input
+   :param \*\*default: the default address for the user to change. if one was not specified, then use the current address.
+   
+.. py:function:: ask\.integer(string, \*\*default)
+   
+   Ask the user for an integer using the provided parameter ``string`` as its prompt.
+   
+   :param string: the message to display when asking the user for input
+   :param \*\*default: the default integer for the user to change. if one was not specified, then use the previous integer that the user input.
+   
+.. py:function:: ask\.note(string, \*\*default)
+   
+   Ask the user for a multi-lined string using the provided parameter ``string`` as its prompt.
+   
+   If the ``length`` parameter is provided as an integer, then restrict
+   the length of the user's input to the integer that was specified.
+   
+   :param string: the message to display when asking the user for input
+   :param \*\*default: the default string for the user to change
+   
+.. py:function:: ask\.segment(string, \*\*default)
+   
+   Ask the user for a segment using the provided parameter ``string`` as its prompt.
+   
+   :param string: the message to display when asking the user for input
+   :param \*\*default: the default segment for the user to change. if one was not specified, then use the address of the current segment.
+   
+.. py:function:: ask\.string(string, \*\*default)
+   
+   Ask the user for a string using the provided parameter ``string`` as its prompt.
+   
+   :param string: the message to display when asking the user for input
+   :param \*\*default: the default string for the user to change
+   
+.. py:function:: ask\.yn(string, \*\*default)
+   
+   Ask the user a question providing the option to choose "yes", "no", or "cancel".
+   
+   If any of the options are specified as a boolean, then it is
+   assumed that this option will be the default. If the user
+   chooses "cancel", then this value will be returned instead of
+   the value :py:obj:`None`.
+   
+   :param string: the message to display when asking the user for input
+   :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
    
 .. _ns-ui-clipboard:
 

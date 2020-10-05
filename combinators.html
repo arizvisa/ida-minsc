@@ -73,22 +73,22 @@ a structure:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">f</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span> <span class="n">fgetitem</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">fattribute</span><span class="p">(</span><span class="s1">&#39;type&#39;</span><span class="p">)</span> <span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">struc</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;MyStructName&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">f</span><span class="p">(</span><span class="n">st</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">f</span><span class="p">(</span><span class="n">st</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>To create a closure which will try and call <code class="xref py py-func docutils literal notranslate"><span class="pre">__repr__()</span></code> whilst
 falling back to formatting as a string if not possible:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">test</span> <span class="o">=</span> <span class="n">fcondition</span><span class="p">(</span><span class="n">fhasattr</span><span class="p">(</span><span class="s1">&#39;__repr__&#39;</span><span class="p">))</span>
-<span class="o">&gt;</span> <span class="n">tf</span> <span class="o">=</span> <span class="n">test</span><span class="p">(</span><span class="n">fgetattr</span><span class="p">(</span><span class="s1">&#39;__repr__&#39;</span><span class="p">),</span> <span class="s2">&quot;{!s}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">tf</span> <span class="o">=</span> <span class="n">test</span><span class="p">(</span><span class="n">fgetattr</span><span class="p">(</span><span class="s1">&#39;__repr__&#39;</span><span class="p">),</span> <span class="s2">&quot;</span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">f</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">tf</span><span class="p">,</span> <span class="n">fcurry</span><span class="p">())</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">f</span><span class="p">(</span><span class="nb">object</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">f</span><span class="p">(</span><span class="nb">object</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>To create a closure which will return a string when defined and an empty
 string when undefined:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">f</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">fdefault</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="s2">&quot;{!s}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">f</span><span class="p">(</span><span class="s1">&#39;hi&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">f</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">f</span> <span class="o">=</span> <span class="n">fcompose</span><span class="p">(</span><span class="n">fdefault</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">),</span> <span class="s2">&quot;</span><span class="si">{!s}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">f</span><span class="p">(</span><span class="s1">&#39;hi&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">f</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>

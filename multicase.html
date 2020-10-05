@@ -155,15 +155,15 @@ types required to call it. This is so the documentation for each function
 variation can include the prototype in its autodoc. Multicased functions are
 defined within all the modules in this project and within namespaces within each
 module. An example of how one might be defined is:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nd">@multicase</span><span class="p">(</span><span class="n">ea</span><span class="o">=</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">long</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nd">@multicase</span><span class="p">(</span><span class="n">ea</span><span class="o">=</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">long</span><span class="p">))</span>
 <span class="o">&gt;</span> <span class="k">def</span> <span class="nf">myfunc</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
       <span class="sd">&#39;&#39;&#39;Takes an integer&#39;&#39;&#39;</span>
-      <span class="k">print</span> <span class="s1">&#39;received an integer&#39;</span><span class="p">,</span> <span class="n">ea</span>
+      <span class="nb">print</span> <span class="s1">&#39;received an integer&#39;</span><span class="p">,</span> <span class="n">ea</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="nd">@multicase</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="nb">str</span><span class="p">):</span>
 <span class="o">&gt;</span> <span class="k">def</span> <span class="nf">myfunc</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
       <span class="sd">&#39;&#39;&#39;Takes a string&#39;&#39;&#39;</span>
-      <span class="k">print</span> <span class="s1">&#39;received a string&#39;</span><span class="p">,</span> <span class="n">name</span>
+      <span class="nb">print</span> <span class="s1">&#39;received a string&#39;</span><span class="p">,</span> <span class="n">name</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -173,8 +173,8 @@ as:</p>
 <span class="n">Help</span> <span class="n">on</span> <span class="n">function</span> <span class="n">myfunc</span> <span class="ow">in</span> <span class="n">module</span> <span class="n">database</span><span class="p">:</span>
 
 <span class="n">myfunc</span><span class="p">(</span><span class="o">*</span><span class="n">arguments</span><span class="p">,</span> <span class="o">**</span><span class="n">keywords</span><span class="p">)</span>
-    <span class="n">myfunc</span><span class="p">(</span><span class="n">ea</span><span class="o">=</span><span class="nb">int</span><span class="o">|</span><span class="nb">long</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Takes</span> <span class="n">an</span> <span class="n">integer</span>
-    <span class="n">myfunc</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="nb">basestring</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Takes</span> <span class="n">a</span> <span class="n">string</span>
+    <span class="n">myfunc</span><span class="p">(</span><span class="n">ea</span><span class="o">=</span><span class="nb">int</span><span class="o">|</span><span class="n">long</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Takes</span> <span class="n">an</span> <span class="n">integer</span>
+    <span class="n">myfunc</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">basestring</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Takes</span> <span class="n">a</span> <span class="n">string</span>
 <span class="o">&gt;</span>
 </pre></div>
 </div>
@@ -186,15 +186,15 @@ as:</p>
 namespaces such as <a class="reference internal" href="modules/database.html#module-database" title="database"><code class="xref py py-mod docutils literal notranslate"><span class="pre">database</span></code></a>, or <a class="reference internal" href="modules/function.html#module-function" title="function"><code class="xref py py-mod docutils literal notranslate"><span class="pre">function</span></code></a>. In the following
 examples, we will use the <code class="xref py py-class docutils literal notranslate"><span class="pre">database.config</span></code> namespace to extract
 information about the database:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filename</span><span class="p">(),</span> <span class="n">database</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">idb</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">filename</span><span class="p">(),</span> <span class="n">database</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">idb</span><span class="p">()</span>
 <span class="o">...</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">path</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">path</span><span class="p">()</span>
 <span class="o">...</span>
 </pre></div>
 </div>
 <p>To get information about the functions in the database, we can use the
 <a class="reference internal" href="modules/database.html#database.functions" title="database.functions"><code class="xref py py-class docutils literal notranslate"><span class="pre">database.functions</span></code></a> namespace to list them:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">print</span> <span class="n">database</span><span class="o">.</span><span class="n">functions</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">functions</span><span class="o">.</span><span class="n">list</span><span class="p">()</span>
 <span class="o">...</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">functions</span><span class="p">():</span>
 <span class="o">...</span>
@@ -204,7 +204,7 @@ information about the database:</p>
 about basic blocks within a function, or identify the chunk that is at a particular
 address:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="k">for</span> <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">blocks</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span>
-      <span class="k">print</span> <span class="s2">&quot;Left: </span><span class="si">%x</span><span class="s2"> Right: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">)</span>
+      <span class="nb">print</span> <span class="s2">&quot;Left: </span><span class="si">%x</span><span class="s2"> Right: </span><span class="si">%x</span><span class="s2">&quot;</span><span class="o">%</span> <span class="p">(</span><span class="n">left</span><span class="p">,</span> <span class="n">right</span><span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">top</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">chunk</span><span class="o">.</span><span class="n">top</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
@@ -220,10 +220,10 @@ parameters that “make sense”.</p>
 <p>Calling a function used for naming, for example, could mean one of two things.
 To set the name for an address, or to return the name for an address:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s1">&#39;Name for address </span><span class="si">%x</span><span class="s1"> is </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s1">&#39;Name for address </span><span class="si">%x</span><span class="s1"> is </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">res</span><span class="p">)</span>
 <span class="o">&gt;</span>
 <span class="o">&gt;</span> <span class="n">newname</span> <span class="o">=</span> <span class="s1">&#39;mynewname&#39;</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s1">&#39;Setting name to </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="n">newname</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s1">&#39;Setting name to </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="n">newname</span>
 <span class="o">&gt;</span> <span class="n">database</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">mynewname</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -231,10 +231,10 @@ To set the name for an address, or to return the name for an address:</p>
 will be assumed. If <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code> is specified as a name, then the name will
 be removed:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">res</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">name</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s1">&#39;Name for the current address is </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="n">res</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s1">&#39;Name for the current address is </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="n">res</span>
 <span class="o">&gt;</span>
-<span class="o">&gt;</span> <span class="n">oldname</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">print</span> <span class="s1">&#39;Name at current address used to be: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="n">oldname</span>
+<span class="o">&gt;</span> <span class="n">oldname</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">name</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span> <span class="s1">&#39;Name at current address used to be: </span><span class="si">%s</span><span class="s1">&#39;</span><span class="o">%</span> <span class="n">oldname</span>
 </pre></div>
 </div>
 <p>If a user wants to fetch a function and they’re not sure of the type of the
