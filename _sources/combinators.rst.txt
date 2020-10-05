@@ -66,6 +66,21 @@ Combinators
    :param \*boxed_args: any number of arguments which are unboxed and concatenated together
    :param \*\*boxed_kwargs: any extra keyword arguments to apply to the callable
 
+.. py:function:: fcar(\*args)
+
+   Given any number of ``args``, return only the first parameter. This is similar
+   to the ``car`` function found in programming languages from the LISP family.
+
+   :param \*args: any number of arguments to return the first element from.
+
+.. py:function:: fcdr(\*args)
+
+   Given any number of ``args``, return all except the first parameter. This is
+   similar to the ``cdr`` function found in programming languages from the LISP
+   family.
+
+   :param \*args: any number of arguments to return the last elements from.
+
 .. py:function:: finstance(type)(object)
 
    Given a ``type``, return a closure that will return true or false
@@ -98,6 +113,15 @@ Combinators
    :param \*default: an item returned by default if the ``object``
                      does not contain the specified ``item``
 
+.. py:function:: fsetitem(item)(value)(object)
+
+   Assign the given ``value`` to the specified ``item`` of the provided
+   ``object`` when called.
+
+   :param item: any kind of python object to pass to :py:func:`operator.setitem`.
+   :param value: the value to assign to the python object as used by :py:func:`operator.setitem`.
+   :param object: any kind of python object to assign the item into.
+
 .. py:function:: fhasattr(attribute)(object)
 
    Given an ``attribute`` as a string, return a closure that will return
@@ -123,6 +147,25 @@ Combinators
    :param object: any kind of python object to return an attribute from
    :param \*default: an attribute returned by default if the ``object``
                      does not contain with specified ``attribute``
+
+.. py:function:: fsetattr(attribute)(value)(object)
+
+   Assign the given ``value`` to the specified ``attribute`` of the
+   provided ``object`` when called.
+
+   Aliases: ``fsetattribute``
+
+   :param attribute: an attribute on the ``object`` to assign.
+   :param value: the value to assign to the python object as used by :py:func:`builtins.setattr`.
+   :param object: any kind of python object to assign the attribute on.
+
+.. py:function:: fconstant(object)
+
+   Return a closure that always returns the provided ``object``.
+
+   Aliases: ``fconst``, ``falways``
+
+   :param object: any kind of python object to return
 
 .. py:function:: fidentity(object)
 

@@ -133,6 +133,37 @@ will expand (unbox) them before applying them to the <code class="docutils liter
 </dd></dl>
 
 <dl class="function">
+<dt id="fcar">
+<code class="descname">fcar</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#fcar" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given any number of <code class="docutils literal notranslate"><span class="pre">args</span></code>, return only the first parameter. This is similar
+to the <code class="docutils literal notranslate"><span class="pre">car</span></code> function found in programming languages from the LISP family.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*args</strong> – any number of arguments to return the first element from.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="fcdr">
+<code class="descname">fcdr</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#fcdr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given any number of <code class="docutils literal notranslate"><span class="pre">args</span></code>, return all except the first parameter. This is
+similar to the <code class="docutils literal notranslate"><span class="pre">cdr</span></code> function found in programming languages from the LISP
+family.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*args</strong> – any number of arguments to return the last elements from.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="finstance">
 <code class="descname">finstance</code><span class="sig-paren">(</span><em>type)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#finstance" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given a <code class="docutils literal notranslate"><span class="pre">type</span></code>, return a closure that will return true or false
@@ -195,6 +226,26 @@ does not contain the specified <code class="docutils literal notranslate"><span 
 </dd></dl>
 
 <dl class="function">
+<dt id="fsetitem">
+<code class="descname">fsetitem</code><span class="sig-paren">(</span><em>item)(value)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fsetitem" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assign the given <code class="docutils literal notranslate"><span class="pre">value</span></code> to the specified <code class="docutils literal notranslate"><span class="pre">item</span></code> of the provided
+<code class="docutils literal notranslate"><span class="pre">object</span></code> when called.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>item</strong> – any kind of python object to pass to <code class="xref py py-func docutils literal notranslate"><span class="pre">operator.setitem()</span></code>.</li>
+<li><strong>value</strong> – the value to assign to the python object as used by <code class="xref py py-func docutils literal notranslate"><span class="pre">operator.setitem()</span></code>.</li>
+<li><strong>object</strong> – any kind of python object to assign the item into.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="fhasattr">
 <code class="descname">fhasattr</code><span class="sig-paren">(</span><em>attribute)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fhasattr" title="Permalink to this definition">¶</a></dt>
 <dd><p>Given an <code class="docutils literal notranslate"><span class="pre">attribute</span></code> as a string, return a closure that will return
@@ -233,6 +284,42 @@ attribute does not exist in <code class="docutils literal notranslate"><span cla
 does not contain with specified <code class="docutils literal notranslate"><span class="pre">attribute</span></code></li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="fsetattr">
+<code class="descname">fsetattr</code><span class="sig-paren">(</span><em>attribute)(value)(object</em><span class="sig-paren">)</span><a class="headerlink" href="#fsetattr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assign the given <code class="docutils literal notranslate"><span class="pre">value</span></code> to the specified <code class="docutils literal notranslate"><span class="pre">attribute</span></code> of the
+provided <code class="docutils literal notranslate"><span class="pre">object</span></code> when called.</p>
+<p>Aliases: <code class="docutils literal notranslate"><span class="pre">fsetattribute</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>attribute</strong> – an attribute on the <code class="docutils literal notranslate"><span class="pre">object</span></code> to assign.</li>
+<li><strong>value</strong> – the value to assign to the python object as used by <code class="xref py py-func docutils literal notranslate"><span class="pre">builtins.setattr()</span></code>.</li>
+<li><strong>object</strong> – any kind of python object to assign the attribute on.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="fconstant">
+<code class="descname">fconstant</code><span class="sig-paren">(</span><em>object</em><span class="sig-paren">)</span><a class="headerlink" href="#fconstant" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a closure that always returns the provided <code class="docutils literal notranslate"><span class="pre">object</span></code>.</p>
+<p>Aliases: <code class="docutils literal notranslate"><span class="pre">fconst</span></code>, <code class="docutils literal notranslate"><span class="pre">falways</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>object</strong> – any kind of python object to return</td>
 </tr>
 </tbody>
 </table>
