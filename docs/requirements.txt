@@ -1,0 +1,4 @@
+Pygments==2.6.1
+pyparsing==2.4.6
+packaging==20.4
+requests==2.24.0
