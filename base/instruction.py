@@ -144,11 +144,25 @@ def feature(ea):
 def opinfo(opnum):
     '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
     return opinfo(ui.current.address(), opnum)
+@utils.multicase(opnum=six.integer_types, info=idaapi.opinfo_t)
+def opinfo(opnum, info, **flags):
+    '''Set the opinfo for the operand `opnum` at the current address to the ``idaapi.opinfo_t`` provided by `info`.'''
+    return opinfo(ui.current.address(), opnum, info, **flags)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def opinfo(ea, opnum):
     '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     ti, flags = idaapi.opinfo_t(), database.type.flags(ea)
     return idaapi.get_opinfo(ea, opnum, flags, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, opnum, flags)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, info=idaapi.opinfo_t)
+def opinfo(ea, opnum, info, **flags):
+    """Set the operand info for the operand `opnum` at the address `ea` to the ``idaapi.opinfo_t`` provided by `info`.
+
+    If any `flags` have been specified, then also set the operand's flags to the provided value.
+    """
+    ok = idaapi.set_opinfo(ea, opnum, flags.get('flags', database.type.flags(ea)), info)
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.opinfo({:#x}, {:d}, {!s}) : Unable to set the operand info for operand {:d}.".format(__name__, ea, opnum, info, opnum))
+    return opinfo(ea, opnum)
 
 @utils.multicase()
 def mnemonic():
