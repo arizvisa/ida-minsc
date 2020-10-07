@@ -40,6 +40,7 @@ class typemap:
 
         ``int`` or ``long`` - an integral
         ``chr`` - a character
+        ``unichr`` - a wide-character
         ``str`` or ``unicode`` - a string or a character
         ``float`` - a floating point number
         ``type`` - a pointer
@@ -60,6 +61,7 @@ class typemap:
 
         `[int, 4]` - a 4 element array of default sized integers
         `[chr, 9]` - a 4 element array of characters
+        `[unichr, 9]` - a 4 element array of wide-characters
         `[(int, 2), 3]` - a 3 element array of 16-bit integers
         `[(float, 8), 4]` - a 4 element array of 64-bit floating point numbers.
         `[type, 6]` - a 6 element array of pointers
@@ -94,8 +96,9 @@ class typemap:
         }
 
         stringmap = {
-            chr:(idaapi.strlit_flag(), 0),
-            str:(idaapi.strlit_flag(), idaapi.STRTYPE_TERMCHR),
+            chr:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
+            unichr:(idaapi.strlit_flag(), idaapi.STRTYPE_C_16),
+            str:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
             unicode:(idaapi.strlit_flag(), idaapi.STRTYPE_C_16),
         }
 
@@ -118,7 +121,8 @@ class typemap:
         }
 
         stringmap = {
-            chr:(idaapi.asciflag(), 0),
+            chr:(idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
+            unichr:(idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
             str:(idaapi.asciflag(), idaapi.ASCSTR_TERMCHR),
             unicode:(idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
         }
@@ -129,7 +133,7 @@ class typemap:
     # lookup table for type
     typemap = {
         int:integermap, long:integermap, float:decimalmap,
-        str:stringmap, unicode:stringmap, chr:stringmap,
+        str:stringmap, unicode:stringmap, chr:stringmap, unichr:stringmap,
         type:ptrmap, None:nonemap,
     }
 
