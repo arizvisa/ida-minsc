@@ -1036,18 +1036,16 @@ def op_string(ea, opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
 def op_string(ea, opnum, strtype):
     '''Set the string type used by operand `opnum` for the instruction at `ea` to `strtype`.'''
-    res, fl = idaapi.opinfo_t(), database.type.flags(ea)
+    info, F = idaapi.opinfo_t(), database.type.flags(ea)
 
-    # Update our flags for the instruction to include the string definition
-    fl |= idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
-    res.strtype = strtype
+    # Update our flags for the instruction to include the string definition.
+    F |= idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
+    info.strtype = strtype
 
-    # Now we can actually apply the opinfo_t
-    # TODO: extend the opinfo() function to allow writing an opinfo_t
-    ok = idaapi.set_opinfo(ea, opnum, fl, res)
-
-    # TODO: verify that set_opinfo was actually applied by checking via get_opinfo
-    return True if ok else False
+    # Now we can actually apply the opinfo_t to the specified operand, and then
+    # cross-check that the operand info's string type matches what we set it to.
+    res = opinfo(ea, opnum, info, flags=F)
+    return True if res.strtype == strtype else False
 
 ## flags
 @utils.multicase()
