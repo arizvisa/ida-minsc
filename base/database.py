@@ -5695,7 +5695,9 @@ class get(object):
     def string(cls, ea, **length):
         """Return the array at the address specified by `ea` as a string.
 
-        If the integer `length` is defined, then use it explicitly as the string's length when reading.
+        If an integer `length` is provided, then use it explicitly as the string's length when reading.
+        If an integer `strtype` is provided, then use it as the string's character width when reading.
+        If a tuple `strtype` is specified, then the first item is the character width and the second is the size of the length prefix when reading.
         """
 
         # For older versions of IDA, we get the strtype from the opinfo
@@ -5710,6 +5712,26 @@ class get(object):
         else:
             strtype = idaapi.get_str_type(ea)
             get_str_type_code = idaapi.get_str_type_code
+
+        # If a strtype was provided in the parameters, then convert it into a proper
+        # string typecode so that the logic which follows will still work.
+        if any(item in length for item in ['strtype', 'type']):
+            widthtype = {1: idaapi.STRWIDTH_1B, 2: idaapi.STRWIDTH_2B, 4: idaapi.STRWIDTH_4B}
+            lengthtype = {0: idaapi.STRLYT_TERMCHR, 1: idaapi.STRLYT_PASCAL1, 2: idaapi.STRLYT_PASCAL2, 4: idaapi.STRLYT_PASCAL4}
+
+            # Extract the strtype that the user gave us whilst ensuring that we remove
+            # the items out of the parameters since we later pass them to `get.array`.
+            res = builtins.next((length.pop(item) for item in ['strtype', 'type'] if item in length))
+            width_t, length_t = res if isinstance(res, (types.ListType, types.TupleType)) else (res, 0)
+
+            # Now that we've unpacked the string width and length prefix size from the
+            # parameter, we can recombine them into a strtype code.
+            strtype = (lengthtype[length_t] << idaapi.STRLYT_SHIFT) & idaapi.STRLYT_MASK
+            strtype|= widthtype[width_t] & idaapi.STRWIDTH_MASK
+
+            # Since the user gave us an explicit type, we need to update the keywords
+            # which get passed to `get.array` so that each element is of the correct width.
+            length['type'] = int, width_t
 
         # If no string was found, then try to treat it as a plain old array
         # XXX: idaapi.get_str_type() seems to return 0xffffffff on failure instead of idaapi.BADADDR
