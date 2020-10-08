@@ -1641,11 +1641,11 @@ def tag(func, key, value):
         return type(fn, value)
 
     # decode both comments and figure out which type of comment the tag is
-    # currently in. if it's in  neither then we just fall back to a repeatable
-    # comment because it's a function.
-    state_correct = internal.comment.decode(comment(fn, repeatable=True))
-    state_wrong = internal.comment.decode(comment(fn, repeatable=False))
-    state, where = (state_correct, True) if key in state_correct else (state_wrong, False) if key in state_wrong else (state_correct, True)
+    # currently in. if it's in neither then we just fall back to a repeatable
+    # comment because we're a function.
+    state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
+    state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
+    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
     # grab the previous value, and update the state with the new one
     res, state[key] = state.get(key, None), value
@@ -1704,12 +1704,12 @@ def tag(func, key, none):
     # decode both comment types so we can figure out which one the user's
     # key is in. if we don't find it in either then it doesn't matter since
     # we're gonna raise an exception anyways.
-    state_correct = internal.comment.decode(comment(fn, repeatable=True))
-    state_wrong = internal.comment.decode(comment(fn, repeatable=False))
-    state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+    state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
+    state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
+    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
     if key not in state:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
 
     # guard the modification of the comment so that we don't tamper with any references
