@@ -1886,17 +1886,17 @@ class type(object):
     @utils.multicase(func=six.integer_types + (idaapi.func_t,))
     def __new__(cls, func):
         '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
-        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        _, ea = interface.addressOfRuntimeOrStatic(func)
 
-        # Fetch the typeinfo for the given address using database.type to grab
-        # it. If it didn't return one, then we need to raise an exception because
-        # a function should pretty much _always_ have typeinfo associated with it.
-        ti = database.type(ea)
-        if ti is None:
-            raise E.MissingTypeOrAttribute(u"{:s}.info({:#x}) : Unable to determine the type information for function.".format('.'.join((__name__, cls.__name__)), ea))
+        # Guess the type information for the function ahead of time because
+        # they should _always_ have type information associated with them.
+        ti = idaapi.tinfo_t()
+        if idaapi.GUESS_FUNC_FAILED == idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea):
+            logging.info(u"{:s}({:#x}) : Ignoring failure ({:d}) when trying to determine `idaapi.tinfo_t()` for the specified function.".format('.'.join((__name__, cls.__name__)), idaapi.GUESS_FUNC_FAILED, ea))
 
-        # Return what we snagged back to the caller.
-        return ti
+        # If we can find a proper typeinfo then use that, otherwise return
+        # whatever it was that was guessed.
+        return database.type(ea) or ti
     @utils.multicase(info=idaapi.tinfo_t)
     def __new__(cls, func, info):
         '''Apply the ``idaapi.tinfo_t`` typeinfo in `info` to the function `func`.'''
