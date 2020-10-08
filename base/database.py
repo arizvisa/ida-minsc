@@ -2988,9 +2988,10 @@ class type(object):
             fl = idaapi.PRTYPE_1LINE
             info_s = idaapi.print_type(ea, fl)
 
-            # If we still couldn't get it, then just raise an exception.
+            # If we still couldn't get the typeinfo, then return None because
+            # there isn't any typeinfo associated with the specified address.
             if info_s is None:
-                raise E.DisassemblerError(u"{:s}.info({:#x}) : Received error ({:d}) while trying to guess `idaapi.tinfo_t()` for address {:#x}.".format('.'.join((__name__, cls.__name__)), ea, res, ea))
+                return None
 
             # Parse the typeinfo string that IDA gave us and return it.
             ti = internal.declaration.parse(info_s)
