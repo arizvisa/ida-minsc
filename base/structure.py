@@ -570,16 +570,16 @@ class structure_t(object):
     @property
     def typeinfo(self):
         '''Return the type info of the member.'''
-        try:
-            ti = database.type(self.id)
+        ti = database.type(self.id)
 
-        # If we caught an exception trying to get the typeinfo for the
-        # structure, then port it to our class.
-        except E.DisassemblerError:
+        # If there was no type information found for the member, then raise
+        # an exception to the caller because structures _are_ types and thus
+        # this should never fail.
+        if ti is None:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to determine `idaapi.tinfo_t()` for structure {:s}.".format('.'.join((__name__, cls.__name__)), self.id, self.name))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for structure {:s}.".format('.'.join((__name__, cls.__name__)), self.id, self.name))
 
-        # Return the structure type that we guessed back to the caller.
+        # Otherwise it worked and we can return it to the caller.
         return ti
     @typeinfo.setter
     def typeinfo(self, info):
@@ -1606,10 +1606,16 @@ class member_t(object):
     def typeinfo(self):
         '''Return the type info of the member.'''
         ti = idaapi.tinfo_t()
+
+        # Guess the typeinfo for the current member. If we're unable to get the
+        # typeinfo, then raise a critical exception because members need to have
+        # types and it doesn't make sense for them to not.
         ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr)
         if not ok:
             cls = self.__class__
-            logging.fatal(u"{:s}({:#x}).typeinfo : Unable to determine `idaapi.tinfo_t()` for member {:s}.".format('.'.join((__name__, cls.__name__)), self.id, self.name))
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for member {:s}.".format('.'.join((__name__, cls.__name__)), self.id, self.name))
+
+        # Return the typeinfo back to the caller.
         return ti
 
     @typeinfo.setter
