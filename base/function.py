@@ -1887,15 +1887,15 @@ class type(object):
     def __new__(cls, func):
         '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
         rt, ea = interface.addressOfRuntimeOrStatic(func)
-        try:
-            ti = database.type(ea)
 
-        # If we caught an exception trying to get the typeinfo for the
-        # function, then port it to our class.
-        except E.DisassemblerError:
-            raise E.DisassemblerError(u"{:s}.info({:#x}) : Unable to determine `idaapi.tinfo_t()` for function.".format('.'.join((__name__, cls.__name__)), ea))
+        # Fetch the typeinfo for the given address using database.type to grab
+        # it. If it didn't return one, then we need to raise an exception because
+        # a function should pretty much _always_ have typeinfo associated with it.
+        ti = database.type(ea)
+        if ti is None:
+            raise E.MissingTypeOrAttribute(u"{:s}.info({:#x}) : Unable to determine the type information for function.".format('.'.join((__name__, cls.__name__)), ea))
 
-        # Return it to the caller
+        # Return what we snagged back to the caller.
         return ti
     @utils.multicase(info=idaapi.tinfo_t)
     def __new__(cls, func, info):
