@@ -217,25 +217,26 @@ class address(commentbase):
         fn = idaapi.get_func(ea)
         rt, _ = internal.interface.addressOfRuntimeOrStatic(fn) if fn else (False, None)
 
-        # if we're in a function, then clear our contents.
+        # if we're in a function but not a runtime-linked one, then we need to
+        # to clear our contents here.
         if fn and not rt:
             internal.comment.contents.set_address(ea, 0)
 
-        # otherwise, just clear the tags globally
+        # otherwise, we can simply clear the tags globally
         else:
             internal.comment.globals.set_address(ea, 0)
 
-        # simply grab the comment and update its refs
+        # grab the comment and then re-create its references.
         res = internal.comment.decode(cmt)
         if res:
             cls._create_refs(ea, res)
 
-        # otherwise, there's nothing to do if its empty
+        # otherwise, there's nothing to do since it's empty.
         else:
             return
 
-        # and then re-write it back to its address, but not before disabling
-        # our hooks that brought is here so that we can avoid any re-entrancy issues.
+        # re-encode the comment back to its address, but not before disabling
+        # our hooks that brought us here so that we can avoid any re-entrancy issues.
         ui.hook.idb.disable('cmt_changed')
         try:
             idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
@@ -244,7 +245,7 @@ class address(commentbase):
         finally:
             ui.hook.idb.enable('cmt_changed')
 
-        # and then leave because hopefully things were updated properly
+        # and then leave because this should've updated things properly.
         return
 
 class globals(commentbase):
