@@ -55,15 +55,17 @@ class address(commentbase):
     @classmethod
     def _update_refs(cls, ea, old, new):
         f = idaapi.get_func(ea)
-        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
                 logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
-                if f: internal.comment.contents.dec(ea, key)
+                if f and not rt: internal.comment.contents.dec(ea, key)
                 else: internal.comment.globals.dec(ea, key)
             if key not in old:
                 logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
-                if f: internal.comment.contents.inc(ea, key)
+                if f and not rt: internal.comment.contents.inc(ea, key)
                 else: internal.comment.globals.inc(ea, key)
             continue
         return
@@ -71,20 +73,24 @@ class address(commentbase):
     @classmethod
     def _create_refs(cls, ea, res):
         f = idaapi.get_func(ea)
-        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys())))
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in res.viewkeys():
             logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
-            if f: internal.comment.contents.inc(ea, key)
+            if f and not rt: internal.comment.contents.inc(ea, key)
             else: internal.comment.globals.inc(ea, key)
         return
 
     @classmethod
     def _delete_refs(cls, ea, res):
         f = idaapi.get_func(ea)
-        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys())))
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' from runtime-linked function' if rt else ''))
         for key in res.viewkeys():
             logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
-            if f: internal.comment.contents.dec(ea, key)
+            if f and not rt: internal.comment.contents.dec(ea, key)
             else: internal.comment.globals.dec(ea, key)
         return
 
@@ -209,9 +215,10 @@ class address(commentbase):
         logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         fn = idaapi.get_func(ea)
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(fn) if fn else (False, None)
 
         # if we're in a function, then clear our contents.
-        if fn:
+        if fn and not rt:
             internal.comment.contents.set_address(ea, 0)
 
         # otherwise, just clear the tags globally
