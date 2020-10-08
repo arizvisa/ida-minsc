@@ -316,7 +316,7 @@ class _dict(default):
     @classmethod
     def encode(cls, instance):
         f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
-        return '{' + ', '.join("{:s} : {!r}".format(f(key), instance[key]) for key in instance) + '}'
+        return '{' + ', '.join("{:s}: {!r}".format(f(key), instance[key]) for key in instance) + '}'
 
 @cache.register(list, pattern.star(' \t'), '[')
 class _list(default):
