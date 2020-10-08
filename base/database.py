@@ -1537,9 +1537,12 @@ def tag(ea, key, value):
         func = None
     repeatable = False if func and function.within(ea) else True
 
-    # grab the current tag out of the correct repeatable or non-repeatable comment
+    # figure out which comment the tag is in, if it's in neither then use the
+    # comment type that's the correct one.
     ea = interface.address.inside(ea)
-    state = internal.comment.decode(comment(ea, repeatable=repeatable))
+    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
+    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
+    state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
 
     # update the tag's reference if we're actually adding a key and not overwriting it
     if key not in state:
@@ -1559,7 +1562,7 @@ def tag(ea, key, value):
     except Exception:
         raise
     else:
-        comment(ea, internal.comment.encode(state), repeatable=repeatable)
+        comment(ea, internal.comment.encode(state), repeatable=where)
     finally:
         [ ui.hook.idb.enable(item) for item in hooks ]
 
@@ -1594,7 +1597,10 @@ def tag(ea, key, none):
 
     # fetch the dictionary from the other repeatable/non-repeatable comment
     # and set a flag in case we need to clear it out for being in the wrong place
-    state = internal.comment.decode(comment(ea, repeatable=repeatable))
+    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
+    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
+    state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+
     if key not in state:
         raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
@@ -1607,7 +1613,7 @@ def tag(ea, key, none):
     except Exception:
         raise
     else:
-        comment(ea, internal.comment.encode(state), repeatable=repeatable)
+        comment(ea, internal.comment.encode(state), repeatable=where)
     finally:
         [ ui.hook.idb.enable(item) for item in hooks ]
 
