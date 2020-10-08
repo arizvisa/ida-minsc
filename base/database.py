@@ -1539,9 +1539,7 @@ def tag(ea, key, value):
 
     # grab the current tag out of the correct repeatable or non-repeatable comment
     ea = interface.address.inside(ea)
-    state = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state and comment(ea, '', repeatable=not repeatable) # clear the old one
-    state.update(internal.comment.decode(comment(ea, repeatable=repeatable)))
+    state = internal.comment.decode(comment(ea, repeatable=repeatable))
 
     # update the tag's reference if we're actually adding a key and not overwriting it
     if key not in state:
@@ -1582,9 +1580,7 @@ def tag(ea, key, none):
     repeatable = False if func and function.within(ea) else True
 
     # fetch the dict, remove the key, then write it back.
-    state = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state and comment(ea, '', repeatable=not repeatable) # clear the old one
-    state.update(internal.comment.decode(comment(ea, repeatable=repeatable)))
+    state = internal.comment.decode(comment(ea, repeatable=repeatable))
     if key not in state:
         raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
