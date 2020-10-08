@@ -59,7 +59,7 @@ def bottom():
 class config(object):
     """
     This namespace contains various read-only properties about the
-    database.  This includes things such as the database boundaries,
+    database. This includes things such as the database boundaries,
     its filename, the path to the generated database, etc. Some tools
     for determining the type of the binary are also included.
     """
@@ -1004,7 +1004,7 @@ def name(none, **flags):
 @utils.multicase(ea=six.integer_types, string=basestring)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(ea, string, *suffix, **flags):
-    """Renames the address  specified by `ea` to `string`.
+    """Renames the address specified by `ea` to `string`.
 
     If `ea` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
     If `flags` is specified, then use the specified value as the flags.
@@ -1459,7 +1459,7 @@ def tag(ea):
 
     # check to see if they're not overwriting each other
     if six.viewkeys(d1) & six.viewkeys(d2):
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
     # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
     res = {}
@@ -1537,21 +1537,24 @@ def tag(ea, key, value):
         func = None
     repeatable = False if func and function.within(ea) else True
 
-    # figure out which comment the tag is in, if it's in neither then use the
-    # comment type that's the correct one.
+    # figure out which comment type the specified tag was encoded into. if it's
+    # in neither, then choose the comment type based on what we determined with
+    # the repeatable variable.
     ea = interface.address.inside(ea)
-    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
-    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable)), repeatable
+    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable)), not repeatable
+    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
-    # update the tag's reference if we're actually adding a key and not overwriting it
+    # update the tag's reference if we're actually adding the user's key and not
+    # overwriting it.
     if key not in state:
         if func and function.within(ea):
             internal.comment.contents.inc(ea, key)
         else:
             internal.comment.globals.inc(ea, key)
 
-    # grab the previous value, and update the state with the new one
+    # grab the previous value, and update the state with the new one so that we
+    # can return this to the user.
     res, state[key] = state.get(key, None), value
 
     # now we're ready to do our updates, but we need to guard the modification
@@ -1595,14 +1598,15 @@ def tag(ea, key, none):
         func = None
     repeatable = False if func and function.within(ea) else True
 
-    # fetch the dictionary from the other repeatable/non-repeatable comment
-    # and set a flag in case we need to clear it out for being in the wrong place
-    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
-    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+    # figure out which comment type the user's key is in so that we can remove
+    # that one. if the key isn't in any of them, then it doesn't really matter
+    # since we're going to raise an exception anyways.
+    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable)), repeatable
+    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable)), not repeatable
+    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
     if key not in state:
-        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
+        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
 
     # now we can do our update, but we still need to guard the modification so
@@ -1669,7 +1673,7 @@ def select(**boolean):
         # And(&) includes any tags that match all of the queried tagnames
         if And:
             if And & six.viewkeys(d) == And:
-                res.update({key : value  for key, value in six.iteritems(d) if key in And})
+                res.update({key : value for key, value in six.iteritems(d) if key in And})
             else: continue
 
         # if anything matched, then yield the address and the queried tags
