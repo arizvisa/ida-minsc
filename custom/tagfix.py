@@ -53,39 +53,6 @@ def fetch_contents(fn):
         continue
     return func.address(fn), addr, tags
 
-def check_contents(ea):
-    '''Validate the cache defined for the contents of the function `ea`.'''
-    node, key = internal.netnode.get(internal.comment.tagging.node()), internal.comment.contents._key(ea)
-    tag = internal.comment.decode(db.comment(key))
-
-    encdata = internal.netnode.sup.get(node, key)
-    if encdata is None and tag: return False
-    if not isinstance(tag, dict): return False
-    if not tag: return True
-    if '__address__' not in tag: return False
-    if '__tags__' not in tag: return False
-    return True
-
-def check_global(ea):
-    '''Validate the cache defined for the global at the address `ea`.'''
-    if func.within(ea): return False
-
-    cache = internal.comment.decode(db.comment(db.top()))
-    cache.update( internal.comment.decode(db.comment(db.bottom())) )
-
-    node = internal.netnode.get(internal.comment.tagging.node())
-    tag = internal.comment.decode(db.comment(ea))
-
-    if cache and '__address__' not in cache: return False
-    if not cache and tag: return False
-    count = internal.netnode.alt.get(node, ea)
-    if tag and not count: return False
-
-    if len(tag['__address__']) != count: return False
-    keys = tag['__tags__']
-    if any(t not in cache for t in keys): return False
-    return True
-
 def fetch_globals_functions():
     """Fetch the reference count for the global tags (function) in the database.
 
