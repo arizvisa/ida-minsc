@@ -2984,7 +2984,7 @@ class type(object):
         res = idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
 
         # If we failed, then we'll try and hack around it using idaapi.print_type.
-        if res == idaapi.GUESS_FUNC_FAILED:
+        if res != idaapi.GUESS_FUNC_OK:
             fl = idaapi.PRTYPE_1LINE
             info_s = idaapi.print_type(ea, fl)
 
