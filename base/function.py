@@ -1640,10 +1640,26 @@ def tag(func, key, value):
     if key == '__typeinfo__':
         return type(fn, value)
 
-    # decode the comment, fetch the old key, re-assign the new key, and then re-encode it
-    state = internal.comment.decode(comment(fn, repeatable=True))
+    # decode both comments and figure out which type of comment the tag is
+    # currently in. if it's in neither then we just fall back to a repeatable
+    # comment because we're a function.
+    state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
+    state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
+    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
+
+    # grab the previous value, and update the state with the new one
     res, state[key] = state.get(key, None), value
-    comment(fn, internal.comment.encode(state), repeatable=True)
+
+    # guard the modification of the comment so we don't tamper with any references
+    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        comment(fn, internal.comment.encode(state), repeatable=where)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
 
     # if we weren't able to find a key in the dict, then one was added and we need to update its reference
     if res is None:
@@ -1685,14 +1701,30 @@ def tag(func, key, none):
     elif key == '__typeinfo__':
         return type(fn, None)
 
-    # decode the comment, remove the key, and then re-encode it
-    state = internal.comment.decode(comment(fn, repeatable=True))
-    if key not in state:
-        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
-    res = state.pop(key)
-    comment(fn, internal.comment.encode(state), repeatable=True)
+    # decode both comment types so we can figure out which one the user's
+    # key is in. if we don't find it in either then it doesn't matter since
+    # we're gonna raise an exception anyways.
+    state_correct = internal.comment.decode(comment(fn, repeatable=True)), True
+    state_wrong = internal.comment.decode(comment(fn, repeatable=False)), False
+    state, where = state_correct if key in state_correct[0] else state_wrong if key in state_wrong[0] else state_correct
 
-    # if we got here without raising an exception, then the tag was stored so update the cache
+    if key not in state:
+        raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
+    res = state.pop(key)
+
+    # guard the modification of the comment so that we don't tamper with any references
+    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        comment(fn, internal.comment.encode(state), repeatable=where)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
+
+    # if we got here without raising an exception, then the tag was remove and
+    # we just need to update the cache with its removal.
     internal.comment.globals.dec(interface.range.start(fn), key)
     return res
 

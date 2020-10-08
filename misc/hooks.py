@@ -53,21 +53,19 @@ class commentbase(object):
 
 class address(commentbase):
     @classmethod
-    def _is_repeatable(cls, ea):
-        f = idaapi.get_func(ea)
-        return True if f is None else False
-
-    @classmethod
     def _update_refs(cls, ea, old, new):
         f = idaapi.get_func(ea)
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
-                if f: internal.comment.contents.dec(ea, key)
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+                if f and not rt: internal.comment.contents.dec(ea, key)
                 else: internal.comment.globals.dec(ea, key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
-                if f: internal.comment.contents.inc(ea, key)
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+                if f and not rt: internal.comment.contents.inc(ea, key)
                 else: internal.comment.globals.inc(ea, key)
             continue
         return
@@ -75,18 +73,24 @@ class address(commentbase):
     @classmethod
     def _create_refs(cls, ea, res):
         f = idaapi.get_func(ea)
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', utils.string.repr(res.viewkeys())))
-            if f: internal.comment.contents.inc(ea, key)
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+            if f and not rt: internal.comment.contents.inc(ea, key)
             else: internal.comment.globals.inc(ea, key)
         return
 
     @classmethod
     def _delete_refs(cls, ea, res):
         f = idaapi.get_func(ea)
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' from runtime-linked function' if rt else ''))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea,  utils.string.repr(key), 'address', utils.string.repr(res.viewkeys())))
-            if f: internal.comment.contents.dec(ea, key)
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+            if f and not rt: internal.comment.contents.dec(ea, key)
             else: internal.comment.globals.dec(ea, key)
         return
 
@@ -106,7 +110,7 @@ class address(commentbase):
 
             # now fix the comment the user typed
             if (newea, nrpt, none) == (ea, rpt, None):
-                ncmt, repeatable = utils.string.of(idaapi.get_cmt(ea, rpt)), cls._is_repeatable(ea)
+                ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
 
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
@@ -114,7 +118,7 @@ class address(commentbase):
                 ## if the comment is of the correct format, then we can simply
                 ## write the comment to the given address
                 if internal.comment.check(new):
-                    idaapi.set_cmt(ea, utils.string.to(new), repeatable)
+                    idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
                 ## if there's a comment to set, then assign it to the requested
                 ## address
@@ -138,8 +142,6 @@ class address(commentbase):
             new = utils.string.of(idaapi.get_cmt(newea, nrpt))
             n = internal.comment.decode(new)
             cls._create_refs(newea, n)
-
-            continue
         return
 
     @classmethod
@@ -213,26 +215,28 @@ class address(commentbase):
         logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         fn = idaapi.get_func(ea)
+        rt, _ = internal.interface.addressOfRuntimeOrStatic(fn) if fn else (False, None)
 
-        # if we're in a function, then clear our contents.
-        if fn:
+        # if we're in a function but not a runtime-linked one, then we need to
+        # to clear our contents here.
+        if fn and not rt:
             internal.comment.contents.set_address(ea, 0)
 
-        # otherwise, just clear the tags globally
+        # otherwise, we can simply clear the tags globally
         else:
             internal.comment.globals.set_address(ea, 0)
 
-        # simply grab the comment and update its refs
+        # grab the comment and then re-create its references.
         res = internal.comment.decode(cmt)
         if res:
             cls._create_refs(ea, res)
 
-        # otherwise, there's nothing to do if its empty
+        # otherwise, there's nothing to do since it's empty.
         else:
             return
 
-        # and then re-write it back to its address, but not before disabling
-        # our hooks that brought is here so that we can avoid any re-entrancy issues.
+        # re-encode the comment back to its address, but not before disabling
+        # our hooks that brought us here so that we can avoid any re-entrancy issues.
         ui.hook.idb.disable('cmt_changed')
         try:
             idaapi.set_cmt(ea, utils.string.to(internal.comment.encode(res)), repeatable_cmt)
@@ -241,34 +245,37 @@ class address(commentbase):
         finally:
             ui.hook.idb.enable('cmt_changed')
 
-        # and then leave because hopefully things were updated properly
+        # and then leave because this should've updated things properly.
         return
 
 class globals(commentbase):
     @classmethod
     def _update_refs(cls, fn, old, new):
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
                 internal.comment.globals.dec(interface.range.start(fn), key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s}. Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
                 internal.comment.globals.inc(interface.range.start(fn), key)
             continue
         return
 
     @classmethod
     def _create_refs(cls, fn, res):
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
         for key in res.viewkeys():
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.inc(interface.range.start(fn), key)
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(res.viewkeys())))
         return
 
     @classmethod
     def _delete_refs(cls, fn, res):
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
         for key in res.viewkeys():
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.dec(interface.range.start(fn), key)
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} for keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', utils.string.repr(res.viewkeys())))
         return
 
     @classmethod
@@ -322,8 +329,6 @@ class globals(commentbase):
             new = utils.string.of(idaapi.get_func_cmt(newfn, nrpt))
             n = internal.comment.decode(new)
             cls._create_refs(newfn, n)
-
-            continue
         return
 
     @classmethod

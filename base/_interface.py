@@ -286,6 +286,11 @@ class prioritybase(object):
             continue
         return not notok
 
+    @property
+    def available(self):
+        '''Return all of the available targets that can be either enabled or disabled.'''
+        return {item for item in self.__cache__}
+
     def enable(self, target):
         '''Enable any callables for the specified `target` that has been previously disabled.'''
         if target not in self.__disabled:

@@ -59,7 +59,7 @@ def bottom():
 class config(object):
     """
     This namespace contains various read-only properties about the
-    database.  This includes things such as the database boundaries,
+    database. This includes things such as the database boundaries,
     its filename, the path to the generated database, etc. Some tools
     for determining the type of the binary are also included.
     """
@@ -1004,7 +1004,7 @@ def name(none, **flags):
 @utils.multicase(ea=six.integer_types, string=basestring)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(ea, string, *suffix, **flags):
-    """Renames the address  specified by `ea` to `string`.
+    """Renames the address specified by `ea` to `string`.
 
     If `ea` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
     If `flags` is specified, then use the specified value as the flags.
@@ -1444,26 +1444,36 @@ def tag(ea):
     ea = interface.address.inside(ea)
 
     # if not within a function, then use a repeatable comment
-    # otherwise, use a non-repeatable one
+    # otherwise, use a non-repeatable one. if our address is
+    # pointing to a runtime-linked function, then we actually
+    # need to switch the comment type that we're fetching from.
     try:
         func = function.by_address(ea)
+        rt, _ = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
-        func = None
-    repeatable = False if func and function.within(ea) else True
+        rt, func = False, None
+    repeatable = False if func and function.within(ea) and not rt else True
 
     # fetch the tags from the repeatable and non-repeatable comment at the given address
     res = comment(ea, repeatable=False)
     d1 = internal.comment.decode(res)
     res = comment(ea, repeatable=True)
     d2 = internal.comment.decode(res)
+    res = function.comment(ea, repeatable=True) if rt else ''
+    d3 = internal.comment.decode(res)
 
     # check to see if they're not overwriting each other
     if six.viewkeys(d1) & six.viewkeys(d2):
-        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea,  ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+        logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
+    if rt and (six.viewkeys(d3) & six.viewkeys(d1) or six.viewkeys(d3) & six.viewkeys(d2)):
+        logging.info(u"{:s}.tag({:#x}) : Contents of the runtime-linked comment conflict with one of the database comments due to using the same keys ({:s}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d3) & six.viewkeys(d2) or six.viewkeys(d3) & six.viewkeys(d1)), 'function'))
 
-    # construct a dictionary that gives priority to repeatable if outside a function, and non-repeatable if inside
+    # construct a dictionary that gives priority to repeatable if outside a
+    # function and non-repeatable if inside. if the address points to a
+    # runtime function, then those tags will get absolute priority.
     res = {}
-    builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
+    [res.update(item) for item in ([d1, d2] if repeatable else [d2, d1])]
+    rt and res.update(d3)
 
     # modify the decoded dictionary with any implicit tags
     aname = name(ea)
@@ -1530,29 +1540,57 @@ def tag(ea, key, value):
     if key == '__typeinfo__':
         return type(ea, value)
 
-    # if not within a function, then use a repeatable comment otherwise, use a non-repeatable one
+    # if we're not within a function, then we need to use a repeatable comment
+    # unless we're in a runtime-linked function. this is because for some reason
+    # IDA uses function-comments for these.
     try:
         func = function.by_address(ea)
+        rt, _ = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
-        func = None
-    repeatable = False if func and function.within(ea) else True
+        rt, func = False, None
+    repeatable = False if func and function.within(ea) and not rt else True
 
-    # grab the current tag out of the correct repeatable or non-repeatable comment
+    # figure out which comment type the specified tag was encoded into. if it's
+    # in neither, then choose the comment type based on what we determined with
+    # the repeatable variable. we need to do special handling for runtime-linked
+    # functions because IDA uses repeatable function comments for some reason.
     ea = interface.address.inside(ea)
-    state = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state and comment(ea, '', repeatable=not repeatable) # clear the old one
-    state.update(internal.comment.decode(comment(ea, repeatable=repeatable)))
+    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
+    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
+    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True)) if func else {}
+    if rt:
+        rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
+    else:
+        state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
 
-    # update the tag's reference if we're actually adding a key and not overwriting it
+    # update the tag's reference if we're actually adding the user's key and not
+    # overwriting it. tags for runtime-linked functions are actually globals, so
+    # that's also necessary to include in our tests.
     if key not in state:
-        if func and function.within(ea):
+        if func and function.within(ea) and not rt:
             internal.comment.contents.inc(ea, key)
         else:
             internal.comment.globals.inc(ea, key)
 
-    # now we can actually update the tag and encode it into the comment
+    # grab the previous value, and update the state with the new one so that we
+    # can return this to the user.
     res, state[key] = state.get(key, None), value
-    comment(ea, internal.comment.encode(state), repeatable=repeatable)
+
+    # now we're ready to do our updates, but we need to guard the modification
+    # so that we don't mistakenly tamper with any references we updated. again,
+    # due to IDA using repeatable function comments for runtime-linked addresses,
+    # we need to check rt in order to determine which comment type to use.
+    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        function.comment(ea, internal.comment.encode(state), repeatable=where) if rt else comment(ea, internal.comment.encode(state), repeatable=where)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
+
+    # we can now return what the user asked for.
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag(key, none):
@@ -1577,21 +1615,43 @@ def tag(ea, key, none):
     # if not within a function, then fetch the repeatable comment otherwise update the non-repeatable one
     try:
         func = function.by_address(ea)
+        rt, _ = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
-        func = None
-    repeatable = False if func and function.within(ea) else True
+        rt, func = False, None
+    repeatable = False if func and function.within(ea) and not rt else True
 
-    # fetch the dict, remove the key, then write it back.
-    state = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state and comment(ea, '', repeatable=not repeatable) # clear the old one
-    state.update(internal.comment.decode(comment(ea, repeatable=repeatable)))
+    # figure out which comment type the user's key is in so that we can remove
+    # that one. if we're a runtime-linked address, then we need to remove the
+    # tag from a repeatable function comment. if the tag isn't in any of them,
+    # then it doesn't really matter since we're going to raise an exception anyways.
+    state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
+    state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
+    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True)) if func else {}
+    if rt:
+        rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
+    else:
+        state, where = (state_correct, repeatable) if key in state_correct else (state_wrong, not repeatable) if key in state_wrong else (state_correct, repeatable)
+
     if key not in state:
-        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
+        raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove non-existent tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
-    comment(ea, internal.comment.encode(state), repeatable=repeatable)
 
-    # delete its reference since it's been removed from the dict
-    if func and function.within(ea):
+    # now we can do our update, but we still need to guard the modification so
+    # that we don't accidentally tamper with any references that are updated.
+    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        function.comment(ea, internal.comment.encode(state), repeatable=where) if rt else comment(ea, internal.comment.encode(state), repeatable=where)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
+
+    # delete its reference since it's been removed from the dict. if
+    # it's a runtime-linked function, then we ensure that only the
+    # global reference is messed with.
+    if func and function.within(ea) and not rt:
         internal.comment.contents.dec(ea, key)
     else:
         internal.comment.globals.dec(ea, key)
@@ -1642,7 +1702,7 @@ def select(**boolean):
         # And(&) includes any tags that match all of the queried tagnames
         if And:
             if And & six.viewkeys(d) == And:
-                res.update({key : value  for key, value in six.iteritems(d) if key in And})
+                res.update({key : value for key, value in six.iteritems(d) if key in And})
             else: continue
 
         # if anything matched, then yield the address and the queried tags
@@ -4178,7 +4238,7 @@ class extra(object):
             res = (sup.get(ea, base+i) for i in six.moves.range(count))
 
             # remove the null-terminator if there is one
-            res = (row[:-1] if row.endswith('\x00') else row for row in res)
+            res = (row[:-1] if row.endswith('\0') else row for row in res)
 
             # fetch them from IDA and join them with newlines
             return '\n'.join(itertools.imap(utils.string.of, res))
@@ -4193,7 +4253,7 @@ class extra(object):
             res = itertools.imap(utils.string.to, string.split('\n'))
 
             # assign them directly into IDA
-            [ sup.set(ea, base+i, row+'\x00') for i, row in enumerate(res) ]
+            [ sup.set(ea, base+i, row+'\0') for i, row in enumerate(res) ]
 
             # now we can show (refresh) them
             cls.__show__(ea)

@@ -40,46 +40,18 @@ def fetch_contents(fn):
 
     for ea in func.iterate(fn):
         ui.navigation.auto(ea)
-        res = db.tag(ea)
-        #res.pop('name', None)
-        for k, v in six.iteritems(res):
-            addr[ea] = addr.get(ea, 0) + 1
-            tags[k] = tags.get(k, 0) + 1
+
+        # grab both comment types so that we can decode them. after decoding,
+        # then iterate through all of their keys and tally up their counts.
+        repeatable, nonrepeatable = (db.comment(ea, repeatable=item) for item in [True, False])
+        for items in map(internal.comment.decode, [repeatable, nonrepeatable]):
+            #items.pop('name', None)
+            for name in items:
+                addr[ea] = addr.get(ea, 0) + 1
+                tags[name] = tags.get(name, 0) + 1
+            continue
         continue
     return func.address(fn), addr, tags
-
-def check_contents(ea):
-    '''Validate the cache defined for the contents of the function `ea`.'''
-    node, key = internal.netnode.get(internal.comment.tagging.node()), internal.comment.contents._key(ea)
-    tag = internal.comment.decode(db.comment(key))
-
-    encdata = internal.netnode.sup.get(node, key)
-    if encdata is None and tag: return False
-    if not isinstance(tag, dict): return False
-    if not tag: return True
-    if '__address__' not in tag: return False
-    if '__tags__' not in tag: return False
-    return True
-
-def check_global(ea):
-    '''Validate the cache defined for the global at the address `ea`.'''
-    if func.within(ea): return False
-
-    cache = internal.comment.decode(db.comment(db.top()))
-    cache.update( internal.comment.decode(db.comment(db.bottom())) )
-
-    node = internal.netnode.get(internal.comment.tagging.node())
-    tag = internal.comment.decode(db.comment(ea))
-
-    if cache and '__address__' not in cache: return False
-    if not cache and tag: return False
-    count = internal.netnode.alt.get(node, ea)
-    if tag and not count: return False
-
-    if len(tag['__address__']) != count: return False
-    keys = tag['__tags__']
-    if any(t not in cache for t in keys): return False
-    return True
 
 def fetch_globals_functions():
     """Fetch the reference count for the global tags (function) in the database.
@@ -89,15 +61,21 @@ def fetch_globals_functions():
     the addresses and tag names.
     """
     addr, tags = {}, {}
-    t = len(list(db.functions()))
-    for i, ea in enumerate(db.functions()):
+    functions = [item for item in db.functions()]
+    for i, ea in enumerate(functions):
         ui.navigation.auto(ea)
-        six.print_(u"globals: fetching tag from function {:#x} : {:d} of {:d}".format(ea, i, t), file=output)
-        res = func.tag(ea)
-        #res.pop('name', None)
-        for k, v in six.iteritems(res):
-            addr[ea] = addr.get(ea, 0) + 1
-            tags[k] = tags.get(k, 0) + 1
+        six.print_(u"globals: fetching tag from function {:#x} : {:d} of {:d}".format(ea, i, len(functions)), file=output)
+
+        # grab both comment types from the current function and then decode
+        # them. once decoded then we can just iterate through their keys and
+        # tally everything up.
+        repeatable, nonrepeatable = (func.comment(ea, repeatable=item) for item in [True, False])
+        for items in map(internal.comment.decode, [repeatable, nonrepeatable]):
+            #items.pop('name', None)
+            for name in items:
+                addr[ea] = addr.get(ea, 0) + 1
+                tags[name] = tags.get(name, 0) + 1
+            continue
         continue
     return addr, tags
 
@@ -109,17 +87,21 @@ def fetch_globals_data():
     the addresses and tag names.
     """
     addr, tags = {}, {}
-    left, right = db.range()
+    left, right = db.config.bounds()
     six.print_(u'globals: fetching tags from data', file=output)
     for ea in db.address.iterate(left, right):
         if func.within(ea): continue
         ui.navigation.auto(ea)
 
-        res = db.tag(ea)
-        #res.pop('name', None)
-        for k, v in six.iteritems(res):
-            addr[ea] = addr.get(ea, 0) + 1
-            tags[k] = tags.get(k, 0) + 1
+        # grab both comment types and decode them. after they've been decoded,
+        # then iterate through all of their keys and tally up their counts.
+        repeatable, nonrepeatable = (db.comment(ea, repeatable=item) for item in [True, False])
+        for items in map(internal.comment.decode, [repeatable, nonrepeatable]):
+            #items.pop('name', None)
+            for name in items:
+                addr[ea] = addr.get(ea, 0) + 1
+                tags[name] = tags.get(name, 0) + 1
+            continue
         continue
     return addr, tags
 
@@ -205,11 +187,11 @@ def globals():
 
 def all():
     '''Re-build the cache for all the globals and contents in the database.'''
-    total = len(list(db.functions()))
+    functions = [item for item in db.functions()]
 
     # process all function contents tags
-    for i, ea in enumerate(db.functions()):
-        six.print_(u"updating references for contents ({:#x}) : {:d} of {:d}".format(ea, i, total), file=output)
+    for i, ea in enumerate(functions):
+        six.print_(u"updating references for contents ({:#x}) : {:d} of {:d}".format(ea, i, len(functions)), file=output)
         _, _ = contents(ea)
 
     # process all global tags
@@ -219,7 +201,7 @@ def all():
 def customnames():
     '''Iterate through all of the custom names defined in the database and update the cache with their reference counts.'''
     # FIXME: first delete all the custom names '__name__' tag
-    left, right = db.range()
+    left, right = db.config.bounds()
     for ea in db.address.iterate(left, right):
         ctx = internal.comment.globals if not func.within(ea) or func.address(ea) == ea else internal.comment.contents
         if db.type.has_customname(ea):
@@ -229,7 +211,7 @@ def customnames():
 
 def extracomments():
     '''Iterate through all of the extra comments defined in the database and update the cache with their reference counts.'''
-    left, right = db.range()
+    left, right = db.config.bounds()
     for ea in db.address.iterate(left, right):
         ctx = internal.comment.contents if func.within(ea) else internal.comment.globals
 
@@ -273,11 +255,11 @@ def erase_globals():
 
 def erase_contents():
     '''Erase the contents cache defined for each function in the database.'''
-    res = db.functions()
-    total, tag = len(res), internal.comment.contents.btag
+    functions = [item for item in db.functions()]
+    total, tag = len(functions), internal.comment.contents.btag
     yield total
 
-    for idx, ea in enumerate(db.functions()):
+    for idx, ea in enumerate(functions):
         internal.netnode.blob.remove(ea, tag)
         yield idx, ea
     return
