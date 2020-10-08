@@ -1557,7 +1557,7 @@ def tag(ea, key, value):
     ea = interface.address.inside(ea)
     state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
     state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True))
+    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True)) if func else {}
     if rt:
         rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
     else:
@@ -1626,7 +1626,7 @@ def tag(ea, key, none):
     # then it doesn't really matter since we're going to raise an exception anyways.
     state_correct = internal.comment.decode(comment(ea, repeatable=repeatable))
     state_wrong = internal.comment.decode(comment(ea, repeatable=not repeatable))
-    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True))
+    state_runtime = internal.comment.decode(function.comment(ea, repeatable=True)) if func else {}
     if rt:
         rt, state, where = (True, state_runtime, True) if key in state_runtime else (False, state_wrong, False) if key in state_wrong else (True, state_runtime, True)
     else:
