@@ -288,6 +288,7 @@ class prioritybase(object):
 
     @property
     def available(self):
+        '''Return all of the available targets that can be either enabled or disabled.'''
         return {item for item in self.__cache__}
 
     def enable(self, target):
