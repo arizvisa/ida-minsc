@@ -53,11 +53,6 @@ class commentbase(object):
 
 class address(commentbase):
     @classmethod
-    def _is_repeatable(cls, ea):
-        f = idaapi.get_func(ea)
-        return True if f is None else False
-
-    @classmethod
     def _update_refs(cls, ea, old, new):
         f = idaapi.get_func(ea)
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
@@ -109,7 +104,7 @@ class address(commentbase):
 
             # now fix the comment the user typed
             if (newea, nrpt, none) == (ea, rpt, None):
-                ncmt, repeatable = utils.string.of(idaapi.get_cmt(ea, rpt)), cls._is_repeatable(ea)
+                ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
 
                 if (ncmt or '') != new:
                     logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
@@ -117,7 +112,7 @@ class address(commentbase):
                 ## if the comment is of the correct format, then we can simply
                 ## write the comment to the given address
                 if internal.comment.check(new):
-                    idaapi.set_cmt(ea, utils.string.to(new), repeatable)
+                    idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
                 ## if there's a comment to set, then assign it to the requested
                 ## address
@@ -141,8 +136,6 @@ class address(commentbase):
             new = utils.string.of(idaapi.get_cmt(newea, nrpt))
             n = internal.comment.decode(new)
             cls._create_refs(newea, n)
-
-            continue
         return
 
     @classmethod
@@ -328,8 +321,6 @@ class globals(commentbase):
             new = utils.string.of(idaapi.get_func_cmt(newfn, nrpt))
             n = internal.comment.decode(new)
             cls._create_refs(newfn, n)
-
-            continue
         return
 
     @classmethod
