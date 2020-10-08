@@ -1643,7 +1643,17 @@ def tag(func, key, value):
     # decode the comment, fetch the old key, re-assign the new key, and then re-encode it
     state = internal.comment.decode(comment(fn, repeatable=True))
     res, state[key] = state.get(key, None), value
-    comment(fn, internal.comment.encode(state), repeatable=True)
+
+    # guard the modification of the comment so we don't tamper with any references
+    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        comment(fn, internal.comment.encode(state), repeatable=True)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
 
     # if we weren't able to find a key in the dict, then one was added and we need to update its reference
     if res is None:
@@ -1690,7 +1700,17 @@ def tag(func, key, none):
     if key not in state:
         raise E.MissingFunctionTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from function.".format(__name__, interface.range.start(fn), key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
-    comment(fn, internal.comment.encode(state), repeatable=True)
+
+    # guard the modification of the comment so that we don't tamper with any references
+    hooks = {'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        comment(fn, internal.comment.encode(state), repeatable=True)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
 
     # if we got here without raising an exception, then the tag was stored so update the cache
     internal.comment.globals.dec(interface.range.start(fn), key)
