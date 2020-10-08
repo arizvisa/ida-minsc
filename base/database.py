@@ -1548,9 +1548,22 @@ def tag(ea, key, value):
         else:
             internal.comment.globals.inc(ea, key)
 
-    # now we can actually update the tag and encode it into the comment
+    # grab the previous value, and update the state with the new one
     res, state[key] = state.get(key, None), value
-    comment(ea, internal.comment.encode(state), repeatable=repeatable)
+
+    # now we're ready to do our updates, but we need to guard the modification
+    # so that we don't mistakenly tamper with any references we updated.
+    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        comment(ea, internal.comment.encode(state), repeatable=repeatable)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
+
+    # we can now return what the user asked for.
     return res
 @utils.multicase(key=basestring, none=types.NoneType)
 def tag(key, none):
@@ -1579,12 +1592,24 @@ def tag(ea, key, none):
         func = None
     repeatable = False if func and function.within(ea) else True
 
-    # fetch the dict, remove the key, then write it back.
+    # fetch the dictionary from the other repeatable/non-repeatable comment
+    # and set a flag in case we need to clear it out for being in the wrong place
     state = internal.comment.decode(comment(ea, repeatable=repeatable))
     if key not in state:
         raise E.MissingTagError(u"{:s}.tag({:#x}, {!r}, {!s}) : Unable to remove tag \"{:s}\" from address.".format(__name__, ea, key, none, utils.string.escape(key, '"')))
     res = state.pop(key)
-    comment(ea, internal.comment.encode(state), repeatable=repeatable)
+
+    # now we can do our update, but we still need to guard the modification so
+    # that we don't accidentally tamper with any references that are updated.
+    hooks = {'changing_cmt', 'cmt_changed', 'changing_range_cmt', 'range_cmt_changed', 'changing_area_cmt', 'area_cmt_changed'} & ui.hook.idb.available
+    try:
+        [ ui.hook.idb.disable(item) for item in hooks ]
+    except Exception:
+        raise
+    else:
+        comment(ea, internal.comment.encode(state), repeatable=repeatable)
+    finally:
+        [ ui.hook.idb.enable(item) for item in hooks ]
 
     # delete its reference since it's been removed from the dict
     if func and function.within(ea):
@@ -4174,7 +4199,7 @@ class extra(object):
             res = (sup.get(ea, base+i) for i in six.moves.range(count))
 
             # remove the null-terminator if there is one
-            res = (row[:-1] if row.endswith('\x00') else row for row in res)
+            res = (row[:-1] if row.endswith('\0') else row for row in res)
 
             # fetch them from IDA and join them with newlines
             return '\n'.join(itertools.imap(utils.string.of, res))
@@ -4189,7 +4214,7 @@ class extra(object):
             res = itertools.imap(utils.string.to, string.split('\n'))
 
             # assign them directly into IDA
-            [ sup.set(ea, base+i, row+'\x00') for i, row in enumerate(res) ]
+            [ sup.set(ea, base+i, row+'\0') for i, row in enumerate(res) ]
 
             # now we can show (refresh) them
             cls.__show__(ea)
