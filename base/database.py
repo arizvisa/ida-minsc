@@ -3422,36 +3422,39 @@ class type(object):
         @utils.multicase()
         @classmethod
         def type(cls):
-            '''Return the type of the element in the array at the current address.'''
+            '''Return the type for the member of the array at the current address.'''
             return cls.type(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def type(cls, ea):
-            '''Return the type of the element in the array at the address specified by `ea`.'''
+            '''Return the type for the member of the array at the address specified by `ea`.'''
             res, _ = cls(ea)
             return res
 
         @utils.multicase()
         @classmethod
-        def typeinfo(cls):
-            '''Return the typeinfo of the element in the array at the current address.'''
-            return cls.typeinfo(ui.current.address())
+        def info(cls):
+            '''Return the type information for the member of the array defined at the current address.'''
+            return cls.info(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def typeinfo(cls, ea):
-            '''Return the typeinfo of the element in the array at the address specified by `ea`.'''
+        def info(cls, ea):
+            '''Return the type information for the member of the array defined at the address specified by `ea`.'''
             ti = type(ea)
-            return ti.get_array_element()
+            if ti is None:
+                raise E.MissingTypeOrAttribute(u"{:s}.info({:#x}) : Unable to fetch any type information from the address at {:#x}.".format('.'.join((__name__, 'type', cls.__name__)), ea, ea))
+            return ti.get_array_element() if ti.is_array() else ti
+        typeinfo = utils.alias(info, 'type.array')
 
         @utils.multicase()
         @classmethod
         def element(cls):
-            '''Return the size of the element in the array at the current address.'''
+            '''Return the size of a member in the array at the current address.'''
             return cls.element(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def element(cls, ea):
-            '''Return the size of the element in the array at the address specified by `ea`.'''
+            '''Return the size of a member in the array at the address specified by `ea`.'''
             FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
             ea, F, T = interface.address.within(ea), type.flags(ea), type.flags(ea, idaapi.DT_TYPE)
@@ -3460,12 +3463,12 @@ class type(object):
         @utils.multicase()
         @classmethod
         def length(cls):
-            '''Return the number of elements of the array at the current address.'''
+            '''Return the number of members in the array at the current address.'''
             return cls.length(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def length(cls, ea):
-            '''Return the number of elements of the array at the address specified by `ea`.'''
+            '''Return the number of members in the array at the address specified by `ea`.'''
             ea, F = interface.address.within(ea), type.flags(ea)
             sz, ele = idaapi.get_item_size(ea), idaapi.get_full_data_elsize(ea, F)
             return sz // ele
