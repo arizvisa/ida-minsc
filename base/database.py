@@ -3336,11 +3336,7 @@ class type(object):
     @staticmethod
     def has_typeinfo(ea):
         '''Return true if the address at `ea` has some typeinfo associated with it.'''
-        try:
-            type(ea)
-        except Exception as E:
-            return False
-        return True
+        return type(ea) is not None
     typeinfoQ = utils.alias(has_typeinfo, 'type')
 
     @utils.multicase()
