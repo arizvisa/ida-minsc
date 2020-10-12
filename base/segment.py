@@ -124,21 +124,21 @@ def by_name(name):
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.by_name({!r}) : Unable to locate the segment with the specified name.".format(__name__, name))
     return seg
-byName = utils.alias(by_name)
+byname = utils.alias(by_name)
 def by_selector(selector):
     '''Return the segment associated with `selector`.'''
     seg = idaapi.get_segm_by_sel(selector)
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.by_selector({:#x}) : Unable to locate the segment with the specified selector.".format(__name__, selector))
     return seg
-bySelector = utils.alias(by_selector)
+byselector = utils.alias(by_selector)
 def by_address(ea):
     '''Return the segment that contains the specified `ea`.'''
     seg = idaapi.getseg(interface.address.within(ea))
     if seg is None:
         raise E.SegmentNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate segment containing the specified address.".format(__name__, ea))
     return seg
-byAddress = utils.alias(by_address)
+byaddress = utils.alias(by_address)
 @utils.multicase(segment=idaapi.segment_t)
 def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
