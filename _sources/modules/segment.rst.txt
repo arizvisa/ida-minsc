@@ -101,7 +101,7 @@ functions and aliases. For more information on this, please see
    
    Return the segment that contains the specified ``ea``.
    
-   Aliases: :py:func:`segment.byAddress<by_address>`
+   Aliases: :py:func:`segment.byaddress<by_address>`
    
    :param ea: an address belonging to the segment to return
    
@@ -109,7 +109,7 @@ functions and aliases. For more information on this, please see
    
    Return the segment with the given ``name``.
    
-   Aliases: :py:func:`segment.byName<by_name>`
+   Aliases: :py:func:`segment.byname<by_name>`
    
    :param name: the name of the segment to return
    
@@ -117,7 +117,7 @@ functions and aliases. For more information on this, please see
    
    Return the segment associated with ``selector``.
    
-   Aliases: :py:func:`segment.bySelector<by_selector>`
+   Aliases: :py:func:`segment.byselector<by_selector>`
    
    :param selector: the selector belonging to the segment to return
    

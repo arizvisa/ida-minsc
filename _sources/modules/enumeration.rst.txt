@@ -62,7 +62,7 @@ functions and aliases. For more information on this, please see
    
    Return the identifier for the enumeration at the specified ``index``.
    
-   Aliases: :py:func:`enumeration.byIndex<by_index>`
+   Aliases: :py:func:`enumeration.byindex<by_index>`
    
    :param index: the index of the enumeration to return
    
@@ -70,7 +70,7 @@ functions and aliases. For more information on this, please see
    
    Return the identifier for the enumeration with the given ``name``.
    
-   Aliases: :py:func:`enumeration.byName<by_name>`
+   Aliases: :py:func:`enumeration.byname<by_name>`
    
    :param name: the name of the enumeration to return
    
@@ -490,7 +490,7 @@ Some examples of using this namespace are::
    
    Return the member identifier for the member of the enumeration ``enum`` with the specified ``name``.
    
-   Aliases: :py:func:`enumeration.member.byName<members\.by_name>`
+   Aliases: :py:func:`enumeration.member.byname<members\.by_name>`
    
    :param enum: the enumeration to return a member for
    :param name: the name of the enumeration member to return
@@ -499,7 +499,7 @@ Some examples of using this namespace are::
    
    Return the member identifier for the member of the enumeration ``enum`` with the specified ``value``.
    
-   Aliases: :py:func:`enumeration.member.byValue<members\.by_value>`
+   Aliases: :py:func:`enumeration.member.byvalue<members\.by_value>`
    
    :param enum: the enumeration to return a member for
    :param value: the value of the enumeration member to return

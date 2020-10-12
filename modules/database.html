@@ -79,6 +79,7 @@ functions and aliases. For more information on this, please see
 <dt id="database.block">
 <code class="descclassname">database.</code><code class="descname">block</code><span class="sig-paren">(</span><em>start</em>, <em>end</em><span class="sig-paren">)</span><a class="headerlink" href="#database.block" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the block of bytes from address <code class="docutils literal notranslate"><span class="pre">start</span></code> to <code class="docutils literal notranslate"><span class="pre">end</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.block" title="database.block"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.read_block</span></code></a>, <a class="reference internal" href="#database.block" title="database.block"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_block</span></code></a>, <a class="reference internal" href="#database.block" title="database.block"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getblock</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -545,7 +546,7 @@ If the bool <code class="docutils literal notranslate"><span class="pre">comment
 <dl class="function">
 <dt>
 <code class="descclassname">database.</code><code class="descname">name</code><span class="sig-paren">(</span><em>ea</em>, <em>string</em>, <em>*suffix</em>, <em>**flags</em><span class="sig-paren">)</span></dt>
-<dd><p>Renames the address  specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<dd><p>Renames the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <p>If <code class="docutils literal notranslate"><span class="pre">ea</span></code> is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
 If <code class="docutils literal notranslate"><span class="pre">flags</span></code> is specified, then use the specified value as the flags.
 If the boolean <code class="docutils literal notranslate"><span class="pre">listed</span></code> is specified, then specify whether to add the label to the Names list or not.</p>
@@ -984,7 +985,7 @@ determining the next valid address. These are:</p>
 <dt id="database.address.by_offset">
 <code class="descclassname">address.</code><code class="descname">by_offset</code><span class="sig-paren">(</span><em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#database.address.by_offset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the specified <code class="docutils literal notranslate"><span class="pre">offset</span></code> translated to an address in the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.byoffset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.byOffset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.by_offset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.byOffset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.byoffset</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.byoffset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.by_offset</span></code></a>, <a class="reference internal" href="#database.address.by_offset" title="database.address.by_offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.byoffset</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1962,14 +1963,14 @@ determining the next valid address. These are:</p>
 <dt id="database.address.offset">
 <code class="descclassname">address.</code><code class="descname">offset</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address.offset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the current address translated to an offset relative to the base address of the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getOffset</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">address.</code><code class="descname">offset</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> translated to an offset relative to the base address of the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getOffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getOffset</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_offset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.address.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getoffset</span></code></a>, <a class="reference internal" href="#database.address.offset" title="database.address.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.offset</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -2864,7 +2865,7 @@ determining the next valid address. These are:</p>
 <div class="section" id="database-config">
 <span id="ns-database-config"></span><h3>3.1.1.2.2. database.config<a class="headerlink" href="#database-config" title="Permalink to this headline">¶</a></h3>
 <p>This namespace contains various read-only properties about the
-database.  This includes things such as the database boundaries,
+database. This includes things such as the database boundaries,
 its filename, the path to the generated database, etc. Some tools
 for determining the type of the binary are also included.</p>
 <dl class="function">
@@ -3783,7 +3784,8 @@ following examples can be used:</p>
 <dt>
 <code class="descclassname">get.</code><code class="descname">array</code><span class="sig-paren">(</span><em>ea</em>, <em>**length</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the values of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it as the number of elements for the array.</p>
+<p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it as the number of elements for the array.
+If a pythonic type is passed to <code class="docutils literal notranslate"><span class="pre">type</span></code>, then use it for the element type of the array when decoding.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -3892,7 +3894,9 @@ If <code class="docutils literal notranslate"><span class="pre">byteorder</span>
 <dt>
 <code class="descclassname">get.</code><code class="descname">string</code><span class="sig-paren">(</span><em>ea</em>, <em>**length</em><span class="sig-paren">)</span></dt>
 <dd><p>Return the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> as a string.</p>
-<p>If the integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is defined, then use it explicitly as the string’s length when reading.</p>
+<p>If an integer <code class="docutils literal notranslate"><span class="pre">length</span></code> is provided, then use it explicitly as the string’s length when reading.
+If an integer <code class="docutils literal notranslate"><span class="pre">strtype</span></code> is provided, then use it as the string’s character width when reading.
+If a tuple <code class="docutils literal notranslate"><span class="pre">strtype</span></code> is specified, then the first item is the character width and the second is the size of the length prefix when reading.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4715,7 +4719,6 @@ up the linking process.</p>
 <dt id="database.imports.list">
 <code class="descclassname">imports.</code><code class="descname">list</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#database.imports.list" title="Permalink to this definition">¶</a></dt>
 <dd><p>List all of the imports matching the glob <code class="docutils literal notranslate"><span class="pre">string</span></code> against the fullname.</p>
-<p>Aliases: <a class="reference internal" href="#database.imports.list" title="database.imports.list"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getImports</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4730,7 +4733,6 @@ up the linking process.</p>
 <dt>
 <code class="descclassname">imports.</code><code class="descname">list</code><span class="sig-paren">(</span><em>**type</em><span class="sig-paren">)</span></dt>
 <dd><p>List all of the imports in the database that match the keyword specified by <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.imports.list" title="database.imports.list"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getImports</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -4765,7 +4767,6 @@ up the linking process.</p>
 <dt id="database.imports.modules">
 <code class="descclassname">imports.</code><code class="descname">modules</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.imports.modules" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return all of the import modules defined in the database.</p>
-<p>Aliases: <a class="reference internal" href="#database.imports.modules" title="database.imports.modules"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getImportModules</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -5178,7 +5179,7 @@ If <code class="docutils literal notranslate"><span class="pre">radix</span></co
 <dt id="database.search.by_bytes">
 <code class="descclassname">search.</code><code class="descname">by_bytes</code><span class="sig-paren">(</span><em>data</em>, <em>**direction</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.by_bytes" title="Permalink to this definition">¶</a></dt>
 <dd><p>Search through the database at the current address for the bytes specified by <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_bytes" title="database.search.by_bytes"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byBytes</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_bytes" title="database.search.by_bytes"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.bybytes</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5200,7 +5201,7 @@ If <code class="docutils literal notranslate"><span class="pre">radix</span></co
 <p>If <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as a bool, then search backwards from the given address.
 If <code class="docutils literal notranslate"><span class="pre">radix</span></code> is specified, then use it as the numerical radix for describing the bytes.
 If <code class="docutils literal notranslate"><span class="pre">radix</span></code> is not specified, then assume that <code class="docutils literal notranslate"><span class="pre">data</span></code> represents the exact bytes to search.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_bytes" title="database.search.by_bytes"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byBytes</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_bytes" title="database.search.by_bytes"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.bybytes</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5220,7 +5221,7 @@ If <code class="docutils literal notranslate"><span class="pre">radix</span></co
 <dt id="database.search.by_name">
 <code class="descclassname">search.</code><code class="descname">by_name</code><span class="sig-paren">(</span><em>name</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.by_name" title="Permalink to this definition">¶</a></dt>
 <dd><p>Search through the database at the current address for the symbol <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byName</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.by_name</span></code></a>, <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byname</span></code></a>, <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.byname</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5241,7 +5242,7 @@ If <code class="docutils literal notranslate"><span class="pre">radix</span></co
 <dd><p>Search through the database at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> for the symbol <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <p>If <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as a bool, then search backwards from the given address.
 If <code class="docutils literal notranslate"><span class="pre">sensitive</span></code> is specified as bool, then perform a case-sensitive search.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byName</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.by_name</span></code></a>, <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byname</span></code></a>, <a class="reference internal" href="#database.search.by_name" title="database.search.by_name"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.byname</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5261,7 +5262,7 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 <dt id="database.search.by_regex">
 <code class="descclassname">search.</code><code class="descname">by_regex</code><span class="sig-paren">(</span><em>string</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.by_regex" title="Permalink to this definition">¶</a></dt>
 <dd><p>Search through the database at the current address for the regex matched by <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_regex" title="database.search.by_regex"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byRegex</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_regex" title="database.search.by_regex"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byregex</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5282,7 +5283,7 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 <dd><p>Search the database at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> for the regex matched by <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <p>If <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as a bool, then search backwards from the given address.
 If <code class="docutils literal notranslate"><span class="pre">sensitive</span></code> is specified as bool, then perform a case-sensitive search.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_regex" title="database.search.by_regex"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byRegex</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_regex" title="database.search.by_regex"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byregex</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5302,7 +5303,7 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 <dt id="database.search.by_text">
 <code class="descclassname">search.</code><code class="descname">by_text</code><span class="sig-paren">(</span><em>string</em>, <em>**options</em><span class="sig-paren">)</span><a class="headerlink" href="#database.search.by_text" title="Permalink to this definition">¶</a></dt>
 <dd><p>Search through the database at the current address for the text matched by <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byText</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.bystring</span></code></a>, <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.by_string</span></code></a>, <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.bytext</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -5323,7 +5324,7 @@ If <code class="docutils literal notranslate"><span class="pre">sensitive</span>
 <dd><p>Search the database at address <code class="docutils literal notranslate"><span class="pre">ea</span></code> for the text matched by <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
 <p>If <code class="docutils literal notranslate"><span class="pre">reverse</span></code> is specified as a bool, then search backwards from the given address.
 If <code class="docutils literal notranslate"><span class="pre">sensitive</span></code> is specified as bool, then perform a case-sensitive search.</p>
-<p>Aliases: <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.byText</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.bystring</span></code></a>, <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.by_string</span></code></a>, <a class="reference internal" href="#database.search.by_text" title="database.search.by_text"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.search.bytext</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6558,14 +6559,14 @@ specified address.</p>
 <dt id="database.type.has_typeinfo">
 <code class="descclassname">type.</code><code class="descname">has_typeinfo</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.has_typeinfo" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return true if the current address has some typeinfo associated with it.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.infoQ</span></code></a>, <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">has_typeinfo</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Return true if the address at <code class="docutils literal notranslate"><span class="pre">ea</span></code> has some typeinfo associated with it.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.infoQ</span></code></a>, <a class="reference internal" href="#database.type.has_typeinfo" title="database.type.has_typeinfo"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfoQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6668,14 +6669,14 @@ specified address.</p>
 <dt id="database.type.is_globalref">
 <code class="descclassname">type.</code><code class="descname">is_globalref</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_globalref" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the instruction at the current address references a global.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isGlobalRef</span></code></a>, <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.globalrefQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isglobalref</span></code></a>, <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.globalrefQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">is_globalref</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> references a global.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isGlobalRef</span></code></a>, <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.globalrefQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isglobalref</span></code></a>, <a class="reference internal" href="#database.type.is_globalref" title="database.type.is_globalref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.globalrefQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6712,14 +6713,14 @@ specified address.</p>
 <dt id="database.type.is_importref">
 <code class="descclassname">type.</code><code class="descname">is_importref</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_importref" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns true if the instruction at the current address references an import.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isImportRef</span></code></a>, <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.importrefQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isimportref</span></code></a>, <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.importrefQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">is_importref</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns true if the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code> references an import.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isImportRef</span></code></a>, <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.importrefQ</span></code></a></p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.isimportref</span></code></a>, <a class="reference internal" href="#database.type.is_importref" title="database.type.is_importref"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.importrefQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6963,15 +6964,35 @@ as a list <code class="docutils literal notranslate"><span class="pre">[size,</s
 <dl class="function">
 <dt id="database.type.array.element">
 <code class="descclassname">type.array.</code><code class="descname">element</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.element" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the size of the element in the array at the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getSize</span></code></a>, <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_size</span></code></a></p>
+<dd><p>Return the size of a member in the array at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.array.</code><code class="descname">element</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the size of the element in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getSize</span></code></a>, <a class="reference internal" href="#database.type.array.element" title="database.type.array.element"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_size</span></code></a></p>
+<dd><p>Return the size of a member in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing an array</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.type.array.info">
+<code class="descclassname">type.array.</code><code class="descname">info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type information for the member of the array defined at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.array.info" title="database.type.array.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfo</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.array.</code><code class="descname">info</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the type information for the member of the array defined at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.array.info" title="database.type.array.info"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.typeinfo</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -6985,15 +7006,13 @@ as a list <code class="docutils literal notranslate"><span class="pre">[size,</s
 <dl class="function">
 <dt id="database.type.array.length">
 <code class="descclassname">type.array.</code><code class="descname">length</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.length" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the number of elements of the array at the current address.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.array.length" title="database.type.array.length"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_arraylength</span></code></a>, <a class="reference internal" href="#database.type.array.length" title="database.type.array.length"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getArrayLength</span></code></a></p>
+<dd><p>Return the number of members in the array at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.array.</code><code class="descname">length</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the number of elements of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.array.length" title="database.type.array.length"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_arraylength</span></code></a>, <a class="reference internal" href="#database.type.array.length" title="database.type.array.length"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getArrayLength</span></code></a></p>
+<dd><p>Return the number of members in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -7027,33 +7046,13 @@ as a list <code class="docutils literal notranslate"><span class="pre">[size,</s
 <dl class="function">
 <dt id="database.type.array.type">
 <code class="descclassname">type.array.</code><code class="descname">type</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.type" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the type of the element in the array at the current address.</p>
+<dd><p>Return the type for the member of the array at the current address.</p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.array.</code><code class="descname">type</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the type of the element in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database containing an array</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="database.type.array.typeinfo">
-<code class="descclassname">type.array.</code><code class="descname">typeinfo</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.array.typeinfo" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the typeinfo of the element in the array at the current address.</p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">type.array.</code><code class="descname">typeinfo</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the typeinfo of the element in the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the type for the member of the array at the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

@@ -98,7 +98,7 @@ functions and aliases. For more information on this, please see
    
    Return the function containing the address ``ea``.
    
-   Aliases: :py:func:`function.byAddress<by_address>`
+   Aliases: :py:func:`function.byaddress<by_address>`
    
    :param ea: the address of the function to return
    :type ea: int or long
@@ -107,7 +107,7 @@ functions and aliases. For more information on this, please see
    
    Return the function with the specified ``name``.
    
-   Aliases: :py:func:`function.byName<by_name>`
+   Aliases: :py:func:`function.byname<by_name>`
    
    :param name: the name of the function to return
    

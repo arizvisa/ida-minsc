@@ -31,6 +31,8 @@ functions and aliases. For more information on this, please see
    
    Return the block of bytes from address ``start`` to ``end``.
    
+   Aliases: :py:func:`database.read_block<block>`, :py:func:`database.get_block<block>`, :py:func:`database.getblock<block>`
+   
    :param start: starting address
    :param end: ending address
    
@@ -267,7 +269,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: name(ea, string, \*suffix, \*\*flags)
    
-   Renames the address  specified by ``ea`` to ``string``.
+   Renames the address specified by ``ea`` to ``string``.
    
    If ``ea`` is pointing to a global and is not contained by a function, then by default the label will be added to the Names list.
    If ``flags`` is specified, then use the specified value as the flags.
@@ -532,7 +534,7 @@ Some examples of using this namespace can be::
    
    Return the specified ``offset`` translated to an address in the database.
    
-   Aliases: :py:func:`database.address.byoffset<address\.by_offset>`, :py:func:`database.address.byOffset<address\.by_offset>`, :py:func:`database.by_offset<address\.by_offset>`, :py:func:`database.byOffset<address\.by_offset>`, :py:func:`database.byoffset<address\.by_offset>`
+   Aliases: :py:func:`database.address.byoffset<address\.by_offset>`, :py:func:`database.by_offset<address\.by_offset>`, :py:func:`database.byoffset<address\.by_offset>`
    
    :param offset:
    
@@ -1082,13 +1084,13 @@ Some examples of using this namespace can be::
    
    Return the current address translated to an offset relative to the base address of the database.
    
-   Aliases: :py:func:`database.getOffset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`, :py:func:`database.get_offset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.address.getOffset<address\.offset>`
+   Aliases: :py:func:`database.get_offset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`
    
 .. py:function:: address\.offset(ea)
    
    Return the address ``ea`` translated to an offset relative to the base address of the database.
    
-   Aliases: :py:func:`database.getOffset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`, :py:func:`database.get_offset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.address.getOffset<address\.offset>`
+   Aliases: :py:func:`database.get_offset<address\.offset>`, :py:func:`database.address.getoffset<address\.offset>`, :py:func:`database.getoffset<address\.offset>`, :py:func:`database.offset<address\.offset>`
    
    :param ea: an address in the database to transform to an offset.
    :type ea: int or long
@@ -1599,7 +1601,7 @@ database.config
 ***************
 
 This namespace contains various read-only properties about the
-database.  This includes things such as the database boundaries,
+database. This includes things such as the database boundaries,
 its filename, the path to the generated database, etc. Some tools
 for determining the type of the binary are also included.
 
@@ -2177,6 +2179,7 @@ following examples can be used::
    Return the values of the array at the address specified by ``ea``.
    
    If the integer ``length`` is defined, then use it as the number of elements for the array.
+   If a pythonic type is passed to ``type``, then use it for the element type of the array when decoding.
    
    :param ea: the address of an array in the database
    :type ea: int or long
@@ -2235,7 +2238,9 @@ following examples can be used::
    
    Return the array at the address specified by ``ea`` as a string.
    
-   If the integer ``length`` is defined, then use it explicitly as the string's length when reading.
+   If an integer ``length`` is provided, then use it explicitly as the string's length when reading.
+   If an integer ``strtype`` is provided, then use it as the string's character width when reading.
+   If a tuple ``strtype`` is specified, then the first item is the character width and the second is the size of the length prefix when reading.
    
    :param ea:
    :type ea: int or long
@@ -2697,16 +2702,12 @@ Some examples of using these keywords are as follows::
    
    List all of the imports matching the glob ``string`` against the fullname.
    
-   Aliases: :py:func:`database.getImports<imports\.list>`
-   
    :param string: the glob to filter the imports with
    :type string: str
    
 .. py:function:: imports\.list(\*\*type)
    
    List all of the imports in the database that match the keyword specified by ``type``.
-   
-   Aliases: :py:func:`database.getImports<imports\.list>`
    
    :param \*\*type: any keyword that can be used to filter imports with
    
@@ -2724,8 +2725,6 @@ Some examples of using these keywords are as follows::
 .. py:function:: imports\.modules()
    
    Return all of the import modules defined in the database.
-   
-   Aliases: :py:func:`database.getImportModules<imports\.modules>`
    
 .. py:function:: imports\.name()
    
@@ -2980,7 +2979,7 @@ result.
    
    Search through the database at the current address for the bytes specified by ``data``.
    
-   Aliases: :py:func:`database.search.byBytes<search\.by_bytes>`
+   Aliases: :py:func:`database.search.bybytes<search\.by_bytes>`
    
    :param data: the bytes to search for
    :param \*\*direction: if ``reverse`` is specified as true then search backwards
@@ -2993,7 +2992,7 @@ result.
    If ``radix`` is specified, then use it as the numerical radix for describing the bytes.
    If ``radix`` is not specified, then assume that ``data`` represents the exact bytes to search.
    
-   Aliases: :py:func:`database.search.byBytes<search\.by_bytes>`
+   Aliases: :py:func:`database.search.bybytes<search\.by_bytes>`
    
    :param ea: the starting address to search from
    :type ea: int or long
@@ -3004,7 +3003,7 @@ result.
    
    Search through the database at the current address for the symbol ``name``.
    
-   Aliases: :py:func:`database.search.byName<search\.by_name>`
+   Aliases: :py:func:`database.by_name<search\.by_name>`, :py:func:`database.search.byname<search\.by_name>`, :py:func:`database.byname<search\.by_name>`
    
    :param name: the identifier to search for
    :type name: str
@@ -3017,7 +3016,7 @@ result.
    If ``reverse`` is specified as a bool, then search backwards from the given address.
    If ``sensitive`` is specified as bool, then perform a case-sensitive search.
    
-   Aliases: :py:func:`database.search.byName<search\.by_name>`
+   Aliases: :py:func:`database.by_name<search\.by_name>`, :py:func:`database.search.byname<search\.by_name>`, :py:func:`database.byname<search\.by_name>`
    
    :param ea: the starting address to search from
    :type ea: int or long
@@ -3029,7 +3028,7 @@ result.
    
    Search through the database at the current address for the regex matched by ``string``.
    
-   Aliases: :py:func:`database.search.byRegex<search\.by_regex>`
+   Aliases: :py:func:`database.search.byregex<search\.by_regex>`
    
    :param string: the regex to search for
    :type string: str
@@ -3042,7 +3041,7 @@ result.
    If ``reverse`` is specified as a bool, then search backwards from the given address.
    If ``sensitive`` is specified as bool, then perform a case-sensitive search.
    
-   Aliases: :py:func:`database.search.byRegex<search\.by_regex>`
+   Aliases: :py:func:`database.search.byregex<search\.by_regex>`
    
    :param ea: the starting address to search from
    :type ea: int or long
@@ -3054,7 +3053,7 @@ result.
    
    Search through the database at the current address for the text matched by ``string``.
    
-   Aliases: :py:func:`database.search.byText<search\.by_text>`
+   Aliases: :py:func:`database.search.bystring<search\.by_text>`, :py:func:`database.search.by_string<search\.by_text>`, :py:func:`database.search.bytext<search\.by_text>`
    
    :param string: the text string to search for
    :type string: str
@@ -3067,7 +3066,7 @@ result.
    If ``reverse`` is specified as a bool, then search backwards from the given address.
    If ``sensitive`` is specified as bool, then perform a case-sensitive search.
    
-   Aliases: :py:func:`database.search.byText<search\.by_text>`
+   Aliases: :py:func:`database.search.bystring<search\.by_text>`, :py:func:`database.search.by_string<search\.by_text>`, :py:func:`database.search.bytext<search\.by_text>`
    
    :param ea: the starting address to search from
    :type ea: int or long
@@ -3825,13 +3824,13 @@ Some examples of using this namespace can be::
    
    Return true if the current address has some typeinfo associated with it.
    
-   Aliases: :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
+   Aliases: :py:func:`database.type.infoQ<type\.has_typeinfo>`, :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
    
 .. py:function:: type\.has_typeinfo(ea)
    
    Return true if the address at ``ea`` has some typeinfo associated with it.
    
-   Aliases: :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
+   Aliases: :py:func:`database.type.infoQ<type\.has_typeinfo>`, :py:func:`database.type.typeinfoQ<type\.has_typeinfo>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3900,13 +3899,13 @@ Some examples of using this namespace can be::
    
    Returns true if the instruction at the current address references a global.
    
-   Aliases: :py:func:`database.type.isGlobalRef<type\.is_globalref>`, :py:func:`database.type.globalrefQ<type\.is_globalref>`
+   Aliases: :py:func:`database.type.isglobalref<type\.is_globalref>`, :py:func:`database.type.globalrefQ<type\.is_globalref>`
    
 .. py:function:: type\.is_globalref(ea)
    
    Returns true if the instruction at ``ea`` references a global.
    
-   Aliases: :py:func:`database.type.isGlobalRef<type\.is_globalref>`, :py:func:`database.type.globalrefQ<type\.is_globalref>`
+   Aliases: :py:func:`database.type.isglobalref<type\.is_globalref>`, :py:func:`database.type.globalrefQ<type\.is_globalref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -3930,13 +3929,13 @@ Some examples of using this namespace can be::
    
    Returns true if the instruction at the current address references an import.
    
-   Aliases: :py:func:`database.type.isImportRef<type\.is_importref>`, :py:func:`database.type.importrefQ<type\.is_importref>`
+   Aliases: :py:func:`database.type.isimportref<type\.is_importref>`, :py:func:`database.type.importrefQ<type\.is_importref>`
    
 .. py:function:: type\.is_importref(ea)
    
    Returns true if the instruction at ``ea`` references an import.
    
-   Aliases: :py:func:`database.type.isImportRef<type\.is_importref>`, :py:func:`database.type.importrefQ<type\.is_importref>`
+   Aliases: :py:func:`database.type.isimportref<type\.is_importref>`, :py:func:`database.type.importrefQ<type\.is_importref>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -4104,30 +4103,37 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.array\.element()
    
-   Return the size of the element in the array at the current address.
-   
-   Aliases: :py:func:`database.getSize<type\.array\.element>`, :py:func:`database.get_size<type\.array\.element>`
+   Return the size of a member in the array at the current address.
    
 .. py:function:: type\.array\.element(ea)
    
-   Return the size of the element in the array at the address specified by ``ea``.
+   Return the size of a member in the array at the address specified by ``ea``.
    
-   Aliases: :py:func:`database.getSize<type\.array\.element>`, :py:func:`database.get_size<type\.array\.element>`
+   :param ea: an address in the database containing an array
+   :type ea: int or long
+   
+.. py:function:: type\.array\.info()
+   
+   Return the type information for the member of the array defined at the current address.
+   
+   Aliases: :py:func:`database.type.typeinfo<type\.array\.info>`
+   
+.. py:function:: type\.array\.info(ea)
+   
+   Return the type information for the member of the array defined at the address specified by ``ea``.
+   
+   Aliases: :py:func:`database.type.typeinfo<type\.array\.info>`
    
    :param ea: an address in the database containing an array
    :type ea: int or long
    
 .. py:function:: type\.array\.length()
    
-   Return the number of elements of the array at the current address.
-   
-   Aliases: :py:func:`database.get_arraylength<type\.array\.length>`, :py:func:`database.getArrayLength<type\.array\.length>`
+   Return the number of members in the array at the current address.
    
 .. py:function:: type\.array\.length(ea)
    
-   Return the number of elements of the array at the address specified by ``ea``.
-   
-   Aliases: :py:func:`database.get_arraylength<type\.array\.length>`, :py:func:`database.getArrayLength<type\.array\.length>`
+   Return the number of members in the array at the address specified by ``ea``.
    
    :param ea: an address in the database containing an array
    :type ea: int or long
@@ -4145,22 +4151,11 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.array\.type()
    
-   Return the type of the element in the array at the current address.
+   Return the type for the member of the array at the current address.
    
 .. py:function:: type\.array\.type(ea)
    
-   Return the type of the element in the array at the address specified by ``ea``.
-   
-   :param ea: an address in the database containing an array
-   :type ea: int or long
-   
-.. py:function:: type\.array\.typeinfo()
-   
-   Return the typeinfo of the element in the array at the current address.
-   
-.. py:function:: type\.array\.typeinfo(ea)
-   
-   Return the typeinfo of the element in the array at the address specified by ``ea``.
+   Return the type for the member of the array at the address specified by ``ea``.
    
    :param ea: an address in the database containing an array
    :type ea: int or long

@@ -73,7 +73,7 @@ functions and aliases. For more information on this, please see
    
    Return the structure identified by ``identifier``.
    
-   Aliases: :py:func:`structure.byId<by_identifier>`, :py:func:`structure.by_id<by_identifier>`, :py:func:`structure.byIdentifier<by_identifier>`
+   Aliases: :py:func:`structure.byid<by_identifier>`, :py:func:`structure.by_id<by_identifier>`, :py:func:`structure.byidentifier<by_identifier>`
    
    :param identifier: the identifier of the structure to return
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
@@ -82,7 +82,7 @@ functions and aliases. For more information on this, please see
    
    Return a structure by its index.
    
-   Aliases: :py:func:`structure.byIndex<by_index>`
+   Aliases: :py:func:`structure.byindex<by_index>`
    
    :param index: the index of the structure to return
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
@@ -91,7 +91,7 @@ functions and aliases. For more information on this, please see
    
    Return a structure by its name.
    
-   Aliases: :py:func:`structure.byName<by_name>`
+   Aliases: :py:func:`structure.byname<by_name>`
    
    :param name: the name of the structure to return
    :param \*\*options: if ``offset`` is specified, then use it as the base offset of the structure
@@ -604,7 +604,7 @@ members_t
       
       Return the member with the specified ``fullname``.
       
-      Aliases: :py:func:`structure.members_t.byfullname<by_fullname>`, :py:func:`structure.members_t.byFullName<by_fullname>`
+      Aliases: :py:func:`structure.members_t.byfullname<by_fullname>`
       
       :param fullname: the full name of the member to return
       
@@ -612,7 +612,7 @@ members_t
       
       Return the member in the structure that has the specified ``id``.
       
-      Aliases: :py:func:`structure.members_t.byId<by_identifier>`, :py:func:`structure.members_t.by_id<by_identifier>`
+      Aliases: :py:func:`structure.members_t.byid<by_identifier>`, :py:func:`structure.members_t.by_id<by_identifier>`
       
       :param id: the identifier of the member to return
       
@@ -620,7 +620,7 @@ members_t
       
       Return the member with the specified ``name``.
       
-      Aliases: :py:func:`structure.members_t.byname<by_name>`, :py:func:`structure.members_t.byName<by_name>`
+      Aliases: :py:func:`structure.members_t.byname<by_name>`
       
       :param name: the name of the member to return
       
@@ -628,7 +628,7 @@ members_t
       
       Return the member at the specified ``offset`` from the base offset of the structure.
       
-      Aliases: :py:func:`structure.members_t.byoffset<by_offset>`, :py:func:`structure.members_t.byOffset<by_offset>`
+      Aliases: :py:func:`structure.members_t.byoffset<by_offset>`
       
       :param offset: the offset of the member to return
       
@@ -636,7 +636,7 @@ members_t
       
       Return the member at the specified ``offset`` of the structure.
       
-      Aliases: :py:func:`structure.members_t.byrealoffset<by_realoffset>`, :py:func:`structure.members_t.byRealOffset<by_realoffset>`
+      Aliases: :py:func:`structure.members_t.byrealoffset<by_realoffset>`
       
       :param offset: the real offset of the member to return
       
@@ -669,7 +669,7 @@ members_t
       
       Return the member nearest to the specified ``offset`` from the base offset of the structure.
       
-      Aliases: :py:func:`structure.members_t.nearoffset<near_offset>`, :py:func:`structure.members_t.near<near_offset>`, :py:func:`structure.members_t.nearOffset<near_offset>`
+      Aliases: :py:func:`structure.members_t.nearoffset<near_offset>`, :py:func:`structure.members_t.near<near_offset>`
       
       :param offset: the offset nearest to the member to return
       

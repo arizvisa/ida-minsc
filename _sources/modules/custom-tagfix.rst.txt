@@ -31,18 +31,6 @@ functions and aliases. For more information on this, please see
    
    Re-build the cache for all the globals and contents in the database.
    
-.. py:function:: check_contents(ea)
-   
-   Validate the cache defined for the contents of the function ``ea``.
-   
-   :param ea: the address of the function to verify the contents tags for
-   
-.. py:function:: check_global(ea)
-   
-   Validate the cache defined for the global at the address ``ea``.
-   
-   :param ea: the address of the global to verify the tags for
-   
 .. py:function:: contents(ea)
    
    Re-build the cache for the contents of the function ``ea``.
