@@ -494,16 +494,16 @@ def op_segment(ea, opnum):
 # FIXME: maybe use idaapi.op_seg(*args) to apply a segment to an operand?
 
 @utils.multicase(opnum=six.integer_types)
-def op_num(opnum):
+def op_number(opnum):
     '''Set the type for operand `opnum` at the current instruction to a number and return it.'''
-    return op_num(ui.current.address(), opnum)
+    return op_number(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_num(ea, opnum):
+def op_number(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a number and return it.'''
     t = idaapi.num_flag()
     ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_num({:#x}, {:d}) : Unable to restore the type of operand {:d} to a number.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_number({:#x}, {:d}) : Unable to restore the type of operand {:d} to a number.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
@@ -521,19 +521,19 @@ def op_num(ea, opnum):
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
-op_number = utils.alias(op_num)
+op_num = utils.alias(op_number)
 
 @utils.multicase(opnum=six.integer_types)
-def op_chr(opnum):
+def op_character(opnum):
     '''Set the type for operand `opnum` at the current instruction to a character and return it.'''
-    return op_chr(ui.current.address(), opnum)
+    return op_character(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_chr(ea, opnum):
+def op_character(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a character and return it.'''
     t = idaapi.char_flag()
     ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_chr({:#x}, {:d}) : Unable to set the type of operand {:d} to a character.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_character({:#x}, {:d}) : Unable to set the type of operand {:d} to a character.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
@@ -567,19 +567,19 @@ def op_chr(ea, opnum):
 
     # Last thing to do is to join each octet together back into some bytes
     return bytes().join(map(six.int2byte, reversed(bytearray(octets))))
-op_character = op_char = utils.alias(op_chr)
+op_chr = op_char = utils.alias(op_character)
 
 @utils.multicase(opnum=six.integer_types)
-def op_bin(opnum):
+def op_binary(opnum):
     '''Set the type for operand `opnum` at the current instruction to binary and return it.'''
-    return op_bin(ui.current.address(), opnum)
+    return op_binary(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_bin(ea, opnum):
+def op_binary(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to binary and return it.'''
     t = idaapi.bin_flag()
     ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_bin({:#x}, {:d}) : Unable to set the type of operand {:d} to binary.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_binary({:#x}, {:d}) : Unable to set the type of operand {:d} to binary.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
@@ -597,19 +597,19 @@ def op_bin(ea, opnum):
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
-op_binary = utils.alias(op_bin)
+op_bin = utils.alias(op_binary)
 
 @utils.multicase(opnum=six.integer_types)
-def op_oct(opnum):
+def op_octal(opnum):
     '''Set the type for operand `opnum` at the current instruction to octal and return it.'''
-    return op_oct(ui.current.address(), opnum)
+    return op_octal(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_oct(ea, opnum):
+def op_octal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to octal and return it.'''
     t = idaapi.oct_flag()
     ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_oct({:#x}, {:d}) : Unable to set the type of operand {:d} to octal.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_octal({:#x}, {:d}) : Unable to set the type of operand {:d} to octal.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
@@ -627,19 +627,19 @@ def op_oct(ea, opnum):
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
-op_octal = utils.alias(op_oct)
+op_oct = utils.alias(op_octal)
 
 @utils.multicase(opnum=six.integer_types)
-def op_dec(opnum):
+def op_decimal(opnum):
     '''Set the type for operand `opnum` at the current instruction to decimal and return it.'''
-    return op_dec(ui.current.address(), opnum)
+    return op_decimal(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_dec(ea, opnum):
+def op_decimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to decimal and return it.'''
     t = idaapi.dec_flag()
     ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_dec({:#x}, {:d}) : Unable to set the type of operand {:d} to decimal.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_decimal({:#x}, {:d}) : Unable to set the type of operand {:d} to decimal.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
@@ -657,19 +657,19 @@ def op_dec(ea, opnum):
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
-op_decimal = utils.alias(op_dec)
+op_dec = utils.alias(op_decimal)
 
 @utils.multicase(opnum=six.integer_types)
-def op_hex(opnum):
+def op_hexadecimal(opnum):
     '''Set the type for operand `opnum` at the current instruction to hexadecimal and return it.'''
-    return op_hex(ui.current.address(), opnum)
+    return op_hexadecimal(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_hex(ea, opnum):
+def op_hexadecimal(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to hexadecimal and return it.'''
     t = idaapi.hex_flag()
     ok, signed = idaapi.set_op_type(ea, t, opnum), idaapi.is_invsign(ea, database.type.flags(ea), opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_hex({:#x}, {:d}) : Unable to set the type of operand {:d} to hexadecimal.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_hexadecimal({:#x}, {:d}) : Unable to set the type of operand {:d} to hexadecimal.".format(__name__, ea, opnum, opnum))
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
@@ -687,21 +687,21 @@ def op_hex(ea, opnum):
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
-op_hexadecimal = utils.alias(op_hex)
+op_hex = utils.alias(op_hexadecimal)
 
 @utils.multicase(opnum=six.integer_types)
-def op_flt(opnum):
+def op_float(opnum):
     '''Set the type for operand `opnum` at the current instruction to floating-point and return it.'''
-    return op_flt(ui.current.address(), opnum)
+    return op_float(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_flt(ea, opnum):
+def op_float(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to floating-point and return it.'''
     t = idaapi.flt_flag()
 
     # Explicitly set the operand type using idaapi.
     ok = idaapi.set_op_type(ea, t, opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_flt({:#x}, {:d}) : Unable to set the type of operand {:d} to floating-point.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_float({:#x}, {:d}) : Unable to set the type of operand {:d} to floating-point.".format(__name__, ea, opnum, opnum))
 
     # Read the number of bits for the operand so we can figure out how to properly
     # decode this integer.
@@ -720,7 +720,7 @@ def op_flt(ea, opnum):
 
     # If we couldn't find a valid encoding, then raise an exception.
     else:
-        raise E.UnsupportedCapability(u"{:s}.op_flt({:#x}, {:d}) : Unable to decode operand {:d} for instruction due to an unsupported number of bits ({:d}).".format(__name__, ea, opnum, opnum, bits))
+        raise E.UnsupportedCapability(u"{:s}.op_float({:#x}, {:d}) : Unable to decode operand {:d} for instruction due to an unsupported number of bits ({:d}).".format(__name__, ea, opnum, opnum, bits))
 
     # Now we can decode the floating-point operand and return it.
     try:
@@ -728,29 +728,29 @@ def op_flt(ea, opnum):
 
     # If an exception was raised, then re-raise it with our parameters prefixed.
     except ValueError as message:
-        raise ValueError(u"{:s}.op_flt({:#x}, {:d}) : {!s}".format(__name__, ea, opnum, message))
+        raise ValueError(u"{:s}.op_float({:#x}, {:d}) : {!s}".format(__name__, ea, opnum, message))
 
     # That's all, folks.
     return res
-op_float = utils.alias(op_flt)
+op_flt = utils.alias(op_float)
 
 @utils.multicase(opnum=six.integer_types)
-def op_stkvar(opnum):
+def op_stackvar(opnum):
     '''Set the type for operand `opnum` at the current instruction to a stack variable and return it.'''
-    return op_stkvar(ui.current.address(), opnum)
+    return op_stackvar(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
-def op_stkvar(ea, opnum):
+def op_stackvar(ea, opnum):
     '''Set the type for operand `opnum` belonging to the instruction at `ea` to a stack variable and return it.'''
     if not function.within(ea):
-        raise E.FunctionNotFoundError(u"{:s}.op_stkvar({:#x}, {:d}) : The specified address ({:#x}) is not within a function.".format(__name__, ea, opnum, ea))
+        raise E.FunctionNotFoundError(u"{:s}.op_stackvar({:#x}, {:d}) : The specified address ({:#x}) is not within a function.".format(__name__, ea, opnum, ea))
 
     ok = idaapi.op_stkvar(ea, opnum)
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_stkvar({:#x}, {:d}) : Unable to set operand {:d} to a stack variable.".format(__name__, ea, opnum, opnum))
+        raise E.DisassemblerError(u"{:s}.op_stackvar({:#x}, {:d}) : Unable to set operand {:d} to a stack variable.".format(__name__, ea, opnum, opnum))
 
     # Now that it's set, call into op_structure to return it.
     return op_structure(ea, opnum)
-op_stack = op_stackvar = utils.alias(op_stkvar)
+op_stack = op_stkvar = utils.alias(op_stackvar)
 
 @utils.multicase(opnum=six.integer_types)
 def op_structure(opnum):
@@ -1238,7 +1238,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is a sentinel-type instruction.'''
         ea = interface.address.inside(ea)
         return database.type.is_code(ea) and all([feature(ea) & idaapi.CF_STOP])
-    isSentinel = sentinelQ = utils.alias(is_sentinel, 'type')
+    issentinel = sentinelQ = utils.alias(is_sentinel, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1253,7 +1253,7 @@ class type(object):
         F, (Xci, Xdi) = feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
         Xc, Xd = ([item for item in X] for X in [Xci, Xdi])
         return cls.is_sentinel(ea) and not any([F & idaapi.CF_JUMP, Xc, Xd])
-    isReturn = returnQ = retQ = utils.alias(is_return, 'type')
+    isreturn = returnQ = retQ = utils.alias(is_return, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1266,7 +1266,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
         ea = interface.address.inside(ea)
         return database.type.is_code(ea) and all([feature(ea) & idaapi.CF_SHFT])
-    isShift = shiftQ = utils.alias(is_shift, 'type')
+    isshift = shiftQ = utils.alias(is_shift, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1281,7 +1281,7 @@ class type(object):
         F, (Xci, Xdi) = feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
         Xc, Xd = ([item for item in X] for X in [Xci, Xdi])
         return database.type.is_code(ea) and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc, Xd])])
-    isBranch = branchQ = utils.alias(is_branch, 'type')
+    isbranch = branchQ = utils.alias(is_branch, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1294,7 +1294,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is an immediate and indirect branch.'''
         ea = interface.address.inside(ea)
         return cls.is_branch(ea) and all([feature(ea) & idaapi.CF_STOP])
-    isJmp = jmpQ = utils.alias(is_jmp, 'type')
+    isjmp = jmpQ = utils.alias(is_jmp, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1307,7 +1307,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is a conditional branch.'''
         ea = interface.address.inside(ea)
         return cls.is_branch(ea) and not all([feature(ea) & idaapi.CF_STOP])
-    isJxx = jxxQ = utils.alias(is_jxx, 'type')
+    isjxx = jxxQ = utils.alias(is_jxx, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1320,7 +1320,7 @@ class type(object):
         '''Returns true if the instruction at `ea` is an indirect branch.'''
         ea = interface.address.inside(ea)
         return cls.is_branch(ea) and all([feature(ea) & idaapi.CF_JUMP])
-    isJmpi = jmpiQ = utils.alias(is_jmpi, 'type')
+    isjmpi = jmpiQ = utils.alias(is_jmpi, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1336,7 +1336,7 @@ class type(object):
             idaapi.decode_insn(ea)
             return idaapi.is_call_insn(ea)
         return database.type.is_code(ea) and all([feature(ea) & idaapi.CF_CALL])
-    isCall = callQ = utils.alias(is_call, 'type')
+    iscall = callQ = utils.alias(is_call, 'type')
 
     @utils.multicase()
     @classmethod
@@ -1350,7 +1350,7 @@ class type(object):
         ea = interface.address.inside(ea)
         F = feature(ea)
         return database.type.is_code(ea) and all([F & idaapi.CF_CALL, F & idaapi.CF_JUMP])
-    isCalli = calliQ = utils.alias(is_calli, 'type')
+    iscalli = calliQ = utils.alias(is_calli, 'type')
 
 t = type    # XXX: ns alias
 
