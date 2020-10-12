@@ -204,7 +204,7 @@ def by_name(name, **options):
 
     # grab an instance of the structure by its id that we found
     return __instance__(id, **options)
-byName = utils.alias(by_name)
+byname = utils.alias(by_name)
 
 def by_index(index, **options):
     '''Return a structure by its index.'''
@@ -214,13 +214,13 @@ def by_index(index, **options):
 
     # grab an instance of the structure by the id we found
     return __instance__(id, **options)
-byIndex = utils.alias(by_index)
+byindex = utils.alias(by_index)
 
 def by_identifier(identifier, **options):
     '''Return the structure identified by `identifier`.'''
     return __instance__(identifier, **options)
 
-by_id = byIdentifier = byId = utils.alias(by_identifier)
+by_id = byidentifier = byId = utils.alias(by_identifier)
 
 ## FIXME: need to add support for a union_t. add_struc takes another parameter
 ##        that defines whether a structure is a union or not.
@@ -1019,7 +1019,7 @@ class members_t(object):
         # figure out the index of the member so we can return the member_t we've cached
         index = self.index(mem)
         return self[index]
-    byname = byName = utils.alias(by_name, 'members_t')
+    byname = utils.alias(by_name, 'members_t')
 
     @utils.string.decorate_arguments('fullname')
     def by_fullname(self, fullname):
@@ -1036,7 +1036,7 @@ class members_t(object):
         # figure out the index of the member so we can return the member_t we've cached
         index = self.index(mem)
         return self[index]
-    byfullname = byFullname = utils.alias(by_fullname, 'members_t')
+    byfullname = utils.alias(by_fullname, 'members_t')
 
     def by_offset(self, offset):
         '''Return the member at the specified `offset` from the base offset of the structure.'''
@@ -1065,7 +1065,7 @@ class members_t(object):
 
         # Chain to the realoffset implementation.. This is just a wrapper.
         return self.by_realoffset(offset - self.baseoffset)
-    byoffset = byOffset = utils.alias(by_offset, 'members_t')
+    byoffset = utils.alias(by_offset, 'members_t')
 
     def by_realoffset(self, offset):
         '''Return the member at the specified `offset` of the structure.'''
@@ -1098,7 +1098,7 @@ class members_t(object):
         # And then search for it in our structure to give back to the user
         index = self.index(mem)
         return self[index]
-    byrealoffset = byRealOffset = utils.alias(by_realoffset, 'members_t')
+    byrealoffset = utils.alias(by_realoffset, 'members_t')
 
     def by_identifier(self, id):
         '''Return the member in the structure that has the specified `id`.'''
@@ -1113,7 +1113,7 @@ class members_t(object):
         # search through our members for the specified member
         index = self.index(mem)
         return self[index]
-    by_id = byId = byIdentifier = utils.alias(by_identifier, 'members_t')
+    by_id = byid = byidentifier = utils.alias(by_identifier, 'members_t')
 
     def __walk_to_realoffset__(self, offset):
         '''Descend into the structure collecting the fields to get to the specified `offset`.'''
@@ -1190,7 +1190,7 @@ class members_t(object):
 
         # Chain to the realoffset implementation.. This is just a wrapper.
         return self.near_realoffset(offset - self.baseoffset)
-    near = nearoffset = nearOffset = utils.alias(near_offset, 'members_t')
+    near = nearoffset = utils.alias(near_offset, 'members_t')
 
     def near_realoffset(self, offset):
         '''Return the member nearest to the specified `offset`.'''
