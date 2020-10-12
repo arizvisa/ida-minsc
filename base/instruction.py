@@ -1011,10 +1011,14 @@ def op_enumeration(opnum, name):
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
     return op_enumeration(ea, opnum, enumeration.by(name))
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types + (types.TupleType,))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types + (types.TupleType, types.ListType))
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration `id` to operand `opnum` of the instruction at `ea`.'''
-    return idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
+    ok = idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
+    if not ok:
+        eid, serial = id if isinstance(id, (types.TupleType, types.ListType)) else (id, 0)
+        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}, {:#x}) : Unable to set operand {:d} for instruction ({:#x}) to enumeration {:#x} (serial {:d}).".format(__name__, ea, opnum, eid, opnum, ea, eid, serial))
+    return op_enumeration(ea, opnum)
 op_enum = utils.alias(op_enumeration)
 
 @utils.multicase(opnum=six.integer_types)
