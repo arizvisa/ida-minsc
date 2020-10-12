@@ -43,7 +43,7 @@ def by_address(ea):
     if res is None:
         raise E.FunctionNotFoundError(u"{:s}.by_address({:#x}) : Unable to locate function by address.".format(__name__, ea))
     return res
-byAddress = utils.alias(by_address)
+byaddress = utils.alias(by_address)
 
 @utils.string.decorate_arguments('name')
 def by_name(name):
@@ -61,7 +61,7 @@ def by_name(name):
     if res is None:
         raise E.FunctionNotFoundError(u"{:s}.by_name({!r}) : Unable to locate function by address.".format(__name__, name))
     return res
-byName = utils.alias(by_name)
+byname = utils.alias(by_name)
 
 @utils.multicase()
 def by():
