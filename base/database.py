@@ -591,7 +591,7 @@ def block(start, end):
         start, end = end, start
     start, end = interface.address.within(start, end)
     return read(start, end - start)
-getBlock = getblock = get_block = read_block = utils.alias(block)
+getblock = get_block = read_block = utils.alias(block)
 
 @utils.multicase()
 def read():
@@ -825,7 +825,7 @@ class search(object):
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, \"{:s}\"{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
         return res
-    byBytes = by_bytes
+    bybytes = utils.alias(by_bytes, 'search')
 
     @utils.multicase(string=basestring)
     @staticmethod
@@ -852,7 +852,7 @@ class search(object):
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
-    byRegex = by_regex
+    byregex = utils.alias(by_regex, 'search')
 
     @utils.multicase(string=basestring)
     @staticmethod
@@ -879,7 +879,7 @@ class search(object):
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
-    byText = by_string = byString = utils.alias(by_text, 'search')
+    bytext = by_string = bystring = utils.alias(by_text, 'search')
 
     @utils.multicase(name=basestring)
     @staticmethod
@@ -906,7 +906,7 @@ class search(object):
         if res == idaapi.BADADDR:
             raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
-    byName = utils.alias(by_name, 'search')
+    byname = utils.alias(by_name, 'search')
 
     @utils.multicase()
     @classmethod
@@ -949,7 +949,7 @@ class search(object):
         """
         return cls.by_bytes(ea, data, **direction)
 
-byName = by_name = utils.alias(search.by_name, 'search')
+byname = by_name = utils.alias(search.by_name, 'search')
 
 def go(ea):
     '''Jump to the specified address at `ea`.'''
@@ -1991,9 +1991,6 @@ class imports(object):
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return res[0]
 
-getImportModules = utils.alias(imports.modules, 'imports')
-getImports = utils.alias(imports.list, 'imports')
-
 ###
 class address(object):
     """
@@ -2924,7 +2921,7 @@ class address(object):
     def by_offset(cls, offset):
         '''Return the specified `offset` translated to an address in the database.'''
         return config.baseaddress() + offset
-    byoffset = byOffset = utils.alias(by_offset, 'address')
+    byoffset = utils.alias(by_offset, 'address')
 
     @utils.multicase()
     @classmethod
@@ -2936,7 +2933,7 @@ class address(object):
     def offset(cls, ea):
         '''Return the address `ea` translated to an offset relative to the base address of the database.'''
         return interface.address.inside(ea) - config.baseaddress()
-    getoffset = getOffset = utils.alias(offset, 'address')
+    getoffset = utils.alias(offset, 'address')
 
 a = addr = address  # XXX: ns alias
 
@@ -3337,7 +3334,7 @@ class type(object):
     def has_typeinfo(ea):
         '''Return true if the address at `ea` has some typeinfo associated with it.'''
         return type(ea) is not None
-    typeinfoQ = utils.alias(has_typeinfo, 'type')
+    typeinfoQ = infoQ = utils.alias(has_typeinfo, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -3566,7 +3563,7 @@ class type(object):
 
         # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
         return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
-    isImportRef = importrefQ = utils.alias(is_importref, 'type')
+    isimportref = importrefQ = utils.alias(is_importref, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -3581,7 +3578,7 @@ class type(object):
 
         # FIXME: this doesn't seem like the right way to determine this...
         return len(database.dxdown(ea)) > len(database.cxdown(ea))
-    isGlobalRef = globalrefQ = utils.alias(is_globalref, 'type')
+    isglobalref = globalrefQ = utils.alias(is_globalref, 'type')
 
 t = type    # XXX: ns alias
 
@@ -3593,14 +3590,6 @@ is_unknown = utils.alias(type.is_unknown, 'type')
 is_head = utils.alias(type.is_head, 'type')
 is_tail = utils.alias(type.is_tail, 'type')
 is_align = utils.alias(type.is_align, 'type')
-getType = get_type = utils.alias(type.__new__, 'type')
-
-# arrays
-getSize = get_size = utils.alias(type.array.element, 'type.array')
-getArrayLength = get_arraylength = utils.alias(type.array.length, 'type.array')
-
-# structures
-getStructureId = get_strucid = get_structureid = utils.alias(type.structure.id, 'type.structure')
 
 class xref(object):
     """
