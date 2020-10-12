@@ -75,7 +75,7 @@ def by_name(name):
     if res == idaapi.BADADDR:
         raise E.EnumerationNotFoundError(u"{:s}.by_name({!r}) : Unable to locate enumeration by the name \"{:s}\".".format(__name__, name, utils.string.escape(name, '"')))
     return res
-byName = utils.alias(by_name)
+byname = utils.alias(by_name)
 
 def by_index(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
@@ -83,7 +83,7 @@ def by_index(index):
     if res == idaapi.BADADDR:
         raise E.EnumerationNotFoundError(u"{:s}.by_index({:#x}) : Unable to locate enumeration by the index {:d}.".format(__name__, index, index))
     return res
-byIndex = utils.alias(by_index)
+byindex = utils.alias(by_index)
 
 @utils.multicase(index=six.integer_types)
 def by(index):
@@ -357,7 +357,7 @@ class members(object):
         if res == idaapi.BADADDR:
             raise E.MemberNotFoundError(u"{:s}.by_value({:#x}, {:d}) : Unable to locate member by value.".format('.'.join((__name__, cls.__name__)), eid, value))
         return res
-    byValue = utils.alias(by_value, 'members')
+    byvalue = utils.alias(by_value, 'members')
 
     @classmethod
     @utils.string.decorate_arguments('name')
@@ -369,7 +369,7 @@ class members(object):
                 return mid
             continue
         return
-    byName = utils.alias(by_name, 'members')
+    byname = utils.alias(by_name, 'members')
 
     @utils.multicase(n=six.integer_types)
     @classmethod
