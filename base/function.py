@@ -614,7 +614,10 @@ def within():
 @utils.multicase(ea=six.integer_types)
 def within(ea):
     '''Return true if the address `ea` is within a function.'''
-    ea = interface.address.within(ea)
+    try:
+        ea = interface.address.within(ea)
+    except E.OutOfBoundsError:
+        return False
     return idaapi.get_func(ea) is not None and idaapi.segtype(ea) != idaapi.SEG_XTRN
 
 # Checks if ea is contained in function or in any of its chunks
@@ -631,9 +634,12 @@ def contains(func, ea):
     '''Returns True if the address `ea` is contained by the function `func`.'''
     try:
         fn = by(func)
-    except E.FunctionNotFoundError:
+        ea = interface.address.within(ea)
+
+    # If the function is not found, or the address is out of bounds
+    # then the address isn't contained in the function. simple.
+    except (E.FunctionNotFoundError, E.OutOfBoundsError):
         return False
-    ea = interface.address.within(ea)
     return any(start <= ea < end for start, end in chunks(fn))
 
 class blocks(object):
