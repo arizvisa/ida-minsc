@@ -759,8 +759,8 @@ def op_structure(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
-    fl, op = database.type.flags(ea), operand(ea, opnum)
-    if all(fl & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
+    F, op = database.type.flags(ea), operand(ea, opnum)
+    if all(F & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
 
     # Figure out the offset for the structure member if it's an immediate value
@@ -775,7 +775,7 @@ def op_structure(ea, opnum):
 
     # Check to see if this is a stack variable, because we'll need to
     # handle it differently if so.
-    if idaapi.is_stkvar(fl, opnum) and function.within(ea):
+    if idaapi.is_stkvar(F, opnum) and function.within(ea):
         fn, insn = function.by(ea), at(ea)
 
         # Now we can ask IDA what's up with it.
@@ -807,8 +807,8 @@ def op_structure(ea, opnum):
 
     # Otherwise, we have no idea what to do here since we need to know the opinfo_t
     # in order to determine what structure is there.
-    elif not idaapi.is_stroff(fl, opnum):
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, fl))
+    elif not idaapi.is_stroff(F, opnum):
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
 
     # We pretty much have to do this ourselves because idaapi.get_stroff_path
     # will always only return the structure associatd with the member..
@@ -978,11 +978,11 @@ op_struc = op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
 def op_enumeration(opnum):
-    '''Return the enumeration id of operand `opnum` for the current instruction.'''
+    '''Return the enumeration member id for the operand `opnum` belonging to the current instruction.'''
     return op_enumeration(ui.current.address(), opnum)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_enumeration(ea, opnum):
-    '''Return the enumeration id of operand `opnum` for the instruction at `ea`.'''
+    '''Return the enumeration member id for the operand `opnum` belonging to the instruction at `ea`.'''
 
     # If our operand number is actually an enumeration identifier, then shift
     # our parameters, and try again with the current address.
@@ -990,17 +990,21 @@ def op_enumeration(ea, opnum):
         ea, opnum, id = ui.current.address(), ea, opnum
         return op_enumeration(ea, opnum, id)
 
-    fl = database.type.flags(ea)
-    if all(fl & n == 0 for n in (idaapi.FF_0ENUM, idaapi.FF_1ENUM)):
+    # Check the flags for the given address to ensure there's actually an
+    # enumeration defined as one of the operands.
+    F = database.type.flags(ea)
+    if all(F & item == 0 for item in [idaapi.FF_0ENUM, idaapi.FF_1ENUM]):
         raise E.MissingTypeOrAttribute(u"{:s}.op_enumeration({:#x}, {:d}) : Operand {:d} does not contain an enumeration.".format(__name__, ea, opnum, opnum))
 
-    # Technically, the is the following call is the proper way to do this...
-    # node, opnum = idaapi.get_enum_id(ea, opnum):
+    # After verifying that there's definitely an enumeration at the address, we
+    # can ask for the enumeration identifier to figure out the actual member.
+    E, _ = idaapi.get_enum_id(ea, opnum)
+    if E == idaapi.BADNODE:
+        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}) : Unable to get enumeration identifier for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, F))
 
-    res = opinfo(ea, opnum)
-    if res is None:
-        raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}) : Unable to get info for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
-    return enumeration.by(res.ec.tid)
+    # Grab the operand value and use it to return the member identifier for the enumeration
+    res = op(ea, opnum)
+    return idaapi.get_enum_member(E, res, -1, 0)
 @utils.multicase(opnum=six.integer_types, name=basestring)
 @utils.string.decorate_arguments('name')
 def op_enumeration(opnum, name):
@@ -1028,13 +1032,13 @@ def op_string(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_string(ea, opnum):
     '''Return the string type (``idaapi.STRTYPE_``) of operand `opnum` for the instruction at `ea`.'''
-    fl = database.type.flags(ea)
-    if fl & (idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI) == 0:
+    F = database.type.flags(ea)
+    if F & (idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI) == 0:
         raise E.MissingTypeOrAttribute(u"{:s}.op_string({:#x}, {:d}) : Operand {:d} does not contain a literate string.".format(__name__, ea, opnum, opnum))
 
     res = opinfo(ea, opnum)
     if res is None:
-        raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:d}) : Unable to get `idaapi.opinfo_t` for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, fl))
+        raise E.DisassemblerError(u"{:s}.op_string({:#x}, {:d}) : Unable to get `idaapi.opinfo_t` for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, F))
 
     return res.strtype
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, strtype=six.integer_types)
