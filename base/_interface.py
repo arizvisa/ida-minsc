@@ -1689,6 +1689,7 @@ class architecture_t(object):
         """
         res = idaapi.ph.regnames[index]
         return self.by_name(res)
+    byindex = internal.utils.alias(by_index)
 
     def by_indextype(self, index, dtype):
         """Lookup a register according to its `index` and `dtype`.
@@ -1698,6 +1699,7 @@ class architecture_t(object):
         res = idaapi.ph.regnames[index]
         name = self.__cache__[res, dtype]
         return getattr(self.__register__, name)
+    byindextype = internal.utils.alias(by_indextype)
 
     def by_name(self, name):
         '''Lookup a register according to its `name`.'''
@@ -1706,12 +1708,15 @@ class architecture_t(object):
         if name.lower() in self.__register__:
             return getattr(self.__register__, name.lower())
         return getattr(self.__register__, name)
+    byname = internal.utils.alias(by_name)
 
     def by_indexsize(self, index, size):
         '''Lookup a register according to its `index` and `size`.'''
         dtype_by_size = internal.utils.fcompose(idaapi.get_dtyp_by_size, six.byte2int) if idaapi.__version__ < 7.0 else idaapi.get_dtype_by_size
         dtype = dtype_by_size(size)
         return self.by_indextype(index, dtype)
+    byindexsize = internal.utils.alias(by_indexsize)
+
     def promote(self, register, size=None):
         '''Promote the specified `register` to its next larger `size`.'''
         parent = internal.utils.fcompose(operator.attrgetter('__parent__'), internal.utils.fbox, functools.partial(filter, None), iter, next)
@@ -1722,6 +1727,7 @@ class architecture_t(object):
         except StopIteration: pass
         cls = self.__class__
         raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({:s}{:s}) : Unable to determine the register to promote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+
     def demote(self, register, size=None):
         '''Demote the specified `register` to its next smaller `size`.'''
         childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('iteritems'))
