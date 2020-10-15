@@ -987,7 +987,7 @@ class members_t(object):
         res = builtins.list(self.iterate(**type))
         if len(res) > 1:
             cls = self.__class__
-            map(logging.info, ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.str()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in res))
+            map(logging.info, ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in res))
             logging.warn(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join((__name__, cls.__name__)), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), utils.string.escape("{!s}".format(res[0].typeinfo.dstr()).replace(' *', '*'), '"')))
 
         res = next(iter(res), None)
