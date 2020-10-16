@@ -5751,15 +5751,16 @@ class get(object):
 
         # For older versions of IDA, we get the strtype from the opinfo
         if idaapi.__version__ < 7.0:
-            ti, F = idaapi.opinfo_t(), type.flags(ea)
-            strtype = ti.strtype if idaapi.get_opinfo(ea, 0, F, ti) else idaapi.BADADDR
+            res = address.head(ea)
+            ti, F = idaapi.opinfo_t(), type.flags(res)
+            strtype = ti.strtype if idaapi.get_opinfo(res, 0, F, ti) else idaapi.BADADDR
 
             # and cast the result from idaapi.get_str_type_code to an integer
             get_str_type_code = utils.fcompose(idaapi.get_str_type_code, six.byte2int)
 
         # Fetch the string type at the given address using the newer API
         else:
-            strtype = idaapi.get_str_type(ea)
+            strtype = idaapi.get_str_type(address.head(ea))
             get_str_type_code = idaapi.get_str_type_code
 
         # If a strtype was provided in the parameters, then convert it into a proper
