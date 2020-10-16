@@ -77,11 +77,16 @@ h, top, go, goof = database.h, func.top, database.go, database.go_offset
 
 ## other useful things that we can grab from other modules
 
+# snag the custom exceptions that we use
+exceptions = __import__('internal').exceptions
+locals().update({name : item for name, item in exceptions.__dict__.items() if not name.startswith('_')})
+del(exceptions)
+
 # snag the fake utilities module to share some things with the user...
 utils = __import__('internal').utils
 
 # import all its combinators by copying them directly into locals()
-locals().update({name : item for name, item in utils.__dict__.iteritems() if name in utils.__all__})
+locals().update({name : item for name, item in utils.__dict__.items() if name in utils.__all__})
 
 # construct some pattern matching types
 AnyRegister = utils.PatternAnyType(__import__('internal').interface.register_t)
