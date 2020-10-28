@@ -3158,14 +3158,14 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_unknown():
-        '''Return true if the current address is undefined.'''
+        '''Return true if the current address is marked as unknown.'''
         return type.is_unknown(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_unknown(ea):
-        '''Return true if the address specified by `ea` is undefined.'''
+        '''Return true if the address specified by `ea` is marked as unknown.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
-    unknownQ = undefined = utils.alias(is_unknown, 'type')
+    unknownQ = is_undefined = undefinedQ = utils.alias(is_unknown, 'type')
 
     @utils.multicase()
     @staticmethod
