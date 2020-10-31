@@ -606,8 +606,14 @@ def read(ea):
 def read(ea, size):
     '''Return `size` number of bytes from address `ea`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
-    start, end = interface.address.within(ea, ea+size)
-    return get_bytes(ea, end - start) or ''
+    start, end = interface.address.within(ea, ea + size)
+    return get_bytes(ea, end - start) or b''
+@utils.multicase(bounds=interface.bounds_t)
+def read(bounds):
+    '''Return the bytes within the specified `bounds`.'''
+    get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
+    start, end = bounds
+    return get_bytes(start, end - start) or b''
 
 @utils.multicase(data=bytes)
 def write(data, **persist):
@@ -1109,7 +1115,6 @@ def name(ea, string, *suffix, **flags):
 
     # otherwise, we use the name_without closure to apply it
     return name_outside(ea, string, flag)
-
 @utils.multicase(ea=six.integer_types, none=types.NoneType)
 def name(ea, none, **flags):
     '''Removes the name defined at the address `ea`.'''
@@ -2084,7 +2089,8 @@ class address(object):
     @classmethod
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
-        return cls.iterate(bounds.left, cls.prev(bounds.right))
+        left, right = bounds
+        return cls.iterate(left, cls.prev(right))
 
     @classmethod
     @utils.multicase(end=six.integer_types)
