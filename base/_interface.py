@@ -1753,5 +1753,17 @@ class bounds_t(namedtypedtuple):
 
     @property
     def size(self):
+        '''Return the size of the ``bounds_t``.'''
         left, right = self
         return right - left if left < right else left - right
+
+    def contains(self, ea):
+        '''Return if the address `ea` is contained by the ``bounds_t``.'''
+        left, right = self
+        return left <= ea < right if left < right else right <= ea < left
+    __contains__ = contains
+
+    def __repr__(self):
+        cls = self.__class__
+        res = ("{!s}={:#x}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
+        return "{:s}({:s})".format(cls.__name__, ', '.join(res))
