@@ -741,7 +741,7 @@ class blocks(object):
     @utils.multicase()
     @classmethod
     def digraph(cls, func):
-        """Return a ``networkx.DiGraph`` of the function at the address `ea`.
+        """Return a ``networkx.DiGraph`` of the function `func`.
 
         Requires the ``networkx`` module in order to build the graph.
         """
@@ -815,6 +815,7 @@ class blocks(object):
                 operator.setitem(attrs, '__contiguous__', interface.range.end(Bp) == target)
                 operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
                 operator.setitem(attrs, '__conditional__', instruction.type.is_jxx(source))
+                operator.setitem(attrs, '__unconditional__', instruction.type.is_jmp(source) or instruction.type.is_jmpi(source))
                 G.add_edge(interface.range.start(Bp), target, **attrs)
 
             # ...add an edge for its successors
@@ -826,10 +827,29 @@ class blocks(object):
                 operator.setitem(attrs, '__contiguous__', interface.range.end(B) == target)
                 operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
                 operator.setitem(attrs, '__conditional__', instruction.type.is_jxx(source))
+                operator.setitem(attrs, '__unconditional__', instruction.type.is_jmp(source) or instruction.type.is_jmpi(source))
                 G.add_edge(interface.range.start(B), target, **attrs)
             continue
         return G
     graph = utils.alias(digraph, 'blocks')
+
+    @utils.multicase(start=six.integer_types, exits=(types.ListType, types.TupleType, set))
+    @classmethod
+    def subgraph(cls, start, exits):
+        '''Return a ``networkx.DiGraph`` subgraph of the current function from address `start` and terminating at any address in `exits`.'''
+        return cls.subgraph(ui.current.function(), start, exits)
+    @utils.multicase(start=six.integer_types, exits=(types.ListType, types.TupleType, set))
+    @classmethod
+    def subgraph(cls, func, start, exits):
+        """Return a ``networkx.DiGraph`` subgraph of the function `func` from address `start` and terminating at any address in `exits`.
+
+        Requires the ``networkx`` module in order to build the graph.
+        """
+        G, exits = cls.digraph(func), {item for item in exits} if hasattr(exits, '__iter__') else {exits}
+
+        import networkx
+        nodes = {ea for ea in G.nodes if networkx.has_path(G, start, ea) and any(networkx.has_path(G, ea, item) for item in exits)}
+        return G.subgraph(nodes)
 
     # XXX: Implement .register for filtering blocks
     # XXX: Implement .search for filtering blocks
