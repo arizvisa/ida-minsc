@@ -759,13 +759,20 @@ class blocks(object):
         # create digraph
         import networkx
         attrs = tag(ea)
-        attrs.setdefault('__name__', database.name(ea))
         attrs.setdefault('__address__', ea)
         attrs.setdefault('__chunks__', availableChunks)
 
+        # set some dot-related attributes
+        attrs.setdefault('mode', 'hier')
+        attrs.setdefault('splines', 'curved')
+        attrs.setdefault('rankdir', 'TB')
+
         try:
             attrs.setdefault('__frame__', frame(fn))
-        except E.MissingTypeOrAttribute: pass
+
+        except E.MissingTypeOrAttribute:
+            pass
+
         if color(fn) is not None:
             operator.setitem(attrs, '__color__', color(fn))
 
@@ -775,8 +782,9 @@ class blocks(object):
         empty = {item for item in []}
         fVisibleTags = lambda items: {tag for tag in items if not tag.startswith('__')}
 
-        # create a node for each block
-        for bounds in cls(fn):
+        # create a node for each block in the flowchart
+        for B in cls.iterate(fn):
+            bounds = block(B)
             items = [item for item in database.address.iterate(bounds)]
             tags = [database.tag(item) for item in items]
             last = database.address.prev(bounds.right)
@@ -788,13 +796,11 @@ class blocks(object):
             attrs.setdefault('__edge__', database.address.prev(bounds.right))
             attrs.setdefault('__size__', getattr(bounds, 'size', bounds.right - bounds.left))
 
-            attrs.setdefault('__entry__', bounds.left == ea)
-            attrs.setdefault('__sentinel__', instruction.type.is_return(last))
+            attrs.setdefault('__entry__', bounds.left == ea or not any(B.preds()))
+            attrs.setdefault('__sentinel__', instruction.type.is_sentinel(last) or not any(B.succs()))
             attrs.setdefault('__conditional__', instruction.type.is_jxx(last))
             attrs.setdefault('__unconditional__', any(F(last) for F in [instruction.type.is_jmp, instruction.type.is_jmpi]))
-
-            attrs.setdefault('__data__', database.read(bounds))
-            attrs.setdefault('__calls__', {ea for ea in items if instruction.type.is_call(ea)})
+            attrs.setdefault('__calls__', [ea for ea in items if instruction.type.is_call(ea)])
 
             attrs.setdefault('__chunk_index__', next((idx for idx, ch in enumerate(availableChunks) if ch.left <= bounds.left < ch.right), None))
             attrs.setdefault('__chunk_start__', bounds.left in {item.left for item in availableChunks})
@@ -804,8 +810,31 @@ class blocks(object):
                 operator.setitem(attrs, '__color__', block.color(bounds))
 
             visibletags = [fVisibleTags(t) for t in tags]
-            attrs.setdefault('__tags__', functools.reduce(operator.or_, visibletags, empty))
+            attrs.setdefault('__tags__', [item for item in functools.reduce(operator.or_, visibletags, empty)])
 
+            # convert some of the attributes to dot
+            operator.setitem(attrs, 'id', "{:#x}".format(bounds.left))
+
+            if operator.contains(attrs, '__color__'):
+                clr = attrs.pop('__color__')
+                r, g, b = clr & 0x00ff0000 // 0x10000, clr & 0x0000ff00 // 0x100, clr & 0x000000ff // 0x1
+                operator.setitem(attrs, 'color', "#{R:02x}{G:02x}{B:02x}".format(R=r, G=g, B=b))
+
+            if attrs.get('__entry__', False):
+                operator.setitem(attrs, 'rank', 'max')
+                operator.setitem(attrs, 'shape', 'diamond')
+                attrs.setdefault('__name__', database.name(bounds.left) or name(bounds.left))
+
+            elif attrs.get('__sentinel__', False):
+                operator.setitem(attrs, 'rank', 'min')
+                operator.setitem(attrs, 'shape', 'box')
+
+            else:
+                operator.setitem(attrs, 'rank', 'same')
+
+            operator.setitem(attrs, 'label', attrs.pop('__name__', "{:#x}<>{:#x}".format(bounds.left, bounds.right - 1)))
+
+            # add the actual node
             G.add_node(bounds.left, **attrs)
 
         # for every single basic-block from the flowchart...
@@ -817,10 +846,22 @@ class blocks(object):
 
                 # FIXME: figure out some more default attributes to include
                 attrs = {}
-                operator.setitem(attrs, '__contiguous__', interface.range.end(Bp) == target)
-                operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
-                operator.setitem(attrs, '__conditional__', instruction.type.is_jxx(source))
-                operator.setitem(attrs, '__unconditional__', instruction.type.is_jmp(source) or instruction.type.is_jmpi(source))
+                if interface.range.end(Bp) == target:
+                    operator.setitem(attrs, '__contiguous__', interface.range.end(Bp) == target)
+                elif instruction.type.is_jxx(source):
+                    operator.setitem(attrs, '__conditional__', True)
+                elif instruction.type.is_jmp(source) or instruction.type.is_jmpi(source):
+                    operator.setitem(attrs, '__unconditional__', True)
+                else:
+                    operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
+
+                # add the dot attributes for the edge
+                operator.setitem(attrs, 'dir', 'forward')
+
+                if any(attrs.get(item, False) for item in ['__branch__', '__conditional__', '__unconditional__']):
+                    attrs['label'] = instruction.mnem(source)
+
+                # add the edge to the predecessor
                 G.add_edge(interface.range.start(Bp), target, **attrs)
 
             # ...add an edge for its successors
@@ -829,10 +870,22 @@ class blocks(object):
 
                 # FIXME: figure out some more default attributes to include
                 attrs = {}
-                operator.setitem(attrs, '__contiguous__', interface.range.end(B) == target)
-                operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
-                operator.setitem(attrs, '__conditional__', instruction.type.is_jxx(source))
-                operator.setitem(attrs, '__unconditional__', instruction.type.is_jmp(source) or instruction.type.is_jmpi(source))
+                if interface.range.end(B) == target:
+                    operator.setitem(attrs, '__contiguous__', interface.range.end(B) == target)
+                elif instruction.type.is_jxx(source):
+                    operator.setitem(attrs, '__conditional__', True)
+                elif instruction.type.is_jmp(source) or instruction.type.is_jmpi(source):
+                    operator.setitem(attrs, '__unconditional__', True)
+                else:
+                    operator.setitem(attrs, '__branch__', instruction.type.is_branch(source))
+
+                # add the dot attributes for the edge
+                operator.setitem(attrs, 'dir', 'forward')
+
+                if any(attrs.get(item, False) for item in ['__branch__', '__conditional__', '__unconditional__']):
+                    attrs['label'] = instruction.mnem(source)
+
+                # add the edge to the successor
                 G.add_edge(interface.range.start(B), target, **attrs)
             continue
         return G
