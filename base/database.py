@@ -45,16 +45,18 @@ def within():
 @utils.multicase(ea=six.integer_types)
 def within(ea):
     '''Returns true if address `ea` is within the bounds of the database.'''
-    l, r = config.bounds()
-    return l <= ea < r
+    left, right = config.bounds()
+    return left <= ea < right
 contains = utils.alias(within)
 
 def top():
     '''Return the very lowest address within the database.'''
-    return config.bounds()[0]
+    ea, _ = config.bounds()
+    return ea
 def bottom():
     '''Return the very highest address within the database.'''
-    return config.bounds()[1]
+    _, ea = config.bounds()
+    return ea
 
 class config(object):
     """
@@ -193,7 +195,7 @@ class config(object):
 
     @classmethod
     def bounds(cls):
-        '''Return the bounds of the current database as a tuple formatted as `(left, right)`.'''
+        '''Return the bounds of the current database in a tuple formatted as `(left, right)`.'''
         return interface.bounds_t(cls.info.minEA, cls.info.maxEA)
 
     class registers(object):
@@ -228,7 +230,7 @@ class config(object):
             '''Return the segment register size for the database.'''
             return idaapi.ph_get_segreg_size()
 
-range = bounds = utils.alias(config.bounds, 'config')
+range = utils.alias(config.bounds, 'config')
 filename, idb, module, path = utils.alias(config.filename, 'config'), utils.alias(config.idb, 'config'), utils.alias(config.module, 'config'), utils.alias(config.path, 'config')
 path = utils.alias(config.path, 'config')
 baseaddress = base = utils.alias(config.baseaddress, 'config')
@@ -2035,6 +2037,17 @@ class address(object):
     def __new__(cls, ea):
         '''Return the address of the item containing the address `ea`.'''
         return cls.head(ea)
+
+    @utils.multicase()
+    @classmethod
+    def bounds(cls):
+        '''Return the bounds of the current address in a tuple formatted as `(left, right)`.'''
+        return cls.bounds(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def bounds(cls, ea):
+        '''Return the bounds of the specified address `ea` in a tuple formatted as `(left, right)`.'''
+        return interface.bounds_t(ea, ea + type.size(ea))
 
     @staticmethod
     def __walk__(ea, next, match):
