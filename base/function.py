@@ -891,12 +891,12 @@ class blocks(object):
         return G
     graph = utils.alias(digraph, 'blocks')
 
-    @utils.multicase(start=six.integer_types, exits=(types.ListType, types.TupleType, set))
+    @utils.multicase(start=six.integer_types, exits=six.integer_types + (types.ListType, types.TupleType, set))
     @classmethod
     def subgraph(cls, start, exits):
         '''Return a ``networkx.DiGraph`` subgraph of the current function from address `start` and terminating at any address in `exits`.'''
         return cls.subgraph(ui.current.function(), start, exits)
-    @utils.multicase(start=six.integer_types, exits=(types.ListType, types.TupleType, set))
+    @utils.multicase(start=six.integer_types, exits=six.integer_types + (types.ListType, types.TupleType, set))
     @classmethod
     def subgraph(cls, func, start, exits):
         """Return a ``networkx.DiGraph`` subgraph of the function `func` from address `start` and terminating at any address in `exits`.
@@ -904,14 +904,16 @@ class blocks(object):
         Requires the ``networkx`` module in order to build the graph.
         """
         g, exits = cls.digraph(func), {item for item in exits} if hasattr(exits, '__iter__') else {exits}
+        start_block = block(start).left
+        exit_blocks = { item.left for item in map(block, exits) }
 
         # Generate the subgraph using nodes that are within the path the user specified.
         import networkx
-        nodes = {ea for ea in g.nodes if networkx.has_path(g, start, ea) and any(networkx.has_path(g, ea, item) for item in exits)}
+        nodes = {ea for ea in g.nodes if networkx.has_path(g, start_block, ea) and any(networkx.has_path(g, ea, item) for item in exit_blocks)}
         G = g.subgraph(nodes)
 
         # Update the node attributes so that the entry and exits can still be used.
-        [ operator.setitem(G.nodes[item], '__entry__', True) for item in [start] ]
+        [ operator.setitem(G.nodes[item], '__entry__', True) for item in [start_block] ]
         [ operator.setitem(G.nodes[item], '__sentinel__', not G.succ[item]) for item in G ]
         return G
 
