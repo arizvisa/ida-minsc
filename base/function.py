@@ -781,18 +781,19 @@ class blocks(object):
             attrs.setdefault('__bounds__', bounds)
             attrs.setdefault('__address__', bounds.left)
             attrs.setdefault('__edge__', database.address.prev(bounds.right))
-            attrs.setdefault('__size__', bounds.right - bounds.left)
+            attrs.setdefault('__size__', getattr(bounds, 'size', bounds.right - bounds.left))
 
             attrs.setdefault('__entry__', bounds.left == ea)
             attrs.setdefault('__sentinel__', instruction.type.is_return(last))
-            attrs.setdefault('__branch__', any(f(last) for f in [instruction.type.is_jmp, instruction.type.is_jmpi]))
-            attrs.setdefault('__cbranch__', instruction.type.is_jxx(last))
+            attrs.setdefault('__conditional__', instruction.type.is_jxx(last))
+            attrs.setdefault('__unconditional__', any(F(last) for F in [instruction.type.is_jmp, instruction.type.is_jmpi]))
+
+            attrs.setdefault('__data__', database.read(bounds))
+            attrs.setdefault('__calls__', {ea for ea in items if instruction.type.is_call(ea)})
 
             attrs.setdefault('__chunk_index__', next((idx for idx, ch in enumerate(availableChunks) if ch.left <= bounds.left < ch.right), None))
-            if bounds.left in {item.left for item in availableChunks}:
-                attrs.setdefault('__chunk_start__', True)
-            if bounds.right in {item.right for item in availableChunks}:
-                attrs.setdefault('__chunk_stop__', True)
+            attrs.setdefault('__chunk_start__', bounds.left in {item.left for item in availableChunks})
+            attrs.setdefault('__chunk_stop__', bounds.right in {item.right for item in availableChunks})
 
             if block.color(bounds) is not None:
                 operator.setitem(attrs, '__color__', block.color(bounds))
