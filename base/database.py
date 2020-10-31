@@ -585,14 +585,6 @@ def disassemble(ea, **options):
     return '\n'.join(res)
 disasm = utils.alias(disassemble)
 
-def block(start, end):
-    '''Return the block of bytes from address `start` to `end`.'''
-    if start > end:
-        start, end = end, start
-    start, end = interface.address.within(start, end)
-    return read(start, end - start)
-getblock = get_block = read_block = utils.alias(block)
-
 @utils.multicase()
 def read():
     '''Return the bytes defined at the current address.'''
