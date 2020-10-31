@@ -850,11 +850,17 @@ class blocks(object):
 
         Requires the ``networkx`` module in order to build the graph.
         """
-        G, exits = cls.digraph(func), {item for item in exits} if hasattr(exits, '__iter__') else {exits}
+        g, exits = cls.digraph(func), {item for item in exits} if hasattr(exits, '__iter__') else {exits}
 
+        # Generate the subgraph using nodes that are within the path the user specified.
         import networkx
-        nodes = {ea for ea in G.nodes if networkx.has_path(G, start, ea) and any(networkx.has_path(G, ea, item) for item in exits)}
-        return G.subgraph(nodes)
+        nodes = {ea for ea in g.nodes if networkx.has_path(g, start, ea) and any(networkx.has_path(g, ea, item) for item in exits)}
+        G = g.subgraph(nodes)
+
+        # Update the node attributes so that the entry and exits can still be used.
+        [ operator.setitem(G.nodes[item], '__entry__', True) for item in [start] ]
+        [ operator.setitem(G.nodes[item], '__sentinel__', not G.succ[item]) for item in G ]
+        return G
 
     # XXX: Implement .register for filtering blocks
     # XXX: Implement .search for filtering blocks
@@ -1340,7 +1346,7 @@ class block(object):
         '''(UNSTABLE) Returns the decompiled code of the basic block at the address `ea`.'''
         source = idaapi.decompile(ea)
 
-        res = itertools.imap(functools.partial(operator.__getitem__, source.eamap), cls.iterate(ea))
+        res = itertools.imap(functools.partial(operator.getitem, source.eamap), cls.iterate(ea))
         res = itertools.chain(*res)
         formatted = reduce(lambda t, c: t if t[-1].ea == c.ea else t+[c], res, [next(res)])
 
