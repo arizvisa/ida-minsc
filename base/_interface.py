@@ -1748,3 +1748,10 @@ class bounds_t(namedtypedtuple):
     _fields = ('left', 'right')
     _types = (six.integer_types, six.integer_types)
 
+    def __new__(cls, *args):
+        return super(bounds_t, cls).__new__(cls, *sorted(args))
+
+    @property
+    def size(self):
+        left, right = self
+        return right - left if left < right else left - right
