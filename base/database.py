@@ -4669,7 +4669,8 @@ class set(object):
         If `size` is specified, then align that number of bytes.
         """
         if not type.is_unknown(ea):
-            raise UserWarning("{:s}.set.align({:#x}{:s}) : Data at specified address has already been defined.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(alignment)) if alignment else ''))  # XXX: define a custom warning
+            logging.warn("{:s}.set.alignment({:#x}{:s}) : Refusing to align the specified address ({:#x}) as it has already been defined.".format('.'.join((__name__, cls.__name__)), ea, u", {:s}".format(utils.string.kwargs(alignment)) if alignment else '', ea))  # XXX: define a custom warning
+            return 0
 
         # grab the size out of the kwarg
         if 'size' in alignment:
