@@ -955,6 +955,11 @@ class members_t(object):
         for key, value in six.iteritems(type):
             res = builtins.list(self.__member_matcher.match(key, value, res))
         for item in res: yield item
+    @utils.multicase(string=basestring)
+    @utils.string.decorate_arguments('string')
+    def iterate(self, string):
+        '''Iterate through all of the members in the structure with a name that matches the glob in `string`.'''
+        return self.iterate(like=string)
 
     @utils.multicase(string=basestring)
     @utils.string.decorate_arguments('string')
