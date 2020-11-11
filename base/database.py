@@ -5989,10 +5989,52 @@ class get(object):
         def __getinsn(cls, ea):
             get_switch_info = idaapi.get_switch_info_ex if idaapi.__version__ < 7.0 else idaapi.get_switch_info
 
+            # Try and get a switch from the given address. If it worked, then
+            # we just need to wrap it up nicely for them to use.
             si = get_switch_info(ea)
-            if si is None:
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
-            return interface.switch_t(si)
+            if si is not None:
+                return interface.switch_t(si)
+
+            # Otherwise, we iterate through all of its downrefs to see if any
+            # valid candidates can be produced.
+            for item in xref.down(ea):
+                found = not (get_switch_info(item) is None)
+
+                try:
+                    # If this reference is pointing to data, then treat it
+                    # an array that we needs to be checked.
+                    if not found and type.is_data(item):
+                        items = (case for case in get.array(item))
+                        candidates = (label for label in itertools.chain(*map(xref.up, items)) if get_switch_info(label))
+                        res = builtins.next(candidates)
+
+                    # If the reference didn't turn up anything, then check
+                    # each of its uprefs to look for candidates.
+                    elif not found:
+                        candidates = (label for label in xref.up(item) if get_switch_info(label))
+                        res = builtins.next(candidates)
+
+                    # Otherwise, the ref directly points to a switch and we
+                    # simply need to use it.
+                    else:
+                        res = item
+
+                # If no candidates for the ref were found (StopIteration),
+                # then we continue onto the next available ref.
+                except StopIteration:
+                    pass
+
+                # If no exception was raised, then we should've gotten an
+                # address with a switch. All we need to do is get the switch_info_t
+                # and wrap it up for the user before we return it.
+                else:
+                    si = get_switch_info(res)
+                    return interface.switch_t(si)
+                continue
+
+            # If the loop went through all of the refs for the given address, then
+            # we didn't find shit and we need to let the user know here.
+            raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to instantiate an `idaapi.switch_info_ex_t` at branch instruction.".format('.'.join((__name__, 'type', cls.__name__)), ea))
 
         @utils.multicase()
         def __new__(cls):
