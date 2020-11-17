@@ -202,8 +202,8 @@ def repr(enum):
     '''Return a printable summary of the enumeration `enum`.'''
     eid = by(enum)
     w = size(eid)*2
-    res = [(member.name(n), member.value(n), member.mask(n), member.comment(n)) for n in members.iterate(eid)]
-    aligned = max([len(n) for n, _, _, _ in res] or [0])
+    res = [(member.name(item), member.value(item), member.mask(item), member.comment(item)) for item in members.iterate(eid)]
+    aligned = max([len(item) for item, _, _, _ in res] if res else [0])
     return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned)+((' // '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res)))   # XXX
 
 __matcher__ = utils.matcher()
@@ -242,11 +242,11 @@ def list(**type):
     '''List all of the enumerations within the database that match the keyword specified by `type`.'''
     res = builtins.list(iterate(**type))
 
-    maxindex = max(builtins.map(idaapi.get_enum_idx, res) or [1])
-    maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) or [0])
-    maxsize = max(builtins.map(size, res) or [0])
+    maxindex = max(builtins.map(idaapi.get_enum_idx, res) if res else [1])
+    maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) if res else [0])
+    maxsize = max(builtins.map(size, res) if res else [0])
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) or [database.config.bits()/4.0])
+    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) if res else [database.config.bits()/4.0])
     except: cmask = 0
 
     for n in res:
@@ -418,8 +418,8 @@ class members(object):
         # FIXME: make this consistent with every other .list using the matcher class
         eid = by(enum)
         res = builtins.list(cls.iterate(eid))
-        maxindex = max(builtins.map(utils.first, enumerate(res)) or [1])
-        maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), res) or [1])
+        maxindex = max(builtins.map(utils.first, enumerate(res)) if res else [1])
+        maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), res) if res else [1])
         for i, mid in enumerate(res):
              six.print_(u"[{:d}] 0x{:>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
         return
