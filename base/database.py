@@ -1804,10 +1804,17 @@ class imports(object):
     def __new__(cls):
         return cls.__iterate__()
 
-    # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
+    @staticmethod
+    def __formats__(module_name_ordinal):
+        module, name, ordinal = module_name_ordinal
+        return name or u"Ordinal{:d}".format(ordinal)
+    @staticmethod
+    def __formatl__(module_name_ordinal):
+        module, name, ordinal = module_name_ordinal
 
-    __formats__ = staticmethod(lambda (module, name, ordinal): name or u"Ordinal{:d}".format(ordinal))
-    __formatl__ = staticmethod(lambda (module, name, ordinal): u"{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal))))
+        # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
+        return u"{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal)))
+
     __format__ = __formatl__
 
     __matcher__ = utils.matcher()
@@ -1816,7 +1823,7 @@ class imports(object):
     __matcher__.boolean('fullname', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, __formatl__.__func__))
     __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, __formats__.__func__))
     __matcher__.boolean('module', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, utils.first))
-    __matcher__.mapping('ordinal', utils.fcompose(utils.second, lambda(m, n, o): o))
+    __matcher__.mapping('ordinal', utils.fcompose(utils.second, utils.funbox(lambda m, n, o: o)))
     __matcher__.boolean('regex', re.search, utils.fcompose(utils.second, __format__))
     __matcher__.predicate('predicate', lambda n:n)
     __matcher__.predicate('pred', lambda n:n)
@@ -4453,12 +4460,16 @@ class extra(object):
         return cls.__del_suffix__(ea)
 
     @classmethod
-    def __insert_space(cls, ea, count, (getter, setter, remover)):
+    def __insert_space(cls, ea, count, getter_setter_remover):
+        getter, setter, remover = getter_setter_remover
+
         res = getter(ea)
         lstripped, nl = ('', 0) if res is None else (res.lstrip('\n'), len(res) - len(res.lstrip('\n')) + 1)
         return setter(ea, '\n'*(nl+count-1) + lstripped) if nl + count > 0 or lstripped else remover(ea)
     @classmethod
-    def __append_space(cls, ea, count, (getter, setter, remover)):
+    def __append_space(cls, ea, count, getter_setter_remover):
+        getter, setter, remover = getter_setter_remover
+
         res = getter(ea)
         rstripped, nl = ('', 0) if res is None else (res.rstrip('\n'), len(res) - len(res.rstrip('\n')) + 1)
         return setter(ea, rstripped + '\n'*(nl+count-1)) if nl + count > 0 or rstripped else remover(ea)
