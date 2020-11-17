@@ -17,14 +17,14 @@ import sys, heapq, collections, array, math
 import internal
 import idaapi
 
-__all__ = ['fbox','funbox','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','imap','ifilter','ichain','izip','count']
+__all__ = ['fbox','funbox','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','count']
 
 ### functional programming primitives (FIXME: probably better to document these with examples)
 
 # box any specified arguments
 fbox = lambda *a: a
 # return a closure that executes `f` with the arguments unboxed.
-funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + builtins.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **builtins.dict(k.items() + kp.items()))
+funbox = lambda f, *a, **k: lambda *ap, **kp: f(*(a + functools.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return the first argument
 fcar = lambda *a: a[:1][0]
 # return the rest of the arguments
@@ -32,13 +32,13 @@ fcdr = lambda *a: a[1:]
 # return a closure that will check that `object` is an instance of `type`.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item `key`.
-fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), builtins.iter, builtins.next, fpartial(operator.eq, builtins.None))
+fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), builtins.iter, builtins.next, fpartial(operator.eq, None))
 # return a closure that will get a particular element from an object
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
 # return a closure that will set a particular element on an object
 fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, item, value) or object
 # return a closure that will check if its argument has an `attribute`.
-fhasattr = fattributeQ = lambda attribute: frpartial(hasattr, attribute)
+fhasattr = fattributeQ = lambda attribute: frpartial(builtins.hasattr, attribute)
 # return a closure that will get a particular attribute from an object
 fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(object, attribute, *default)
 # return a closure that will set a particular attribute on an object
@@ -52,7 +52,7 @@ fdefault = lambda default: lambda object: object or default
 # return the first, second, or third item of a box.
 first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right
-fcompose = lambda *f: builtins.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), builtins.reversed(f))
+fcompose = lambda *f: functools.reduce(lambda f1, f2: lambda *a: f1(f2(*a)), builtins.reversed(f))
 # return a closure that executes function `f` whilst discarding any extra arguments
 fdiscard = lambda f: lambda *a, **k: f()
 # return a closure that executes function `crit` and then returns/executes `f` or `t` based on whether or not it's successful.
@@ -61,29 +61,29 @@ fcondition = lambda crit: lambda t, f: \
 # return a closure that takes a list of functions to execute with the provided arguments
 fmap = lambda *fa: lambda *a, **k: (f(*a, **k) for f in fa)
 #lazy = lambda f, state={}: lambda *a, **k: state[(f, a, builtins.tuple(builtins.sorted(k.items())))] if (f, a, builtins.tuple(builtins.sorted(k.items()))) in state else state.setdefault((f, a, builtins.tuple(builtins.sorted(k.items()))), f(*a, **k))
-#lazy = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **dict(k.items() + kp.items()))
+#lazy = lambda f, *a, **k: lambda *ap, **kp: f(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a memoized closure that's lazy and only executes when evaluated
 def flazy(f, *a, **k):
     sortedtuple, state = fcompose(builtins.sorted, builtins.tuple), {}
     def lazy(*ap, **kp):
-        A, K = a+ap, sortedtuple(k.items() + kp.items())
-        return state[(A, K)] if (A, K) in state else state.setdefault((A, K), f(*A, **builtins.dict(k.items()+kp.items())))
+        A, K = a + ap, sortedtuple(builtins.tuple(k.items()) + builtins.tuple(kp.items()))
+        return state[(A, K)] if (A, K) in state else state.setdefault((A, K), f(*A, **{ key : value for key, value in itertools.chain(k.items(), kp.items())}))
     return lazy
 # return a closure with the function's arglist partially applied
 fpartial = functools.partial
 # return a closure that applies the provided arguments to the function `f`.
-fapply = lambda f, *a, **k: lambda *ap, **kp: f(*(a+ap), **builtins.dict(k.items() + kp.items()))
+fapply = lambda f, *a, **k: lambda *ap, **kp: f(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a closure that will use the specified arguments to call the provided function.
-fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a+ap), **builtins.dict(k.items() + kp.items()))
+fcurry = lambda *a, **k: lambda f, *ap, **kp: f(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a closure that applies the initial arglist to the end of function `f`.
-frpartial = lambda f, *a, **k: lambda *ap, **kp: f(*(ap + builtins.tuple(builtins.reversed(a))), **builtins.dict(k.items() + kp.items()))
+frpartial = lambda f, *a, **k: lambda *ap, **kp: f(*(ap + builtins.tuple(builtins.reversed(a))), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a closure that applies the arglist to function `f` in reverse.
-freverse = lambda f, *a, **k: lambda *ap, **kp: f(*builtins.reversed(a + ap), **builtins.dict(k.items() + kp.items()))
+freverse = lambda f, *a, **k: lambda *ap, **kp: f(*builtins.reversed(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a closure that executes function `f` and includes the caught exception (or None) as the first element in the boxed result.
 def fcatch(f, *a, **k):
     def fcatch(*a, **k):
-        try: return builtins.None, f(*a, **k)
-        except: return sys.exc_info()[1], builtins.None
+        try: return None, f(*a, **k)
+        except: return sys.exc_info()[1], None
     return functools.partial(fcatch, *a, **k)
 # boolean inversion of the result of a function
 fcomplement = fnot = frpartial(fcompose, operator.not_)
@@ -96,7 +96,7 @@ itake = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*count), bui
 # get the `nth` element from an iterator
 iget = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*(count)), builtins.tuple, operator.itemgetter(-1))
 # copy from itertools
-imap, ifilter, ichain, izip = itertools.imap, itertools.ifilter, itertools.chain, itertools.izip
+islice, imap, ifilter, ichain, izip = itertools.islice, builtins.map, builtins.filter, itertools.chain, builtins.zip
 # count number of elements of a container
 count = fcompose(builtins.iter, builtins.list, builtins.len)
 
@@ -246,8 +246,10 @@ class multicase(object):
         return "{:s}({:s})".format(func.func_name, ', '.join(itertools.chain(*res)))
 
     @classmethod
-    def match(cls, (args, kwds), heap):
-        '''Given the specified `args` and `kwds`, find the correct function according to its types.'''
+    def match(cls, args_kwds, heap):
+        '''Given the tuple (`args`, `kwds`), find the correct function according to its types.'''
+        args, kwds = args_kwds
+
         # FIXME: yep, done in O(n) time.
         for f, ts, (sa, af, defaults, (argname, kwdname)) in heap:
             # populate our arguments
@@ -786,7 +788,7 @@ class wrap(object):
         # if operand was defined, then encode it
         op1 = (operand & 0x00ff) / 0x0001
         op2 = (operand & 0xff00) / 0x0100
-        return reduce(operator.add, map(six.int2byte, (opcode, op1, op2)), bytes())
+        return functools.reduce(operator.add, map(six.int2byte, [opcode, op1, op2]), bytes())
 
     @classmethod
     def co_varargsQ(cls, co):
