@@ -21,16 +21,16 @@ def greeting():
     barrier = 93
     available = ['database', 'function', 'instruction', 'segment', 'structure', 'enumeration']
 
-    print '=' * barrier
-    print "Welcome to the ida-minsc plugin!"
-    print ""
-    print "You can find documentation at https://arizvisa.github.io/ida-minsc/"
-    print ""
-    print "The available namespaces are: {:s}".format(', '.join(available))
-    print "Please use `help(namespace)` for their usage."
-    print ""
-    print "Your globals have also been cleaned, use `dir()` to see your work."
-    print '-' * barrier
+    print('=' * barrier)
+    print("Welcome to the ida-minsc plugin!")
+    print("")
+    print("You can find documentation at https://arizvisa.github.io/ida-minsc/")
+    print("")
+    print("The available namespaces are: {:s}".format(', '.join(available)))
+    print("Please use `help(namespace)` for their usage.")
+    print("")
+    print("Your globals have also been cleaned, use `dir()` to see your work.")
+    print('-' * barrier)
 
 ### comment hooks
 class commentbase(object):
@@ -164,7 +164,7 @@ class address(commentbase):
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
-        except StopIteration, E:
+        except StopIteration as E:
             logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt)))
             cls.event = cls._event(); next(cls.event)
 
@@ -195,7 +195,7 @@ class address(commentbase):
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
-        except StopIteration, E:
+        except StopIteration as E:
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt))
             cls.event = cls._event(); next(cls.event)
 
@@ -358,7 +358,7 @@ class globals(commentbase):
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
-        except StopIteration, E:
+        except StopIteration as E:
             logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
 
@@ -396,7 +396,7 @@ class globals(commentbase):
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
-        except StopIteration, E:
+        except StopIteration as E:
             logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
 
