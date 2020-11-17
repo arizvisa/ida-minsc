@@ -165,7 +165,7 @@ def by(**type):
 
     listable = builtins.list(__iterate__(**type))
     if len(listable) > 1:
-        maxaddr = max(builtins.map(interface.range.end, listable) or [1])
+        maxaddr = max(builtins.map(interface.range.end, listable) if listable else [1])
         caddr = math.ceil(math.log(maxaddr)/math.log(16))
         builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), int(caddr), interface.range.end(seg), int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
         logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), int(caddr), interface.range.end(listable[0]), int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
