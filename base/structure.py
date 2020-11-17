@@ -1683,8 +1683,6 @@ class member_t(object):
         If `opnum` is ``None``, then the returned `address` has the structure applied to it.
         If `opnum` is defined, then the instruction at the returned `address` references a field that contains the specified structure.
         """
-        get_opinfo = (lambda (ti, ea, opnum, fl): idaapi.get_opinfo(ea, opnum, fl, ti)) if idaapi.__version__ < 7.0 else idaapi.get_opinfo
-
         mid = self.id
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
