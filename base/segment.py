@@ -382,7 +382,7 @@ def within(ea):
 def contains(ea):
     '''Returns true if the address `ea` is contained within the current segment.'''
     return contains(ui.current.segment(), ea)
-@utils.multicase(segaddr=six.integer_types, ea=six.integer_types)
+@utils.multicase(address=six.integer_types, ea=six.integer_types)
 def contains(address, ea):
     '''Returns true if the address `ea` is contained within the segment belonging to the specified `address`.'''
     seg = by_address(address)
