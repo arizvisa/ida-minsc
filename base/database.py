@@ -3820,7 +3820,7 @@ class xref(object):
     def add_code(target, **reftype):
         '''Add a code reference from the current address to `target`.'''
         return xref.add_code(ui.current.address(), target, **reftype)
-    @utils.multicase(six=six.integer_types, target=six.integer_types)
+    @utils.multicase(ea=six.integer_types, target=six.integer_types)
     @staticmethod
     def add_code(ea, target, **reftype):
         """Add a code reference from address `ea` to `target`.
@@ -4750,7 +4750,7 @@ class set(object):
         res = builtins.next((strtype[item] for item in ['strtype', 'type'] if item in strtype), (1, 0))
 
         # If it's not tuple, then convert it to one that uses a null-terminator.
-        if not isinstance(res, (types.ListType, types.TupleType)):
+        if not isinstance(res, (builtins.list, builtins.tuple)):
             res = (res, 0)
 
         # Now we can extract the width and the length size so we can validate them.
@@ -5175,7 +5175,7 @@ class set(object):
 
     struc = struct = utils.alias(structure, 'set')
 
-    @utils.multicase(type=types.ListType)
+    @utils.multicase(type=builtins.list)
     @classmethod
     def array(cls, type):
         '''Set the data at the current address to an array of the specified `type`.'''
@@ -5185,7 +5185,7 @@ class set(object):
     def array(cls, type, length):
         '''Set the data at the current address to an array with the specified `length` and `type`.'''
         return cls.array(ui.current.address(), type, length)
-    @utils.multicase(ea=six.integer_types, type=types.ListType)
+    @utils.multicase(ea=six.integer_types, type=builtins.list)
     @classmethod
     def array(cls, ea, type):
         '''Set the data at the address `ea` to an array of the specified `type`.'''
@@ -5250,7 +5250,7 @@ class get(object):
         '''Read an unsigned integer from the current address.'''
         ea = ui.current.address()
         return cls.unsigned(ea, type.size(ea), **byteorder)
-    @utils.multicase(size=six.integer_types)
+    @utils.multicase(ea=six.integer_types)
     @classmethod
     def unsigned(cls, ea, **byteorder):
         '''Read an unsigned integer from the address `ea` using the size defined in the database.'''
@@ -5277,7 +5277,7 @@ class get(object):
         '''Read a signed integer from the current address.'''
         ea = ui.current.address()
         return cls.signed(ea, type.size(ea), **byteorder)
-    @utils.multicase(size=six.integer_types)
+    @utils.multicase(ea=six.integer_types)
     @classmethod
     def signed(cls, ea, **byteorder):
         '''Read a signed integer from the address `ea` using the size defined in the database.'''
@@ -5691,7 +5691,7 @@ class get(object):
 
             # If we were given an array in the "type" parameter, then reassign
             # that back into the "length" parameter so it can be used later.
-            if isinstance(length['type'], types.ListType):
+            if isinstance(length['type'], builtins.list):
                 _, count = length['type']
                 length.setdefault('length', count)
 
@@ -5795,7 +5795,7 @@ class get(object):
             # Extract the strtype that the user gave us whilst ensuring that we remove
             # the items out of the parameters since we later pass them to `get.array`.
             res = builtins.next((length.pop(item) for item in ['strtype', 'type'] if item in length))
-            width_t, length_t = res if isinstance(res, (types.ListType, types.TupleType)) else (res, 0)
+            width_t, length_t = res if isinstance(res, (builtins.list, builtins.tuple)) else (res, 0)
 
             # Now that we've unpacked the string width and length prefix size from the
             # parameter, we can recombine them into a strtype code.
