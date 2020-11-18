@@ -10,7 +10,7 @@ functions, and a number of functional programming primitives (combinators).
 import six
 from six.moves import builtins
 
-import logging, types, weakref
+import os, logging, types, weakref
 import functools, operator, itertools
 import sys, heapq, collections, array, math
 
@@ -239,9 +239,47 @@ class multicase(object):
 
     @classmethod
     def prototype(cls, func, parameters={}):
-        '''Generate a prototype for an instance of a function.'''
+        '''Generate a prototype for an instance of a function `func`.'''
         args, defaults, (star, starstar) = cls.ex_args(func)
-        argsiter = ("{:s}={:s}".format(n, parameters[n].__name__ if isinstance(parameters[n], types.TypeType) or parameters[n] in {callable} else '|'.join(t.__name__ for t in parameters[n]) if hasattr(parameters[n], '__iter__') else "{!r}".format(parameters[n])) if parameters.has_key(n) else n for n in args)
+
+        def flatten(iterable):
+            '''This closure takes the provided `iterable` (or tree), and flattens it into a list.'''
+            for item in iterable:
+                if isinstance(item, (builtins.list, builtins.tuple)):
+                    for item in flatten(item):
+                        yield item
+                    continue
+                yield item
+            return
+
+        def Fargsiter(names=args, values=parameters):
+            '''Yield a tuple for each individual parameter composed of the name and its constraints.'''
+            for item in names:
+                if item not in parameters:
+                    yield item, None
+                    continue
+
+                param_type = parameters[item]
+                if isinstance(param_type, types.TypeType) or param_type in {callable}:
+                    yield item, param_type.__name__
+                elif hasattr(param_type, '__iter__'):
+                    yield item, '|'.join(t.__name__ for t in flatten(param_type))
+                else:
+                    yield item, "{!s}".format(param_type)
+                continue
+            return
+
+        # Log any multicased functions that define type constraints for parameters which don't exist.
+        co = func.func_code
+        co_fullname, co_filename, co_lineno = '.'.join([func.__module__, func.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
+        unavailable = six.viewkeys(parameters) - args
+        if unavailable:
+            proto_s = "{:s}({:s}{:s}{:s})".format(co_fullname, ', '.join(args) if args else '', ", *{:s}".format(star) if star and args else "*{:s}".format(star) if star else '', ", **{:s}".format(starstar) if starstar and (star or args) else "**{:s}".format(starstar) if starstar else '')
+            path_s = "{:s}:{:d}".format(co_filename, co_lineno)
+            logging.warning("{:s}({:s}): unable to constrain the type in {:s} for parameter{:s} ({:s}) at {:s}.".format('.'.join([__name__, 'multicase']), co_fullname, proto_s, '' if len(unavailable) == 1 else 's', ', '.join(unavailable), path_s))
+
+        # Return the prototype for the current function with the provided parameter constraints.
+        argsiter = ("{:s}={:s}".format(item, parameter) if parameter else item for item, parameter in Fargsiter(args, parameters))
         res = (argsiter, ("*{:s}".format(star),) if star else (), ("**{:s}".format(starstar),) if starstar else ())
         return "{:s}({:s})".format(func.func_name, ', '.join(itertools.chain(*res)))
 
