@@ -1595,7 +1595,7 @@ class member_t(object):
             t, sz = res
             if isinstance(t, structure_t):
                 t = __instance__(t.id, offset=self.offset)
-            elif isinstance(t, types.ListType) and isinstance(t[0], structure_t):
+            elif isinstance(t, builtins.list) and isinstance(t[0], structure_t):
                 t[0] = __instance__(t[0].id, offset=self.offset)
             res = t, sz
         return res
