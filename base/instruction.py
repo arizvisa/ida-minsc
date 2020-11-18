@@ -881,7 +881,7 @@ def op_structure(opnum, structure, **delta):
 def op_structure(opnum, member, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, [member.parent, member], **delta)
-@utils.multicase(opnum=six.integer_types, path=(types.TupleType, types.ListType))
+@utils.multicase(opnum=six.integer_types, path=(builtins.tuple, builtins.list))
 def op_structure(opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
@@ -893,7 +893,7 @@ def op_structure(ea, opnum, structure, **delta):
 def op_structure(ea, opnum, member, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
     return op_structure(ea, opnum, [member.parent, member], **delta)
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(types.TupleType, types.ListType))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(builtins.tuple, builtins.list))
 def op_structure(ea, opnum, path, **delta):
     """Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.
 
@@ -1015,12 +1015,12 @@ def op_enumeration(opnum, name):
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
     return op_enumeration(ea, opnum, enumeration.by(name))
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=six.integer_types + (types.TupleType, types.ListType))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=(six.string_types, builtins.tuple, builtins.list))
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration `id` to operand `opnum` of the instruction at `ea`.'''
-    ok = idaapi.op_enum(ea, opnum, *id) if isinstance(id, types.TupleType) else idaapi.op_enum(ea, opnum, id, 0)
+    ok = idaapi.op_enum(ea, opnum, *id) if isinstance(id, builtins.tuple) else idaapi.op_enum(ea, opnum, id, 0)
     if not ok:
-        eid, serial = id if isinstance(id, (types.TupleType, types.ListType)) else (id, 0)
+        eid, serial = id if isinstance(id, (builtins.tuple, builtins.list)) else (id, 0)
         raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}, {:#x}) : Unable to set operand {:d} for instruction ({:#x}) to enumeration {:#x} (serial {:d}).".format(__name__, ea, opnum, eid, opnum, ea, eid, serial))
     return op_enumeration(ea, opnum)
 op_enum = utils.alias(op_enumeration)
@@ -1066,7 +1066,7 @@ def ops_refinfo(ea):
     '''Returns the ``idaapi.refinfo_t`` for the instruction at the address `ea`.'''
     OPND_ALL = getattr(idaapi, 'OPND_ALL', 0xf)
     return op_refinfo(ea, OPND_ALL)
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types)
+@utils.multicase(opnum=six.integer_types)
 def op_refinfo(opnum):
     '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
     return op_refinfo(ui.current.address(), opnum)
