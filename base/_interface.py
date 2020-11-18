@@ -1334,6 +1334,11 @@ class ref_t(namedtypedtuple):
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, (six.integer_types, types.NoneType), reftype_t)
 
+    def __repr__(self):
+        cls = self.__class__
+        res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in {'address'} else "{!s}").format(value)) for name, value in zip(self._fields, self))
+        return "{:s}({:s})".format(cls.__name__, ', '.join(res))
+
 class opref_t(ref_t):
     """
     This tuple is used to represent references that include an operand number
