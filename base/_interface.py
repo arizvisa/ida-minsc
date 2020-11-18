@@ -1332,7 +1332,7 @@ class ref_t(namedtypedtuple):
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
-    _types = (six.integer_types, (types.NoneType,) + six.integer_types, reftype_t)
+    _types = (six.integer_types, (six.integer_types, types.NoneType), reftype_t)
 
 class opref_t(ref_t):
     """
