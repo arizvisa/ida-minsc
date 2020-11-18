@@ -891,12 +891,12 @@ class blocks(object):
         return G
     graph = utils.alias(digraph, 'blocks')
 
-    @utils.multicase(start=six.integer_types, exits=six.integer_types + (types.ListType, types.TupleType, set))
+    @utils.multicase(start=six.integer_types, exits=(six.integer_types, builtins.list, builtins.tuple, builtins.set))
     @classmethod
     def subgraph(cls, start, exits):
         '''Return a ``networkx.DiGraph`` subgraph of the current function from address `start` and terminating at any address in `exits`.'''
         return cls.subgraph(ui.current.function(), start, exits)
-    @utils.multicase(start=six.integer_types, exits=six.integer_types + (types.ListType, types.TupleType, set))
+    @utils.multicase(start=six.integer_types, exits=(six.integer_types, builtins.list, builtins.tuple, builtins.set))
     @classmethod
     def subgraph(cls, func, start, exits):
         """Return a ``networkx.DiGraph`` subgraph of the function `func` from address `start` and terminating at any address in `exits`.
@@ -963,7 +963,7 @@ class block(object):
     def at(cls, bb):
         '''Return the ``idaapi.BasicBlock`` of the basic block `bb`.'''
         return bb
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def at(cls, bounds):
         '''Return the ``idaapi.BasicBlock`` identified by `bounds`.'''
@@ -990,7 +990,7 @@ class block(object):
     def id(cls, bb):
         '''Return the block id of the basic block `bb`.'''
         return bb.id
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def id(cls, bounds):
         '''Return the block id of the basic block identified by `bounds`.'''
@@ -1013,7 +1013,7 @@ class block(object):
     def __new__(cls, bb):
         '''Returns the boundaries of the basic block `bb`.'''
         return interface.range.bounds(bb)
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     def __new__(cls, bounds):
         '''Return the boundaries of the basic block identified by `bounds`.'''
         left, _ = bounds
@@ -1043,7 +1043,7 @@ class block(object):
         '''Return whether the address `ea` is within the basic block `bb`.'''
         left, right = cls(bb)
         return left <= ea < right
-    @utils.multicase(bounds=types.TupleType, ea=six.integer_types)
+    @utils.multicase(bounds=builtins.tuple, ea=six.integer_types)
     @classmethod
     def contains(cls, bounds, ea):
         '''Return whether the address `ea` is within the basic block identified by `bounds`.'''
@@ -1068,7 +1068,7 @@ class block(object):
         '''Return the top address of the basic block `bb`.'''
         left, _ = cls(bb)
         return left
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def top(cls, bounds):
         '''Return the top address of the basic block identified by `bounds`.'''
@@ -1093,7 +1093,7 @@ class block(object):
         '''Return the bottom address of the basic block `bb`.'''
         _, right = cls(bb)
         return right
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def bottom(cls, bounds):
         '''Return the bottom address of the basic block identified by `bounds`.'''
@@ -1129,7 +1129,7 @@ class block(object):
             b, r = (res&0xff0000)>>16, res&0x0000ff
             return (r<<16) | (res&0x00ff00) | b
         return None
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def color(cls, bounds):
         '''Returns the color of the basic block identified by `bounds`.'''
@@ -1150,7 +1150,7 @@ class block(object):
             database.color(ea, None)
             # internal.netnode.alt.remove(ea, 0x14)
         return res
-    @utils.multicase(bounds=types.TupleType, none=types.NoneType)
+    @utils.multicase(bounds=builtins.tuple, none=types.NoneType)
     @classmethod
     def color(cls, bounds, none):
         '''Removes the color of the basic block identified by `bounds`.'''
@@ -1228,7 +1228,7 @@ class block(object):
             database.color(ea, rgb)
             #internal.netnode.alt.set(ea, 0x14, ni.bg_color)
         return res
-    @utils.multicase(bounds=types.TupleType, rgb=six.integer_types)
+    @utils.multicase(bounds=builtins.tuple, rgb=six.integer_types)
     @classmethod
     def color(cls, bounds, rgb, **frame):
         '''Sets the color of the basic block identifed by `bounds` to `rgb`.'''
@@ -1246,7 +1246,7 @@ class block(object):
         '''Return the addresses of all the instructions that branch to the basic block at address `ea`.'''
         res = blocks.at(ea)
         return cls.before(res)
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def before(cls, bounds):
         '''Return the addresses of all the instructions that branch to the basic block identified by `bounds`.'''
@@ -1270,7 +1270,7 @@ class block(object):
         '''Return the addresses of all the instructions that the basic block at address `ea` leaves to.'''
         bb = cls.at(ea)
         return cls.after(bb)
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def after(cls, bounds):
         '''Return the addresses of all the instructions that branch to the basic block identified by `bounds`.'''
@@ -1294,7 +1294,7 @@ class block(object):
         '''Yield all the addresses in the basic block at address `ea`.'''
         left, right = cls(ea)
         return database.address.iterate(left, database.address.prev(right))
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def iterate(cls, bounds):
         '''Yield all the addresses in the basic block identified by `bounds`.'''
@@ -1318,7 +1318,7 @@ class block(object):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
         bb = cls.at(ea)
         return cls.register(B, reg, *regs, **modifiers)
-    @utils.multicase(bounds=types.TupleType, reg=(basestring, interface.register_t))
+    @utils.multicase(bounds=builtins.tuple, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block identified by `bounds` that uses `reg` or any one of the registers in `regs`.'''
@@ -1351,7 +1351,7 @@ class block(object):
         '''Return all the bytes contained in the basic block at address `ea`.'''
         l, r = cls(ea)
         return database.read(l, r - l)
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def read(cls, bounds):
         '''Return all the bytes contained in the basic block identified by `bounds`.'''
@@ -1375,7 +1375,7 @@ class block(object):
         '''Returns the disassembly of the basic block at the address `ea`.'''
         F = functools.partial(database.disassemble, **options)
         return '\n'.join(itertools.imap(F, cls.iterate(ea)))
-    @utils.multicase(bounds=types.TupleType)
+    @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def disassemble(cls, bounds, **options):
         '''Returns the disassembly of the basic block identified by `bounds`.'''
@@ -1834,7 +1834,7 @@ def tags(func):
 
 # FIXME: consolidate this logic into the utils module
 # FIXME: document this properly
-@utils.multicase(tag=basestring)
+@utils.multicase()
 @utils.string.decorate_arguments('And', 'Or')
 def select(**boolean):
     '''Query the contents of the current function for any tags specified by `boolean`'''
@@ -1976,7 +1976,7 @@ class type(object):
     def __new__(cls, none):
         '''Remove the typeinfo for the current function.'''
         return cls(ui.current.address(), None)
-    @utils.multicase(func=six.integer_types + (idaapi.func_t,))
+    @utils.multicase(func=(six.integer_types, idaapi.func_t))
     def __new__(cls, func):
         '''Return the typeinfo for the function `func` as a ``idaapi.tinfo_t``.'''
         _, ea = interface.addressOfRuntimeOrStatic(func)
