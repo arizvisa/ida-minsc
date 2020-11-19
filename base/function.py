@@ -1689,15 +1689,26 @@ def tag(func):
         res.setdefault('__name__', fname)
 
     # add the function's typeinfo to the result
-    if type.has_prototype(fn):
-        ti, fname = type(fn), database.name(interface.range.start(fn))
+    try:
+        if type.has_prototype(fn):
+            ti, fname = type(fn), database.name(interface.range.start(fn))
 
-        # Demangle the name if necessary, and render it to a string.
-        realname = internal.declaration.unmangle_name(fname)
-        fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
+            # Demangle the name if necessary, and render it to a string.
+            realname = internal.declaration.unmangle_name(fname)
+            fprototype = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
 
-        # And then return it to the user
-        res.setdefault('__typeinfo__', fprototype)
+            # And then return it to the user
+            res.setdefault('__typeinfo__', fprototype)
+
+    # if an exception was raised, then this name might be mangled and we need
+    # to rip the type information from the demangled name.
+    except E.InvalidTypeOrValueError:
+        demangled = internal.declaration.demangle(fname)
+
+        # if the demangled name is different from the actual name, then we need
+        # to extract its result type and prepend it to the demangled name.
+        if demangled != fname:
+            res.setdefault('__typeinfo__', demangled)
 
     # ..and now hand it off.
     return res
