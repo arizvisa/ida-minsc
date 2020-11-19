@@ -1489,16 +1489,27 @@ def tag(ea):
 
     # if there's some typeinfo then we need to figure out its name so we can
     # format it.
-    if type.has_typeinfo(ea):
-        ti = type(ea)
+    try:
+        if type.has_typeinfo(ea):
+            ti = type(ea)
 
-        # Demangle the name if it's mangled in some way, and use it to render
-        # the typeinfo to return.
-        realname = internal.declaration.unmangle_name(aname)
-        ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
+            # Demangle just the name if it's mangled in some way, and use it to render
+            # the typeinfo to return.
+            realname = internal.declaration.unmangle_name(aname)
+            ti_s = idaapi.print_tinfo('', 0, 0, 0, ti, utils.string.to(realname), '')
 
-        # Add it to our dictionary that we return to the user.
-        res.setdefault('__typeinfo__', ti_s)
+            # Add it to our dictionary that we return to the user.
+            res.setdefault('__typeinfo__', ti_s)
+
+    # if we caught an exception, then this name might be mangled and we can just rip
+    # our type information directly from the name.
+    except E.InvalidTypeOrValueError:
+        demangled = internal.declaration.demangle(aname)
+
+        # if the demangled name is different from the actual name, then we need
+        # to extract its result type and prepend it to the demangled name.
+        if demangled != aname:
+            res.setdefault('__typeinfo__', demangled)
 
     # now return what the user cares about
     return res
@@ -3074,7 +3085,7 @@ class type(object):
         # Check if we're pointing at an export or directly at a function. If we
         # are, then we need to use function.type.
         try:
-            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            rt, ea = interface.addressOfRuntimeOrStatic(ea)
             if rt or function.address(ea) == ea:
                 return function.type(ea, info)
 
@@ -3352,6 +3363,18 @@ class type(object):
     def has_typeinfo(ea):
         '''Return true if the address at `ea` has some typeinfo associated with it.'''
         return type(ea) is not None
+
+        try:
+            ok = type(ea) is not None
+
+        # If we got an exception raised, then we were unable to parse this type
+        # properly. Prior to failing, check to see if the name is a mangled C++
+        # symbol that contains type information.
+        except E.InvalidTypeOrValueError as e:
+            #logging.warn(u"{:s}.has_typeinfo({:#x}) : Unable to interpret the type information at address {:#x}.".format('.'.join((__name__, type.__name__)), ea, ea), exc_info=True)
+            realname = name(ea)
+            ok = internal.declaration.demangle(realname) != realname
+        return ok
     typeinfoQ = infoQ = utils.alias(has_typeinfo, 'type')
 
     @utils.multicase()
