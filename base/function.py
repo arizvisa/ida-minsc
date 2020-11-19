@@ -1708,7 +1708,7 @@ def tag(func):
         # if the demangled name is different from the actual name, then we need
         # to extract its result type and prepend it to the demangled name.
         if demangled != fname:
-            res.setdefault('__typeinfo__', demangled)
+            res.setdefault('__typeinfo__', ' '.join([internal.declaration.extract.result(prototype(ea)), demangled]))
 
     # ..and now hand it off.
     return res
