@@ -1,4 +1,4 @@
-import exceptions as E
+import builtins as E
 
 class UnicodeException(E.BaseException):
     """
