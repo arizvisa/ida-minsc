@@ -213,7 +213,7 @@ class UnknownPrototypeError(UnicodeException, E.LookupError):
     The requested prototype does not match any of the ones that are available.
     """
 
-class DuplicateItemError(E.DisassemblerError, E.NameError):
+class DuplicateItemError(DisassemblerError, E.NameError):
     """
     The requested command has failed due to a duplicate item.
     """
