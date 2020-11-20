@@ -28,7 +28,7 @@ class internal_api(object):
     os, imp, fnmatch = os, imp, fnmatch
     def __init__(self, directory, **attributes):
         self.path = self.os.path.realpath(directory)
-        [setattr(self, k, v) for k, v in attributes.iteritems()]
+        [ setattr(self, name, attribute) for name, attribute in attributes.items() ]
 
     ### Api operations
     def load_api(self, path):
@@ -45,8 +45,8 @@ class internal_api(object):
             path = self.os.path.join(self.path, filename)
             _, ext = self.os.path.splitext(filename)
 
-            left, right = (None, None) if include == '*' else (include.index('*'), len(include)-include.rindex('*'))
-            modulename = filename[left:-right+1]
+            left, right = (None, None) if include == '*' else (include.index('*'), len(include) - include.rindex('*'))
+            modulename = filename[left : -right + 1]
             yield modulename, path
         return
 
@@ -59,6 +59,7 @@ class internal_api(object):
     ### Module operations
     def new_module(self, fullname, doc=None):
         res = self.imp.new_module(fullname)
+        res.__package__ = fullname
         res.__doc__ = doc or ''
         return res
 
@@ -69,84 +70,71 @@ class internal_api(object):
         raise NotImplementedError
 
 class internal_path(internal_api):
-    sys = sys
     def __init__(self, path, **attrs):
         super(internal_path, self).__init__(path)
         attrs.setdefault('include', '*.py')
-        self.attrs = attrs
-        self.cache = dict(self.iterate_api(**attrs))
+        self.attrs, self.cache = attrs, { name : path for name, path in self.iterate_api(**attrs) }
 
     def find_module(self, fullname, path=None):
         return self if path is None and fullname in self.cache else None
 
     def load_module(self, fullname):
-        self.cache = dict(self.iterate_api(**self.attrs))
-        res = self.sys.modules[fullname] = self.new_api(fullname, self.cache[fullname])
-        return res
+        self.cache = { name : path for name, path in self.iterate_api(**self.attrs) }
+        return self.new_api(fullname, self.cache[fullname])
 
 class internal_submodule(internal_api):
     sys = sys
     def __init__(self, __name__, path, **attrs):
         super(internal_submodule, self).__init__(path)
         attrs.setdefault('include', '*.py')
-        self.__name__ = __name__
-        self.attrs = attrs
+        self.__name__, self.attrs = __name__, attrs
 
     def find_module(self, fullname, path=None):
         return self if path is None and fullname == self.__name__ else None
 
     def filter_module(self, filename):
         return self.fnmatch.fnmatch(filename, self.attrs['include']) and ('exclude' in self.attrs and not self.fnmatch.fnmatch(filename, self.attrs['exclude']))
+
     def fetch_module(self, name):
-        cache = dict(self.iterate_api(**self.attrs))
+        cache = { name : path for name, path in self.iterate_api(**self.attrs) }
         return self.new_api(name, cache[name])
 
-    class module(types.ModuleType):
-        def __init__(self, path, **attrs):
-            self.__path__ = path
-            self.__filter__ = attrs['filter']
-            self.__module__ = attrs['getmodule']
-
-            # FIXME: create a get-descriptor for each sub-module that will try to
-            #        load the module continuously until it's finally successful
-
-        @property
-        def __dict__(self):
-            files = filter(self.__filter__, os.listdir(self.__path__))
-            return { n : self.__module__(n) for n in files }
-
-        def __getattr__(self, name):
-            #import os
-            res = self.__module__(n)
-            #res = self.new_api(name, os.path.join(self.__path__, name))
-            setattr(self, name, res)
-            return res
-            #raise NotImplementedError("Unable to fetch module {:s} on-demand".format(name))
+    def new_api(self, modulename, path):
+        cls, fullname = self.__class__, '.'.join([self.__name__, modulename])
+        res = super(cls, self).new_api(fullname, path)
+        res.__package__ = self.__name__
+        return res
 
     def load_module(self, fullname):
+        module = self.sys.modules[fullname] = self.new_module(fullname)
         # FIXME: make module a lazy-loaded object for fetching module-code on-demand
-        module = self.sys.modules.setdefault(fullname, self.new_module(fullname))
 
-        cache = dict(self.iterate_api(**self.attrs))
-        module.__doc__ = '\n'.join("{:s} -- {:s}".format(name, path) for name, path in sorted(cache.iteritems()))
+        cache = { name : path for name, path in self.iterate_api(**self.attrs) }
+        module.__doc__ = '\n'.join("{:s} -- {:s}".format(name, path) for name, path in sorted(cache.items()))
 
-        for name, path in cache.iteritems():
+        for name, path in cache.items():
             try:
                 res = self.new_api(name, path)
-            except:
+                modulename = '.'.join([res.__package__, name])
+
+            except Exception:
                 __import__('logging').warn("{:s} : Unable to import module {:s} from {!r}".format(self.__name__, name, path), exc_info=True)
+
             else:
                 setattr(module, name, res)
             continue
         return module
 
 class internal_object(object):
-    def __init__(self, name, object):
-        self.name, self.object = name, object
+    def __init__(self, __name__, object):
+        self.__name__, self.object = __name__, object
+
     def find_module(self, fullname, path=None):
-        return self if path is None and fullname == self.name else None
+        return self if path is None and fullname == self.__name__ else None
+
     def load_module(self, fullname):
-        assert fullname == self.name
+        if fullname != self.__name__:
+            raise ImportError("Loader {:s} was not able to find a module named {:s}".format(self.__name__, fullname))
         return self.object
 
 class plugin_module(object):
