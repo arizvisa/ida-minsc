@@ -237,16 +237,16 @@ try:
         # execute user's .pythonrc and .idapythonrc in one go
         if __import__('user').home:
             path = __import__('user').home
-            execfile(os.path.join(path, filename))
+            exec(open(os.path.join(path, filename)).read())
 
     except ImportError:
         # otherwise try to figure it out without tainting the namespace
         if __import__('os').getenv('HOME', default=None) is not None:
             path = os.getenv('HOME')
-            execfile(os.path.join(path, filename))
+            exec(open(os.path.join(path, filename)).read())
         elif __import__('os').getenv('USERPROFILE', default=None) is not None:
             path = os.getenv('USERPROFILE')
-            execfile(os.path.join(path, filename))
+            exec(open(os.path.join(path, filename)).read())
         else:
             raise OSError('Unable to determine the user\'s home directory.')
         pass
