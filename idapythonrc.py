@@ -24,19 +24,28 @@ root = idaapi.get_user_idadir()
 sys.path.remove(root)
 
 class internal_api(object):
-    """Meta-path base-class for an api that's based on files within a directory"""
+    """
+    Loader base-class for any api that's based on files contained within a directory.
+    """
     os, imp, fnmatch = os, imp, fnmatch
     def __init__(self, directory, **attributes):
+        '''Initialize the api using the contents within the specified `directory`.'''
         self.path = self.os.path.realpath(directory)
-        [setattr(self, k, v) for k, v in attributes.iteritems()]
+        [ setattr(self, name, attribute) for name, attribute in attributes.items() ]
 
     ### Api operations
     def load_api(self, path):
+        '''Load the specified `path` into a module that can be used.'''
         path, filename = self.os.path.split(path)
         name, _ = self.os.path.splitext(filename)
-        return self.imp.find_module(name, [ path ])
+        return self.imp.find_module(name, [path])
 
     def iterate_api(self, include='*.py', exclude=None):
+        """Iterate through all of the files in the directory specified when initializing the loader.
+
+        The `include` string is a glob that specifies which files are part of the loader's api.
+        If the `exclude` glob is specified, then exclude files that match it from the loader api.
+        """
         result = []
         for filename in self.fnmatch.filter(self.os.listdir(self.path), include):
             if exclude and self.fnmatch.fnmatch(filename, exclude):
@@ -45,21 +54,24 @@ class internal_api(object):
             path = self.os.path.join(self.path, filename)
             _, ext = self.os.path.splitext(filename)
 
-            left, right = (None, None) if include == '*' else (include.index('*'), len(include)-include.rindex('*'))
-            modulename = filename[left:-right+1]
+            left, right = (None, None) if include == '*' else (include.index('*'), len(include) - include.rindex('*'))
+            modulename = filename[left : -right + 1]
             yield modulename, path
         return
 
     def new_api(self, modulename, path):
+        '''Load the file found at `path` into the specified `modulename`.'''
         file, path, description = self.load_api(path)
         try:
             return self.imp.load_module(modulename, file, path, description)
         finally: file.close()
 
     ### Module operations
-    def new_module(self, fullname, doc=None):
+    def new_module(self, fullname, documentation=None):
+        '''Create a new module (empty) with the specified `fullname` and the provided `documentation`.'''
         res = self.imp.new_module(fullname)
-        res.__doc__ = doc or ''
+        res.__package__ = fullname
+        res.__doc__ = documentation or ''
         return res
 
     def find_module(self, fullname, path=None):
@@ -69,87 +81,98 @@ class internal_api(object):
         raise NotImplementedError
 
 class internal_path(internal_api):
-    sys = sys
+    """
+    Loader class which provides all api composed of all of the files within a directory
+    as modules that can always be imported from anywhere.
+    """
     def __init__(self, path, **attrs):
+        '''Initialize the loader using the files from the directory specified by `path`.'''
         super(internal_path, self).__init__(path)
         attrs.setdefault('include', '*.py')
-        self.attrs = attrs
-        self.cache = dict(self.iterate_api(**attrs))
+        self.attrs, self.cache = attrs, { name : path for name, path in self.iterate_api(**attrs) }
 
     def find_module(self, fullname, path=None):
+        '''If the module with the name `fullname` matches one of the files handled by our api, then act as their loader.'''
         return self if path is None and fullname in self.cache else None
 
     def load_module(self, fullname):
-        self.cache = dict(self.iterate_api(**self.attrs))
-        res = self.sys.modules[fullname] = self.new_api(fullname, self.cache[fullname])
-        return res
+        '''Iterate through all of the modules that we can handle, and then load it if we've been asked.'''
+        self.cache = { name : path for name, path in self.iterate_api(**self.attrs) }
+        if fullname not in self.cache:
+            raise ImportError("Path-loader ({:s}) was unable to find a module named {:s}".format(self.path, fullname))
+        return self.new_api(fullname, self.cache[fullname])
 
 class internal_submodule(internal_api):
+    """
+    Loader class which provides an api composed of all of the files within a
+    directory, and binds them to a module which is used to access them.
+    """
     sys = sys
     def __init__(self, __name__, path, **attrs):
+        '''Initialize the loader using `__name__` as the name of the submodule using the files underneath the directory `path`.'''
         super(internal_submodule, self).__init__(path)
         attrs.setdefault('include', '*.py')
-        self.__name__ = __name__
-        self.attrs = attrs
+        self.__name__, self.attrs = __name__, attrs
 
     def find_module(self, fullname, path=None):
+        '''If the module with the name `fullname` matches our submodule name, then act as its loader.'''
         return self if path is None and fullname == self.__name__ else None
 
-    def filter_module(self, filename):
-        return self.fnmatch.fnmatch(filename, self.attrs['include']) and ('exclude' in self.attrs and not self.fnmatch.fnmatch(filename, self.attrs['exclude']))
-    def fetch_module(self, name):
-        cache = dict(self.iterate_api(**self.attrs))
-        return self.new_api(name, cache[name])
-
-    class module(types.ModuleType):
-        def __init__(self, path, **attrs):
-            self.__path__ = path
-            self.__filter__ = attrs['filter']
-            self.__module__ = attrs['getmodule']
-
-            # FIXME: create a get-descriptor for each sub-module that will try to
-            #        load the module continuously until it's finally successful
-
-        @property
-        def __dict__(self):
-            files = filter(self.__filter__, os.listdir(self.__path__))
-            return { n : self.__module__(n) for n in files }
-
-        def __getattr__(self, name):
-            #import os
-            res = self.__module__(n)
-            #res = self.new_api(name, os.path.join(self.__path__, name))
-            setattr(self, name, res)
-            return res
-            #raise NotImplementedError("Unable to fetch module {:s} on-demand".format(name))
+    def new_api(self, modulename, path):
+        '''Load the file found at the specified `path` as a submodule with the specified `modulename`.'''
+        cls, fullname = self.__class__, '.'.join([self.__name__, modulename])
+        res = super(cls, self).new_api(fullname, path)
+        res.__package__ = self.__name__
+        return res
 
     def load_module(self, fullname):
+        '''Iterate through all of the modules that we can handle, load the submodule with them, and return it.'''
+        module = self.sys.modules[fullname] = self.new_module(fullname)
         # FIXME: make module a lazy-loaded object for fetching module-code on-demand
-        module = self.sys.modules.setdefault(fullname, self.new_module(fullname))
 
-        cache = dict(self.iterate_api(**self.attrs))
-        module.__doc__ = '\n'.join("{:s} -- {:s}".format(name, path) for name, path in sorted(cache.iteritems()))
+        # Build a temporary cache for the module names and paths to load the api,
+        # and use them to build their documentation.
+        cache = { name : path for name, path in self.iterate_api(**self.attrs) }
+        module.__doc__ = '\n'.join("{:s} -- {:s}".format(name, path) for name, path in sorted(cache.items()))
 
-        for name, path in cache.iteritems():
+        # Load each module composing the api, and attach it to the returned submodule.
+        for name, path in cache.items():
             try:
                 res = self.new_api(name, path)
-            except:
-                __import__('logging').warn("{:s} : Unable to import module {:s} from {!r}".format(self.__name__, name, path), exc_info=True)
+                modulename = '.'.join([res.__package__, name])
+
+            except Exception:
+                __import__('logging').warning("{:s} : Unable to import module {:s} from {!s}".format(self.__name__, name, path), exc_info=True)
+
             else:
                 setattr(module, name, res)
             continue
         return module
 
 class internal_object(object):
-    def __init__(self, name, object):
-        self.name, self.object = name, object
+    """
+    Loader class which will simply expose an object instance as the module.
+    """
+    def __init__(self, __name__, object):
+        '''Initialize the loader with the specified `__name__` and returning the provided `object` as its module.'''
+        self.__name__, self.object = __name__, object
+
     def find_module(self, fullname, path=None):
-        return self if path is None and fullname == self.name else None
+        '''If the module being searched for matches our `fullname`, then act as its loader.'''
+        return self if path is None and fullname == self.__name__ else None
+
     def load_module(self, fullname):
-        assert fullname == self.name
+        '''Return the specific object for the module specified by `fullname`.'''
+        if fullname != self.__name__:
+            raise ImportError("Loader {:s} was not able to find a module named {:s}".format(self.__name__, fullname))
         return self.object
 
 class plugin_module(object):
+    """
+    Loader class which iterates through all of the files in a directory, and
+    manually initializes each plugin similar to the way `idaapi.plugin_t` is
+    supposed to be initialized.
+    """
     def __init__(self, path, **attrs):
         # FIXME: go through all files in plugin/ and call PLUGIN_ENTRY() on each module
         #        this should return an idaapi.plugin_t.
@@ -168,25 +191,26 @@ class plugin_module(object):
         # idaapi.require
         pass
 
-## ida's native api
-if sys.platform == 'darwin':
+## IDA's native lower-level api
+if sys.platform in {'darwin'}:
     sys.meta_path.append( internal_object('ida', library(idaapi.idadir('libida.dylib'))) )
-elif sys.platform in 'linux2':
-    sys.meta_path.append( internal_object('ida', library('libida.so')) )
-elif sys.platform == 'win32':
+
+elif sys.platform in {'linux2'}:
+    sys.meta_path.append( internal_object('ida', library("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64'))) )
+
+elif sys.platform in {'win32'}:
     if __import__('os').path.exists(idaapi.idadir('ida.wll')):
         sys.meta_path.append( internal_object('ida', library(idaapi.idadir('ida.wll'))) )
-    elif idaapi.BADADDR >= 0x100000000:
-        sys.meta_path.append( internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format("64")))) )
     else:
-        sys.meta_path.append( internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format("")))) )
-else:
-    raise NotImplementedError
+        sys.meta_path.append( internal_object('ida', library(idaapi.idadir("ida{:s}.dll".format('' if idaapi.BADADDR < 0x100000000 else '64')))) )
 
-# private api
+else:
+    __import__('logging').warning("{:s} : Unable to successfully load IDA's native api with ctypes.".format(__name__))
+
+## private (internal) api
 sys.meta_path.append( internal_submodule('internal', os.path.join(root, 'base'), include='_*.py') )
 
-# public api
+## public api
 sys.meta_path.append( internal_path(os.path.join(root, 'base'), exclude='_*.py') )
 sys.meta_path.append( internal_path(os.path.join(root, 'misc')) )
 
@@ -194,50 +218,60 @@ sys.meta_path.append( internal_path(os.path.join(root, 'misc')) )
 for _ in ('custom', 'app'):
     sys.meta_path.append( internal_submodule(_, os.path.join(root, _)) )
 
-# temporarily root namespace
+# temporarily load the root namespace
 __root__ = imp.load_source('__root__', os.path.join(root, '__root__.py'))
 
-# empty out idapython's namespace
-map(globals().pop, {_ for _ in globals().copy().viewkeys() if not _.startswith('__')})
+# empty out IDAPython's namespace so that we can replace it
+map(globals().pop, {symbol for symbol in globals().copy() if not symbol.startswith('__')})
 
-# re-populate with a default namespace and empty out our variable
-globals().update({_ for _ in __root__.__dict__.viewitems() if not _[0].startswith('__')})
-globals().pop('__root__')
+# re-populate with a default namespace and remove our variable that contained it
+globals().update({symbol : value for symbol, value in __root__.__dict__.items() if not symbol.startswith('__')})
+del(__root__)
 
 # try and execute our user's idapythonrc.py
 try:
+    import os
+    path, filename = None, '.idapythonrc.py'
+
     try:
         # execute user's .pythonrc and .idapythonrc in one go
         if __import__('user').home:
-            execfile(__import__('os').path.join(__import__('user').home, '.idapythonrc.py'))
+            path = __import__('user').home
+            exec(open(os.path.join(path, filename)).read())
 
     except ImportError:
         # otherwise try to figure it out without tainting the namespace
         if __import__('os').getenv('HOME', default=None) is not None:
-            execfile(__import__('os').path.join(__import__('os').getenv('HOME'), '.idapythonrc.py'))
+            path = os.getenv('HOME')
+            exec(open(os.path.join(path, filename)).read())
         elif __import__('os').getenv('USERPROFILE', default=None) is not None:
-            execfile(__import__('os').path.join(__import__('os').getenv('USERPROFILE'), '.idapythonrc.py'))
+            path = os.getenv('USERPROFILE')
+            exec(open(os.path.join(path, filename)).read())
         else:
             raise OSError('Unable to determine the user\'s home directory.')
         pass
 
 except IOError:
-    __import__('logging').warn('No .idapythonrc.py file found in the user\'s home directory.')
+    __import__('logging').warning("No {:s} file found in the user's home directory ({!s}).".format(filename, path))
 
-except Exception, e:
-    print("Unexpected exception raised while trying to execute `~/.idapythonrc.py`.")
-    __import__('traceback').print_exc()
+except Exception:
+    __import__('logging').warning("Unexpected exception raised while trying to execute `{!s}`.".format(os.path.join(path or '~', filename)), exc_info=True)
+
+finally:
+    del(filename)
+    del(path)
+    del(os)
 
 ## stupid fucking idapython hax
 # prevent idapython from trying to write its banner to the message window since we called it up above.
 print_banner = lambda: None
 
 # find the frame that fucks with our sys.modules, and save it for later
-_ = __import__('sys')._getframe()
-while _.f_code.co_name != 'IDAPython_ExecScript':
-    _ = _.f_back
+frame = __import__('sys')._getframe()
+while frame.f_code.co_name != 'IDAPython_ExecScript':
+    frame = frame.f_back
 
 # inject our current sys.modules state into IDAPython_ExecScript's state if it's the broken version
-if 'basemodules' in _.f_locals:
-    _.f_locals['basemodules'].update(__import__('sys').modules)
-del _
+if 'basemodules' in frame.f_locals:
+    frame.f_locals['basemodules'].update(__import__('sys').modules)
+del(frame)
