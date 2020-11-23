@@ -91,7 +91,7 @@ locals().update({name : item for name, item in utils.__dict__.items() if name in
 # construct some pattern matching types
 AnyRegister = utils.PatternAnyType(__import__('internal').interface.register_t)
 AnyInteger = utils.PatternAnyType(__import__('six').integer_types)
-AnyString = utils.PatternAnyType(basestring)
+AnyString = utils.PatternAnyType(__import__('six').string_types)
 AnyBytes = utils.PatternAnyType(bytes)
 Any = utils.PatternAny()
 
@@ -99,8 +99,8 @@ Any = utils.PatternAny()
 del(utils)
 
 # some types that the user might want to compare with
-architecture_t, register_t, symbol_t = (getattr(__import__('internal').interface, _) for _ in ['architecture_t', 'register_t', 'symbol_t'])
-ref_t, opref_t = (getattr(__import__('internal').interface, _) for _ in ['ref_t', 'opref_t'])
+architecture_t, register_t, symbol_t = (getattr(__import__('internal').interface, item) for item in ['architecture_t', 'register_t', 'symbol_t'])
+ref_t, opref_t = (getattr(__import__('internal').interface, item) for item in ['ref_t', 'opref_t'])
 
 # other miscellaneous modules to expose to the user
 import ui, tools, custom
