@@ -215,8 +215,9 @@ sys.meta_path.append( internal_path(os.path.join(root, 'base'), exclude='_*.py')
 sys.meta_path.append( internal_path(os.path.join(root, 'misc')) )
 
 # user and application api's
-for _ in ('custom', 'app'):
-    sys.meta_path.append( internal_submodule(_, os.path.join(root, _)) )
+for subdir in ('custom', 'app'):
+    sys.meta_path.append( internal_submodule(subdir, os.path.join(root, subdir)) )
+del(subdir)
 
 # temporarily load the root namespace
 __root__ = imp.load_source('__root__', os.path.join(root, '__root__.py'))
@@ -235,8 +236,8 @@ try:
 
     try:
         # execute user's .pythonrc and .idapythonrc in one go
-        if __import__('user').home:
-            path = __import__('user').home
+        if os.path.expanduser("~"):
+            path = os.path.expanduser("~")
             exec(open(os.path.join(path, filename)).read())
 
     except ImportError:
