@@ -7,8 +7,7 @@ class for querying and filtering lists of things, support for aliasing
 functions, and a number of functional programming primitives (combinators).
 """
 
-import six
-from six.moves import builtins
+import six, builtins
 
 import os, logging, types, weakref
 import functools, operator, itertools
@@ -92,11 +91,11 @@ ilist, liter = fcompose(builtins.list, builtins.iter), fcompose(builtins.iter, b
 # converts a tuple to an iterator, or an iterator to a tuple
 ituple, titer = fcompose(builtins.tuple, builtins.iter), fcompose(builtins.iter, builtins.tuple)
 # take `count` number of elements from an iterator
-itake = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*count), builtins.tuple)
+itake = lambda count: fcompose(builtins.iter, fmap(*[builtins.next] * count), builtins.tuple)
 # get the `nth` element from an iterator
-iget = lambda count: fcompose(builtins.iter, fmap(*(builtins.next,)*(count)), builtins.tuple, operator.itemgetter(-1))
+iget = lambda count: fcompose(builtins.iter, fmap(*[builtins.next] * count), builtins.tuple, operator.itemgetter(-1))
 # copy from itertools
-islice, imap, ifilter, ichain, izip = itertools.islice, builtins.map, builtins.filter, itertools.chain, builtins.zip
+islice, imap, ifilter, ichain, izip = itertools.islice, fcompose(builtins.map, builtins.iter), fcompose(builtins.filter, builtins.iter), itertools.chain, fcompose(builtins.zip, builtins.iter)
 # count number of elements of a container
 count = fcompose(builtins.iter, builtins.list, builtins.len)
 
@@ -179,7 +178,7 @@ class multicase(object):
 
             # calculate the priority by trying to match the most first
             argtuple = s_args, args, defaults, (star, starstar)
-            priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i, a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for _ in filter(None, (star, starstar)))
+            priority = len(args) - s_args - len(t_args) + (len(args) and (next((float(i) for i, a in enumerate(args[s_args:]) if a in t_args), 0) / len(args))) + sum(0.3 for item in [star, starstar] if item)
 
             # check to see if our func is already in the cache
             current = tuple(t_args.get(_, None) for _ in args), (star, starstar)
@@ -203,9 +202,9 @@ class multicase(object):
             return cons(res)
 
         # validate type arguments
-        for n, t in t_args.iteritems():
+        for n, t in t_args.items():
             if not isinstance(t, (builtins.type, builtins.tuple)) and t not in {callable}:
-                error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+                error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
                 raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), t, string.escape(n, '"')))
             continue
 
@@ -214,12 +213,12 @@ class multicase(object):
             for c in other:
                 cls.ex_function(c)
         except:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
 
         # throw an exception if we were given an unexpected number of arguments
         if len(other) > 1:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.items())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(c.co_name if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
         return result
 
@@ -231,7 +230,7 @@ class multicase(object):
             doc = (func.__doc__ or '').split('\n')
             if len(doc) > 1:
                 res.append("{:s} ->".format(cls.prototype(func, types)))
-                res.extend("{: >{padding:d}s}".format(n, padding=len(name)+len(n)+1) for n in map(operator.methodcaller('strip'), doc))
+                res.extend("{: >{padding:d}s}".format(item, padding=1 + len(name) + len(item)) for item in map(operator.methodcaller('strip'), doc))
             elif len(doc) == 1:
                 res.append(cls.prototype(func, types) + (" -> {:s}".format(doc[0]) if len(doc[0]) else ''))
             continue
@@ -272,7 +271,7 @@ class multicase(object):
         # Log any multicased functions that define type constraints for parameters which don't exist.
         co = func.func_code
         co_fullname, co_filename, co_lineno = '.'.join([func.__module__, func.__name__]), os.path.relpath(co.co_filename, idaapi.get_user_idadir()), co.co_firstlineno
-        unavailable = six.viewkeys(parameters) - args
+        unavailable = {param for param in parameters.keys()} - {item for item in args}
         if unavailable:
             proto_s = "{:s}({:s}{:s}{:s})".format(co_fullname, ', '.join(args) if args else '', ", *{:s}".format(star) if star and args else "*{:s}".format(star) if star else '', ", **{:s}".format(starstar) if starstar and (star or args) else "**{:s}".format(starstar) if starstar else '')
             path_s = "{:s}:{:d}".format(co_filename, co_lineno)
@@ -291,10 +290,10 @@ class multicase(object):
         # FIXME: yep, done in O(n) time.
         for f, ts, (sa, af, defaults, (argname, kwdname)) in heap:
             # populate our arguments
-            ac, kc = (n for n in args), dict(kwds)
+            ac, kc = (n for n in args), { kwd : kval for kwd, kval in kwds.items() }
 
             # skip some args in our tuple
-            map(next, (ac,)*sa)
+            [next(item) for item in [ac] * sa]
 
             # build the argument tuple using the generator, kwds, or our defaults.
             a = []
@@ -306,7 +305,7 @@ class multicase(object):
             finally: a = tuple(a)
 
             # now anything left in ac or kc goes in the wildcards. if there aren't any, then this iteration doesn't match.
-            wA, wK = list(ac), dict(kc)
+            wA, wK = [item for item in ac], { kwd : kval for kwd, kval in kc.items() }
             if (not argname and len(wA)) or (not kwdname and wK):
                 continue
 
@@ -387,7 +386,7 @@ class multicase(object):
     def ex_args(cls, f):
         '''Extract the arguments from a function.'''
         c = f.func_code
-        varnames_count, varnames_iter = c.co_argcount, iter(c.co_varnames)
+        varnames_count, varnames_iter = c.co_argcount, (item for item in c.co_varnames)
         args = tuple(itertools.islice(varnames_iter, varnames_count))
         res = { a : v for v, a in zip(reversed(f.func_defaults or []), reversed(args)) }
         try: starargs = next(varnames_iter) if c.co_flags & cls.CO_VARARGS else ""
@@ -453,7 +452,7 @@ class matcher(object):
         self.__predicate__[type] = functools.partial(fcompose, attr)
     def match(self, type, value, iterable):
         matcher = self.__predicate__[type](value)
-        return itertools.ifilter(matcher, iterable)
+        return (item for item in iterable if matcher(item))
 
 ### character processing (escaping and unescaping)
 class character(object):
@@ -488,7 +487,7 @@ class character(object):
         }
 
         # inverse mappings of characters plus the '\7 -> '\a' byte
-        inverse = { v : k for k, v in itertools.chain([('\7', r'\7')], six.iteritems(mappings)) }
+        inverse = { v : k for k, v in itertools.chain([('\7', r'\7')], mappings.items()) }
 
         # whitespace characters as a set
         whitespace = { ch for ch in _string.whitespace }
@@ -573,30 +572,30 @@ class character(object):
             elif n < 0x100:
                 result.send(cls.const.backslash)
                 result.send('x')
-                result.send(cls.to_hex((n & 0xf0) / 0x10))
-                result.send(cls.to_hex((n & 0x0f) / 0x01))
+                result.send(cls.to_hex((n & 0xf0) // 0x10))
+                result.send(cls.to_hex((n & 0x0f) // 0x01))
 
             # check that character is an unprintable unicode character
             elif n < 0x10000:
                 result.send(cls.const.backslash)
                 result.send('u')
-                result.send(cls.to_hex((n & 0xf000) / 0x1000))
-                result.send(cls.to_hex((n & 0x0f00) / 0x0100))
-                result.send(cls.to_hex((n & 0x00f0) / 0x0010))
-                result.send(cls.to_hex((n & 0x000f) / 0x0001))
+                result.send(cls.to_hex((n & 0xf000) // 0x1000))
+                result.send(cls.to_hex((n & 0x0f00) // 0x0100))
+                result.send(cls.to_hex((n & 0x00f0) // 0x0010))
+                result.send(cls.to_hex((n & 0x000f) // 0x0001))
 
             # maybe the character is an unprintable long-unicode character
             elif n < 0x110000:
                 result.send(cls.const.backslash)
                 result.send('U')
-                result.send(cls.to_hex((n & 0x00000000) / 0x10000000))
-                result.send(cls.to_hex((n & 0x00000000) / 0x01000000))
-                result.send(cls.to_hex((n & 0x00100000) / 0x00100000))
-                result.send(cls.to_hex((n & 0x000f0000) / 0x00010000))
-                result.send(cls.to_hex((n & 0x0000f000) / 0x00001000))
-                result.send(cls.to_hex((n & 0x00000f00) / 0x00000100))
-                result.send(cls.to_hex((n & 0x000000f0) / 0x00000010))
-                result.send(cls.to_hex((n & 0x0000000f) / 0x00000001))
+                result.send(cls.to_hex((n & 0x00000000) // 0x10000000))
+                result.send(cls.to_hex((n & 0x00000000) // 0x01000000))
+                result.send(cls.to_hex((n & 0x00100000) // 0x00100000))
+                result.send(cls.to_hex((n & 0x000f0000) // 0x00010000))
+                result.send(cls.to_hex((n & 0x0000f000) // 0x00001000))
+                result.send(cls.to_hex((n & 0x00000f00) // 0x00000100))
+                result.send(cls.to_hex((n & 0x000000f0) // 0x00000010))
+                result.send(cls.to_hex((n & 0x0000000f) // 0x00000001))
 
             # if we're here, then we have no idea what kind of character it is
             else:
@@ -728,7 +727,7 @@ class string(object):
         transform = character.escape(res); next(transform)
 
         # iterate through each character, sending everything to res
-        for ch in iter(string or ''):
+        for ch in (string or ''):
 
             # check if character is a user-specified quote or a backslash
             if any(operator.contains(set, ch) for set in (quote, '\\')):
@@ -737,7 +736,7 @@ class string(object):
 
             # check if character has an escape mapping to use
             elif operator.contains(cls.mapping, ch):
-                map(res.send, cls.mapping[ch])
+                [res.send(item) for item in cls.mapping[ch]]
 
             # otherwise we can just send it to transform to escape it
             else:
@@ -771,7 +770,7 @@ class string(object):
             res = map(cls.repr, item)
             return "set([{:s}])".format(', '.join(res))
         elif isinstance(item, dict):
-            res = ("{:s}: {:s}".format(cls.repr(k), cls.repr(v)) for k, v in six.iteritems(item))
+            res = ("{:s}: {:s}".format(cls.repr(k), cls.repr(v)) for k, v in item.items())
             return "{{{:s}}}".format(', '.join(res))
         return repr(item)
 
@@ -779,7 +778,7 @@ class string(object):
     def kwargs(cls, kwds):
         '''Format a dictionary (from kwargs) so that it can be emitted to a user as part of a message.'''
         res = []
-        for key, value in six.iteritems(kwds):
+        for key, value in kwds.items():
             k, v = cls.escape(key), cls.repr(value)
             res.append("{:s}={!s}".format(*(item.encode('utf8') if isinstance(item, unicode) else item for item in (k, v))))
         return ', '.join(res).decode('utf8')
@@ -824,9 +823,9 @@ class wrap(object):
             return six.int2byte(opcode)
 
         # if operand was defined, then encode it
-        op1 = (operand & 0x00ff) / 0x0001
-        op2 = (operand & 0xff00) / 0x0100
-        return functools.reduce(operator.add, map(six.int2byte, [opcode, op1, op2]), bytes())
+        op1 = (operand & 0x00ff) // 0x0001
+        op2 = (operand & 0xff00) // 0x0100
+        return bytes(bytearray([opcode, op1, op2]))
 
     @classmethod
     def co_varargsQ(cls, co):
@@ -978,7 +977,7 @@ class wrap(object):
     def arguments(cls, f):
         '''Extract the arguments from a function `f`.'''
         c = f.func_code
-        count, iterable = c.co_argcount, iter(c.co_varnames)
+        count, iterable = c.co_argcount, (item for item in c.co_varnames)
         args = tuple(itertools.islice(iterable, count))
         res = { a : v for v, a in zip(reversed(f.func_defaults or []), reversed(args)) }
         starargs = next(iterable, '') if c.co_flags & cls.CO_VARARGS else ''
@@ -1030,8 +1029,8 @@ def transform(translate, *names):
             res += (translate(value) if wildname in names else value,)
 
         # convert any keywords arguments
-        kwds = dict(rkwds)
-        for argname in six.viewkeys(rkwds) & names:
+        kwds = {k : v for k, v in rkwds.items()}
+        for argname in {item for item in rkwds.keys()} & names:
             kwds[argname] = translate(kwds[argname])
         return F(*res, **kwds)
 
