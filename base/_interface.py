@@ -242,7 +242,7 @@ class prioritybase(object):
 
     def __init__(self):
         self.__cache__ = collections.defaultdict(list)
-        self.__disabled = set()
+        self.__disabled = {item for item in []}
         self.__traceback = {}
 
     def __iter__(self):
@@ -1061,6 +1061,9 @@ class symbol_t(object):
     This can be used to weakly describe an expression which allows for
     a user to then enumerate any symbolic parts.
     """
+    def __hash__(self):
+        cls, res = self.__class__, id(self)
+        return hash(cls, res)
 
     @property
     def symbols(self):
@@ -1073,6 +1076,10 @@ class register_t(symbol_t):
     This allows a user to determine the register's name, size, and allows
     for comparison to other registers.
     """
+
+    def __hash__(self):
+        items = self.id, self.dtype, self.position, self.size
+        return hash(items)
 
     @property
     def symbols(self):
@@ -1136,14 +1143,14 @@ class register_t(symbol_t):
     def subsetQ(self, other):
         '''Returns true if the `other` register is a part of `self`.'''
         def collect(node):
-            res = set([node])
+            res = {node}
             [res.update(collect(n)) for n in six.itervalues(node.__children__)]
             return res
         return other in self.alias or other in collect(self)
 
     def supersetQ(self, other):
         '''Returns true if the `other` register actually contains `self`.'''
-        res, pos = set(), self
+        res, pos = {item for item in []}, self
         while pos is not None:
             res.add(pos)
             pos = pos.__parent__
@@ -1655,7 +1662,7 @@ class architecture_t(object):
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits})
         namespace['realname'] = idaname
-        namespace['alias'] = kwargs.get('alias', set())
+        namespace['alias'] = kwargs.get('alias', {item for item in []})
         namespace['architecture'] = self
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
@@ -1679,7 +1686,7 @@ class architecture_t(object):
         namespace = dict(register_t.__dict__)
         namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits})
         namespace['realname'] = idaname
-        namespace['alias'] = kwargs.get('alias', set())
+        namespace['alias'] = kwargs.get('alias', {item for item in []})
         namespace['architecture'] = self
         res = type(name, (register_t,), namespace)()
         self.__register__.__state__[name] = res
