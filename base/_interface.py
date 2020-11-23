@@ -102,7 +102,7 @@ class typemap:
             unicode:(idaapi.strlit_flag(), idaapi.STRTYPE_C_16),
         }
 
-        ptrmap = { sz : (idaapi.off_flag()|flg, tid) for sz, (flg, tid) in six.iteritems(integermap) }
+        ptrmap = { sz : (idaapi.off_flag() | flg, tid) for sz, (flg, tid) in integermap.items() }
         nonemap = { None :(idaapi.align_flag(), -1) }
 
     ## IDA 6.95 types
@@ -127,7 +127,7 @@ class typemap:
             unicode:(idaapi.asciflag(), idaapi.ASCSTR_UNICODE),
         }
 
-        ptrmap = { sz : (idaapi.offflag()|flg, tid) for sz, (flg, tid) in six.iteritems(integermap) }
+        ptrmap = { sz : (idaapi.offflag() | flg, tid) for sz, (flg, tid) in integermap.items() }
         nonemap = { None :(idaapi.alignflag(), -1) }
 
     # lookup table for type
@@ -265,7 +265,7 @@ class prioritybase(object):
         notok = False
 
         # Just iterate through each target and connect a closure for it
-        for target in self.__cache__.viewkeys():
+        for target in self.__cache__:
             ok = self.connect(target, self.apply(target))
             if not ok:
                 logging.warn(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join(('internal', __name__, self.__class__.__name__)), self.__format__(target)))
@@ -278,7 +278,7 @@ class prioritybase(object):
         notok = False
 
         # Simply disconnect everything
-        for target in self.__cache__.viewkeys():
+        for target in self.__cache__:
             ok = self.disconnect(target)
             if not ok:
                 logging.warn(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join(('internal', __name__, self.__class__.__name__)), self.__format__(target)))
@@ -304,7 +304,7 @@ class prioritybase(object):
         '''Disable execution of all the callables for the specified `target`.'''
         cls = self.__class__
         if target not in self.__cache__:
-            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__.viewkeys())))))
+            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__)))))
             return False
         if target in self.__disabled:
             logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
@@ -857,8 +857,8 @@ class node(object):
         elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
             if base == idaapi.BT_COMPLEX:
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2+2))
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2+2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2 + 2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2 + 2))
 
         # append the return type
         res.append(data)
@@ -881,7 +881,7 @@ class node(object):
         """
         le = internal.utils.fcompose(
             functools.partial(map, six.byte2int),
-            functools.partial(reduce, lambda t, c: (t*0x100)|c)
+            functools.partial(reduce, lambda t, c: (t * 0x100) | c)
         )
         ror = lambda n, shift, bits: (n>>shift) | ((n & 2**shift - 1) << (bits - shift))
 
@@ -980,8 +980,8 @@ class node(object):
 
 def tuplename(*names):
     '''Given a tuple as a name, return a single name joined by "_" characters.'''
-    res = ("{:x}".format(abs(n)) if isinstance(n, six.integer_types) else n for n in names)
-    return '_'.join(res)
+    iterable = ("{:x}".format(abs(item)) if isinstance(item, six.integer_types) else item for item in names)
+    return '_'.join(iterable)
 
 # copied mostly from the collections.namedtuple template
 class namedtypedtuple(tuple):
@@ -1047,7 +1047,7 @@ class namedtypedtuple(tuple):
         result = self._make(map(fc.pop, self._fields, self))
         if fc:
             cls = self.__class__
-            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(('internal', __name__, cls.__name__)), internal.utils.string.kwargs(fields), '{' + ', '.join(map(internal.utils.string.repr, six.viewkeys(fc))) + '}'))
+            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(['internal', __name__, cls.__name__]), internal.utils.string.kwargs(fields), '{' + ', '.join(map(internal.utils.string.repr, fc)) + '}'))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
@@ -1144,7 +1144,7 @@ class register_t(symbol_t):
         '''Returns true if the `other` register is a part of `self`.'''
         def collect(node):
             res = {node}
-            [res.update(collect(n)) for n in six.itervalues(node.__children__)]
+            [res.update(collect(item)) for item in node.__children__.values()]
             return res
         return other in self.alias or other in collect(self)
 
@@ -1325,7 +1325,7 @@ class reftype_t(object):
 
         # Search through our mapper for the correct contents of the reftype_t
         res = { item for item in state }
-        for F, t in six.iteritems(cls.__mapper__):
+        for F, t in cls.__mapper__.items():
             if { item for item in t } == res:
                 return cls(F, res)
             continue
@@ -1470,12 +1470,12 @@ class switch_t(object):
     def cases(self):
         '''Return all of the non-default cases in the switch.'''
         import instruction
-        f = lambda ea, dflt=self.default: (ea == dflt) or (instruction.type.is_jmp(ea) and instruction.op(ea, 0) == dflt)
-        return tuple(idx for idx in six.moves.range(self.base, self.base+self.count) if not f(self.case(idx)))
+        F = lambda ea, dflt=self.default: (ea == dflt) or (instruction.type.is_jmp(ea) and instruction.op(ea, 0) == dflt)
+        return tuple(idx for idx in six.moves.range(self.base, self.base + self.count) if not F(self.case(idx)))
     @property
     def range(self):
         '''Return all of the possible cases for the switch.'''
-        return tuple(six.moves.range(self.base, self.base+self.count))
+        return tuple(six.moves.range(self.base, self.base + self.count))
     def __repr__(self):
         cls = self.__class__
         if self.indirectQ():
@@ -1657,9 +1657,9 @@ class architecture_t(object):
             dt_bitfield = idaapi.dt_bitfild
 
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
-        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        dtype = six.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
 
-        namespace = dict(register_t.__dict__)
+        namespace = {key : value for key, value in register_t.__dict__.items()}
         namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', {item for item in []})
@@ -1681,9 +1681,9 @@ class architecture_t(object):
             dtype_by_size = idaapi.get_dtype_by_size
             dt_bitfield = idaapi.dt_bitfild
 
-        dtype = six.next((kwargs[n] for n in ('dtyp', 'dtype', 'type') if n in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        dtype = six.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
-        namespace = dict(register_t.__dict__)
+        namespace = {key : value for key, value in register_t.__dict__.items() }
         namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits})
         namespace['realname'] = idaname
         namespace['alias'] = kwargs.get('alias', {item for item in []})
