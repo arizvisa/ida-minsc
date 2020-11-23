@@ -7,7 +7,7 @@ anything that a user should use. Nonetheless, we document this for curious
 individuals to attempt to understand this craziness.
 """
 
-import six
+import six, builtins
 import sys, logging, contextlib
 import functools, operator, itertools, types
 import collections, heapq, traceback, ctypes, math
@@ -160,9 +160,9 @@ class typemap:
         bits = 64 if info.is_64bit() else 32 if info.is_32bit() else None
         if bits is None: return
 
-        typemap.integermap[None] = typemap.integermap[bits/8]
-        typemap.decimalmap[None] = typemap.decimalmap[bits/8]
-        typemap.ptrmap[None] = typemap.ptrmap[bits/8]
+        typemap.integermap[None] = typemap.integermap[bits // 8]
+        typemap.decimalmap[None] = typemap.decimalmap[bits // 8]
+        typemap.ptrmap[None] = typemap.ptrmap[bits // 8]
         typemap.stringmap[None] = typemap.stringmap[str]
 
     @classmethod
@@ -815,11 +815,10 @@ class node(object):
 
         This string is typically found in a supval[0x3000] of a function.
         """
-        res, iterable = [], iter(sup)
-        onext = internal.utils.fcompose(next, six.byte2int)
+        res, iterable = [], (item for item in bytearray(sup))
 
         # pointer and model
-        by = onext(iterable)
+        by = builtins.next(iterable)
         if by & 0xf0:
             # FIXME: If this doesn't match, then this is a type that forwards to the real function type.
             raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), by, 2 + 2))
@@ -827,14 +826,14 @@ class node(object):
         res.append( (by & idaapi.CM_M_MASK) )
 
         # calling convention
-        by = onext(iterable)
+        by = builtins.next(iterable)
         cc, count = by & idaapi.CM_CC_MASK, by & 0x0f
         if cc == idaapi.CM_CC_SPOILED:
             if count != 15:
                 lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('CM_CC_') }
                 raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
-            funcattr = onext(iterable)
-            by = onext(iterable)
+            funcattr = builtins.next(iterable)
+            by = builtins.next(iterable)
             res.append( (by & idaapi.CM_CC_MASK) )
         else:
             res.append(cc)
@@ -844,15 +843,15 @@ class node(object):
 
         # XXX: implement a parser for type_t in order to figure out idaapi.BT_COMPLEX types
         # return type_t
-        data = six.next(iterable)
+        data = builtins.next(iterable)
         base, flags, mods = six.byte2int(data) & idaapi.TYPE_BASE_MASK, six.byte2int(data) & idaapi.TYPE_FLAGS_MASK, six.byte2int(data) & idaapi.TYPE_MODIF_MASK
         if base == idaapi.BT_PTR:
-            data+= six.next(iterable)
+            data+= builtins.next(iterable)
         elif base == idaapi.BT_COMPLEX and flags == 0x30:
-            by = six.next(iterable)
+            by = builtins.next(iterable)
             skip, data = six.byte2int(by), data + by
             while skip > 1:
-                data+= six.next(iterable)
+                data+= builtins.next(iterable)
                 skip -= 1
         elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
@@ -864,7 +863,7 @@ class node(object):
         res.append(data)
 
         # append the number of arguments
-        by = onext(iterable)
+        by = builtins.next(iterable)
         res.append(by)
 
         # Everything else in the iterable is an array of type_t as found in "Type flags" in the SDK docs.
@@ -879,10 +878,7 @@ class node(object):
 
         This string is typically found in a supval[0xF+opnum] of the instruction.
         """
-        le = internal.utils.fcompose(
-            functools.partial(map, six.byte2int),
-            functools.partial(reduce, lambda t, c: (t * 0x100) | c)
-        )
+        le = functools.partial(functools.reduce, lambda agg, by: (agg * 0x100) | by)
         ror = lambda n, shift, bits: (n>>shift) | ((n & 2**shift - 1) << (bits - shift))
 
         # 16-bit
@@ -898,21 +894,21 @@ class node(object):
         # (x ^ 0x3f000000)
 
         def id32(sup):
-            iterable = iter(sup)
+            iterable = (item for item in bytearray(sup))
 
             # First consume the offset (FIXME: we only support 2 bytes for now...)
-            by = six.next(iterable)
-            if le(by) & 0x80:
-                offset = le([by] + [six.next(iterable)])
+            by = builtins.next(iterable)
+            if le([by]) & 0x80:
+                offset = le([by] + [builtins.next(iterable)])
                 offset ^= 0x8000
             else:
                 offset = 0
 
-            count, rest = le([six.next(iterable)]), list(iterable)
-            itemsize = len(rest) / count
+            count, rest = le([builtins.next(iterable)]), [item for item in iterable]
+            itemsize = len(rest) // count
 
-            iterable = iter(rest)
-            chunks = zip(*(itemsize * [iterable]))
+            iterable = (item for item in rest)
+            chunks = [item for item in zip(*(itemsize * [iterable]))]
 
             if itemsize == 1:
                 return offset, [0xff000000 | le(item) for item in chunks]
@@ -939,19 +935,19 @@ class node(object):
         # (x ^ 0xc0000000ff) ror 8
 
         def id64(sup):
-            iterable = iter(sup)
+            iterable = (item for item in bytearray(sup))
 
             # First consume the offset (FIXME: we only support 2 bytes for now...)
-            by = six.next(iterable)
-            if le(by) & 0x80:
-                offset = le([by] + [six.next(iterable)])
+            by = builtins.next(iterable)
+            if le([by]) & 0x80:
+                offset = le([by] + [builtins.next(iterable)])
                 offset ^= 0x8000
             else:
                 offset = 0
 
             # Now we can grab our length
-            length = le((six.next(iterable), six.next(iterable)))
-            rest = list(iterable)
+            length = le([builtins.next(iterable), builtins.next(iterable)])
+            rest = [item for item in iterable]
 
             if len(rest) % 3 == 0:
                 count, mask = 3, 0x8000ff
@@ -962,8 +958,8 @@ class node(object):
             else:
                 raise NotImplementedError(u"{:s}.sup_opstruct(\"{:s}\") -> id64 : Error decoding supval from parameter.".format('.'.join([__name__, node.__name__]), rest))
 
-            iterable = iter(rest)
-            chunks = zip(*(count * [iterable]))
+            iterable = (item for item in rest)
+            chunks = [item for item in zip(*(count * [iterable]))]
 
             #length = le(chunks.pop(0))
             if len(chunks) != length:
@@ -1023,7 +1019,7 @@ class namedtypedtuple(tuple):
         '''Return the type for the field `name`.'''
         res = (t for n, t in zip(cls._fields, cls._types) if n == name)
         try:
-            result = six.next(res)
+            result = builtins.next(res)
         except StopIteration:
             raise NameError("Unable to locate the type for an unknown field {!r}.".format(name))
         return result
@@ -1140,7 +1136,8 @@ class register_t(symbol_t):
 
     def __contains__(self, other):
         '''Returns True if the `other` register is a sub-part of `self`.'''
-        return other in six.viewvalues(self.__children__)
+        viewvalues = {item for item in self.__children__.values()}
+        return other in viewvalues
 
     def subsetQ(self, other):
         '''Returns true if the `other` register is a part of `self`.'''
@@ -1189,7 +1186,7 @@ class regmatch(object):
         regs = { _instruction.architecture.by_name(r) if isinstance(r, six.string_types) else r for r in regs }
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
-        match = lambda r, regs=regs: any(itertools.imap(r.relatedQ, regs))
+        match = lambda r, regs=regs: any(map(r.relatedQ, regs))
 
         # returns true if the operand at the specified address is related to one of the registers in `regs`.
         def uses_register(ea, opnum):
@@ -1206,7 +1203,7 @@ class regmatch(object):
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # by default, grab all operand indexes
-        iterops = internal.utils.fcompose(_instruction.ops_count, six.moves.range, sorted)
+        iterops = internal.utils.fcompose(_instruction.ops_count, builtins.range, sorted)
 
         # if `read` is specified, then only grab operand indexes that are read from
         if modifiers.get('read', False):
@@ -1320,7 +1317,7 @@ class reftype_t(object):
 
         # Verify that the state we were given can be iterated through
         try:
-            iter(state)
+            (item for item in state)
 
         except TypeError:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), state, state, cls.__name__))
@@ -1473,11 +1470,11 @@ class switch_t(object):
         '''Return all of the non-default cases in the switch.'''
         import instruction
         F = lambda ea, dflt=self.default: (ea == dflt) or (instruction.type.is_jmp(ea) and instruction.op(ea, 0) == dflt)
-        return tuple(idx for idx in six.moves.range(self.base, self.base + self.count) if not F(self.case(idx)))
+        return tuple(idx for idx in builtins.range(self.base, self.base + self.count) if not F(self.case(idx)))
     @property
     def range(self):
         '''Return all of the possible cases for the switch.'''
-        return tuple(six.moves.range(self.base, self.base + self.count))
+        return tuple(builtins.range(self.base, self.base + self.count))
     def __str__(self):
         cls = self.__class__
         if self.indirectQ():
@@ -1522,7 +1519,7 @@ def addressOfRuntimeOrStatic(func):
         if not isinstance(func, six.integer_types): six.reraise(*exc_info)
 
         # make sure that we're actually data
-        if not database.is_data(func): six.reraise(*exc_info)
+        if not database.type.is_data(func): six.reraise(*exc_info)
 
         # ensure that we're an import, otherwise throw original exception
         try:
@@ -1666,7 +1663,7 @@ class architecture_t(object):
             dt_bitfield = idaapi.dt_bitfild
 
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
-        dtype = six.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
 
         namespace = {key : value for key, value in register_t.__dict__.items()}
         namespace.update({'__name__':name, '__parent__':None, '__children__':{}, '__dtype__':dtype, '__position__':0, '__size__':bits})
@@ -1690,7 +1687,7 @@ class architecture_t(object):
             dtype_by_size = idaapi.get_dtype_by_size
             dt_bitfield = idaapi.dt_bitfild
 
-        dtype = six.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
+        dtype = builtins.next((kwargs[item] for item in ['dtyp', 'dtype', 'type'] if item in kwargs), dt_bitfield if bits == 1 else dtype_by_size(bits // 8))
         #dtyp = kwargs.get('dtyp', idaapi.dt_bitfild if bits == 1 else dtype_by_size(bits//8))
         namespace = {key : value for key, value in register_t.__dict__.items() }
         namespace.update({'__name__':name, '__parent__':parent, '__children__':{}, '__dtype__':dtype, '__position__':position, '__size__':bits})
@@ -1751,7 +1748,7 @@ class architecture_t(object):
 
     def demote(self, register, size=None):
         '''Demote the specified `register` to its next smaller `size`.'''
-        childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('iteritems'))
+        childitems = internal.utils.fcompose(operator.attrgetter('__children__'), operator.methodcaller('items'))
         firstchild = internal.utils.fcompose(childitems, functools.partial(sorted, key=operator.itemgetter(0)), iter, next, operator.itemgetter(1))
         try:
             if size is None:
