@@ -554,7 +554,7 @@ def __process_functions(percentage=0.10):
     It's intended to be called once the database is ready to be tampered with.
     """
     p = ui.Progress()
-    globals = set(internal.comment.globals.address())
+    globals = {item for item in internal.comment.globals.address()}
 
     total = 0
 
@@ -571,11 +571,11 @@ def __process_functions(percentage=0.10):
         if i % (int(len(funcs) * percentage) or 1) == 0:
             six.print_(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, 1 + i, len(funcs), i / float(len(funcs)) * 100.0))
 
-        contents = set(internal.comment.contents.address(fn))
+        contents = {item for item in internal.comment.contents.address(fn)}
         for ci, (l, r) in enumerate(chunks):
             p.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
             ui.navigation.analyze(l)
-            for ea in database.address.iterate(l, r):
+            for ea in database.address.iterate(l, database.address.prev(r)):
                 # FIXME: no need to iterate really since we should have
                 #        all of the addresses
                 for k, v in database.tag(ea).items():
@@ -705,7 +705,7 @@ def rename(ea, newname):
     if the name is being removed.
     """
     fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
-    labelQ, customQ = (fl & item == item for item in {idaapi.FF_LABL, idaapi.FF_NAME})
+    labelQ, customQ = (fl & item == item for item in [idaapi.FF_LABL, idaapi.FF_NAME])
     #r, fn = database.xref.up(ea), idaapi.get_func(ea)
     fn = idaapi.get_func(ea)
 
@@ -769,7 +769,7 @@ def func_tail_appended(pfn, tail):
     global State
     if State != state.ready: return
     # tail = func_t
-    for ea in database.address.iterate(*interface.range.unpack(tail)):
+    for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -786,7 +786,7 @@ def removing_func_tail(pfn, tail):
     global State
     if State != state.ready: return
     # tail = range_t
-    for ea in database.address.iterate(*interface.range.unpack(tail)):
+    for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
@@ -841,7 +841,7 @@ def tail_owner_changed(tail, owner_func):
 
     # this is easy as we just need to walk through tail and add it
     # to owner_func
-    for ea in database.address.iterate(*interface.range.unpack(tail)):
+    for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=owner_func)
@@ -861,7 +861,7 @@ def add_func(pfn):
 
     # convert all globals into contents
     for l, r in function.chunks(pfn):
-        for ea in database.address.iterate(l, r):
+        for ea in database.address.iterate(l, database.address.prev(r)):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -884,7 +884,7 @@ def del_func(pfn):
 
     # convert all contents into globals
     for l, r in function.chunks(pfn):
-        for ea in database.address.iterate(l, r):
+        for ea in database.address.iterate(l, database.address.prev(r)):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
@@ -911,7 +911,7 @@ def set_func_start(pfn, new_start):
     # new_start has removed addresses from function
     # replace contents with globals
     if interface.range.start(pfn) > new_start:
-        for ea in database.address.iterate(new_start, interface.range.start(pfn)):
+        for ea in database.address.iterate(new_start, database.address.prev(interface.range.start(pfn))):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
@@ -922,7 +922,7 @@ def set_func_start(pfn, new_start):
     # new_start has added addresses to function
     # replace globals with contents
     elif interface.range.start(pfn) < new_start:
-        for ea in database.address.iterate(interface.range.start(pfn), new_start):
+        for ea in database.address.iterate(interface.range.start(pfn), database.address.prev(new_start)):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -943,7 +943,7 @@ def set_func_end(pfn, new_end):
     # new_end has added addresses to function
     # replace globals with contents
     if new_end > interface.range.end(pfn):
-        for ea in database.address.iterate(interface.range.end(pfn), new_end):
+        for ea in database.address.iterate(interface.range.end(pfn), database.address.prev(new_end)):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -954,7 +954,7 @@ def set_func_end(pfn, new_end):
     # new_end has removed addresses from function
     # replace contents with globals
     elif new_end < interface.range.end(pfn):
-        for ea in database.address.iterate(new_end, interface.range.end(pfn)):
+        for ea in database.address.iterate(new_end, database.address.prev(interface.range.end(pfn))):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
