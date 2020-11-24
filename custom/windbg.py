@@ -36,10 +36,10 @@ def tokenize(input, escapables={"'", '"', '\\'} | {item for item in string.white
 
     If the set `escapables` is defined, then use it as the list of characters to tokenize.
     """
-    result, iterable = '', iter(input)
+    result, iterable = '', (item for item in input)
     try:
         while True:
-            char = six.next(iterable)
+            char = builtins.next(iterable)
             if operator.contains(escapables, char):
                 if result:
                     yield result
@@ -88,7 +88,7 @@ def escape(input, depth=0, **extra):
                 # Add any characters that were explicitly specified in the
                 # "extra" dictionary, and replace our current token with it
                 if any(operator.contains(token, item) for item in extra):
-                    k = six.next(item for item in extra if operator.contains(token, item))
+                    k = builtins.next(item for item in extra if operator.contains(token, item))
                     token = token.replace(k, extra[k] * depth + k)
 
                 # Now we can yield our token
@@ -119,7 +119,7 @@ def breakpoints(f=None, **kwargs):
     tags, select = {}, itertools.chain(func.select(f, And=(tagname,), Or=('',)))
     for ea, t in select:
         h = tags.setdefault(ea, {})
-        for k in six.iterkeys(t):
+        for k in t.keys():
             if k == tagname:
                 h.setdefault(k, []).extend(t[k] if isinstance(t[k], builtins.list) else t[k].split(';'))
 
@@ -132,7 +132,7 @@ def breakpoints(f=None, **kwargs):
         continue
 
     # aggregate all of the discovered tags into a list of breakpoints
-    for ea, t in six.iteritems(tags):
+    for ea, t in tags.items():
         ofs, commands = db.offset(ea), []
 
         # create the command that emits the current label
@@ -147,7 +147,7 @@ def breakpoints(f=None, **kwargs):
             commands.append(res)
 
         # escape all of the commands since we're going to join them together
-        commands = map(escape, commands)
+        commands = (escape(cmd) for cmd in commands)
 
-        print 'bp {:s} "{:s}"'.format(reference(ea, **kwargs), escape(';'.join(commands), depth=1))
+        six.print_('bp {:s} "{:s}"'.format(reference(ea, **kwargs), escape(';'.join(commands), depth=1)))
     return
