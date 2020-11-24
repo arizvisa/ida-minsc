@@ -119,9 +119,9 @@ def fetch_globals():
     # consolidate tags into individual dictionaries
     six.print_(u'globals: aggregating results', file=output)
     addr, tags = dict(faddr), dict(ftags)
-    for k, v in six.iteritems(daddr):
+    for k, v in daddr.items():
         addr[k] = addr.get(k, 0) + v
-    for k, v in six.iteritems(dtags):
+    for k, v in dtags.items():
         tags[k] = tags.get(k, 0) + v
 
     six.print_(u"globals: found {:d} addresses".format(len(addr)), file=output)
@@ -142,7 +142,7 @@ def contents(ea):
     f, addr, tags = fetch_contents(ea)
 
     # clean out any hidden tag values
-    for k in six.viewkeys(tags):
+    for k in tags.keys():
         if k in {'__tags__', '__address__'}:
             if f in addr:
                 addr[f] -= 1
@@ -157,11 +157,11 @@ def contents(ea):
     # update addresses and tags to contents
     ui.navigation.set(ea)
     logging.debug(u"{:s}.contents({:#x}): Updating the name reference cache for the contents of function {:#x}.".format('.'.join([__name__]), ea, ea))
-    for k, v in six.iteritems(tags):
+    for k, v in tags.items():
         internal.comment.contents.set_name(f, k, v)
 
     logging.debug(u"{:s}.contents({:#x}): Updating the address reference cache for the contents of function {:#x}.".format('.'.join([__name__]), ea, ea))
-    for k, v in six.iteritems(addr):
+    for k, v in addr.items():
         if not func.within(k):
             continue
         internal.comment.contents.set_address(k, v)
@@ -176,11 +176,11 @@ def globals():
 
     # update the global state
     six.print_(u'globals: updating global name refs', file=output)
-    for k, v in six.iteritems(tags):
+    for k, v in tags.items():
         internal.comment.globals.set_name(k, v)
 
     six.print_(u'globals: updating global address refs', file=output)
-    for k, v in six.iteritems(addr):
+    for k, v in addr.items():
         internal.comment.globals.set_address(k, v)
 
     return addr, tags
@@ -216,10 +216,10 @@ def extracomments():
         ctx = internal.comment.contents if func.within(ea) else internal.comment.globals
 
         count = db.extra.__count__(ea, idaapi.E_PREV)
-        if count: [ ctx.inc(ea, '__extra_prefix__') for i in six.moves.range(count) ]
+        if count: [ ctx.inc(ea, '__extra_prefix__') for i in range(count) ]
 
         count = db.extra.__count__(ea, idaapi.E_NEXT)
-        if count: [ ctx.inc(ea, '__extra_suffix__') for i in six.moves.range(count) ]
+        if count: [ ctx.inc(ea, '__extra_suffix__') for i in range(count) ]
     return
 
 def everything():
