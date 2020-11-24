@@ -23,7 +23,7 @@ def function(ea):
 def arguments(ea):
     '''Returns an array of all of the arguments within the prototype of the function at `ea`.'''
     decl = function(ea)
-    args = decl[ decl.index('(')+1: decl.rindex(')') ]
+    args = decl[ decl.index('(') + 1 : decl.rindex(')') ]
     return [ arg.strip() for arg in args.split(',')]
 
 def size(string):
@@ -56,7 +56,7 @@ def demangle(string):
 
 def mangledQ(string):
     '''Return true if the provided `string` has been mangled.'''
-    return any(string.startswith(n) for n in ('?', '__'))
+    return any(string.startswith(item) for item in ['?', '__'])
 
 @internal.utils.string.decorate_arguments('info')
 def parse(info):
@@ -123,7 +123,7 @@ def unmangle_name(name):
         items = items[:]
 
     # Strip out any backticked components, operators, and other weirdness.
-    foperatorQ = lambda s: s.startswith('operator') and any(s.endswith(invalid) for invalid in _string.punctuation)
+    foperatorQ = lambda string: string.startswith('operator') and any(string.endswith(invalid) for invalid in _string.punctuation)
     joined = ' '.join(items)
     if '::' in joined:
         components = joined.split('::')
@@ -147,12 +147,12 @@ def unmangle_arguments(ea):
     parameters = extract.arguments("{!s}".format(idaapi.idc_get_type(ea))) or extract.arguments("{!s}".format(info))
     param_s = parameters.lstrip('(').rstrip(')')
 
-    index, indices, iterable = 0, [], iter(enumerate(param_s))
+    index, indices, iterable = 0, [], ((idx, item) for idx, item in enumerate(param_s))
     for argi in range(info.get_nargs()):
         arg = info.get_nth_arg(argi)
         arg_s = "{!s}".format(arg)
 
-        index, ch = next(iterable, (1+index,','))
+        index, ch = next(iterable, (1 + index, ','))
         while ch in ' ':
             index, ch = next(iterable)
 
@@ -163,7 +163,7 @@ def unmangle_arguments(ea):
 
             count = 0
             while ch != ',' or count > 0:
-                index, ch = next(iterable, (1+index, ','))
+                index, ch = next(iterable, (1 + index, ','))
                 if ch in '()':
                     count += -1 if ch in ')' else +1
                 continue
@@ -207,14 +207,14 @@ class extract:
 
     @staticmethod
     def convention(string):
-        types = set(('__cdecl', '__stdcall', '__thiscall', '__fastcall'))
+        types = {'__cdecl', '__stdcall', '__thiscall', '__fastcall'}
         res = string.split(' ')
         return res[0]
 
     @staticmethod
     def fullname(string):
         decl = extract.declaration(string)
-        return decl[:decl.find('(')].split(' ', 3)[-1] if any(n in decl for n in ('(', ' ')) else decl
+        return decl[:decl.find('(')].split(' ', 3)[-1] if any(item in decl for item in ['(', ' ']) else decl
 
     @staticmethod
     def name(string):
