@@ -18,7 +18,7 @@ in use. This can allow for one to automatically show or hide a
 window that they wish to expose to the user.
 """
 
-import six
+import six, builtins
 import sys, os, time, functools
 import logging
 
@@ -75,7 +75,7 @@ class ask(object):
         state = {'no': getattr(idaapi, 'ASKBTN_NO', 0), 'yes': getattr(idaapi, 'ASKBTN_YES', 1), 'cancel': getattr(idaapi, 'ASKBTN_CANCEL', -1)}
         results = {state['no']: False, state['yes']: True}
         if default:
-            keys = {item for item in default.viewkeys()}
+            keys = {item for item in default.keys()}
             keys = {item.lower() for item in keys if default.get(item, False)}
             dflt = next((item for item in keys), 'cancel')
         else:
@@ -402,7 +402,7 @@ class names(appwindow):
     @classmethod
     def iterate(cls):
         '''Iterate through all of the address and symbols in the names list.'''
-        for idx in six.moves.range(cls.size()):
+        for idx in range(cls.size()):
             yield cls.at(idx)
         return
 
@@ -446,7 +446,7 @@ class strings(appwindow):
         else:
             res = [idaapi.STRTYPE_TERMCHR, idaapi.STRTYPE_PASCAL, idaapi.STRTYPE_LEN2, idaapi.STRTYPE_C_16, idaapi.STRTYPE_LEN4, idaapi.STRTYPE_LEN2_16, idaapi.STRTYPE_LEN4_16]
 
-        config.strtypes = reduce(lambda t, c: t | (2**c), res, 0)
+        config.strtypes = functools.reduce(lambda t, c: t | (2**c), res, 0)
         if not idaapi.set_strlist_options(config):
             raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
         #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
@@ -479,7 +479,7 @@ class strings(appwindow):
     @classmethod
     def iterate(cls):
         '''Iterate through all of the address and strings in the strings list.'''
-        for index in six.moves.range(cls.size()):
+        for index in range(cls.size()):
             yield cls.get(index)
         return
 
@@ -520,7 +520,7 @@ class timer(object):
     @classmethod
     def reset(cls):
         '''Remove all the registered timers.'''
-        for id, clk in six.iteritems(cls.clock):
+        for id, clk in cls.clock.items():
             idaapi.unregister_timer(clk)
             del(cls.clock[id])
         return
@@ -603,7 +603,7 @@ class menu(object):
     @classmethod
     def reset(cls):
         '''Remove all currently registered menu items.'''
-        for path, name in six.iterkeys(state):
+        for path, name in cls.state.keys():
             cls.rm(path, name)
         return
 
@@ -744,7 +744,7 @@ class keyboard(object):
         if len(key) != 1:
             raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : An invalid hotkey combination ({!s}) was provided as a parameter.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(hotkey)))
 
-        res = next(iter(key))
+        res = next(item for item in key)
         if len(res) != 1:
             raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : The hotkey combination {!s} contains the wrong number of keys ({:d}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(res), len(res)))
 
@@ -897,14 +897,14 @@ try:
             res.setVisible(False)
             res.setWindowModality(blocking)
             res.setAutoClose(True)
-            path = u"{:s}/{:s}".format(_database.config.path(), _database.config.filename())
+            path = os.path.join(_database.config.path(), _database.config.filename())
             self.update(current=0, min=0, max=0, text=u'Processing...', tooltip=u'...', title=path)
 
         # properties
-        canceled = property(fget=lambda s: s.object.wasCanceled(), fset=lambda s, v: s.object.canceled.connect(v))
-        maximum = property(fget=lambda s: s.object.maximum())
-        minimum = property(fget=lambda s: s.object.minimum())
-        current = property(fget=lambda s: s.object.value())
+        canceled = property(fget=lambda self: self.object.wasCanceled(), fset=lambda self, value: self.object.canceled.connect(value))
+        maximum = property(fget=lambda self: self.object.maximum())
+        minimum = property(fget=lambda self: self.object.minimum())
+        current = property(fget=lambda self: self.object.value())
 
         # methods
         def open(self, width=0.8, height=0.1):
@@ -954,7 +954,7 @@ try:
         def update(self, **options):
             '''Update the current state of the progress bar.'''
             minimum, maximum = options.get('min', None), options.get('max', None)
-            text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
+            text, title, tooltip = (options.get(item, None) for item in ['text', 'title', 'tooltip'])
 
             if minimum is not None:
                 self.object.setMinimum(minimum)
@@ -1104,15 +1104,15 @@ class ConsoleProgress(object):
     Helper class used to simplify the showing of a progress bar in IDA's console.
     """
     def __init__(self, blocking=True):
-        self.__path__ = u"{:s}/{:s}".format(_database.config.path(), _database.config.filename())
+        self.__path__ = os.path.join(_database.config.path(), _database.config.filename())
         self.__value__ = 0
         self.__min__, self.__max__ = 0, 0
         return
 
-    canceled = property(fget=lambda s: False, fset=lambda s, v: None)
-    maximum = property(fget=lambda s: self.__max__)
-    minimum = property(fget=lambda s: self.__min__)
-    current = property(fget=lambda s: self.__value__)
+    canceled = property(fget=lambda self: False, fset=lambda self, value: None)
+    maximum = property(fget=lambda self: self.__max__)
+    minimum = property(fget=lambda self: self.__min__)
+    current = property(fget=lambda self: self.__value__)
 
     def open(self, width=0.8, height=0.1):
         '''Open a progress bar with the specified `width` and `height` relative to the dimensions of IDA's window.'''
@@ -1125,7 +1125,7 @@ class ConsoleProgress(object):
     def update(self, **options):
         '''Update the current state of the progress bar.'''
         minimum, maximum = options.get('min', None), options.get('max', None)
-        text, title, tooltip = (options.get(n, None) for n in ['text', 'title', 'tooltip'])
+        text, title, tooltip = (options.get(item, None) for item in ['text', 'title', 'tooltip'])
 
         if minimum is not None:
             self.__min__ = minimum
@@ -1262,7 +1262,7 @@ class DisplayHook(object):
                 num_printer = bin
             self.format_item(num_printer, storage, item)
             sys.stdout.write("%s\n" % "".join(storage))
-        except:
+        except Exception:
             import traceback
             traceback.print_exc()
             self.orig_displayhook(item)
