@@ -13,9 +13,7 @@ The tools defined within here are unorganized and thus may
 shift around during development as they find their place.
 """
 
-import six, sys, logging
-from six.moves import builtins
-
+import six, sys, logging, builtins
 import functools, operator, itertools, types
 import logging
 
@@ -36,14 +34,14 @@ def map(F, **kwargs):
     result, all = [], database.functions()
     total = len(all)
     if len(all):
-        ea = next(iter(all))
+        ea = next(item for item in all)
         try:
             for i, ea in enumerate(all):
                 ui.navigation.set(ea)
-                print("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
+                six.print_("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, 1 + i, total, func.name(ea)))
                 result.append( f((i, ea), **kwargs) )
         except KeyboardInterrupt:
-            print("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, i+1, total, func.name(ea)))
+            six.print_("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, 1 + i, total, func.name(ea)))
     return result
 
 # For poor folk without a dbgeng
@@ -91,7 +89,7 @@ def colormarks(color=0x7f007f):
     address of the marks that it contains.
     """
     # tag and color
-    f = set()
+    f = {item for item in []}
     for ea, m in database.marks():
         database.tag(ea, 'mark', m)
         if database.color(ea) is None:
@@ -103,7 +101,7 @@ def colormarks(color=0x7f007f):
         continue
 
     # tag the functions too
-    for ea in list(f):
+    for ea in f:
         m = func.marks(ea)
         func.tag(ea, 'marks', [ea for ea, _ in m])
     return
@@ -117,15 +115,15 @@ def recovermarks():
     # collect
     result = []
     for fn, l in database.select('marks'):
-        m = set( (l['marks']) if hasattr(l['marks'], '__iter__') else [int(x, 16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
+        m = {item for item in l['marks']} if hasattr(l['marks'], '__iter__') else {int(item, 16) for item in l['marks'].split(',')} if isinstance(l['marks'], six.string_types) else {l['marks']}
         res = [(ea, d['mark']) for ea, d in func.select(fn, 'mark')]
-        if m != { a for a, _ in res }:
-            logging.warning("{:s} : Ignoring the function tag \"{:s}\" for function {:#x} due to its value being out-of-sync with the contents values ({!s} <> {!s}).".format('.'.join([__name__, 'recovermarks']), fn, builtins.map(hex, m), builtins.map(hex, set(a for a, _ in res))))
+        if m != { ea for ea, _ in res }:
+            logging.warning("{:s} : Ignoring the function tag \"{:s}\" for function {:#x} due to its value being out-of-sync with the contents values ({!s} <> {!s}).".format('.'.join([__name__, 'recovermarks']), fn, builtins.map("{:#x}".format, m), builtins.map("{:#x}".format, {ea for ea, _ in res})))
         result.extend(res)
     result.sort(cmp=lambda x, y: cmp(x[1], y[1]))
 
     # discovered marks versus database marks
-    result = dict(result)
+    result = {ea : item for ea, item in result.items()}
     current = {ea : descr for ea, descr in database.marks()}
 
     # create tags
@@ -144,7 +142,7 @@ def recovermarks():
         database.mark(x, y)
 
     # marks that aren't reachable in the database
-    for ea in set(current.viewkeys()).difference(result.viewkeys()):
+    for ea in { item for item in current.keys() }.difference({item for item in result.keys()}):
         logging.warning("{:#x}: unreachable mark (global) : {!r}".format(ea, current[ea]))
 
     # color them
@@ -156,15 +154,15 @@ def checkmarks():
     As an example, if marks are used to keep track of backtraces then
     this tool will emit where those backtraces intersect.
     """
-    res = []
+    listable = []
     for a, m in database.marks():
         try:
-            res.append((func.top(a), a, m))
+            listable.append((func.top(a), a, m))
         except internal.exceptions.FunctionNotFoundError:
             pass
         continue
 
-    d = list(res)
+    d = listable[:]
     d.sort( lambda a, b: cmp(a[0], b[0]) )
 
     flookup = {}
@@ -181,8 +179,8 @@ def checkmarks():
         return
 
     for k, v in functions:
-        print >>sys.stdout, "{:#x} : in function {:s}".format(k, func.name(func.byAddress(k)))
-        print >>sys.stdout, '\n'.join( ("- {:#x} : {:s}".format(a, m) for a, m in sorted(v)) )
+        six.print_("{:#x} : in function {:s}".format(k, func.name(func.by_address(k))), file=sys.stdout)
+        six.print_('\n'.join(("- {:#x} : {:s}".format(a, m) for a, m in sorted(v))), file=sys.stdout)
     return
 
 def collect(ea, sentinel):
@@ -192,21 +190,21 @@ def collect(ea, sentinel):
     sentinel blocks and collection will terminate when those blocks are
     reached.
     """
-    if isinstance(sentinel, list):
-        sentinel = set(sentinel)
+    if isinstance(sentinel, (list, tuple)):
+        sentinel = {item for item in sentinel}
     if not all((sentinel, isinstance(sentinel, set))):
         raise AssertionError("{:s}.collect({:#x}, {!r}) : Sentinel is empty or not a set.".format(__name__, ea, sentinel))
     def _collect(addr, result):
-        process = set()
+        process = {item for item in []}
         for blk in builtins.map(func.block, func.block.after(addr)):
-            if any(blk in coll for coll in (result, sentinel)):
+            if any(blk in coll for coll in [result, sentinel]):
                 continue
             process.add(blk)
         for addr, _ in process:
             result |= _collect(addr, result | process)
         return result
     addr, _ = blk = func.block(ea)
-    return _collect(addr, set([blk]))
+    return _collect(addr, {blk})
 
 def collectcall(ea, sentinel=set()):
     """Collect all of the function calls starting at function `ea` and recurse until a terminating function is encountered.
@@ -215,14 +213,14 @@ def collectcall(ea, sentinel=set()):
     sentinel functions and collection will terminate when one of those
     functions are reached.
     """
-    if isinstance(sentinel, list):
-        sentinel = set(sentinel)
+    if isinstance(sentinel, (list, tuple)):
+        sentinel = {item for item in sentinel}
     if not isinstance(sentinel, set):
         raise AssertionError("{:s}.collectcall({:#x}, {!r}) : Sentinel is not a set.".format(__name__, ea, sentinel))
     def _collectcall(addr, result):
-        process = set()
+        process = {item for item in []}
         for f in func.down(addr):
-            if any(f in coll for coll in (result, sentinel)):
+            if any(f in coll for coll in [result, sentinel]):
                 continue
             if not func.within(f):
                 logging.warning("{:s}.collectcall({:#x}, {!r}) : Adding non-function address {:#x} ({:s}).".format(__name__, ea, sentinel, f, database.name(f)))
@@ -233,7 +231,7 @@ def collectcall(ea, sentinel=set()):
             result |= _collectcall(addr, result | process)
         return result
     addr = func.top(ea)
-    return _collectcall(addr, set([addr]))
+    return _collectcall(addr, {addr})
 
 # FIXME: Don't emit the +0 if offset is 0
 def above(ea, includeSegment=False):
@@ -283,7 +281,7 @@ def makecall(ea=None, target=None):
     try:
         result = []
         for offset, name, size in func.arguments(fn):
-            left = database.address.prevstack(ea, offset+database.config.bits()/8)
+            left = database.address.prevstack(ea, offset + database.config.bits() // 8)
             # FIXME: if left is not an assignment or a push, find last assignment
             result.append((name, left))
     except internal.exceptions.OutOfBoundsError:
@@ -291,7 +289,7 @@ def makecall(ea=None, target=None):
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
 #    result = ["{:s}={:s}".format(name, instruction.op_repr(ea, 0)) for name, ea in result]
-    result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea, 0), write=1), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea, 0), write=1))) if instruction.op_type(ea, 0) == 'reg' else instruction.op_repr(ea, 0)) for name, ea in result]
+    result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea, 0), write=True), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea, 0), write=True))) if instruction.op_type(ea, 0) == 'reg' else instruction.op_repr(ea, 0)) for name, ea in result]
 
     try:
         return "{:s}({:s})".format(internal.declaration.demangle(func.name(func.by_address(fn))), ','.join(result))
