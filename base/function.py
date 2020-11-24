@@ -18,8 +18,7 @@ to the different parts of a function. Some of the available namespaces
 are ``type``, ``block``, ``chunk``, ``blocks``, ``chunks``, and ``frame``.
 """
 
-import six
-from six.moves import builtins
+import six, builtins
 
 import functools, operator, itertools, types
 import logging, string
@@ -410,8 +409,9 @@ class chunks(object):
     def iterate(cls, func):
         '''Iterate through all the instructions for each chunk in the function `func`.'''
         for start, end in cls(func):
-            for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, database.address.prev(end))):
-                yield ea
+            for ea in database.address.iterate(start, database.address.prev(end)):
+                if database.type.is_code(ea):
+                    yield ea
             continue
         return
 
@@ -453,8 +453,9 @@ class chunks(object):
         uses_register = interface.regmatch.use( (reg,) + regs )
 
         for ea in cls.iterate(func):
-            for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
-                yield ea, opnum, instruction.op_state(ea, opnum)
+            for opnum in iterops(ea):
+                if uses_register(ea, opnum):
+                    yield ea, opnum, instruction.op_state(ea, opnum)
             continue
         return
 
@@ -496,8 +497,10 @@ class chunk(object):
     def iterate(cls, ea):
         '''Iterate through all the instructions for the function chunk containing the address ``ea``.'''
         start, end = cls(ea)
-        for ea in itertools.ifilter(database.type.is_code, database.address.iterate(start, database.address.prev(end))):
-            yield ea
+        for ea in database.address.iterate(start, database.address.prev(end)):
+            if database.type.is_code(ea):
+                yield ea
+            continue
         return
 
     @utils.multicase(reg=(six.string_types, interface.register_t))
@@ -516,7 +519,7 @@ class chunk(object):
         uses_register = interface.regmatch.use( (reg,) + regs )
 
         for ea in cls.iterate(ea):
-            for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
+            for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
                 yield ea, opnum, instruction.op_state(ea, opnum)
             continue
         return
@@ -1345,8 +1348,10 @@ class block(object):
         uses_register = interface.regmatch.use( (reg,) + regs )
 
         for ea in cls.iterate(bb):
-            for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
-                yield ea, opnum, instruction.op_state(ea, opnum)
+            for opnum in iterops(ea):
+                if uses_register(ea, opnum):
+                    yield ea, opnum, instruction.op_state(ea, opnum)
+                continue
             continue
         return
 
@@ -1384,7 +1389,7 @@ class block(object):
     def disassemble(cls, ea, **options):
         '''Returns the disassembly of the basic block at the address `ea`.'''
         F = functools.partial(database.disassemble, **options)
-        return '\n'.join(itertools.imap(F, cls.iterate(ea)))
+        return '\n'.join(map(F, cls.iterate(ea)))
     @utils.multicase(bounds=builtins.tuple)
     @classmethod
     def disassemble(cls, bounds, **options):
@@ -1396,7 +1401,7 @@ class block(object):
     def disassemble(cls, bb, **options):
         '''Returns the disassembly of the basic block `bb`.'''
         F = functools.partial(database.disassemble, **options)
-        return '\n'.join(itertools.imap(F, cls.iterate(bb)))
+        return '\n'.join(map(F, cls.iterate(bb)))
     disasm = utils.alias(disassemble, 'block')
 
     # FIXME: implement .decompile for an idaapi.BasicBlock type too
@@ -1411,9 +1416,9 @@ class block(object):
         '''(UNSTABLE) Returns the decompiled code of the basic block at the address `ea`.'''
         source = idaapi.decompile(ea)
 
-        res = itertools.imap(functools.partial(operator.getitem, source.eamap), cls.iterate(ea))
+        res = map(functools.partial(operator.getitem, source.eamap), cls.iterate(ea))
         res = itertools.chain(*res)
-        formatted = reduce(lambda t, c: t if t[-1].ea == c.ea else t+[c], res, [next(res)])
+        formatted = functools.reduce(lambda t, c: t if t[-1].ea == c.ea else t + [c], res, [next(res)])
 
         res = []
         # FIXME: This has been pretty damn unstable in my tests.
@@ -1421,7 +1426,7 @@ class block(object):
             for fmt in formatted:
                 res.append( fmt.print1(source.__deref__()) )
         except TypeError: pass
-        res = itertools.imap(idaapi.tag_remove, res)
+        res = map(idaapi.tag_remove, res)
         return '\n'.join(map(utils.string.of, res))
 
 class frame(object):
@@ -1456,13 +1461,13 @@ class frame(object):
     @classmethod
     def new(cls):
         '''Add an empty frame to the current function.'''
-        _r = database.config.bits() / 8
+        _r = database.config.bits() // 8
         return cls.new(ui.current.function(), 0, _r, 0)
     @utils.multicase(lvars=six.integer_types, args=six.integer_types)
     @classmethod
     def new(cls, lvars, args):
         '''Add a frame to the current function using the sizes specified by `lvars` for local variables, and `args` for arguments.'''
-        _r = database.config.bits() / 8
+        _r = database.config.bits() // 8
         return cls.new(ui.current.function(), lvars, _r, args)
     @utils.multicase(lvars=six.integer_types, regs=six.integer_types, args=six.integer_types)
     @classmethod
@@ -1477,7 +1482,7 @@ class frame(object):
         When specifying the size of the registers (`regs`) the size of the saved instruction pointer must also be included.
         """
         fn = by(func)
-        _r = database.config.bits() / 8
+        _r = database.config.bits() // 8
         ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
             raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), lvars, regs - _r, args, interface.range.start(fn), lvars, regs - _r, args))
@@ -1673,7 +1678,7 @@ class frame(object):
             '''Returns the number of bytes occupied by the saved registers for the function `func`.'''
             fn = by(func)
             # include the size of a word for the pc because ida doesn't count it
-            return fn.frregs + database.config.bits() / 8
+            return fn.frregs + database.config.bits() // 8
 
 get_frameid = utils.alias(frame.id, 'frame')
 get_args_size = utils.alias(frame.args.size, 'frame.args')
@@ -1729,7 +1734,7 @@ def tag(func):
         logging.info(u"{:s}.tag({:#x}) : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format(__name__, ea, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
     res = {}
-    map(res.update, (d1, d2) if repeatable else (d2, d1))
+    [ res.update(d) for d in ([d1, d2] if repeatable else [d2, d1]) ]
 
     # add the function's name to the result
     fname = name(fn)
@@ -1929,7 +1934,7 @@ def select(func, **boolean):
     """
     fn = by(func)
     containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in six.viewitems(boolean)}
+    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
 
     # nothing specific was queried, so just yield each tag
     if not boolean:
@@ -1940,7 +1945,6 @@ def select(func, **boolean):
         return
 
     # collect the keys to query as specified by the user
-    Or, And = (set(iter(boolean.get(B, ()))) for B in ('Or', 'And'))
     Or, And = ({item for item in boolean.get(B, [])} for B in ['Or', 'And'])
 
     # walk through every tagged address and cross-check it against query
@@ -1949,12 +1953,12 @@ def select(func, **boolean):
         res, d = {}, database.tag(ea)
 
         # Or(|) includes any of the tags being queried
-        res.update({key : value for key, value in six.iteritems(d) if key in Or})
+        res.update({key : value for key, value in d.items() if key in Or})
 
         # And(&) includes any tags only if they include all the specified tagnames
         if And:
-            if And & d.viewkeys() == And:
-                res.update({key : value for key, value in six.iteritems(d) if key in And})
+            if And & six.viewkeys(d) == And:
+                res.update({key : value for key, value in d.items() if key in And})
             else: continue
 
         # if anything matched, then yield the address and the queried tags.
