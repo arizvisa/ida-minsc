@@ -70,8 +70,9 @@ class address(commentbase):
     def _update_refs(cls, ea, old, new):
         f, rt = cls.get_func_extern(ea)
 
-        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys()), ' for runtime-linked function' if rt else ''))
-        for key in old.viewkeys() ^ new.viewkeys():
+        oldkeys, newkeys = ({item for item in content.keys()} for content in [old, new])
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(oldkeys), utils.string.repr(newkeys), ' for runtime-linked function' if rt else ''))
+        for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
                 if f and not rt: internal.comment.contents.dec(ea, key)
@@ -84,22 +85,24 @@ class address(commentbase):
         return
 
     @classmethod
-    def _create_refs(cls, ea, res):
+    def _create_refs(cls, ea, content):
         f, rt = cls.get_func_extern(ea)
 
-        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(res.viewkeys()), ' for runtime-linked function' if rt else ''))
-        for key in res.viewkeys():
+        contentkeys = {item for item in content.keys()}
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(contentkeys), ' for runtime-linked function' if rt else ''))
+        for key in contentkeys:
             logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
             if f and not rt: internal.comment.contents.inc(ea, key)
             else: internal.comment.globals.inc(ea, key)
         return
 
     @classmethod
-    def _delete_refs(cls, ea, res):
+    def _delete_refs(cls, ea, content):
         f, rt = cls.get_func_extern(ea)
 
-        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(res.viewkeys()), ' from runtime-linked function' if rt else ''))
-        for key in res.viewkeys():
+        contentkeys = {item for item in content.keys()}
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(contentkeys), ' from runtime-linked function' if rt else ''))
+        for key in contentkeys:
             logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
             if f and not rt: internal.comment.contents.dec(ea, key)
             else: internal.comment.globals.dec(ea, key)
@@ -261,8 +264,9 @@ class address(commentbase):
 class globals(commentbase):
     @classmethod
     def _update_refs(cls, fn, old, new):
-        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
-        for key in old.viewkeys() ^ new.viewkeys():
+        oldkeys, newkeys = ({item for item in content.keys()} for content in [old, new])
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(oldkeys), utils.string.repr(newkeys)))
+        for key in oldkeys ^ newkeys:
             if key not in new:
                 logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
                 internal.comment.globals.dec(interface.range.start(fn), key)
@@ -273,17 +277,19 @@ class globals(commentbase):
         return
 
     @classmethod
-    def _create_refs(cls, fn, res):
-        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
-        for key in res.viewkeys():
+    def _create_refs(cls, fn, content):
+        contentkeys = {item for item in content.keys()}
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(contentkeys)))
+        for key in contentkeys:
             logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.inc(interface.range.start(fn), key)
         return
 
     @classmethod
-    def _delete_refs(cls, fn, res):
-        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
-        for key in res.viewkeys():
+    def _delete_refs(cls, fn, content):
+        contentkeys = {item for item in content.keys()}
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(contentkeys)))
+        for key in contentkeys:
             logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.dec(interface.range.start(fn), key)
         return
@@ -563,7 +569,7 @@ def __process_functions(percentage=0.10):
     p.open()
     six.print_(u"Pre-building tagcache for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
-        chunks = list(function.chunks(fn))
+        chunks = [item for item in function.chunks(fn)]
 
         text = functools.partial(u"Processing function {:#x} ({chunks:d} chunk{plural:s}) -> {:d} of {:d}".format, fn, 1 + i, len(funcs))
         p.update(current=i)
@@ -596,7 +602,7 @@ def rebase(info):
     through all of the known global tags and then transform those.
     """
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
-    functions, globals = map(utils.fcompose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
+    functions, globals = map(utils.fcompose(sorted, list), [database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())])
 
     p = ui.Progress()
     p.update(current=0, title=u"Rebasing tagcache...", min=0, max=sum(len(item) for item in [functions, globals]))
@@ -636,7 +642,7 @@ def rebase(info):
 
 def __rebase_function(old, new, size, iterable):
     key = internal.comment.tagging.__address__
-    failure, total = [], list(iterable)
+    failure, total = [], [item for item in iterable]
 
     for i, fn in enumerate(total):
         offset = fn - new
@@ -675,7 +681,7 @@ def __rebase_function(old, new, size, iterable):
 
 def __rebase_globals(old, new, size, iterable):
     node = internal.comment.tagging.node()
-    failure, total = [], list(iterable)
+    failure, total = [], [item for item in iterable]
     for i, (ea, count) in enumerate(total):
         offset = ea - old
 
