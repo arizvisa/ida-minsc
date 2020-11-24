@@ -18,8 +18,7 @@ that can be used for querying are ``functions``, ``segments``,
 ``names``, ``imports``, ``entries``, and ``marks``.
 """
 
-import six
-from six.moves import builtins
+import six, builtins
 
 import functools, operator, itertools, types
 import sys, os, logging, string
@@ -205,15 +204,15 @@ class config(object):
         @classmethod
         def names(cls):
             '''Return all of the register names in the database.'''
-            res = idaapi.ph_get_regnames()
-            return map(utils.string.of, res)
+            names = idaapi.ph_get_regnames()
+            return [utils.string.of(item) for item in names]
         @classmethod
         def segments(cls):
             '''Return all of the segment registers in the database.'''
             sreg_first, sreg_last = (idaapi.ph_get_regFirstSreg, idaapi.ph_get_regLastSreg) if idaapi.__version__ < 7.0 else (idaapi.ph_get_reg_first_sreg, idaapi.ph_get_reg_last_sreg)
 
             names = cls.names()
-            return [names[i] for i in six.moves.range(sreg_first(), sreg_last() + 1)]
+            return [names[ri] for ri in builtins.range(sreg_first(), 1 + sreg_last())]
         @classmethod
         def codesegment(cls):
             '''Return all of the code segment registers in the database.'''
@@ -265,8 +264,8 @@ class functions(object):
     __matcher__.boolean('address', function.contains), __matcher__.boolean('ea', function.contains)
 
     # chunk matching
-    #__matcher__.boolean('greater', operator.le, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(-1)), max))
-    #__matcher__.boolean('less', operator.ge, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min)), __matcher__.boolean('lt', operator.gt, utils.fcompose(function.chunks, functools.partial(itertools.imap, operator.itemgetter(0)), min))
+    #__matcher__.boolean('greater', operator.le, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max)), __matcher__.boolean('gt', operator.lt, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(-1)), max))
+    #__matcher__.boolean('less', operator.ge, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(0)), min)), __matcher__.boolean('lt', operator.gt, utils.fcompose(function.chunks, functools.partial(map, builtins.list, operator.itemgetter(0)), min))
 
     # entry point matching
     __matcher__.boolean('greater', operator.le, function.top), __matcher__.boolean('gt', operator.lt, function.top)
@@ -274,7 +273,7 @@ class functions(object):
 
     def __new__(cls):
         '''Returns a list of all of the functions in the current database.'''
-        return builtins.list(cls.__iterate__())
+        return [item for item in cls.__iterate__()]
 
     @utils.multicase()
     @classmethod
@@ -308,7 +307,7 @@ class functions(object):
     def iterate(cls, **type):
         '''Iterate through all of the functions in the database that match the keyword specified by `type`.'''
         iterable = cls.__iterate__()
-        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
+        for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
         for item in iterable: yield item
 
@@ -326,8 +325,8 @@ class functions(object):
         listable = []
 
         # Some utility functions for grabbing frame information
-        flvars = lambda f: _structure.fragment(f.frame, 0, f.frsize) if f.frsize else iter([])
-        favars = lambda f: function.frame.args(f) if f.frsize else iter([])
+        flvars = lambda f: _structure.fragment(f.frame, 0, f.frsize) if f.frsize else []
+        favars = lambda f: function.frame.args(f) if f.frsize else []
 
         # Set some reasonable defaults here
         maxentry = config.bounds()[0]
@@ -341,7 +340,7 @@ class functions(object):
             maxentry = max(ea, maxentry)
             maxname = max(len(function.name(func)), maxname)
 
-            res = builtins.list(function.chunks(func))
+            res = [item for item in function.chunks(func)]
             maxaddr, minaddr = max(max(map(operator.itemgetter(-1), res)), maxaddr), max(max(map(operator.itemgetter(0), res)), minaddr)
             chunks = max(len(res), chunks)
 
@@ -371,18 +370,18 @@ class functions(object):
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
             func, _ = function.by(ea), ui.navigation.procedure(ea)
-            res = builtins.list(function.chunks(func))
+            res = [item for item in function.chunks(func)]
             six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} {:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
                 index, int(cindex),
                 offset(ea), int(cmaxoffset),
                 min(map(operator.itemgetter(0), res)), int(cminaddr), max(map(operator.itemgetter(-1), res)), int(cmaxaddr),
                 int(cchunks) * ' ', len(res),
                 function.name(func), int(maxname),
-                len(list(favars(func))) if func.frsize else 0, 1 + int(cavars),
-                len(list(flvars(func))), 1 + int(clvars),
-                len(list(function.blocks(func))), 1 + int(cblocks),
-                len(list(function.bottom(func))), 1 + int(cexits),
-                '' if idaapi.__version__ < 7.0 else " marks:{:<{:d}d}".format(len(list(function.marks(func))), 1 + int(cmarks))
+                len(builtins.list(favars(func))) if func.frsize else 0, 1 + int(cavars),
+                len(builtins.list(flvars(func))), 1 + int(clvars),
+                len(builtins.list(function.blocks(func))), 1 + int(cblocks),
+                len(builtins.list(function.bottom(func))), 1 + int(cexits),
+                '' if idaapi.__version__ < 7.0 else " marks:{:<{:d}d}".format(len(builtins.list(function.marks(func))), 1 + int(cmarks))
             ))
         return
 
@@ -399,13 +398,15 @@ class functions(object):
         '''Search through all of the functions within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        listable = builtins.list(cls.iterate(**type))
+        listable = [item for item in cls.iterate(**type)]
         if len(listable) > 1:
-            builtins.map(logging.info, ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(listable)))
+            messages = ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(listable))
+            [ logging.info(msg) for msg in messages ]
             f = utils.fcompose(function.by, function.name)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
-        res = builtins.next(iter(listable), None)
+        iterable = (item for item in listable)
+        res = builtins.next(iterable, None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), query_s))
         return res
@@ -512,7 +513,7 @@ def instruction(ea):
 
     # combine any multiple spaces into just a single space and return it
     res = utils.string.of(nocomment.strip())
-    return reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), res, '')
+    return functools.reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), res, '')
 
 @utils.multicase()
 def disassemble(**options):
@@ -526,7 +527,7 @@ def disassemble(ea, **options):
     If the bool `comments` is true, then return the comments for each instruction as well.
     """
     ea = interface.address.inside(ea)
-    commentQ = builtins.next((options[k] for k in ('comment', 'comments') if k in options), False)
+    commentQ = builtins.next((options[k] for k in ['comment', 'comments'] if k in options), False)
 
     # grab the values we need in order to distinguish a comment
     ash = idaapi.cvar.ash if idaapi.__version__ < 7.5 else idaapi.get_ash()
@@ -562,7 +563,7 @@ def disassemble(ea, **options):
         stripped = nocomment.strip()
 
         # combine all multiple spaces together so it's single-spaced
-        noextraspaces = reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), utils.string.of(stripped), '')
+        noextraspaces = functools.reduce(lambda agg, char: agg + (('' if agg.endswith(' ') else ' ') if char == ' ' else char), utils.string.of(stripped), '')
 
         # if we've been asked to include the comment, then first we need to clean
         # it up a bit.
@@ -621,7 +622,7 @@ def write(ea, data, **persist):
     patch_bytes, put_bytes = (idaapi.patch_many_bytes, idaapi.put_many_bytes) if idaapi.__version__ < 7.0 else (idaapi.patch_bytes, idaapi.put_bytes)
 
     ea, _ = interface.address.within(ea, ea + len(data))
-    originalQ = builtins.next((persist[k] for k in ('original', 'persist', 'store', 'save') if k in persist), False)
+    originalQ = builtins.next((persist[k] for k in ['original', 'persist', 'store', 'save'] if k in persist), False)
     return patch_bytes(ea, data) if originalQ else put_bytes(ea, data)
 
 class names(object):
@@ -657,8 +658,8 @@ class names(object):
 
     def __new__(cls):
         '''Iterate through all of the names in the database yielding a tuple of the address and its name.'''
-        for index in six.moves.range(idaapi.get_nlist_size()):
-            res = zip((idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)), (index,)*2)
+        for index in builtins.range(idaapi.get_nlist_size()):
+            res = zip([idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)], 2 * [index])
             yield tuple(f(x) for f, x in res)
         return
 
@@ -671,8 +672,8 @@ class names(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
-        iterable = iter(six.moves.range(idaapi.get_nlist_size()))
-        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
+        iterable = (idx for idx in builtins.range(idaapi.get_nlist_size()))
+        for key, value in (type or {'predicate': utils.fconstant(True)}).items():
             iterable = cls.__matcher__.match(key, value, iterable)
         for item in iterable: yield item
 
@@ -740,13 +741,15 @@ class names(object):
         '''Search through all of the names within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        listable = builtins.list(cls.__iterate__(**type))
+        listable = [item for item in cls.__iterate__(**type)]
         if len(listable) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)
-            builtins.map(logging.info, ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in listable))
+            messages = ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in listable)
+            [ logging.info(msg) for msg in messages ]
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
 
-        res = builtins.next(iter(listable), None)
+        iterable = (item for item in listable)
+        res = builtins.next(iterable, None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), query_s))
         return idaapi.get_nlist_ea(res)
@@ -834,7 +837,7 @@ class search(object):
         else:
             radix, queryF = radix or 16, utils.string.to
 
-        reverseQ = builtins.next((direction[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in direction), False)
+        reverseQ = builtins.next((direction[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in direction), False)
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(data), radix, idaapi.SEARCH_CASE | flags)
         if res == idaapi.BADADDR:
@@ -859,7 +862,7 @@ class search(object):
         """
         queryF = utils.string.to
 
-        reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
+        reverseQ = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = idaapi.SEARCH_REGEX
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
@@ -886,7 +889,7 @@ class search(object):
         """
         queryF = utils.string.to
 
-        reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
+        reverseQ = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = 0
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
@@ -913,7 +916,7 @@ class search(object):
         """
         queryF = utils.string.to
 
-        reverseQ = builtins.next((options[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in options), False)
+        reverseQ = builtins.next((options[k] for k in ['reverse', 'reversed', 'up', 'backwards'] if k in options), False)
         flags = idaapi.SEARCH_IDENT
         flags |= idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
@@ -1259,10 +1262,10 @@ class entries(object):
     @classmethod
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def __iterate__(cls, **type):
-        iterable = iter(six.moves.range(idaapi.get_entry_qty()))
-        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
-            iterable = builtins.list(cls.__matcher__.match(key, value, iterable))
-        for item in iterable: yield item
+        listable = builtins.range(idaapi.get_entry_qty())
+        for key, value in (type or {'predicate': utils.fconstant(True)}).items():
+            listable = [item for item in cls.__matcher__.match(key, value, listable)]
+        for item in listable: yield item
 
     @utils.multicase(string=six.string_types)
     @classmethod
@@ -1275,17 +1278,26 @@ class entries(object):
     @utils.string.decorate_arguments('name', 'like', 'regex')
     def iterate(cls, **type):
         '''Iterate through all of the entry points in the database that match the keyword specified by `type`.'''
-        iterable = itertools.imap(cls.__address__, cls.__iterate__(**type))
-        for ea in iterable: yield ea
+        for ea in cls.__iterate__(**type):
+            yield cls.__address__(ea)
+        return
 
     @classmethod
     def __index__(cls, ea):
         '''Returns the index of the entry point at the specified `address`.'''
         f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-        iterable = itertools.imap(utils.fcompose(utils.fmap(f, lambda n:n), builtins.tuple), six.moves.range(idaapi.get_entry_qty()))
-        filterable = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), iterable)
-        result = itertools.imap(utils.second, filterable)
-        return builtins.next(result, None)
+
+        # Iterate through each entry point, and yield a tuple containing its address and index.
+        Ftransform = utils.fcompose(utils.fmap(f, lambda item: item), builtins.tuple)
+        iterable = (Ftransform(item) for item in builtins.range(idaapi.get_entry_qty()))
+
+        # Iterate through each (address, index) looking for the matching address.
+        Fcrit = utils.fcompose(utils.first, functools.partial(operator.eq, ea))
+        filterable = (item for item in iterable if Fcrit(item))
+
+        # Return the index of the address that matched.
+        iterable = (utils.second(item) for item in filterable)
+        return builtins.next(iterable, None)
 
     @classmethod
     def __address__(cls, index):
@@ -1378,13 +1390,15 @@ class entries(object):
         '''Search through all of the entry points within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        listable = builtins.list(cls.__iterate__(**type))
+        listable = [item for item in cls.__iterate__(**type)]
         if len(listable) > 1:
-            builtins.map(logging.info, ((u"[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in listable))
+            messages = ((u"[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in listable)
+            [ logging.info(msg) for msg in messages ]
             f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f(listable[0])))
 
-        res = builtins.next(iter(listable), None)
+        iterable = (item for item in listable)
+        res = builtins.next(iterable, None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), query_s))
         return cls.__address__(res)
@@ -1478,7 +1492,7 @@ def tag(ea):
     # function and non-repeatable if inside. if the address points to a
     # runtime function, then those tags will get absolute priority.
     res = {}
-    [res.update(item) for item in ([d1, d2] if repeatable else [d2, d1])]
+    [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
     rt and res.update(d3)
 
     # modify the decoded dictionary with any implicit tags
@@ -1697,7 +1711,7 @@ def select(**boolean):
     If `Or` contains an iterable then include any other tags that are specified.
     """
     containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in six.viewitems(boolean)}
+    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
 
     # nothing specific was queried, so just yield all the tags
     if not boolean:
@@ -1716,12 +1730,12 @@ def select(**boolean):
         res, d = {}, function.tag(ea) if function.within(ea) else tag(ea)
 
         # Or(|) includes any tags that were queried
-        res.update({key : value for key, value in six.iteritems(d) if key in Or})
+        res.update({key : value for key, value in d.items() if key in Or})
 
         # And(&) includes any tags that match all of the queried tagnames
         if And:
             if And & six.viewkeys(d) == And:
-                res.update({key : value for key, value in six.iteritems(d) if key in And})
+                res.update({key : value for key, value in d.items() if key in And})
             else: continue
 
         # if anything matched, then yield the address and the queried tags
@@ -1746,7 +1760,7 @@ def selectcontents(**boolean):
     If `Or` contains an iterable then include any other tags that are specified.
     """
     containers = (builtins.tuple, builtins.set, builtins.list)
-    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in six.viewitems(boolean)}
+    boolean = {key : {item for item in value} if isinstance(value, containers) else {value} for key, value in boolean.items()}
 
     # nothing specific was queried, so just yield all tagnames
     if not boolean:
@@ -1867,7 +1881,7 @@ class imports(object):
 
         Yields `(address, (module, name, ordinal))` for each iteration.
         """
-        for idx in six.moves.range(idaapi.get_import_module_qty()):
+        for idx in builtins.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
             listable = []
             idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, listable.append, utils.fconstant(True)))
@@ -1890,8 +1904,8 @@ class imports(object):
     def iterate(cls, **type):
         '''Iterate through all of the imports in the database that match the keyword specified by `type`.'''
         iterable = cls.__iterate__()
-        for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
-            iterable = builtins.list(cls.__matcher__.match(key, value, iterable))
+        for key, value in (type or {'predicate': utils.fconstant(True)}).items():
+            iterable = (item for item in cls.__matcher__.match(key, value, iterable))
         for item in iterable: yield item
 
     # searching
@@ -1905,7 +1919,8 @@ class imports(object):
     def at(cls, ea):
         '''Return the import at the address `ea`.'''
         ea = interface.address.inside(ea)
-        iterable = itertools.ifilter(utils.fcompose(utils.first, functools.partial(operator.eq, ea)), cls.__iterate__())
+        Fcrit = utils.fcompose(utils.first, functools.partial(operator.eq, ea))
+        iterable = (item for item in cls.__iterate__() if Fcrit(item))
         try:
             return utils.second(builtins.next(iterable))
         except StopIteration:
@@ -1968,7 +1983,8 @@ class imports(object):
     def modules(cls):
         '''Return all of the import modules defined in the database.'''
         iterable = (module for _, (module, _, _) in cls.__iterate__())
-        return map(utils.string.of, { item for item in iterable if item})
+        settable = {item for item in iterable if item}
+        return [utils.string.of(item) for item in settable]
 
     @utils.multicase(string=six.string_types)
     @classmethod
@@ -2019,13 +2035,15 @@ class imports(object):
         '''Search through all of the imports within the database and return the first result matching the keyword specified by `type`.'''
         query_s = utils.string.kwargs(type)
 
-        listable = builtins.list(cls.iterate(**type))
+        listable = [item for item in cls.iterate(**type)]
         if len(listable) > 1:
-            builtins.map(logging.info, (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in listable))
+            messages = (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in listable)
+            [ logging.info(msg) for msg in messages ]
             f = utils.fcompose(utils.second, cls.__formatl__)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
-        res = builtins.next(iter(listable), None)
+        iterable = (item for item in listable)
+        res = builtins.next(iterable, None)
         if res is None:
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), query_s))
         return res[0]
@@ -3821,7 +3839,7 @@ class xref(object):
     @staticmethod
     def code_down(ea):
         '''Return all of the code xrefs that are referenced by the address `ea`.'''
-        res = builtins.set(xref.code(ea, True))
+        res = {item for item in xref.code(ea, True)}
 
         # if we're not pointing at code, then the logic that follows is irrelevant
         if not type.is_code(ea):
@@ -3851,7 +3869,7 @@ class xref(object):
     @staticmethod
     def code_up(ea):
         '''Return all of the code xrefs that refer to the address `ea`.'''
-        res = builtins.set(xref.code(ea, False))
+        res = {item for item in xref.code(ea, False)}
 
         # if we're not pointing at code, then the logic that follows is irrelevant
         if not type.is_code(ea):
@@ -3881,7 +3899,7 @@ class xref(object):
     @staticmethod
     def up(ea):
         '''Return all of the references that refer to the address `ea`.'''
-        code, data = builtins.set(xref.code_up(ea)), builtins.set(xref.data_up(ea))
+        code, data = {item for item in xref.code_up(ea)}, {item for item in xref.data_up(ea)}
         return sorted(code | data)
     u = utils.alias(up, 'xref')
 
@@ -3895,7 +3913,7 @@ class xref(object):
     @staticmethod
     def down(ea):
         '''Return all of the references that are referred by the address `ea`.'''
-        code, data = builtins.set(xref.code_down(ea)), builtins.set(xref.data_down(ea))
+        code, data = {item for item in xref.code_down(ea)}, {item for item in xref.data_down(ea)}
         return sorted(code | data)
     d = utils.alias(down, 'xref')
 
@@ -3913,8 +3931,8 @@ class xref(object):
         """
         ea, target = interface.address.head(ea, target)
 
-        isCall = builtins.next((reftype[k] for k in ('call', 'is_call', 'isCall', 'iscall', 'callQ') if k in reftype), None)
-        if abs(target-ea) > 2**(config.bits()/2):
+        isCall = builtins.next((reftype[k] for k in ['call', 'is_call', 'isCall', 'iscall', 'callQ'] if k in reftype), None)
+        if abs(target - ea) > 2**(config.bits() // 2):
             flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
         else:
             flowtype = idaapi.fl_CN if isCall else idaapi.fl_JN
@@ -3993,7 +4011,7 @@ class xref(object):
     def erase(ea):
         '''Clear all references at the address `ea`.'''
         ea = interface.address.inside(ea)
-        return builtins.all(ok for ok in (xref.rm_code(ea), xref.rm_data(ea)))
+        return all(ok for ok in [xref.rm_code(ea), xref.rm_data(ea)])
     rx = utils.alias(rm_data, 'xref')
 
 x = xref    # XXX: ns alias
@@ -4029,7 +4047,7 @@ class marks(object):
     # FIXME: implement a matcher class for this too
     def __new__(cls):
         '''Yields each of the marked positions within the database.'''
-        listable = builtins.list(cls.iterate()) # make a copy in-case someone is actively modifying it
+        listable = [item for item in cls.iterate()] # make a copy in-case someone is actively modifying it
         for ea, comment in listable:
             yield ea, comment
         return
@@ -4077,7 +4095,7 @@ class marks(object):
         '''Iterate through all of the marks in the database.'''
         count = 0
         try:
-            for idx in six.moves.range(cls.MAX_SLOT_COUNT):
+            for idx in builtins.range(cls.MAX_SLOT_COUNT):
                 yield cls.by_index(idx)
         except (E.OutOfBoundsError, E.AddressNotFoundError):
             pass
@@ -4086,7 +4104,8 @@ class marks(object):
     @classmethod
     def length(cls):
         '''Return the number of marks in the database.'''
-        return len(builtins.list(cls.iterate()))
+        listable = [item for item in cls.iterate()]
+        return len(listable)
 
     @classmethod
     def by_index(cls, index):
@@ -4114,7 +4133,7 @@ class marks(object):
         def __location(cls, **attrs):
             '''Return a location_t object with the specified attributes.'''
             res = idaapi.curloc()
-            builtins.list(itertools.starmap(functools.partial(setattr, res), six.iteritems(attrs)))
+            [item for item in itertools.starmap(functools.partial(setattr, res), attrs.items())]
             return res
 
         @classmethod
@@ -4138,12 +4157,12 @@ class marks(object):
             '''Return the index of the mark at the specified address `ea`.'''
             # FIXME: figure out how to fail if this address isn't found
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
-            res, iterable = itertools.tee(itertools.imap(cls.__get_slotaddress, res))
+            res, iterable = itertools.tee(map(cls.__get_slotaddress, res))
             try:
-                count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
+                count = len(builtins.list(itertools.takewhile(lambda item: item != ea, res)))
             except:
                 raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join([__name__, cls.__name__]), ea))
-            builtins.list(itertools.islice(iterable, count))
+            [item for item in itertools.islice(iterable, count)]
             if builtins.next(iterable) != ea:
                 raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join([__name__, cls.__name__]), ea))
             return count
@@ -4185,12 +4204,12 @@ class marks(object):
         def __find_slotaddress(cls, ea):
             '''Return the index of the mark at the specified address `ea`.'''
             res = itertools.islice(itertools.count(), cls.MAX_SLOT_COUNT)
-            res, iterable = itertools.tee(itertools.imap(cls.__get_slotaddress, res))
+            res, iterable = itertools.tee(map(cls.__get_slotaddress, res))
             try:
-                count = len(builtins.list(itertools.takewhile(lambda n: n != ea, res)))
+                count = len(builtins.list(itertools.takewhile(lambda item: item != ea, res)))
             except:
                 raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join([__name__, cls.__name__]), ea))
-            builtins.list(itertools.islice(iterable, count))
+            [item for item in itertools.islice(iterable, count)]
             if builtins.next(iterable) != ea:
                 raise E.AddressNotFoundError(u"{:s}.find_slotaddress({:#x}) : Unable to find specified slot address.".format('.'.join([__name__, cls.__name__]), ea))
             return count
@@ -4198,7 +4217,7 @@ class marks(object):
         @classmethod
         def __free_slotindex(cls):
             '''Return the index of the next available mark slot.'''
-            res = builtins.next((i for i in six.moves.range(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
+            res = builtins.next((i for i in builtins.range(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
             if res is None:
                 raise OverflowError("{:s}.free_slotindex() : No free slots available for mark.".format('.'.join([__name__, 'bookmarks', cls.__name__])))
             return res
@@ -4294,7 +4313,7 @@ class extra(object):
     @classmethod
     def __count__(cls, ea, base):
         sup = internal.netnode.sup
-        for i in six.moves.range(cls.MAX_ITEM_LINES):
+        for i in builtins.range(cls.MAX_ITEM_LINES):
             row = sup.get(ea, base + i, type=memoryview)
             if row is None: break
         return i or None
@@ -4326,13 +4345,13 @@ class extra(object):
             if count is None: return None
 
             # now we can fetch them
-            res = (sup.get(ea, base + i, type=bytes) for i in six.moves.range(count))
+            res = (sup.get(ea, base + i, type=bytes) for i in builtins.range(count))
 
             # remove the null-terminator if there is one
             res = (row[:-1] if row.endswith(b'\0') else row for row in res)
 
             # fetch them from IDA and join them with newlines
-            return '\n'.join(itertools.imap(utils.string.of, res))
+            return '\n'.join(map(utils.string.of, res))
         @classmethod
         @utils.string.decorate_arguments('string')
         def __set__(cls, ea, string, base):
@@ -4341,7 +4360,7 @@ class extra(object):
             sup = internal.netnode.sup
 
             # break the string up into rows, and encode each type for IDA
-            res = itertools.imap(utils.string.to, string.split('\n'))
+            res = [ utils.string.to(item) for item in string.split('\n') ]
 
             # assign them directly into IDA
             [ sup.set(ea, base + i, row + b'\0') for i, row in enumerate(res) ]
@@ -4364,7 +4383,7 @@ class extra(object):
             cls.__hide__(ea)
 
             # now we can remove them
-            [ sup.remove(ea, base + i) for i in six.moves.range(count) ]
+            [ sup.remove(ea, base + i) for i in builtins.range(count) ]
 
             # and then show (refresh) it
             cls.__show__(ea)
@@ -4378,20 +4397,20 @@ class extra(object):
             if count is None: return None
 
             # grab the extra commenta from the database
-            res = (idaapi.get_extra_cmt(ea, base + i) or b'' for i in six.moves.range(count))
+            iterable = (idaapi.get_extra_cmt(ea, base + i) or b'' for i in builtins.range(count))
 
             # convert them back into Python and join them with a newline
-            res = itertools.imap(utils.string.of, res)
-            return '\n'.join(res)
+            iterable = (utils.string.of(item) for item in iterable)
+            return '\n'.join(iterable)
         @classmethod
         @utils.string.decorate_arguments('string')
         def __set__(cls, ea, string, base):
             '''Set the extra comment(s) for the address ``ea`` with the newline-delimited ``string`` at the index ``base``.'''
             # break the string up into rows, and encode each type for IDA
-            res = itertools.imap(utils.string.to, string.split('\n'))
+            iterable = (utils.string.to(item) for item in string.split('\n'))
 
             # assign them into IDA using its api
-            [ idaapi.update_extra_cmt(ea, base + i, row) for i, row in enumerate(res) ]
+            [ idaapi.update_extra_cmt(ea, base + i, row) for i, row in enumerate(iterable) ]
 
             # return how many newlines there were
             return string.count('\n')
@@ -4404,7 +4423,7 @@ class extra(object):
             if res is None: return 0
 
             # now we can delete them using the api
-            [idaapi.del_extra_cmt(ea, base + i) for i in six.moves.range(res)]
+            [idaapi.del_extra_cmt(ea, base + i) for i in builtins.range(res)]
 
             # return how many comments we deleted
             return res
@@ -4790,8 +4809,8 @@ class set(object):
             return cls.data(ea, size, type=idaapi.FF_ALIGN)
 
         # grab the aligment out of the kwarg
-        if any(k in alignment for k in ('align', 'alignment')):
-            align = builtins.next((alignment[k] for k in ('align', 'alignment') if k in alignment))
+        if any(k in alignment for k in ['align', 'alignment']):
+            align = builtins.next((alignment[k] for k in ['align', 'alignment'] if k in alignment))
             e = math.trunc(math.log(align) / math.log(2))
 
         # or we again...just figure it out via brute force
@@ -5357,7 +5376,7 @@ class get(object):
         endian = byteorder.get('order', None) or byteorder.get('byteorder', config.byteorder())
         if endian.lower().startswith('little'):
             data = data[::-1]
-        return reduce(lambda x, y: x << 8 | six.byte2int(y), data, 0)
+        return functools.reduce(lambda agg, byte: agg << 8 | byte, bytearray(data), 0)
 
     @utils.multicase()
     @classmethod
@@ -5825,7 +5844,7 @@ class get(object):
             cb = _structure.size(tid)
             # FIXME: this math doesn't work with dynamically sized structures (of course)
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ cls.structure(ea + index * cb, id=tid) for index in six.moves.range(count) ]
+            return [ cls.structure(ea + index * cb, id=tid) for index in builtins.range(count) ]
 
         # If the DT_TYPE was found in our numerics dictionary, then we're able
         # to use a native _array with the decode_array closure.
@@ -5842,7 +5861,7 @@ class get(object):
             #        so that it directly corresponds to the user's view.
             Fgetinteger = get.signed if F & idaapi.FF_SIGN == idaapi.FF_SIGN else get.unsigned
             count = length.get('length', math.trunc(math.ceil(float(total) / cb)))
-            return [ Fgetinteger(ea + index * cb, cb) for index in six.moves.range(count) ]
+            return [ Fgetinteger(ea + index * cb, cb) for index in builtins.range(count) ]
 
         # Otherwise the DT_TYPE is unsupported, and we don't have a clue on how
         # this should be properly decoded...
@@ -5986,7 +6005,7 @@ class get(object):
         """
         ea = interface.address.within(ea)
 
-        key = builtins.next((k for k in ('structure', 'struct', 'struc', 'sid', 'id') if k in structure), None)
+        key = builtins.next((k for k in ['structure', 'struct', 'struc', 'sid', 'id'] if k in structure), None)
         if key is None:
             sid = type.structure.id(ea)
         else:
@@ -6008,7 +6027,7 @@ class get(object):
         for m in st.members:
             t, val = m.type, read(m.offset, m.size) or ''
 
-            # try and lookup the individual type+size
+            # try and lookup the individual type + size
             try:
                 ct = typelookup[t]
 
@@ -6038,7 +6057,7 @@ class get(object):
                     ct = None
 
             # finally we can add the member to our result by creating a buffer for it
-            res[m.name] = val if any(_ is None for _ in (ct, val)) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
+            res[m.name] = val if any(item is None for item in [ct, val]) else ctypes.cast(ctypes.pointer(ctypes.c_buffer(val)), ctypes.POINTER(ct)).contents
         return res
     struc = struct = utils.alias(structure, 'get')
 
@@ -6063,7 +6082,7 @@ class get(object):
             f = type.flags(ea)
             if idaapi.has_dummy_name(f) or idaapi.has_user_name(f):
                 drefs = (ea for ea in xref.data_up(ea))
-                refs = (ea for ea in itertools.chain(*itertools.imap(xref.up, drefs)) if get_switch_info(ea) is not None)
+                refs = (ea for ea in itertools.chain(*map(xref.up, drefs)) if get_switch_info(ea) is not None)
                 try:
                     ea = builtins.next(refs)
                     si = get_switch_info(ea)
