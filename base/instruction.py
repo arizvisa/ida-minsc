@@ -349,11 +349,11 @@ def ops_register(ea, **modifiers):
     iterops = interface.regmatch.modifier(**modifiers)
     fregisterQ = utils.fcompose(op, utils.fcondition(utils.finstance(interface.symbol_t))(utils.fcompose(utils.fattribute('symbols'), functools.partial(map, utils.finstance(interface.register_t)), any), utils.fconstant(False)))
     return tuple(filter(functools.partial(fregisterQ, ea), iterops(ea)))
-@utils.multicase(reg=(basestring, interface.register_t))
+@utils.multicase(reg=(six.string_types, interface.register_t))
 def ops_register(reg, *regs, **modifiers):
     '''Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.'''
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
-@utils.multicase(reg=(basestring, interface.register_t))
+@utils.multicase(reg=(six.string_types, interface.register_t))
 def ops_register(ea, reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
 
@@ -918,7 +918,7 @@ def op_structure(ea, opnum, path, **delta):
     if len(path) == 0:
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
-    if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring) + six.integer_types) for m in path):
+    if any(not isinstance(m, (structure.structure_t, structure.member_t, six.string_types, six.integer_types)) for m in path):
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # ensure the path begins with a structure.structure_t
@@ -944,7 +944,7 @@ def op_structure(ea, opnum, path, **delta):
     # collect each member resolving them to an id
     moff, tids = 0, []
     for i, item in enumerate(path[1:]):
-        if isinstance(item, basestring):
+        if isinstance(item, six.string_types):
             m = idaapi.get_member_by_name(sptr, item)
         elif isinstance(item, structure.member_t):
             m = item.ptr
@@ -1022,12 +1022,12 @@ def op_enumeration(ea, opnum):
     # Grab the operand value and use it to return the member identifier for the enumeration
     res = op(ea, opnum)
     return idaapi.get_enum_member(E, res, -1, 0)
-@utils.multicase(opnum=six.integer_types, name=basestring)
+@utils.multicase(opnum=six.integer_types, name=six.string_types)
 @utils.string.decorate_arguments('name')
 def op_enumeration(opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=basestring)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=six.string_types)
 @utils.string.decorate_arguments('name')
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
