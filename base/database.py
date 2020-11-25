@@ -403,7 +403,7 @@ class functions(object):
         if len(listable) > 1:
             builtins.map(logging.info, ((u"[{:d}] {:s}".format(i, function.name(ea))) for i, ea in enumerate(listable)))
             f = utils.fcompose(function.by, function.name)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first function \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
         res = builtins.next(iter(listable), None)
         if res is None:
@@ -744,7 +744,7 @@ class names(object):
         if len(listable) > 1:
             f1, f2 = idaapi.get_nlist_ea, utils.fcompose(idaapi.get_nlist_name, utils.string.of)
             builtins.map(logging.info, ((u"[{:d}] {:x} {:s}".format(idx, f1(idx), f2(idx))) for idx in listable))
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first item at {:#x} with the name \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f1(listable[0]), utils.string.escape(f2(listable[0]), '"')))
 
         res = builtins.next(iter(listable), None)
         if res is None:
@@ -1382,7 +1382,7 @@ class entries(object):
         if len(listable) > 1:
             builtins.map(logging.info, ((u"[{:d}] {:x} : ({:x}) {:s}".format(idx, cls.__address__(idx), cls.__entryordinal__(idx), cls.__entryname__(idx))) for idx in listable))
             f = utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f(listable[0])))
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, Returning the first entry point at {:#x}.".format('.'.join([__name__, cls.__name__]), query_s, len(listable), f(listable[0])))
 
         res = builtins.next(iter(listable), None)
         if res is None:
@@ -1768,7 +1768,7 @@ def selectcontents(**boolean):
         if {key for key in d} != res:
             # FIXME: include query in warning
             q = utils.string.kwargs(boolean)
-            logging.warn(u"{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
+            logging.warning(u"{:s}.selectcontents({:s}) : Contents cache is out of sync. Using contents blob at {:#x} instead of the sup cache.".format(__name__, q, ea))
 
         # now start aggregating the keys that the user is looking for
         res, d = {item for item in []}, internal.comment.contents.name(ea)
@@ -2023,7 +2023,7 @@ class imports(object):
         if len(listable) > 1:
             builtins.map(logging.info, (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in listable))
             f = utils.fcompose(utils.second, cls.__formatl__)
-            logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
+            logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
         res = builtins.next(iter(listable), None)
         if res is None:
@@ -2656,7 +2656,7 @@ class address(object):
 
         # FIXME: it'd be much better to keep track of this with a global class that wraps the logger
         if getattr(cls, '__prevstack_warning_count__', 0) == 0:
-            logging.warn(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join([__name__, cls.__name__]), ea, delta))
+            logging.warning(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join([__name__, cls.__name__]), ea, delta))
             cls.__prevstack_warning_count__ = getattr(cls, '__prevstack_warning_count__', 0) + 1
 
         # determine the boundaries that we're not allowed to seek past
@@ -2687,7 +2687,7 @@ class address(object):
 
         # FIXME: it'd be much better to keep track of this with a global class that wraps the logger
         if getattr(cls, '__nextstack_warning_count__', 0) == 0:
-            logging.warn(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join([__name__, cls.__name__]), ea, delta))
+            logging.warning(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join([__name__, cls.__name__]), ea, delta))
             cls.__nextstack_warning_count__ = getattr(cls, '__nextstack_warning_count__', 0) + 1
 
         # determine the boundaries that we're not allowed to seek past
@@ -3439,7 +3439,7 @@ class type(object):
         # properly. Prior to failing, check to see if the name is a mangled C++
         # symbol that contains type information.
         except E.InvalidTypeOrValueError as e:
-            #logging.warn(u"{:s}.has_typeinfo({:#x}) : Unable to interpret the type information at address {:#x}.".format('.'.join([__name__, type.__name__]), ea, ea), exc_info=True)
+            #logging.warning(u"{:s}.has_typeinfo({:#x}) : Unable to interpret the type information at address {:#x}.".format('.'.join([__name__, type.__name__]), ea, ea), exc_info=True)
             realname = name(ea)
             ok = internal.declaration.demangle(realname) != realname
         return ok
@@ -4049,7 +4049,7 @@ class marks(object):
         try:
             idx = cls.__find_slotaddress(ea)
             ea, res = cls.by_index(idx)
-            logging.warn(u"{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, description, u", {:s}".format(utils.string.kwargs(extra)) if extra else '', idx, ea, utils.string.escape(res, '"'), utils.string.escape(description, '"')))
+            logging.warning(u"{:s}.new({:#x}, {!r}{:s}) : Replacing mark {:d} at {:#x} and changing the description from \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, description, u", {:s}".format(utils.string.kwargs(extra)) if extra else '', idx, ea, utils.string.escape(res, '"'), utils.string.escape(description, '"')))
         except (E.ItemNotFoundError, E.OutOfBoundsError):
             res, idx = None, cls.__free_slotindex()
             logging.info(u"{:s}.new({:#x}, {!r}{:s}) : Creating mark {:d} at {:#x} with the description \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, description, u", {:s}".format(utils.string.kwargs(extra)) if extra else '', idx, ea, utils.string.escape(description, '"')))
@@ -4069,7 +4069,7 @@ class marks(object):
         idx = cls.__find_slotaddress(ea)
         descr = cls.__get_description(idx)
         cls.__set_description(idx, ea, '')
-        logging.warn(u"{:s}.remove({:#x}) : Removed mark {:d} at {:#x} with the description \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, idx, ea, utils.string.escape(descr, '"')))
+        logging.warning(u"{:s}.remove({:#x}) : Removed mark {:d} at {:#x} with the description \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, idx, ea, utils.string.escape(descr, '"')))
         return descr
 
     @classmethod
@@ -4764,7 +4764,7 @@ class set(object):
         If `size` is specified, then align that number of bytes.
         """
         if not type.is_unknown(ea):
-            logging.warn("{:s}.set.alignment({:#x}{:s}) : Refusing to align the specified address ({:#x}) as it has already been defined.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(alignment)) if alignment else '', ea))  # XXX: define a custom warning
+            logging.warning("{:s}.set.alignment({:#x}{:s}) : Refusing to align the specified address ({:#x}) as it has already been defined.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(alignment)) if alignment else '', ea))  # XXX: define a custom warning
             return 0
 
         # grab the size out of the kwarg
@@ -5753,7 +5753,7 @@ class get(object):
             # hijacking the array decoding with our own hardcoded unsigned length.
             cb = lnumerics[T]
             if res.itemsize != cb:
-                logging.warn(u"{:s}.array({:#x}{:s}) : Refusing to decode array at address {:#x} using the array size ({:+d}) identified for DT_TYPE ({:#x}) due to the size of the DT_TYPE ({:#x}) not corresponding to the desired element size ({:+d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.itemsize, T, T, cb))
+                logging.warning(u"{:s}.array({:#x}{:s}) : Refusing to decode array at address {:#x} using the array size ({:+d}) identified for DT_TYPE ({:#x}) due to the size of the DT_TYPE ({:#x}) not corresponding to the desired element size ({:+d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea, res.itemsize, T, T, cb))
 
                 # Reconstruct the array but with the expected element size.
                 try:
@@ -5772,7 +5772,7 @@ class get(object):
 
             # Validate the _array's length so that we can warn the user if it's wrong.
             if len(res) != count:
-                logging.warn(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', len(res), count))
+                logging.warning(u"{:s}.array({:#x}{:s}) : The decoded array length ({:d}) is different from the expected length ({:d}).".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', len(res), count))
             return res
 
         # If the "type" parameter was provided, then resolve that type into the
@@ -5909,7 +5909,7 @@ class get(object):
 
             # Warn the user what we're doing before we start figuring out
             # the element size of the string.
-            logging.warn(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type code for address {:#x}. Reading it as an integer array and converting it to a string instead.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
+            logging.warning(u"{:s}.string({:#x}{:s}) : Unable to automatically determine the string type code for address {:#x}. Reading it as an integer array and converting it to a string instead.".format('.'.join([__name__, cls.__name__]), ea, u", {:s}".format(utils.string.kwargs(length)) if length else '', ea))
 
             # We can't figure out the shift.. So, since that's a dead end we
             # have to assume that the terminator is a null byte.
@@ -6034,7 +6034,7 @@ class get(object):
                 # otherwise we have no idea what ctype we can use for this, so skip it
                 # by creating a buffer for it
                 else:
-                    logging.warn(u"{:s}.structure({:#x}, ...) : Using buffer with size {:+#x} for member #{:d} ({:s}) due to unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), ea, m.size, m.index, m.fullname, ty if count < 0 else [ty, count]))
+                    logging.warning(u"{:s}.structure({:#x}, ...) : Using buffer with size {:+#x} for member #{:d} ({:s}) due to unsupported type {!s}.".format('.'.join([__name__, cls.__name__]), ea, m.size, m.index, m.fullname, ty if count < 0 else [ty, count]))
                     ct = None
 
             # finally we can add the member to our result by creating a buffer for it
