@@ -522,9 +522,9 @@ class structure_t(object):
         d2 = internal.comment.decode(res)
 
         # check for duplicate keys
-        if d1.viewkeys() & d2.viewkeys():
+        if six.viewkeys(d1) & six.viewkeys(d2):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment() : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}({:#x}).comment() : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
         res = {}
@@ -1631,9 +1631,9 @@ class member_t(object):
         d2 = internal.comment.decode(res)
 
         # check for duplicate keys
-        if d1.viewkeys() & d2.viewkeys():
+        if six.viewkeys(d1) & six.viewkeys(d2):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it
         # XXX: it'd be cool to return an object with a dictionary
