@@ -436,7 +436,7 @@ class matcher(object):
     def __attrib__(self, *attribute):
         if not attribute:
             return lambda n: n
-        res = [(operator.attrgetter(a) if isinstance(a, basestring) else a) for a in attribute]
+        res = [(operator.attrgetter(a) if isinstance(a, six.string_types) else a) for a in attribute]
         return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)
@@ -756,7 +756,7 @@ class string(object):
         All unicode strings are encoded to UTF-8 in order to guarantee
         the resulting string can be emitted.
         """
-        if isinstance(item, basestring):
+        if isinstance(item, six.string_types):
             res = cls.escape(item, '\'')
             if all(six.byte2int(ch) < 0x100 for ch in item):
                 return "'{:s}'".format(res)
