@@ -124,7 +124,7 @@ class address(commentbase):
                 ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
 
                 if (ncmt or '') != new:
-                    logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                    logging.warning(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
                 ## if the comment is of the correct format, then we can simply
                 ## write the comment to the given address
@@ -147,7 +147,7 @@ class address(commentbase):
             # delete the old comment
             cls._delete_refs(ea, o)
             idaapi.set_cmt(ea, '', rpt)
-            logging.warn(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
+            logging.warning(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
             # new comment
             new = utils.string.of(idaapi.get_cmt(newea, nrpt))
@@ -308,7 +308,7 @@ class globals(commentbase):
                 ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
 
                 if (ncmt or '') != new:
-                    logging.warn(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                    logging.warning(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
                 ## if the comment is correctly formatted as a tag, then we
                 ## can simply write the comment at the given address
@@ -332,7 +332,7 @@ class globals(commentbase):
             # delete the old comment
             cls._delete_refs(fn, o)
             idaapi.set_func_cmt(fn, '', rpt)
-            logging.warn(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
+            logging.warning(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
             # new comment
             newfn = idaapi.get_func(newea)
@@ -659,7 +659,7 @@ def __rebase_function(old, new, size, iterable):
             state.setdefault(key, {})
             # FIXME: we should completely rebuild the contents here instead of just
             #        initializing it with an empty dict and throwing a warning.
-            logging.warn(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Missing address cache while translating address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
+            logging.warning(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Missing address cache while translating address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
 
         # update the addresses
         res, state[key] = state[key], {ea - old + new : ref for ea, ref in state[key].items()}
