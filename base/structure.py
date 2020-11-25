@@ -176,7 +176,7 @@ def by(**type):
     res = builtins.list(iterate(**type))
     if len(res) > 1:
         map(logging.info, ((u"[{:d}] {:s}".format(idaapi.get_struc_idx(st.id), st.name)) for i, st in enumerate(res)))
-        logging.warn(u"{:s}.search({:s}) : Found {:d} matching results, returning the first one {!s}.".format(__name__, searchstring, len(res), res[0]))
+        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, returning the first one {!s}.".format(__name__, searchstring, len(res), res[0]))
 
     res = next(iter(res), None)
     if res is None:
@@ -276,7 +276,7 @@ class structure_t(object):
             sptr = idaapi.get_member_struc(fullname)
             if not sptr:
                 cls = self.__class__
-                logging.warn(u"{:s}({:#x}).up() : Unable to find structure from member name \"{:s}\" while trying to handle reference for {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(fullname, '"'), xrfrom))
+                logging.warning(u"{:s}({:#x}).up() : Unable to find structure from member name \"{:s}\" while trying to handle reference for {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(fullname, '"'), xrfrom))
                 continue
 
             # we figured out the owner, so find the member with the ref, and add it.
@@ -314,7 +314,7 @@ class structure_t(object):
             sptr = idaapi.get_member_struc(fullname)
             if not sptr:
                 cls = self.__class__
-                logging.warn(u"{:s}({:#x}).down() : Unable to find structure from member name \"{:s}\" while trying to handle reference for {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(fullname, '"'), xrto))
+                logging.warning(u"{:s}({:#x}).down() : Unable to find structure from member name \"{:s}\" while trying to handle reference for {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(fullname, '"'), xrto))
                 continue
 
             # we figured out the owner, so find the member with the ref, and add it.
@@ -1031,7 +1031,7 @@ class members_t(object):
         if len(res) > 1:
             cls = self.__class__
             map(logging.info, ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in res))
-            logging.warn(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), utils.string.escape("{!s}".format(res[0].typeinfo.dstr()).replace(' *', '*'), '"')))
+            logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), utils.string.escape("{!s}".format(res[0].typeinfo.dstr()).replace(' *', '*'), '"')))
 
         res = next(iter(res), None)
         if res is None:
@@ -1300,7 +1300,7 @@ class members_t(object):
         # figure out some defaults for the member name
         if name is None:
             cls = self.__class__
-            logging.warn(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Name is undefined, defaulting to offset {:+#x}.".format('.'.join([__name__, cls.__name__]), self.parent.id, name, type, offset, realoffset))
+            logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Name is undefined, defaulting to offset {:+#x}.".format('.'.join([__name__, cls.__name__]), self.parent.id, name, type, offset, realoffset))
             name = 'v', realoffset
         if isinstance(name, tuple):
             name = interface.tuplename(*name)
@@ -1467,7 +1467,7 @@ class member_t(object):
         if mem == idaapi.STRUC_ERROR_MEMBER_NAME:
             if idaapi.get_member_by_name(parent.ptr, res).soff != ofs:
                 newname = u"{:s}_{:x}".format(res, ofs)
-                logging.warn(u"{:s}({:#x}): Duplicate name found for member \"{:s}\" of structure ({:s}), renaming to \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(name, '"'), parentname, utils.string.escape(newname, '"')))
+                logging.warning(u"{:s}({:#x}): Duplicate name found for member \"{:s}\" of structure ({:s}), renaming to \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(name, '"'), parentname, utils.string.escape(newname, '"')))
                 idaapi.set_member_name(parent.ptr, ofs, utils.string.to(newname))
             else:
                 logging.info(u"{:s}({:#x}): Field at {:+#x} of structure ({:s}) contains the same name \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, ofs, parentname, utils.string.escape(name, '"')))
@@ -1478,10 +1478,10 @@ class member_t(object):
             idaapi.set_member_name(parent.ptr, ofs, res)
         # invalid size
         elif mem == idaapi.STRUC_ERROR_MEMBER_SIZE:
-            logging.warn(u"{:s}({:#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mem, utils.string.escape(fullname, '"')))
+            logging.warning(u"{:s}({:#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mem, utils.string.escape(fullname, '"')))
         # unknown
         elif mem != idaapi.STRUC_ERROR_MEMBER_OK:
-            logging.warn(u"{:s}({:#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mem, utils.string.escape(fullname, '"')))
+            logging.warning(u"{:s}({:#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mem, utils.string.escape(fullname, '"')))
 
         # assign some of our internal attributes
         self.__index = index
