@@ -268,7 +268,7 @@ class prioritybase(object):
         for target in self.__cache__:
             ok = self.connect(target, self.apply(target))
             if not ok:
-                logging.warn(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
+                logging.warning(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
                 notok = True
             continue
         return not notok
@@ -281,7 +281,7 @@ class prioritybase(object):
         for target in self.__cache__:
             ok = self.disconnect(target)
             if not ok:
-                logging.warn(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
+                logging.warning(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
                 notok = True
             continue
         return not notok
@@ -307,7 +307,7 @@ class prioritybase(object):
             logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__)))))
             return False
         if target in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
+            logging.warning(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
         self.__disabled.add(target)
         return True
@@ -389,9 +389,9 @@ class prioritybase(object):
 
                     format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)))
                     logging.fatal(format(u"Callback for {:s} with priority ({:+d}) raised an exception while executing {!s}".format(self.__formatter__(target), priority, callable)))
-                    logging.warn(format("Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
-                    [ logging.warn(format(item)) for item in str().join(bt).split('\n') ]
-                    [ logging.warn(format(item)) for item in current.split('\n') ]
+                    logging.warning(format("Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
+                    [ logging.warning(format(item)) for item in str().join(bt).split('\n') ]
+                    [ logging.warning(format(item)) for item in current.split('\n') ]
 
                     result = self.STOP
 
@@ -619,7 +619,7 @@ class address(object):
     def __head1__(cls, ea, **silent):
         '''Adjusts `ea` so that it is pointing to the beginning of an item.'''
         entryframe = cls.pframe()
-        logF = logging.warn if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if not silent.get('silent', False) else logging.debug
 
         res = idaapi.get_item_head(ea)
         if ea != res:
@@ -629,7 +629,7 @@ class address(object):
     def __head2__(cls, start, end, **silent):
         '''Adjusts both `start` and `end` so that each are pointing to the beginning of their respective items.'''
         entryframe = cls.pframe()
-        logF = logging.warn if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if not silent.get('silent', False) else logging.debug
 
         res_start, res_end = idaapi.get_item_head(start), idaapi.get_item_head(end)
         # FIXME: off-by-one here, as end can be the size of the db.
@@ -649,7 +649,7 @@ class address(object):
     def __tail1__(cls, ea, **silent):
         '''Adjusts `ea` so that it is pointing to the end of an item.'''
         entryframe = cls.pframe()
-        logF = logging.warn if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if not silent.get('silent', False) else logging.debug
 
         res = idaapi.get_item_end(ea)
         if ea != res:
@@ -659,7 +659,7 @@ class address(object):
     def __tail2__(cls, start, end, **silent):
         '''Adjusts both `start` and `end` so that each are pointing to the end of their respective items.'''
         entryframe = cls.pframe()
-        logF = logging.warn if not silent.get('silent', False) else logging.debug
+        logF = logging.warning if not silent.get('silent', False) else logging.debug
 
         res_start, res_end = idaapi.get_item_end(start), idaapi.get_item_end(end)
         # FIXME: off-by-one here, as end can be the size of the db.
@@ -1049,7 +1049,7 @@ class namedtypedtuple(tuple):
         result = self._make(map(fc.pop, self._fields, self))
         if fc:
             cls = self.__class__
-            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join([__name__, cls.__name__]), internal.utils.string.kwargs(fields), '{' + ', '.join(map(internal.utils.string.repr, fc)) + '}'))
+            logging.warning(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join([__name__, cls.__name__]), internal.utils.string.kwargs(fields), '{' + ', '.join(map(internal.utils.string.repr, fc)) + '}'))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
