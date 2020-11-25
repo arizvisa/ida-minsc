@@ -225,7 +225,7 @@ def collectcall(ea, sentinel=set()):
             if any(f in coll for coll in (result, sentinel)):
                 continue
             if not func.within(f):
-                logging.warn("{:s}.collectcall({:#x}, {!r}) : Adding non-function address {:#x} ({:s}).".format(__name__, ea, sentinel, f, database.name(f)))
+                logging.warning("{:s}.collectcall({:#x}, {!r}) : Adding non-function address {:#x} ({:s}).".format(__name__, ea, sentinel, f, database.name(f)))
                 result.add(f)
                 continue
             process.add(f)
