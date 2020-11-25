@@ -1712,11 +1712,11 @@ def tag(func):
     try:
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
-        logging.warn(u"{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
+        logging.warning(u"{:s}.tag({:s}) : Attempted to read tag from a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return database.tag(func)
 
     if rt:
-        logging.warn(u"{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
+        logging.warning(u"{:s}.tag({:#x}) : Attempted to read tag from a runtime-linked address. Falling back to a database tag.".format(__name__, ea))
         return database.tag(ea)
 
     fn, repeatable = by_address(ea), True
@@ -1773,12 +1773,12 @@ def tag(func, key, value):
 
     # If we're not even in a function, then use a database tag.
     except E.FunctionNotFoundError:
-        logging.warn(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
+        logging.warning(u"{:s}.tag({:s}, {!r}, {!r}) : Attempted to set tag for a non-function. Falling back to a database tag.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func), key, value))
         return database.tag(func, key, value)
 
     # If we are a runtime-only function, then write the tag to the import
     if rt:
-        logging.warn(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
+        logging.warning(u"{:s}.tag({:#x}, {!r}, {!r}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, value))
         return database.tag(ea, key, value)
 
     # Otherwise, it's a function.
@@ -1834,12 +1834,12 @@ def tag(func, key, none):
         rt, ea = interface.addressOfRuntimeOrStatic(func)
     except E.FunctionNotFoundError:
         # If we're not even in a function, then use a database tag.
-        logging.warn(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
+        logging.warning(u"{:s}.tag({:s}, {!r}, {!s}) : Attempted to clear tag for a non-function. Falling back to a database tag.".format(__name__, ('{:#x}' if isinstance(func, six.integer_types) else '{!r}').format(func), key, none))
         return database.tag(func, key, none)
 
     # If so, then write the tag to the import
     if rt:
-        logging.warn(u"{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, none))
+        logging.warning(u"{:s}.tag({:#x}, {!r}, {!s}) : Attempted to set tag for a runtime-linked symbol. Falling back to a database tag.".format(__name__, ea, key, none))
         return database.tag(ea, key, none)
 
     # Otherwise, it's a function.
@@ -2181,7 +2181,7 @@ class type(object):
         '''Return if the function `func` returns.'''
         fn = by(func)
         if fn.flags & idaapi.FUNC_NORET_PENDING == idaapi.FUNC_NORET_PENDING:
-            logging.warn(u"{:s}.has_return({:s}) : Analysis for function return is still pending. The flag (`idaapi.FUNC_NORET_PENDING`) is still set.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
+            logging.warning(u"{:s}.has_return({:s}) : Analysis for function return is still pending. The flag (`idaapi.FUNC_NORET_PENDING`) is still set.".format(__name__, ("{:#x}" if isinstance(func, six.integer_types) else "{!r}").format(func)))
         return not (fn.flags & idaapi.FUNC_NORET == idaapi.FUNC_NORET)
     returnQ = utils.alias(has_return, 'type')
 
