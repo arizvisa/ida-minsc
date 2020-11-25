@@ -288,7 +288,7 @@ class apply(object):
                 if not name.startswith(' '): break
 
                 # if type is a string, then treat it as a structure so we can calculate a size
-                if isinstance(type, basestring):
+                if isinstance(type, six.string_types):
                     try:
                         st = struc.by(type)
                     except internal.exceptions.StructureNotFoundError:
@@ -357,7 +357,7 @@ class apply(object):
             member.comment = internal.comment.encode(state)
 
             # if the type is a string, then figure out which structure to use
-            if isinstance(type, basestring):
+            if isinstance(type, six.string_types):
                 try:
                     member.type = struc.by(type)
                 except internal.exceptions.StructureNotFoundError:
