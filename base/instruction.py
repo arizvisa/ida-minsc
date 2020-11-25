@@ -379,7 +379,7 @@ def op_repr(ea, opnum):
     try:
         res = outop(insn.ea, opnum) or "{:s}".format(op(insn.ea, opnum))
     except:
-        logging.warn(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand \"{:s}\". Returning the result from {:s} instead.".format('.'.join([__name__, 'op_repr']), ea, opnum, utils.string.escape(oppr(insn.ea, opnum), '"'), '.'.join([__name__, 'op'])))
+        logging.warning(u"{:s}({:#x}, {:d}) : Unable to strip tags from operand \"{:s}\". Returning the result from {:s} instead.".format('.'.join([__name__, 'op_repr']), ea, opnum, utils.string.escape(oppr(insn.ea, opnum), '"'), '.'.join([__name__, 'op'])))
         return u"{!s}".format(op(insn.ea, opnum))
     return utils.string.of(res)
 
@@ -931,7 +931,7 @@ def op_structure(ea, opnum, path, **delta):
         res.append(path[len(res)])
 
     if len(res) < len(path):
-        logging.warn(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
+        logging.warning(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
     path = res[:]
 
     # if the delta is in the path, move it into the delta kwarg
@@ -963,7 +963,7 @@ def op_structure(ea, opnum, path, **delta):
 
     # check what was different
     if len(path) != len(tids) + 1:
-        logging.warn(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        logging.warning(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : There was an error trying to determine the path for the list of members (not all members were pointing to structures).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # build the list of member ids and prefix it with a structure id
     length = 1 + len(tids)
@@ -1133,7 +1133,7 @@ def op_refs(ea, opnum):
             member, stkofs = idaapi.get_stkvar(inst, op, res)
 
         if stkofs != stkofs_:
-            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
+            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
 
         # build the xrefs
         xl = idaapi.xreflist_t()
@@ -1180,7 +1180,7 @@ def op_refs(ea, opnum):
         if mem is None:
             # if memofs does not point to the size of structure, then warn that we're falling back to the structure
             if memofs != idaapi.get_struc_size(st):
-                logging.warn(u"{:s}.op_refs({:#x}, {:d}) : Unable to find the member for offset ({:#x}) in the structure {:#x}. Falling back to references to the structure itself.".format(__name__, inst.ea, opnum, memofs, st.id))
+                logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Unable to find the member for offset ({:#x}) in the structure {:#x}. Falling back to references to the structure itself.".format(__name__, inst.ea, opnum, memofs, st.id))
             mem = st
 
         # extract the references
@@ -1188,7 +1188,7 @@ def op_refs(ea, opnum):
 
         if not x.first_to(mem.id, 0):
             fullname = idaapi.get_member_fullname(mem.id)
-            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
+            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
 
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
@@ -2428,10 +2428,10 @@ def __newprc__(id):
     elif plfm == idaapi.PLFM_MIPS:  # id == 12
         res, description = MIPS64() if database.config.bits() > 32 else MIPS32(), "MIPS{:d}".format(database.config.bits())
     else:
-        logging.warn("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
+        logging.warning("{:s} : IDP_Hooks.newprc({:d}) : Unsupported processor type {:d} was specified. Tools that use the instruction module might not work properly.".format(__name__, id, plfm))
         return
 
-    logging.warn("Detected processor module : {:s} ({:d})".format(description, plfm))
+    logging.warning("Detected processor module : {:s} ({:d})".format(description, plfm))
 
     # assign our required globals
     m.architecture, m.register = res, res.r
