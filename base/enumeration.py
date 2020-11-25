@@ -89,7 +89,7 @@ byindex = utils.alias(by_index)
 def by(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
     return index if interface.node.is_identifier(index) else by_index(index)
-@utils.multicase(name=basestring)
+@utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def by(name):
     '''Return the identifier for the enumeration with the specified `name`.'''
@@ -110,7 +110,7 @@ def by(**type):
         raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
-@utils.multicase(string=basestring)
+@utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
 def search(string):
     '''Return the identifier of the first enumeration that matches the glob `string`.'''
@@ -153,7 +153,7 @@ def name(enum):
     eid = by(enum)
     res = idaapi.get_enum_name(eid)
     return utils.string.of(res)
-@utils.multicase(name=basestring)
+@utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def name(enum, name):
     '''Rename the enumeration `enum` to the string `name`.'''
@@ -169,7 +169,7 @@ def comment(enum, **repeatable):
     eid = by(enum)
     res = idaapi.get_enum_cmt(eid, repeatable.get('repeatable', True))
     return utils.string.of(res)
-@utils.multicase(comment=basestring)
+@utils.multicase(comment=six.string_types)
 @utils.string.decorate_arguments('comment')
 def comment(enum, comment, **repeatable):
     """Set the comment for the enumeration `enum` to `comment`.
@@ -239,7 +239,7 @@ def iterate(**type):
         res = builtins.list(__matcher__.match(key, value, res))
     for item in res: yield item
 
-@utils.multicase(string=basestring)
+@utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
 def list(string):
     '''List any enumerations that match the glob in `string`.'''
@@ -384,7 +384,7 @@ class members(object):
     def by(cls, enum, n):
         '''Return the member belonging to `enum` identified by its index or id in `n`.'''
         return cls.by_identifier(enum, n) if interface.node.is_identifier(n) else cls.by_index(enum, n)
-    @utils.multicase(member=basestring)
+    @utils.multicase(member=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('member')
     def by(cls, enum, member):
@@ -489,14 +489,14 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.name(mid)
-    @utils.multicase(mid=six.integer_types, name=(basestring, tuple))
+    @utils.multicase(mid=six.integer_types, name=(six.string_types, tuple))
     @classmethod
     @utils.string.decorate_arguments('name')
     def name(cls, mid, name):
         '''Rename the enumeration member `mid` to `name`.'''
         res = interface.tuplename(*name) if isinstance(name, tuple) else name
         return idaapi.set_enum_member_name(mid, utils.string.to(res))
-    @utils.multicase(name=basestring)
+    @utils.multicase(name=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('name', 'suffix')
     def name(cls, enum, member, name, *suffix):
@@ -524,7 +524,7 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.comment(mid, **repeatable)
-    @utils.multicase(mid=six.integer_types, comment=basestring)
+    @utils.multicase(mid=six.integer_types, comment=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('comment')
     def comment(cls, mid, comment, **repeatable):
@@ -536,7 +536,7 @@ class member(object):
             raise E.MemberNotFoundError(u"{:s}.comment({:#x}, {!r}) : Unable to locate member by the specified identifier.".format('.'.join([__name__, cls.__name__]), mid, comment))
         res = utils.string.to(comment)
         return idaapi.set_enum_member_cmt(mid, res, repeatable.get('repeatable', True))
-    @utils.multicase(comment=basestring)
+    @utils.multicase(comment=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('comment')
     def comment(cls, enum, member, comment, **repeatable):
