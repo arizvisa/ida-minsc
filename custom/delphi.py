@@ -23,5 +23,5 @@ def string(ea):
         except TypeError:
             al = db.set.align(ea - 4 + cb, alignment=4)
         return 4 + cb + al
-    logging.warn(u"{:s}.string({:#x}): The data at address {:#x} is not a properly prefixed delphi string.".format(__name__, ea, ea - 8))
+    logging.warning(u"{:s}.string({:#x}): The data at address {:#x} is not a properly prefixed delphi string.".format(__name__, ea, ea - 8))
     return 0
