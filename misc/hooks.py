@@ -21,16 +21,16 @@ def greeting():
     barrier = 93
     available = ['database', 'function', 'instruction', 'segment', 'structure', 'enumeration']
 
-    print('=' * barrier)
-    print("Welcome to the ida-minsc plugin!")
-    print("")
-    print("You can find documentation at https://arizvisa.github.io/ida-minsc/")
-    print("")
-    print("The available namespaces are: {:s}".format(', '.join(available)))
-    print("Please use `help(namespace)` for their usage.")
-    print("")
-    print("Your globals have also been cleaned, use `dir()` to see your work.")
-    print('-' * barrier)
+    six.print_('=' * barrier)
+    six.print_("Welcome to the ida-minsc plugin!")
+    six.print_("")
+    six.print_("You can find documentation at https://arizvisa.github.io/ida-minsc/")
+    six.print_("")
+    six.print_("The available namespaces are: {:s}".format(', '.join(available)))
+    six.print_("Please use `help(namespace)` for their usage.")
+    six.print_("")
+    six.print_("Your globals have also been cleaned, use `dir()` to see your work.")
+    six.print_('-' * barrier)
 
 ### comment hooks
 class commentbase(object):
@@ -53,9 +53,22 @@ class commentbase(object):
 
 class address(commentbase):
     @classmethod
+    def get_func_extern(cls, ea):
+        """Return the function at the given address and whether the address is a function populated by the rtld (an external).
+
+        This is necessary to determine whether this is an actual function, or is really
+        just an address to an import.
+        """
+        get_flags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_full_flags
+
+        # If there's a function defined at our address, then return True (we're an rtld)
+        # if we're in an external segment, otherwise we return True if we're not pointing to data.
+        f, seg = idaapi.get_func(ea), idaapi.getseg(ea)
+        return f, seg.type in {idaapi.SEG_XTRN} if f else (get_flags(ea) & idaapi.as_uint32(idaapi.MS_CLS) == idaapi.FF_DATA)
+
+    @classmethod
     def _update_refs(cls, ea, old, new):
-        f = idaapi.get_func(ea)
-        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+        f, rt = cls.get_func_extern(ea)
 
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in old.viewkeys() ^ new.viewkeys():
@@ -72,8 +85,7 @@ class address(commentbase):
 
     @classmethod
     def _create_refs(cls, ea, res):
-        f = idaapi.get_func(ea)
-        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+        f, rt = cls.get_func_extern(ea)
 
         logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in res.viewkeys():
@@ -84,8 +96,7 @@ class address(commentbase):
 
     @classmethod
     def _delete_refs(cls, ea, res):
-        f = idaapi.get_func(ea)
-        rt, _ = internal.interface.addressOfRuntimeOrStatic(f) if f else (False, None)
+        f, rt = cls.get_func_extern(ea)
 
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' from runtime-linked function' if rt else ''))
         for key in res.viewkeys():
@@ -214,8 +225,7 @@ class address(commentbase):
         # first we'll grab our comment that the user updated
         logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
-        fn = idaapi.get_func(ea)
-        rt, _ = internal.interface.addressOfRuntimeOrStatic(fn) if fn else (False, None)
+        fn, rt = cls.get_func_extern(ea)
 
         # if we're in a function but not a runtime-linked one, then we need to
         # to clear our contents here.
@@ -544,31 +554,31 @@ def __process_functions(percentage=0.10):
     It's intended to be called once the database is ready to be tampered with.
     """
     p = ui.Progress()
-    globals = set(internal.comment.globals.address())
+    globals = {item for item in internal.comment.globals.address()}
 
     total = 0
 
-    funcs = list(database.functions())
+    funcs = [ea for ea in database.functions()]
     p.update(current=0, max=len(funcs), title=u"Pre-building tagcache...")
     p.open()
     six.print_(u"Pre-building tagcache for {:d} functions.".format(len(funcs)))
     for i, fn in enumerate(funcs):
         chunks = list(function.chunks(fn))
 
-        text = functools.partial(u"Processing function {:#x} ({chunks:d} chunk{plural:s}) -> {:d} of {:d}".format, fn, i + 1, len(funcs))
+        text = functools.partial(u"Processing function {:#x} ({chunks:d} chunk{plural:s}) -> {:d} of {:d}".format, fn, 1 + i, len(funcs))
         p.update(current=i)
         ui.navigation.procedure(fn)
         if i % (int(len(funcs) * percentage) or 1) == 0:
-            six.print_(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, i+1, len(funcs), i / float(len(funcs)) * 100.0))
+            six.print_(u"Processing function {:#x} -> {:d} of {:d} ({:.02f}%)".format(fn, 1 + i, len(funcs), i / float(len(funcs)) * 100.0))
 
-        contents = set(internal.comment.contents.address(fn))
+        contents = {item for item in internal.comment.contents.address(fn)}
         for ci, (l, r) in enumerate(chunks):
             p.update(text=text(chunks=len(chunks), plural='' if len(chunks) == 1 else 's'), tooltip="Chunk #{:d} : {:#x} - {:#x}".format(ci, l, r))
             ui.navigation.analyze(l)
-            for ea in database.address.iterate(l, r):
+            for ea in database.address.iterate(l, database.address.prev(r)):
                 # FIXME: no need to iterate really since we should have
                 #        all of the addresses
-                for k, v in six.iteritems(database.tag(ea)):
+                for k, v in database.tag(ea).items():
                     if ea in globals: internal.comment.globals.dec(ea, k)
                     if ea not in contents: internal.comment.contents.inc(ea, k, target=fn)
                     total += 1
@@ -579,42 +589,49 @@ def __process_functions(percentage=0.10):
     p.close()
 
 def rebase(info):
-    """This is for when the user re-bases the entire database.
+    """This is for when the user rebases the entire database.
 
     We update the entire database in two parts. First we iterate through all
     the functions, and transform its cache to its new address. Next we iterate
     through all of the known global tags and then transform those.
     """
+    get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
     functions, globals = map(utils.fcompose(sorted, list), (database.functions(), internal.netnode.alt.fiter(internal.comment.tagging.node())))
 
     p = ui.Progress()
-    p.update(current=0, title=u"Rebasing tagcache...", min=0, max=len(functions)+len(globals))
+    p.update(current=0, title=u"Rebasing tagcache...", min=0, max=sum(len(item) for item in [functions, globals]))
     fcount = gcount = 0
 
-    scount = info.size() + 1
-    six.print_(u"{:s}.rebase({!s}) : Rebasing tagcache for {:d} segments.".format(__name__, utils.string.repr(info), scount))
+    scount = info.size()
+    segmap = {info[si].to : info[si]._from for si in range(scount)}
+    listable = sorted(segmap)
+    six.print_(u"{:s}.rebase({:#x}, {:#x}) : Rebasing tagcache for {:d} segments.".format(__name__, segmap[listable[0]], listable[0], scount))
 
     # for each segment
     p.open()
-    for si in six.moves.range(scount):
-        msg = u"Rebasing tagcache for segment {:d} of {:d} : {:#x} ({:+#x}) -> {:#x}".format(si, scount, info[si]._from, info[si].size, info[si].to)
+    for si in range(scount):
+        seg = idaapi.getseg(info[si].to)
+
+        msg = u"Rebasing tagcache for segment {:d} of {:d}{:s}: {:#x} ({:+#x}) -> {:#x}".format(1 + si, scount, " ({:s})".format(get_segment_name(seg)) if seg else '', info[si]._from, info[si].size, info[si].to)
         p.update(title=msg), six.print_(msg)
 
         # for each function (using target address because ida moved the netnodes for us)
-        res = [n for n in functions if info[si].to <= n < info[si].to + info[si].size]
-        for i, fn in __rebase_function(info[si]._from, info[si].to, info[si].size, iter(res)):
-            text = u"Function {:d} of {:d} : {:#x}".format(i + fcount, len(functions), fn)
-            p.update(value=sum((fcount, gcount, i)), text=text)
-            ui.navigation.procedure(fn)
-        fcount += len(res)
+        listable = [ea for ea in functions if info[si].to <= ea < info[si].to + info[si].size]
+        for i, offset in __rebase_function(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
+            name = database.name(info[si].to + offset)
+            text = u"Relocating function {:d} of {:d}{:s}: {:#x} -> {:#x}".format(i + fcount, len(functions), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
+            p.update(value=sum([fcount, gcount, i]), text=text)
+            ui.navigation.procedure(info[si].to + offset)
+        fcount += len(listable)
 
         # for each global
-        res = [(ea, count) for ea, count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
-        for i, ea in __rebase_globals(info[si]._from, info[si].to, info[si].size, iter(res)):
-            text = u"Global {:d} of {:d} : {:#x}".format(i + gcount, len(globals), ea)
-            p.update(value=sum((fcount, gcount, i)), text=text)
-            ui.navigation.analyze(ea)
-        gcount += len(res)
+        listable = [(ea, count) for ea, count in globals if info[si]._from <= ea < info[si]._from + info[si].size]
+        for i, offset in __rebase_globals(info[si]._from, info[si].to, info[si].size, (item for item in listable)):
+            name = database.name(info[si].to + offset)
+            text = u"Relocating global {:d} of {:d}{:s}: {:#x} -> {:#x}".format(i + gcount, len(globals), " ({:s})".format(name) if name else '', info[si]._from + offset, info[si].to + offset)
+            p.update(value=sum([fcount, gcount, i]), text=text)
+            ui.navigation.analyze(info[si].to + offset)
+        gcount += len(listable)
     p.close()
 
 def __rebase_function(old, new, size, iterable):
@@ -622,47 +639,50 @@ def __rebase_function(old, new, size, iterable):
     failure, total = [], list(iterable)
 
     for i, fn in enumerate(total):
-        # grab the contents dictionary
+        offset = fn - new
+
+        # grab the contents dictionary from the former address
         try:
-            state = internal.comment.contents._read(None, fn)
+            state = internal.comment.contents._read(offset + old, offset + old)
+
         except E.FunctionNotFoundError:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Address {:#x} -> {:#x} is not a function.".format(__name__, old, new, size, iterable, fn - new + old, fn))
+            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Address {:#x} -> {:#x} is not a function.".format(__name__, old, new, size, iterable, res, fn), exc_info=True)
             state = None
+
         if state is None: continue
 
-        # now we can erase the old one
-        res = fn - new + old
-        internal.comment.contents._write(res, None, None)
+        # erase the old one since we've loaded its state
+        internal.comment.contents._write(offset + old, offset + old, None)
 
         # update the addresses
-        res, state[key] = state[key], {ea - old + new : ref for ea, ref in six.iteritems(state[key])}
+        res, state[key] = state[key], {ea - old + new : ref for ea, ref in state[key].items()}
 
-        # and put the new addresses back
+        # and put the new addresses back to the new state
         ok = internal.comment.contents._write(None, fn, state)
         if not ok:
             logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to write refcount for function {:#x} while trying to update old reference count ({!s}) to new one ({!s}).".format(__name__, old, new, size, iterable, fn, utils.string.repr(res), utils.string.repr(state[key])))
             failure.append((fn, res, state[key]))
 
-        yield i, fn
+        yield i, offset
     return
 
 def __rebase_globals(old, new, size, iterable):
     node = internal.comment.tagging.node()
     failure, total = [], list(iterable)
     for i, (ea, count) in enumerate(total):
+        offset = ea - old
+
         # remove the old address
         ok = internal.netnode.alt.remove(node, ea)
         if not ok:
             logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to remove refcount ({!r}) for global {:#x}.".format(__name__, old, new, size, iterable, count, ea))
 
         # now add the new address
-        res = ea - old + new
-        ok = internal.netnode.alt.set(node, res, count)
+        ok = internal.netnode.alt.set(node, offset + new, count)
         if not ok:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to store refcount ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, res))
-
-            failure.append((ea, res, count))
-        yield i, ea
+            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to store refcount ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, new + offset))
+            failure.append((ea, new + offset, count))
+        yield i, offset
     return
 
 def segm_start_changed(s):
@@ -684,8 +704,8 @@ def rename(ea, newname):
     We simply increase the refcount for the "__name__" key, or decrease it
     if the name is being removed.
     """
-    fl = database.type.flags(ea)
-    labelQ, customQ = (fl & n == n for n in {idaapi.FF_LABL, idaapi.FF_NAME})
+    fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
+    labelQ, customQ = (fl & item == item for item in [idaapi.FF_LABL, idaapi.FF_NAME])
     #r, fn = database.xref.up(ea), idaapi.get_func(ea)
     fn = idaapi.get_func(ea)
 
@@ -721,14 +741,14 @@ def extra_cmt_changed(ea, line_idx, cmt):
     #      simply a no-op. this is okay for now...
 
     oldcmt = internal.netnode.sup.get(ea, line_idx)
-    if oldcmt is not None: oldcmt = oldcmt.rstrip('\x00')
+    if oldcmt is not None: oldcmt = oldcmt.rstrip('\0')
     ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
     MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
     prefix = (idaapi.E_PREV, idaapi.E_PREV+MAX_ITEM_LINES, '__extra_prefix__')
     suffix = (idaapi.E_NEXT, idaapi.E_NEXT+MAX_ITEM_LINES, '__extra_suffix__')
 
-    for l, r, key in (prefix, suffix):
+    for l, r, key in [prefix, suffix]:
         if l <= line_idx < r:
             if oldcmt is None and cmt is not None: ctx.inc(ea, key)
             elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
@@ -749,7 +769,7 @@ def func_tail_appended(pfn, tail):
     global State
     if State != state.ready: return
     # tail = func_t
-    for ea in database.address.iterate(*interface.range.unpack(tail)):
+    for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -766,7 +786,7 @@ def removing_func_tail(pfn, tail):
     global State
     if State != state.ready: return
     # tail = range_t
-    for ea in database.address.iterate(*interface.range.unpack(tail)):
+    for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
@@ -821,7 +841,7 @@ def tail_owner_changed(tail, owner_func):
 
     # this is easy as we just need to walk through tail and add it
     # to owner_func
-    for ea in database.address.iterate(*interface.range.unpack(tail)):
+    for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=owner_func)
@@ -841,7 +861,7 @@ def add_func(pfn):
 
     # convert all globals into contents
     for l, r in function.chunks(pfn):
-        for ea in database.address.iterate(l, r):
+        for ea in database.address.iterate(l, database.address.prev(r)):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -864,7 +884,7 @@ def del_func(pfn):
 
     # convert all contents into globals
     for l, r in function.chunks(pfn):
-        for ea in database.address.iterate(l, r):
+        for ea in database.address.iterate(l, database.address.prev(r)):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
@@ -891,7 +911,7 @@ def set_func_start(pfn, new_start):
     # new_start has removed addresses from function
     # replace contents with globals
     if interface.range.start(pfn) > new_start:
-        for ea in database.address.iterate(new_start, interface.range.start(pfn)):
+        for ea in database.address.iterate(new_start, database.address.prev(interface.range.start(pfn))):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
@@ -902,7 +922,7 @@ def set_func_start(pfn, new_start):
     # new_start has added addresses to function
     # replace globals with contents
     elif interface.range.start(pfn) < new_start:
-        for ea in database.address.iterate(interface.range.start(pfn), new_start):
+        for ea in database.address.iterate(interface.range.start(pfn), database.address.prev(new_start)):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -923,7 +943,7 @@ def set_func_end(pfn, new_end):
     # new_end has added addresses to function
     # replace globals with contents
     if new_end > interface.range.end(pfn):
-        for ea in database.address.iterate(interface.range.end(pfn), new_end):
+        for ea in database.address.iterate(interface.range.end(pfn), database.address.prev(new_end)):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
@@ -934,7 +954,7 @@ def set_func_end(pfn, new_end):
     # new_end has removed addresses from function
     # replace contents with globals
     elif new_end < interface.range.end(pfn):
-        for ea in database.address.iterate(new_end, interface.range.end(pfn)):
+        for ea in database.address.iterate(new_end, database.address.prev(interface.range.end(pfn))):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
@@ -1054,12 +1074,12 @@ def make_ida_not_suck_cocks(nw_code):
         idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
 
     ## just some debugging notification hooks
-    #[ ui.hook.ui.add(n, notify(n), -100) for n in ('range','idcstop','idcstart','suspend','resume','term','ready_to_run') ]
-    #[ ui.hook.idp.add(n, notify(n), -100) for n in ('ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty') ]
-    #[ ui.hook.idb.add(n, notify(n), -100) for n in ('closebase','savebase','loader_finished', 'auto_empty', 'thunk_func_created','func_tail_appended') ]
-    #[ ui.hook.idp.add(n, notify(n), -100) for n in ('add_func','del_func','set_func_start','set_func_end') ]
+    #[ ui.hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
+    #[ ui.hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
+    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['closebase','savebase','loader_finished', 'auto_empty', 'thunk_func_created','func_tail_appended'] ]
+    #[ ui.hook.idp.add(item, notify(item), -100) for item in ['add_func','del_func','set_func_start','set_func_end'] ]
     #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
-    #[ ui.hook.idb.add(n, notify(n), -100) for n in ('cmt_changed', 'changing_cmt', 'range_cmt_changed', 'changing_range_cmt') ]
+    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['cmt_changed', 'changing_cmt', 'range_cmt_changed', 'changing_range_cmt'] ]
 
     ### ...and that's it for all the hooks, so give out our greeting
     return greeting()
