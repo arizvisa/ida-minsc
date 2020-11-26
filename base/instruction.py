@@ -1755,7 +1755,7 @@ class intelops:
         """
         _fields = ('segment', 'offset')
         _types = (
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
         )
 
@@ -1775,10 +1775,10 @@ class intelops:
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
         _types = (
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
-            (types.NoneType, interface.register_t),
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
         )
 
@@ -1800,8 +1800,8 @@ class intelops:
         _fields = ('offset', 'base', 'index', 'scale')
         _types = (
             six.integer_types,
-            (types.NoneType, interface.register_t),
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
         )
 
