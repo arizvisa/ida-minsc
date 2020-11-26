@@ -351,11 +351,11 @@ def color(segment):
     seg = by(segment)
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(none):
     '''Clear the color of the current segment.'''
     return color(ui.current.segment(), None)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(segment, none):
     '''Clear the color of the segment identified by `segment`.'''
     seg = by(segment)
