@@ -147,7 +147,7 @@ class trie(node):
                 branch_data = stringify(layer[k], indent+1, tab=tab)
                 result.extend(branch_data)
             return result
-        return '\n'.join(("{!r}({:d})".format(cls, self.id), '\n'.join(stringify(self))))
+        return '\n'.join(["{!r}({:d})".format(cls, self.id), '\n'.join(stringify(self))])
 
 ### cache for looking up encoder/decoder types
 class cache(object):
