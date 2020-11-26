@@ -138,7 +138,7 @@ def contents(ea):
 
     # read addresses and tags from contents
     ui.navigation.auto(ea)
-    logging.debug(u"{:s}.contents({:#x}): Fetching the contents from the function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
+    logging.debug(u"{:s}.contents({:#x}): Fetching the contents from the function {:#x}.".format('.'.join([__name__]), ea, ea))
     f, addr, tags = fetch_contents(ea)
 
     # clean out any hidden tag values
@@ -156,11 +156,11 @@ def contents(ea):
 
     # update addresses and tags to contents
     ui.navigation.set(ea)
-    logging.debug(u"{:s}.contents({:#x}): Updating the name reference cache for the contents of function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
+    logging.debug(u"{:s}.contents({:#x}): Updating the name reference cache for the contents of function {:#x}.".format('.'.join([__name__]), ea, ea))
     for k, v in six.iteritems(tags):
         internal.comment.contents.set_name(f, k, v)
 
-    logging.debug(u"{:s}.contents({:#x}): Updating the address reference cache for the contents of function {:#x}.".format('.'.join(('custom', __name__)), ea, ea))
+    logging.debug(u"{:s}.contents({:#x}): Updating the address reference cache for the contents of function {:#x}.".format('.'.join([__name__]), ea, ea))
     for k, v in six.iteritems(addr):
         if not func.within(k):
             continue
