@@ -116,7 +116,7 @@ def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
     fn = ui.current.function()
     return comment(fn, string, **repeatable)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def comment(none, **repeatable):
     '''Remove the comment for the current function.'''
     fn = ui.current.function()
@@ -134,7 +134,7 @@ def comment(func, string, **repeatable):
     if not ok:
         raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.to(string), repeatable.get('repeatable', True)))
     return res
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def comment(func, none, **repeatable):
     """Remove the comment for the function `func`.
 
@@ -177,7 +177,7 @@ def name(func):
     return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def name(none, **flags):
     '''Remove the custom-name from the current function.'''
     # we use ui.current.address() instead of ui.current.function()
@@ -189,7 +189,7 @@ def name(none, **flags):
 def name(string, *suffix, **flags):
     '''Set the name of the current function to `string`.'''
     return name(ui.current.address(), string, *suffix, **flags)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def name(func, none, **flags):
     '''Remove the custom-name from the function `func`.'''
     return name(func, none or '', **flags)
@@ -272,7 +272,7 @@ def color(func):
     fn = by(func)
     b, r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
     return None if fn.color == 0xffffffff else (r<<16) | (fn.color&0x00ff00) | b
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(func, none):
     '''Remove the color for the function `func`.'''
     fn = by(func)
@@ -285,7 +285,7 @@ def color(func, rgb):
     fn = by(func)
     fn.color = (b<<16) | (rgb&0x00ff00) | r
     return bool(idaapi.update_func(fn))
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(none):
     '''Remove the color for the current function.'''
     return color(ui.current.function(), None)
@@ -1115,7 +1115,7 @@ class block(object):
     def color(cls):
         '''Returns the color of the basic block at the current address.'''
         return cls.color(ui.current.address())
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     @classmethod
     def color(cls, none):
         '''Removes the color of the basic block at the current address.'''
@@ -1145,7 +1145,7 @@ class block(object):
         '''Returns the color of the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.color(bb)
-    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @utils.multicase(ea=six.integer_types, none=None.__class__)
     @classmethod
     def color(cls, ea, none):
         '''Removes the color of the basic block at the address `ea`.'''
@@ -1160,13 +1160,13 @@ class block(object):
             database.color(ea, None)
             # internal.netnode.alt.remove(ea, 0x14)
         return res
-    @utils.multicase(bounds=builtins.tuple, none=types.NoneType)
+    @utils.multicase(bounds=builtins.tuple, none=None.__class__)
     @classmethod
     def color(cls, bounds, none):
         '''Removes the color of the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.color(bb, None)
-    @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
+    @utils.multicase(bb=idaapi.BasicBlock, none=None.__class__)
     @classmethod
     def color(cls, bb, none):
         '''Removes the color of the basic block `bb`.'''
@@ -1819,12 +1819,12 @@ def tag(func, key, value):
 
     # return what we fetched from the dict
     return res
-@utils.multicase(key=six.string_types, none=types.NoneType)
+@utils.multicase(key=six.string_types, none=None.__class__)
 @utils.string.decorate_arguments('key')
 def tag(key, none):
     '''Removes the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key, None)
-@utils.multicase(key=six.string_types, none=types.NoneType)
+@utils.multicase(key=six.string_types, none=None.__class__)
 @utils.string.decorate_arguments('key')
 def tag(func, key, none):
     '''Removes the tag identified by `key` from the function `func`.'''
@@ -2031,7 +2031,7 @@ class type(object):
     def __new__(cls, info):
         '''Apply the typeinfo in `info` to the current function.'''
         return cls(ui.current.address(), info)
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     def __new__(cls, none):
         '''Remove the typeinfo for the current function.'''
         return cls(ui.current.address(), None)
@@ -2127,7 +2127,7 @@ class type(object):
 
         # Just return the type we applied to the user.
         return cls(ea)
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     def __new__(cls, func, none):
         '''Remove the typeinfo for the function `func`.'''
         fn = by(func)
