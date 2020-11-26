@@ -111,9 +111,9 @@ class utils(object):
     def range(cls):
         this = netnode.new()
         ok, start = netnode.start(this), netnode.index(this)
-        if not ok: raise internal.exceptions.NetNodeNotFoundError(u"{:s}.range() : Unable to find first node.".format('.'.join(('internal', __name__, cls.__name__))))
+        if not ok: raise internal.exceptions.NetNodeNotFoundError(u"{:s}.range() : Unable to find first node.".format('.'.join([__name__, cls.__name__])))
         ok, end = netnode.end(this), netnode.index(this)
-        if not ok: raise internal.exceptions.NetNodeNotFoundError(u"{:s}.range() : Unable to find end node.".format('.'.join(('internal', __name__, cls.__name__))))
+        if not ok: raise internal.exceptions.NetNodeNotFoundError(u"{:s}.range() : Unable to find end node.".format('.'.join([__name__, cls.__name__])))
         return start, end
 
     @classmethod
@@ -122,7 +122,7 @@ class utils(object):
         this = netnode.new()
         ok = netnode.end(this)
         if not ok:
-            raise internal.exceptions.NetNodeNotFoundError(u"{:s}.renumerate() : Unable to find the end node.".format('.'.join(('internal', __name__, cls.__name__))))
+            raise internal.exceptions.NetNodeNotFoundError(u"{:s}.renumerate() : Unable to find the end node.".format('.'.join([__name__, cls.__name__])))
 
         yield end, netnode.new(end)
         while end != start:
@@ -138,7 +138,7 @@ class utils(object):
         this = netnode.new()
         ok = netnode.start(this)
         if not ok:
-            raise internal.exceptions.NetNodeNotFoundError(u"{:s}.fenumerate() : Unable to find the start node.".format('.'.join(('internal', __name__, cls.__name__))))
+            raise internal.exceptions.NetNodeNotFoundError(u"{:s}.fenumerate() : Unable to find the start node.".format('.'.join([__name__, cls.__name__])))
 
         yield start, netnode.new(start)
         while start != end:
@@ -281,7 +281,7 @@ class value(object):
             return netnode.valstr(node)
         elif issubclass(type, six.integer_types):
             return netnode.long_value(node)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's value.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, type, type))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's value.".format('.'.join([__name__, cls.__name__]), nodeidx, type, type))
 
     @classmethod
     def set(cls, nodeidx, value):
@@ -290,7 +290,7 @@ class value(object):
             return netnode.set(node, value)
         elif isinstance(value, six.integer_types):
             return netnode.set_long(node, value)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}) : An unsupported type ({!r}) was specified for the netnode's value.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, value, value.__class__))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}) : An unsupported type ({!r}) was specified for the netnode's value.".format('.'.join([__name__, cls.__name__]), nodeidx, value, value.__class__))
 
     @classmethod
     def remove(cls, nodeidx, value):
@@ -300,7 +300,7 @@ class value(object):
     @classmethod
     def repr(cls, nodeidx):
         if not cls.exists(nodeidx):
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any value.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, nodeidx))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any value.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
         res, string, value = cls.get(nodeidx), cls.get(nodeidx, type=str), cls.get(nodeidx, type=int)
         return "{!r} {!r} {:#x}".format(res, string, value)
 
@@ -331,7 +331,7 @@ class blob(object):
     @classmethod
     def repr(cls, nodeidx, tag):
         if cls.size(nodeidx, tag) == 0:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}, {!r}) : The tag {!r} for the specified node ({:x}) does not have a blob.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, tag, tag, nodeidx))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}, {!r}) : The tag {!r} for the specified node ({:x}) does not have a blob.".format('.'.join([__name__, cls.__name__]), nodeidx, tag, tag, nodeidx))
         res = cls.get(nodeidx, tag)
         return "{!r}".format(res)
 
@@ -383,7 +383,7 @@ class alt(object):
         for idx, value in cls.fiter(nodeidx):
             res.append("{0:x} : {1:#x} ({1:d})".format(idx, value))
         if not res:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any altvals.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, nodeidx))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any altvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
         return '\n'.join(res)
 
 ### node sup iteration
@@ -399,7 +399,7 @@ class sup(object):
             return netnode.supval(node, idx)
         elif issubclass(type, basestring):
             return netnode.supstr(node, idx)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, idx, type, type))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, idx, type, type))
 
     @classmethod
     def set(cls, nodeidx, idx, value):
@@ -432,7 +432,7 @@ class sup(object):
             value = cls.get(nodeidx, idx)
             res.append("[{:d}] {:x} : {!r}".format(i, idx, value))
         if not res:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any supvals.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, nodeidx))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any supvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
         return '\n'.join(res)
 
 ### node hash iteration
@@ -449,7 +449,7 @@ class hash(object):
             return netnode.hashstr_buf(node, key or '')
         elif issubclass(type, six.integer_types):
             return netnode.hashval_long(node, key or '')
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, key, type, type))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, type, type))
 
     @classmethod
     def set(cls, nodeidx, key, value):
@@ -461,7 +461,7 @@ class hash(object):
             return netnode.hashset_buf(node, key, value)
         elif isinstance(value, six.integer_types):
             return netnode.hashset_idx(node, key, value)
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}, {!r}) : An unsupported type ({!r}) was specified for the netnode's hash.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, key, value, type(value)))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}, {!r}) : An unsupported type ({!r}) was specified for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, value, type(value)))
 
     @classmethod
     def remove(cls, nodeidx, key):
@@ -495,7 +495,7 @@ class hash(object):
             value = "{:<{:d}s} : str={!r}, buffer={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, str), cls.get(nodeidx, key, buffer), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
             res.append("[{:d}] {:<{:d}s} -> {:s}".format(i, key, l1, value))
         if not res:
-            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join(('internal', __name__, cls.__name__)), nodeidx, nodeidx))
+            raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
         return '\n'.join(res)
 
 # FIXME: implement a file-allocation-table based filesystem using the netnode wrappers defined above
