@@ -342,7 +342,7 @@ class multicase(object):
         f, c = F, F.func_code
         cargs = c.co_argcount, c.co_nlocals, c.co_stacksize, c.co_flags, \
                 c.co_code, c.co_consts, c.co_names, c.co_varnames, \
-                c.co_filename, '.'.join((func.__module__, func.func_name)), \
+                c.co_filename, '.'.join([func.__module__, func.func_name]), \
                 c.co_firstlineno, c.co_lnotab, c.co_freevars, c.co_cellvars
         newcode = types.CodeType(*cargs)
         res = types.FunctionType(newcode, f.func_globals, f.func_name, f.func_defaults, f.func_closure)
