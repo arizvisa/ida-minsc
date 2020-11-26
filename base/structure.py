@@ -543,7 +543,7 @@ class structure_t(object):
         repeatable, res, state[key] = True, state.get(key, None), value
         ok = idaapi.set_struc_cmt(self.id, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
-    @utils.multicase(key=six.string_types, none=types.NoneType)
+    @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the structure.'''
@@ -705,7 +705,7 @@ def comment(structure, **repeatable):
 def comment(structure, cmt, **repeatable):
     '''Set the comment to `cmt` for the specified `structure`.'''
     return comment(structure.id, cmt, **repeatable)
-@utils.multicase(structure=structure_t, none=types.NoneType)
+@utils.multicase(structure=structure_t, none=None.__class__)
 def comment(structure, none, **repeatable):
     '''Remove the comment from the specified `structure`.'''
     return comment(structure.id, none or '', **repeatable)
@@ -718,7 +718,7 @@ def comment(id, cmt, **repeatable):
     """
     res = utils.string.to(cmt)
     return idaapi.set_struc_cmt(id, res, repeatable.get('repeatable', True))
-@utils.multicase(id=six.integer_types, none=types.NoneType)
+@utils.multicase(id=six.integer_types, none=None.__class__)
 def comment(id, none, **repeatable):
     '''Remove the comment from the structure identified by `id`.'''
     return comment(id, none or '', **repeatable)
@@ -1650,7 +1650,7 @@ class member_t(object):
         repeatable, res, state[key] = True, state.get(key, None), value
         ok = idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable)
         return res
-    @utils.multicase(key=six.string_types, none=types.NoneType)
+    @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
     def tag(self, key, none):
         '''Removes the tag specified by `key` from the member.'''
