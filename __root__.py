@@ -123,7 +123,7 @@ try:
 # the user about this.
 except NameError:
     TIMEOUT = 5
-    __import__('logging').warn("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
+    __import__('logging').warning("Unable to add notification for idaapi.NW_INITIDA ({:d}). Registering a {:.1f} second timer to setup hooks...".format(idaapi.NW_INITIDA, TIMEOUT))
     idaapi.register_timer(TIMEOUT, __import__('hooks').ida_is_busy_sucking_cocks)
     del(TIMEOUT)
 
@@ -134,4 +134,4 @@ else:
 
     # Installing the termination hook failed, but it's not really too important...
     except NameError:
-        __import__('logging').warn("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
+        __import__('logging').warning("Unable to add notification for idaapi.NW_TERMIDA ({:d}).".format(idaapi.NW_TERMIDA))
