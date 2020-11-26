@@ -122,7 +122,7 @@ class read(object):
         try:
             res = func.frame(F)
         except internal.exceptions.MissingTypeOrAttribute:
-            logging.info(u"{:s}.frame({:#x}) : Skipping function at {:#x} due to a missing frame.".format('.'.join((__name__, cls.__name__)), ea, ea))
+            logging.info(u"{:s}.frame({:#x}) : Skipping function at {:#x} due to a missing frame.".format('.'.join([__name__, cls.__name__]), ea, ea))
             return
 
         for member in res.members:
@@ -132,7 +132,7 @@ class read(object):
 
             # if it's a structure, then the type is the structure name
             if isinstance(member.type, struc.structure_t):
-                logging.debug(u"{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!s}.".format('.'.join((__name__, cls.__name__)), ea, member.offset, internal.utils.string.repr(member.type)))
+                logging.debug(u"{:s}.frame({:#x}) : Storing structure-based type as name for field {:+#x} with tne type {!s}.".format('.'.join([__name__, cls.__name__]), ea, member.offset, internal.utils.string.repr(member.type)))
                 type = member.type.name
 
             # otherwise, the type is a tuple that we can serializer
@@ -292,7 +292,7 @@ class apply(object):
                     try:
                         st = struc.by(type)
                     except internal.exceptions.StructureNotFoundError:
-                        logging.fatal(u"{:s}.frame({:#x}, ...{:s}): Unable to find structure \"{:s}\" for member {:+#x} in order to calculate register size for function at {:+#x}. Using register size of {:+#x}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, internal.utils.string.escape(type, '"'), offset, ea, regs))
+                        logging.fatal(u"{:s}.frame({:#x}, ...{:s}): Unable to find structure \"{:s}\" for member {:+#x} in order to calculate register size for function at {:+#x}. Using register size of {:+#x}.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, internal.utils.string.escape(type, '"'), offset, ea, regs))
                         break
                     type = [(int, 1), st.size]
 
@@ -305,7 +305,7 @@ class apply(object):
                 regs += cb
 
             # finally we can create the frame
-            logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Creating a new frame for function {:#x} with the parameters lvars={:+#x} regs={:+#x} args={:+#x}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, ea, abs(minimum), regs, abs(maximum)))
+            logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Creating a new frame for function {:#x} with the parameters lvars={:+#x} regs={:+#x} args={:+#x}.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, ea, abs(minimum), regs, abs(maximum)))
             F = func.frame.new(ea, abs(minimum), regs, abs(maximum) - regs)
 
         # iterate through our dictionary of members
@@ -319,17 +319,17 @@ class apply(object):
 
             # if we didn't find a member, then try and add it with what we currently know
             if member is None:
-                logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Attempting to create the member with the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\").".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
+                logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Unable to find frame member at {:+#x}. Attempting to create the member with the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\").".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
                 try:
                     member = F.members.add(name, type, offset)
                 except:
-                    logging.fatal(u"{:s}.frame({:#x}, ...{:s}) : Unable to add frame member at {:+#x}. Skipping application of the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\") to it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
+                    logging.fatal(u"{:s}.frame({:#x}, ...{:s}) : Unable to add frame member at {:+#x}. Skipping application of the name (\"{:s}\"), type ({!s}), and comment (\"{:s}\") to it.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, offset, internal.utils.string.escape(name, '"'), internal.utils.string.repr(type), internal.utils.string.escape(comment, '"')))
                     continue
 
             # check if the name has changed or is different in some way
             if member.name != name:
                 log = logging.info if lvarNameQ(member.name) else logging.warn
-                log(u"{:s}.frame({:#x}, ...{:s}) : Renaming frame member {:+#x} from the name \"{:s}\" to \"{:s}\".".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, offset, internal.utils.string.escape(member.name, '"'), internal.utils.string.escape(name, '"')))
+                log(u"{:s}.frame({:#x}, ...{:s}) : Renaming frame member {:+#x} from the name \"{:s}\" to \"{:s}\".".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, offset, internal.utils.string.escape(member.name, '"'), internal.utils.string.escape(name, '"')))
                 member.name = name
 
             # check what's going to be overwritten with different values prior to doing it
@@ -341,13 +341,13 @@ class apply(object):
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
                 for name in six.viewkeys(res) - six.viewkeys(new):
-                    logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting tag \"{:s}\" for the frame member {:+#x}. The value {!s} would be overwritten by {!s}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), offset, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
+                    logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting tag \"{:s}\" for the frame member {:+#x}. The value {!s} would be overwritten by {!s}.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), offset, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
                 pass
 
             # warn the user about what's going to be overwritten prior to doing it
             for name in six.viewkeys(state) & six.viewkeys(new):
                 if state[name] == new[name]: continue
-                logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Overwriting tag \"{:s}\" for frame member {:+#x} with new value {!s}. The old value was {!s}.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, internal.utils.string.escape(name, '"'), offset, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
+                logging.warn(u"{:s}.frame({:#x}, ...{:s}) : Overwriting tag \"{:s}\" for frame member {:+#x} with new value {!s}. The old value was {!s}.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, internal.utils.string.escape(name, '"'), offset, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
 
             # now we can update the current dictionary
             mapstate = { name : value for name, value in six.iteritems(new) if state.get(name, dummy) != value }
@@ -361,7 +361,7 @@ class apply(object):
                 try:
                     member.type = struc.by(type)
                 except internal.exceptions.StructureNotFoundError:
-                    logging.warn(u"{:s}.frame({:#x}, ...{:s}): Unable to find structure \"{:s}\" for member at {:+#x}. Skipping it.".format('.'.join((__name__, cls.__name__)), ea, tagmap_output, internal.utils.string.escape(type, '"'), offset))
+                    logging.warn(u"{:s}.frame({:#x}, ...{:s}): Unable to find structure \"{:s}\" for member at {:+#x}. Skipping it.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, internal.utils.string.escape(type, '"'), offset))
 
             # otherwise, it's a pythonic tuple that we can just assign
             else:
@@ -434,19 +434,19 @@ class apply(object):
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
                 for name in six.viewkeys(res) - six.viewkeys(new):
-                    logging.warn(u"{:s}.globals(...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting the tag \"{:s}\" in the global {:#x}. The value {!s} would be replaced with {!s}.".format('.'.join((__name__, cls.__name__)), tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), ea, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
+                    logging.warn(u"{:s}.globals(...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting the tag \"{:s}\" in the global {:#x}. The value {!s} would be replaced with {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), ea, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
                 pass
 
             # check what's going to be overwritten with different values prior to doing it
             for name in six.viewkeys(state) & six.viewkeys(new):
                 if state[name] == new[name]: continue
-                logging.warn(u"{:s}.globals(...{:s}) : Overwriting tag \"{:s}\" for global at {:#x} with new value {!s}. Old value was {!s}.".format('.'.join((__name__, cls.__name__)), tagmap_output, internal.utils.string.escape(name, '"'), ea, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
+                logging.warn(u"{:s}.globals(...{:s}) : Overwriting tag \"{:s}\" for global at {:#x} with new value {!s}. Old value was {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), ea, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
 
             # now we can apply the tags to the global address
             try:
                 [ ns.tag(ea, name, value) for name, value in six.iteritems(new) if state.get(name, dummy) != value ]
             except:
-                logging.warn(u"{:s}.globals(...{:s}) : Unable to apply tags ({!s}) to global {:#x}.".format('.'.join((__name__, cls.__name__)), tagmap_output, internal.utils.string.repr(new), ea), exc_info=True)
+                logging.warn(u"{:s}.globals(...{:s}) : Unable to apply tags ({!s}) to global {:#x}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.repr(new), ea), exc_info=True)
 
             # increase our counter
             count += 1
@@ -465,7 +465,7 @@ class apply(object):
 
             # warn the user if this address is not within a function
             if not func.within(ea):
-                logging.warn(u"{:s}.contents(...{:s}) : Address {:#x} is not within a function. Using a global tag.".format('.'.join((__name__, cls.__name__)), tagmap_output, ea))
+                logging.warn(u"{:s}.contents(...{:s}) : Address {:#x} is not within a function. Using a global tag.".format('.'.join([__name__, cls.__name__]), tagmap_output, ea))
 
             # grab the current (old) tag state
             state = db.tag(ea)
@@ -476,19 +476,19 @@ class apply(object):
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
                 for name in six.viewkeys(res) - six.viewkeys(new):
-                    logging.warn(u"{:s}.contents(...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting tag \"{:s}\" for the contents at {:#x}. The value {!s} would be overwritten by {!s}.".format('.'.join((__name__, cls.__name__)), tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), ea, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
+                    logging.warn(u"{:s}.contents(...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting tag \"{:s}\" for the contents at {:#x}. The value {!s} would be overwritten by {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), ea, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
                 pass
 
             # inform the user if any tags are being overwritten with different values
             for name in six.viewkeys(state) & six.viewkeys(new):
                 if state[name] == new[name]: continue
-                logging.warn(u"{:s}.contents(...{:s}) : Overwriting contents tag \"{:s}\" for address {:#x} with new value {!s}. Old value was {!s}.".format('.'.join((__name__, cls.__name__)), tagmap_output, internal.utils.string.escape(name, '"'), ea, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
+                logging.warn(u"{:s}.contents(...{:s}) : Overwriting contents tag \"{:s}\" for address {:#x} with new value {!s}. Old value was {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), ea, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
 
             # write the tags to the contents address
             try:
                 [ db.tag(ea, name, value) for name, value in six.iteritems(new) if state.get(name, dummy) != value ]
             except:
-                logging.warn(u"{:s}.contents(...{:s}) : Unable to apply tags {!s} to location {:#x}.".format('.'.join((__name__, cls.__name__)), tagmap_output, internal.utils.string.repr(new), ea), exc_info=True)
+                logging.warn(u"{:s}.contents(...{:s}) : Unable to apply tags {!s} to location {:#x}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.repr(new), ea), exc_info=True)
 
             # increase our counter
             count += 1
@@ -506,7 +506,7 @@ class apply(object):
             try:
                 apply.frame(ea, res, **tagmap)
             except:
-                logging.warn(u"{:s}.frames(...{:s}) : Unable to apply tags ({!s}) to frame at {:#x}.".format('.'.join((__name__, cls.__name__)), tagmap_output, internal.utils.string.repr(res), ea), exc_info=True)
+                logging.warn(u"{:s}.frames(...{:s}) : Unable to apply tags ({!s}) to frame at {:#x}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.repr(res), ea), exc_info=True)
 
             # increase our counter
             count += 1
