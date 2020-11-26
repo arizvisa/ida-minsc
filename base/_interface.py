@@ -1341,7 +1341,7 @@ class ref_t(namedtypedtuple):
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
-    _types = (six.integer_types, (six.integer_types, types.NoneType), reftype_t)
+    _types = (six.integer_types, (six.integer_types, None.__class__), reftype_t)
 
     def __repr__(self):
         cls = self.__class__
