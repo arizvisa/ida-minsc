@@ -1015,7 +1015,7 @@ def name(ea, **flags):
 def name(string, *suffix, **flags):
     '''Renames the current address to `string`.'''
     return name(ui.current.address(), string, *suffix, **flags)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def name(none, **flags):
     '''Removes the name at the current address.'''
     return name(ui.current.address(), none or '', **flags)
@@ -1127,7 +1127,7 @@ def name(ea, string, *suffix, **flags):
 
     # otherwise, we use the name_without closure to apply it
     return name_outside(ea, string, flag)
-@utils.multicase(ea=six.integer_types, none=types.NoneType)
+@utils.multicase(ea=six.integer_types, none=None.__class__)
 def name(ea, none, **flags):
     '''Removes the name defined at the address `ea`.'''
     return name(ea, none or '', **flags)
@@ -1136,7 +1136,7 @@ def name(ea, none, **flags):
 def color():
     '''Return the rgb color at the current address.'''
     return color(ui.current.address())
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(none):
     '''Remove the color from the current address.'''
     return color(ui.current.address(), None)
@@ -1146,7 +1146,7 @@ def color(ea):
     res = idaapi.get_item_color(interface.address.inside(ea))
     b, r = (res&0xff0000)>>16, res&0x0000ff
     return None if res == 0xffffffff else (r<<16)|(res&0x00ff00)|b
-@utils.multicase(ea=six.integer_types, none=types.NoneType)
+@utils.multicase(ea=six.integer_types, none=None.__class__)
 def color(ea, none):
     '''Remove the color at the address `ea`.'''
     return idaapi.set_item_color(interface.address.inside(ea), 0xffffffff)
@@ -1175,7 +1175,7 @@ def comment(ea, **repeatable):
 def comment(string, **repeatable):
     '''Set the comment at the current address to `string`.'''
     return comment(ui.current.address(), string, **repeatable)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def comment(none, **repeatable):
     '''Remove the comment at the current address.'''
     return comment(ui.current.address(), none or '', **repeatable)
@@ -1191,7 +1191,7 @@ def comment(ea, string, **repeatable):
     if not ok:
         raise E.DisassemblerError(u"{:s}.comment({:#x}, {!r}{:s}) : Unable to call `idaapi.set_cmt({:#x}, \"{:s}\", {!s})`.".format(__name__, ea, string, u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.escape(string, '"'), repeatable.get('repeatable', False)))
     return res
-@utils.multicase(ea=six.integer_types, none=types.NoneType)
+@utils.multicase(ea=six.integer_types, none=None.__class__)
 def comment(ea, none, **repeatable):
     """Remove the comment at the address `ea`.
 
@@ -1609,11 +1609,11 @@ def tag(ea, key, value):
 
     # we can now return what the user asked for.
     return res
-@utils.multicase(key=six.string_types, none=types.NoneType)
+@utils.multicase(key=six.string_types, none=None.__class__)
 def tag(key, none):
     '''Remove the tag identified by `key` from the current address.'''
     return tag(ui.current.address(), key, none)
-@utils.multicase(ea=six.integer_types, key=six.string_types, none=types.NoneType)
+@utils.multicase(ea=six.integer_types, key=six.string_types, none=None.__class__)
 @utils.string.decorate_arguments('key')
 def tag(ea, key, none):
     '''Removes the tag identified by `key` at the address `ea`.'''
@@ -3083,7 +3083,7 @@ class type(object):
                 raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to parse the returned type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(info_s)))
             return ti
         return ti
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     def __new__(cls, none):
         '''Remove the typeinfo from the current address.'''
         return cls(ui.current.address(), None)
@@ -3114,7 +3114,7 @@ class type(object):
 
         # Return the typeinfo that was applied to the specified address.
         return cls(ea)
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     def __new__(cls, ea, none):
         '''Remove the typeinfo from the address `ea`.'''
         ti = idaapi.tinfo_t()
@@ -4216,7 +4216,7 @@ def mark():
     '''Return the mark at the current address.'''
     _, res = marks.by_address(ui.current.address())
     return res
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def mark(none):
     '''Remove the mark at the current address.'''
     return mark(ui.current.address(), None)
@@ -4230,7 +4230,7 @@ def mark(ea):
 def mark(description):
     '''Set the mark at the current address to the specified `description`.'''
     return mark(ui.current.address(), description)
-@utils.multicase(ea=six.integer_types, none=types.NoneType)
+@utils.multicase(ea=six.integer_types, none=None.__class__)
 def mark(ea, none):
     '''Erase the mark at address `ea`.'''
     try:
@@ -4491,7 +4491,7 @@ class extra(object):
     def prefix(cls, string):
         '''Set the prefixed comment at the current address to the specified `string`.'''
         return cls.__set_prefix__(ui.current.address(), string)
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     @classmethod
     def prefix(cls, none):
         '''Delete the prefixed comment at the current address.'''
@@ -4506,7 +4506,7 @@ class extra(object):
     def prefix(cls, ea, string):
         '''Set the prefixed comment at address `ea` to the specified `string`.'''
         return cls.__set_prefix__(ea, string)
-    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @utils.multicase(ea=six.integer_types, none=None.__class__)
     @classmethod
     def prefix(cls, ea, none):
         '''Delete the prefixed comment at address `ea`.'''
@@ -4522,7 +4522,7 @@ class extra(object):
     def suffix(cls, string):
         '''Set the suffixed comment at the current address to the specified `string`.'''
         return cls.__set_suffix__(ui.current.address(), string)
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     @classmethod
     def suffix(cls, none):
         '''Delete the suffixed comment at the current address.'''
@@ -4537,7 +4537,7 @@ class extra(object):
     def suffix(cls, ea, string):
         '''Set the suffixed comment at address `ea` to the specified `string`.'''
         return cls.__set_suffix__(ea, string)
-    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @utils.multicase(ea=six.integer_types, none=None.__class__)
     @classmethod
     def suffix(cls, ea, none):
         '''Delete the suffixed comment at address `ea`.'''
