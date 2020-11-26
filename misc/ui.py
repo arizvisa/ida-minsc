@@ -230,7 +230,7 @@ class current(object):
         ea = cls.address()
         res = idaapi.get_func(ea)
         if res is None:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}.function() : Unable to locate the current function.".format('.'.join((__name__, cls.__name__))))
+            raise internal.exceptions.FunctionNotFoundError(u"{:s}.function() : Unable to locate the current function.".format('.'.join([__name__, cls.__name__])))
         return res
     @classmethod
     def segment(cls):
@@ -240,7 +240,7 @@ class current(object):
     @classmethod
     def status(cls):
         '''Return the IDA status.'''
-        raise internal.exceptions.UnsupportedCapability(u"{:s}.status() : Unable to return the current status of IDA.".format('.'.join((__name__, cls.__name__))))
+        raise internal.exceptions.UnsupportedCapability(u"{:s}.status() : Unable to return the current status of IDA.".format('.'.join([__name__, cls.__name__])))
     @classmethod
     def symbol(cls):
         '''Return the current highlighted symbol name.'''
@@ -260,7 +260,7 @@ class current(object):
         left, right = idaapi.twinpos_t(), idaapi.twinpos_t()
         ok = idaapi.read_selection(view, left, right)
         if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.selection() : Unable to read the current selection.".format('.'.join((__name__, cls.__name__))))
+            raise internal.exceptions.DisassemblerError(u"{:s}.selection() : Unable to read the current selection.".format('.'.join([__name__, cls.__name__])))
         pl_l, pl_r = left.place(view), right.place(view)
         ea_l, ea_r = internal.interface.address.inside(pl_l.ea, pl_r.ea)
         return internal.interface.bounds_t(ea_l, ea_r)
@@ -430,7 +430,7 @@ class strings(appwindow):
     @classmethod
     def __on_openidb__(cls, code, is_old_database):
         if code != idaapi.NW_OPENIDB or is_old_database:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.__on_openidb__({:#x}, {:b}) : Hook was called with an unexpected code or an old database.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.__on_openidb__({:#x}, {:b}) : Hook was called with an unexpected code or an old database.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
         config = idaapi.strwinsetup_t()
         config.minlen = 3
         config.ea1, config.ea2 = idaapi.cvar.inf.minEA, idaapi.cvar.inf.maxEA
@@ -448,7 +448,7 @@ class strings(appwindow):
 
         config.strtypes = reduce(lambda t, c: t | (2**c), res, 0)
         if not idaapi.set_strlist_options(config):
-            raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join((__name__, cls.__name__)), code, is_old_database))
+            raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
         #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
     @classmethod
@@ -467,7 +467,7 @@ class strings(appwindow):
         # FIXME: this isn't being used correctly
         ok = idaapi.get_strlist_item(si, index)
         if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join((__name__, cls.__name__)), index, index, res))
+            raise internal.exceptions.DisassemblerError(u"{:s}.at({:d}) : The call to `idaapi.get_strlist_item({:d})` returned {!r}.".format('.'.join([__name__, cls.__name__]), index, index, res))
         return si
     @classmethod
     def get(cls, index):
@@ -514,7 +514,7 @@ class timer(object):
     @classmethod
     def unregister(cls, id):
         '''Unregister the specified `id`.'''
-        raise internal.exceptions.UnsupportedCapability(u"{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join((__name__, cls.__name__)), id))
+        raise internal.exceptions.UnsupportedCapability(u"{:s}.unregister({!s}) : A lock or a signal is needed here in order to unregister this timer safely.".format('.'.join([__name__, cls.__name__]), id))
         idaapi.unregister_timer(cls.clock[id])
         del(cls.clock[id])
     @classmethod
@@ -697,7 +697,7 @@ class keyboard(object):
 
         # Validate the type of our parameter
         if not isinstance(key, tuple):
-            raise internal.exceptions.InvalidParameterError(u"{:s}.of_key({!r}) : A key combination of an invalid type was provided as a parameter.".format('.'.join((__name__, cls.__name__)), key))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.of_key({!r}) : A key combination of an invalid type was provided as a parameter.".format('.'.join([__name__, cls.__name__]), key))
 
         # Find a separator that we can use, and use it to join our tuple into a
         # string with each element capitalized. That way it looks good for the user.
@@ -742,11 +742,11 @@ class keyboard(object):
         # given any more, then this isn't a valid hotkey combination and we need
         # to bitch about it.
         if len(key) != 1:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : An invalid hotkey combination ({!s}) was provided as a parameter.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(hotkey), internal.utils.string.repr(hotkey)))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : An invalid hotkey combination ({!s}) was provided as a parameter.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(hotkey)))
 
         res = next(iter(key))
         if len(res) != 1:
-            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : The hotkey combination {!s} contains the wrong number of keys ({:d}).".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(hotkey), internal.utils.string.repr(res), len(res)))
+            raise internal.exceptions.InvalidParameterError(u"{:s}.normalize_key({!s}) : The hotkey combination {!s} contains the wrong number of keys ({:d}).".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(hotkey), internal.utils.string.repr(res), len(res)))
 
         # That was it. Now to do the actual normalization, we need to sort our
         # modifiers into a tuple, and return the single hotkey that we extracted.
@@ -774,12 +774,12 @@ class keyboard(object):
         # already within our cache. If it is, then we need to unmap it prior to
         # re-creating the mapping.
         if hotkey in cls.__cache__:
-            logging.warn(u"{:s}.map({!s}, {!r}) : Remapping the hotkey combination {!s} with the callable {!r}.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring), callable))
+            logging.warn(u"{:s}.map({!s}, {!r}) : Remapping the hotkey combination {!s} with the callable {!r}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring), callable))
             ctx, _ = cls.__cache__[hotkey]
 
             ok = idaapi.del_hotkey(ctx)
             if not ok:
-                raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to remove the hotkey combination {!s} from the list of current keyboard mappings.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring)))
+                raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to remove the hotkey combination {!s} from the list of current keyboard mappings.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring)))
 
             # Pop the callable that was mapped out of the cache so that we can
             # return it to the user.
@@ -799,7 +799,7 @@ class keyboard(object):
         # XXX: I'm not sure if the key needs to be utf8 encoded or not
         ctx = idaapi.add_hotkey(keystring, closure)
         if not ctx:
-            raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to map the callable {!r} to the hotkey combination {!s}.".format('.'.join((__name__, cls.__name__)), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.map({!s}, {!r}) : Unable to map the callable {!r} to the hotkey combination {!s}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
 
         # Last thing to do is to stash it in our cache with the user's callable
         # in order to keep track of it for removal.
@@ -819,10 +819,10 @@ class keyboard(object):
                 hotkey = cls.__normalize_key__(next(item for item, (_, fcallback) in cls.__cache__.items() if fcallback == key))
 
             except StopIteration:
-                raise internal.exceptions.InvalidParameterError(u"{:s}.unmap({:s}) : Unable to locate the callable {!r} in the current list of keyboard mappings.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), key))
+                raise internal.exceptions.InvalidParameterError(u"{:s}.unmap({:s}) : Unable to locate the callable {!r} in the current list of keyboard mappings.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), key))
 
             else:
-                logging.warn(u"{:s}.unmap({:s}) : Discovered the hotkey {!s} being currently mapped to the callable {!r}.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey), key))
+                logging.warn(u"{:s}.unmap({:s}) : Discovered the hotkey {!s} being currently mapped to the callable {!r}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey), key))
 
         # We need to normalize the hotkey we were given, and convert it back
         # into IDA's format. This way we can locate it in our cache, and prevent
@@ -832,7 +832,7 @@ class keyboard(object):
 
         # Check to see if the hotkey is cached and warn the user if it isn't.
         if hotkey not in cls.__cache__:
-            logging.warn(u"{:s}.unmap({:s}) : Refusing to unmap the hotkey {!s} as it is not currently mapped to anything.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
+            logging.warn(u"{:s}.unmap({:s}) : Refusing to unmap the hotkey {!s} as it is not currently mapped to anything.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
             return
 
         # Grab the keymapping context from our cache, and then ask IDA to remove
@@ -841,7 +841,7 @@ class keyboard(object):
         ctx, _ = cls.__cache__[hotkey]
         ok = idaapi.del_hotkey(ctx)
         if not ok:
-            raise internal.exceptions.DisassemblerError(u"{:s}.unmap({:s}) : Unable to unmap the specified hotkey ({!s}) from the current list of keyboard mappings.".format('.'.join((__name__, cls.__name__)), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
+            raise internal.exceptions.DisassemblerError(u"{:s}.unmap({:s}) : Unable to unmap the specified hotkey ({!s}) from the current list of keyboard mappings.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
 
         # Now we can pop off the callable that was mapped to the hotkey context
         # in order to return it, and remove the hotkey from our cache.
@@ -918,7 +918,7 @@ try:
                 main = window.main()
 
             if main is None:
-                logging.warn(u"{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join((__name__, cls.__name__)), width, height))
+                logging.warn(u"{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join([__name__, cls.__name__]), width, height))
 
             # figure out the dimensions of the window
             if main is None:
@@ -928,7 +928,7 @@ try:
                 w, h = main.width(), main.height()
 
             # now we can calculate the dimensions of the progress bar
-            logging.info(u"{:s}.open({!s}, {!s}) : Using dimensions ({:d}, {:d}) for progress bar.".format('.'.join((__name__, cls.__name__)), width, height, int(w*width), int(h*height)))
+            logging.info(u"{:s}.open({!s}, {!s}) : Using dimensions ({:d}, {:d}) for progress bar.".format('.'.join([__name__, cls.__name__]), width, height, int(w*width), int(h*height)))
             self.object.setFixedWidth(w * width), self.object.setFixedHeight(h * height)
 
             # calculate the center
@@ -941,7 +941,7 @@ try:
 
             # ...and center it.
             x, y = cx - (w * width * 0.5), cy - (h * height * 1.0)
-            logging.info(u"{:s}.open({!s}, {!s}) : Centering progress bar at ({:d}, {:d}).".format('.'.join((__name__, cls.__name__)), width, height, int(x), int(y)))
+            logging.info(u"{:s}.open({!s}, {!s}) : Centering progress bar at ({:d}, {:d}).".format('.'.join([__name__, cls.__name__]), width, height, int(x), int(y)))
             self.object.move(x, y)
 
             # now everything should look good.
@@ -1156,7 +1156,7 @@ class Progress(object):
     def __new__(cls, *args, **kwargs):
         '''Figure out which progress bar to use and instantiate it with the provided parameters `args` and `kwargs`.'''
         if 'UIProgress' not in globals():
-            logging.warn(u"{:s}(...) : Using console-only implementation of the `ui.Progress` class.".format('.'.join((__name__, cls.__name__))))
+            logging.warn(u"{:s}(...) : Using console-only implementation of the `ui.Progress` class.".format('.'.join([__name__, cls.__name__])))
             return ConsoleProgress(*args, **kwargs)
 
         # XXX: spin for a bit looking for the application window as IDA seems to be racy with this for some reason
@@ -1166,7 +1166,7 @@ class Progress(object):
 
         # If no main window was found, then fall back to the console-only progress bar
         if main is None:
-            logging.warn(u"{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the `ui.Progress` class.".format('.'.join((__name__, cls.__name__))))
+            logging.warn(u"{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the `ui.Progress` class.".format('.'.join([__name__, cls.__name__])))
             return ConsoleProgress(*args, **kwargs)
 
         cls.__appwindow__ = main
