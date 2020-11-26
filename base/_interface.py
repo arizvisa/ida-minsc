@@ -186,7 +186,7 @@ class typemap:
             sz = t.size
             return t if sz == size else [t, size // sz]
         if dt not in cls.inverted:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join(('internal', __name__, cls.__name__)), dt, typeid, size))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dt, typeid, size))
 
         t, sz = cls.inverted[dt]
         # if the type and size are the same, then it's a string or pointer type
@@ -268,7 +268,7 @@ class prioritybase(object):
         for target in self.__cache__:
             ok = self.connect(target, self.apply(target))
             if not ok:
-                logging.warn(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join(('internal', __name__, self.__class__.__name__)), self.__format__(target)))
+                logging.warn(u"{:s}.cycle() : Error trying to connect to the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
                 notok = True
             continue
         return not notok
@@ -281,7 +281,7 @@ class prioritybase(object):
         for target in self.__cache__:
             ok = self.disconnect(target)
             if not ok:
-                logging.warn(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join(('internal', __name__, self.__class__.__name__)), self.__format__(target)))
+                logging.warn(u"{:s}.cycle() : Error trying to disconnect from the specified {:s}.".format('.'.join([__name__, self.__class__.__name__]), self.__format__(target)))
                 notok = True
             continue
         return not notok
@@ -295,7 +295,7 @@ class prioritybase(object):
         '''Enable any callables for the specified `target` that has been previously disabled.'''
         if target not in self.__disabled:
             cls = self.__class__
-            logging.fatal(u"{:s}.enable({!r}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
+            logging.fatal(u"{:s}.enable({!r}) : The requested {:s} is not disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
         self.__disabled.discard(target)
         return True
@@ -304,10 +304,10 @@ class prioritybase(object):
         '''Disable execution of all the callables for the specified `target`.'''
         cls = self.__class__
         if target not in self.__cache__:
-            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__)))))
+            logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__)))))
             return False
         if target in self.__disabled:
-            logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
+            logging.warn(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
         self.__disabled.add(target)
         return True
@@ -318,7 +318,7 @@ class prioritybase(object):
         # connect to the requested target if possible
         if target not in self.__cache__ and not self.connect(target, self.apply(target)):
             cls = self.__class__
-            raise NameError(u"{:s}.add({!r}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join(('internal', __name__, cls.__name__)), target, callable, priority, self.__formatter__(target)))
+            raise NameError(u"{:s}.add({!r}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, self.__formatter__(target)))
 
         # discard any callables already attached to the specified target
         self.discard(target, callable)
@@ -376,7 +376,7 @@ class prioritybase(object):
             # executing it with the parameters we received
             hookq = self.__cache__[target][:]
             for priority, callable in heapq.nsmallest(len(hookq), hookq):
-                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority ({:+d})".format('.'.join(('internal', __name__, self.__class__.__name__)), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
+                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority ({:+d})".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
 
                 try:
                     result = callable(*parameters)
@@ -387,7 +387,7 @@ class prioritybase(object):
                     bt = traceback.format_list(self.__traceback[target, callable])
                     current = str().join(traceback.format_exception(*sys.exc_info()))
 
-                    format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)))
+                    format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)))
                     logging.fatal(format(u"Callback for {:s} with priority ({:+d}) raised an exception while executing {!r}".format(self.__formatter__(target), priority, callable)))
                     logging.warn(format("Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
                     [ logging.warn(format(item)) for item in str().join(bt).split('\n') ]
@@ -402,7 +402,7 @@ class prioritybase(object):
                     break
 
                 cls = self.__class__
-                raise TypeError("{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), ', '.join(map("{!r}".format, parameters)), result, callable))
+                raise TypeError("{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!r}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
             return
 
         # That's it!
@@ -479,14 +479,14 @@ class priorityhook(prioritybase):
     def __hook(self):
         if not self.object.hook():
             cls = self.__class__
-            logging.debug(u"{:s}.hook(...) : Unable to hook with object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), self.object))
+            logging.debug(u"{:s}.hook(...) : Unable to hook with object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
             return False
         return True
 
     def __unhook(self):
         if not self.object.unhook():
             cls = self.__class__
-            logging.debug(u"{:s}.unhook(...) : Error trying to unhook object ({!r}).".format('.'.join(('internal', __name__, cls.__name__)), self.object))
+            logging.debug(u"{:s}.unhook(...) : Error trying to unhook object ({!r}).".format('.'.join([__name__, cls.__name__]), self.object))
             return False
         return True
 
@@ -513,7 +513,7 @@ class priorityhook(prioritybase):
         '''Connect the hook `callable` to the specified `name`.'''
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, method))
+            raise NameError("{:s}.connect({!r}) : Unable to connect to the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
 
         # create a closure that calls our callable, and its supermethod
         supermethod = self.__make_dummy_method(name)
@@ -534,7 +534,7 @@ class priorityhook(prioritybase):
             return supermethod(*parameters)
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.disconnect({!r}, {!r}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join(('internal', __name__, cls.__name__)), name, callable, method))
+            raise NameError("{:s}.disconnect({!r}, {!r}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
         method = types.MethodType(closure, self.object, self.__type__)
         setattr(self.object, name, method)
         return True
@@ -543,14 +543,14 @@ class priorityhook(prioritybase):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.discard({!r}, {!r}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, callable, method))
+            raise NameError("{:s}.discard({!r}, {!r}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, method))
         return super(priorityhook, self).discard(name, callable)
 
     def apply(self, name):
         '''Apply the currently registered callables to the event `name`.'''
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join(('internal', __name__, cls.__name__)), name, method))
+            raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
         return super(priorityhook, self).apply(name)
 
 class prioritynotification(prioritybase):
@@ -579,7 +579,7 @@ class prioritynotification(prioritybase):
         '''Return a closure that will execute all of the hooks for the specified `notification`.'''
         if notification not in {idaapi.NW_INITIDA, idaapi.NW_TERMIDA, idaapi.NW_OPENIDB, idaapi.NW_CLOSEIDB}:
             cls = self.__class__
-            raise ValueError("{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join(('internal', __name__, cls.__name__)), notification, notification))
+            raise ValueError("{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, notification))
 
         return super(prioritynotification, self).apply(notification)
 
@@ -822,7 +822,7 @@ class node(object):
         by = onext(iterable)
         if by & 0xf0:
             # FIXME: If this doesn't match, then this is a type that forwards to the real function type.
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join(('internal', node.__name__)), sup.encode('hex'), by, 2 + 2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join([node.__name__]), sup.encode('hex'), by, 2 + 2))
         res.append( (by & idaapi.CM_MASK) )
         res.append( (by & idaapi.CM_M_MASK) )
 
@@ -832,7 +832,7 @@ class node(object):
         if cc == idaapi.CM_CC_SPOILED:
             if count != 15:
                 lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('CM_CC_') }
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join([node.__name__]), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
             funcattr = onext(iterable)
             by = onext(iterable)
             res.append( (by & idaapi.CM_CC_MASK) )
@@ -857,8 +857,8 @@ class node(object):
         elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
             if base == idaapi.BT_COMPLEX:
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2 + 2))
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join(('internal', node.__name__)), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2 + 2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([node.__name__]), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2 + 2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([node.__name__]), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2 + 2))
 
         # append the return type
         res.append(data)
@@ -958,14 +958,14 @@ class node(object):
                 count, mask = 5, 0xc0000000ff
 
             else:
-                raise NotImplementedError(u"{:s}.op_id(\"{:s}\") -> id64 : Error decoding supval from parameter.".format('.'.join(('internal', __name__)), rest))
+                raise NotImplementedError(u"{:s}.op_id(\"{:s}\") -> id64 : Error decoding supval from parameter.".format('.'.join([__name__]), rest))
 
             iterable = iter(rest)
 
             chunks = zip(*((iterable,) * count))
             #length = le(chunks.pop(0))
             if len(chunks) != length:
-                raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join(('internal', __name__)), sup.encode('hex'), len(chunks), length, map(''.join, chunks)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join([__name__]), sup.encode('hex'), len(chunks), length, map(''.join, chunks)))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
@@ -1047,7 +1047,7 @@ class namedtypedtuple(tuple):
         result = self._make(map(fc.pop, self._fields, self))
         if fc:
             cls = self.__class__
-            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join(['internal', __name__, cls.__name__]), internal.utils.string.kwargs(fields), '{' + ', '.join(map(internal.utils.string.repr, fc)) + '}'))
+            logging.warn(u"{:s}._replace({:s}) : Unable to assign unknown field names ({:s}) to tuple.".format('.'.join([__name__, cls.__name__]), internal.utils.string.kwargs(fields), '{' + ', '.join(map(internal.utils.string.repr, fc)) + '}'))
         return result
     def _asdict(self): return collections.OrderedDict(zip(self._fields, self))
     def __getnewargs__(self): return tuple(self)
@@ -1172,7 +1172,7 @@ class regmatch(object):
         if not regs:
             args = ', '.join(map(internal.utils.string.escape, regs))
             mods = internal.utils.string.kwargs(modifiers)
-            raise internal.exceptions.InvalidParameterError(u"{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join(('internal', __name__, cls.__name__)), args, (', '+mods) if mods else ''))
+            raise internal.exceptions.InvalidParameterError(u"{:s}({:s}{:s}) : The specified registers are empty.".format('.'.join([__name__, cls.__name__]), args, (', '+mods) if mods else ''))
         use, iterops = cls.use(regs), cls.modifier(**modifiers)
         def match(ea):
             return any(map(functools.partial(use, ea), iterops(ea)))
@@ -1303,7 +1303,7 @@ class reftype_t(object):
     def of_type(cls, xrtype):
         '''Convert an IDA reference type in `xrtype` to a ``reftype_t``.'''
         if not isinstance(xrtype, six.integer_types):
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing coercion of a non-integral {!s} into the necessary type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), xrtype, xrtype.__class__, 'xrtype'))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing coercion of a non-integral {!s} into the necessary type ({!s}).".format('.'.join([__name__, cls.__name__]), xrtype, xrtype.__class__, 'xrtype'))
         res = cls.__mapper__.get(xrtype, '')
         return cls(xrtype, (item for item in res))
     of = of_type
@@ -1321,7 +1321,7 @@ class reftype_t(object):
             iter(state)
 
         except TypeError:
-            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), state, state, cls.__name__))
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to coerce the provided state ({!r}) into a cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), state, state, cls.__name__))
 
         # Search through our mapper for the correct contents of the reftype_t
         res = { item for item in state }
@@ -1330,7 +1330,7 @@ class reftype_t(object):
                 return cls(F, res)
             continue
         resP = str().join(sorted(res))
-        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a cross-reference type ({!s}).".format('.'.join(('internal', __name__, cls.__name__)), resP, resP, cls.__name__))
+        raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_action({!r}) : Unable to to coerce the requested state ({!r}) into a cross-reference type ({!s}).".format('.'.join([__name__, cls.__name__]), resP, resP, cls.__name__))
 
 class ref_t(namedtypedtuple):
     """
@@ -1738,7 +1738,7 @@ class architecture_t(object):
             return register if register.size == size else self.promote(parent(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({:s}{:s}) : Unable to determine the register to promote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.promote({:s}{:s}) : Unable to determine the register to promote to.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size)))
 
     def demote(self, register, size=None):
         '''Demote the specified `register` to its next smaller `size`.'''
@@ -1750,7 +1750,7 @@ class architecture_t(object):
             return register if register.size == size else self.demote(firstchild(register), size=size)
         except StopIteration: pass
         cls = self.__class__
-        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({:s}{:s}) : Unable to determine the register to demote to.".format('.'.join(('internal', __name__, cls.__name__)), register, '' if size is None else ", size={:d}".format(size)))
+        raise internal.exceptions.RegisterNotFoundError(u"{:s}.demote({:s}{:s}) : Unable to determine the register to demote to.".format('.'.join([__name__, cls.__name__]), register, '' if size is None else ", size={:d}".format(size)))
 
 class bounds_t(namedtypedtuple):
     """
