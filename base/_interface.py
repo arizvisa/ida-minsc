@@ -318,7 +318,7 @@ class prioritybase(object):
         # connect to the requested target if possible
         if target not in self.__cache__ and not self.connect(target, self.apply(target)):
             cls = self.__class__
-            raise NameError(u"{:s}.add({!r}, {!r}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, self.__formatter__(target)))
+            raise NameError(u"{:s}.add({!r}, {!s}, priority={:d}) : Unable to connect to the specified {:s}.".format('.'.join([__name__, cls.__name__]), target, callable, priority, self.__formatter__(target)))
 
         # discard any callables already attached to the specified target
         self.discard(target, callable)
@@ -376,7 +376,7 @@ class prioritybase(object):
             # executing it with the parameters we received
             hookq = self.__cache__[target][:]
             for priority, callable in heapq.nsmallest(len(hookq), hookq):
-                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({:s}) with priority ({:+d})".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
+                logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({!s}) with priority ({:+d})".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
 
                 try:
                     result = callable(*parameters)
@@ -388,7 +388,7 @@ class prioritybase(object):
                     current = str().join(traceback.format_exception(*sys.exc_info()))
 
                     format = functools.partial(u"{:s}.callback({:s}) : {:s}".format, '.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)))
-                    logging.fatal(format(u"Callback for {:s} with priority ({:+d}) raised an exception while executing {!r}".format(self.__formatter__(target), priority, callable)))
+                    logging.fatal(format(u"Callback for {:s} with priority ({:+d}) raised an exception while executing {!s}".format(self.__formatter__(target), priority, callable)))
                     logging.warn(format("Traceback ({:s} was hooked at)".format(self.__formatter__(target))))
                     [ logging.warn(format(item)) for item in str().join(bt).split('\n') ]
                     [ logging.warn(format(item)) for item in current.split('\n') ]
@@ -402,7 +402,7 @@ class prioritybase(object):
                     break
 
                 cls = self.__class__
-                raise TypeError("{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!r}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
+                raise TypeError("{:s}.callback({:s}) : Unable to determine the result ({!r}) returned from callable ({!s}).".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, parameters)), result, callable))
             return
 
         # That's it!
@@ -534,7 +534,7 @@ class priorityhook(prioritybase):
             return supermethod(*parameters)
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.disconnect({!r}, {!r}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            raise NameError("{:s}.disconnect({!r}, {!s}) : Unable to disconnect from the specified hook ({:s}).".format('.'.join([__name__, cls.__name__]), name, callable, method))
         method = types.MethodType(closure, self.object, self.__type__)
         setattr(self.object, name, method)
         return True
@@ -543,7 +543,7 @@ class priorityhook(prioritybase):
         '''Discard the specified `callable` from hooking the event `name`.'''
         if not hasattr(self.object, name):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
-            raise NameError("{:s}.discard({!r}, {!r}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, method))
+            raise NameError("{:s}.discard({!r}, {!s}) : Unable to discard method for hook as the specified hook ({:s}) is unavailable.".format('.'.join([__name__, cls.__name__]), name, callable, method))
         return super(priorityhook, self).discard(name, callable)
 
     def apply(self, name):
@@ -822,7 +822,7 @@ class node(object):
         by = onext(iterable)
         if by & 0xf0:
             # FIXME: If this doesn't match, then this is a type that forwards to the real function type.
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join([node.__name__]), sup.encode('hex'), by, 2 + 2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Forwarded function prototypes are currently unsupported (current byte is {:#0{:d}x}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), by, 2 + 2))
         res.append( (by & idaapi.CM_MASK) )
         res.append( (by & idaapi.CM_M_MASK) )
 
@@ -832,7 +832,7 @@ class node(object):
         if cc == idaapi.CM_CC_SPOILED:
             if count != 15:
                 lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('CM_CC_') }
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join([node.__name__]), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : The calling convention {!s}({:d}) with a count ({:d}) not equal to {:d} is not supported (current byte is {:#0{:d}x}).".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[cc], cc, count, 15, by, 2 + 2))
             funcattr = onext(iterable)
             by = onext(iterable)
             res.append( (by & idaapi.CM_CC_MASK) )
@@ -857,8 +857,8 @@ class node(object):
         elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
             if base == idaapi.BT_COMPLEX:
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([node.__name__]), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2 + 2))
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([node.__name__]), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2 + 2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2 + 2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2 + 2))
 
         # append the return type
         res.append(data)
@@ -910,7 +910,9 @@ class node(object):
 
             count, rest = le([six.next(iterable)]), list(iterable)
             itemsize = len(rest) / count
-            chunks = zip(*([iter(rest)] * itemsize))
+
+            iterable = iter(res)
+            chunks = zip(*(itemsize * [iterable]))
 
             if itemsize == 1:
                 return offset, [0xff000000 | le(item) for item in chunks]
@@ -923,7 +925,7 @@ class node(object):
                 #res = map(functools.partial(operator.xor, 0x3f000000), res)
                 return offset, [0x3f000000 ^ le(item) for item in chunks]
 
-            raise NotImplementedError(offset, itemsize, count, chunks)
+            raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id32 : An unsupported itemsize ({:d}) was discovered while trying to decode {:d} chunks at offset {:#x}. These chunks are {!r}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), itemsize, count, offset, [bytes().join(item) for item in chunks]))
 
         # 64-bit
         # 000002 c000888e00 c000889900 -- KEVENT.Header.anonymous_0.anonymous_0.Type
@@ -958,14 +960,14 @@ class node(object):
                 count, mask = 5, 0xc0000000ff
 
             else:
-                raise NotImplementedError(u"{:s}.op_id(\"{:s}\") -> id64 : Error decoding supval from parameter.".format('.'.join([__name__]), rest))
+                raise NotImplementedError(u"{:s}.sup_opstruct(\"{:s}\") -> id64 : Error decoding supval from parameter.".format('.'.join([__name__, node.__name__]), rest))
 
             iterable = iter(rest)
+            chunks = zip(*(count * [iterable]))
 
-            chunks = zip(*((iterable,) * count))
             #length = le(chunks.pop(0))
             if len(chunks) != length:
-                raise internal.exceptions.SizeMismatchError(u"{:s}.op_id(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join([__name__]), sup.encode('hex'), len(chunks), length, map(''.join, chunks)))
+                raise internal.exceptions.SizeMismatchError(u"{:s}.sup_opstruct(\"{:s}\") -> id64 : Number of chunks ({:d}) does not match the extracted length ({:d}). These chunks are {!r}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), len(chunks), length, [bytes().join(item) for item in chunks]))
             res = map(le, chunks)
             res = map(functools.partial(operator.xor, mask), res)
             return offset, [ror(item, 8, 64) for item in res]
@@ -1029,12 +1031,12 @@ class namedtypedtuple(tuple):
     def __getattribute__(self, name):
         try:
             # honor the ._fields first
-            res = object.__getattribute__(self, '_fields')
-            res = map(operator.methodcaller('lower'), res)
-            res = operator.itemgetter(res.index(name.lower()))
+            fields = object.__getattribute__(self, '_fields')
+            items = [item.lower() for item in fields]
+            F = operator.itemgetter(items.index(name.lower()))
         except (IndexError, ValueError):
-            res = lambda s: object.__getattribute__(s, name)
-        return res(self)
+            F = lambda self: object.__getattribute__(self, name)
+        return F(self)
 
     def __repr__(self):
         cls = self.__class__
