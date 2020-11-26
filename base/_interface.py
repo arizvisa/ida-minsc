@@ -1505,7 +1505,7 @@ def addressOfRuntimeOrStatic(func):
         fn = function.by(func)
 
     # otherwise, maybe it's an rtld symbol
-    except internal.exceptions.FunctionNotFoundError, e:
+    except internal.exceptions.FunctionNotFoundError as e:
         import database
         exc_info = sys.exc_info()
 
