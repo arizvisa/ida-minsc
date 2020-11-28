@@ -73,11 +73,11 @@ class address(commentbase):
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
                 if f and not rt: internal.comment.contents.dec(ea, key)
                 else: internal.comment.globals.dec(ea, key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
                 if f and not rt: internal.comment.contents.inc(ea, key)
                 else: internal.comment.globals.inc(ea, key)
             continue
@@ -89,7 +89,7 @@ class address(commentbase):
 
         logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
             if f and not rt: internal.comment.contents.inc(ea, key)
             else: internal.comment.globals.inc(ea, key)
         return
@@ -100,7 +100,7 @@ class address(commentbase):
 
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' from runtime-linked function' if rt else ''))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
             if f and not rt: internal.comment.contents.dec(ea, key)
             else: internal.comment.globals.dec(ea, key)
         return
@@ -264,10 +264,10 @@ class globals(commentbase):
         logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
                 internal.comment.globals.dec(interface.range.start(fn), key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
                 internal.comment.globals.inc(interface.range.start(fn), key)
             continue
         return
@@ -276,7 +276,7 @@ class globals(commentbase):
     def _create_refs(cls, fn, res):
         logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.inc(interface.range.start(fn), key)
         return
 
@@ -284,7 +284,7 @@ class globals(commentbase):
     def _delete_refs(cls, fn, res):
         logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing refcount for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.dec(interface.range.start(fn), key)
         return
 
@@ -646,7 +646,7 @@ def __rebase_function(old, new, size, iterable):
             state = internal.comment.contents._read(offset + old, offset + old)
 
         except E.FunctionNotFoundError:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Address {:#x} -> {:#x} is not a function.".format(__name__, old, new, size, iterable, res, fn), exc_info=True)
+            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Unable to transform non-function address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
             state = None
 
         if state is None: continue
@@ -654,13 +654,20 @@ def __rebase_function(old, new, size, iterable):
         # erase the old one since we've loaded its state
         internal.comment.contents._write(offset + old, offset + old, None)
 
+        # ensure that the key is available in the state that we fetched
+        if key not in state:
+            state.setdefault(key, {})
+            # FIXME: we should completely rebuild the contents here instead of just
+            #        initializing it with an empty dict and throwing a warning.
+            logging.warn(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Missing address cache while translating address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
+
         # update the addresses
         res, state[key] = state[key], {ea - old + new : ref for ea, ref in state[key].items()}
 
         # and put the new addresses back to the new state
         ok = internal.comment.contents._write(None, fn, state)
         if not ok:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to write refcount for function {:#x} while trying to update old reference count ({!s}) to new one ({!s}).".format(__name__, old, new, size, iterable, fn, utils.string.repr(res), utils.string.repr(state[key])))
+            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to write reference count for function {:#x} while trying to update old reference count ({!s}) to new one ({!s}).".format(__name__, old, new, size, iterable, fn, utils.string.repr(res), utils.string.repr(state[key])))
             failure.append((fn, res, state[key]))
 
         yield i, offset
@@ -675,12 +682,12 @@ def __rebase_globals(old, new, size, iterable):
         # remove the old address
         ok = internal.netnode.alt.remove(node, ea)
         if not ok:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to remove refcount ({!r}) for global {:#x}.".format(__name__, old, new, size, iterable, count, ea))
+            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to remove reference count ({!r}) for global {:#x}.".format(__name__, old, new, size, iterable, count, ea))
 
         # now add the new address
         ok = internal.netnode.alt.set(node, offset + new, count)
         if not ok:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to store refcount ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, new + offset))
+            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Failure trying to store reference count ({!r}) from {:#x} to {:#x}.".format(__name__, old, new, size, iterable, count, ea, new + offset))
             failure.append((ea, new + offset, count))
         yield i, offset
     return
@@ -701,7 +708,7 @@ def segm_moved(source, destination, size):
 def rename(ea, newname):
     """This hook is when a user adds a name or removes it from the database.
 
-    We simply increase the refcount for the "__name__" key, or decrease it
+    We simply increase the reference count for the "__name__" key, or decrease it
     if the name is being removed.
     """
     fl = idaapi.getFlags(ea) if idaapi.__version__ < 7.0 else idaapi.get_full_flags(ea)
@@ -717,13 +724,13 @@ def rename(ea, newname):
         # if it's a custom name
         if (not labelQ and customQ):
             ctx.dec(ea, '__name__')
-            logging.debug(u"{:s}.rename({:#x}, {!s}) : Decreasing refcount for tag {!r} at address due to an empty name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
+            logging.debug(u"{:s}.rename({:#x}, {!s}) : Decreasing reference count for tag {!r} at address due to an empty name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
         return
 
     # if it's currently a label or is unnamed
     if (labelQ and not customQ) or all(not q for q in {labelQ, customQ}):
         ctx.inc(ea, '__name__')
-        logging.debug(u"{:s}.rename({:#x}, {!s}) : Increasing refcount for tag {!r} at address due to a new name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
+        logging.debug(u"{:s}.rename({:#x}, {!s}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
     return
 
 def extra_cmt_changed(ea, line_idx, cmt):
@@ -736,9 +743,9 @@ def extra_cmt_changed(ea, line_idx, cmt):
     #      this event. unfortunately, our tag cache doesn't allow us to identify
     #      the actual number of tags that are at an address, so there's no way
     #      to identify the actual change to the extra comment that the user made,
-    #      which totally fucks up the refcount. in the current implementation, if
-    #      we can't distinguish between the old and new extra comments, then its
-    #      simply a no-op. this is okay for now...
+    #      which totally fucks up the reference count. in the current
+    #      implementation, if we can't distinguish between the old and new extra
+    #      comments, then its simply a no-op. this is okay for now...
 
     oldcmt = internal.netnode.sup.get(ea, line_idx)
     if oldcmt is not None: oldcmt = oldcmt.rstrip('\0')
@@ -752,7 +759,7 @@ def extra_cmt_changed(ea, line_idx, cmt):
         if l <= line_idx < r:
             if oldcmt is None and cmt is not None: ctx.inc(ea, key)
             elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
-            logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}, oldcmt={!s}) : {:s} refcount at address for tag {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), utils.string.repr(oldcmt), 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', utils.string.repr(key)))
+            logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}, oldcmt={!s}) : {:s} reference count at address for tag {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), utils.string.repr(oldcmt), 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', utils.string.repr(key)))
         continue
     return
 
@@ -773,7 +780,7 @@ def func_tail_appended(pfn, tail):
         for k in database.tag(ea):
             internal.comment.globals.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-            logging.debug(u"{:s}.func_tail_appended({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.func_tail_appended({:#x}, {:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
@@ -790,7 +797,7 @@ def removing_func_tail(pfn, tail):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
-            logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.removing_func_tail({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), interface.range.start(tail), utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
@@ -824,7 +831,7 @@ def func_tail_removed(pfn, ea):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
             internal.comment.globals.inc(ea, k)
-            logging.debug(u"{:s}.func_tail_removed({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), ea, utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.func_tail_removed({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), ea, utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
@@ -845,7 +852,7 @@ def tail_owner_changed(tail, owner_func):
         for k in database.tag(ea):
             internal.comment.contents.dec(ea, k)
             internal.comment.contents.inc(ea, k, target=owner_func)
-            logging.debug(u"{:s}.tail_owner_changed({:#x}, {:#x}) : Exchanging (increasing) refcount for contents tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(tail), owner_func, utils.string.repr(k), utils.string.repr(k)))
+            logging.debug(u"{:s}.tail_owner_changed({:#x}, {:#x}) : Exchanging (increasing) reference count for contents tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(tail), owner_func, utils.string.repr(k), utils.string.repr(k)))
         continue
     return
 
@@ -865,7 +872,7 @@ def add_func(pfn):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-                logging.debug(u"{:s}.add_func({:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.add_func({:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
             continue
         continue
     return
@@ -875,9 +882,9 @@ def del_func(pfn):
 
     When a function is removed, all of its tags get moved from the function back
     into the database as global tags. We iterate through the entire function and
-    transform its tags by decreasing its refcount within the function, and then
-    increasing it for the database. Afterwards we simply remove the refcount
-    cache for the function.
+    transform its tags by decreasing its reference count within the function,
+    and then increasing it for the database. Afterwards we simply remove the
+    reference count cache for the function.
     """
     global State
     if State != state.ready: return
@@ -888,7 +895,7 @@ def del_func(pfn):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.del_func({:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.del_func({:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), utils.string.repr(k), utils.string.repr(k)))
             continue
         continue
 
@@ -902,8 +909,8 @@ def set_func_start(pfn, new_start):
     """This is called when the user changes the beginning of the function to another address.
 
     If this happens, we simply walk from the new address to the old address of
-    the function that was changed. Then we can update the refcount for any
-    globals that were tagged by moving them into the function's tagcache.
+    the function that was changed. Then we can update the reference count for
+    any globals that were tagged by moving them into the function's tagcache.
     """
     global State
     if State != state.ready: return
@@ -915,7 +922,7 @@ def set_func_start(pfn, new_start):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
 
@@ -926,7 +933,7 @@ def set_func_start(pfn, new_start):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_start({:#x}, {:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_start, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
     return
@@ -935,8 +942,8 @@ def set_func_end(pfn, new_end):
     """This is called when the user changes the ending of the function to another address.
 
     If this happens, we simply walk from the old end of the function to the new
-    end of the function that was changed. Then we can update the refcount for any
-    globals that were tagged by moving them into the function's tagcache.
+    end of the function that was changed. Then we can update the reference count
+    for any globals that were tagged by moving them into the function's tagcache.
     """
     global State
     if State != state.ready: return
@@ -947,7 +954,7 @@ def set_func_end(pfn, new_end):
             for k in database.tag(ea):
                 internal.comment.globals.dec(ea, k)
                 internal.comment.contents.inc(ea, k, target=interface.range.start(pfn))
-                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (decreasing) refcount for global tag {!s} and (increasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (decreasing) reference count for global tag {!s} and (increasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
 
@@ -958,7 +965,7 @@ def set_func_end(pfn, new_end):
             for k in database.tag(ea):
                 internal.comment.contents.dec(ea, k, target=interface.range.start(pfn))
                 internal.comment.globals.inc(ea, k)
-                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (increasing) refcount for global tag {!s} and (decreasing) refcount for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
+                logging.debug(u"{:s}.set_func_end({:#x}, {:#x}) : Exchanging (increasing) reference count for global tag {!s} and (decreasing) reference count for contents tag {!s}.".format(__name__, interface.range.start(pfn), new_end, utils.string.repr(k), utils.string.repr(k)))
             continue
         return
     return
