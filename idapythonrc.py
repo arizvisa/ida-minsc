@@ -153,6 +153,7 @@ class internal_object(object):
     """
     Loader class which will simply expose an object instance as the module.
     """
+    sys = sys
     def __init__(self, __name__, object):
         '''Initialize the loader with the specified `__name__` and returning the provided `object` as its module.'''
         self.__name__, self.object = __name__, object
@@ -165,7 +166,8 @@ class internal_object(object):
         '''Return the specific object for the module specified by `fullname`.'''
         if fullname != self.__name__:
             raise ImportError("Loader {:s} was not able to find a module named {:s}".format(self.__name__, fullname))
-        return self.object
+        module = self.sys.modules[fullname] = self.object
+        return module
 
 class plugin_module(object):
     """
@@ -195,7 +197,7 @@ class plugin_module(object):
 if sys.platform in {'darwin'}:
     sys.meta_path.append( internal_object('ida', library(idaapi.idadir('libida.dylib'))) )
 
-elif sys.platform in {'linux2'}:
+elif sys.platform in {'linux', 'linux2'}:
     sys.meta_path.append( internal_object('ida', library("libida{:s}.so".format('' if idaapi.BADADDR < 0x100000000 else '64'))) )
 
 elif sys.platform in {'win32'}:
