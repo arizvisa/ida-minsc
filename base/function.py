@@ -238,9 +238,10 @@ def convention(func):
     The integer returned corresponds to one of the ``idaapi.CM_CC_*`` constants.
     """
     rt, ea = interface.addressOfRuntimeOrStatic(func)
-    sup = internal.netnode.sup.get(ea, 0x3000)
-    if sup is None:
+    view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
+    if view is None:
         raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
+    sup = view.tobytes()
     try:
         _, _, cc = interface.node.sup_functype(sup)
     except E.UnsupportedCapability:
