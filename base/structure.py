@@ -1749,7 +1749,8 @@ class member_t(object):
         # now figure out which operand has the structure member applied to it
         res = []
         for ea, _, t in refs:
-            listable = [(idx, internal.netnode.sup.get(ea, 0xf+idx)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf+idx) is not None]
+            iterable = ((idx, internal.netnode.sup.get(ea, 0xf + idx, type=memoryview)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
+            listable = [(idx, view.tobytes()) for idx, view in iterable]
 
             # check if we found any ops that point directly to this member
             if any(listable):
