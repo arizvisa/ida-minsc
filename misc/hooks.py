@@ -747,8 +747,8 @@ def extra_cmt_changed(ea, line_idx, cmt):
     #      implementation, if we can't distinguish between the old and new extra
     #      comments, then its simply a no-op. this is okay for now...
 
-    oldcmt = internal.netnode.sup.get(ea, line_idx)
-    if oldcmt is not None: oldcmt = oldcmt.rstrip('\0')
+    oldcmt = internal.netnode.sup.get(ea, line_idx, type=memoryview)
+    if oldcmt is not None: oldcmt = oldcmt.tobytes().rstrip(b'\0')
     ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
     MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
