@@ -171,21 +171,21 @@ class utils(object):
     @classmethod
     def hfiter(cls, node, first, last, next, val):
         start, end = first(node), last(node)
-        if val(node, start or '') is None: return
-        yield start or '', val(node, start or '')
+        if val(node, start) is None: return
+        yield start, val(node, start)
         while start != end:
-            start = next(node, start or '')
-            yield start or '', val(node, start or '')
+            start = next(node, start)
+            yield start, val(node, start)
         return
 
     @classmethod
     def hriter(cls, node, first, last, prev, val):
         start, end = first(node), last(node)
-        if val(node, start or '') is None: return
-        yield end or '', val(node, end or '')
+        if val(node, start) is None: return
+        yield end, val(node, end)
         while end != start:
-            end = prev(node, end or '')
-            yield end, val(node, end or '')
+            end = prev(node, end)
+            yield end, val(node, end)
         return
 
     @classmethod
@@ -275,9 +275,15 @@ class value(object):
         if not netnode.value_exists(node):
             return None
 
-        if type is None:
+        if type in {None}:
             return netnode.valobj(node)
-        elif issubclass(type, basestring):
+        elif issubclass(type, memoryview):
+            res = netnode.valobj(node)
+            return res and memoryview(res)
+        elif issubclass(type, bytes):
+            res = netnode.valstr(node)
+            return res and bytes(res)
+        elif issubclass(type, six.string_types):
             return netnode.valstr(node)
         elif issubclass(type, six.integer_types):
             return netnode.long_value(node)
@@ -286,7 +292,11 @@ class value(object):
     @classmethod
     def set(cls, nodeidx, value):
         node = netnode.new(nodeidx)
-        if isinstance(value, bytes):
+        if isinstance(value, memoryview):
+            return netnode.set(nodeidx, value.tobytes())
+        elif isinstance(value, bytes):
+            return netnode.set(node, value)
+        elif isinstance(value, six.string_types):
             return netnode.set(node, value)
         elif isinstance(value, six.integer_types):
             return netnode.set_long(node, value)
@@ -301,7 +311,7 @@ class value(object):
     def repr(cls, nodeidx):
         if not cls.exists(nodeidx):
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any value.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
-        res, string, value = cls.get(nodeidx), cls.get(nodeidx, type=str), cls.get(nodeidx, type=int)
+        res, string, value = cls.get(nodeidx), cls.get(nodeidx, type=bytes), cls.get(nodeidx, type=int)
         return "{!r} {!r} {:#x}".format(res, string, value)
 
 ### node blob
@@ -316,7 +326,7 @@ class blob(object):
     @classmethod
     def set(cls, nodeidx, tag, value, start=0):
         node = netnode.new(nodeidx)
-        return netnode.setblob(node, value, start, tag)
+        return netnode.setblob(node, value.tobytes() if isinstance(value, memoryview) else value, start, tag)
 
     @classmethod
     def remove(cls, nodeidx, tag, start=0):
@@ -395,16 +405,21 @@ class sup(object):
     @classmethod
     def get(cls, nodeidx, idx, type=None):
         node = netnode.new(nodeidx)
-        if type is None:
+        if type in {None}:
             return netnode.supval(node, idx)
-        elif issubclass(type, basestring):
+        elif issubclass(type, memoryview):
+            res = netnode.supval(node, idx)
+            return res and memoryview(res)
+        elif issubclass(type, bytes):
+            return netnode.supstr(node, idx)
+        elif issubclass(type, six.string_types):
             return netnode.supstr(node, idx)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, idx, type, type))
 
     @classmethod
     def set(cls, nodeidx, idx, value):
         node = netnode.new(nodeidx)
-        return netnode.supset(node, idx, value)
+        return netnode.supset(node, idx, value.tobytes() if isinstance(value, memoryview) else value)
 
     @classmethod
     def remove(cls, nodeidx, idx):
@@ -441,23 +456,29 @@ class hash(object):
     @classmethod
     def get(cls, nodeidx, key, type=None):
         node = netnode.new(nodeidx)
-        if type is None:
-            return netnode.hashval(node, key or '')
-        elif issubclass(type, basestring):
-            return netnode.hashstr(node, key or '')
-        elif issubclass(type, buffer):
-            return netnode.hashstr_buf(node, key or '')
+        if type in {None}:
+            return netnode.hashval(node, key)
+        elif issubclass(type, memoryview):
+            res = netnode.hashval(node, key)
+            return res and memoryview(res)
+        elif issubclass(type, bytes):
+            res = netnode.hashstr_buf(node, key)
+            return res and bytes(res)
+        elif issubclass(type, six.string_types):
+            return netnode.hashstr(node, key)
         elif issubclass(type, six.integer_types):
-            return netnode.hashval_long(node, key or '')
+            return netnode.hashval_long(node, key)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, type, type))
 
     @classmethod
     def set(cls, nodeidx, key, value):
         node = netnode.new(nodeidx)
         # in my testing the type really doesn't matter
-        if isinstance(value, basestring):
-            return netnode.hashset(node, key, value)
-        elif isinstance(value, buffer):
+        if isinstance(value, memoryview):
+            return netnode.hashset(node, key, value.tobytes())
+        elif isinstance(value, bytes):
+            return netnode.hashset_buf(node, key, value)
+        elif isinstance(value, six.string_types):
             return netnode.hashset_buf(node, key, value)
         elif isinstance(value, six.integer_types):
             return netnode.hashset_idx(node, key, value)
@@ -492,7 +513,7 @@ class hash(object):
             l1, l2 = 0, 2
 
         for i, key in enumerate(cls.fiter(nodeidx)):
-            value = "{:<{:d}s} : str={!r}, buffer={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, str), cls.get(nodeidx, key, buffer), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
+            value = "{:<{:d}s} : default={!r}, memoryview={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, None), cls.get(nodeidx, key, memoryview), cls.get(nodeidx, key, bytes), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
             res.append("[{:d}] {:<{:d}s} -> {:s}".format(i, key, l1, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))

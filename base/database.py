@@ -4206,7 +4206,7 @@ class extra(object):
     @classmethod
     def __has_extra__(cls, ea, base):
         sup = internal.netnode.sup
-        return sup.get(ea, base) is not None
+        return sup.get(ea, base, type=memoryview) is not None
 
     @utils.multicase()
     @classmethod
@@ -4234,7 +4234,7 @@ class extra(object):
     def __count__(cls, ea, base):
         sup = internal.netnode.sup
         for i in six.moves.range(cls.MAX_ITEM_LINES):
-            row = sup.get(ea, base+i)
+            row = sup.get(ea, base + i, type=memoryview)
             if row is None: break
         return i or None
 
@@ -4265,10 +4265,10 @@ class extra(object):
             if count is None: return None
 
             # now we can fetch them
-            res = (sup.get(ea, base+i) for i in six.moves.range(count))
+            res = (sup.get(ea, base + i, type=bytes) for i in six.moves.range(count))
 
             # remove the null-terminator if there is one
-            res = (row[:-1] if row.endswith('\0') else row for row in res)
+            res = (row[:-1] if row.endswith(b'\0') else row for row in res)
 
             # fetch them from IDA and join them with newlines
             return '\n'.join(itertools.imap(utils.string.of, res))
@@ -4283,7 +4283,7 @@ class extra(object):
             res = itertools.imap(utils.string.to, string.split('\n'))
 
             # assign them directly into IDA
-            [ sup.set(ea, base+i, row+'\0') for i, row in enumerate(res) ]
+            [ sup.set(ea, base + i, row + b'\0') for i, row in enumerate(res) ]
 
             # now we can show (refresh) them
             cls.__show__(ea)
@@ -4303,7 +4303,7 @@ class extra(object):
             cls.__hide__(ea)
 
             # now we can remove them
-            [ sup.remove(ea, base+i) for i in six.moves.range(count) ]
+            [ sup.remove(ea, base + i) for i in six.moves.range(count) ]
 
             # and then show (refresh) it
             cls.__show__(ea)
@@ -4317,7 +4317,7 @@ class extra(object):
             if count is None: return None
 
             # grab the extra commenta from the database
-            res = (idaapi.get_extra_cmt(ea, base+i) or '' for i in six.moves.range(count))
+            res = (idaapi.get_extra_cmt(ea, base + i) or b'' for i in six.moves.range(count))
 
             # convert them back into Python and join them with a newline
             res = itertools.imap(utils.string.of, res)
@@ -4330,7 +4330,7 @@ class extra(object):
             res = itertools.imap(utils.string.to, string.split('\n'))
 
             # assign them into IDA using its api
-            [ idaapi.update_extra_cmt(ea, base+i, row) for i, row in enumerate(res) ]
+            [ idaapi.update_extra_cmt(ea, base + i, row) for i, row in enumerate(res) ]
 
             # return how many newlines there were
             return string.count('\n')
@@ -4343,7 +4343,7 @@ class extra(object):
             if res is None: return 0
 
             # now we can delete them using the api
-            [idaapi.del_extra_cmt(ea, base+i) for i in six.moves.range(res)]
+            [idaapi.del_extra_cmt(ea, base + i) for i in six.moves.range(res)]
 
             # return how many comments we deleted
             return res
@@ -4488,14 +4488,14 @@ class extra(object):
 
         res = getter(ea)
         lstripped, nl = ('', 0) if res is None else (res.lstrip('\n'), len(res) - len(res.lstrip('\n')) + 1)
-        return setter(ea, '\n'*(nl+count-1) + lstripped) if nl + count > 0 or lstripped else remover(ea)
+        return setter(ea, '\n'*(nl + count - 1) + lstripped) if nl + count > 0 or lstripped else remover(ea)
     @classmethod
     def __append_space(cls, ea, count, getter_setter_remover):
         getter, setter, remover = getter_setter_remover
 
         res = getter(ea)
         rstripped, nl = ('', 0) if res is None else (res.rstrip('\n'), len(res) - len(res.rstrip('\n')) + 1)
-        return setter(ea, rstripped + '\n'*(nl+count-1)) if nl + count > 0 or rstripped else remover(ea)
+        return setter(ea, rstripped + '\n'*(nl + count - 1)) if nl + count > 0 or rstripped else remover(ea)
 
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
