@@ -911,7 +911,7 @@ class node(object):
             count, rest = le([six.next(iterable)]), list(iterable)
             itemsize = len(rest) / count
 
-            iterable = iter(res)
+            iterable = iter(rest)
             chunks = zip(*(itemsize * [iterable]))
 
             if itemsize == 1:
