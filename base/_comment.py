@@ -699,9 +699,10 @@ class contents(tagging):
         if key is None:
             raise internal.exceptions.FunctionNotFoundError(u"{:s}._read_header({!r}, {:#x}) : Unable to locate a function for target ({!r}) at {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, key, ea))
 
-        encdata = internal.netnode.sup.get(node, key)
-        if encdata is None:
+        view = internal.netnode.sup.get(node, key, type=memoryview)
+        if view is None:
             return None
+        encdata = view.tobytes()
 
         try:
             data, sz = cls.codec.decode(encdata)
@@ -850,7 +851,8 @@ class contents(tagging):
         '''Yield each address and names for all of the contents tags in the database according to what is written into the tagging supval.'''
         node = tagging.node()
         for ea in internal.netnode.sup.fiter(node):
-            encdata = internal.netnode.sup.get(node, ea)
+            view = internal.netnode.sup.get(node, ea, type=memoryview)
+            encdata = view.tobytes()
             data, sz = cls.codec.decode(encdata)
             if len(encdata) != sz:
                 logging.warn(u"{:s}.iterate() : Error while decoding the tag names out of the sup cache for address {:#x} due to the length of encoded data not matching the expected size ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), ea, len(encdata), sz))
