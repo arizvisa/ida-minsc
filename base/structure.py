@@ -471,7 +471,7 @@ class structure_t(object):
         ida_string = utils.string.to(string)
 
         # validate the name
-        res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
+        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_VISIBLE)
         if ida_string and ida_string != res:
             cls = self.__class__
             logging.info(u"{:s}({:#x}).name({!r}) : Stripping invalid chars from structure name \"{:s}\" resulted in \"{:s}\".".format('.'.join((__name__, cls.__name__)), self.id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
@@ -650,7 +650,7 @@ def name(id, string, *suffix):
     ida_string = utils.string.to(string)
 
     # validate the name
-    res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
+    res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_VISIBLE)
     if ida_string and ida_string != res:
         logging.info(u"{:s}.name({!r}, {!r}) : Stripping invalid chars from the structure name \"{:s}\" resulted in \"{:s}\".".format(__name__, id, string, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
         ida_string = res
@@ -1507,7 +1507,7 @@ class member_t(object):
         ida_string = utils.string.to(string)
 
         # validate the name
-        res = idaapi.validate_name2(buffer(ida_string)[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(buffer(ida_string)[:], idaapi.VNT_VISIBLE)
+        res = idaapi.validate_name2(ida_string[:]) if idaapi.__version__ < 7.0 else idaapi.validate_name(ida_string[:], idaapi.VNT_VISIBLE)
         if ida_string and ida_string != res:
             cls = self.__class__
             logging.info(u"{:s}({:#x}).name : Stripping invalid chars from structure member name (\"{:s}\") resulted in \"{:s}\".".format('.'.join((__name__, cls.__name__)), self.id, utils.string.escape(string, '"'), utils.string.escape(utils.string.of(res), '"')))
