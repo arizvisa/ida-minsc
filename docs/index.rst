@@ -25,10 +25,12 @@ and annotation issues can be performed with just a few lines of code. This
 should enable a user to write quick, hacky, temporary code that can be used
 to augment their reversing endeavors without distraction.
 
-This plugin is dependant upon IDAPython with Python 2.x, and supports all of
-the different platforms the IDA supports which includes Windows, Linux, and
-MacOS. At the present time, only IDA 6.8 up till IDA 7.5.200619 are currently
-supported.
+This plugin is dependent upon IDAPython with Python 2.x, and supports all of
+the different platforms that IDA supports which includes Windows, Linux, and
+MacOS. If your instance of IDA was installed with Python 3.x, please refer to
+the installation instructions at section :ref:`1.4<install-downgrade>` for how to switch
+back to Python 2.x. At the present time, only IDA 6.8 up till IDA 7.5.200619 are
+currently supported.
 
 Table of Contents
 =================
