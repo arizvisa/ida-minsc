@@ -1852,7 +1852,12 @@ class imports(object):
             idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, listable.append, utils.fconstant(True)))
             for ea, name, ordinal in listable:
                 ui.navigation.set(ea)
-                yield ea, (utils.string.of(module), utils.string.of(name), ordinal)
+                if module is None and '@@' in name:
+                    nestname, nestmodule = name.rsplit('@@')
+                    yield ea, (utils.string.of(nestmodule), utils.string.of(nestname), ordinal)
+                else:
+                    yield ea, (utils.string.of(module), utils.string.of(name), ordinal)
+                continue
             continue
         return
 
@@ -1980,8 +1985,8 @@ class imports(object):
         # List all the fields of every import that was matched
         for ea, (module, name, ordinal) in listable:
             ui.navigation.set(ea)
-            moduleordinal = "{:s}{:s}".format(module, "<{:d}>".format(ordinal) if has_ordinal else '')
-            six.print_(u"{:<#0{:d}x} : {:s}{:s}".format(ea, 2 + int(caddr), "{:>{:d}s} ".format(moduleordinal, maxmodule + cordinal) if module else '', name))
+            moduleordinal = "{:s}{:s}".format(module or '', "<{:d}>".format(ordinal) if has_ordinal else '')
+            six.print_(u"{:<#0{:d}x} : {:s}{:s}".format(ea, 2 + int(caddr), "{:>{:d}s} ".format(moduleordinal, maxmodule + cordinal) if module else ' ' * (1 + maxmodule + cordinal), name))
         return
 
     @utils.multicase(string=basestring)
