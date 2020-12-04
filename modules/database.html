@@ -76,25 +76,6 @@ that can be used for querying are <a class="reference internal" href="#database.
 functions and aliases. For more information on this, please see
 <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
 <dl class="function">
-<dt id="database.block">
-<code class="descclassname">database.</code><code class="descname">block</code><span class="sig-paren">(</span><em>start</em>, <em>end</em><span class="sig-paren">)</span><a class="headerlink" href="#database.block" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the block of bytes from address <code class="docutils literal notranslate"><span class="pre">start</span></code> to <code class="docutils literal notranslate"><span class="pre">end</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.block" title="database.block"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.read_block</span></code></a>, <a class="reference internal" href="#database.block" title="database.block"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.get_block</span></code></a>, <a class="reference internal" href="#database.block" title="database.block"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.getblock</span></code></a></p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>start</strong> – starting address</li>
-<li><strong>end</strong> – ending address</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="database.bottom">
 <code class="descclassname">database.</code><code class="descname">bottom</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.bottom" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the very highest address within the database.</p>
@@ -624,6 +605,20 @@ If the boolean <code class="docutils literal notranslate"><span class="pre">list
 </dd></dl>
 
 <dl class="function">
+<dt>
+<code class="descclassname">database.</code><code class="descname">read</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the bytes within the specified <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>interface.bounds_t</em>) – the <code class="docutils literal notranslate"><span class="pre">interface.bounds_t</span></code> to return bytes from</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="database.select">
 <code class="descclassname">database.</code><code class="descname">select</code><span class="sig-paren">(</span><em>tag</em>, <em>*And</em>, <em>**boolean</em><span class="sig-paren">)</span><a class="headerlink" href="#database.select" title="Permalink to this definition">¶</a></dt>
 <dd><p>Query all of the global tags in the database for the specified <code class="docutils literal notranslate"><span class="pre">tag</span></code> and any others specified as <code class="docutils literal notranslate"><span class="pre">And</span></code>.</p>
@@ -976,6 +971,26 @@ determining the next valid address. These are:</p>
 <li><strong>end</strong> (<em>int</em><em> or </em><em>long</em>) – the address to stop at</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.address.bounds">
+<code class="descclassname">address.</code><code class="descname">bounds</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.address.bounds" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the bounds of the current address in a tuple formatted as <code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">right)</span></code>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">address.</code><code class="descname">bounds</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the bounds of the specified address <code class="docutils literal notranslate"><span class="pre">ea</span></code> in a tuple formatted as <code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">right)</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address within the database to return an <code class="docutils literal notranslate"><span class="pre">interface.bounds_t</span></code> from</td>
 </tr>
 </tbody>
 </table>
@@ -2884,8 +2899,8 @@ for determining the type of the binary are also included.</p>
 <dl class="function">
 <dt id="database.config.bounds">
 <code class="descclassname">config.</code><code class="descname">bounds</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.bounds" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the bounds of the current database as a tuple formatted as <code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">right)</span></code>.</p>
-<p>Aliases: <a class="reference internal" href="#database.config.bounds" title="database.config.bounds"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.range</span></code></a>, <a class="reference internal" href="#database.config.bounds" title="database.config.bounds"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.bounds</span></code></a></p>
+<dd><p>Return the bounds of the current database in a tuple formatted as <code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">right)</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#database.config.bounds" title="database.config.bounds"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.range</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -3845,7 +3860,7 @@ If a pythonic type is passed to <code class="docutils literal notranslate"><span
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> – an address in the database</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the integer</li>
 </ul>
 </td>
@@ -3959,7 +3974,7 @@ If a tuple <code class="docutils literal notranslate"><span class="pre">strtype<
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> – an address in the database</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>**byteorder</strong> – if <code class="docutils literal notranslate"><span class="pre">byteorder</span></code> is provided, use it to determine the byteorder of the integer</li>
 </ul>
 </td>
@@ -6866,15 +6881,15 @@ specified address.</p>
 <dl class="function">
 <dt id="database.type.is_unknown">
 <code class="descclassname">type.</code><code class="descname">is_unknown</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.type.is_unknown" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return true if the current address is undefined.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.is_unknown</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.unknownQ</span></code></a></p>
+<dd><p>Return true if the current address is marked as unknown.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.undefinedQ</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.is_unknown</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_undefined</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.unknownQ</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
 <dt>
 <code class="descclassname">type.</code><code class="descname">is_unknown</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return true if the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> is undefined.</p>
-<p>Aliases: <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.is_unknown</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.unknownQ</span></code></a></p>
+<dd><p>Return true if the address specified by <code class="docutils literal notranslate"><span class="pre">ea</span></code> is marked as unknown.</p>
+<p>Aliases: <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.undefinedQ</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.is_unknown</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.is_undefined</span></code></a>, <a class="reference internal" href="#database.type.is_unknown" title="database.type.is_unknown"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.type.unknownQ</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -7198,7 +7213,7 @@ also aliased as globals. Some of these are:</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>ea</strong> – an address in the database</li>
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – an address in the database</li>
 <li><strong>target</strong> (<em>int</em><em> or </em><em>long</em>) – the target address to add a code reference to</li>
 <li><strong>**reftype</strong> – if <code class="docutils literal notranslate"><span class="pre">call</span></code> is set to true, this specify that this reference is a function call</li>
 </ul>

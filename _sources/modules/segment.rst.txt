@@ -166,6 +166,7 @@ functions and aliases. For more information on this, please see
    Returns true if the address ``ea`` is contained within the segment belonging to the specified ``address``.
    
    :param address: an address belonging to a segment
+   :type address: int or long
    :param ea: an address in the database
    :type ea: int or long
    

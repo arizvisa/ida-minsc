@@ -125,14 +125,28 @@ within this namespace, then its value will be used by default
 in the inbox that is displayed to the user.</p>
 <dl class="function">
 <dt id="ui.ask">
-<code class="descclassname">ui.</code><code class="descname">ask</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user a question providing the option to choose “yes”, “no”, or “cancel”.</p>
+<code class="descclassname">ui.</code><code class="descname">ask</code><span class="sig-paren">(</span><em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask" title="Permalink to this definition">¶</a></dt>
+<dd><p>Request the user choose from the options “yes”, “no”, or “cancel”.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**default</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ui.</code><code class="descname">ask</code><span class="sig-paren">(</span><em>message</em>, <em>**default</em><span class="sig-paren">)</span></dt>
+<dd><p>Request the user choose from the options “yes”, “no”, or “cancel” using the specified <code class="docutils literal notranslate"><span class="pre">message</span></code> as the prompt.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>message</strong> – the message to display when asking the user for input</li>
 <li><strong>**default</strong> – if <code class="docutils literal notranslate"><span class="pre">yes</span></code>, <code class="docutils literal notranslate"><span class="pre">no</span></code>, or <code class="docutils literal notranslate"><span class="pre">cancel</span></code> is set to true, then use that value as the default</li>
 </ul>
 </td>
@@ -143,8 +157,22 @@ in the inbox that is displayed to the user.</p>
 
 <dl class="function">
 <dt id="ui.ask.address">
-<code class="descclassname">ask.</code><code class="descname">address</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.address" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user for an address using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<code class="descclassname">ask.</code><code class="descname">address</code><span class="sig-paren">(</span><em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.address" title="Permalink to this definition">¶</a></dt>
+<dd><p>Request the user provide an address.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**default</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ask.</code><code class="descname">address</code><span class="sig-paren">(</span><em>message</em>, <em>**default</em><span class="sig-paren">)</span></dt>
+<dd><p>Request the user provide an address using the specified <code class="docutils literal notranslate"><span class="pre">message</span></code> as the prompt.</p>
 <p>If the <code class="docutils literal notranslate"><span class="pre">valid</span></code> parameter is specified, then verify that the
 address is within the bounds of the database. If the <code class="docutils literal notranslate"><span class="pre">bounds</span></code>
 parameter is specified, then verify that the address chosen
@@ -154,7 +182,7 @@ by the user is within the provided bounds.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>message</strong> – the message to display when asking the user for input</li>
 <li><strong>**default</strong> – the default address for the user to change. if one was not specified, then use the current address.</li>
 </ul>
 </td>
@@ -165,14 +193,28 @@ by the user is within the provided bounds.</p>
 
 <dl class="function">
 <dt id="ui.ask.integer">
-<code class="descclassname">ask.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.integer" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user for an integer using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<code class="descclassname">ask.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.integer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Request the user provide an integer.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**default</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ask.</code><code class="descname">integer</code><span class="sig-paren">(</span><em>message</em>, <em>**default</em><span class="sig-paren">)</span></dt>
+<dd><p>Request the user provide an integer using the specified <code class="docutils literal notranslate"><span class="pre">message</span></code> as the prompt.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>message</strong> – the message to display when asking the user for input</li>
 <li><strong>**default</strong> – the default integer for the user to change. if one was not specified, then use the previous integer that the user input.</li>
 </ul>
 </td>
@@ -183,16 +225,30 @@ by the user is within the provided bounds.</p>
 
 <dl class="function">
 <dt id="ui.ask.note">
-<code class="descclassname">ask.</code><code class="descname">note</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.note" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user for a multi-lined string using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
-<p>If the <code class="docutils literal notranslate"><span class="pre">length</span></code> parameter is provided as an integer, then restrict
+<code class="descclassname">ask.</code><code class="descname">note</code><span class="sig-paren">(</span><em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.note" title="Permalink to this definition">¶</a></dt>
+<dd><p>Request the user provide a multi-lined string.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**default</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ask.</code><code class="descname">note</code><span class="sig-paren">(</span><em>message</em>, <em>**default</em><span class="sig-paren">)</span></dt>
+<dd><p>Request the user provide a multi-lined string using the specified <code class="docutils literal notranslate"><span class="pre">message</span></code> as the prompt.</p>
+<p>If the <code class="docutils literal notranslate"><span class="pre">length</span></code> parameter is provided as an integer, then constrain
 the length of the user’s input to the integer that was specified.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>message</strong> – the message to display when asking the user for input</li>
 <li><strong>**default</strong> – the default string for the user to change</li>
 </ul>
 </td>
@@ -203,14 +259,28 @@ the length of the user’s input to the integer that was specified.</p>
 
 <dl class="function">
 <dt id="ui.ask.segment">
-<code class="descclassname">ask.</code><code class="descname">segment</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.segment" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user for a segment using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<code class="descclassname">ask.</code><code class="descname">segment</code><span class="sig-paren">(</span><em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.segment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Request the user provide a segment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**default</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ask.</code><code class="descname">segment</code><span class="sig-paren">(</span><em>message</em>, <em>**default</em><span class="sig-paren">)</span></dt>
+<dd><p>Request the user provide a segment using the specified <code class="docutils literal notranslate"><span class="pre">message</span></code> as the prompt.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>message</strong> – the message to display when asking the user for input</li>
 <li><strong>**default</strong> – the default segment for the user to change. if one was not specified, then use the address of the current segment.</li>
 </ul>
 </td>
@@ -221,14 +291,28 @@ the length of the user’s input to the integer that was specified.</p>
 
 <dl class="function">
 <dt id="ui.ask.string">
-<code class="descclassname">ask.</code><code class="descname">string</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.string" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user for a string using the provided parameter <code class="docutils literal notranslate"><span class="pre">string</span></code> as its prompt.</p>
+<code class="descclassname">ask.</code><code class="descname">string</code><span class="sig-paren">(</span><em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.string" title="Permalink to this definition">¶</a></dt>
+<dd><p>Request the user provide a string.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**default</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ask.</code><code class="descname">string</code><span class="sig-paren">(</span><em>message</em>, <em>**default</em><span class="sig-paren">)</span></dt>
+<dd><p>Request the user provide a string using the specified <code class="docutils literal notranslate"><span class="pre">message</span></code> as the prompt.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>message</strong> – the message to display when asking the user for input</li>
 <li><strong>**default</strong> – the default string for the user to change</li>
 </ul>
 </td>
@@ -239,8 +323,22 @@ the length of the user’s input to the integer that was specified.</p>
 
 <dl class="function">
 <dt id="ui.ask.yn">
-<code class="descclassname">ask.</code><code class="descname">yn</code><span class="sig-paren">(</span><em>string</em>, <em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.yn" title="Permalink to this definition">¶</a></dt>
-<dd><p>Ask the user a question providing the option to choose “yes”, “no”, or “cancel”.</p>
+<code class="descclassname">ask.</code><code class="descname">yn</code><span class="sig-paren">(</span><em>**default</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.ask.yn" title="Permalink to this definition">¶</a></dt>
+<dd><p>Request the user choose from the options “yes”, “no”, or “cancel”.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**default</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">ask.</code><code class="descname">yn</code><span class="sig-paren">(</span><em>message</em>, <em>**default</em><span class="sig-paren">)</span></dt>
+<dd><p>Request the user choose from the options “yes”, “no”, or “cancel” using the specified <code class="docutils literal notranslate"><span class="pre">message</span></code> as the prompt.</p>
 <p>If any of the options are specified as a boolean, then it is
 assumed that this option will be the default. If the user
 chooses “cancel”, then this value will be returned instead of
@@ -250,7 +348,7 @@ the value <code class="xref py py-obj docutils literal notranslate"><span class=
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>string</strong> – the message to display when asking the user for input</li>
+<li><strong>message</strong> – the message to display when asking the user for input</li>
 <li><strong>**default</strong> – if <code class="docutils literal notranslate"><span class="pre">yes</span></code>, <code class="docutils literal notranslate"><span class="pre">no</span></code>, or <code class="docutils literal notranslate"><span class="pre">cancel</span></code> is set to true, then use that value as the default</li>
 </ul>
 </td>

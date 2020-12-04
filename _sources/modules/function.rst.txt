@@ -63,7 +63,7 @@ functions and aliases. For more information on this, please see
    
    Aliases: :py:func:`function.range<bounds>`
    
-   :param func: the function to return the bounds for
+   :param func: the function to return the boundaries for
    
 .. py:function:: by()
    
@@ -626,7 +626,7 @@ Some examples of this functionality can be::
    
    Return the :py:obj:`idaapi.BasicBlock` identified by ``bounds``.
    
-   :param bounds: the bounds of the basic block to return
+   :param bounds: the boundaries of the basic block to return
    :type bounds: tuple
    
 .. py:function:: block\.before()
@@ -817,7 +817,7 @@ Some examples of this functionality can be::
    
    Return whether the address ``ea`` is within the basic block identified by ``bounds``.
    
-   :param bounds: the bounds of the basic block to use when checking
+   :param bounds: the boundaries of the basic block to use when checking
    :type bounds: tuple
    :param ea: the address to check within the basic block
    :type ea: int or long
@@ -901,7 +901,7 @@ Some examples of this functionality can be::
    
    Return the block id of the basic block identified by ``bounds``.
    
-   :param bounds: the bounds of the basic block to return the id for
+   :param bounds: the boundaries of the basic block to return the id for
    :type bounds: tuple
    
 .. py:function:: block\.iterate()
@@ -1058,6 +1058,13 @@ Some examples of this namespace's usage::
    
    :param func: the function to return the basic blocks for
    
+.. py:function:: blocks(bounds)
+   
+   Return each basic block contained within the specified ``bounds``.
+   
+   :param bounds: the boundaries to use when constraining the returned list of basic blocks
+   :type bounds: interface.bounds_t
+   
 .. py:function:: blocks(left, right)
    
    Returns each basic block contained within the addresses ``left`` and ``right``.
@@ -1092,7 +1099,7 @@ Some examples of this namespace's usage::
    
 .. py:function:: blocks\.digraph(func)
    
-   Return a :py:obj:`networkx.DiGraph` of the function at the address ``ea``.
+   Return a :py:obj:`networkx.DiGraph` of the function ``func``.
    
    Requires the :py:obj:`networkx` module in order to build the graph.
    
@@ -1123,6 +1130,27 @@ Some examples of this namespace's usage::
    Returns each :py:obj:`idaapi.BasicBlock` for the function ``func``.
    
    :param func: the function containing the basic blocks to yield
+   
+.. py:function:: blocks\.subgraph(start, exits)
+   
+   Return a :py:obj:`networkx.DiGraph` subgraph of the current function from address ``start`` and terminating at any address in ``exits``.
+   
+   :param start: the address of the basic block to start from
+   :type start: int or long
+   :param exits: the addresses of basic blocks to stop at
+   :type exits: intlong or list or tuple or set
+   
+.. py:function:: blocks\.subgraph(func, start, exits)
+   
+   Return a :py:obj:`networkx.DiGraph` subgraph of the function ``func`` from address ``start`` and terminating at any address in ``exits``.
+   
+   Requires the :py:obj:`networkx` module in order to build the graph.
+   
+   :param func: the function to return the graph from
+   :param start: the address of the basic block to start from
+   :type start: int or long
+   :param exits: the addresses of basic blocks to stop at
+   :type exits: intlong or list or tuple or set
    
 .. _ns-function-chunk:
 
@@ -1593,7 +1621,7 @@ Some simple ways of getting information about a function::
    Return the typeinfo for the function ``func`` as a :py:obj:`idaapi.tinfo_t`.
    
    :param func: the function to get the typeinfo for
-   :type func: int or long or idaapi.func_t
+   :type func: intlong or idaapi.func_t
    
 .. py:function:: type(func, info)
    

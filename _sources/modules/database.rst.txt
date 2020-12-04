@@ -27,15 +27,6 @@ The functions that are available in this module use multicased
 functions and aliases. For more information on this, please see
 :ref:`multicase-aliases` and :ref:`multicase-functions`.
 
-.. py:function:: block(start, end)
-   
-   Return the block of bytes from address ``start`` to ``end``.
-   
-   Aliases: :py:func:`database.read_block<block>`, :py:func:`database.get_block<block>`, :py:func:`database.getblock<block>`
-   
-   :param start: starting address
-   :param end: ending address
-   
 .. py:function:: bottom()
    
    Return the very highest address within the database.
@@ -312,6 +303,13 @@ functions and aliases. For more information on this, please see
    :param size: the number of bytes to read
    :type size: int or long
    
+.. py:function:: read(bounds)
+   
+   Return the bytes within the specified ``bounds``.
+   
+   :param bounds: the ``interface.bounds_t`` to return bytes from
+   :type bounds: interface.bounds_t
+   
 .. py:function:: select(tag, \*And, \*\*boolean)
    
    Query all of the global tags in the database for the specified ``tag`` and any others specified as ``And``.
@@ -529,6 +527,17 @@ Some examples of using this namespace can be::
    :type start: int or long
    :param end: the address to stop at
    :type end: int or long
+   
+.. py:function:: address\.bounds()
+   
+   Return the bounds of the current address in a tuple formatted as ``(left, right)``.
+   
+.. py:function:: address\.bounds(ea)
+   
+   Return the bounds of the specified address ``ea`` in a tuple formatted as ``(left, right)``.
+   
+   :param ea: the address within the database to return an ``interface.bounds_t`` from
+   :type ea: int or long
    
 .. py:function:: address\.by_offset(offset)
    
@@ -1617,9 +1626,9 @@ for determining the type of the binary are also included.
    
 .. py:function:: config\.bounds()
    
-   Return the bounds of the current database as a tuple formatted as ``(left, right)``.
+   Return the bounds of the current database in a tuple formatted as ``(left, right)``.
    
-   Aliases: :py:func:`database.range<config\.bounds>`, :py:func:`database.bounds<config\.bounds>`
+   Aliases: :py:func:`database.range<config\.bounds>`
    
 .. py:function:: config\.byteorder()
    
@@ -2211,6 +2220,7 @@ following examples can be used::
    Read a signed integer from the address ``ea`` using the size defined in the database.
    
    :param ea: an address in the database
+   :type ea: int or long
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.signed(ea, size, \*\*byteorder)
@@ -2271,6 +2281,7 @@ following examples can be used::
    Read an unsigned integer from the address ``ea`` using the size defined in the database.
    
    :param ea: an address in the database
+   :type ea: int or long
    :param \*\*byteorder: if ``byteorder`` is provided, use it to determine the byteorder of the integer
    
 .. py:function:: get\.unsigned(ea, size, \*\*byteorder)
@@ -4032,15 +4043,15 @@ Some examples of using this namespace can be::
    
 .. py:function:: type\.is_unknown()
    
-   Return true if the current address is undefined.
+   Return true if the current address is marked as unknown.
    
-   Aliases: :py:func:`database.is_unknown<type\.is_unknown>`, :py:func:`database.type.unknownQ<type\.is_unknown>`
+   Aliases: :py:func:`database.type.undefinedQ<type\.is_unknown>`, :py:func:`database.is_unknown<type\.is_unknown>`, :py:func:`database.type.is_undefined<type\.is_unknown>`, :py:func:`database.type.unknownQ<type\.is_unknown>`
    
 .. py:function:: type\.is_unknown(ea)
    
-   Return true if the address specified by ``ea`` is undefined.
+   Return true if the address specified by ``ea`` is marked as unknown.
    
-   Aliases: :py:func:`database.is_unknown<type\.is_unknown>`, :py:func:`database.type.unknownQ<type\.is_unknown>`
+   Aliases: :py:func:`database.type.undefinedQ<type\.is_unknown>`, :py:func:`database.is_unknown<type\.is_unknown>`, :py:func:`database.type.is_undefined<type\.is_unknown>`, :py:func:`database.type.unknownQ<type\.is_unknown>`
    
    :param ea: an address in the database
    :type ea: int or long
@@ -4269,6 +4280,7 @@ Some ways to utilize this namespace can be::
    Aliases: :py:func:`database.xref.ac<xref\.add_code>`
    
    :param ea: an address in the database
+   :type ea: int or long
    :param target: the target address to add a code reference to
    :type target: int or long
    :param \*\*reftype: if ``call`` is set to true, this specify that this reference is a function call

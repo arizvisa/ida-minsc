@@ -325,7 +325,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="instruction.op_enumeration">
 <code class="descclassname">instruction.</code><code class="descname">op_enumeration</code><span class="sig-paren">(</span><em>opnum</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.op_enumeration" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the enumeration id of operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> for the current instruction.</p>
+<dd><p>Return the enumeration member id for the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the current instruction.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_enumeration" title="instruction.op_enumeration"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_enum</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -340,7 +340,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt>
 <code class="descclassname">instruction.</code><code class="descname">op_enumeration</code><span class="sig-paren">(</span><em>ea</em>, <em>opnum</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the enumeration id of operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> for the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return the enumeration member id for the operand <code class="docutils literal notranslate"><span class="pre">opnum</span></code> belonging to the instruction at <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.op_enumeration" title="instruction.op_enumeration"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.op_enum</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -407,7 +407,7 @@ functions and aliases. For more information on this, please see
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
 <li><strong>opnum</strong> (<em>int</em><em> or </em><em>long</em>) – the operand number of the instruction</li>
-<li><strong>id</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>tuple</em>) – the identifer of an enumeration to apply</li>
+<li><strong>id</strong> (<em>intlong</em><em> or </em><em>tuple</em><em> or </em><a class="reference internal" href="#instruction.armops.list" title="instruction.armops.list"><em>list</em></a>) – the identifer of an enumeration to apply</li>
 </ul>
 </td>
 </tr>

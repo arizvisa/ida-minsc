@@ -75,66 +75,108 @@ If the ``default`` parameter is specified to any of the functions
 within this namespace, then its value will be used by default
 in the inbox that is displayed to the user.
 
-.. py:function:: ask(string, \*\*default)
+.. py:function:: ask(\*\*default)
    
-   Ask the user a question providing the option to choose "yes", "no", or "cancel".
+   Request the user choose from the options "yes", "no", or "cancel".
    
-   :param string: the message to display when asking the user for input
+   :param \*\*default:
+   
+.. py:function:: ask(message, \*\*default)
+   
+   Request the user choose from the options "yes", "no", or "cancel" using the specified ``message`` as the prompt.
+   
+   :param message: the message to display when asking the user for input
    :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
    
-.. py:function:: ask\.address(string, \*\*default)
+.. py:function:: ask\.address(\*\*default)
    
-   Ask the user for an address using the provided parameter ``string`` as its prompt.
+   Request the user provide an address.
+   
+   :param \*\*default:
+   
+.. py:function:: ask\.address(message, \*\*default)
+   
+   Request the user provide an address using the specified ``message`` as the prompt.
    
    If the ``valid`` parameter is specified, then verify that the
    address is within the bounds of the database. If the ``bounds``
    parameter is specified, then verify that the address chosen
    by the user is within the provided bounds.
    
-   :param string: the message to display when asking the user for input
+   :param message: the message to display when asking the user for input
    :param \*\*default: the default address for the user to change. if one was not specified, then use the current address.
    
-.. py:function:: ask\.integer(string, \*\*default)
+.. py:function:: ask\.integer(\*\*default)
    
-   Ask the user for an integer using the provided parameter ``string`` as its prompt.
+   Request the user provide an integer.
    
-   :param string: the message to display when asking the user for input
+   :param \*\*default:
+   
+.. py:function:: ask\.integer(message, \*\*default)
+   
+   Request the user provide an integer using the specified ``message`` as the prompt.
+   
+   :param message: the message to display when asking the user for input
    :param \*\*default: the default integer for the user to change. if one was not specified, then use the previous integer that the user input.
    
-.. py:function:: ask\.note(string, \*\*default)
+.. py:function:: ask\.note(\*\*default)
    
-   Ask the user for a multi-lined string using the provided parameter ``string`` as its prompt.
+   Request the user provide a multi-lined string.
    
-   If the ``length`` parameter is provided as an integer, then restrict
+   :param \*\*default:
+   
+.. py:function:: ask\.note(message, \*\*default)
+   
+   Request the user provide a multi-lined string using the specified ``message`` as the prompt.
+   
+   If the ``length`` parameter is provided as an integer, then constrain
    the length of the user's input to the integer that was specified.
    
-   :param string: the message to display when asking the user for input
+   :param message: the message to display when asking the user for input
    :param \*\*default: the default string for the user to change
    
-.. py:function:: ask\.segment(string, \*\*default)
+.. py:function:: ask\.segment(\*\*default)
    
-   Ask the user for a segment using the provided parameter ``string`` as its prompt.
+   Request the user provide a segment.
    
-   :param string: the message to display when asking the user for input
+   :param \*\*default:
+   
+.. py:function:: ask\.segment(message, \*\*default)
+   
+   Request the user provide a segment using the specified ``message`` as the prompt.
+   
+   :param message: the message to display when asking the user for input
    :param \*\*default: the default segment for the user to change. if one was not specified, then use the address of the current segment.
    
-.. py:function:: ask\.string(string, \*\*default)
+.. py:function:: ask\.string(\*\*default)
    
-   Ask the user for a string using the provided parameter ``string`` as its prompt.
+   Request the user provide a string.
    
-   :param string: the message to display when asking the user for input
+   :param \*\*default:
+   
+.. py:function:: ask\.string(message, \*\*default)
+   
+   Request the user provide a string using the specified ``message`` as the prompt.
+   
+   :param message: the message to display when asking the user for input
    :param \*\*default: the default string for the user to change
    
-.. py:function:: ask\.yn(string, \*\*default)
+.. py:function:: ask\.yn(\*\*default)
    
-   Ask the user a question providing the option to choose "yes", "no", or "cancel".
+   Request the user choose from the options "yes", "no", or "cancel".
+   
+   :param \*\*default:
+   
+.. py:function:: ask\.yn(message, \*\*default)
+   
+   Request the user choose from the options "yes", "no", or "cancel" using the specified ``message`` as the prompt.
    
    If any of the options are specified as a boolean, then it is
    assumed that this option will be the default. If the user
    chooses "cancel", then this value will be returned instead of
    the value :py:obj:`None`.
    
-   :param string: the message to display when asking the user for input
+   :param message: the message to display when asking the user for input
    :param \*\*default: if ``yes``, ``no``, or ``cancel`` is set to true, then use that value as the default
    
 .. _ns-ui-clipboard:

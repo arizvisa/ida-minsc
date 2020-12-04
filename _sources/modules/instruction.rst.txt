@@ -181,7 +181,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_enumeration(opnum)
    
-   Return the enumeration id of operand ``opnum`` for the current instruction.
+   Return the enumeration member id for the operand ``opnum`` belonging to the current instruction.
    
    Aliases: :py:func:`instruction.op_enum<op_enumeration>`
    
@@ -190,7 +190,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: op_enumeration(ea, opnum)
    
-   Return the enumeration id of operand ``opnum`` for the instruction at ``ea``.
+   Return the enumeration member id for the operand ``opnum`` belonging to the instruction at ``ea``.
    
    Aliases: :py:func:`instruction.op_enum<op_enumeration>`
    
@@ -234,7 +234,7 @@ functions and aliases. For more information on this, please see
    :param opnum: the operand number of the instruction
    :type opnum: int or long
    :param id: the identifer of an enumeration to apply
-   :type id: int or long or tuple
+   :type id: intlong or tuple or list
    
 .. py:function:: op_float(opnum)
    

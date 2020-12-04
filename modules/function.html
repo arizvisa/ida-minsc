@@ -133,7 +133,7 @@ functions and aliases. For more information on this, please see
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the bounds for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function to return the boundaries for</td>
 </tr>
 </tbody>
 </table>
@@ -1192,7 +1192,7 @@ namespace.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the bounds of the basic block to return</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to return</td>
 </tr>
 </tbody>
 </table>
@@ -1550,7 +1550,7 @@ namespace.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>bounds</strong> (<em>tuple</em>) – the bounds of the basic block to use when checking</li>
+<li><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to use when checking</li>
 <li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address to check within the basic block</li>
 </ul>
 </td>
@@ -1711,7 +1711,7 @@ namespace.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the bounds of the basic block to return the id for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>tuple</em>) – the boundaries of the basic block to return the id for</td>
 </tr>
 </tbody>
 </table>
@@ -1982,6 +1982,20 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 
 <dl class="function">
 <dt>
+<code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>bounds</em><span class="sig-paren">)</span></dt>
+<dd><p>Return each basic block contained within the specified <code class="docutils literal notranslate"><span class="pre">bounds</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>bounds</strong> (<em>interface.bounds_t</em>) – the boundaries to use when constraining the returned list of basic blocks</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">function.</code><code class="descname">blocks</code><span class="sig-paren">(</span><em>left</em>, <em>right</em><span class="sig-paren">)</span></dt>
 <dd><p>Returns each basic block contained within the addresses <code class="docutils literal notranslate"><span class="pre">left</span></code> and <code class="docutils literal notranslate"><span class="pre">right</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -2046,7 +2060,7 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <dl class="function">
 <dt>
 <code class="descclassname">blocks.</code><code class="descname">digraph</code><span class="sig-paren">(</span><em>func</em><span class="sig-paren">)</span></dt>
-<dd><p>Return a <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx.DiGraph</span></code> of the function at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<dd><p>Return a <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx.DiGraph</span></code> of the function <code class="docutils literal notranslate"><span class="pre">func</span></code>.</p>
 <p>Requires the <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx</span></code> module in order to build the graph.</p>
 <p>Aliases: <a class="reference internal" href="#function.blocks.digraph" title="function.blocks.digraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.blocks.graph</span></code></a>, <a class="reference internal" href="#function.blocks.digraph" title="function.blocks.digraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.graph</span></code></a>, <a class="reference internal" href="#function.blocks.digraph" title="function.blocks.digraph"><code class="xref py py-func docutils literal notranslate"><span class="pre">function.digraph</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -2096,6 +2110,44 @@ and <code class="xref py py-obj docutils literal notranslate"><span class="pre">
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> – the function containing the basic blocks to yield</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="function.blocks.subgraph">
+<code class="descclassname">blocks.</code><code class="descname">subgraph</code><span class="sig-paren">(</span><em>start</em>, <em>exits</em><span class="sig-paren">)</span><a class="headerlink" href="#function.blocks.subgraph" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx.DiGraph</span></code> subgraph of the current function from address <code class="docutils literal notranslate"><span class="pre">start</span></code> and terminating at any address in <code class="docutils literal notranslate"><span class="pre">exits</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to start from</li>
+<li><strong>exits</strong> (<em>intlong</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em><em> or </em><em>set</em>) – the addresses of basic blocks to stop at</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">blocks.</code><code class="descname">subgraph</code><span class="sig-paren">(</span><em>func</em>, <em>start</em>, <em>exits</em><span class="sig-paren">)</span></dt>
+<dd><p>Return a <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx.DiGraph</span></code> subgraph of the function <code class="docutils literal notranslate"><span class="pre">func</span></code> from address <code class="docutils literal notranslate"><span class="pre">start</span></code> and terminating at any address in <code class="docutils literal notranslate"><span class="pre">exits</span></code>.</p>
+<p>Requires the <code class="xref py py-obj docutils literal notranslate"><span class="pre">networkx</span></code> module in order to build the graph.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>func</strong> – the function to return the graph from</li>
+<li><strong>start</strong> (<em>int</em><em> or </em><em>long</em>) – the address of the basic block to start from</li>
+<li><strong>exits</strong> (<em>intlong</em><em> or </em><a class="reference internal" href="instruction.html#instruction.armops.list" title="instruction.armops.list"><em>list</em></a><em> or </em><em>tuple</em><em> or </em><em>set</em>) – the addresses of basic blocks to stop at</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -2810,7 +2862,7 @@ one to filter functions according to their particular attributes.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>idaapi.func_t</em>) – the function to get the typeinfo for</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>func</strong> (<em>intlong</em><em> or </em><em>idaapi.func_t</em>) – the function to get the typeinfo for</td>
 </tr>
 </tbody>
 </table>
