@@ -779,10 +779,10 @@ def fragment(id, offset, size):
     member = members(id)
 
     # seek
-    while True:
-        (m_offset, m_size), (m_name, m_cmt, m_rcmt) = member.next()
+    for item in member:
+        (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
 
-        left, right = m_offset, m_offset+m_size
+        left, right = m_offset, m_offset + m_size
         if (offset >= left) and (offset < right):
             yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
             size -= m_size
@@ -790,10 +790,12 @@ def fragment(id, offset, size):
         continue
 
     # return
-    while size > 0:
-        (m_offset, m_size), (m_name, m_cmt, m_rcmt) = member.next()
-        yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
-        size -= m_size
+    for item in member:
+        if size > 0:
+            (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
+            yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
+            size -= m_size
+        continue
     return
 
 @utils.multicase(structure=structure_t)
