@@ -602,7 +602,7 @@ def read(ea, size):
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
     start, end = interface.address.within(ea, ea + size)
     return get_bytes(ea, end - start) or b''
-@utils.multicase(bounds=interface.bounds_t)
+@utils.multicase(bounds=tuple)
 def read(bounds):
     '''Return the bytes within the specified `bounds`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
@@ -2113,7 +2113,7 @@ class address(object):
                 yield res
                 res = step(res)
         except E.OutOfBoundsError: pass
-    @utils.multicase(bounds=interface.bounds_t)
+    @utils.multicase(bounds=tuple)
     @classmethod
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
