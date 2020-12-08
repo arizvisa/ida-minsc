@@ -675,7 +675,7 @@ class blocks(object):
         for bb in cls.iterate(func):
             yield interface.range.bounds(bb)
         return
-    @utils.multicase(bounds=interface.bounds_t)
+    @utils.multicase(bounds=tuple)
     def __new__(cls, bounds):
         '''Return each basic block contained within the specified `bounds`.'''
         left, right = bounds
