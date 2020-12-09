@@ -3099,7 +3099,7 @@ class type(object):
         # Check if we're pointing at an export or directly at a function. If we
         # are, then we need to use function.type.
         try:
-            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            rt, ea = interface.addressOfRuntimeOrStatic(ea)
             if rt or function.address(ea) == ea:
                 return function.type(ea, info)
 
@@ -3208,50 +3208,74 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_initialized():
-        '''Return true if the current address is initialized.'''
+        '''Return if the current address is initialized.'''
         return type.is_initialized(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_initialized(ea):
-        '''Return true if the address specified by `ea` is initialized.'''
+        '''Return if the address specified by `ea` is initialized.'''
         return type.flags(interface.address.within(ea), idaapi.FF_IVL) == idaapi.FF_IVL
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_initialized(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is initialized.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.FF_IVL) == idaapi.FF_IVL for offset in builtins.range(size))
     initializedQ = utils.alias(is_initialized, 'type')
 
     @utils.multicase()
     @staticmethod
     def is_code():
-        '''Return true if the current address is marked as code.'''
+        '''Return if the current address is marked as code.'''
         return type.is_code(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_code(ea):
-        '''Return true if the address specified by `ea` is marked as code.'''
+        '''Return if the address specified by `ea` is marked as code.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_code(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is marked as code.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_CODE for offset in builtins.range(size))
     codeQ = utils.alias(is_code, 'type')
 
     @utils.multicase()
     @staticmethod
     def is_data():
-        '''Return true if the current address is marked as data.'''
+        '''Return if the current address is marked as data.'''
         return type.is_data(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_data(ea):
-        '''Return true if the address specified by `ea` is marked as data.'''
+        '''Return if the address specified by `ea` is marked as data.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_DATA
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_data(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is marked as data.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_DATA for offset in builtins.range(size))
     dataQ = utils.alias(is_data, 'type')
 
     # True if ea marked unknown
     @utils.multicase()
     @staticmethod
     def is_unknown():
-        '''Return true if the current address is marked as unknown.'''
+        '''Return if the current address is marked as unknown.'''
         return type.is_unknown(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_unknown(ea):
-        '''Return true if the address specified by `ea` is marked as unknown.'''
+        '''Return if the address specified by `ea` is marked as unknown.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_unknown(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is marked as unknown.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_UNK for offset in builtins.range(size))
     unknownQ = is_undefined = undefinedQ = utils.alias(is_unknown, 'type')
 
     @utils.multicase()
@@ -3445,7 +3469,7 @@ class type(object):
         '''Return true if the address at `ea` is defined as a structure.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         return type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
-    structQ = is_struc = is_struct = utils.alias(is_structure, 'type')
+    structQ = structureQ = is_struc = is_struct = utils.alias(is_structure, 'type')
 
     @utils.multicase()
     @staticmethod
@@ -3471,7 +3495,7 @@ class type(object):
 
             > type, length = database.t.array()
             > print database.t.array.size(ea)
-            > print database.t.array.type(ea)
+            > print database.t.array.member(ea)
             > print database.t.array.element(ea)
             > print database.t.array.length(ea)
 
@@ -3503,39 +3527,39 @@ class type(object):
 
         @utils.multicase()
         @classmethod
-        def type(cls):
+        def member(cls):
             '''Return the type for the member of the array at the current address.'''
-            return cls.type(ui.current.address())
+            return cls.member(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def type(cls, ea):
+        def member(cls, ea):
             '''Return the type for the member of the array at the address specified by `ea`.'''
             res, _ = cls(ea)
             return res
 
         @utils.multicase()
         @classmethod
-        def info(cls):
+        def element(cls):
             '''Return the type information for the member of the array defined at the current address.'''
-            return cls.info(ui.current.address())
+            return cls.element(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def info(cls, ea):
+        def element(cls, ea):
             '''Return the type information for the member of the array defined at the address specified by `ea`.'''
             ti = type(ea)
             if ti is None:
                 raise E.MissingTypeOrAttribute(u"{:s}.info({:#x}) : Unable to fetch any type information from the address at {:#x}.".format('.'.join((__name__, 'type', cls.__name__)), ea, ea))
             return ti.get_array_element() if ti.is_array() else ti
-        typeinfo = utils.alias(info, 'type.array')
+        info = typeinfo = utils.alias(element, 'type.array')
 
         @utils.multicase()
         @classmethod
-        def element(cls):
+        def size(cls):
             '''Return the size of a member in the array at the current address.'''
-            return cls.element(ui.current.address())
+            return cls.size(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
-        def element(cls, ea):
+        def size(cls, ea):
             '''Return the size of a member in the array at the address specified by `ea`.'''
             FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
@@ -3554,17 +3578,6 @@ class type(object):
             ea, F = interface.address.within(ea), type.flags(ea)
             sz, ele = idaapi.get_item_size(ea), idaapi.get_full_data_elsize(ea, F)
             return sz // ele
-
-        @utils.multicase()
-        @classmethod
-        def size(cls):
-            '''Return the total size of the array at the current address.'''
-            return type.size(ui.current.address())
-        @utils.multicase(ea=six.integer_types)
-        @classmethod
-        def size(cls, ea):
-            '''Return the total size of the array at the address specified by `ea`.'''
-            return type.size(ea)
 
     class structure(object):
         """
@@ -3616,12 +3629,14 @@ class type(object):
         @classmethod
         def size(cls):
             '''Return the total size of the structure at the current address.'''
-            return type.size(ui.current.address())
+            return cls.size(ui.current.address())
         @utils.multicase(ea=six.integer_types)
         @classmethod
         def size(cls, ea):
             '''Return the total size of the structure at address `ea`.'''
-            return type.size(ea)
+            id = cls.id(ea)
+            ptr = idaapi.get_struc(id)
+            return idaapi.get_struc_size(ptr)
     struc = struct = structure  # ns alias
 
     @utils.multicase()
@@ -4636,7 +4651,7 @@ class set(object):
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok else 0
+        return size if ok and type.is_unknown(ea, size) else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unknown(cls, ea, size):
@@ -4645,7 +4660,7 @@ class set(object):
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok else 0
+        return size if ok and type.is_unknown(ea, size) else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
     undef = undefine = undefined = utils.alias(unknown, 'set')
 
     @utils.multicase()
@@ -4880,7 +4895,7 @@ class set(object):
         def __new__(cls, ea, size):
             '''Set the data at the address `ea` to an integer of the specified `size`.'''
             res = set.unknown(ea, size)
-            if res != size:
+            if not type.is_unknown(ea, size) or res < size:
                 raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to undefine {:d} byte{:s} for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, size, '' if size == 1 else 's'))
 
             ok = set.data(ea, size)
@@ -4898,7 +4913,7 @@ class set(object):
         def uint8_t(cls, ea):
             '''Set the data at address `ea` to a uint8_t.'''
             res = set.unknown(ea, 1)
-            if res != 1:
+            if not type.is_unknown(ea, 1) or res < 1:
                 raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
 
             # Apply our data type after undefining it
@@ -4922,7 +4937,7 @@ class set(object):
         def sint8_t(cls, ea):
             '''Set the data at address `ea` to a sint8_t.'''
             res = set.unknown(ea, 1)
-            if res != 1:
+            if not type.is_unknown(ea, 1) or res < 1:
                 raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
 
             # Apply our data type after undefining it
@@ -4948,7 +4963,7 @@ class set(object):
         def uint16_t(cls, ea):
             '''Set the data at address `ea` to a uint16_t.'''
             res = set.unknown(ea, 2)
-            if res != 2:
+            if not type.is_unknown(ea, 2) or res < 2:
                 raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
             # Apply our data type after undefining it
@@ -4972,7 +4987,7 @@ class set(object):
         def sint16_t(cls, ea):
             '''Set the data at address `ea` to a sint16_t.'''
             res = set.unknown(ea, 2)
-            if res != 2:
+            if not type.is_unknown(ea, 2) or res < 2:
                 raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
             # Apply our data type after undefining it
@@ -5001,7 +5016,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 4)
-            if res != 4:
+            if not type.is_unknown(ea, 4) or res < 4:
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our new data type after undefining it
@@ -5028,7 +5043,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 4)
-            if res != 4:
+            if not type.is_unknown(ea, 4) or res < 4:
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our new data type after undefining it
@@ -5057,7 +5072,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 8)
-            if res != 8:
+            if not type.is_unknown(ea, 8) or res < 8:
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our new data type after undefining it
@@ -5084,7 +5099,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 8)
-            if res != 8:
+            if not type.is_unknown(ea, 8) or res < 8:
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our new data type after undefining it
@@ -5113,7 +5128,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 16)
-            if res != 16:
+            if not type.is_unknown(ea, 16) or res < 16:
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
             # Apply our new data type after undefining it
@@ -5140,7 +5155,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 16)
-            if res != 16:
+            if not type.is_unknown(ea, 16) or res < 16:
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
             # Apply our new data type after undefining it
@@ -5178,7 +5193,10 @@ class set(object):
         def __new__(cls, ea):
             '''Sets the data at address `ea` to an IEEE-754 floating-point number based on its size.'''
             size = type.size(ea)
-            if size == 4:
+            if size < 4 and type.is_unknown(ea, 4):
+                logging.warning(u"{:s}({:#x}) : Promoting number at address {:#x} to 32-bit single due to item size ({:+d}) being less than the smallest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'set', cls.__name__]), ea, size, 4))
+                return cls.single(ea)
+            elif size == 4:
                 return cls.single(ea)
             elif size == 8:
                 return cls.double(ea)
@@ -5194,7 +5212,7 @@ class set(object):
         def single(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 single.'''
             res = set.unknown(ea, 4)
-            if res != 4:
+            if not type.is_unknown(ea, 4) or res < 4:
                 raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our data type after undefining it
@@ -5215,7 +5233,7 @@ class set(object):
         def double(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 double.'''
             res = set.unknown(ea, 8)
-            if res != 8:
+            if not type.is_unknown(ea, 8) or res < 8:
                 raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our data type after undefining it
@@ -5244,21 +5262,22 @@ class set(object):
 
     struc = struct = utils.alias(structure, 'set')
 
-    @utils.multicase(type=builtins.list)
+    @utils.multicase()
     @classmethod
     def array(cls, type):
         '''Set the data at the current address to an array of the specified `type`.'''
-        return cls.array(ui.current.address(), type, 1)
+        return cls.array(ui.current.address(), type)
     @utils.multicase(length=six.integer_types)
     @classmethod
     def array(cls, type, length):
         '''Set the data at the current address to an array with the specified `length` and `type`.'''
         return cls.array(ui.current.address(), type, length)
-    @utils.multicase(ea=six.integer_types, type=builtins.list)
+    @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, type):
         '''Set the data at the address `ea` to an array of the specified `type`.'''
-        return cls.array(ea, type, 1)
+        type, length = type if isinstance(type, builtins.list) else (type, 1)
+        return cls.array(ea, type, length)
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
@@ -5543,6 +5562,9 @@ class get(object):
             elif size == 4:
                 return cls.single(ea, **byteorder)
             elif size == 8:
+                return cls.double(ea, **byteorder)
+            elif size > 8:
+                logging.warning(u"{:s}({:#x}) : Demoting size ({:+d}) for floating-point number at {:#x} down to largest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'get', cls.__name__]), size, ea, 8))
                 return cls.double(ea, **byteorder)
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}) : Unable to determine the type of floating-point number for the item's size ({:+#x}).".format('.'.join((__name__, 'get', cls.__name__)), ea, size))
 

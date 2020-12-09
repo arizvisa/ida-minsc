@@ -227,29 +227,6 @@ def name(func, string, *suffix, **flags):
     return database.name(ea, string, **flags)
 
 @utils.multicase()
-def convention():
-    '''Return the calling convention of the current function.'''
-    # use ui.current.address() instead of ui.current.function() to deal with import table entries
-    return convention(ui.current.address())
-@utils.multicase()
-def convention(func):
-    """Return the calling convention of the function `func`.
-
-    The integer returned corresponds to one of the ``idaapi.CM_CC_*`` constants.
-    """
-    rt, ea = interface.addressOfRuntimeOrStatic(func)
-    view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
-    if view is None:
-        raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
-    sup = view.tobytes()
-    try:
-        _, _, cc = interface.node.sup_functype(sup)
-    except E.UnsupportedCapability:
-        raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
-    return cc
-cc = utils.alias(convention)
-
-@utils.multicase()
 def prototype():
     '''Return the prototype of the current function if it has one.'''
     # use ui.current.address() instead of ui.current.function() to deal with import table entries
@@ -2289,4 +2266,30 @@ class type(object):
         return database.type.has_typeinfo(ea)
     prototypeQ = has_typeinfo = typeinfoQ = utils.alias(has_prototype, 'type')
 
+    @utils.multicase()
+    @classmethod
+    def convention(cls):
+        '''Return the calling convention of the current function.'''
+        # use ui.current.address() instead of ui.current.function() to deal with import table entries
+        return cls.convention(ui.current.address())
+    @utils.multicase()
+    @classmethod
+    def convention(cls, func):
+        """Return the calling convention of the function `func`.
+
+        The integer returned corresponds to one of the ``idaapi.CM_CC_*`` constants.
+        """
+        rt, ea = interface.addressOfRuntimeOrStatic(func)
+        view = internal.netnode.sup.get(ea, 0x3000, type=memoryview)
+        if view is None:
+            raise E.MissingTypeOrAttribute(u"{:s}.convention({!r}) : Specified function does not contain a prototype declaration.".format(__name__, func))
+        sup = view.tobytes()
+        try:
+            _, _, cc = interface.node.sup_functype(sup)
+        except E.UnsupportedCapability:
+            raise E.UnsupportedCapability(u"{:s}.convention({!r}) : Specified prototype declaration is a type forward which is currently unimplemented.".format(__name__, func))
+        return cc
+    cc = utils.alias(convention)
+
 t = type # XXX: ns alias
+convention = cc = utils.alias(type.convention, 'type')
