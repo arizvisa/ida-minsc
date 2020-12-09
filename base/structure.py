@@ -745,14 +745,17 @@ def members(id):
         # grab the member's boundaries
         left, right = m.soff, m.eoff
 
+        # if our offset doesn't match the beginning of the member, then
+        # this is padding that is undefined or unamed which we need to
+        # yield to the caller.
+        if offset < left:
+            yield (offset, left - offset), (None, None, None)
+            offset = left
+
         # grab the member's attributes
         res = map(utils.string.of, (idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1)))
 
         # yield our current position and iterate to the next member
-        if offset < left:
-            yield (offset, left-offset), tuple(res)
-            offset = left
-
         yield (offset, ms), tuple(res)
         offset += ms
     return
