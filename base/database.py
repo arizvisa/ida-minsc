@@ -3281,36 +3281,36 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_head():
-        '''Return true if the current address is aligned to a definition in the database.'''
+        '''Return if the current address is aligned to a definition in the database.'''
         return type.is_head(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_head(ea):
-        '''Return true if the address `ea` is aligned to a definition in the database.'''
+        '''Return if the address `ea` is aligned to a definition in the database.'''
         return type.flags(interface.address.within(ea), idaapi.FF_DATA) != 0
     headQ = utils.alias(is_head, 'type')
 
     @utils.multicase()
     @staticmethod
     def is_tail():
-        '''Return true if the current address is not-aligned to a definition in the database.'''
+        '''Return if the current address is not aligned to a definition in the database.'''
         return type.is_tail(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_tail(ea):
-        '''Return true if the address `ea` is not-aligned to a definition in the database.'''
+        '''Return if the address `ea` is not aligned to a definition in the database.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_TAIL
     tailQ = utils.alias(is_tail, 'type')
 
     @utils.multicase()
     @staticmethod
     def is_align():
-        '''Return true if the current address is defined as an alignment.'''
+        '''Return if the current address is defined as an alignment.'''
         return type.is_align(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_align(ea):
-        '''Return true if the address at `ea` is defined as an alignment.'''
+        '''Return if the address at `ea` is defined as an alignment.'''
         is_align = idaapi.isAlign if idaapi.__version__ < 7.0 else idaapi.is_align
         return is_align(type.flags(ea))
     alignQ = utils.alias(is_align, 'type')
@@ -3318,12 +3318,12 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def has_comment():
-        '''Return true if the current address is commented.'''
+        '''Return if the current address is commented.'''
         return type.has_comment(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_comment(ea):
-        '''Return true if the address at `ea` is commented.'''
+        '''Return if the address at `ea` is commented.'''
         return type.flags(interface.address.within(ea), idaapi.FF_COMM) == idaapi.FF_COMM
     commentQ = utils.alias(has_comment, 'type')
 
@@ -3354,84 +3354,84 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def has_customname():
-        '''Return true if the current address has a custom-name.'''
+        '''Return if the current address has a custom name.'''
         return type.has_customname(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_customname(ea):
-        '''Return true if the address at `ea` has a custom-name.'''
+        '''Return if the address at `ea` has a custom name.'''
         return type.flags(interface.address.within(ea), idaapi.FF_NAME) == idaapi.FF_NAME
     customnameQ = utils.alias(has_customname, 'type')
 
     @utils.multicase()
     @staticmethod
     def has_dummyname():
-        '''Return true if the current address has a dummy-name.'''
+        '''Return if the current address has a dummy name.'''
         return type.has_dummyname(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_dummyname(ea):
-        '''Return true if the address at `ea` has a dummy-name.'''
+        '''Return if the address at `ea` has a dummy name.'''
         return type.flags(ea, idaapi.FF_LABL) == idaapi.FF_LABL
     dummynameQ = utils.alias(has_dummyname, 'type')
 
     @utils.multicase()
     @staticmethod
     def has_autoname():
-        '''Return true if the current address is automatically named.'''
+        '''Return if the current address was automatically named.'''
         return type.has_autoname(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_autoname(ea):
-        '''Return true if the address `ea` is automatically named.'''
+        '''Return if the address `ea` was automatically named.'''
         return idaapi.has_auto_name(type.flags(ea))
     autonameQ = utils.alias(has_autoname, 'type')
 
     @utils.multicase()
     @staticmethod
     def has_publicname():
-        '''Return true if the current address has a public name.'''
+        '''Return if the current address has a public name.'''
         return type.has_publicname(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_publicname(ea):
-        '''Return true if the address at `ea` has a public name.'''
+        '''Return if the address at `ea` has a public name.'''
         return idaapi.is_public_name(interface.address.within(ea))
     publicnameQ = utils.alias(has_publicname, 'type')
 
     @utils.multicase()
     @staticmethod
     def has_weakname():
-        '''Return true if the current address has a weakly-typed name.'''
+        '''Return if the current address has a name with a weak type.'''
         return type.has_weakname(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_weakname(ea):
-        '''Return true if the address at `ea` has a weakly-typed name.'''
+        '''Return if the address at `ea` has a name with a weak type.'''
         return idaapi.is_weak_name(interface.address.within(ea))
     weaknameQ = utils.alias(has_weakname, 'type')
 
     @utils.multicase()
     @staticmethod
     def has_listedname():
-        '''Return true if the current address has a name that is listed.'''
+        '''Return if the current address has a name that is listed.'''
         return type.has_listedname(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_listedname(ea):
-        '''Return true if the address at `ea` has a name that is listed.'''
+        '''Return if the address at `ea` has a name that is listed.'''
         return idaapi.is_in_nlist(interface.address.within(ea))
     listednameQ = utils.alias(has_listedname, 'type')
 
     @utils.multicase()
     @staticmethod
     def has_typeinfo():
-        '''Return true if the current address has some typeinfo associated with it.'''
+        '''Return if the current address has typeinfo associated with it.'''
         return type.has_typeinfo(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_typeinfo(ea):
-        '''Return true if the address at `ea` has some typeinfo associated with it.'''
+        '''Return if the address at `ea` has typeinfo associated with it.'''
         try:
             ok = type(ea) is not None
 
@@ -3448,12 +3448,12 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_string():
-        '''Return true if the current address is defined as a string.'''
+        '''Return if the current address is defined as a string.'''
         return type.is_string(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_string(ea):
-        '''Return true if the address at `ea` is defined as a string.'''
+        '''Return if the address at `ea` is defined as a string.'''
         FF_STRLIT = idaapi.FF_STRLIT if hasattr(idaapi, 'FF_STRLIT') else idaapi.FF_ASCI
         return type.flags(ea, idaapi.DT_TYPE) == FF_STRLIT
     stringQ = utils.alias(is_string, 'type')
@@ -3461,12 +3461,12 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_structure():
-        '''Return true if the current address is defined as a structure.'''
+        '''Return if the current address is defined as a structure.'''
         return type.is_structure(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_structure(ea):
-        '''Return true if the address at `ea` is defined as a structure.'''
+        '''Return if the address at `ea` is defined as a structure.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         return type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
     structQ = structureQ = is_struc = is_struct = utils.alias(is_structure, 'type')
