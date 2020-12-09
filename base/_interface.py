@@ -1800,6 +1800,12 @@ class bounds_t(namedtypedtuple):
         left, right = self
         return right - left if left < right else left - right
 
+    def translate(self, offset):
+        '''Return an instance of the class with its boundaries translated by the provided `offset`.'''
+        cls = self.__class__
+        left, right = self
+        return cls(offset + left, offset + right)
+
     def contains(self, ea):
         '''Return if the address `ea` is contained by the ``bounds_t``.'''
         left, right = self
