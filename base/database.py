@@ -4946,7 +4946,7 @@ class set(object):
         def sint16_t(cls, ea):
             '''Set the data at address `ea` to a sint16_t.'''
             res = set.unknown(ea, 2)
-            if not type.is_unkonwn(ea, 2) or res < 2:
+            if not type.is_unknown(ea, 2) or res < 2:
                 raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
             # Apply our data type after undefining it
