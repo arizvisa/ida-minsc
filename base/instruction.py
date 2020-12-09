@@ -102,7 +102,7 @@ def at(ea):
     '''Returns the ``idaapi.insn_t`` instance at the address `ea`.'''
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
+        raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at specified address {:#x}.".format(__name__, ea, ea))
 
     # If we're using backwards-compatiblity mode (which means decode_insn takes
     # different parameters, then manage the result using idaapi.cmd
@@ -1138,6 +1138,14 @@ def op_refs(ea, opnum):
         res = [ interface.opref_t(x.ea, int(x.opnum), interface.reftype_t.of(x.type)) for x in xl ]
         # FIXME: how do we handle the type for an LEA instruction which should include '&'...
 
+    # enums
+    elif ok and enumeration.has(res.tid):
+        e = enumeration.by(res.tid)
+        # enums are defined in a altval at index 0xb+opnum
+        # the int points straight at the enumeration id
+        # FIXME: references to enums don't seem to work
+        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : References are not implemented for enumeration types.".format(__name__, inst.ea, opnum))
+
     # struc member
     elif ok and res.tid != idaapi.BADADDR:    # FIXME: is this right?
         # structures are defined in a supval at index 0xf+opnum
@@ -1152,7 +1160,7 @@ def op_refs(ea, opnum):
         else:
             ok = idaapi.get_stroff_path(pathvar.cast(), delta.cast(), inst.ea, opnum)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand.".format(__name__, inst.ea, opnum))
+            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand number {:d}.".format(__name__, inst.ea, opnum, opnum))
 
         # get the structure offset and then use that to figure out the correct member
         addr = operator.attrgetter('value' if idaapi.__version__ < 7.0 else 'addr')     # FIXME: this will be incorrect for an offsetted struct
@@ -1176,7 +1184,8 @@ def op_refs(ea, opnum):
         x = idaapi.xrefblk_t()
 
         if not x.first_to(mem.id, 0):
-            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(mem.fullname, '"')))
+            fullname = idaapi.get_member_fullname(mem.id)
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
 
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
@@ -1190,14 +1199,6 @@ def op_refs(ea, opnum):
             ops = (idx for idx, (_, ids) in ops if st.id in ids)
             res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
         res = res
-
-    # enums
-    elif ok and res.tid != idaapi.BADADDR:
-        e = enumeration.by_identifier(res.tid)
-        # enums are defined in a altval at index 0xb+opnum
-        # the int points straight at the enumeration id
-        # FIXME: references to enums don't seem to work
-        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : References are not implemented for enumeration types.".format(__name__, inst.ea, opnum))
 
     # FIXME: is this supposed to execute if ok == T? or not?
     # global
