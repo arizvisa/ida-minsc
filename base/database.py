@@ -806,12 +806,12 @@ class search(object):
         radix = direction.get('radix', 0)
 
         # convert the bytes directly into a string of base-10 integers
-        if isinstance(string, bytes) and radix == 0:
+        if isinstance(data, bytes) and radix == 0:
             radix, queryF = 10, lambda string: ' '.join("{:d}".format(by) for by in bytearray(string))
 
         # convert the string directly into a string of base-10 integers
-        elif isinstance(string, six.string_types) and radix == 0:
-            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((six.unichr(ch) & 0xff00) // 0x100, (six.unichr(ch) & 0x00ff) // 0x1) for ch in string))))
+        elif isinstance(data, six.string_types) and radix == 0:
+            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((ord(ch) & 0xff00) // 0x100, (ord(ch) & 0x00ff) // 0x1) for ch in string))))
 
         # otherwise, leave it alone because the user specified the radix already
         else:
@@ -819,9 +819,9 @@ class search(object):
 
         reverseQ = builtins.next((direction[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in direction), False)
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
-        res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(string), radix, idaapi.SEARCH_CASE | flags)
+        res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(data), radix, idaapi.SEARCH_CASE | flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, \"{:s}\"{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
+            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, \"{:s}\"{:s}) : The specified bytes were not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(data, '"'), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
         return res
     bybytes = utils.alias(by_bytes, 'search')
 
@@ -848,7 +848,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     byregex = utils.alias(by_regex, 'search')
 
@@ -875,7 +875,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     bytext = by_string = bystring = utils.alias(by_text, 'search')
 
@@ -902,7 +902,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(name), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     byname = utils.alias(by_name, 'search')
 
@@ -928,9 +928,12 @@ class search(object):
     def iterate(cls, ea, data, predicate, **options):
         '''Iterate through all search results matched by the function `predicate` with the specified `data` starting at address `ea`.'''
         ea = predicate(ea, data, **options)
-        while ea != idaapi.BADADDR:
-            yield ea
-            ea = predicate(address.next(ea), data)
+        try:
+            while ea != idaapi.BADADDR:
+                yield ea
+                ea = predicate(address.next(ea), data)
+        except E.SearchResultsError:
+            return
         return
 
     @utils.multicase()
