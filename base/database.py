@@ -126,8 +126,12 @@ class config(object):
     def processor(cls):
         '''Returns the name of the processor configured by the database.'''
         if idaapi.__version__ >= 7.0:
-            return cls.info.get_procName()
-        raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
+            result = cls.info.get_procName()
+        elif hasattr(cls.info, 'procName'):
+            result = cls.info.procName
+        else:
+            raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        return utils.string.of(result)
 
     @classmethod
     def compiler(cls):
@@ -171,12 +175,6 @@ class config(object):
             res = idaapi.cvar.inf.mf
             return 'big' if res else 'little'
         return 'big' if cls.info.is_be() else 'little'
-
-    @classmethod
-    def processor(cls):
-        '''Return processor name used by the database.'''
-        res = cls.info.procName
-        return utils.string.of(res)
 
     @classmethod
     def main(cls):
@@ -753,20 +751,36 @@ class names(object):
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return idaapi.get_nlist_ea(res)
 
+    @utils.multicase()
     @classmethod
-    def name(cls, ea):
-        '''Return the symbol name of the string at address `ea`.'''
+    def symbol(cls):
+        '''Return the symbol name of the current address.'''
+        return cls.symbol(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def symbol(cls, ea):
+        '''Return the symbol name of the address `ea`.'''
         res = idaapi.get_nlist_idx(ea)
         return utils.string.of(idaapi.get_nlist_name(res))
+    name = utils.alias(symbol, 'names')
+
     @classmethod
     def address(cls, index):
-        '''Return the address of the string at `index`.'''
+        '''Return the address of the symbol at `index`.'''
         return idaapi.get_nlist_ea(index)
+
+    @utils.multicase()
+    @classmethod
+    def at(cls):
+        '''Return the index, symbol address, and name at the current address.'''
+        return cls.at(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea):
+        '''Return the index, symbol address, and name at the address `ea`.'''
         idx = idaapi.get_nlist_idx(ea)
         ea, name = idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
-        return ea, utils.string.of(name)
+        return idx, ea, utils.string.of(name)
 
 class search(object):
     """
@@ -808,13 +822,13 @@ class search(object):
         """
         radix = direction.get('radix', 0)
 
-        # convert the data directly into a string of base-10 integers
-        if isinstance(string, bytes) and radix == 0:
-            radix, queryF = 10, lambda string: ' '.join("{:d}".format(six.byte2int(ch)) for ch in string)
+        # convert the bytes directly into a string of base-10 integers
+        if isinstance(data, bytes) and radix == 0:
+            radix, queryF = 10, lambda string: ' '.join("{:d}".format(by) for by in bytearray(string))
 
-        # convert the unicode string directly into a string of base-10 integers
-        elif isinstance(string, unicode) and radix == 0:
-            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((six.byte2int(ch) & 0xff00) / 0x100, (six.byte2int(ch) & 0x00ff) / 0x1) for ch in string))))
+        # convert the string directly into a string of base-10 integers
+        elif isinstance(data, six.string_types) and radix == 0:
+            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((ord(ch) & 0xff00) // 0x100, (ord(ch) & 0x00ff) // 0x1) for ch in string))))
 
         # otherwise, leave it alone because the user specified the radix already
         else:
@@ -822,9 +836,9 @@ class search(object):
 
         reverseQ = builtins.next((direction[k] for k in ('reverse', 'reversed', 'up', 'backwards') if k in direction), False)
         flags = idaapi.SEARCH_UP if reverseQ else idaapi.SEARCH_DOWN
-        res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(string), radix, idaapi.SEARCH_CASE | flags)
+        res = idaapi.find_binary(ea, idaapi.BADADDR, queryF(data), radix, idaapi.SEARCH_CASE | flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, \"{:s}\"{:s}) : The specified bytes were not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
+            raise E.SearchResultsError(u"{:s}.by_bytes({:#x}, \"{:s}\"{:s}) : The specified bytes were not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(data, '"'), u", {:s}".format(utils.string.kwargs(direction)) if direction else '', res))
         return res
     bybytes = utils.alias(by_bytes, 'search')
 
@@ -851,7 +865,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_regex({:#x}, \"{:s}\"{:s}) : The specified regex was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     byregex = utils.alias(by_regex, 'search')
 
@@ -878,7 +892,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(string), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_text({:#x}, \"{:s}\"{:s}) : The specified text was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     bytext = by_string = bystring = utils.alias(by_text, 'search')
 
@@ -905,7 +919,7 @@ class search(object):
         flags |= idaapi.SEARCH_CASE if options.get('sensitive', False) else 0
         res = idaapi.find_text(ea, 0, 0, queryF(name), flags)
         if res == idaapi.BADADDR:
-            raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join((__name__, search.__name__)), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
+            raise E.SearchResultsError(u"{:s}.by_name({:#x}, \"{:s}\"{:s}) : The specified name was not found.".format('.'.join([__name__, search.__name__]), ea, utils.string.escape(name, '"'), u", {:s}".format(utils.string.kwargs(options)) if options else '', res))
         return res
     byname = utils.alias(by_name, 'search')
 
@@ -931,9 +945,12 @@ class search(object):
     def iterate(cls, ea, data, predicate, **options):
         '''Iterate through all search results matched by the function `predicate` with the specified `data` starting at address `ea`.'''
         ea = predicate(ea, data, **options)
-        while ea != idaapi.BADADDR:
-            yield ea
-            ea = predicate(address.next(ea), data)
+        try:
+            while ea != idaapi.BADADDR:
+                yield ea
+                ea = predicate(address.next(ea), data)
+        except E.SearchResultsError:
+            return
         return
 
     @utils.multicase()
@@ -1114,17 +1131,6 @@ def name(ea, string, *suffix, **flags):
 def name(ea, none, **flags):
     '''Removes the name defined at the address `ea`.'''
     return name(ea, none or '', **flags)
-
-@utils.multicase()
-def erase():
-    '''Remove all of the defined tags at the current address.'''
-    return erase(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def erase(ea):
-    '''Remove all of the defined tags at address `ea`.'''
-    ea = interface.address.inside(ea)
-    for k in tag(ea): tag(ea, k, None)
-    color(ea, None)
 
 @utils.multicase()
 def color():
@@ -1617,11 +1623,13 @@ def tag(ea, key, none):
     if key == '__name__':
         return name(ea, None, listed=True)
     if key == '__extra_prefix__':
-        return extra.__del_prefix__(ea)
+        return extra.__delete_prefix__(ea)
     if key == '__extra_suffix__':
-        return extra.__del_suffix__(ea)
+        return extra.__delete_suffix__(ea)
     if key == '__typeinfo__':
         return type(ea, None)
+    if key == '__color__':
+        return color(ea, None)
 
     # if not within a function, then fetch the repeatable comment otherwise update the non-repeatable one
     try:
@@ -1817,15 +1825,27 @@ class imports(object):
         return cls.__iterate__()
 
     @staticmethod
-    def __formats__(module_name_ordinal):
-        module, name, ordinal = module_name_ordinal
-        return name or u"Ordinal{:d}".format(ordinal)
-    @staticmethod
-    def __formatl__(module_name_ordinal):
+    def __symbol__(module_name_ordinal):
         module, name, ordinal = module_name_ordinal
 
+        # FIXME: I believe this is a windows-only scheme...
+        name = name or u"Ordinal{:d}".format(ordinal)
+
+        # FIXME: I think this is a gnu-only thing...
+        if module is None and '@@' in name:
+            nestname, nestmodule = name.rsplit('@@', 1)
+            return utils.string.of(nestmodule), utils.string.of(nestname)
+        return utils.string.of(module), utils.string.of(name)
+
+    @staticmethod
+    def __formats__(module_name_ordinal):
+        _, name = imports.__symbol__(module_name_ordinal)
+        return name
+    @staticmethod
+    def __formatl__(module_name_ordinal):
+        module, name = imports.__symbol__(module_name_ordinal)
         # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
-        return u"{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal)))
+        return u"{:s}!{:s}".format(module, name)
 
     __format__ = __formatl__
 
@@ -1836,9 +1856,9 @@ class imports(object):
     __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, __formats__.__func__))
     __matcher__.boolean('module', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, utils.first))
     __matcher__.mapping('ordinal', utils.fcompose(utils.second, utils.funbox(lambda m, n, o: o)))
-    __matcher__.boolean('regex', re.search, utils.fcompose(utils.second, __format__))
-    __matcher__.predicate('predicate', lambda n:n)
-    __matcher__.predicate('pred', lambda n:n)
+    __matcher__.boolean('regex', re.search, utils.fcompose(utils.second, __format__.__func__))
+    __matcher__.predicate('predicate', lambda item: item)
+    __matcher__.predicate('pred', lambda item: item)
     __matcher__.mapping('index', utils.first)
 
     @classmethod
@@ -1853,12 +1873,8 @@ class imports(object):
             idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, listable.append, utils.fconstant(True)))
             for ea, name, ordinal in listable:
                 ui.navigation.set(ea)
-                if module is None and '@@' in name:
-                    nestname, nestmodule = name.rsplit('@@')
-                    yield ea, (utils.string.of(nestmodule), utils.string.of(nestname), ordinal)
-                else:
-                    yield ea, (utils.string.of(module), utils.string.of(name), ordinal)
-                continue
+                realmodule, realname = cls.__symbol__((module, name, ordinal))
+                yield ea, (utils.string.of(realmodule), utils.string.of(realname), ordinal)
             continue
         return
 
@@ -1951,8 +1967,8 @@ class imports(object):
     @classmethod
     def modules(cls):
         '''Return all of the import modules defined in the database.'''
-        iterable = (idaapi.get_import_module_name(i) for i in six.moves.range(idaapi.get_import_module_qty()))
-        return map(utils.string.of, iterable)
+        iterable = (module for _, (module, _, _) in cls.__iterate__())
+        return map(utils.string.of, { item for item in iterable if item})
 
     @utils.multicase(string=basestring)
     @classmethod
@@ -3290,25 +3306,25 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def has_reference():
-        '''Return true if the current address has a reference.'''
+        '''Return if the current address is referencing another address.'''
         return type.has_reference(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_reference(ea):
-        '''Return true if the address at `ea` has a reference.'''
+        '''Return if the address at `ea` is referencing another address.'''
         return type.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF
     referenceQ = refQ = utils.alias(has_reference, 'type')
 
     @utils.multicase()
     @staticmethod
     def has_label():
-        '''Return true if the current address has a label.'''
+        '''Return if the current address has a label.'''
         return type.has_label(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_label(ea):
-        '''Return true if the address at `ea` has a label.'''
-        return idaapi.has_any_name(type.flags(ea))
+        '''Return if the address at `ea` has a label.'''
+        return idaapi.has_any_name(type.flags(ea)) or type.has_dummyname(ea) or type.has_customname(ea)
     labelQ = nameQ = has_name = utils.alias(has_label, 'type')
 
     @utils.multicase()
@@ -3385,18 +3401,6 @@ class type(object):
 
     @utils.multicase()
     @staticmethod
-    def is_label():
-        '''Return true if the current address has a label.'''
-        return type.is_label(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @staticmethod
-    def is_label(ea):
-        '''Return true if the address at `ea` has a label.'''
-        return type.has_dummyname(ea) or type.has_customname(ea)
-    labelQ = utils.alias(is_label, 'type')
-
-    @utils.multicase()
-    @staticmethod
     def has_typeinfo():
         '''Return true if the current address has some typeinfo associated with it.'''
         return type.has_typeinfo(ui.current.address())
@@ -3404,8 +3408,6 @@ class type(object):
     @staticmethod
     def has_typeinfo(ea):
         '''Return true if the address at `ea` has some typeinfo associated with it.'''
-        return type(ea) is not None
-
         try:
             ok = type(ea) is not None
 
@@ -3448,12 +3450,12 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_reference():
-        '''Return true if the data at the current address is referenced.'''
+        '''Return if the data at the current address is referenced by another address.'''
         return type.is_reference(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_reference(ea):
-        '''Return true if the data at the address `ea` is referenced.'''
+        '''Return if the data at the address `ea` is referenced by another address.'''
         X, flags = idaapi.xrefblk_t(), idaapi.XREF_FAR | idaapi.XREF_DATA
         return X.first_to(ea, flags)
     is_ref = is_referenced = utils.alias(is_reference, 'type')
@@ -3645,7 +3647,8 @@ class type(object):
         ea = interface.address.inside(ea)
 
         # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
-        return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
+        datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
+        return len(datarefs) == len(coderefs) and len(coderefs) > 0
     isimportref = importrefQ = utils.alias(is_importref, 'type')
 
     @utils.multicase()
@@ -3660,7 +3663,8 @@ class type(object):
         ea = interface.address.inside(ea)
 
         # FIXME: this doesn't seem like the right way to determine this...
-        return len(database.dxdown(ea)) > len(database.cxdown(ea))
+        datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
+        return len(datarefs) > len(coderefs)
     isglobalref = globalrefQ = utils.alias(is_globalref, 'type')
 
 t = type    # XXX: ns alias
@@ -4075,7 +4079,7 @@ class marks(object):
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.__get_slotaddress(index), cls.__get_description(index))
         raise E.IndexOutOfBoundsError(u"{:s}.by_index({:d}) : The specified mark slot index ({:d}) is out of bounds ({:s}).".format('.'.join((__name__, cls.__name__)), index, index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
-    byIndex = utils.alias(by_index, 'marks')
+    byindex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
     @classmethod
@@ -4087,7 +4091,7 @@ class marks(object):
     def by_address(cls, ea):
         '''Return the `(address, description)` of the mark at the given address `ea`.'''
         return cls.by_index(cls.__find_slotaddress(ea))
-    by = byAddress = utils.alias(by_address, 'marks')
+    by = byaddress = utils.alias(by_address, 'marks')
 
     ## Internal functions depending on which version of IDA is being used (<7.0)
     if idaapi.__version__ < 7.0:
@@ -4333,7 +4337,7 @@ class extra(object):
             # an exception before this happens would imply failure
             return True
         @classmethod
-        def __del__(cls, ea, base):
+        def __delete__(cls, ea, base):
             '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
             sup = internal.netnode.sup
 
@@ -4377,7 +4381,7 @@ class extra(object):
             # return how many newlines there were
             return string.count('\n')
         @classmethod
-        def __del__(cls, ea, base):
+        def __delete__(cls, ea, base):
             '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
 
             # count the number of extra comments to remove
@@ -4404,31 +4408,31 @@ class extra(object):
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def __del_prefix__(cls, ea):
+    def __delete_prefix__(cls, ea):
         '''Delete the prefixed comment at address `ea`.'''
         res = cls.__get__(ea, idaapi.E_PREV)
-        cls.__del__(ea, idaapi.E_PREV)
+        cls.__delete__(ea, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def __del_suffix__(cls, ea):
+    def __delete_suffix__(cls, ea):
         '''Delete the suffixed comment at address `ea`.'''
         res = cls.__get__(ea, idaapi.E_NEXT)
-        cls.__del__(ea, idaapi.E_NEXT)
+        cls.__delete__(ea, idaapi.E_NEXT)
         return res
 
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def __set_prefix__(cls, ea, string):
         '''Set the prefixed comment at address `ea` to the specified `string`.'''
-        res, ok = cls.__del_prefix__(ea), cls.__set__(ea, string, idaapi.E_PREV)
+        res, ok = cls.__delete_prefix__(ea), cls.__set__(ea, string, idaapi.E_PREV)
         ok = cls.__set__(ea, string, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def __set_suffix__(cls, ea, string):
         '''Set the suffixed comment at address `ea` to the specified `string`.'''
-        res, ok = cls.__del_suffix__(ea), cls.__set__(ea, string, idaapi.E_NEXT)
+        res, ok = cls.__delete_suffix__(ea), cls.__set__(ea, string, idaapi.E_NEXT)
         return res
 
     @utils.multicase()
@@ -4443,14 +4447,14 @@ class extra(object):
         return cls.__get_suffix__(ui.current.address())
     @utils.multicase()
     @classmethod
-    def __del_prefix__(cls):
+    def __delete_prefix__(cls):
         '''Delete the prefixed comment at the current address.'''
-        return cls.__del_prefix__(ui.current.address())
+        return cls.__delete_prefix__(ui.current.address())
     @utils.multicase()
     @classmethod
-    def __del_suffix__(cls):
+    def __delete_suffix__(cls):
         '''Delete the suffixed comment at the current address.'''
-        return cls.__del_suffix__(ui.current.address())
+        return cls.__delete_suffix__(ui.current.address())
     @utils.multicase(string=basestring)
     @classmethod
     def __set_prefix__(cls, string):
@@ -4476,7 +4480,7 @@ class extra(object):
     @classmethod
     def prefix(cls, none):
         '''Delete the prefixed comment at the current address.'''
-        return cls.__del_prefix__(ui.current.address())
+        return cls.__delete_prefix__(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prefix(cls, ea):
@@ -4491,7 +4495,7 @@ class extra(object):
     @classmethod
     def prefix(cls, ea, none):
         '''Delete the prefixed comment at address `ea`.'''
-        return cls.__del_prefix__(ea)
+        return cls.__delete_prefix__(ea)
 
     @utils.multicase()
     @classmethod
@@ -4507,7 +4511,7 @@ class extra(object):
     @classmethod
     def suffix(cls, none):
         '''Delete the suffixed comment at the current address.'''
-        return cls.__del_suffix__(ui.current.address())
+        return cls.__delete_suffix__(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def suffix(cls, ea):
@@ -4522,7 +4526,7 @@ class extra(object):
     @classmethod
     def suffix(cls, ea, none):
         '''Delete the suffixed comment at address `ea`.'''
-        return cls.__del_suffix__(ea)
+        return cls.__delete_suffix__(ea)
 
     @classmethod
     def __insert_space(cls, ea, count, getter_setter_remover):
@@ -4543,26 +4547,26 @@ class extra(object):
     @classmethod
     def preinsert(cls, ea, count):
         '''Insert `count` lines in front of the item at address `ea`.'''
-        res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
+        res = cls.__get_prefix__, cls.__set_prefix__, cls.__delete_prefix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def preappend(cls, ea, count):
         '''Append `count` lines in front of the item at address `ea`.'''
-        res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
+        res = cls.__get_prefix__, cls.__set_prefix__, cls.__delete_prefix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postinsert(cls, ea, count):
         '''Insert `count` lines after the item at address `ea`.'''
-        res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
+        res = cls.__get_suffix__, cls.__set_suffix__, cls.__delete_suffix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postappend(cls, ea, count):
         '''Append `count` lines after the item at address `ea`.'''
-        res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
+        res = cls.__get_suffix__, cls.__set_suffix__, cls.__delete_suffix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(count=six.integer_types)
