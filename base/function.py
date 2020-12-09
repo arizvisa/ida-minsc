@@ -1318,13 +1318,13 @@ class block(object):
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
         bb = cls.at(ea)
-        return cls.register(B, reg, *regs, **modifiers)
+        return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bounds=builtins.tuple, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block identified by `bounds` that uses `reg` or any one of the registers in `regs`.'''
-        bb = cls.at(bounds)
-        return cls.register(bb, reg, *regs, **modifiers)
+        B = cls.at(bounds)
+        return cls.register(B, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
@@ -1592,6 +1592,25 @@ class frame(object):
 
         """
         @utils.multicase()
+        def __new__(cls):
+            '''Yield each frame member of the current function.'''
+            return cls(ui.current.address())
+        @utils.multicase()
+        def __new__(cls, func):
+            '''Yield each frame member of the function `func`.'''
+            fn = by(func)
+
+            # figure out the frame
+            fr = idaapi.get_frame(fn)
+            if fr is None:  # unable to figure out arguments
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+
+            base = -fn.frsize
+            for (off, size), (name, _, _) in structure.fragment(fr.id, 0, cls.size(fn)):
+                yield off + base, name, size
+            return
+
+        @utils.multicase()
         @classmethod
         def size(cls):
             '''Returns the size of the local variables for the current function.'''
@@ -1614,6 +1633,25 @@ class frame(object):
             > print function.frame.regs.size(ea)
 
         """
+
+        @utils.multicase()
+        def __new__(cls):
+            '''Yield each saved register frame of the current function.'''
+            return cls(ui.current.address())
+        @utils.multicase()
+        def __new__(cls, func):
+            '''Yield each saved register frame of the function `func`.'''
+            fn = by(func)
+
+            # figure out the frame
+            fr = idaapi.get_frame(fn)
+            if fr is None:  # unable to figure out arguments
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+
+            base = frame.lvars.size(fn)
+            for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
+                yield off - base, name, size
+            return
 
         @utils.multicase()
         @classmethod
