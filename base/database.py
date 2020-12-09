@@ -1606,9 +1606,9 @@ def tag(ea, key, none):
     if key == '__name__':
         return name(ea, None, listed=True)
     if key == '__extra_prefix__':
-        return extra.__del_prefix__(ea)
+        return extra.__delete_prefix__(ea)
     if key == '__extra_suffix__':
-        return extra.__del_suffix__(ea)
+        return extra.__delete_suffix__(ea)
     if key == '__typeinfo__':
         return type(ea, None)
     if key == '__color__':
@@ -3347,8 +3347,6 @@ class type(object):
     @staticmethod
     def has_typeinfo(ea):
         '''Return true if the address at `ea` has some typeinfo associated with it.'''
-        return type(ea) is not None
-
         try:
             ok = type(ea) is not None
 
@@ -4278,7 +4276,7 @@ class extra(object):
             # an exception before this happens would imply failure
             return True
         @classmethod
-        def __del__(cls, ea, base):
+        def __delete__(cls, ea, base):
             '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
             sup = internal.netnode.sup
 
@@ -4322,7 +4320,7 @@ class extra(object):
             # return how many newlines there were
             return string.count('\n')
         @classmethod
-        def __del__(cls, ea, base):
+        def __delete__(cls, ea, base):
             '''Remove the extra comment(s) for the address ``ea`` at the index ``base``.'''
 
             # count the number of extra comments to remove
@@ -4349,31 +4347,31 @@ class extra(object):
 
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def __del_prefix__(cls, ea):
+    def __delete_prefix__(cls, ea):
         '''Delete the prefixed comment at address `ea`.'''
         res = cls.__get__(ea, idaapi.E_PREV)
-        cls.__del__(ea, idaapi.E_PREV)
+        cls.__delete__(ea, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types)
     @classmethod
-    def __del_suffix__(cls, ea):
+    def __delete_suffix__(cls, ea):
         '''Delete the suffixed comment at address `ea`.'''
         res = cls.__get__(ea, idaapi.E_NEXT)
-        cls.__del__(ea, idaapi.E_NEXT)
+        cls.__delete__(ea, idaapi.E_NEXT)
         return res
 
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def __set_prefix__(cls, ea, string):
         '''Set the prefixed comment at address `ea` to the specified `string`.'''
-        res, ok = cls.__del_prefix__(ea), cls.__set__(ea, string, idaapi.E_PREV)
+        res, ok = cls.__delete_prefix__(ea), cls.__set__(ea, string, idaapi.E_PREV)
         ok = cls.__set__(ea, string, idaapi.E_PREV)
         return res
     @utils.multicase(ea=six.integer_types, string=basestring)
     @classmethod
     def __set_suffix__(cls, ea, string):
         '''Set the suffixed comment at address `ea` to the specified `string`.'''
-        res, ok = cls.__del_suffix__(ea), cls.__set__(ea, string, idaapi.E_NEXT)
+        res, ok = cls.__delete_suffix__(ea), cls.__set__(ea, string, idaapi.E_NEXT)
         return res
 
     @utils.multicase()
@@ -4388,14 +4386,14 @@ class extra(object):
         return cls.__get_suffix__(ui.current.address())
     @utils.multicase()
     @classmethod
-    def __del_prefix__(cls):
+    def __delete_prefix__(cls):
         '''Delete the prefixed comment at the current address.'''
-        return cls.__del_prefix__(ui.current.address())
+        return cls.__delete_prefix__(ui.current.address())
     @utils.multicase()
     @classmethod
-    def __del_suffix__(cls):
+    def __delete_suffix__(cls):
         '''Delete the suffixed comment at the current address.'''
-        return cls.__del_suffix__(ui.current.address())
+        return cls.__delete_suffix__(ui.current.address())
     @utils.multicase(string=basestring)
     @classmethod
     def __set_prefix__(cls, string):
@@ -4421,7 +4419,7 @@ class extra(object):
     @classmethod
     def prefix(cls, none):
         '''Delete the prefixed comment at the current address.'''
-        return cls.__del_prefix__(ui.current.address())
+        return cls.__delete_prefix__(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def prefix(cls, ea):
@@ -4436,7 +4434,7 @@ class extra(object):
     @classmethod
     def prefix(cls, ea, none):
         '''Delete the prefixed comment at address `ea`.'''
-        return cls.__del_prefix__(ea)
+        return cls.__delete_prefix__(ea)
 
     @utils.multicase()
     @classmethod
@@ -4452,7 +4450,7 @@ class extra(object):
     @classmethod
     def suffix(cls, none):
         '''Delete the suffixed comment at the current address.'''
-        return cls.__del_suffix__(ui.current.address())
+        return cls.__delete_suffix__(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def suffix(cls, ea):
@@ -4467,7 +4465,7 @@ class extra(object):
     @classmethod
     def suffix(cls, ea, none):
         '''Delete the suffixed comment at address `ea`.'''
-        return cls.__del_suffix__(ea)
+        return cls.__delete_suffix__(ea)
 
     @classmethod
     def __insert_space(cls, ea, count, getter_setter_remover):
@@ -4488,26 +4486,26 @@ class extra(object):
     @classmethod
     def preinsert(cls, ea, count):
         '''Insert `count` lines in front of the item at address `ea`.'''
-        res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
+        res = cls.__get_prefix__, cls.__set_prefix__, cls.__delete_prefix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def preappend(cls, ea, count):
         '''Append `count` lines in front of the item at address `ea`.'''
-        res = cls.__get_prefix__, cls.__set_prefix__, cls.__del_prefix__
+        res = cls.__get_prefix__, cls.__set_prefix__, cls.__delete_prefix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postinsert(cls, ea, count):
         '''Insert `count` lines after the item at address `ea`.'''
-        res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
+        res = cls.__get_suffix__, cls.__set_suffix__, cls.__delete_suffix__
         return cls.__insert_space(ea, count, res)
     @utils.multicase(ea=six.integer_types, count=six.integer_types)
     @classmethod
     def postappend(cls, ea, count):
         '''Append `count` lines after the item at address `ea`.'''
-        res = cls.__get_suffix__, cls.__set_suffix__, cls.__del_suffix__
+        res = cls.__get_suffix__, cls.__set_suffix__, cls.__delete_suffix__
         return cls.__append_space(ea, count, res)
 
     @utils.multicase(count=six.integer_types)
