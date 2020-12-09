@@ -523,6 +523,27 @@ class chunk(object):
             yield ea
         return
 
+    @utils.multicase(reg=(basestring, interface.register_t))
+    @classmethod
+    def register(cls, reg, *regs, **modifiers):
+        '''Yield each `(address, opnum, state)` within the function chunk containing the current address which uses `reg` or any one of the registers in `regs`.'''
+        return cls.register(ui.current.function(), reg, *regs, **modifiers)
+    @utils.multicase(reg=(basestring, interface.register_t))
+    @classmethod
+    def register(cls, ea, reg, *regs, **modifiers):
+        """Yield each `(address, opnum, state)` within the function chunk containing the address `ea` which uses `reg` or any one of the registers in `regs`.
+
+        If the keyword `write` is True, then only return the result if it's writing to the register.
+        """
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use( (reg,) + regs )
+
+        for ea in cls.iterate(ea):
+            for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
+                yield ea, opnum, instruction.op_state(ea, opnum)
+            continue
+        return
+
     @utils.multicase()
     @classmethod
     def at(cls):
@@ -1329,7 +1350,7 @@ class block(object):
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
         bb = cls.at(ea)
-        return cls.register(B, reg, *regs, **modifiers)
+        return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bounds=builtins.tuple, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
@@ -1603,6 +1624,25 @@ class frame(object):
 
         """
         @utils.multicase()
+        def __new__(cls):
+            '''Yield each frame member of the current function.'''
+            return cls(ui.current.address())
+        @utils.multicase()
+        def __new__(cls, func):
+            '''Yield each frame member of the function `func`.'''
+            fn = by(func)
+
+            # figure out the frame
+            fr = idaapi.get_frame(fn)
+            if fr is None:  # unable to figure out arguments
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+
+            base = -fn.frsize
+            for (off, size), (name, _, _) in structure.fragment(fr.id, 0, cls.size(fn)):
+                yield off + base, name, size
+            return
+
+        @utils.multicase()
         @classmethod
         def size(cls):
             '''Returns the size of the local variables for the current function.'''
@@ -1625,6 +1665,25 @@ class frame(object):
             > print function.frame.regs.size(ea)
 
         """
+
+        @utils.multicase()
+        def __new__(cls):
+            '''Yield each saved register frame of the current function.'''
+            return cls(ui.current.address())
+        @utils.multicase()
+        def __new__(cls, func):
+            '''Yield each saved register frame of the function `func`.'''
+            fn = by(func)
+
+            # figure out the frame
+            fr = idaapi.get_frame(fn)
+            if fr is None:  # unable to figure out arguments
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+
+            base = frame.lvars.size(fn)
+            for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
+                yield off - base, name, size
+            return
 
         @utils.multicase()
         @classmethod

@@ -129,17 +129,6 @@ def size(ea):
     '''Returns the length of the instruction at the address `ea`.'''
     return at(ea).size
 
-@utils.multicase()
-def feature():
-    '''Returns the feature bitmask of the instruction at the current address.'''
-    return feature(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def feature(ea):
-    '''Return the feature bitmask for the instruction at the address `ea`.'''
-    if database.type.is_code(ea):
-        return at(ea).get_canon_feature()
-    return None
-
 @utils.multicase(opnum=six.integer_types)
 def opinfo(opnum):
     '''Returns the ``idaapi.opinfo_t`` for the operand `opnum` belonging to the instruction at the current address.'''
@@ -306,9 +295,9 @@ def ops_state():
 def ops_state(ea):
     '''Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address `ea`.'''
     ea = interface.address.inside(ea)
-    f = feature(ea)
+    f = type.feature(ea)
     res = ( ((f&ops_state.read[i]), (f&ops_state.write[i])) for i in six.moves.range(ops_count(ea)) )
-    return tuple((r and 'r' or '') + (w and 'w' or '') for r, w in res)
+    return tuple(interface.reftype_t.of_action((r and 'r' or '') + (w and 'w' or '')) for r, w in res)
 
 # pre-cache the CF_ flags from idaapi inside ops_state
 ops_state.read, ops_state.write = zip(*((getattr(idaapi, "CF_USE{:d}".format(idx + 1), 1 << (7 + idx)), getattr(idaapi, "CF_CHG{:d}".format(idx + 1), 1 << (1 + idx))) for idx in six.moves.range(idaapi.UA_MAXOP)))
@@ -344,12 +333,20 @@ def ops_constant(ea):
     return tuple(opnum for opnum, value in enumerate(ops_value(ea)) if isinstance(value, six.integer_types))
 ops_const = utils.alias(ops_constant)
 
+@utils.multicase()
+def ops_register(**modifiers):
+    '''Yields the index of each operand in the instruction at the current address which uses a register.'''
+    return ops_register(ui.current.address(), **modifiers)
+@utils.multicase()
+def ops_register(ea, **modifiers):
+    '''Yields the index of each operand in the instruction at the address `ea` which uses a register.'''
+    ea = interface.address.inside(ea)
+    iterops = interface.regmatch.modifier(**modifiers)
+    fregisterQ = utils.fcompose(op, utils.fcondition(utils.finstance(interface.symbol_t))(utils.fcompose(utils.fattribute('symbols'), functools.partial(map, utils.finstance(interface.register_t)), any), utils.fconstant(False)))
+    return tuple(filter(functools.partial(fregisterQ, ea), iterops(ea)))
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(reg, *regs, **modifiers):
-    """Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.
-
-    If the keyword `write` is true, then only return the result if it's writing to the register.
-    """
+    '''Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.'''
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(ea, reg, *regs, **modifiers):
@@ -392,7 +389,7 @@ def op_state(ea, opnum):
     The returned state is a string that can be "r", "w", or "rw" depending on
     whether the operand is being read from, written to, or modified (both).
     """
-    f = feature(ea)
+    f = type.feature(ea)
     r, w = f&ops_state.read[opnum], f&ops_state.write[opnum]
     res = (r and 'r' or '') + (w and 'w' or '')
 
@@ -1237,6 +1234,26 @@ class type(object):
     """
     @utils.multicase()
     @classmethod
+    def feature(cls):
+        '''Returns the feature bitmask of the instruction at the current address.'''
+        return cls.feature(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def feature(cls, ea):
+        '''Return the feature bitmask for the instruction at the address `ea`.'''
+        if database.type.is_code(ea):
+            return at(ea).get_canon_feature()
+        return None
+    @utils.multicase(ea=six.integer_types, mask=six.integer_types)
+    @classmethod
+    def feature(cls, ea, mask):
+        '''Return the feature bitmask for the instruction at the address `ea` masked with `mask`.'''
+        if database.type.is_code(ea):
+            return at(ea).get_canon_feature() & idaapi.as_uint32(mask)
+        return None
+
+    @utils.multicase()
+    @classmethod
     def is_sentinel(cls):
         '''Returns true if the current instruction is a sentinel-type instruction.'''
         return cls.is_sentinel(ui.current.address())
@@ -1245,7 +1262,7 @@ class type(object):
     def is_sentinel(cls, ea):
         '''Returns true if the instruction at `ea` is a sentinel-type instruction.'''
         ea = interface.address.inside(ea)
-        return database.type.is_code(ea) and all([feature(ea) & idaapi.CF_STOP])
+        return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
     issentinel = sentinelQ = utils.alias(is_sentinel, 'type')
 
     @utils.multicase()
@@ -1257,9 +1274,9 @@ class type(object):
     @classmethod
     def is_return(cls, ea):
         '''Returns true if the instruction at `ea` is a return-type instruction.'''
-        ea = interface.address.inside(ea)
-        F, (Xci, Xdi) = feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
-        Xc, Xd = ([item for item in X] for X in [Xci, Xdi])
+        ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
+        F, (Xci, Xdi) = cls.feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
+        Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
         return cls.is_sentinel(ea) and not any([F & idaapi.CF_JUMP, Xc, Xd])
     isreturn = returnQ = retQ = utils.alias(is_return, 'type')
 
@@ -1273,7 +1290,7 @@ class type(object):
     def is_shift(cls, ea):
         '''Returns true if the instruction at `ea` is a bit-shifting instruction.'''
         ea = interface.address.inside(ea)
-        return database.type.is_code(ea) and all([feature(ea) & idaapi.CF_SHFT])
+        return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_SHFT)])
     isshift = shiftQ = utils.alias(is_shift, 'type')
 
     @utils.multicase()
@@ -1285,10 +1302,10 @@ class type(object):
     @classmethod
     def is_branch(cls, ea):
         '''Returns true if the instruction at `ea` is any kind of branch.'''
-        ea = interface.address.inside(ea)
-        F, (Xci, Xdi) = feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
-        Xc, Xd = ([item for item in X] for X in [Xci, Xdi])
-        return database.type.is_code(ea) and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc, Xd])])
+        ea, Xcfilter = interface.address.inside(ea), {idaapi.get_item_end(ea)}
+        F, (Xci, Xdi) = cls.feature(ea), (interface.xiterate(ea, ffirst, fnext) for ffirst, fnext in [(idaapi.get_first_cref_from, idaapi.get_next_cref_from), (idaapi.get_first_dref_from, idaapi.get_next_dref_from)])
+        Xc, Xd = ([item for item in X] for X in [(item for item in Xci if item not in Xcfilter), Xdi])
+        return database.type.is_code(ea) and all([not any([F & idaapi.CF_CALL, F & idaapi.CF_SHFT]), any([F & idaapi.CF_JUMP, Xc])])
     isbranch = branchQ = utils.alias(is_branch, 'type')
 
     @utils.multicase()
@@ -1301,7 +1318,7 @@ class type(object):
     def is_jmp(cls, ea):
         '''Returns true if the instruction at `ea` is an immediate and indirect branch.'''
         ea = interface.address.inside(ea)
-        return cls.is_branch(ea) and all([feature(ea) & idaapi.CF_STOP])
+        return cls.is_branch(ea) and all([cls.feature(ea, idaapi.CF_STOP)])
     isjmp = jmpQ = utils.alias(is_jmp, 'type')
 
     @utils.multicase()
@@ -1314,7 +1331,7 @@ class type(object):
     def is_jxx(cls, ea):
         '''Returns true if the instruction at `ea` is a conditional branch.'''
         ea = interface.address.inside(ea)
-        return cls.is_branch(ea) and not all([feature(ea) & idaapi.CF_STOP])
+        return cls.is_branch(ea) and not all([cls.feature(ea, idaapi.CF_STOP)])
     isjxx = jxxQ = utils.alias(is_jxx, 'type')
 
     @utils.multicase()
@@ -1327,7 +1344,7 @@ class type(object):
     def is_jmpi(cls, ea):
         '''Returns true if the instruction at `ea` is an indirect branch.'''
         ea = interface.address.inside(ea)
-        return cls.is_branch(ea) and all([feature(ea) & idaapi.CF_JUMP])
+        return cls.is_branch(ea) and all([cls.feature(ea, idaapi.CF_JUMP)])
     isjmpi = jmpiQ = utils.alias(is_jmpi, 'type')
 
     @utils.multicase()
@@ -1343,7 +1360,7 @@ class type(object):
         if idaapi.__version__ < 7.0 and hasattr(idaapi, 'is_call_insn'):
             idaapi.decode_insn(ea)
             return idaapi.is_call_insn(ea)
-        return database.type.is_code(ea) and all([feature(ea) & idaapi.CF_CALL])
+        return database.type.is_code(ea) and all([cls.feature(ea, idaapi.CF_CALL)])
     iscall = callQ = utils.alias(is_call, 'type')
 
     @utils.multicase()
@@ -1356,12 +1373,13 @@ class type(object):
     def is_calli(cls, ea):
         '''Returns true if the instruction at `ea` is an indirect call.'''
         ea = interface.address.inside(ea)
-        F = feature(ea)
+        F = cls.feature(ea)
         return database.type.is_code(ea) and all([F & idaapi.CF_CALL, F & idaapi.CF_JUMP])
     iscalli = calliQ = utils.alias(is_calli, 'type')
 
 t = type    # XXX: ns alias
 
+feature = utils.alias(type.feature, 'type')
 is_return = returnQ = retQ = utils.alias(type.is_return, 'type')
 is_shift = shiftQ = utils.alias(type.is_shift, 'type')
 is_branch = branchQ = utils.alias(type.is_branch, 'type')
