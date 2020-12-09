@@ -297,7 +297,7 @@ def ops_state(ea):
     ea = interface.address.inside(ea)
     f = type.feature(ea)
     res = ( ((f&ops_state.read[i]), (f&ops_state.write[i])) for i in six.moves.range(ops_count(ea)) )
-    return tuple((r and 'r' or '') + (w and 'w' or '') for r, w in res)
+    return tuple(interface.reftype_t.of_action((r and 'r' or '') + (w and 'w' or '')) for r, w in res)
 
 # pre-cache the CF_ flags from idaapi inside ops_state
 ops_state.read, ops_state.write = zip(*((getattr(idaapi, "CF_USE{:d}".format(idx + 1), 1 << (7 + idx)), getattr(idaapi, "CF_CHG{:d}".format(idx + 1), 1 << (1 + idx))) for idx in six.moves.range(idaapi.UA_MAXOP)))
