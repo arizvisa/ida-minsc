@@ -3608,7 +3608,8 @@ class type(object):
         ea = interface.address.inside(ea)
 
         # FIXME: this doesn't seem like the right way to determine an instruction is reffing an import
-        return len(database.dxdown(ea)) == len(database.cxdown(ea)) and len(database.cxdown(ea)) > 0
+        datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
+        return len(datarefs) == len(coderefs) and len(coderefs) > 0
     isimportref = importrefQ = utils.alias(is_importref, 'type')
 
     @utils.multicase()
@@ -3623,7 +3624,8 @@ class type(object):
         ea = interface.address.inside(ea)
 
         # FIXME: this doesn't seem like the right way to determine this...
-        return len(database.dxdown(ea)) > len(database.cxdown(ea))
+        datarefs, coderefs = xref.data_down(ea), xref.code_down(ea)
+        return len(datarefs) > len(coderefs)
     isglobalref = globalrefQ = utils.alias(is_globalref, 'type')
 
 t = type    # XXX: ns alias
