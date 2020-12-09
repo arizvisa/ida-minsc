@@ -621,10 +621,18 @@ class structure_t(object):
         '''Remove the structure from the database.'''
         return idaapi.del_struc(self.ptr)
 
-    def __repr__(self):
+    def __str__(self):
         '''Display the structure in a readable format.'''
         name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment or '', self.tag()
-        return "<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
+        return "<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+
+    def __unicode__(self):
+        '''Display the structure in a readable format.'''
+        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment or '', self.tag()
+        return u"<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+
+    def __repr__(self):
+        return u"{!s}".format(self)
 
     def field(self, offset):
         '''Return the member at the specified offset.'''
@@ -1354,7 +1362,7 @@ class members_t(object):
             return False
         return True
 
-    def __repr__(self):
+    def __str__(self):
         '''Display all the fields within the specified structure.'''
         res = []
         mn, ms, mti = 0, 0, 0
@@ -1370,8 +1378,30 @@ class members_t(object):
 
         if len(self):
             mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
-            return "{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else c.encode('utf8')) if c else '') for i, n, t, ti, o, s, c, T in res))
+            return "{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
         return "{!r}".format(self.parent)
+
+    def __unicode__(self):
+        '''Display all the fields within the specified structure.'''
+        res = []
+        mn, ms, mti = 0, 0, 0
+        for i in six.moves.range(len(self)):
+            m = self[i]
+            name, t, ti, ofs, size, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
+            res.append((i, name, t, ti, ofs, size, comment or '', tag))
+            mn = max(mn, len(name))
+            ms = max(ms, len("{:+#x}".format(size)))
+            mti = max(mti, len("{!s}".format(ti.dstr()).replace(' *', '*')))
+
+        mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
+
+        if len(self):
+            mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
+            return u"{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
+        return u"{!r}".format(self.parent)
+
+    def __repr__(self):
+        return u"{!s}".format(self)
 
 class member_t(object):
     """
@@ -1713,10 +1743,18 @@ class member_t(object):
         cls = self.__class__
         raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to assign typeinfo ({!s}) to structure member {:s} ({:s}).".format('.'.join((__name__, cls.__name__)), self.id, utils.string.repr(info), utils.string.repr(self.name), message))
 
-    def __repr__(self):
+    def __str__(self):
         '''Display the member in a readable format.'''
         id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
-        return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}> {:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else comment.encode('utf8')) if comment else '')
+        return "<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}> {:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+
+    def __unicode__(self):
+        '''Display the member in a readable format.'''
+        id, name, typ, comment, tag, typeinfo = self.id, self.fullname, self.type, self.comment or '', self.tag(), "{!s}".format(self.typeinfo.dstr()).replace(' *', '*')
+        return u"<member '{:s}' index={:d} offset={:-#x} size={:+#x}{:s}> {:s}".format(utils.string.escape(name, '\''), self.index, self.offset, self.size, " typeinfo='{:s}'".format(typeinfo) if len("{:s}".format(typeinfo)) else '', " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+
+    def __repr__(self):
+        return u"{!s}".format(self)
 
     def refs(self):
         """Return the `(address, opnum, type)` of all the code and data references to this member within the database.
