@@ -750,20 +750,36 @@ class names(object):
             raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format('.'.join((__name__, cls.__name__)), query_s))
         return idaapi.get_nlist_ea(res)
 
+    @utils.multicase()
     @classmethod
-    def name(cls, ea):
-        '''Return the symbol name of the string at address `ea`.'''
+    def symbol(cls):
+        '''Return the symbol name of the current address.'''
+        return cls.symbol(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
+    @classmethod
+    def symbol(cls, ea):
+        '''Return the symbol name of the address `ea`.'''
         res = idaapi.get_nlist_idx(ea)
         return utils.string.of(idaapi.get_nlist_name(res))
+    name = utils.alias(symbol, 'names')
+
     @classmethod
     def address(cls, index):
-        '''Return the address of the string at `index`.'''
+        '''Return the address of the symbol at `index`.'''
         return idaapi.get_nlist_ea(index)
+
+    @utils.multicase()
+    @classmethod
+    def at(cls):
+        '''Return the index, symbol address, and name at the current address.'''
+        return cls.at(ui.current.address())
+    @utils.multicase(ea=six.integer_types)
     @classmethod
     def at(cls, ea):
+        '''Return the index, symbol address, and name at the address `ea`.'''
         idx = idaapi.get_nlist_idx(ea)
         ea, name = idaapi.get_nlist_ea(idx), idaapi.get_nlist_name(idx)
-        return ea, utils.string.of(name)
+        return idx, ea, utils.string.of(name)
 
 class search(object):
     """
