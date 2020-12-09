@@ -978,7 +978,12 @@ def op_structure(ea, opnum, path, **delta):
         insn = at(ea)
         ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, moff + delta.get('delta', 0))
 
-    return True if ok else False
+    # if we were not successful at applying the structure, then raise an exception.
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Unable to apply the given structure path to the specified address ({:#x}).".format(__name__, ea, opnum, path, delta.get('delta', 0), ea))
+
+    # otherwise, we just chain into another case to return what was applied.
+    return op_structure(ea, opnum)
 op_struc = op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
