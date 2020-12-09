@@ -568,15 +568,26 @@ class chunk(object):
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
     def add(cls, start, end):
-        '''Add the chunk `start` to `end` to the current function.'''
+        '''Add the chunk starting at the address `start` and terminating at `end` to the current function.'''
         return cls.add(ui.current.function(), start, end)
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def add(cls, bounds):
+        '''Add the chunk specified by `bounds` to the current function.'''
+        return cls.add(ui.current.function(), bounds)
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     @classmethod
     def add(cls, func, start, end):
-        '''Add the chunk `start` to `end` to the function `func`.'''
+        '''Add the chunk starting at the address `start` and terminating at `end` to the function `func`.'''
         fn = by(func)
         start, end = interface.address.inside(start, end)
         return idaapi.append_func_tail(fn, start, end)
+    @utils.multicase(bounds=tuple)
+    @classmethod
+    def add(cls, func, bounds):
+        '''Add the chunk specified by `bounds` to the function `func`.'''
+        start, end = bounds
+        return cls.add(func, start, end)
 
     @utils.multicase()
     @classmethod
