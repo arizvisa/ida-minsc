@@ -3251,12 +3251,12 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def has_reference():
-        '''Return true if the current address has a reference.'''
+        '''Return if the current address is referencing another address.'''
         return type.has_reference(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_reference(ea):
-        '''Return true if the address at `ea` has a reference.'''
+        '''Return if the address at `ea` is referencing another address.'''
         return type.flags(interface.address.within(ea), idaapi.FF_REF) == idaapi.FF_REF
     referenceQ = refQ = utils.alias(has_reference, 'type')
 
@@ -3397,12 +3397,12 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_reference():
-        '''Return true if the data at the current address is referenced.'''
+        '''Return if the data at the current address is referenced by another address.'''
         return type.is_reference(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_reference(ea):
-        '''Return true if the data at the address `ea` is referenced.'''
+        '''Return if the data at the address `ea` is referenced by another address.'''
         X, flags = idaapi.xrefblk_t(), idaapi.XREF_FAR | idaapi.XREF_DATA
         return X.first_to(ea, flags)
     is_ref = is_referenced = utils.alias(is_reference, 'type')
@@ -4026,7 +4026,7 @@ class marks(object):
         if 0 <= index < cls.MAX_SLOT_COUNT:
             return (cls.__get_slotaddress(index), cls.__get_description(index))
         raise E.IndexOutOfBoundsError(u"{:s}.by_index({:d}) : The specified mark slot index ({:d}) is out of bounds ({:s}).".format('.'.join((__name__, cls.__name__)), index, index, ("{:d} < 0".format(index)) if index < 0 else ("{:d} >= MAX_SLOT_COUNT".format(index))))
-    byIndex = utils.alias(by_index, 'marks')
+    byindex = utils.alias(by_index, 'marks')
 
     @utils.multicase()
     @classmethod
@@ -4038,7 +4038,7 @@ class marks(object):
     def by_address(cls, ea):
         '''Return the `(address, description)` of the mark at the given address `ea`.'''
         return cls.by_index(cls.__find_slotaddress(ea))
-    by = byAddress = utils.alias(by_address, 'marks')
+    by = byaddress = utils.alias(by_address, 'marks')
 
     ## Internal functions depending on which version of IDA is being used (<7.0)
     if idaapi.__version__ < 7.0:
