@@ -1050,7 +1050,7 @@ def name(ea, string, *suffix, **flags):
 
         # if we're pointing to the start of the function, then unless public was explicitly
         # specified we need to set the local name.
-        elif interface.range.start(func) == ea and not all(flag & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
+        elif interface.range.start(func) == ea and not builtins.all(flag & item for item in [idaapi.SN_PUBLIC, idaapi.SN_NON_PUBLIC]):
             flag |= idaapi.SN_LOCAL
 
         # if the name is supposed to be in the list, then we need to check if there's a
@@ -2510,20 +2510,20 @@ class address(object):
         iterops = interface.regmatch.modifier(**modifiers)
         uses_register = interface.regmatch.use(regs)
 
-        # if within a function, then make sure we're within the chunk's bounds.
+        # if within a function, then make sure we're within the chunk's bounds and we're a code type
         if function.within(ea):
             (start, _) = function.chunk(ea)
-            fwithin = functools.partial(operator.le, start)
+            fwithin = utils.fcompose(utils.fmap(functools.partial(operator.le, start), type.is_code), builtins.all)
 
         # otherwise ensure that we're not in the function and we're a code type.
         else:
-            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), all)
+            fwithin = utils.fcompose(utils.fmap(utils.fcompose(function.within, operator.not_), type.is_code), builtins.all)
 
             start = cls.__walk__(ea, cls.prev, fwithin)
             start = top() if start == idaapi.BADADDR else start
 
         # define a predicate for cls.walk to continue looping when true
-        Freg = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+        Freg = lambda ea: fwithin(ea) and not builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
         Fnot = utils.fcompose(predicate, operator.not_)
         F = utils.fcompose(utils.fmap(Freg, Fnot), builtins.any)
 
@@ -2539,6 +2539,10 @@ class address(object):
         if res in {None, idaapi.BADADDR} or (cls == address and res < start):
             # FIXME: include registers in message
             raise E.RegisterNotFoundError(u"{:s}.prevreg({:s}) : Unable to find register{:s} within the chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', start, ea, res))
+
+        # if the address is not a code type, then recurse so we can skip it.
+        if not type.is_code(res):
+            return cls.prevreg(res, predicate, *regs, **modifiers)
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2575,7 +2579,7 @@ class address(object):
         # if within a function, then make sure we're within the chunk's bounds.
         if function.within(ea):
             (_, end) = function.chunk(ea)
-            fwithin = functools.partial(operator.gt, end)
+            fwithin = utils.fcompose(utils.fmap(functools.partial(operator.gt, end), type.is_code), builtins.all)
 
         # otherwise ensure that we're not in a function and we're a code type.
         else:
@@ -2585,7 +2589,7 @@ class address(object):
             end = bottom() if end == idaapi.BADADDR else end
 
         # define a predicate for cls.walk to continue looping when true
-        Freg = lambda ea: fwithin(ea) and not any(uses_register(ea, opnum) for opnum in iterops(ea))
+        Freg = lambda ea: fwithin(ea) and not builtins.any(uses_register(ea, opnum) for opnum in iterops(ea))
         Fnot = utils.fcompose(predicate, operator.not_)
         F = utils.fcompose(utils.fmap(Freg, Fnot), builtins.any)
 
@@ -2601,6 +2605,10 @@ class address(object):
         if res in {None, idaapi.BADADDR} or (cls == address and res >= end):
             # FIXME: include registers in message
             raise E.RegisterNotFoundError(u"{:s}.nextreg({:s}) : Unable to find register{:s} within chunk {:#x}{:+#x}. Stopped at address {:#x}.".format('.'.join((__name__, cls.__name__)), args, '' if len(regs)==1 else 's', ea, end, res))
+
+        # if the address is not a code type, then recurse so we can skip it.
+        if not type.is_code(res):
+            return cls.nextreg(res, predicate, *regs, **modifiers)
 
         # recurse if the user specified it
         modifiers['count'] = count - 1
@@ -2622,11 +2630,19 @@ class address(object):
             logging.warn(u"{:s}.prevstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecated in the future..".format('.'.join((__name__, cls.__name__)), ea, delta))
             cls.__prevstack_warning_count__ = getattr(cls, '__prevstack_warning_count__', 0) + 1
 
+        # determine the boundaries that we're not allowed to seek past
         fn, sp = function.top(ea), function.get_spdelta(ea)
         start, _ = function.chunk(ea)
-        res = cls.__walk__(ea, cls.prev, lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta)
-        if res == idaapi.BADADDR or res < start:
-            raise E.AddressOutOfBoundsError(u"{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the top ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, start, fn, res))
+        fwithin = lambda ea: ea >= start and abs(function.get_spdelta(ea) - sp) < delta
+
+        # walk to the previous major change in the stack delta, and keep
+        # looping if we haven't found it yet.
+        found = False
+        while not found:
+            res = cls.__walk__(ea, cls.prev, fwithin)
+            if res == idaapi.BADADDR or res < start:
+                raise E.AddressOutOfBoundsError(u"{:s}.prevstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the top ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, start, fn, res))
+            found, ea = type.is_code(res), cls.prev(res)
         return res
 
     # FIXME: modify this to just locate _any_ amount of change in the sp delta by default
@@ -2645,12 +2661,20 @@ class address(object):
             logging.warn(u"{:s}.nextstack({:#x}, {:#x}) : This function's semantics are subject to change and may be deprecatd in the future.".format('.'.join((__name__, cls.__name__)), ea, delta))
             cls.__nextstack_warning_count__ = getattr(cls, '__nextstack_warning_count__', 0) + 1
 
+        # determine the boundaries that we're not allowed to seek past
         fn, sp = function.top(ea), function.get_spdelta(ea)
         _, end = function.chunk(ea)
-        res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
-        if res == idaapi.BADADDR or res >= end:
-            raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to walking past the bottom ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, end, fn, res))
+
+        # walk to the next major change in the stack delta, and keep
+        # looping if we haven't found it yet.
+        found = False
+        while not found:
+            res = cls.__walk__(ea, cls.next, lambda ea: ea < end and abs(function.get_spdelta(ea) - sp) < delta)
+            if res == idaapi.BADADDR or res >= end:
+                raise E.AddressOutOfBoundsError(u"{:s}.nextstack({:#x}, {:+#x}) : Unable to locate instruction matching contraints due to encountering the bottom ({:#x}) of the function {:#x}. Stopped at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, delta, end, fn, res))
+            found, ea = type.is_code(res), cls.next(res)
         return res
+
     prevdelta, nextdelta = utils.alias(prevstack, 'address'), utils.alias(nextstack, 'address')
 
     @utils.multicase()
@@ -3777,7 +3801,7 @@ class xref(object):
 
             # if the current instruction is a non-"stop" instruction, then it will
             # include a reference to the next instruction. so, we'll remove it.
-            if type.is_code(ea) and _instruction.feature(ea) & idaapi.CF_STOP != idaapi.CF_STOP:
+            if type.is_code(ea) and _instruction.type.feature(ea, idaapi.CF_STOP) != idaapi.CF_STOP:
                 res.discard(next_ea)
 
         except E.OutOfBoundsError:
@@ -3807,7 +3831,7 @@ class xref(object):
 
             # if the previous instruction is a non-"stop" instruction, then it will
             # reference the current instruction which is a reason to remove it.
-            if type.is_code(prev_ea) and _instruction.feature(prev_ea) & idaapi.CF_STOP != idaapi.CF_STOP:
+            if type.is_code(prev_ea) and _instruction.type.feature(prev_ea, idaapi.CF_STOP) != idaapi.CF_STOP:
                 res.discard(prev_ea)
 
         except E.OutOfBoundsError:
@@ -3937,7 +3961,7 @@ class xref(object):
     def erase(ea):
         '''Clear all references at the address `ea`.'''
         ea = interface.address.inside(ea)
-        return all(ok for ok in (xref.rm_code(ea), xref.rm_data(ea)))
+        return builtins.all(ok for ok in (xref.rm_code(ea), xref.rm_data(ea)))
     rx = utils.alias(rm_data, 'xref')
 
 x = xref    # XXX: ns alias
