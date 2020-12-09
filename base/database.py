@@ -3161,7 +3161,7 @@ class type(object):
     @staticmethod
     def is_initialized(ea):
         '''Return true if the address specified by `ea` is initialized.'''
-        return type.flags(interface.address.within(ea), idaapi.FF_IVL) == idaapi.FF_IVL
+        return type.flags(interface.address.within(ea), idaapi.FF_IVL) != idaapi.FF_IVL
     initializedQ = utils.alias(is_initialized, 'type')
 
     @utils.multicase()
@@ -4595,7 +4595,7 @@ class set(object):
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok else 0
+        return size if ok else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unknown(cls, ea, size):
@@ -4604,7 +4604,7 @@ class set(object):
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok else 0
+        return size if ok else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
     undef = undefine = undefined = utils.alias(unknown, 'set')
 
     @utils.multicase()
@@ -5203,21 +5203,22 @@ class set(object):
 
     struc = struct = utils.alias(structure, 'set')
 
-    @utils.multicase(type=builtins.list)
+    @utils.multicase()
     @classmethod
     def array(cls, type):
         '''Set the data at the current address to an array of the specified `type`.'''
-        return cls.array(ui.current.address(), type, 1)
+        return cls.array(ui.current.address(), type)
     @utils.multicase(length=six.integer_types)
     @classmethod
     def array(cls, type, length):
         '''Set the data at the current address to an array with the specified `length` and `type`.'''
         return cls.array(ui.current.address(), type, length)
-    @utils.multicase(ea=six.integer_types, type=builtins.list)
+    @utils.multicase(ea=six.integer_types)
     @classmethod
     def array(cls, ea, type):
         '''Set the data at the address `ea` to an array of the specified `type`.'''
-        return cls.array(ea, type, 1)
+        type, length = type if isinstance(type, builtins.list) else (type, 1)
+        return cls.array(ea, type, length)
     @utils.multicase(ea=six.integer_types, length=six.integer_types)
     @classmethod
     def array(cls, ea, type, length):
