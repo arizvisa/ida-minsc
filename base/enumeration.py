@@ -209,10 +209,10 @@ def mask(enum):
 def repr(enum):
     '''Return a printable summary of the enumeration `enum`.'''
     eid = by(enum)
-    w = size(eid)*2
-    res = [(member.name(item), member.value(item), member.mask(item), member.comment(item)) for item in members.iterate(eid)]
+    w, cmt = 2 * size(eid), comment(enum, repeatable=True) or comment(enum, repeatable=False)
+    res = [(member.name(item), member.value(item), member.mask(item), member.comment(item, repeatable=True) or member.comment(item, repeatable=False)) for item in members.iterate(eid)]
     aligned = max([len(item) for item, _, _, _ in res] if res else [0])
-    return "<type 'enum'> {:s}\n".format(name(eid)) + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned)+((' // '+comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res)))   # XXX
+    return "<type 'enum'> {:s}{:s}\n".format(name(eid), " // {:s}".format(cmt) if cmt else '') + '\n'.join(("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned) + (" // {:s}".format(comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res)))
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
@@ -453,6 +453,7 @@ class member(object):
     def parent(cls, mid):
         '''Return the id of the enumeration that owns the member `mid`.'''
         return idaapi.get_enum_member_enum(mid)
+    owner = utils.alias(parent, 'member')
 
     @utils.multicase(mid=six.integer_types)
     @classmethod
