@@ -3155,50 +3155,74 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def is_initialized():
-        '''Return true if the current address is initialized.'''
+        '''Return if the current address is initialized.'''
         return type.is_initialized(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_initialized(ea):
-        '''Return true if the address specified by `ea` is initialized.'''
-        return type.flags(interface.address.within(ea), idaapi.FF_IVL) != idaapi.FF_IVL
+        '''Return if the address specified by `ea` is initialized.'''
+        return type.flags(interface.address.within(ea), idaapi.FF_IVL) == idaapi.FF_IVL
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_initialized(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is initialized.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.FF_IVL) == idaapi.FF_IVL for offset in builtins.range(size))
     initializedQ = utils.alias(is_initialized, 'type')
 
     @utils.multicase()
     @staticmethod
     def is_code():
-        '''Return true if the current address is marked as code.'''
+        '''Return if the current address is marked as code.'''
         return type.is_code(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_code(ea):
-        '''Return true if the address specified by `ea` is marked as code.'''
+        '''Return if the address specified by `ea` is marked as code.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_CODE
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_code(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is marked as code.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_CODE for offset in builtins.range(size))
     codeQ = utils.alias(is_code, 'type')
 
     @utils.multicase()
     @staticmethod
     def is_data():
-        '''Return true if the current address is marked as data.'''
+        '''Return if the current address is marked as data.'''
         return type.is_data(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_data(ea):
-        '''Return true if the address specified by `ea` is marked as data.'''
+        '''Return if the address specified by `ea` is marked as data.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_DATA
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_data(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is marked as data.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_DATA for offset in builtins.range(size))
     dataQ = utils.alias(is_data, 'type')
 
     # True if ea marked unknown
     @utils.multicase()
     @staticmethod
     def is_unknown():
-        '''Return true if the current address is marked as unknown.'''
+        '''Return if the current address is marked as unknown.'''
         return type.is_unknown(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def is_unknown(ea):
-        '''Return true if the address specified by `ea` is marked as unknown.'''
+        '''Return if the address specified by `ea` is marked as unknown.'''
         return type.flags(interface.address.within(ea), idaapi.MS_CLS) == idaapi.FF_UNK
+    @utils.multicase(ea=six.integer_types, size=six.integer_types)
+    @staticmethod
+    def is_unknown(ea, size):
+        '''Return if the address specified by `ea` up to `size` bytes is marked as unknown.'''
+        ea = interface.address.within(ea)
+        return all(type.flags(ea + offset, idaapi.MS_CLS) == idaapi.FF_UNK for offset in builtins.range(size))
     unknownQ = is_undefined = undefinedQ = utils.alias(is_unknown, 'type')
 
     @utils.multicase()
@@ -4595,7 +4619,7 @@ class set(object):
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
+        return size if ok and type.is_unknown(ea, size) else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
     @utils.multicase(ea=six.integer_types, size=six.integer_types)
     @classmethod
     def unknown(cls, ea, size):
@@ -4604,7 +4628,7 @@ class set(object):
             ok = idaapi.do_unknown_range(ea, size, idaapi.DOUNK_SIMPLE)
         else:
             ok = idaapi.del_items(ea, idaapi.DELIT_SIMPLE, size)
-        return size if ok else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
+        return size if ok and type.is_unknown(ea, size) else idaapi.get_item_size(ea) if type.is_unknown(ea) else 0
     undef = undefine = undefined = utils.alias(unknown, 'set')
 
     @utils.multicase()
@@ -4839,7 +4863,7 @@ class set(object):
         def __new__(cls, ea, size):
             '''Set the data at the address `ea` to an integer of the specified `size`.'''
             res = set.unknown(ea, size)
-            if res != size:
+            if not type.is_unknown(ea, size) or res < size:
                 raise E.DisassemblerError(u"{:s}({:#x}, {:d}) : Unable to undefine {:d} byte{:s} for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, size, '' if size == 1 else 's'))
 
             ok = set.data(ea, size)
@@ -4857,7 +4881,7 @@ class set(object):
         def uint8_t(cls, ea):
             '''Set the data at address `ea` to a uint8_t.'''
             res = set.unknown(ea, 1)
-            if res != 1:
+            if not type.is_unknown(ea, 1) or res < 1:
                 raise E.DisassemblerError(u"{:s}.uint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
 
             # Apply our data type after undefining it
@@ -4881,7 +4905,7 @@ class set(object):
         def sint8_t(cls, ea):
             '''Set the data at address `ea` to a sint8_t.'''
             res = set.unknown(ea, 1)
-            if res != 1:
+            if not type.is_unknown(ea, 1) or res < 1:
                 raise E.DisassemblerError(u"{:s}.sint8_t({:#x}) : Unable to undefine {:d} byte for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 1))
 
             # Apply our data type after undefining it
@@ -4907,7 +4931,7 @@ class set(object):
         def uint16_t(cls, ea):
             '''Set the data at address `ea` to a uint16_t.'''
             res = set.unknown(ea, 2)
-            if res != 2:
+            if not type.is_unknown(ea, 2) or res < 2:
                 raise E.DisassemblerError(u"{:s}.uint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
             # Apply our data type after undefining it
@@ -4931,7 +4955,7 @@ class set(object):
         def sint16_t(cls, ea):
             '''Set the data at address `ea` to a sint16_t.'''
             res = set.unknown(ea, 2)
-            if res != 2:
+            if not type.is_unkonwn(ea, 2) or res < 2:
                 raise E.DisassemblerError(u"{:s}.sint16_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 2))
 
             # Apply our data type after undefining it
@@ -4960,7 +4984,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 4)
-            if res != 4:
+            if not type.is_unknown(ea, 4) or res < 4:
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our new data type after undefining it
@@ -4987,7 +5011,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 4)
-            if res != 4:
+            if not type.is_unknown(ea, 4) or res < 4:
                 raise E.DisassemblerError(u"{:s}.uint32_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our new data type after undefining it
@@ -5016,7 +5040,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 8)
-            if res != 8:
+            if not type.is_unknown(ea, 8) or res < 8:
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our new data type after undefining it
@@ -5043,7 +5067,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 8)
-            if res != 8:
+            if not type.is_unknown(ea, 8) or res < 8:
                 raise E.DisassemblerError(u"{:s}.uint64_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our new data type after undefining it
@@ -5072,7 +5096,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 16)
-            if res != 16:
+            if not type.is_unknown(ea, 16) or res < 16:
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
             # Apply our new data type after undefining it
@@ -5099,7 +5123,7 @@ class set(object):
 
             # Undefine the data at the specified address
             res = set.unknown(ea, 16)
-            if res != 16:
+            if not type.is_unknown(ea, 16) or res < 16:
                 raise E.DisassemblerError(u"{:s}.uint128_t({:#x}) : Unable to undefine {:d} bytes for the integer.".format('.'.join((__name__, 'set', cls.__name__)), ea, 16))
 
             # Apply our new data type after undefining it
@@ -5153,7 +5177,7 @@ class set(object):
         def single(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 single.'''
             res = set.unknown(ea, 4)
-            if res != 4:
+            if not type.is_unknown(ea, 4) or res < 4:
                 raise E.DisassemblerError(u"{:s}.single({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 4))
 
             # Apply our data type after undefining it
@@ -5174,7 +5198,7 @@ class set(object):
         def double(cls, ea):
             '''Set the data at address `ea` to an IEEE-754 double.'''
             res = set.unknown(ea, 8)
-            if res != 8:
+            if not type.is_unknown(ea, 8) or res < 8:
                 raise E.DisassemblerError(u"{:s}.double({:#x}) : Unable to undefine {:d} bytes for the float.".format('.'.join((__name__, 'set', cls.__name__)), ea, 8))
 
             # Apply our data type after undefining it
