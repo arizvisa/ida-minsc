@@ -697,6 +697,10 @@ def comment(structure, **repeatable):
 def comment(structure, cmt, **repeatable):
     '''Set the comment to `cmt` for the specified `structure`.'''
     return comment(structure.id, cmt, **repeatable)
+@utils.multicase(structure=structure_t, none=types.NoneType)
+def comment(structure, none, **repeatable):
+    '''Remove the comment from the specified `structure`.'''
+    return comment(structure.id, none or '', **repeatable)
 @utils.multicase(id=six.integer_types, cmt=basestring)
 @utils.string.decorate_arguments('cmt')
 def comment(id, cmt, **repeatable):
@@ -706,6 +710,10 @@ def comment(id, cmt, **repeatable):
     """
     res = utils.string.to(cmt)
     return idaapi.set_struc_cmt(id, res, repeatable.get('repeatable', True))
+@utils.multicase(id=six.integer_types, none=types.NoneType)
+def comment(id, none, **repeatable):
+    '''Remove the comment from the structure identified by `id`.'''
+    return comment(id, none or '', **repeatable)
 
 @utils.multicase(id=six.integer_types)
 def index(id):
