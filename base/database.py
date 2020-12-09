@@ -5161,7 +5161,10 @@ class set(object):
         def __new__(cls, ea):
             '''Sets the data at address `ea` to an IEEE-754 floating-point number based on its size.'''
             size = type.size(ea)
-            if size == 4:
+            if size < 4 and type.is_unknown(ea, 4):
+                logging.warning(u"{:s}({:#x}) : Promoting number at address {:#x} to 32-bit single due to item size ({:+d}) being less than the smallest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'set', cls.__name__]), ea, size, 4))
+                return cls.single(ea)
+            elif size == 4:
                 return cls.single(ea)
             elif size == 8:
                 return cls.double(ea)
@@ -5527,6 +5530,9 @@ class get(object):
             elif size == 4:
                 return cls.single(ea, **byteorder)
             elif size == 8:
+                return cls.double(ea, **byteorder)
+            elif size > 8:
+                logging.warning(u"{:s}({:#x}) : Demoting size ({:+d}) for floating-point number at {:#x} down to largest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'get', cls.__name__]), size, ea, 8))
                 return cls.double(ea, **byteorder)
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}) : Unable to determine the type of floating-point number for the item's size ({:+#x}).".format('.'.join((__name__, 'get', cls.__name__)), ea, size))
 
