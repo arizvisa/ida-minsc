@@ -523,6 +523,27 @@ class chunk(object):
             yield ea
         return
 
+    @utils.multicase(reg=(basestring, interface.register_t))
+    @classmethod
+    def register(cls, reg, *regs, **modifiers):
+        '''Yield each `(address, opnum, state)` within the function chunk containing the current address which uses `reg` or any one of the registers in `regs`.'''
+        return cls.register(ui.current.function(), reg, *regs, **modifiers)
+    @utils.multicase(reg=(basestring, interface.register_t))
+    @classmethod
+    def register(cls, ea, reg, *regs, **modifiers):
+        """Yield each `(address, opnum, state)` within the function chunk containing the address `ea` which uses `reg` or any one of the registers in `regs`.
+
+        If the keyword `write` is True, then only return the result if it's writing to the register.
+        """
+        iterops = interface.regmatch.modifier(**modifiers)
+        uses_register = interface.regmatch.use( (reg,) + regs )
+
+        for ea in cls.iterate(ea):
+            for opnum in itertools.ifilter(functools.partial(uses_register, ea), iterops(ea)):
+                yield ea, opnum, instruction.op_state(ea, opnum)
+            continue
+        return
+
     @utils.multicase()
     @classmethod
     def at(cls):
