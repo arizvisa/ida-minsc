@@ -181,16 +181,24 @@ def comment(enum, comment, **repeatable):
 
 @utils.multicase()
 def size(enum):
-    '''Return the number of bits for the enumeration `enum`.'''
+    '''Return the number of bytes for the enumeration `enum`.'''
     eid = by(enum)
-    res = idaapi.get_enum_width(eid)
-    return res * 8
+    return idaapi.get_enum_width(eid)
 @utils.multicase(width=six.integer_types)
 def size(enum, width):
-    '''Set the number of bits for the enumeration `enum` to `width`.'''
+    '''Set the number of bytes for the enumeration `enum` to `width`.'''
     eid = by(enum)
+    return idaapi.set_enum_width(eid, width)
+
+@utils.multicase()
+def bits(enum):
+    '''Return the number of bits for the enumeration `enum`.'''
+    return 8 * size(enum)
+@utils.multicase(width=six.integer_types)
+def bits(enum, width):
+    '''Set the number of bits for the enumeration `enum` to `width`.'''
     res = math.trunc(math.ceil(width / 8.0))
-    return idaapi.set_enum_width(eid, int(res))
+    return size(enum, int(res))
 
 def mask(enum):
     '''Return the bitmask for the enumeration `enum`.'''
