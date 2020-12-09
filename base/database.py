@@ -3046,7 +3046,7 @@ class type(object):
         # Check if we're pointing at an export or directly at a function. If we
         # are, then we need to use function.type.
         try:
-            rt, ea = interface.addressOfRuntimeOrStatic(func)
+            rt, ea = interface.addressOfRuntimeOrStatic(ea)
             if rt or function.address(ea) == ea:
                 return function.type(ea, info)
 
@@ -3430,7 +3430,7 @@ class type(object):
         '''Return true if the address at `ea` is defined as a structure.'''
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         return type.flags(ea, idaapi.DT_TYPE) == FF_STRUCT
-    structQ = is_struc = is_struct = utils.alias(is_structure, 'type')
+    structQ = structureQ = is_struc = is_struct = utils.alias(is_structure, 'type')
 
     @utils.multicase()
     @staticmethod
