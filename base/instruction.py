@@ -344,6 +344,10 @@ def ops_constant(ea):
     return tuple(opnum for opnum, value in enumerate(ops_value(ea)) if isinstance(value, six.integer_types))
 ops_const = utils.alias(ops_constant)
 
+@utils.multicase()
+def ops_register(**modifiers):
+    '''Yields the index of each operand in the instruction at the current address which uses a register.'''
+    return ops_register(ui.current.address(), **modifiers)
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.
@@ -351,6 +355,13 @@ def ops_register(reg, *regs, **modifiers):
     If the keyword `write` is true, then only return the result if it's writing to the register.
     """
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
+@utils.multicase()
+def ops_register(ea, **modifiers):
+    '''Yields the index of each operand in the instruction at the address `ea` which uses a register.'''
+    ea = interface.address.inside(ea)
+    iterops = interface.regmatch.modifier(**modifiers)
+    fregisterQ = utils.fcompose(op, utils.fcondition(utils.finstance(interface.symbol_t))(utils.fcompose(utils.fattribute('symbols'), functools.partial(map, utils.finstance(interface.register_t)), any), utils.fconstant(False)))
+    return tuple(filter(functools.partial(fregisterQ, ea), iterops(ea)))
 @utils.multicase(reg=(basestring, interface.register_t))
 def ops_register(ea, reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
