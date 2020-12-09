@@ -805,13 +805,13 @@ class search(object):
         """
         radix = direction.get('radix', 0)
 
-        # convert the data directly into a string of base-10 integers
+        # convert the bytes directly into a string of base-10 integers
         if isinstance(string, bytes) and radix == 0:
-            radix, queryF = 10, lambda string: ' '.join("{:d}".format(six.byte2int(ch)) for ch in string)
+            radix, queryF = 10, lambda string: ' '.join("{:d}".format(by) for by in bytearray(string))
 
-        # convert the unicode string directly into a string of base-10 integers
-        elif isinstance(string, unicode) and radix == 0:
-            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((six.byte2int(ch) & 0xff00) / 0x100, (six.byte2int(ch) & 0x00ff) / 0x1) for ch in string))))
+        # convert the string directly into a string of base-10 integers
+        elif isinstance(string, six.string_types) and radix == 0:
+            radix, queryF = 10, lambda string: ' '.join(map("{:d}".format, itertools.chain(*(((six.unichr(ch) & 0xff00) // 0x100, (six.unichr(ch) & 0x00ff) // 0x1) for ch in string))))
 
         # otherwise, leave it alone because the user specified the radix already
         else:
@@ -1111,17 +1111,6 @@ def name(ea, string, *suffix, **flags):
 def name(ea, none, **flags):
     '''Removes the name defined at the address `ea`.'''
     return name(ea, none or '', **flags)
-
-@utils.multicase()
-def erase():
-    '''Remove all of the defined tags at the current address.'''
-    return erase(ui.current.address())
-@utils.multicase(ea=six.integer_types)
-def erase(ea):
-    '''Remove all of the defined tags at address `ea`.'''
-    ea = interface.address.inside(ea)
-    for k in tag(ea): tag(ea, k, None)
-    color(ea, None)
 
 @utils.multicase()
 def color():
@@ -1619,6 +1608,8 @@ def tag(ea, key, none):
         return extra.__del_suffix__(ea)
     if key == '__typeinfo__':
         return type(ea, None)
+    if key == '__color__':
+        return color(ea, None)
 
     # if not within a function, then fetch the repeatable comment otherwise update the non-repeatable one
     try:
