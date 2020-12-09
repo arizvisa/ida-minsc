@@ -1344,8 +1344,8 @@ class block(object):
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block identified by `bounds` that uses `reg` or any one of the registers in `regs`.'''
-        B = cls.at(bounds)
-        return cls.register(B, reg, *regs, **modifiers)
+        bb = cls.at(bounds)
+        return cls.register(bb, reg, *regs, **modifiers)
     @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
