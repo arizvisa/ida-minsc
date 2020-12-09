@@ -602,7 +602,7 @@ def read(ea, size):
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
     start, end = interface.address.within(ea, ea + size)
     return get_bytes(ea, end - start) or b''
-@utils.multicase(bounds=interface.bounds_t)
+@utils.multicase(bounds=tuple)
 def read(bounds):
     '''Return the bytes within the specified `bounds`.'''
     get_bytes = idaapi.get_many_bytes if idaapi.__version__ < 7.0 else idaapi.get_bytes
@@ -2113,22 +2113,34 @@ class address(object):
                 yield res
                 res = step(res)
         except E.OutOfBoundsError: pass
-    @utils.multicase(bounds=interface.bounds_t)
+    @utils.multicase(bounds=tuple)
     @classmethod
     def iterate(cls, bounds):
         '''Iterate through all of the addresses defined within `bounds`.'''
         left, right = bounds
         return cls.iterate(left, cls.prev(right))
+    @utils.multicase(bounds=tuple, step=callable)
+    @classmethod
+    def iterate(cls, bounds, step):
+        '''Iterate through all of the addresses defined within `bounds` using the callable `step` to determine the next address.'''
+        left, right = bounds
+        return cls.iterate(left, cls.prev(right), step)
 
     @classmethod
     @utils.multicase(end=six.integer_types)
     def blocks(cls, end):
-        '''Yields the bounds of each block from the current address to `end`.'''
+        '''Yields the boundaries of each block from the current address to `end`.'''
         return cls.blocks(ui.current.address(), end)
+    @classmethod
+    @utils.multicase(bounds=tuple)
+    def blocks(cls, bounds):
+        '''Yields the boundaries of each block within the specified `bounds`.'''
+        left, right = bounds
+        return cls.blocks(left, right)
     @classmethod
     @utils.multicase(start=six.integer_types, end=six.integer_types)
     def blocks(cls, start, end):
-        '''Yields the bounds of each block between the addresses `start` and `end`.'''
+        '''Yields the boundaries of each block between the addresses `start` and `end`.'''
         block, _ = start, end = interface.address.head(start), address.tail(end) + 1
         for ea in cls.iterate(start, end):
             nextea = cls.next(ea)

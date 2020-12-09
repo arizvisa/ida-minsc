@@ -1762,7 +1762,36 @@ class bounds_t(namedtypedtuple):
     _fields = ('left', 'right')
     _types = (six.integer_types, six.integer_types)
 
-    def __new__(cls, *args):
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 2 and not kwargs:
+            return super(bounds_t, cls).__new__(cls, *sorted(args))
+
+        # create a mapping containing our individual fields given with our
+        # arguments. the keyword parameters are given secondary priority to
+        # any argument parameters.
+        fields = {fld : item for fld, item in zip(cls._fields, args)}
+        [ fields.setdefault(fld, kwargs.pop(fld)) for fld in cls._fields if fld in kwargs ]
+
+        # if the size was provided, then we can use it to calculate the
+        # right size of our boundaries.
+        if all(item in fields for item in cls._fields) and 'size' in kwargs:
+            raise TypeError("{!s}() got unexpected keyword argument{:s} {:s}".format(cls.__name__, '' if len(kwargs) == 1 else 's', ', '.join(map("'{!s}'".format, kwargs))))
+
+        elif 'left' in fields and 'size' in kwargs:
+            fields.setdefault('right', fields['left'] + kwargs.pop('size'))
+
+        # at this point, we should have all our boundaries. it kwargs has
+        # anything left in it or any required fields are not defined, then
+        # raise an exception because invalid parameters were passed to us.
+        if len(kwargs):
+            raise TypeError("{!s}() got unexpected keyword argument{:s} {:s}".format(cls.__name__, '' if len(kwargs) == 1 else 's', ', '.join(map("'{!s}'".format, kwargs))))
+        if any(item not in fields for item in cls._fields):
+            available, required = ({item for item in items} for items in [fields, cls._fields])
+            missing = required - available
+            raise TypeError("{!s}() is missing required field{:s} {:s}".format(cls.__name__, '' if len(missing) == 1 else 's', ', '.join(map("'{!s}'".format, (item for item in cls._fields if item in missing)))))
+
+        # now we can use our fields to construct our type properly.
+        args = (fields[item] for item in cls._fields)
         return super(bounds_t, cls).__new__(cls, *sorted(args))
 
     @property
@@ -1771,13 +1800,27 @@ class bounds_t(namedtypedtuple):
         left, right = self
         return right - left if left < right else left - right
 
+    def translate(self, offset):
+        '''Return an instance of the class with its boundaries translated by the provided `offset`.'''
+        cls = self.__class__
+        left, right = self
+        return cls(offset + left, offset + right)
+
     def contains(self, ea):
         '''Return if the address `ea` is contained by the ``bounds_t``.'''
         left, right = self
         return left <= ea < right if left < right else right <= ea < left
     __contains__ = contains
 
-    def __repr__(self):
+    def __str__(self):
         cls = self.__class__
-        res = ("{!s}={:#x}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
-        return "{:s}({:s})".format(cls.__name__, ', '.join(res))
+        items = ("{!s}={:#x}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
+        return "{:s}({:s})".format(cls.__name__, ', '.join(items))
+
+    def __unicode__(self):
+        cls = self.__class__
+        items = (u"{!s}={:#x}".format(internal.utils.string.escape(name, ''), value) for name, value in zip(self._fields, self))
+        return u"{:s}({:s})".format(cls.__name__, u', '.join(items))
+
+    def __repr__(self):
+        return u"{!s}".format(self)
