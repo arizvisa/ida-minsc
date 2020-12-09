@@ -478,7 +478,16 @@ class structure_t(object):
             ida_string = res
 
         # now we can set the name of the structure
-        return idaapi.set_struc_name(self.id, ida_string)
+        oldname = idaapi.get_struc_name(self.id)
+        ok = idaapi.set_struc_name(self.id, ida_string)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
+
+        # verify that the name was actually assigned properly
+        assigned = idaapi.get_struc_name(self.id) or ''
+        if utils.string.of(assigned) != utils.string.of(ida_string):
+            logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
+        return ok
 
     @property
     def comment(self, repeatable=True):
@@ -489,8 +498,16 @@ class structure_t(object):
     @utils.string.decorate_arguments('value')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
-        res = utils.string.to(value)
-        return idaapi.set_struc_cmt(self.id, res, repeatable)
+        res = utils.string.to(value or '')
+        ok = idaapi.set_struc_cmt(self.id, res, repeatable)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(self.name)))
+
+        # verify that the comment was actually assigned
+        assigned = idaapi.get_struc_cmt(self.id, repeatable)
+        if utils.string.of(assigned) != utils.string.of(res):
+            logging.info(u"{:s}({:#x}).comment : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
+        return ok
 
     @utils.multicase()
     def tag(self):
@@ -1516,7 +1533,16 @@ class member_t(object):
             ida_string = res
 
         # now we can set the name of the member at the specified offset
-        return idaapi.set_member_name(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, ida_string)
+        oldname = self.name
+        ok = idaapi.set_member_name(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, ida_string)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
+
+        # verify that the name was actually assigned properly
+        assigned = idaapi.get_member_name(self.id) or ''
+        if utils.string.of(assigned) != utils.string.of(ida_string):
+            logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
+        return ok
 
     @property
     def comment(self, repeatable=True):
@@ -1527,8 +1553,16 @@ class member_t(object):
     @utils.string.decorate_arguments('value')
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment of the member to `value`.'''
-        res = utils.string.to(value)
-        return idaapi.set_member_cmt(self.ptr, res, repeatable)
+        res = utils.string.to(value or '')
+        ok = idaapi.set_member_cmt(self.ptr, res, repeatable)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name)))
+
+        # verify that the comment was actually assigned properly
+        assigned = idaapi.get_member_cmt(self.id, repeatable)
+        if utils.string.of(assigned) != utils.string.of(res):
+            logging.info(u"{:s}({:#x}).comment : The comment ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
+        return ok
 
     @utils.multicase()
     def tag(self):
@@ -1583,10 +1617,7 @@ class member_t(object):
         if m is None:
             return 0
         flag = m.flag & idaapi.DT_TYPE
-
-        # idaapi(swig) and python have different definitions of what constant values are
-        max = (sys.maxint+1)*2
-        return (max+flag) if flag < 0 else (flag-max) if flag > max else flag
+        return idaapi.as_uint32(flag)
     @property
     def type(self):
         '''Return the type of the member in its pythonic form.'''
