@@ -1488,6 +1488,14 @@ class member_t(object):
         '''Return the ending offset of the member.'''
         return self.ptr.eoff
     @property
+    def realbounds(self):
+        ptr = self.ptr
+        return interface.bounds_t(ptr.soff, ptr.eoff)
+    @property
+    def bounds(self):
+        ptr, base = self.ptr, self.__parent.members.baseoffset
+        return interface.bounds_t(ptr.soff, ptr.eoff).translate(base)
+    @property
     def parent(self):
         '''Return the structure_t that owns the member.'''
         return self.__parent
