@@ -209,6 +209,8 @@ def operand(opnum):
 def operand(ea, opnum):
     '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn = at(ea)
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.operand({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # If we're using backwards-compatiblity mode then we need to assign the
     # operand into our op_t.
@@ -390,7 +392,13 @@ def op_state(ea, opnum):
     whether the operand is being read from, written to, or modified (both).
     """
     f = type.feature(ea)
-    r, w = f&ops_state.read[opnum], f&ops_state.write[opnum]
+
+    # Verify that we're using a valid operand number.
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_state({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+
+    # Now we can check our instruction feature for what the operand state is.
+    r, w = f & ops_state.read[opnum], f & ops_state.write[opnum]
     res = (r and 'r' or '') + (w and 'w' or '')
 
     # Make a reftype_t from the state we determined. If we couldn't figure it out,
@@ -987,6 +995,10 @@ def op_enumeration(ea, opnum):
         ea, opnum, id = ui.current.address(), ea, opnum
         return op_enumeration(ea, opnum, id)
 
+    # Ensure that the operand number is within our available operands.
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_enumeration({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+
     # Check the flags for the given address to ensure there's actually an
     # enumeration defined as one of the operands.
     F = database.type.flags(ea)
@@ -1015,6 +1027,9 @@ def op_enumeration(ea, opnum, name):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=(six.integer_types, builtins.tuple, builtins.list))
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration `id` to operand `opnum` of the instruction at `ea`.'''
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_enumeration({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+
     ok = idaapi.op_enum(ea, opnum, *id) if isinstance(id, (builtins.tuple, builtins.tuple)) else idaapi.op_enum(ea, opnum, id, 0)
     if not ok:
         eid, serial = id if isinstance(id, (builtins.tuple, builtins.list)) else (id, 0)
@@ -1081,6 +1096,8 @@ def op_refs(opnum):
 def op_refs(ea, opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
     inst = at(ea)
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_refs({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # sanity: returns whether the operand has a local or global xref
     F = database.type.flags(inst.ea)
