@@ -142,16 +142,17 @@ class config(object):
     def type(cls, typestr):
         '''Evaluates a type string and returns its size according to the compiler used by the database.'''
         lookup = {
-            'bool':'size_b',
-            'short':'size_s',
-            'int':'size_i', 'float':'size_l', 'single':'size_l',
-            'long':'size_l',
-            'longlong':'size_ll', 'double':'size_ll',
-            'enum':'size_e',
-            'longdouble':'size_ldbl',
-            'align':'defalign', 'alignment':'defalign',
+            'bool': 'size_b',
+            'short': 'size_s',
+            'int': 'size_i', 'float': 'size_l', 'single': 'size_l',
+            'long': 'size_l',
+            'longlong': 'size_ll', 'double': 'size_ll',
+            'enum': 'size_e',
+            'longdouble': 'size_ldbl',
+            'align': 'defalign', 'alignment': 'defalign',
         }
-        return getattr(cls.compiler(), lookup.get(typestr.translate(None, ' ').lower(), typestr) )
+        string = typestr.replace(' ', '')
+        return getattr(cls.compiler(), lookup.get(string.lower(), typestr.lower()))
 
     @classmethod
     def bits(cls):
@@ -198,7 +199,7 @@ class config(object):
         '''Return the bounds of the current database in a tuple formatted as `(left, right)`.'''
         return interface.bounds_t(cls.info.minEA, cls.info.maxEA)
 
-    class registers(object):
+    class register(object):
         """
         This namespace returns the available register names and their
         sizes for the database.
@@ -226,9 +227,9 @@ class config(object):
             res = idaapi.ph_get_regDataSreg() if idaapi.__version__ < 7.0 else idaapi.ph_get_reg_data_sreg()
             return cls.names()[res]
         @classmethod
-        def segmentsize(cls):
+        def segmentbits(cls):
             '''Return the segment register size for the database.'''
-            return idaapi.ph_get_segreg_size()
+            return 8 * idaapi.ph_get_segreg_size()
 
 range = utils.alias(config.bounds, 'config')
 filename, idb, module, path = utils.alias(config.filename, 'config'), utils.alias(config.idb, 'config'), utils.alias(config.module, 'config'), utils.alias(config.path, 'config')
