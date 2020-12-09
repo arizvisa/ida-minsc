@@ -1808,15 +1808,27 @@ class imports(object):
         return cls.__iterate__()
 
     @staticmethod
-    def __formats__(module_name_ordinal):
-        module, name, ordinal = module_name_ordinal
-        return name or u"Ordinal{:d}".format(ordinal)
-    @staticmethod
-    def __formatl__(module_name_ordinal):
+    def __symbol__(module_name_ordinal):
         module, name, ordinal = module_name_ordinal
 
+        # FIXME: I believe this is a windows-only scheme...
+        name = name or u"Ordinal{:d}".format(ordinal)
+
+        # FIXME: I think this is a gnu-only thing...
+        if module is None and '@@' in name:
+            nestname, nestmodule = name.rsplit('@@', 1)
+            return utils.string.of(nestmodule), utils.string.of(nestname)
+        return utils.string.of(module), utils.string.of(name)
+
+    @staticmethod
+    def __formats__(module_name_ordinal):
+        _, name = imports.__symbol__(module_name_ordinal)
+        return name
+    @staticmethod
+    def __formatl__(module_name_ordinal):
+        module, name = imports.__symbol__(module_name_ordinal)
         # FIXME: use "`" instead of "!" when analyzing an OSX fat binary
-        return u"{:s}!{:s}".format(module, imports.__formats__((module, name, ordinal)))
+        return u"{:s}!{:s}".format(module, name)
 
     __format__ = __formatl__
 
@@ -1827,9 +1839,9 @@ class imports(object):
     __matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, __formats__.__func__))
     __matcher__.boolean('module', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(utils.second, utils.first))
     __matcher__.mapping('ordinal', utils.fcompose(utils.second, utils.funbox(lambda m, n, o: o)))
-    __matcher__.boolean('regex', re.search, utils.fcompose(utils.second, __format__))
-    __matcher__.predicate('predicate', lambda n:n)
-    __matcher__.predicate('pred', lambda n:n)
+    __matcher__.boolean('regex', re.search, utils.fcompose(utils.second, __format__.__func__))
+    __matcher__.predicate('predicate', lambda item: item)
+    __matcher__.predicate('pred', lambda item: item)
     __matcher__.mapping('index', utils.first)
 
     @classmethod
@@ -1844,12 +1856,8 @@ class imports(object):
             idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, listable.append, utils.fconstant(True)))
             for ea, name, ordinal in listable:
                 ui.navigation.set(ea)
-                if module is None and '@@' in name:
-                    nestname, nestmodule = name.rsplit('@@')
-                    yield ea, (utils.string.of(nestmodule), utils.string.of(nestname), ordinal)
-                else:
-                    yield ea, (utils.string.of(module), utils.string.of(name), ordinal)
-                continue
+                realmodule, realname = cls.__symbol__((module, name, ordinal))
+                yield ea, (utils.string.of(realmodule), utils.string.of(realname), ordinal)
             continue
         return
 
@@ -1942,8 +1950,8 @@ class imports(object):
     @classmethod
     def modules(cls):
         '''Return all of the import modules defined in the database.'''
-        iterable = (idaapi.get_import_module_name(i) for i in six.moves.range(idaapi.get_import_module_qty()))
-        return map(utils.string.of, iterable)
+        iterable = (module for _, (module, _, _) in cls.__iterate__())
+        return map(utils.string.of, { item for item in iterable if item})
 
     @utils.multicase(string=basestring)
     @classmethod
