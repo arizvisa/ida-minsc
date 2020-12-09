@@ -126,8 +126,12 @@ class config(object):
     def processor(cls):
         '''Returns the name of the processor configured by the database.'''
         if idaapi.__version__ >= 7.0:
-            return cls.info.get_procName()
-        raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join((__name__, cls.__name__))))
+            result = cls.info.get_procName()
+        elif hasattr(cls.info, 'procName'):
+            result = cls.info.procName
+        else:
+            raise E.UnsupportedVersion(u"{:s}.processor() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+        return utils.string.of(result)
 
     @classmethod
     def compiler(cls):
@@ -170,12 +174,6 @@ class config(object):
             res = idaapi.cvar.inf.mf
             return 'big' if res else 'little'
         return 'big' if cls.info.is_be() else 'little'
-
-    @classmethod
-    def processor(cls):
-        '''Return processor name used by the database.'''
-        res = cls.info.procName
-        return utils.string.of(res)
 
     @classmethod
     def main(cls):
@@ -3265,13 +3263,13 @@ class type(object):
     @utils.multicase()
     @staticmethod
     def has_label():
-        '''Return true if the current address has a label.'''
+        '''Return if the current address has a label.'''
         return type.has_label(ui.current.address())
     @utils.multicase(ea=six.integer_types)
     @staticmethod
     def has_label(ea):
-        '''Return true if the address at `ea` has a label.'''
-        return idaapi.has_any_name(type.flags(ea))
+        '''Return if the address at `ea` has a label.'''
+        return idaapi.has_any_name(type.flags(ea)) or type.has_dummyname(ea) or type.has_customname(ea)
     labelQ = nameQ = has_name = utils.alias(has_label, 'type')
 
     @utils.multicase()
@@ -3345,18 +3343,6 @@ class type(object):
         '''Return true if the address at `ea` has a name that is listed.'''
         return idaapi.is_in_nlist(interface.address.within(ea))
     listednameQ = utils.alias(has_listedname, 'type')
-
-    @utils.multicase()
-    @staticmethod
-    def is_label():
-        '''Return true if the current address has a label.'''
-        return type.is_label(ui.current.address())
-    @utils.multicase(ea=six.integer_types)
-    @staticmethod
-    def is_label(ea):
-        '''Return true if the address at `ea` has a label.'''
-        return type.has_dummyname(ea) or type.has_customname(ea)
-    labelQ = utils.alias(is_label, 'type')
 
     @utils.multicase()
     @staticmethod
