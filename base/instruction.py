@@ -102,7 +102,7 @@ def at(ea):
     '''Returns the ``idaapi.insn_t`` instance at the address `ea`.'''
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at specified address.".format(__name__, ea))
+        raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at the specified address ({:#x}).".format(__name__, ea, ea))
 
     # If we're using backwards-compatiblity mode (which means decode_insn takes
     # different parameters, then manage the result using idaapi.cmd
@@ -161,6 +161,9 @@ def mnemonic():
 def mnemonic(ea):
     '''Returns the mnemonic of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
+    if not database.type.is_code(ea):
+        raise E.InvalidTypeOrValueError(u"{:s}.mnemonic({:#x}) : Unable to get the mnemonic for a non-instruction at the specified address ({:#x}).".format(__name__, ea, ea))
+
     res = (idaapi.ua_mnem(ea) or '').lower()
     return utils.string.of(res)
 mnem = utils.alias(mnemonic)
@@ -209,6 +212,8 @@ def operand(opnum):
 def operand(ea, opnum):
     '''Returns the ``idaapi.op_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     insn = at(ea)
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.operand({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # If we're using backwards-compatiblity mode then we need to assign the
     # operand into our op_t.
@@ -390,7 +395,13 @@ def op_state(ea, opnum):
     whether the operand is being read from, written to, or modified (both).
     """
     f = type.feature(ea)
-    r, w = f&ops_state.read[opnum], f&ops_state.write[opnum]
+
+    # Verify that we're using a valid operand number.
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_state({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+
+    # Now we can check our instruction feature for what the operand state is.
+    r, w = f & ops_state.read[opnum], f & ops_state.write[opnum]
     res = (r and 'r' or '') + (w and 'w' or '')
 
     # Make a reftype_t from the state we determined. If we couldn't figure it out,
@@ -970,7 +981,12 @@ def op_structure(ea, opnum, path, **delta):
         insn = at(ea)
         ok = idaapi.op_stroff(insn, opnum, tid.cast(), length, moff + delta.get('delta', 0))
 
-    return True if ok else False
+    # if we were not successful at applying the structure, then raise an exception.
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Unable to apply the given structure path to the specified address ({:#x}).".format(__name__, ea, opnum, path, delta.get('delta', 0), ea))
+
+    # otherwise, we just chain into another case to return what was applied.
+    return op_structure(ea, opnum)
 op_struc = op_struct = utils.alias(op_structure)
 
 @utils.multicase(opnum=six.integer_types)
@@ -986,6 +1002,10 @@ def op_enumeration(ea, opnum):
     if enumeration.has(opnum):
         ea, opnum, id = ui.current.address(), ea, opnum
         return op_enumeration(ea, opnum, id)
+
+    # Ensure that the operand number is within our available operands.
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_enumeration({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # Check the flags for the given address to ensure there's actually an
     # enumeration defined as one of the operands.
@@ -1015,6 +1035,9 @@ def op_enumeration(ea, opnum, name):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, id=(six.integer_types, builtins.tuple, builtins.list))
 def op_enumeration(ea, opnum, id):
     '''Apply the enumeration `id` to operand `opnum` of the instruction at `ea`.'''
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_enumeration({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
+
     ok = idaapi.op_enum(ea, opnum, *id) if isinstance(id, (builtins.tuple, builtins.tuple)) else idaapi.op_enum(ea, opnum, id, 0)
     if not ok:
         eid, serial = id if isinstance(id, (builtins.tuple, builtins.list)) else (id, 0)
@@ -1081,6 +1104,8 @@ def op_refs(opnum):
 def op_refs(ea, opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
     inst = at(ea)
+    if opnum >= len(operands(ea)):
+        raise E.InvalidTypeOrValueError(u"{:s}.op_refs({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
     # sanity: returns whether the operand has a local or global xref
     F = database.type.flags(inst.ea)
@@ -1116,6 +1141,14 @@ def op_refs(ea, opnum):
         res = [ interface.opref_t(x.ea, int(x.opnum), interface.reftype_t.of(x.type)) for x in xl ]
         # FIXME: how do we handle the type for an LEA instruction which should include '&'...
 
+    # enums
+    elif ok and enumeration.has(res.tid):
+        e = enumeration.by(res.tid)
+        # enums are defined in a altval at index 0xb+opnum
+        # the int points straight at the enumeration id
+        # FIXME: references to enums don't seem to work
+        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : References are not implemented for enumeration types.".format(__name__, inst.ea, opnum))
+
     # struc member
     elif ok and res.tid != idaapi.BADADDR:    # FIXME: is this right?
         # structures are defined in a supval at index 0xf+opnum
@@ -1130,7 +1163,7 @@ def op_refs(ea, opnum):
         else:
             ok = idaapi.get_stroff_path(pathvar.cast(), delta.cast(), inst.ea, opnum)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand.".format(__name__, inst.ea, opnum))
+            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : Unable to get structure id for operand number {:d}.".format(__name__, inst.ea, opnum, opnum))
 
         # get the structure offset and then use that to figure out the correct member
         addr = operator.attrgetter('value' if idaapi.__version__ < 7.0 else 'addr')     # FIXME: this will be incorrect for an offsetted struct
@@ -1154,7 +1187,8 @@ def op_refs(ea, opnum):
         x = idaapi.xrefblk_t()
 
         if not x.first_to(mem.id, 0):
-            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(mem.fullname, '"')))
+            fullname = idaapi.get_member_fullname(mem.id)
+            logging.warn(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
 
         refs = [(x.frm, x.iscode, x.type)]
         while x.next_to():
@@ -1168,14 +1202,6 @@ def op_refs(ea, opnum):
             ops = (idx for idx, (_, ids) in ops if st.id in ids)
             res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
         res = res
-
-    # enums
-    elif ok and res.tid != idaapi.BADADDR:
-        e = enumeration.by_identifier(res.tid)
-        # enums are defined in a altval at index 0xb+opnum
-        # the int points straight at the enumeration id
-        # FIXME: references to enums don't seem to work
-        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : References are not implemented for enumeration types.".format(__name__, inst.ea, opnum))
 
     # FIXME: is this supposed to execute if ok == T? or not?
     # global
