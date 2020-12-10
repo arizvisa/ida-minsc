@@ -102,7 +102,7 @@ def at(ea):
     '''Returns the ``idaapi.insn_t`` instance at the address `ea`.'''
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at specified address {:#x}.".format(__name__, ea, ea))
+        raise E.InvalidTypeOrValueError(u"{:s}.at({:#x}) : Unable to decode a non-instruction at the specified address ({:#x}).".format(__name__, ea, ea))
 
     # If we're using backwards-compatiblity mode (which means decode_insn takes
     # different parameters, then manage the result using idaapi.cmd
@@ -161,6 +161,9 @@ def mnemonic():
 def mnemonic(ea):
     '''Returns the mnemonic of the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
+    if not database.type.is_code(ea):
+        raise E.InvalidTypeOrValueError(u"{:s}.mnemonic({:#x}) : Unable to get the mnemonic for a non-instruction at the specified address ({:#x}).".format(__name__, ea, ea))
+
     res = (idaapi.ua_mnem(ea) or '').lower()
     return utils.string.of(res)
 mnem = utils.alias(mnemonic)
