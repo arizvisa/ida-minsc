@@ -861,12 +861,12 @@ class node(object):
                 raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, item, 2 + 2))
             raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, mods, item, 2 + 2))
 
-        # append the return type
-        res.append(data)
+        # append the return type as some bytes
+        res.append(bytes(data))
 
         # append the number of arguments
         by = builtins.next(iterable)
-        res.append(bytearray([by]))
+        res.append(by)
 
         # Everything else in the iterable is an array of type_t as found in "Type flags" in the SDK docs.
         ''.join(iterable)
