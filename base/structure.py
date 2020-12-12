@@ -480,11 +480,13 @@ class structure_t(object):
         # now we can set the name of the structure
         oldname = idaapi.get_struc_name(self.id)
         if not idaapi.set_struc_name(self.id, ida_string):
+            cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
 
         # verify that the name was actually assigned properly
         assigned = idaapi.get_struc_name(self.id) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
+            cls = self.__class__
             logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
         return assigned
 
@@ -499,12 +501,14 @@ class structure_t(object):
         '''Set the repeatable comment for the structure to `value`.'''
         res = utils.string.to(value or '')
         if not idaapi.set_struc_cmt(self.id, res, repeatable):
-            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(self.name)))
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
 
         # verify that the comment was actually assigned
         assigned = idaapi.get_struc_cmt(self.id, repeatable)
         if utils.string.of(assigned) != utils.string.of(res):
-            logging.info(u"{:s}({:#x}).comment : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
         return assigned
 
     @utils.multicase()
@@ -561,6 +565,11 @@ class structure_t(object):
         if not idaapi.expand_struc(self.ptr, 0, size - res, True):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).size({:+d}) : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format('.'.join([__name__, cls.__name__]), self.id, size, utils.string.escape(self.name, '"'), res, size))
+
+        res = idaapi.get_struc_size(self.ptr)
+        if res != size:
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).size({:+d}) : The size that was assigned to the structure ({:+d}) does not match what was requested ({:+d}).".format('.'.join([__name__, cls.__name__]), self.id, size, res, size))
         return res
 
     @property
@@ -586,7 +595,7 @@ class structure_t(object):
 
         res = idaapi.get_struc_idx(self.id)
         if res != index:
-            logging.info(u"{:s}({:#x}).index({:+d}) : The index ({:d}) that the structure was moved to does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), self.id, index, index, res))
+            logging.info(u"{:s}({:#x}).index({:+d}) : The index that the structure was moved to ({:#x}) does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), self.id, index, res, index))
         return res
 
     @property
@@ -613,13 +622,13 @@ class structure_t(object):
         # we should re-raise for the user.
         except E.InvalidTypeOrValueError:
             cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info)))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info)))
 
         # If we caught an exception trying to get the typeinfo for the
         # structure, then port it to our class and re-raise.
         except E.DisassemblerError:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to apply `idaapi.tinfo_t()` to structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to apply `idaapi.tinfo_t()` to structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), self.name))
         return
 
     def destroy(self):
@@ -1593,11 +1602,13 @@ class member_t(object):
         # now we can set the name of the member at the specified offset
         oldname = self.name
         if not idaapi.set_member_name(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, ida_string):
+            cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
 
         # verify that the name was actually assigned properly
         assigned = idaapi.get_member_name(self.id) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
+            cls = self.__class__
             logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
         return assigned
 
@@ -1612,12 +1623,14 @@ class member_t(object):
         '''Set the repeatable comment of the member to `value`.'''
         res = utils.string.to(value or '')
         if not idaapi.set_member_cmt(self.ptr, res, repeatable):
-            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name)))
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
 
         # verify that the comment was actually assigned properly
         assigned = idaapi.get_member_cmt(self.id, repeatable)
         if utils.string.of(assigned) != utils.string.of(res):
-            logging.info(u"{:s}({:#x}).comment : The comment ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
+            cls = self.__class__
+            logging.info(u"{:s}({:#x}).comment(..., repeatable={!s}) : The comment ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
         return assigned
 
     @utils.multicase()
@@ -1667,7 +1680,7 @@ class member_t(object):
         repeatable, res, = True, state.pop(key)
         if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
         return res
 
     @property
@@ -1700,20 +1713,21 @@ class member_t(object):
         opinfo.tid = typeid
         if not idaapi.set_member_type(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, flag, opinfo, nbytes):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).type : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, type, utils.string.repr(self.name)))
 
+        items = flag, typeid, nbytes
         newflag, newtypeid, newsize = self.flag, self.typeid or idaapi.BADADDR, self.size
         if newflag != flag:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).type : The provided flags ({:#x}) were incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, flags, newflags))
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided flags ({:#x}) were incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, flags, newflags))
 
         if newtypeid != typeid:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).type : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, typeid, newtypeid))
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, typeid, newtypeid))
 
         if newsize != nbytes:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).type : The provided size ({:+#x}) was incorrectly assigned as {:+#x}.".format('.'.join([__name__, cls.__name__]), self.id, nbytes, newsize))
+            logging.info(u"{:s}({:#x}).type({!s}) : The provided size ({:+#x}) was incorrectly assigned as {:+#x}.".format('.'.join([__name__, cls.__name__]), self.id, items, nbytes, newsize))
 
         return newflag, newtypeid, newsize
 
@@ -1747,7 +1761,7 @@ class member_t(object):
         ti = internal.declaration.parse(info)
         if ti is None:
             cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info)))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).typeinfo({!s}) : Unable to parse the specified type declaration ({!s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info)))
 
         # Now we can pass our tinfo_t along with the member information to IDA.
         res = set_member_tinfo(self.parent.ptr, self.ptr, self.ptr.get_soff(), ti, 0)
@@ -1757,7 +1771,7 @@ class member_t(object):
         # We failed, so just raise an exception for the user to handle.
         elif res == idaapi.SMT_FAILED:
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to assign typeinfo ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign typeinfo ({!s}) to structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name)))
 
         # If we received an alternative return code, then build a relevant
         # message that we can raise with our exception.
@@ -1780,7 +1794,7 @@ class member_t(object):
 
         # Finally we can raise our exception so that the user knows whats up.
         cls = self.__class__
-        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo : Unable to assign typeinfo ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(self.name), message))
+        raise E.DisassemblerError(u"{:s}({:#x}).typeinfo({!s}) : Unable to assign typeinfo ({!s}) to structure member {:s} ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(info), utils.string.repr(self.name), message))
 
     def __str__(self):
         '''Display the member in a readable format.'''
