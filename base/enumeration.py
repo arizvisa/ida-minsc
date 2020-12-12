@@ -103,7 +103,7 @@ def by(**type):
     res = builtins.list(iterate(**type))
     if len(res) > 1:
         map(logging.info, (u"[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
-        logging.warn(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(res), res[0]))
+        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(res), res[0]))
 
     res = next(iter(res), None)
     if res is None:

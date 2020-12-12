@@ -124,7 +124,7 @@ def breakpoints(f=None, **kwargs):
                 h.setdefault(k, []).extend(t[k] if isinstance(t[k], builtins.list) else t[k].split(';'))
 
             elif operator.contains(h, k):
-                logging.warn(u"{:s}.breakpoints({:#x}{:s}) : The specified key \"{:s}\" already exists in dictionary for address {:#x}.".format(__name__, func.addr(f), u", {:s}".format(utils.strings.kwargs(kwargs)) if kwargs else '', utils.string.escape(k, '"'), ea))
+                logging.warning(u"{:s}.breakpoints({:#x}{:s}) : The specified key \"{:s}\" already exists in dictionary for address {:#x}.".format(__name__, func.addr(f), u", {:s}".format(utils.strings.kwargs(kwargs)) if kwargs else '', utils.string.escape(k, '"'), ea))
 
             else:
                 h[k] = t[k]

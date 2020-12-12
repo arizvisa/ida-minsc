@@ -168,7 +168,7 @@ def by(**type):
         maxaddr = max(builtins.map(interface.range.end, listable) if listable else [1])
         caddr = math.ceil(math.log(maxaddr)/math.log(16))
         builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), int(caddr), interface.range.end(seg), int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
-        logging.warn(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), int(caddr), interface.range.end(listable[0]), int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
+        logging.warning(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), int(caddr), interface.range.end(listable[0]), int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
 
     res = six.next(iter(listable), None)
     if res is None:
@@ -534,7 +534,7 @@ def new(offset, size, name, **kwds):
     if not ok:
         ok = idaapi.del_selector(sel)
         if not ok:
-            logging.warn(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', sel))
+            logging.warning(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to delete the created selector ({:#x}) for the new segment.".format(__name__, offset, size, name, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', sel))
         raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : Unable to add a new segment.".format(__name__, offset, size, name, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else ''))
     return seg
 create = utils.alias(new)
@@ -551,12 +551,12 @@ def remove(segment, contents=False):
     # delete the selector defined by the segment_t
     res = idaapi.del_selector(segment.sel)
     if res == 0:
-        logging.warn(u"{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
+        logging.warning(u"{:s}.remove({!r}) : Unable to delete the selector {:#x}.".format(__name__, segment, segment.sel))
 
     # remove the actual segment using the address in the segment_t
     res = idaapi.del_segm(interface.range.start(segment), idaapi.SEGMOD_KILL if contents else idaapi.SEGMOD_KEEP)
     if res == 0:
-        logging.warn(u"{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
+        logging.warning(u"{:s}.remove({!r}) : Unable to delete the segment {:s} with the selector {:s}.".format(__name__, segment, segment.name, segment.sel))
     return res
 delete = utils.alias(remove)
 

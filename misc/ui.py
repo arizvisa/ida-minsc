@@ -774,7 +774,7 @@ class keyboard(object):
         # already within our cache. If it is, then we need to unmap it prior to
         # re-creating the mapping.
         if hotkey in cls.__cache__:
-            logging.warn(u"{:s}.map({!s}, {!r}) : Remapping the hotkey combination {!s} with the callable {!r}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring), callable))
+            logging.warning(u"{:s}.map({!s}, {!r}) : Remapping the hotkey combination {!s} with the callable {!r}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, internal.utils.string.repr(keystring), callable))
             ctx, _ = cls.__cache__[hotkey]
 
             ok = idaapi.del_hotkey(ctx)
@@ -822,7 +822,7 @@ class keyboard(object):
                 raise internal.exceptions.InvalidParameterError(u"{:s}.unmap({:s}) : Unable to locate the callable {!r} in the current list of keyboard mappings.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), key))
 
             else:
-                logging.warn(u"{:s}.unmap({:s}) : Discovered the hotkey {!s} being currently mapped to the callable {!r}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey), key))
+                logging.warning(u"{:s}.unmap({:s}) : Discovered the hotkey {!s} being currently mapped to the callable {!r}.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey), key))
 
         # We need to normalize the hotkey we were given, and convert it back
         # into IDA's format. This way we can locate it in our cache, and prevent
@@ -832,7 +832,7 @@ class keyboard(object):
 
         # Check to see if the hotkey is cached and warn the user if it isn't.
         if hotkey not in cls.__cache__:
-            logging.warn(u"{:s}.unmap({:s}) : Refusing to unmap the hotkey {!s} as it is not currently mapped to anything.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
+            logging.warning(u"{:s}.unmap({:s}) : Refusing to unmap the hotkey {!s} as it is not currently mapped to anything.".format('.'.join([__name__, cls.__name__]), "{!r}".format(key) if callable(key) else "{!s}".format(internal.utils.string.repr(key)), frepr(hotkey)))
             return
 
         # Grab the keymapping context from our cache, and then ask IDA to remove
@@ -918,7 +918,7 @@ try:
                 main = window.main()
 
             if main is None:
-                logging.warn(u"{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join([__name__, cls.__name__]), width, height))
+                logging.warning(u"{:s}.open({!s}, {!s}) : Unable to find main application window. Falling back to default screen dimensions to calculate size.".format('.'.join([__name__, cls.__name__]), width, height))
 
             # figure out the dimensions of the window
             if main is None:
@@ -1156,7 +1156,7 @@ class Progress(object):
     def __new__(cls, *args, **kwargs):
         '''Figure out which progress bar to use and instantiate it with the provided parameters `args` and `kwargs`.'''
         if 'UIProgress' not in globals():
-            logging.warn(u"{:s}(...) : Using console-only implementation of the `ui.Progress` class.".format('.'.join([__name__, cls.__name__])))
+            logging.warning(u"{:s}(...) : Using console-only implementation of the `ui.Progress` class.".format('.'.join([__name__, cls.__name__])))
             return ConsoleProgress(*args, **kwargs)
 
         # XXX: spin for a bit looking for the application window as IDA seems to be racy with this for some reason
@@ -1166,7 +1166,7 @@ class Progress(object):
 
         # If no main window was found, then fall back to the console-only progress bar
         if main is None:
-            logging.warn(u"{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the `ui.Progress` class.".format('.'.join([__name__, cls.__name__])))
+            logging.warning(u"{:s}(...) : Unable to find main application window. Falling back to console-only implementation of the `ui.Progress` class.".format('.'.join([__name__, cls.__name__])))
             return ConsoleProgress(*args, **kwargs)
 
         cls.__appwindow__ = main
