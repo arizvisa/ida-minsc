@@ -579,7 +579,15 @@ class structure_t(object):
     @index.setter
     def index(self, idx):
         '''Set the index of the structure to `idx`.'''
-        return idaapi.set_struc_idx(self.ptr, idx)
+        res = idaapi.get_struc_idx(self.id)
+        if not idaapi.set_struc_idx(self.ptr, idx):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).index({:+d}) : Unable to modify the index of structure \"{:s}\" from {:d} to index {:d}.".format('.'.join([__name__, cls.__name__]), self.id, idx, utils.string.escape(self.name, '"'), res, idx))
+
+        res = idaapi.get_struc_idx(self.id)
+        if res != idx:
+            logging.info(u"{:s}({:#x}).index({:+d}) : The index ({:d}) that the structure was moved to does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), self.id, idx, idx, res))
+        return res
 
     @property
     def typeinfo(self):
