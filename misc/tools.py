@@ -120,7 +120,7 @@ def recovermarks():
         m = set( (l['marks']) if hasattr(l['marks'], '__iter__') else [int(x, 16) for x in l['marks'].split(',')] if type(l['marks']) is str else [l['marks']])
         res = [(ea, d['mark']) for ea, d in func.select(fn, 'mark')]
         if m != { a for a, _ in res }:
-            logging.warning("{:s} : Ignoring the function tag \"{:s}\" for function {:#x} due to its value being out-of-sync with the contents values ({!s} <> {!s}).".format('.'.join((__name__, 'recovermarks')), fn, builtins.map(hex, m), builtins.map(hex, set(a for a, _ in res))))
+            logging.warning("{:s} : Ignoring the function tag \"{:s}\" for function {:#x} due to its value being out-of-sync with the contents values ({!s} <> {!s}).".format('.'.join([__name__, 'recovermarks']), fn, builtins.map(hex, m), builtins.map(hex, set(a for a, _ in res))))
         result.extend(res)
     result.sort(cmp=lambda x, y: cmp(x[1], y[1]))
 
@@ -239,13 +239,13 @@ def collectcall(ea, sentinel=set()):
 def above(ea, includeSegment=False):
     '''Return all of the function names and their offset that calls the function at `ea`.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
-    return '\n'.join(':'.join((segment.name(ea), tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.up(ea))
+    return '\n'.join(':'.join([segment.name(ea), tryhard(ea)] if includeSegment else [tryhard(ea)]) for ea in func.up(ea))
 
 # FIXME: Don't emit the +0 if offset is 0
 def below(ea, includeSegment=False):
     '''Return all of the function names and their offset that are called by the function at `ea`.'''
     tryhard = lambda ea: "{:s}{:+x}".format(func.name(func.top(ea)), ea - func.top(ea)) if func.within(ea) else "{:+x}".format(ea) if func.name(ea) is None else func.name(ea)
-    return '\n'.join(':'.join((segment.name(ea), tryhard(ea)) if includeSegment else (tryhard(ea),)) for ea in func.down(ea))
+    return '\n'.join(':'.join([segment.name(ea), tryhard(ea)] if includeSegment else [tryhard(ea)]) for ea in func.down(ea))
 
 # FIXME: this only works on x86 where args are pushed via stack
 def makecall(ea=None, target=None):

@@ -435,7 +435,7 @@ class chunks(object):
             if left <= ea < right:
                 return interface.bounds_t(left, right)
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
     @utils.multicase(reg=(basestring, interface.register_t))
     @classmethod
@@ -734,7 +734,7 @@ class blocks(object):
             if interface.range.within(ea, bb):
                 return bb
             continue
-        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), ea, ea, interface.range.start(fn)))
+        raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate `idaapi.BasicBlock` for address {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
     @utils.multicase()
     @classmethod
@@ -1450,7 +1450,7 @@ class frame(object):
         res = idaapi.get_frame(interface.range.start(fn))
         if res is not None:
             return structure.by_identifier(res.id, offset=-fn.frsize)
-        raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+        raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : The specified function does not have a frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
     @utils.multicase()
     @classmethod
@@ -1480,7 +1480,7 @@ class frame(object):
         _r = database.config.bits() / 8
         ok = idaapi.add_frame(fn, lvars, regs - _r, args)
         if not ok:
-            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), lvars, regs - _r, args, interface.range.start(fn), lvars, regs - _r, args))
+            raise E.DisassemblerError(u"{:s}.new({:#x}, {:+#x}, {:+#x}, {:+#x}) : Unable to use `idaapi.add_frame({:#x}, {:d}, {:d}, {:d})` to add a frame to the specified function.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), lvars, regs - _r, args, interface.range.start(fn), lvars, regs - _r, args))
         return cls(fn)
 
     @utils.multicase()
@@ -1564,11 +1564,11 @@ class frame(object):
             # grab from structure
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             # FIXME: The calling conventions should be defined within the interface.architecture_t
             if cc not in {idaapi.CM_CC_VOIDARG, idaapi.CM_CC_CDECL, idaapi.CM_CC_ELLIPSIS, idaapi.CM_CC_STDCALL, idaapi.CM_CC_PASCAL}:
-                logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn), cc))
+                logging.debug(u"{:s}({:#x}) : Possibility that register-based arguments will not be listed due to non-implemented calling convention. Calling convention is {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), cc))
 
             base = frame.lvars.size(fn) + frame.regs.size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
@@ -1612,7 +1612,7 @@ class frame(object):
             # figure out the frame
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             base = -fn.frsize
             for (off, size), (name, _, _) in structure.fragment(fr.id, 0, cls.size(fn)):
@@ -1655,7 +1655,7 @@ class frame(object):
             # figure out the frame
             fr = idaapi.get_frame(fn)
             if fr is None:  # unable to figure out arguments
-                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn)))
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}) : Unable to get the function frame.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn)))
 
             base = frame.lvars.size(fn)
             for (off, size), (name, _, _) in structure.fragment(fr.id, base, cls.size(fn)):
@@ -2044,7 +2044,7 @@ class type(object):
         # they should _always_ have type information associated with them.
         ti = idaapi.tinfo_t()
         if idaapi.GUESS_FUNC_FAILED == idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea):
-            logging.info(u"{:s}({:#x}) : Ignoring failure ({:d}) when trying to determine `idaapi.tinfo_t()` for the specified function.".format('.'.join((__name__, cls.__name__)), idaapi.GUESS_FUNC_FAILED, ea))
+            logging.info(u"{:s}({:#x}) : Ignoring failure ({:d}) when trying to determine `idaapi.tinfo_t()` for the specified function.".format('.'.join([__name__, cls.__name__]), idaapi.GUESS_FUNC_FAILED, ea))
 
         # If we can find a proper typeinfo then use that, otherwise return
         # whatever it was that was guessed.
@@ -2072,7 +2072,7 @@ class type(object):
 
         # If we caught an error, then we couldn't render the string for some reason.
         except Exception:
-            raise E.DisassemblerError(u"{:s}({:#x}, \"{:s}\") : Unable to render `idaapi.tinfo_t()` with name (\"{!s}\") to a string.".format('.'.join((__name__, cls.__name__)), ea, utils.string.escape("{!s}".format(info), '"'), utils.string.escape(realname, '"')))
+            raise E.DisassemblerError(u"{:s}({:#x}, \"{:s}\") : Unable to render `idaapi.tinfo_t()` with name (\"{!s}\") to a string.".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape("{!s}".format(info), '"'), utils.string.escape(realname, '"')))
 
         # Recurse back into ourselves in order to call idaapi.apply_cdecl
         return cls(ea, tinfo_s)
@@ -2123,7 +2123,7 @@ class type(object):
         # Now we should just be able to apply it to the function.
         ok = idaapi.apply_cdecl(til, ea, terminated)
         if not ok:
-            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to apply the specified type declaration (\"{!s}\").".format('.'.join((__name__, cls.__name__)), ea, utils.string.escape(info, '"')))
+            raise E.InvalidTypeOrValueError(u"{:s}.info({:#x}) : Unable to apply the specified type declaration (\"{!s}\").".format('.'.join([__name__, cls.__name__]), ea, utils.string.escape(info, '"')))
 
         # Just return the type we applied to the user.
         return cls(ea)
@@ -2133,7 +2133,7 @@ class type(object):
         fn = by(func)
         ti, ea = idaapi.tinfo_t(), interface.range.start(fn)
 
-        raise E.UnsupportedCapability(u"{:s}({:#x}, {!s}) : IDAPython does not allow one to remove the prototype of a function.`.".format('.'.join((__name__, cls.__name__)), ea, None))
+        raise E.UnsupportedCapability(u"{:s}({:#x}, {!s}) : IDAPython does not allow one to remove the prototype of a function.`.".format('.'.join([__name__, cls.__name__]), ea, None))
 
         # There really isn't a way to remove the prototype from a function,
         # but it seems that there are some supvals and altvals which are

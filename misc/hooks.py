@@ -70,14 +70,14 @@ class address(commentbase):
     def _update_refs(cls, ea, old, new):
         f, rt = cls.get_func_extern(ea)
 
-        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys()), ' for runtime-linked function' if rt else ''))
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
                 if f and not rt: internal.comment.contents.dec(ea, key)
                 else: internal.comment.globals.dec(ea, key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
                 if f and not rt: internal.comment.contents.inc(ea, key)
                 else: internal.comment.globals.inc(ea, key)
             continue
@@ -87,9 +87,9 @@ class address(commentbase):
     def _create_refs(cls, ea, res):
         f, rt = cls.get_func_extern(ea)
 
-        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' for runtime-linked function' if rt else ''))
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(res.viewkeys()), ' for runtime-linked function' if rt else ''))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
             if f and not rt: internal.comment.contents.inc(ea, key)
             else: internal.comment.globals.inc(ea, key)
         return
@@ -98,9 +98,9 @@ class address(commentbase):
     def _delete_refs(cls, ea, res):
         f, rt = cls.get_func_extern(ea)
 
-        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(res.viewkeys()), ' from runtime-linked function' if rt else ''))
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}){:s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(res.viewkeys()), ' from runtime-linked function' if rt else ''))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(key), 'address', ea))
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(key), 'address', ea))
             if f and not rt: internal.comment.contents.dec(ea, key)
             else: internal.comment.globals.dec(ea, key)
         return
@@ -124,7 +124,7 @@ class address(commentbase):
                 ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
 
                 if (ncmt or '') != new:
-                    logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                    logging.warn(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
                 ## if the comment is of the correct format, then we can simply
                 ## write the comment to the given address
@@ -142,12 +142,12 @@ class address(commentbase):
                 continue
 
             # if the changed event doesn't happen in the right order
-            logging.fatal(u"{:s}.event() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(o), utils.string.repr(n)))
+            logging.fatal(u"{:s}.event() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
             # delete the old comment
             cls._delete_refs(ea, o)
             idaapi.set_cmt(ea, '', rpt)
-            logging.warn(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(o)))
+            logging.warn(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
             # new comment
             new = utils.string.of(idaapi.get_cmt(newea, nrpt))
@@ -158,10 +158,10 @@ class address(commentbase):
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Grab our old comment, because we're going to submit this later to a coro
-        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         oldcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
@@ -176,7 +176,7 @@ class address(commentbase):
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, utils.string.repr(newcmt)))
+            logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt)))
             cls.event = cls._event(); next(cls.event)
 
         # Last thing to do is to re-enable the hooks that we disabled
@@ -189,10 +189,10 @@ class address(commentbase):
     @classmethod
     def changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Grab our new comment, because we're going to submit this later to our coro
-        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         newcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
@@ -207,7 +207,7 @@ class address(commentbase):
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt))
+            logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt))
             cls.event = cls._event(); next(cls.event)
 
         # Re-enable our hooks that we had prior disabled
@@ -220,10 +220,10 @@ class address(commentbase):
     @classmethod
     def old_changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # first we'll grab our comment that the user updated
-        logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
         cmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
         fn, rt = cls.get_func_extern(ea)
 
@@ -261,30 +261,30 @@ class address(commentbase):
 class globals(commentbase):
     @classmethod
     def _update_refs(cls, fn, old, new):
-        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
+        logging.debug(u"{:s}.update_refs({:#x}) : Updating old keys ({!s}) to new keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(old.viewkeys()), utils.string.repr(new.viewkeys())))
         for key in old.viewkeys() ^ new.viewkeys():
             if key not in new:
-                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+                logging.debug(u"{:s}.update_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
                 internal.comment.globals.dec(interface.range.start(fn), key)
             if key not in old:
-                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+                logging.debug(u"{:s}.update_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
                 internal.comment.globals.inc(interface.range.start(fn), key)
             continue
         return
 
     @classmethod
     def _create_refs(cls, fn, res):
-        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
+        logging.debug(u"{:s}.create_refs({:#x}) : Creating keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+            logging.debug(u"{:s}.create_refs({:#x}) : Increasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.inc(interface.range.start(fn), key)
         return
 
     @classmethod
     def _delete_refs(cls, fn, res):
-        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
+        logging.debug(u"{:s}.delete_refs({:#x}) : Deleting keys ({!s}).".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(res.viewkeys())))
         for key in res.viewkeys():
-            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join((__name__, cls.__name__)), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
+            logging.debug(u"{:s}.delete_refs({:#x}) : Decreasing reference count for {!s} at {:s} {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn) if fn else idaapi.BADADDR, utils.string.repr(key), 'function' if fn else 'global', interface.range.start(fn)))
             internal.comment.globals.dec(interface.range.start(fn), key)
         return
 
@@ -308,7 +308,7 @@ class globals(commentbase):
                 ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
 
                 if (ncmt or '') != new:
-                    logging.warn(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+                    logging.warn(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
                 ## if the comment is correctly formatted as a tag, then we
                 ## can simply write the comment at the given address
@@ -327,12 +327,12 @@ class globals(commentbase):
                 continue
 
             # if the changed event doesn't happen in the right order
-            logging.fatal(u"{:s}.event() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(o), utils.string.repr(n)))
+            logging.fatal(u"{:s}.event() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
             # delete the old comment
             cls._delete_refs(fn, o)
             idaapi.set_func_cmt(fn, '', rpt)
-            logging.warn(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join((__name__, cls.__name__)), ea, utils.string.repr(o)))
+            logging.warn(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
             # new comment
             newfn = idaapi.get_func(newea)
@@ -344,11 +344,11 @@ class globals(commentbase):
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
-        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
@@ -369,7 +369,7 @@ class globals(commentbase):
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
+            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
 
         # Last thing to do is to re-enable the hooks that we disabled
@@ -382,11 +382,11 @@ class globals(commentbase):
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
-        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         fn = idaapi.get_func(interface.range.start(a))
         if fn is None and not cmt:
             return
@@ -407,7 +407,7 @@ class globals(commentbase):
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
+            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
             cls.event = cls._event(); next(cls.event)
 
         # Last thing to do is to re-enable the hooks that we disabled
@@ -420,11 +420,11 @@ class globals(commentbase):
     @classmethod
     def old_changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
-            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # first thing to do is to identify whether we're in a function or not,
         # so we first grab the address from the area_t...
-        logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join((__name__, cls.__name__)), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
         ea = interface.range.start(a)
 
         # then we can use it to verify that we're in a function. if not, then
