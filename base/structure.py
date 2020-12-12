@@ -481,13 +481,13 @@ class structure_t(object):
         oldname = idaapi.get_struc_name(self.id)
         if not idaapi.set_struc_name(self.id, ida_string):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
+            raise E.DisassemblerError(u"{:s}({:#x}).name({!r}) : Unable to assign the specified name ({:s}) to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(ida_string), utils.string.repr(oldname)))
 
         # verify that the name was actually assigned properly
         assigned = idaapi.get_struc_name(self.id) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
+            logging.info(u"{:s}({:#x}).name({!r}) : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, string, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
         return assigned
 
     @property
@@ -1670,7 +1670,7 @@ class member_t(object):
         repeatable, res, state[key] = True, state.get(key, None), value
         if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name)))
+            raise E.DisassemblerError(u"{:s}({:#x}).comment(..., repeatable={!s}) : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, repeatable, utils.string.repr(self.name)))
         return res
     @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
