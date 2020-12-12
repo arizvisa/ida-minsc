@@ -190,46 +190,46 @@ class utils(object):
 
     @classmethod
     def falt(cls, node):
-        for res in cls.valfiter(node, netnode.altfirst, netnode.altlast, netnode.altnext, netnode.altval):
-            yield res
+        for item in cls.valfiter(node, netnode.altfirst, netnode.altlast, netnode.altnext, netnode.altval):
+            yield item
         return
     @classmethod
     def ralt(cls, node):
-        for res in cls.valriter(node, netnode.altfirst, netnode.altprev, netnode.altnext, netnode.altval):
-            yield res
+        for item in cls.valriter(node, netnode.altfirst, netnode.altprev, netnode.altnext, netnode.altval):
+            yield item
         return
 
     @classmethod
     def fsup(cls, node):
-        for res in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, netnode.supval):
-            yield res
+        for item in cls.valfiter(node, netnode.supfirst, netnode.suplast, netnode.supnext, netnode.supval):
+            yield item
         return
     @classmethod
     def rsup(cls, node):
-        for res in cls.valriter(node, netnode.supfirst, netnode.supprev, netnode.supnext, netnode.supval):
-            yield res
+        for item in cls.valriter(node, netnode.supfirst, netnode.supprev, netnode.supnext, netnode.supval):
+            yield item
         return
 
     @classmethod
     def fhash(cls, node):
-        for res in cls.hfiter(node, netnode.hashfirst, netnode.hashlast, netnode.hashnext, netnode.hashval):
-            yield res
+        for item in cls.hfiter(node, netnode.hashfirst, netnode.hashlast, netnode.hashnext, netnode.hashval):
+            yield item
         return
     @classmethod
     def rhash(cls, node):
-        for res in cls.hriter(node, netnode.hashfirst, netnode.hashprev, netnode.hashnext, netnode.hashval):
-            yield res
+        for item in cls.hriter(node, netnode.hashfirst, netnode.hashprev, netnode.hashnext, netnode.hashval):
+            yield item
         return
 
     @classmethod
     def fchar(cls, node):
-        for res in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, netnode.charval):
-            yield res
+        for item in cls.valfiter(node, netnode.charfirst, netnode.charlast, netnode.charnext, netnode.charval):
+            yield item
         return
     @classmethod
     def rchar(cls, node):
-        for res in cls.valriter(node, netnode.charfirst, netnode.charprev, netnode.charnext, netnode.charval):
-            yield res
+        for item in cls.valriter(node, netnode.charfirst, netnode.charprev, netnode.charnext, netnode.charval):
+            yield item
         return
 
 def new(name):
@@ -443,9 +443,9 @@ class sup(object):
     @classmethod
     def repr(cls, nodeidx):
         res = []
-        for i, idx in enumerate(cls.fiter(nodeidx)):
-            value = cls.get(nodeidx, idx)
-            res.append("[{:d}] {:x} : {!r}".format(i, idx, value))
+        for idx, item in enumerate(cls.fiter(nodeidx)):
+            value = cls.get(nodeidx, item)
+            res.append("[{:d}] {:x} : {!r}".format(idx, item, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any supvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
         return '\n'.join(res)
@@ -512,9 +512,9 @@ class hash(object):
         except ValueError:
             l1, l2 = 0, 2
 
-        for i, key in enumerate(cls.fiter(nodeidx)):
+        for idx, key in enumerate(cls.fiter(nodeidx)):
             value = "{:<{:d}s} : default={!r}, memoryview={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, None), cls.get(nodeidx, key, memoryview), cls.get(nodeidx, key, bytes), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
-            res.append("[{:d}] {:<{:d}s} -> {:s}".format(i, key, l1, value))
+            res.append("[{:d}] {:<{:d}s} -> {:s}".format(idx, key, l1, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
         return '\n'.join(res)

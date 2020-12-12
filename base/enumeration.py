@@ -30,8 +30,7 @@ as follows:
 
 """
 
-import six
-from six.moves import builtins
+import six, builtins
 
 import functools, operator, itertools
 import logging, sys, math
@@ -100,12 +99,14 @@ def by(**type):
     '''Return the identifier for the first enumeration matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
 
-    res = builtins.list(iterate(**type))
-    if len(res) > 1:
-        map(logging.info, (u"[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), idaapi.get_enum_name(n), mask(n), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else '') for i,n in enumerate(res)))
-        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(res), res[0]))
+    listable = [item for item in iterate(**type)]
+    if len(listable) > 1:
+        messages = (u"[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(item), idaapi.get_enum_name(item), mask(item), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else '') for i, item in enumerate(listable))
+        [ logging.info(msg) for msg in messages ]
+        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(listable), listable[0]))
 
-    res = next(iter(res), None)
+    iterable = (item for item in listable)
+    res = next(iterable, None)
     if res is None:
         raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
@@ -123,12 +124,12 @@ def search(**type):
 
 def names(enum):
     '''Return a list of all the names belonging to the enumeration `enum`.'''
-    return [member.name(n) for n in members.iterate(enum)]
+    return [member.name(item) for item in members.iterate(enum)]
 keys = utils.alias(names)
 
 def values(enum):
     '''Return a list of all the values belonging to the enumeration `enum`.'''
-    return [member.value(n) for n in members.iterate(enum)]
+    return [member.value(item) for item in members.iterate(enum)]
 
 ## creation/deletion
 @utils.string.decorate_arguments('name')
@@ -226,18 +227,18 @@ __matcher__.predicate('predicate')
 
 def __iterate__():
     '''Yield the identifier of each enumeration within the database.'''
-    for n in six.moves.range(idaapi.get_enum_qty()):
-        yield idaapi.getn_enum(n)
+    for item in range(idaapi.get_enum_qty()):
+        yield idaapi.getn_enum(item)
     return
 
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the enumerations in the database that match the keyword specified by `type`.'''
-    if not type: type = {'predicate':lambda n: True}
-    res = builtins.list(__iterate__())
-    for key, value in six.iteritems(type):
-        res = builtins.list(__matcher__.match(key, value, res))
-    for item in res: yield item
+    if not type: type = {'predicate': lambda item: True}
+    listable = [item for item in __iterate__()]
+    for key, value in type.items():
+        listable = [item for item in __matcher__.match(key, value, listable)]
+    for item in listable: yield item
 
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
@@ -248,18 +249,18 @@ def list(string):
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all of the enumerations within the database that match the keyword specified by `type`.'''
-    res = builtins.list(iterate(**type))
+    res = [item for item in iterate(**type)]
 
     maxindex = max(builtins.map(idaapi.get_enum_idx, res) if res else [1])
     maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) if res else [0])
     maxsize = max(builtins.map(size, res) if res else [0])
     cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) if res else [database.config.bits()/4.0])
+    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) if res else [database.config.bits() / 4.0])
     except: cmask = 0
 
-    for n in res:
-        name = idaapi.get_enum_name(n)
-        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(n), int(cindex), utils.string.of(name), maxname, mask(n), int(cmask), len(builtins.list(members(n))), u" // {:s}".format(comment(n)) if comment(n) else ''))
+    for item in res:
+        name = idaapi.get_enum_name(item)
+        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(item), int(cindex), utils.string.of(name), maxname, mask(item), int(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
     return
 
 ## members
@@ -306,8 +307,8 @@ class members(object):
         res = interface.tuplename(name) if isinstance(name, tuple) else name
         ok = idaapi.add_enum_member(eid, utils.string.to(res), value, bmask)
 
-        err = {getattr(idaapi, n) : n for n in ('ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV')}
-        if ok in err.viewkeys():
+        err = {getattr(idaapi, item) : item for item in ['ENUM_MEMBER_ERROR_NAME', 'ENUM_MEMBER_ERROR_VALUE', 'ENUM_MEMBER_ERROR_ENUM', 'ENUM_MEMBER_ERROR_MASK', 'ENUM_MEMBER_ERROR_ILLV']}
+        if ok in err.keys():
             raise E.DisassemblerError(u"{:s}.add({:#x}, {!r}, {:#x}{:s}) : Unable to add member to enumeration due to error {:s}({:d}).".format('.'.join([__name__, cls.__name__]), eid, name, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else '', err[ok], ok))
         return eid
     new = create = utils.alias(add, 'members')
@@ -425,10 +426,10 @@ class members(object):
         '''List all the members belonging to the enumeration identified by `enum`.'''
         # FIXME: make this consistent with every other .list using the matcher class
         eid = by(enum)
-        res = builtins.list(cls.iterate(eid))
-        maxindex = max(builtins.map(utils.first, enumerate(res)) if res else [1])
-        maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), res) if res else [1])
-        for i, mid in enumerate(res):
+        listable = [item for item in cls.iterate(eid)]
+        maxindex = max(builtins.map(utils.first, enumerate(listable)) if listable else [1])
+        maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), listable) if listable else [1])
+        for i, mid in enumerate(listable):
              six.print_(u"[{:d}] 0x{:>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
         return
 

@@ -39,8 +39,7 @@ Some examples of using these keywords are as follows::
 
 """
 
-import six
-from six.moves import builtins
+import six, builtins
 
 import functools, operator, itertools, types
 import sys, logging
@@ -110,11 +109,11 @@ def iterate(string):
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def iterate(**type):
     '''Iterate through all of the structures that match the keyword specified by `type`.'''
-    if not type: type = {'predicate':lambda n: True}
-    res = builtins.list(__iterate__())
-    for key, value in six.iteritems(type):
-        res = builtins.list(__matcher__.match(key, value, res))
-    for item in res: yield item
+    if not type: type = {'predicate': lambda item: True}
+    listable = [item for item in __iterate__()]
+    for key, value in type.items():
+        listable = [item for item in __matcher__.match(key, value, listable)]
+    for item in listable: yield item
 
 @utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
@@ -125,7 +124,7 @@ def list(string):
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def list(**type):
     '''List all the structures within the database that match the keyword specified by `type`.'''
-    res = builtins.list(iterate(**type))
+    res = [item for item in iterate(**type)]
 
     maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) if res else [1])
     maxname = max(builtins.map(utils.fcompose(operator.attrgetter('name'), utils.fdefault(''), len), res) if res else [1])
@@ -173,12 +172,14 @@ def by(**type):
     '''Return the structure matching the keyword specified by `type`.'''
     searchstring = utils.string.kwargs(type)
 
-    res = builtins.list(iterate(**type))
-    if len(res) > 1:
-        map(logging.info, ((u"[{:d}] {:s}".format(idaapi.get_struc_idx(st.id), st.name)) for i, st in enumerate(res)))
-        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, returning the first one {!s}.".format(__name__, searchstring, len(res), res[0]))
+    listable = [item for item in iterate(**type)]
+    if len(listable) > 1:
+        messages = ((u"[{:d}] {:s}".format(idaapi.get_struc_idx(st.id), st.name)) for i, st in enumerate(listable))
+        [ logging.info(msg) for msg in messages ]
+        logging.warning(u"{:s}.search({:s}) : Found {:d} matching results, returning the first one {!s}.".format(__name__, searchstring, len(listable), listable[0]))
 
-    res = next(iter(res), None)
+    iterable = (item for item in listable)
+    res = next(iterable, None)
     if res is None:
         raise E.SearchResultsError(u"{:s}.search({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
@@ -425,10 +426,10 @@ class structure_t(object):
         return self.__members__
 
     def __getstate__(self):
-        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), (True, False))
+        cmtt, cmtf = map(functools.partial(idaapi.get_struc_cmt, self.id), [True, False])
 
         # decode the comments that we found in the structure
-        res = map(utils.string.of, (cmtt, cmtf))
+        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
 
         # FIXME: perhaps we should preserve the get_struc_idx result too
         return (self.name, tuple(res), self.members)
@@ -521,13 +522,13 @@ class structure_t(object):
         d2 = internal.comment.decode(res)
 
         # check for duplicate keys
-        if d1.viewkeys() & d2.viewkeys():
+        if six.viewkeys(d1) & six.viewkeys(d2):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment() : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}({:#x}).comment() : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it (XXX: return a dictionary that automatically updates the comment when it's updated)
         res = {}
-        builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
+        [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
         return res
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key')
@@ -769,7 +770,7 @@ def members(id):
 
     # iterate through the number of members belonging to the struct
     offset = 0
-    for i in six.moves.range(st.memqty):
+    for i in range(st.memqty):
 
         # grab the member and its size
         m = st.get_member(i)
@@ -786,10 +787,11 @@ def members(id):
             offset = left
 
         # grab the member's attributes
-        res = map(utils.string.of, (idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1)))
+        iterable = (utils.string.of(cmt) for cmt in [idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1)])
+        items = builtins.tuple(iterable)
 
         # yield our current position and iterate to the next member
-        yield (offset, ms), tuple(res)
+        yield (offset, ms), items
         offset += ms
     return
 
@@ -909,7 +911,8 @@ class members_t(object):
         self.baseoffset = baseoffset
 
     def __getstate__(self):
-        return (self.parent.name, self.baseoffset, map(self.__getitem__, six.moves.range(len(self))))
+        items = [self[idx] for idx in range(len(self))]
+        return (self.parent.name, self.baseoffset, items)
     def __setstate__(self, state):
         parentname, baseoffset, _ = state
 
@@ -932,7 +935,7 @@ class members_t(object):
         return 0 if self.parent.ptr is None else self.parent.ptr.memqty
     def __iter__(self):
         '''Yield all the members within the structure.'''
-        for idx in six.moves.range(len(self)):
+        for idx in range(len(self)):
             yield member_t(self.parent, idx)
         return
     def __getitem__(self, index):
@@ -943,7 +946,8 @@ class members_t(object):
         elif isinstance(index, six.string_types):
             res = self.by_name(index)
         elif isinstance(index, slice):
-            res = [self.__getitem__(i) for i in six.moves.range(self.parent.ptr.memqty)].__getitem__(index)
+            sliceable = [self[idx] for idx in range(self.parent.ptr.memqty)]
+            res = sliceable[index]
         else:
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).members.__getitem__({!r}) : An invalid type ({!r}) was specified for the index.".format('.'.join([__name__, cls.__name__]), self.parent.id, index, index.__class__))
@@ -959,7 +963,7 @@ class members_t(object):
             cls = self.__class__
             raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!r}) was specified for the member to search for.".format('.'.join([__name__, cls.__name__]), self.parent.id, member, member.__class__))
 
-        for i in six.moves.range(self.parent.ptr.memqty):
+        for i in range(self.parent.ptr.memqty):
             if member.id == self[i].id:
                 return i
             continue
@@ -988,11 +992,11 @@ class members_t(object):
     @utils.multicase()
     def iterate(self, **type):
         '''Iterate through all of the members in the structure that match the keyword specified by `type`.'''
-        if not type: type = {'predicate':lambda n: True}
-        res = builtins.list(iter(self))
-        for key, value in six.iteritems(type):
-            res = builtins.list(self.__member_matcher.match(key, value, res))
-        for item in res: yield item
+        if not type: type = {'predicate': lambda item: True}
+        listable = [item for item in self]
+        for key, value in type.items():
+            listable = [item for item in self.__member_matcher.match(key, value, listable)]
+        for item in listable: yield item
     @utils.multicase(string=six.string_types)
     @utils.string.decorate_arguments('string')
     def iterate(self, string):
@@ -1008,7 +1012,7 @@ class members_t(object):
     @utils.string.decorate_arguments('regex', 'name', 'like', 'fullname', 'comment', 'comments')
     def list(self, **type):
         '''List all the members within the structure that match the keyword specified by `type`.'''
-        res = builtins.list(self.iterate(**type))
+        res = [item for item in self.iterate(**type)]
 
         maxindex = max(builtins.map(utils.fcompose(operator.attrgetter('index'), "{:d}".format, len), res) if res else [1])
         maxoffset = max(builtins.map(utils.fcompose(operator.attrgetter('offset'), "{:x}".format, len), res) if res else [1])
@@ -1027,13 +1031,15 @@ class members_t(object):
         '''Return the member that matches the keyword specified by `type`.'''
         searchstring = utils.string.kwargs(type)
 
-        res = builtins.list(self.iterate(**type))
-        if len(res) > 1:
+        listable = [item for item in self.iterate(**type)]
+        if len(listable) > 1:
             cls = self.__class__
-            map(logging.info, ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in res))
-            logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.parent.id, searchstring, len(res), res[0].index, res[0].offset, res[0].size, utils.string.escape(res[0].fullname, '"'), utils.string.escape("{!s}".format(res[0].typeinfo.dstr()).replace(' *', '*'), '"')))
+            messages = ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in listable)
+            [ logging.info(msg) for msg in messages ]
+            logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.parent.id, searchstring, len(listable), listable[0].index, listable[0].offset, listable[0].size, utils.string.escape(listable[0].fullname, '"'), utils.string.escape("{!s}".format(listable[0].typeinfo.dstr()).replace(' *', '*'), '"')))
 
-        res = next(iter(res), None)
+        iterable = (item for item in listable)
+        res = next(iterable, None)
         if res is None:
             cls = self.__class__
             raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), self.parent.id, searchstring))
@@ -1086,7 +1092,7 @@ class members_t(object):
 
         # Start out by getting our bounds, and translating them to our relative
         # offset.
-        min, max = map(lambda offset: offset + self.baseoffset, (idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)))
+        min, max = map(lambda offset: offset + self.baseoffset, [idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)])
 
         # Guard against a potential OverflowError that would be raised by SWIG's typechecking
         if self.baseoffset > max:
@@ -1226,7 +1232,7 @@ class members_t(object):
 
     def near_offset(self, offset):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
-        min, max = map(lambda sz: sz + self.baseoffset, (idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)))
+        min, max = map(lambda sz: sz + self.baseoffset, [idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)])
         if (offset < min) or (offset >= max):
             cls = self.__class__
             logging.info(u"{:s}({:#x}).members.near_offset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, min, max))
@@ -1369,7 +1375,7 @@ class members_t(object):
         '''Display all the fields within the specified structure.'''
         res = []
         mn, ms, mti = 0, 0, 0
-        for i in six.moves.range(len(self)):
+        for i in range(len(self)):
             m = self[i]
             name, t, ti, ofs, size, comment, tag = m.name, m.type, m.typeinfo, m.offset, m.size, m.comment, m.tag()
             res.append((i, name, t, ti, ofs, size, comment or '', tag))
@@ -1380,7 +1386,7 @@ class members_t(object):
         mi = len("{:d}".format(len(self) - 1)) if len(self) else 1
 
         if len(self):
-            mo = max(map(len, map("{:x}".format, (self.baseoffset, self[-1].offset + self[-1].size))))
+            mo = max(map(len, map("{:x}".format, [self.baseoffset, self[-1].offset + self[-1].size])))
             return "{!r}\n{:s}".format(self.parent, '\n'.join("[{:{:d}d}] {:>{:d}x}{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {!s} {:s}".format(i, mi, o, mo, s, ms, "{!s}".format(ti.dstr()).replace(' *','*'), mti, utils.string.repr(n), mn+2, utils.string.repr(t), " // {!s}".format(utils.string.repr(T) if '\n' in c else utils.string.to(c)) if c else '') for i, n, t, ti, o, s, c, T in res))
         return "{!r}".format(self.parent)
 
@@ -1430,7 +1436,7 @@ class member_t(object):
         # grab its comments
         cmtt = idaapi.get_member_cmt(self.id, True)
         cmtf = idaapi.get_member_cmt(self.id, False)
-        res = map(utils.string.of, (cmtt, cmtf))
+        res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
 
         # now we can return them
         ofs = self.offset - self.__parent.members.baseoffset
@@ -1625,16 +1631,16 @@ class member_t(object):
         d2 = internal.comment.decode(res)
 
         # check for duplicate keys
-        if d1.viewkeys() & d2.viewkeys():
+        if six.viewkeys(d1) & six.viewkeys(d2):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(d1.viewkeys() & d2.viewkeys()), 'repeatable' if repeatable else 'non-repeatable'))
+            logging.info(u"{:s}({:#x}).comment : Contents of both the repeatable and non-repeatable comment conflict with one another due to using the same keys ({!r}). Giving the {:s} comment priority.".format('.'.join([__name__, cls.__name__]), self.id, ', '.join(six.viewkeys(d1) & six.viewkeys(d2)), 'repeatable' if repeatable else 'non-repeatable'))
 
         # merge the dictionaries into one and return it
         # XXX: it'd be cool to return an object with a dictionary
         #      that automatically synchronizes itself to the
         #      comment when a value is actually updated.
         res = {}
-        builtins.map(res.update, (d1, d2) if repeatable else (d2, d1))
+        [res.update(d) for d in ([d1, d2] if repeatable else [d2, d1])]
         return res
     @utils.multicase(key=six.string_types)
     @utils.string.decorate_arguments('key')
@@ -1839,7 +1845,7 @@ class member_t(object):
         # now figure out which operand has the structure member applied to it
         res = []
         for ea, _, t in refs:
-            iterable = ((idx, internal.netnode.sup.get(ea, 0xf + idx, type=memoryview)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
+            iterable = ((idx, internal.netnode.sup.get(ea, 0xf + idx, type=memoryview)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
             listable = [(idx, view.tobytes()) for idx, view in iterable]
 
             # check if we found any ops that point directly to this member
@@ -1864,7 +1870,7 @@ class member_t(object):
                 # are pointing to our structure member.
                 # pointing at our member exactly..
                 for opnum, ri, opvalue in iterable:
-                    offset = opvalue if isinstance(opvalue, six.integer_types) else six.next((getattr(opvalue, attribute) for attribute in {'offset', 'address'} if hasattr(opvalue, attribute)), None)
+                    offset = opvalue if isinstance(opvalue, six.integer_types) else builtins.next((getattr(opvalue, attribute) for attribute in {'offset', 'address'} if hasattr(opvalue, attribute)), None)
 
                     # check if we got a valid offset, because if not then we just
                     # need to skip to the next iteration

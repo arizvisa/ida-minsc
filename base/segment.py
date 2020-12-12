@@ -34,8 +34,7 @@ Some examples of using these keywords are as follows::
 
 """
 
-import six
-from six.moves import builtins
+import six, builtins
 
 import functools, operator, itertools, types
 import os, logging
@@ -74,9 +73,9 @@ def __iterate__(**type):
         seg = idaapi.getnseg(index)
         seg.index, _ = index, ui.navigation.set(interface.range.start(seg))
         return seg
-    iterable = itertools.imap(newsegment, six.moves.range(idaapi.get_segm_qty()))
-    for key, value in six.iteritems(type or builtins.dict(predicate=utils.fconstant(True))):
-        iterable = builtins.list(__matcher__.match(key, value, iterable))
+    iterable = (newsegment(index) for index in builtins.range(idaapi.get_segm_qty()))
+    for key, value in (type or {'predicate': utils.fconstant(True)}).items():
+        iterable = (item for item in __matcher__.match(key, value, iterable))
     for item in iterable: yield item
 
 @utils.multicase(string=six.string_types)
@@ -105,9 +104,9 @@ def list(**type):
         listable.append(seg)
 
     # Collect the maximum sizes for everything from the first pass
-    cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
-    csize = math.ceil(math.log(maxsize or 1)/math.log(16))
+    cindex = math.ceil(math.log(maxindex or 1) / math.log(10))
+    caddr = math.ceil(math.log(maxaddr or 1) / math.log(16))
+    csize = math.ceil(math.log(maxsize or 1) / math.log(16))
 
     # List all the fields for each segment that we've aggregated
     for seg in listable:
@@ -163,14 +162,16 @@ def by(**type):
     searchstring = utils.string.kwargs(type)
     get_segment_name = idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name
 
-    listable = builtins.list(__iterate__(**type))
+    listable = [item for item in __iterate__(**type)]
     if len(listable) > 1:
         maxaddr = max(builtins.map(interface.range.end, listable) if listable else [1])
-        caddr = math.ceil(math.log(maxaddr)/math.log(16))
-        builtins.map(logging.info, ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), int(caddr), interface.range.end(seg), int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable))
+        caddr = math.ceil(math.log(maxaddr) / math.log(16))
+        messages = ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), int(caddr), interface.range.end(seg), int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable)
+        [ logging.info(msg) for msg in messages ]
         logging.warning(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), int(caddr), interface.range.end(listable[0]), int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
 
-    res = six.next(iter(listable), None)
+    iterable = (item for item in listable)
+    res = builtins.next(iterable, None)
     if res is None:
         raise E.SearchResultsError(u"{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
@@ -490,9 +491,9 @@ def new(offset, size, name, **kwds):
         if org & 0xf > 0:
             raise E.InvalidTypeOrValueError(u"{:s}.new({:#x}, {:+#x}, {!r}{:s}) : The specified origin ({:#x}) is not aligned to the size of a paragraph (0x10).".format(__name__, offset, size, name, u", {:s}".format(utils.string.kwargs(kwds)) if kwds else '', org))
 
-        para = offset/16
+        para = offset // 16
         sel = idaapi.allocate_selector(para)
-        idaapi.set_selector(sel, (para-kwds.get('org',0)/16)&0xffffffff)
+        idaapi.set_selector(sel, (para - kwds.get('org', 0) // 16) & 0xffffffff)
 
     ## if the user specified a selector, then use it
     elif 'sel' in kwds or 'selector' in kwds:

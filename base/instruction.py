@@ -37,8 +37,7 @@ between its various sizes. This allows one to navigate between the
 the architecture.
 """
 
-import six
-from six.moves import builtins
+import six, builtins
 
 import functools, operator, itertools, types
 import logging, collections, math
@@ -195,7 +194,7 @@ def operands(ea):
 
     # apparently idaapi is not increasing a reference count for our operands, so we
     # need to make a copy of them quickly before we access them.
-    operands = [idaapi.op_t() for index in six.moves.range(idaapi.UA_MAXOP)]
+    operands = [idaapi.op_t() for index in range(idaapi.UA_MAXOP)]
     [ op.assign(insn.ops[index]) for index, op in enumerate(operands)]
 
     # now we can just fetch them until idaapi.o_void
@@ -252,7 +251,7 @@ def ops_repr(ea):
     '''Returns a tuple of the ``op_repr`` of all the operands for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(op_repr, ea)
-    return tuple(map(f, six.moves.range(ops_count(ea))))
+    return tuple(map(f, range(ops_count(ea))))
 
 @utils.multicase()
 def ops():
@@ -263,7 +262,7 @@ def ops(ea):
     '''Returns a tuple of all the operands for the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(op, ea)
-    return tuple(map(f, six.moves.range(ops_count(ea))))
+    return tuple(map(f, range(ops_count(ea))))
 ops_value = utils.alias(ops)
 
 @utils.multicase()
@@ -278,7 +277,7 @@ def ops_size(ea):
 
     ea = interface.address.inside(ea)
     f = utils.fcompose(functools.partial(operand, ea), get_dtype_attribute, get_dtype_size, int)
-    return tuple(map(f, six.moves.range(ops_count(ea))))
+    return tuple(map(f, range(ops_count(ea))))
 
 @utils.multicase()
 def opts():
@@ -289,7 +288,7 @@ def opts(ea):
     '''Returns a tuple of the types for all the operands in the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     f = functools.partial(opt, ea)
-    return tuple(map(f, six.moves.range(ops_count(ea))))
+    return tuple(map(f, range(ops_count(ea))))
 ops_type = utils.alias(opts)
 
 @utils.multicase()
@@ -301,11 +300,11 @@ def ops_state(ea):
     '''Returns a tuple of for all the operands containing one of the states "r", "w", or "rw" describing how the operands are modified for the instruction at address `ea`.'''
     ea = interface.address.inside(ea)
     f = type.feature(ea)
-    res = ( ((f&ops_state.read[i]), (f&ops_state.write[i])) for i in six.moves.range(ops_count(ea)) )
+    res = ( ((f & ops_state.read[i]), (f & ops_state.write[i])) for i in range(ops_count(ea)) )
     return tuple(interface.reftype_t.of_action((r and 'r' or '') + (w and 'w' or '')) for r, w in res)
 
 # pre-cache the CF_ flags from idaapi inside ops_state
-ops_state.read, ops_state.write = zip(*((getattr(idaapi, "CF_USE{:d}".format(idx + 1), 1 << (7 + idx)), getattr(idaapi, "CF_CHG{:d}".format(idx + 1), 1 << (1 + idx))) for idx in six.moves.range(idaapi.UA_MAXOP)))
+ops_state.read, ops_state.write = zip(*((getattr(idaapi, "CF_USE{:d}".format(1 + idx), 1 << (7 + idx)), getattr(idaapi, "CF_CHG{:d}".format(1 + idx), 1 << (1 + idx))) for idx in range(idaapi.UA_MAXOP)))
 
 @utils.multicase()
 def ops_read():
@@ -574,7 +573,7 @@ def op_character(ea, opnum):
         absolute //= 0x100
 
     # Last thing to do is to join each octet together back into some bytes
-    return bytes().join(map(six.int2byte, reversed(bytearray(octets))))
+    return bytes(bytearray(reversed(bytearray(octets))))
 op_chr = op_char = utils.alias(op_character)
 
 @utils.multicase(opnum=six.integer_types)
@@ -828,7 +827,7 @@ def op_structure(ea, opnum):
 
     # First we'll collect all of the IDs in our path. Then we can start by
     # grabbing the first structure id to see how we should search.
-    path = [ path[index] for index in six.moves.range(count) ]
+    path = [ path[index] for index in range(count) ]
     logging.debug(u"{:s}.op_structure({:#x}, {:d}) : Processing {:d} members ({:s}) from path that was returned from `{:s}`.".format(__name__, ea, opnum, count, ', '.join("{:#x}".format(mid) for mid in path), "{!s}({:#x}, {:d}, ...)".format('idaapi.get_stroff_path', ea, opnum)))
 
     st = structure.by_identifier(path.pop(0))
@@ -926,7 +925,7 @@ def op_structure(ea, opnum, path, **delta):
         path[0:0] = [path[0].parent]
 
     # crop elements to valid ones in case the delta is specified at the end
-    res = list(itertools.takewhile(lambda t: not isinstance(t, six.integer_types), path))
+    res = [item for item in itertools.takewhile(lambda t: not isinstance(t, six.integer_types), path)]
     if len(res) < len(path):
         res.append(path[len(res)])
 
@@ -939,7 +938,7 @@ def op_structure(ea, opnum, path, **delta):
         delta['delta'] = delta.get('delta', 0) + path.pop(-1)
 
     # figure out the structure that this all starts with
-    sptr, path = path[0].ptr, list(path)
+    sptr, path = path[0].ptr, [item for item in path]
 
     # collect each member resolving them to an id
     moff, tids = 0, []
@@ -1197,7 +1196,7 @@ def op_refs(ea, opnum):
         # now figure out the operands if there are any
         res = []
         for ea, _, t in refs:
-            ops = ((idx, internal.netnode.sup.get(ea, 0xf + idx)) for idx in six.moves.range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
+            ops = ((idx, internal.netnode.sup.get(ea, 0xf + idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
             ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in ops)
             ops = (idx for idx, (_, ids) in ops if st.id in ids)
             res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
@@ -1222,7 +1221,7 @@ def op_refs(ea, opnum):
         for ea, _, t in refs:
             if ea == idaapi.BADADDR: continue
             if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
-                ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in {idaapi.o_imm} else operand(ea, idx).addr) for idx in six.moves.range(ops_count(ea)))
+                ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in {idaapi.o_imm} else operand(ea, idx).addr) for idx in range(ops_count(ea)))
                 ops = (idx for idx, val in ops if val == gid)
                 res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
             else:
@@ -1447,7 +1446,7 @@ class operand_types:
 
         global architecture
         if op.type in {idaapi.o_reg}:
-            res, dt = op.reg, dtype_by_size(database.config.bits()//8)
+            res, dt = op.reg, dtype_by_size(database.config.bits() // 8)
             return architecture.by_indextype(res, get_dtype_attribute(op))
 
         optype = "{:s}({:d})".format('idaapi.o_reg', idaapi.o_reg)
@@ -1631,13 +1630,13 @@ class operand_types:
 
         # get the address and the operand size
         addr, size = op.addr, get_dtype_size(get_dtype_attribute(op))
-        maxval = 1<<size*8
+        maxval = 1 << size * 8
 
         # dereference the address and return its integer.
-        res = get_bytes(addr, size) or ''
-        res = reversed(res) if database.config.byteorder() == 'little' else iter(res)
-        res = reduce(lambda agg, n: (agg*0x100)|n, six.iterbytes(res), 0)
-        sf = bool(res & maxval>>1)
+        res = get_bytes(addr, size) or b''
+        res = res[::-1] if database.config.byteorder() in {'little'} else res[:]
+        res = functools.reduce(lambda agg, item: (agg * 0x100) | item, bytearray(res), 0)
+        sf = bool(res & maxval >> 1)
 
         return armops.memory(addr, res - maxval if sf else res)
 
@@ -1665,7 +1664,7 @@ class operand_types:
 
         # op.specval represents a bitmask specifying which registers are included
         specval = op.specval
-        for index in six.moves.range(16):
+        for index in range(16):
             if specval & 1:
                 res.add(architecture.by_index(index))
             specval >>= 1
@@ -2005,11 +2004,11 @@ class Intel(interface.architecture_t):
         i2s = "{:d}".format
 
         [ setitem('r'+_, self.new('r'+_, 64, _)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
-        [ setitem('r'+_, self.new('r'+_, 64)) for _ in map(i2s, six.moves.range(8, 16)) ]
+        [ setitem('r'+_, self.new('r'+_, 64)) for _ in map(i2s, range(8, 16)) ]
         [ setitem('e'+_, self.child(self.by_name('r'+_), 'e'+_, 0, 32, _)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
-        [ setitem('r'+_+'d', self.child(self.by_name('r'+_), 'r'+_+'d', 0, 32, idaname='r'+_)) for _ in map(i2s, six.moves.range(8, 16)) ]
-        [ setitem('r'+_+'w', self.child(self.by_name('r'+_+'d'), 'r'+_+'w', 0, 16, idaname='r'+_)) for _ in map(i2s, six.moves.range(8, 16)) ]
-        [ setitem('r'+_+'b', self.child(self.by_name('r'+_+'w'), 'r'+_+'b', 0, 8, idaname='r'+_)) for _ in map(i2s, six.moves.range(8, 16)) ]
+        [ setitem('r'+_+'d', self.child(self.by_name('r'+_), 'r'+_+'d', 0, 32, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
+        [ setitem('r'+_+'w', self.child(self.by_name('r'+_+'d'), 'r'+_+'w', 0, 16, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
+        [ setitem('r'+_+'b', self.child(self.by_name('r'+_+'w'), 'r'+_+'b', 0, 8, idaname='r'+_)) for _ in map(i2s, range(8, 16)) ]
         [ setitem(    _, self.child(self.by_name('e'+_), _, 0, 16)) for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip') ]
         [ setitem(_+'h', self.child(self.by_name(_+'x'), _+'h', 8, 8)) for _ in ('a', 'c', 'd', 'b') ]
         [ setitem(_+'l', self.child(self.by_name(_+'x'), _+'l', 0, 8)) for _ in ('a', 'c', 'd', 'b') ]
@@ -2018,10 +2017,10 @@ class Intel(interface.architecture_t):
         setitem('fpstack', self.new('fptags', 80*8, dtype=None))    # FIXME: is this the right IDA register name??
 
         # FIXME: rex-prefixed 32-bit registers are implicitly extended to the 64-bit regs which implies that 64-bit are children of 32-bit
-        for _ in ('ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip'):
+        for _ in ['ax', 'cx', 'dx', 'bx', 'sp', 'bp', 'si', 'di', 'ip']:
             r32, r64 = getitem('e'+_), getitem('r'+_)
             r32.alias, r64.alias = { r64 }, { r32 }
-        for _ in map(i2s, six.moves.range(8, 16)):
+        for _ in map(i2s, range(8, 16)):
             r32, r64 = getitem('r'+_+'d'), getitem('r'+_)
             r32.alias, r64.alias = { r64 }, { r32 }
 
@@ -2030,21 +2029,21 @@ class Intel(interface.architecture_t):
 
         fpstack = self.__register__.fpstack
         # single precision
-        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float)) for _ in six.moves.range(8) ]
+        [ setitem("st{:d}f".format(_), self.child(fpstack, "st{:d}f".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_float)) for _ in range(8) ]
         # double precision
-        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(8) ]
+        [ setitem("st{:d}d".format(_), self.child(fpstack, "st{:d}d".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(8) ]
         # umm..80-bit precision? i've seen op_t's in ida for fsubp with the implied st(0) using idaapi.dt_tbyte
-        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte)) for _ in six.moves.range(8) ]
+        [ setitem("st{:d}".format(_), self.child(fpstack, "st{:d}".format(_), _*80, 80, "st{:d}".format(_), dtype=idaapi.dt_tbyte)) for _ in range(8) ]
 
         # not sure if the mmx registers trash the other 16 bits of an fp register
-        [ setitem("mm{:d}".format(_), self.child(fpstack, "mm{:d}".format(_), _*80, 64, dtype=idaapi.dt_qword)) for _ in six.moves.range(8) ]
+        [ setitem("mm{:d}".format(_), self.child(fpstack, "mm{:d}".format(_), _*80, 64, dtype=idaapi.dt_qword)) for _ in range(8) ]
 
         # sse1/sse2 simd registers
-        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16)) for _ in six.moves.range(16) ]
-        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 128, dtype=idaapi.dt_ldbl)) for _ in six.moves.range(16) ]
+        [ setitem("xmm{:d}".format(_), self.new("xmm{:d}".format(_), 128, dtype=idaapi.dt_byte16)) for _ in range(16) ]
+        [ setitem("ymm{:d}".format(_), self.new("ymm{:d}".format(_), 128, dtype=idaapi.dt_ldbl)) for _ in range(16) ]
 
         # control registers
-        [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in six.moves.range(8) ]
+        [ setitem("cr{:d}".format(_), self.new("cr{:d}".format(_), database.config.bits())) for _ in range(8) ]
 
         ##fpctrl, fpstat, fptags
         ##mxcsr
@@ -2089,30 +2088,30 @@ class AArch(interface.architecture_t):
         super(AArch, self).__init__()
         getitem, setitem = self.__register__.__getattr__, self.__register__.__setattr__
 
-        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), 128, idaname="V{:d}".format(_))) for _ in six.moves.range(32) ]
-        [ setitem("q{:d}".format(_), self.new("q{:d}".format(_), 128, idaname="Q{:d}".format(_))) for _ in six.moves.range(32) ]
+        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), 128, idaname="V{:d}".format(_))) for _ in range(32) ]
+        [ setitem("q{:d}".format(_), self.new("q{:d}".format(_), 128, idaname="Q{:d}".format(_))) for _ in range(32) ]
 
-        for _ in six.moves.range(32):
+        for _ in range(32):
             rv, rq = getitem("v{:d}".format(_)), getitem("q{:d}".format(_))
             rv.alias, rq.alias = { rq }, { rv }
 
-        [ setitem("r{:d}".format(_), self.new("r{:d}".format(_), 32, idaname="R{:d}".format(_))) for _ in six.moves.range(13) ]
-        [ setitem("r{:d}h".format(_), self.child(getitem("r{:d}".format(_)), "r{:d}h".format(_), 0, 16, idaname="R{:d}".format(_))) for _ in six.moves.range(13) ]
-        [ setitem("r{:d}b".format(_), self.child(getitem("r{:d}".format(_)), "r{:d}b".format(_), 0, 8, idaname="R{:d}".format(_))) for _ in six.moves.range(13) ]
+        [ setitem("r{:d}".format(_), self.new("r{:d}".format(_), 32, idaname="R{:d}".format(_))) for _ in range(13) ]
+        [ setitem("r{:d}h".format(_), self.child(getitem("r{:d}".format(_)), "r{:d}h".format(_), 0, 16, idaname="R{:d}".format(_))) for _ in range(13) ]
+        [ setitem("r{:d}b".format(_), self.child(getitem("r{:d}".format(_)), "r{:d}b".format(_), 0, 8, idaname="R{:d}".format(_))) for _ in range(13) ]
 
         # Sub-registers that compose the V register (floating-point)
         if BITS > 32:
-            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="V{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(32) ]
+            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="V{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(32) ]
         else:
-            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(32) ]
-        [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_), dtype=idaapi.dt_float)) for _ in six.moves.range(32) ]
-        [ setitem("h{:d}".format(_), self.child(getitem("s{:d}".format(_)), "h{:d}".format(_), 0, 16, idaname="X{:d}".format(_), dtype=getattr(idaapi, 'dt_half', idaapi.dt_word))) for _ in six.moves.range(32) ]
-        [ setitem("b{:d}".format(_), self.child(getitem("h{:d}".format(_)), "b{:d}".format(_), 0, 8, idaname="X{:d}".format(_))) for _ in six.moves.range(32) ]
+            [ setitem("d{:d}".format(_), self.child(getitem("v{:d}".format(_)), "d{:d}".format(_), 0, 64, idaname="D{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(32) ]
+        [ setitem("s{:d}".format(_), self.child(getitem("d{:d}".format(_)), "s{:d}".format(_), 0, 32, idaname="S{:d}".format(_), dtype=idaapi.dt_float)) for _ in range(32) ]
+        [ setitem("h{:d}".format(_), self.child(getitem("s{:d}".format(_)), "h{:d}".format(_), 0, 16, idaname="X{:d}".format(_), dtype=getattr(idaapi, 'dt_half', idaapi.dt_word))) for _ in range(32) ]
+        [ setitem("b{:d}".format(_), self.child(getitem("h{:d}".format(_)), "b{:d}".format(_), 0, 8, idaname="X{:d}".format(_))) for _ in range(32) ]
 
         # General-purpose registers
-        [ setitem("x{:d}".format(_), self.new("x{:d}".format(_), BITS, idaname="X{:d}".format(_))) for _ in six.moves.range(31) ]
+        [ setitem("x{:d}".format(_), self.new("x{:d}".format(_), BITS, idaname="X{:d}".format(_))) for _ in range(31) ]
         if BITS > 32:
-            [ setitem("w{:d}".format(_), self.child(self.by_name("x{:d}".format(_)), "w{:d}".format(_), 0, 32, idaname="X{:d}".format(_))) for _ in six.moves.range(31) ]
+            [ setitem("w{:d}".format(_), self.child(self.by_name("x{:d}".format(_)), "w{:d}".format(_), 0, 32, idaname="X{:d}".format(_))) for _ in range(31) ]
         setitem('lr', self.new('lr', BITS, idaname='LR', alias={'x31'}))
 
         # Zero registers and special regs
@@ -2288,19 +2287,19 @@ class MIPS(interface.architecture_t):
         setitem('ra', self.new('ra', BITS, idaname='$ra'))
         setitem('pc', self.new('pc', BITS))
 
-        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), BITS, idaname="$v{:d}".format(_))) for _ in six.moves.range(2) ]
-        [ setitem("a{:d}".format(_), self.new("a{:d}".format(_), BITS, idaname="$a{:d}".format(_))) for _ in six.moves.range(8) ]
-        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), BITS, idaname="$t{:d}".format(_))) for _ in six.moves.range(0, 10) ]
-        [ setitem("s{:d}".format(_), self.new("s{:d}".format(_), BITS, idaname="$s{:d}".format(_))) for _ in six.moves.range(8) ]
-        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), BITS, idaname="$k{:d}".format(_))) for _ in six.moves.range(2) ]
+        [ setitem("v{:d}".format(_), self.new("v{:d}".format(_), BITS, idaname="$v{:d}".format(_))) for _ in range(2) ]
+        [ setitem("a{:d}".format(_), self.new("a{:d}".format(_), BITS, idaname="$a{:d}".format(_))) for _ in range(8) ]
+        [ setitem("t{:d}".format(_), self.new("t{:d}".format(_), BITS, idaname="$t{:d}".format(_))) for _ in range(0, 10) ]
+        [ setitem("s{:d}".format(_), self.new("s{:d}".format(_), BITS, idaname="$s{:d}".format(_))) for _ in range(8) ]
+        [ setitem("k{:d}".format(_), self.new("k{:d}".format(_), BITS, idaname="$k{:d}".format(_))) for _ in range(2) ]
 
         # FIXME: add the register definitions for : cs, ds, mips16
 
         # floating-point registers
         if BITS > 32:
-            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_double)) for _ in six.moves.range(32) ]
+            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_double)) for _ in range(32) ]
         else:
-            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_float)) for _ in six.moves.range(32) ]
+            [ setitem("f{:d}".format(_), self.new("f{:d}".format(_), BITS, idaname="$f{:d}".format(_), dtype=idaapi.dt_float)) for _ in range(32) ]
 
         # FIXME: we should probably include all of the selector versions for the
         #        coprocessor registers too...

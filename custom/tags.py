@@ -41,9 +41,9 @@ def list():
 ### internal utility functions and classes
 def lvarNameQ(name):
     '''Determine whether a `name` is something that IDA named automatically.'''
-    if any(name.startswith(n) for n in ('arg_', 'var_')):
+    if any(name.startswith(item) for item in ['arg_', 'var_']):
         res = name.split('_', 1)[-1]
-        return all(n in string.hexdigits for n in res)
+        return all(item in string.hexdigits for item in res)
     elif name.startswith(' '):
         return name[1:] in {'s', 'r'}
     return False
@@ -262,7 +262,7 @@ class apply(object):
     @classmethod
     def frame(cls, ea, frame, **tagmap):
         '''Apply the fields from `frame` back into the function at `ea`.'''
-        tagmap_output = u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(k), internal.utils.string.escape(v)) for k, v in six.iteritems(tagmap))) if tagmap else ''
+        tagmap_output = u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(k), internal.utils.string.escape(v)) for k, v in tagmap.items())) if tagmap else ''
 
         # nothing to do here, so we gtfo
         if not frame:
@@ -276,10 +276,11 @@ class apply(object):
         except internal.exceptions.MissingTypeOrAttribute:
 
             # first we figure out the bounds of our members in order to figure out the the lvars and args sizes
-            minimum, maximum = min(six.viewkeys(frame)), max(six.viewkeys(frame))
+            framekeys = {item for item in frame.keys()}
+            minimum, maximum = min(framekeys), max(framekeys)
 
             # calculate the size of regs by first finding everything that begins at offset 0
-            res = sorted(offset for offset in six.viewkeys(frame) if offset >= 0)
+            res = sorted(offset for offset in framekeys if offset >= 0)
 
             # now we look for anything near offset 0 that begins with a space (which should be a register)
             regs = 0
@@ -309,7 +310,7 @@ class apply(object):
             F = func.frame.new(ea, abs(minimum), regs, abs(maximum) - regs)
 
         # iterate through our dictionary of members
-        for offset, (name, type, comment) in six.iteritems(frame):
+        for offset, (name, type, comment) in frame.items():
 
             # first try and locate the member
             try:
@@ -333,24 +334,26 @@ class apply(object):
                 member.name = name
 
             # check what's going to be overwritten with different values prior to doing it
-            state, res = map(internal.comment.decode, (member.comment, comment))
+            state, res = (internal.comment.decode(cmt) for cmt in [member.comment, comment])
 
             # transform the new tag state using the tagmap
-            new = { tagmap.get(name, name) : value for name, value in six.viewitems(res) }
+            new = { tagmap.get(name, name) : value for name, value in res.items() }
 
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
-                for name in six.viewkeys(res) - six.viewkeys(new):
+                reskeys, newkeys = ({item for item in items.keys()} for items in [res, new])
+                for name in reskeys - newkeys:
                     logging.warning(u"{:s}.frame({:#x}, ...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting tag \"{:s}\" for the frame member {:+#x}. The value {!s} would be overwritten by {!s}.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), offset, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
                 pass
 
             # warn the user about what's going to be overwritten prior to doing it
-            for name in six.viewkeys(state) & six.viewkeys(new):
+            statekeys, newkeys = ({item for item in items.keys()} for items in [state, new])
+            for name in statekeys & newkeys:
                 if state[name] == new[name]: continue
                 logging.warning(u"{:s}.frame({:#x}, ...{:s}) : Overwriting tag \"{:s}\" for frame member {:+#x} with new value {!s}. The old value was {!s}.".format('.'.join([__name__, cls.__name__]), ea, tagmap_output, internal.utils.string.escape(name, '"'), offset, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
 
             # now we can update the current dictionary
-            mapstate = { name : value for name, value in six.iteritems(new) if state.get(name, dummy) != value }
+            mapstate = { name : value for name, value in new.items() if state.get(name, dummy) != value }
             state.update(mapstate)
 
             # convert it back to a multi-lined comment and assign it
@@ -396,19 +399,19 @@ class apply(object):
 
         ## handle globals
         six.print_(u"--> Writing globals... ({:d} entr{:s})".format(len(Globals), 'y' if len(Globals) == 1 else 'ies'), file=output)
-        iterable = sorted(six.iteritems(Globals), key=operator.itemgetter(0))
+        iterable = sorted(Globals.items(), key=operator.itemgetter(0))
         res = apply.globals(update_navigation(iterable, ui.navigation.auto), **tagmap)
         # FIXME: verify that res matches number of Globals
 
         ## handle contents
         six.print_(u"--> Writing function contents... ({:d} entr{:s})".format(len(Contents), 'y' if len(Contents) == 1 else 'ies'), file=output)
-        iterable = sorted(six.iteritems(Contents), key=operator.itemgetter(0))
+        iterable = sorted(Contents.items(), key=operator.itemgetter(0))
         res = apply.contents(update_navigation_contents(iterable, ui.navigation.set), **tagmap)
         # FIXME: verify that res matches number of Contents
 
         ## update any frames
         six.print_(u"--> Applying frames to each function... ({:d} entr{:s})".format(len(Frames), 'y' if len(Frames) == 1 else 'ies'), file=output)
-        iterable = sorted(six.iteritems(Frames), key=operator.itemgetter(0))
+        iterable = sorted(Frames.items(), key=operator.itemgetter(0))
         res = apply.frames(update_navigation(iterable, ui.navigation.procedure), **tagmap)
         # FIXME: verify that res matches number of Frames
 
@@ -419,7 +422,7 @@ class apply(object):
     def globals(Globals, **tagmap):
         '''Apply the tags in `Globals` back into the database.'''
         global apply
-        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(oldtag), internal.utils.string.escape(newtag)) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
+        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(oldtag), internal.utils.string.escape(newtag)) for oldtag, newtag in tagmap.items())) if tagmap else ''
 
         count = 0
         for ea, res in Globals:
@@ -429,22 +432,24 @@ class apply(object):
             state = ns.tag(ea)
 
             # transform the new tag state using the tagmap
-            new = { tagmap.get(name, name) : value for name, value in six.viewitems(res) }
+            new = { tagmap.get(name, name) : value for name, value in res.items() }
 
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
-                for name in six.viewkeys(res) - six.viewkeys(new):
+                reskeys, newkeys = ({item for item in items.keys()} for items in [res, new])
+                for name in reskeys - newkeys:
                     logging.warning(u"{:s}.globals(...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting the tag \"{:s}\" in the global {:#x}. The value {!s} would be replaced with {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), ea, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
                 pass
 
             # check what's going to be overwritten with different values prior to doing it
-            for name in six.viewkeys(state) & six.viewkeys(new):
+            statekeys, newkeys = ({item for item in items.keys()} for items in [state, new])
+            for name in statekeys & newkeys:
                 if state[name] == new[name]: continue
                 logging.warning(u"{:s}.globals(...{:s}) : Overwriting tag \"{:s}\" for global at {:#x} with new value {!s}. Old value was {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), ea, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
 
             # now we can apply the tags to the global address
             try:
-                [ ns.tag(ea, name, value) for name, value in six.iteritems(new) if state.get(name, dummy) != value ]
+                [ ns.tag(ea, name, value) for name, value in new.items() if state.get(name, dummy) != value ]
             except:
                 logging.warning(u"{:s}.globals(...{:s}) : Unable to apply tags ({!s}) to global {:#x}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.repr(new), ea), exc_info=True)
 
@@ -457,7 +462,7 @@ class apply(object):
     def contents(Contents, **tagmap):
         '''Apply the tags in `Contents` back into each function within the database.'''
         global apply
-        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(oldtag), internal.utils.string.escape(newtag)) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
+        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(oldtag), internal.utils.string.escape(newtag)) for oldtag, newtag in tagmap.items())) if tagmap else ''
 
         count = 0
         for loc, res in Contents:
@@ -471,22 +476,24 @@ class apply(object):
             state = db.tag(ea)
 
             # transform the new tag state using the tagmap
-            new = { tagmap.get(name, name) : value for name, value in six.viewitems(res) }
+            new = { tagmap.get(name, name) : value for name, value in res.items() }
 
             # check if the tag mapping resulted in the deletion of a tag
             if len(new) != len(res):
-                for name in six.viewkeys(res) - six.viewkeys(new):
+                reskeys, newkeys = ({item for item in items.keys()} for items in [res, new])
+                for name in reskeys - newkeys:
                     logging.warning(u"{:s}.contents(...{:s}) : Refusing requested tag mapping as it results in the tag \"{:s}\" overwriting tag \"{:s}\" for the contents at {:#x}. The value {!s} would be overwritten by {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), internal.utils.string.escape(tagmap[name], '"'), ea, internal.utils.string.repr(res[name]), internal.utils.string.repr(res[tagmap[name]])))
                 pass
 
             # inform the user if any tags are being overwritten with different values
-            for name in six.viewkeys(state) & six.viewkeys(new):
+            statekeys, newkeys = ({item for item in items.keys()} for items in [state, new])
+            for name in statekeys & newkeys:
                 if state[name] == new[name]: continue
                 logging.warning(u"{:s}.contents(...{:s}) : Overwriting contents tag \"{:s}\" for address {:#x} with new value {!s}. Old value was {!s}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.escape(name, '"'), ea, internal.utils.string.repr(new[name]), internal.utils.string.repr(state[name])))
 
             # write the tags to the contents address
             try:
-                [ db.tag(ea, name, value) for name, value in six.iteritems(new) if state.get(name, dummy) != value ]
+                [ db.tag(ea, name, value) for name, value in new.items() if state.get(name, dummy) != value ]
             except:
                 logging.warning(u"{:s}.contents(...{:s}) : Unable to apply tags {!s} to location {:#x}.".format('.'.join([__name__, cls.__name__]), tagmap_output, internal.utils.string.repr(new), ea), exc_info=True)
 
@@ -499,7 +506,7 @@ class apply(object):
     def frames(Frames, **tagmap):
         '''Apply the fields from `Frames` back into each function's frame.'''
         global apply
-        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(oldtag), internal.utils.string.escape(newtag)) for oldtag, newtag in six.iteritems(tagmap))) if tagmap else ''
+        cls, tagmap_output = apply.__class__, u", {:s}".format(u', '.join(u"{:s}={:s}".format(internal.utils.string.escape(oldtag), internal.utils.string.escape(newtag)) for oldtag, newtag in tagmap.items())) if tagmap else ''
 
         count = 0
         for ea, res in Frames:
@@ -558,7 +565,8 @@ class export(object):
 
             # otherwise, decode the comment into a dictionary using only the tags the user asked for
             comment_ = internal.comment.decode(comment)
-            res = { name : comment_[name] for name in six.viewkeys(comment_) & tags_ }
+            comment_keys = {item for item in comment_.keys()}
+            res = { name : comment_[name] for name in comment_keys & tags_ }
 
             # if anything was found, then re-encode it and yield to the user
             if res: yield ofs, (field, type, internal.comment.encode(res))
@@ -579,18 +587,18 @@ class export(object):
         # collect all the globals into a dictionary
         six.print_(u'--> Grabbing globals (cached)...', file=output)
         iterable = export.globals(*tags)
-        Globals = {ea : res for ea, res in itertools.ifilter(None, iterable)}
+        Globals = {ea : res for ea, res in filter(None, iterable)}
 
         # grab all the contents into a dictionary
         six.print_(u'--> Grabbing contents from functions (cached)...', file=output)
         location = location.get('location', False)
         iterable = export.contents(*tags, location=location)
-        Contents = {loc : res for loc, res in itertools.ifilter(None, iterable)}
+        Contents = {loc : res for loc, res in filter(None, iterable)}
 
         # grab any frames into a dictionary
         six.print_(u'--> Grabbing frames from functions (cached)...', file=output)
         iterable = export.frames(*tags)
-        Frames = {ea : res for ea, res in itertools.ifilter(None, iterable)}
+        Frames = {ea : res for ea, res in filter(None, iterable)}
 
         # return it back to the user
         return Globals, Contents, Frames

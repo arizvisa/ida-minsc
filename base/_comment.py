@@ -80,7 +80,7 @@ class node(dict):
 
 class trie(node):
     def assign(self, symbols, value):
-        res = list(symbols)
+        res = [item for item in symbols]
         head = res.pop(0)
         symbols = tuple(res)
 
@@ -136,15 +136,15 @@ class trie(node):
         cls = self.__class__
         # FIXME: doesn't support recursion
         def stringify(layer, indent=0, tab='  '):
-            data = (k for k, v in six.viewitems(layer) if not isinstance(v, node))
+            data = (k for k, v in layer.items() if not isinstance(v, node))
             result = []
             for k in data:
                 result.append("{:s}{!r} -> {!r}".format(tab * indent, k, layer[k]))
 
-            branches = [k for k, v in six.viewitems(layer) if isinstance(v, node)]
+            branches = [k for k, v in layer.items() if isinstance(v, node)]
             for k in branches:
                 result.append("{:s}{!r}".format(tab * indent, k))
-                branch_data = stringify(layer[k], indent+1, tab=tab)
+                branch_data = stringify(layer[k], 1 + indent, tab=tab)
                 result.extend(branch_data)
             return result
         return '\n'.join(["{!r}({:d})".format(cls, self.id), '\n'.join(stringify(self))])
@@ -280,11 +280,13 @@ class _str(default):
     @classmethod
     def decode(cls, data):
         res = data if isinstance(data, unicode) else data.decode('utf8')
-        return unicode().join(cls._unescape(iter(res.lstrip())))
+        iterable = (ch for ch in res.lstrip())
+        return unicode().join(cls._unescape(iterable))
 
     @classmethod
     def encode(cls, instance):
-        res = cls._escape(iter(instance))
+        iterable = (item for item in instance)
+        res = cls._escape(iterable)
         return unicode().join(res)
 
 @cache.register(unicode, pattern.star(' \t'), 'u', "'\"")
@@ -325,7 +327,7 @@ class _list(default):
         return isinstance(instance, list)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
         return '[' + ', '.join(map(f, instance)) + ']'
 
 @cache.register(tuple, pattern.star(' \t'), '(')
@@ -335,7 +337,7 @@ class _tuple(default):
         return isinstance(instance, tuple)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
         return '(' + ', '.join(map(f, instance)) + (', ' if len(instance) == 1 else '') + ')'
 
 @cache.register(set, pattern.star(' \t'), *'set([')
@@ -345,7 +347,7 @@ class _set(default):
         return isinstance(instance, set)
     @classmethod
     def encode(cls, instance):
-        f = lambda n: "{:-#x}".format(n) if isinstance(n, six.integer_types) else "{!r}".format(n)
+        f = lambda item: "{:-#x}".format(item) if isinstance(item, six.integer_types) else "{!r}".format(item)
         return 'set([' + ', '.join(map(f, instance)) + '])'
 
 ### general tag encoding/decoding
@@ -549,7 +551,7 @@ def decode(data, default=u''):
 
     # iterate through each line in the data
     for line in data.split(u'\n'):
-        iterable = iter(line)
+        iterable = (ch for ch in line)
 
         # try and decode the key and the value from the line
         try:
@@ -558,8 +560,8 @@ def decode(data, default=u''):
         # if the key wasn't terminated properly, or formatted correctly,
         # then append it to the default key separated by newlines
         except (StopIteration, internal.exceptions.InvalidFormatError) as E:
-            items = filter(None, res.setdefault(default, u'').split(u'\n')) + [line]
-            k, v = default, u'\n'.join(items)
+            items = filter(None, res.setdefault(default, u'').split(u'\n'))
+            k, v = default, u'\n'.join(itertools.chain(items, [line]))
 
         # warn the user if we're overwriting a key in the tag that
         # already exists.
@@ -578,7 +580,7 @@ def encode(dict):
     res = []
 
     # walk each item in the dictionary
-    for k, v in six.iteritems(dict or {}):
+    for k, v in (dict or {}).items():
         # encode the key and value from the dictionary
         line = tag.encode(k, v)
 
@@ -592,7 +594,7 @@ def check(data):
     '''Check that the string `data` has the correct format by trying to decode it.'''
     res = map(iter, (data or '').split('\n'))
     try:
-        map(tag.decode, res)
+        [tag.decode(item) for item in res]
     except Exception as E:
         return False
     return True
@@ -840,7 +842,7 @@ class contents(tagging):
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to write the contents for address {:#x} to the blob cache ({!s}) associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, cls.btag, key))
 
         # update sup cache with keys
-        res = set(six.viewkeys(value))
+        res = {item for item in value.keys()}
         ok = cls._write_header(target, ea, res)
         if not ok:
             raise internal.exceptions.DisassemblerError(u"{:s}._write({!r}, {:#x}, {!s}) : Unable to write the cache header for address {:#x} associated with the key {:#x}.".format('.'.join([__name__, cls.__name__]), target, ea, internal.utils.string.repr(value), ea, key))
@@ -917,7 +919,7 @@ class contents(tagging):
         key = target.get('target', None)
         res = cls._read(key, address) or {}
         res = res.get(cls.__tags__, {})
-        return set(six.viewkeys(res))
+        return {item for item in res.keys()}
 
     @classmethod
     def address(cls, address, **target):
@@ -928,7 +930,7 @@ class contents(tagging):
         key = target.get('target', None)
         res = cls._read(key, address) or {}
         res = res.get(cls.__address__, {})
-        return sorted(six.viewkeys(res))
+        return sorted(res.keys())
 
     @classmethod
     def set_name(cls, address, name, count, **target):
@@ -1062,4 +1064,3 @@ class globals(tagging):
         res = internal.netnode.alt.get(node, address)
         internal.netnode.alt.set(node, address, count)
         return res
-
