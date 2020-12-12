@@ -120,7 +120,7 @@ def recovermarks():
         if m != { ea for ea, _ in res }:
             logging.warning("{:s} : Ignoring the function tag \"{:s}\" for function {:#x} due to its value being out-of-sync with the contents values ({!s} <> {!s}).".format('.'.join([__name__, 'recovermarks']), fn, builtins.map("{:#x}".format, m), builtins.map("{:#x}".format, {ea for ea, _ in res})))
         result.extend(res)
-    result.sort(cmp=lambda x, y: cmp(x[1], y[1]))
+    result.sort(key=lambda item: item[1])
 
     # discovered marks versus database marks
     result = {ea : item for ea, item in result.items()}
@@ -163,7 +163,7 @@ def checkmarks():
         continue
 
     d = listable[:]
-    d.sort( lambda a, b: cmp(a[0], b[0]) )
+    d.sort(key=lambda item: item[0])
 
     flookup = {}
     for fn, a, m in d:
