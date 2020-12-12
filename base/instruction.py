@@ -879,7 +879,6 @@ def op_structure(ea, opnum):
     if position > 0:
         return results + (position,)
     return results if len(results) > 1 else results[0]
-
 @utils.multicase(opnum=six.integer_types, structure=structure.structure_t)
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
