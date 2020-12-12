@@ -533,7 +533,7 @@ class character(object):
     def to_hex(cls, integer):
         '''Given an integer, return the hex digit that it represents.'''
         if integer >= 0 and integer < 0x10:
-            return six.int2byte(integer + 0x30) if integer < 10 else six.int2byte(integer + 0x57)
+            return six.unichr(integer + 0x30) if integer < 10 else six.unichr(integer + 0x57)
         raise ValueError
 
     @classmethod
@@ -635,7 +635,7 @@ class character(object):
                     h, l = map(cls.of_hex, (hb.lower(), lb.lower()))
 
                     # coerce the digits into an ascii character and send the character to our result
-                    result.send(six.int2byte(
+                    result.send(six.unichr(
                         h * 0x10 |
                         l * 0x01 |
                     0))
