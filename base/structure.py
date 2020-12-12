@@ -564,7 +564,7 @@ class structure_t(object):
         ok = idaapi.expand_struc(self.ptr, 0, size - res, True)
         if not ok:
             cls = self.__class__
-            logging.fatal(u"{:s}({:#x}).size({:+d}) : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format('.'.join([__name__, cls.__name__]), self.id, size, utils.string.escape(self.name, '"'), res, size))
+            raise E.DisassemblerError(u"{:s}({:#x}).size({:+d}) : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format('.'.join([__name__, cls.__name__]), self.id, size, utils.string.escape(self.name, '"'), res, size))
         return res
 
     @property
