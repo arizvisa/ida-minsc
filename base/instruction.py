@@ -1601,7 +1601,7 @@ class operand_types:
         sf, dt = 2 ** (bits - 1), dtype_by_size(database.config.bits() // 8)
 
         inverted, regular = offset & (2 ** bits - 1) if offset & sf else -2 ** bits + offset, -2 ** bits + offset if offset & sf else offset & (sf - 1)
-        res = long(inverted) if interface.node.alt_opinverted(ea, op.n) else long(regular), None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
+        res = inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
         return intelops.OffsetBaseIndexScale(*res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
@@ -1620,7 +1620,7 @@ class operand_types:
         '''Operand type decoder for returning a memory displacement on either the AArch32 or AArch64 architectures.'''
         global architecture
         Rn = architecture.by_index(op.reg)
-        return armops.immediatephrase(Rn, long(op.addr))
+        return armops.immediatephrase(Rn, op.addr)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
@@ -1639,7 +1639,7 @@ class operand_types:
         res = reduce(lambda agg, n: (agg*0x100)|n, six.iterbytes(res), 0)
         sf = bool(res & maxval>>1)
 
-        return armops.memory(long(addr), long(res-maxval) if sf else long(res))
+        return armops.memory(addr, res - maxval if sf else res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
     def flex(ea, op):
