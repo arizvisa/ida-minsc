@@ -204,8 +204,8 @@ class multicase(object):
 
         # validate type arguments
         for n, t in t_args.iteritems():
-            if not isinstance(t, (types.TypeType, types.TupleType)) and t not in {callable}:
-                error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+            if not isinstance(t, (builtins.type, builtins.tuple)) and t not in {callable}:
+                error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
                 raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The value ({!s}) specified for parameter \"{:s}\" is not a supported type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), t, string.escape(n, '"')))
             continue
 
@@ -214,12 +214,12 @@ class multicase(object):
             for c in other:
                 cls.ex_function(c)
         except:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : The specified callable{:s} {!r} {:s} not of a valid type.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), '' if len(other) == 1 else 's', other, 'is' if len(other) == 1 else 'are'))
 
         # throw an exception if we were given an unexpected number of arguments
         if len(other) > 1:
-            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, types.TypeType) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
+            error_keywords = ("{:s}={!s}".format(n, t.__name__ if isinstance(t, builtins.type) or t in {callable} else '|'.join(t_.__name__ for t_ in t) if hasattr(t, '__iter__') else "{!r}".format(t)) for n, t in t_args.iteritems())
             raise internal.exceptions.InvalidParameterError(u"@{:s}({:s}) : More than one callable ({:s}) was specified to add a case to. Refusing to add cases to more than one callable.".format('.'.join([__name__, cls.__name__]), ', '.join(error_keywords), ', '.join("\"{:s}\"".format(string.escape(c.co_name if isinstance(c, types.CodeType) else c.__name__, '"')) for c in other)))
         return result
 
@@ -260,7 +260,7 @@ class multicase(object):
                     continue
 
                 param_type = parameters[item]
-                if isinstance(param_type, types.TypeType) or param_type in {callable}:
+                if isinstance(param_type, builtins.type) or param_type in {callable}:
                     yield item, param_type.__name__
                 elif hasattr(param_type, '__iter__'):
                     yield item, '|'.join(t.__name__ for t in flatten(param_type))
@@ -379,7 +379,7 @@ class multicase(object):
             return lambda f: type(n)(f)
         if isinstance(n, types.InstanceType):
             return lambda f: types.InstanceType(type(n), dict(f.__dict__))
-        if isinstance(n, (types.TypeType, types.ClassType)):
+        if isinstance(n, (builtins.type, types.ClassType)):
             return lambda f: type(n)(n.__name__, n.__bases__, dict(f.__dict__))
         raise internal.exceptions.InvalidTypeOrValueError(type(n))
 
@@ -436,7 +436,7 @@ class matcher(object):
     def __attrib__(self, *attribute):
         if not attribute:
             return lambda n: n
-        res = [(operator.attrgetter(a) if isinstance(a, basestring) else a) for a in attribute]
+        res = [(operator.attrgetter(a) if isinstance(a, six.string_types) else a) for a in attribute]
         return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)
@@ -756,7 +756,7 @@ class string(object):
         All unicode strings are encoded to UTF-8 in order to guarantee
         the resulting string can be emitted.
         """
-        if isinstance(item, basestring):
+        if isinstance(item, six.string_types):
             res = cls.escape(item, '\'')
             if all(six.byte2int(ch) < 0x100 for ch in item):
                 return "'{:s}'".format(res)
@@ -1006,7 +1006,7 @@ class wrap(object):
             return lambda method, mt=callable.__class__: types.InstanceType(mt, dict(method.__dict__))
 
         # otherwise if it's a class or a type, then we just need to create the object with its bases
-        elif isinstance(n, (types.TypeType, types.ClassType)):
+        elif isinstance(n, (builtins.type, types.ClassType)):
             return lambda method, t=callable.__class__, name=callable.__name__, bases=callable.__bases__: t(name, bases, dict(method.__dict__))
 
         # if we get here, then we have no idea what kind of type `callable` is

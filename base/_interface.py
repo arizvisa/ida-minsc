@@ -1127,7 +1127,7 @@ class register_t(symbol_t):
         return "<class '{:s}' index={:d} dtype={:s} name='{!s}' position={:d}{:+d}>".format(cls.__name__, self.id, dt, internal.utils.string.escape(self.name, '\''), self.position, self.size)
 
     def __eq__(self, other):
-        if isinstance(other, basestring):
+        if isinstance(other, six.string_types):
             return self.name.lower() == other.lower()
         elif isinstance(other, register_t):
             return self is other
@@ -1186,7 +1186,7 @@ class regmatch(object):
         _instruction = sys.modules.get('instruction', __import__('instruction'))
 
         # convert any regs that are strings into their correct object type
-        regs = { _instruction.architecture.by_name(r) if isinstance(r, basestring) else r for r in regs }
+        regs = { _instruction.architecture.by_name(r) if isinstance(r, six.string_types) else r for r in regs }
 
         # returns an iterable of bools that returns whether r is a subset of any of the registers in `regs`.
         match = lambda r, regs=regs: any(itertools.imap(r.relatedQ, regs))
@@ -1341,7 +1341,7 @@ class ref_t(namedtypedtuple):
     optional as not all references will provide it.
     """
     _fields = ('address', 'opnum', 'reftype')
-    _types = (six.integer_types, (six.integer_types, types.NoneType), reftype_t)
+    _types = (six.integer_types, (six.integer_types, None.__class__), reftype_t)
 
     def __repr__(self):
         cls = self.__class__

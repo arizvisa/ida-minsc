@@ -51,7 +51,7 @@ class ask(object):
     def __new__(cls, **default):
         '''Request the user choose from the options "yes", "no", or "cancel".'''
         return cls(u'', **default)
-    @internal.utils.multicase(message=basestring)
+    @internal.utils.multicase(message=six.string_types)
     def __new__(cls, message, **default):
         '''Request the user choose from the options "yes", "no", or "cancel" using the specified `message` as the prompt.'''
         return cls.yn(message, **default)
@@ -61,7 +61,7 @@ class ask(object):
     def yn(cls, **default):
         '''Request the user choose from the options "yes", "no", or "cancel".'''
         return cls.yn(u'', **default)
-    @internal.utils.multicase(message=basestring)
+    @internal.utils.multicase(message=six.string_types)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def yn(cls, message, **default):
@@ -88,7 +88,7 @@ class ask(object):
     def address(cls, **default):
         '''Request the user provide an address.'''
         return cls.address(u'', **default)
-    @internal.utils.multicase(message=basestring)
+    @internal.utils.multicase(message=six.string_types)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def address(cls, message, **default):
@@ -127,7 +127,7 @@ class ask(object):
     def integer(cls, **default):
         '''Request the user provide an integer.'''
         return cls.integer(u'', **default)
-    @internal.utils.multicase(message=basestring)
+    @internal.utils.multicase(message=six.string_types)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def integer(cls, message, **default):
@@ -149,7 +149,7 @@ class ask(object):
     def segment(cls, **default):
         '''Request the user provide a segment.'''
         return cls.segment(u'', **default)
-    @internal.utils.multicase(message=basestring)
+    @internal.utils.multicase(message=six.string_types)
     @classmethod
     @internal.utils.string.decorate_arguments('message')
     def segment(cls, message, **default):
@@ -175,7 +175,7 @@ class ask(object):
     def string(cls, **default):
         '''Request the user provide a string.'''
         return cls.string(u'', **default)
-    @internal.utils.multicase(message=basestring)
+    @internal.utils.multicase(message=six.string_types)
     @classmethod
     @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
     def string(cls, message, **default):
@@ -194,7 +194,7 @@ class ask(object):
     def note(cls, **default):
         '''Request the user provide a multi-lined string.'''
         return cls.note(u'', **default)
-    @internal.utils.multicase(message=basestring)
+    @internal.utils.multicase(message=six.string_types)
     @classmethod
     @internal.utils.string.decorate_arguments('message', 'default', 'text', 'string')
     def note(cls, message, **default):

@@ -79,7 +79,7 @@ def __iterate__(**type):
         iterable = builtins.list(__matcher__.match(key, value, iterable))
     for item in iterable: yield item
 
-@utils.multicase(string=basestring)
+@utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
 def list(string):
     '''List all of the segments whose name matches the glob specified by `string`.'''
@@ -143,7 +143,7 @@ byaddress = utils.alias(by_address)
 def by(segment):
     '''Return a segment by its ``idaapi.segment_t``.'''
     return segment
-@utils.multicase(name=basestring)
+@utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def by(name):
     '''Return the segment by its `name`.'''
@@ -175,7 +175,7 @@ def by(**type):
         raise E.SearchResultsError(u"{:s}.by({:s}) : Found 0 matching results.".format(__name__, searchstring))
     return res
 
-@utils.multicase(name=basestring)
+@utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def search(name):
     '''Search through all the segments and return the first one matching the glob `name`.'''
@@ -351,11 +351,11 @@ def color(segment):
     seg = by(segment)
     b,r = (seg.color&0xff0000)>>16, seg.color&0x0000ff
     return None if seg.color == 0xffffffff else (r<<16)|(seg.color&0x00ff00)|b
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(none):
     '''Clear the color of the current segment.'''
     return color(ui.current.segment(), None)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(segment, none):
     '''Clear the color of the segment identified by `segment`.'''
     seg = by(segment)
@@ -387,7 +387,7 @@ def contains(address, ea):
     '''Returns true if the address `ea` is contained within the segment belonging to the specified `address`.'''
     seg = by_address(address)
     return contains(seg, ea)
-@utils.multicase(name=basestring, ea=six.integer_types)
+@utils.multicase(name=six.string_types, ea=six.integer_types)
 @utils.string.decorate_arguments('name')
 def contains(name, ea):
     '''Returns true if the address `ea` is contained within the segment with the specified `name`.'''

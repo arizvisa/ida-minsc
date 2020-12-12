@@ -75,7 +75,7 @@ def by(func):
 def by(ea):
     '''Return the function at the address `ea`.'''
     return by_address(ea)
-@utils.multicase(name=basestring)
+@utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def by(name):
     '''Return the function with the specified `name`.'''
@@ -110,18 +110,18 @@ def comment(func, **repeatable):
     fn = by(func)
     res = idaapi.get_func_cmt(fn, repeatable.get('repeatable', True))
     return utils.string.of(res)
-@utils.multicase(string=basestring)
+@utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
 def comment(string, **repeatable):
     '''Set the comment for the current function to `string`.'''
     fn = ui.current.function()
     return comment(fn, string, **repeatable)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def comment(none, **repeatable):
     '''Remove the comment for the current function.'''
     fn = ui.current.function()
     return comment(fn, none or '', **repeatable)
-@utils.multicase(string=basestring)
+@utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string')
 def comment(func, string, **repeatable):
     """Set the comment for the function `func` to `string`.
@@ -134,7 +134,7 @@ def comment(func, string, **repeatable):
     if not ok:
         raise E.DisassemblerError(u"{:s}.comment({:#x}, \"{:s}\"{:s}) : Unable to call `idaapi.set_func_cmt({:#x}, {!r}, {!s})`.".format(__name__, ea, utils.string.escape(string, '"'), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else '', ea, utils.string.to(string), repeatable.get('repeatable', True)))
     return res
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def comment(func, none, **repeatable):
     """Remove the comment for the function `func`.
 
@@ -177,23 +177,23 @@ def name(func):
     return internal.declaration.demangle(res) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.fullname(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
     #return internal.declaration.extract.name(internal.declaration.demangle(res)) if internal.declaration.mangledQ(res) else res
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def name(none, **flags):
     '''Remove the custom-name from the current function.'''
     # we use ui.current.address() instead of ui.current.function()
     # in case the user might be hovering over an import table
     # function and wanting to rename that instead.
     return name(ui.current.address(), none or '', **flags)
-@utils.multicase(string=basestring)
+@utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(string, *suffix, **flags):
     '''Set the name of the current function to `string`.'''
     return name(ui.current.address(), string, *suffix, **flags)
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def name(func, none, **flags):
     '''Remove the custom-name from the function `func`.'''
     return name(func, none or '', **flags)
-@utils.multicase(string=basestring)
+@utils.multicase(string=six.string_types)
 @utils.string.decorate_arguments('string', 'suffix')
 def name(func, string, *suffix, **flags):
     """Set the name of the function `func` to `string`.
@@ -272,7 +272,7 @@ def color(func):
     fn = by(func)
     b, r = (fn.color&0xff0000)>>16, fn.color&0x0000ff
     return None if fn.color == 0xffffffff else (r<<16) | (fn.color&0x00ff00) | b
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(func, none):
     '''Remove the color for the function `func`.'''
     fn = by(func)
@@ -285,7 +285,7 @@ def color(func, rgb):
     fn = by(func)
     fn.color = (b<<16) | (rgb&0x00ff00) | r
     return bool(idaapi.update_func(fn))
-@utils.multicase(none=types.NoneType)
+@utils.multicase(none=None.__class__)
 def color(none):
     '''Remove the color for the current function.'''
     return color(ui.current.function(), None)
@@ -437,12 +437,12 @@ class chunks(object):
             continue
         raise E.AddressNotFoundError(u"{:s}.at({:#x}, {:#x}) : Unable to locate chunk for address {:#x} in function {:#x}.".format('.'.join([__name__, cls.__name__]), interface.range.start(fn), ea, ea, interface.range.start(fn)))
 
-    @utils.multicase(reg=(basestring, interface.register_t))
+    @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the current function that uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.function(), reg, *regs, **modifiers)
-    @utils.multicase(reg=(basestring, interface.register_t))
+    @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, func, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the function `func` that uses `reg` or any one of the registers in `regs`.
@@ -500,12 +500,12 @@ class chunk(object):
             yield ea
         return
 
-    @utils.multicase(reg=(basestring, interface.register_t))
+    @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the function chunk containing the current address which uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.function(), reg, *regs, **modifiers)
-    @utils.multicase(reg=(basestring, interface.register_t))
+    @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the function chunk containing the address `ea` which uses `reg` or any one of the registers in `regs`.
@@ -1115,7 +1115,7 @@ class block(object):
     def color(cls):
         '''Returns the color of the basic block at the current address.'''
         return cls.color(ui.current.address())
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     @classmethod
     def color(cls, none):
         '''Removes the color of the basic block at the current address.'''
@@ -1145,7 +1145,7 @@ class block(object):
         '''Returns the color of the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.color(bb)
-    @utils.multicase(ea=six.integer_types, none=types.NoneType)
+    @utils.multicase(ea=six.integer_types, none=None.__class__)
     @classmethod
     def color(cls, ea, none):
         '''Removes the color of the basic block at the address `ea`.'''
@@ -1160,13 +1160,13 @@ class block(object):
             database.color(ea, None)
             # internal.netnode.alt.remove(ea, 0x14)
         return res
-    @utils.multicase(bounds=builtins.tuple, none=types.NoneType)
+    @utils.multicase(bounds=builtins.tuple, none=None.__class__)
     @classmethod
     def color(cls, bounds, none):
         '''Removes the color of the basic block identified by `bounds`.'''
         bb = cls.at(bounds)
         return cls.color(bb, None)
-    @utils.multicase(bb=idaapi.BasicBlock, none=types.NoneType)
+    @utils.multicase(bb=idaapi.BasicBlock, none=None.__class__)
     @classmethod
     def color(cls, bb, none):
         '''Removes the color of the basic block `bb`.'''
@@ -1317,24 +1317,24 @@ class block(object):
         left, right = interface.range.unpack(bb)
         return database.address.iterate(left, database.address.prev(right))
 
-    @utils.multicase(reg=(basestring, interface.register_t))
+    @utils.multicase(reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the current block that uses `reg` or any one of the registers in `regs`.'''
         return cls.register(ui.current.address(), reg, *regs, **modifiers)
-    @utils.multicase(ea=six.integer_types, reg=(basestring, interface.register_t))
+    @utils.multicase(ea=six.integer_types, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, ea, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block containing `ea` that uses `reg` or any one of the registers in `regs`.'''
         bb = cls.at(ea)
         return cls.register(bb, reg, *regs, **modifiers)
-    @utils.multicase(bounds=builtins.tuple, reg=(basestring, interface.register_t))
+    @utils.multicase(bounds=builtins.tuple, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, bounds, reg, *regs, **modifiers):
         '''Yield each `(address, opnum, state)` within the block identified by `bounds` that uses `reg` or any one of the registers in `regs`.'''
         bb = cls.at(bounds)
         return cls.register(bb, reg, *regs, **modifiers)
-    @utils.multicase(bb=idaapi.BasicBlock, reg=(basestring, interface.register_t))
+    @utils.multicase(bb=idaapi.BasicBlock, reg=(six.string_types, interface.register_t))
     @classmethod
     def register(cls, bb, reg, *regs, **modifiers):
         """Yield each `(address, opnum, state)` within the block `bb` that uses `reg` or any one of the registers in `regs`.
@@ -1688,17 +1688,17 @@ arguments = args = frame.args
 def tag():
     '''Returns all the tags defined for the current function.'''
     return tag(ui.current.address())
-@utils.multicase(key=basestring)
+@utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key')
 def tag(key):
     '''Returns the value of the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key)
-@utils.multicase(key=basestring)
+@utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key', 'value')
 def tag(key, value):
     '''Sets the value for the tag `key` to `value` for the current function.'''
     return tag(ui.current.address(), key, value)
-@utils.multicase(key=basestring)
+@utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key')
 def tag(func, key):
     '''Returns the value of the tag identified by `key` for the function `func`.'''
@@ -1760,7 +1760,7 @@ def tag(func):
 
     # ..and now hand it off.
     return res
-@utils.multicase(key=basestring)
+@utils.multicase(key=six.string_types)
 @utils.string.decorate_arguments('key', 'value')
 def tag(func, key, value):
     '''Sets the value for the tag `key` to `value` for the function `func`.'''
@@ -1819,12 +1819,12 @@ def tag(func, key, value):
 
     # return what we fetched from the dict
     return res
-@utils.multicase(key=basestring, none=types.NoneType)
+@utils.multicase(key=six.string_types, none=None.__class__)
 @utils.string.decorate_arguments('key')
 def tag(key, none):
     '''Removes the tag identified by `key` for the current function.'''
     return tag(ui.current.address(), key, None)
-@utils.multicase(key=basestring, none=types.NoneType)
+@utils.multicase(key=six.string_types, none=None.__class__)
 @utils.string.decorate_arguments('key')
 def tag(func, key, none):
     '''Removes the tag identified by `key` from the function `func`.'''
@@ -1898,14 +1898,14 @@ def tags(func):
 def select(**boolean):
     '''Query the contents of the current function for any tags specified by `boolean`'''
     return select(ui.current.function(), **boolean)
-@utils.multicase(tag=basestring)
+@utils.multicase(tag=six.string_types)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(tag, *Or, **boolean):
     '''Query the contents of the current function for the specified `tag` and any others specified as `Or`.'''
     res = {tag} | {item for item in Or}
     boolean['Or'] = {item for item in boolean.get('Or', [])} | res
     return select(ui.current.function(), **boolean)
-@utils.multicase(tag=basestring)
+@utils.multicase(tag=six.string_types)
 @utils.string.decorate_arguments('tag', 'And', 'Or')
 def select(func, tag, *Or, **boolean):
     '''Query the contents of the function `func` for the specified `tag` and any others specified as `Or`.'''
@@ -2027,11 +2027,11 @@ class type(object):
     def __new__(cls):
         '''Return the typeinfo for the current function as a ``idaapi.tinfo_t``.'''
         return cls(ui.current.address())
-    @utils.multicase(info=(basestring, idaapi.tinfo_t))
+    @utils.multicase(info=(six.string_types, idaapi.tinfo_t))
     def __new__(cls, info):
         '''Apply the typeinfo in `info` to the current function.'''
         return cls(ui.current.address(), info)
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     def __new__(cls, none):
         '''Remove the typeinfo for the current function.'''
         return cls(ui.current.address(), None)
@@ -2076,7 +2076,7 @@ class type(object):
 
         # Recurse back into ourselves in order to call idaapi.apply_cdecl
         return cls(ea, tinfo_s)
-    @utils.multicase(info=basestring)
+    @utils.multicase(info=six.string_types)
     def __new__(cls, func, info):
         '''Parse the typeinfo string in `info` to an ``idaapi.tinfo_t`` and apply it to the function `func`.'''
         til = idaapi.cvar.idati if idaapi.__version__ < 7.0 else idaapi.get_idati()
@@ -2127,7 +2127,7 @@ class type(object):
 
         # Just return the type we applied to the user.
         return cls(ea)
-    @utils.multicase(none=types.NoneType)
+    @utils.multicase(none=None.__class__)
     def __new__(cls, func, none):
         '''Remove the typeinfo for the function `func`.'''
         fn = by(func)

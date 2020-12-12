@@ -349,11 +349,11 @@ def ops_register(ea, **modifiers):
     iterops = interface.regmatch.modifier(**modifiers)
     fregisterQ = utils.fcompose(op, utils.fcondition(utils.finstance(interface.symbol_t))(utils.fcompose(utils.fattribute('symbols'), functools.partial(map, utils.finstance(interface.register_t)), any), utils.fconstant(False)))
     return tuple(filter(functools.partial(fregisterQ, ea), iterops(ea)))
-@utils.multicase(reg=(basestring, interface.register_t))
+@utils.multicase(reg=(six.string_types, interface.register_t))
 def ops_register(reg, *regs, **modifiers):
     '''Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.'''
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
-@utils.multicase(reg=(basestring, interface.register_t))
+@utils.multicase(reg=(six.string_types, interface.register_t))
 def ops_register(ea, reg, *regs, **modifiers):
     """Yields the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
 
@@ -918,7 +918,7 @@ def op_structure(ea, opnum, path, **delta):
     if len(path) == 0:
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : No structure members were specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
-    if any(not isinstance(m, (structure.structure_t, structure.member_t, basestring) + six.integer_types) for m in path):
+    if any(not isinstance(m, (structure.structure_t, structure.member_t, six.string_types, six.integer_types)) for m in path):
         raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
 
     # ensure the path begins with a structure.structure_t
@@ -944,7 +944,7 @@ def op_structure(ea, opnum, path, **delta):
     # collect each member resolving them to an id
     moff, tids = 0, []
     for i, item in enumerate(path[1:]):
-        if isinstance(item, basestring):
+        if isinstance(item, six.string_types):
             m = idaapi.get_member_by_name(sptr, item)
         elif isinstance(item, structure.member_t):
             m = item.ptr
@@ -1022,12 +1022,12 @@ def op_enumeration(ea, opnum):
     # Grab the operand value and use it to return the member identifier for the enumeration
     res = op(ea, opnum)
     return idaapi.get_enum_member(E, res, -1, 0)
-@utils.multicase(opnum=six.integer_types, name=basestring)
+@utils.multicase(opnum=six.integer_types, name=six.string_types)
 @utils.string.decorate_arguments('name')
 def op_enumeration(opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the current instruction.'''
     return op_enumeration(ui.current.address(), opnum, enumeration.by(name))
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=basestring)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=six.string_types)
 @utils.string.decorate_arguments('name')
 def op_enumeration(ea, opnum, name):
     '''Apply the enumeration `name` to operand `opnum` for the instruction at `ea`.'''
@@ -1601,7 +1601,7 @@ class operand_types:
         sf, dt = 2 ** (bits - 1), dtype_by_size(database.config.bits() // 8)
 
         inverted, regular = offset & (2 ** bits - 1) if offset & sf else -2 ** bits + offset, -2 ** bits + offset if offset & sf else offset & (sf - 1)
-        res = long(inverted) if interface.node.alt_opinverted(ea, op.n) else long(regular), None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
+        res = inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
         return intelops.OffsetBaseIndexScale(*res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
@@ -1620,7 +1620,7 @@ class operand_types:
         '''Operand type decoder for returning a memory displacement on either the AArch32 or AArch64 architectures.'''
         global architecture
         Rn = architecture.by_index(op.reg)
-        return armops.immediatephrase(Rn, long(op.addr))
+        return armops.immediatephrase(Rn, op.addr)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
@@ -1639,7 +1639,7 @@ class operand_types:
         res = reduce(lambda agg, n: (agg*0x100)|n, six.iterbytes(res), 0)
         sf = bool(res & maxval>>1)
 
-        return armops.memory(long(addr), long(res-maxval) if sf else long(res))
+        return armops.memory(addr, res - maxval if sf else res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_idpspec0)
     def flex(ea, op):
@@ -1755,7 +1755,7 @@ class intelops:
         """
         _fields = ('segment', 'offset')
         _types = (
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
         )
 
@@ -1775,10 +1775,10 @@ class intelops:
         """
         _fields = ('segment', 'offset', 'base', 'index', 'scale')
         _types = (
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
-            (types.NoneType, interface.register_t),
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
         )
 
@@ -1800,8 +1800,8 @@ class intelops:
         _fields = ('offset', 'base', 'index', 'scale')
         _types = (
             six.integer_types,
-            (types.NoneType, interface.register_t),
-            (types.NoneType, interface.register_t),
+            (None.__class__, interface.register_t),
+            (None.__class__, interface.register_t),
             six.integer_types,
         )
 
