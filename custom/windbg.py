@@ -67,7 +67,7 @@ def escape(input, depth=0, **extra):
     # result into a string anyways.
     def closure(input, depth, extra):
         bs = '\\'
-        ws = { six.int2byte(i) : item for i, item in enumerate('0123456abtnvfr') }
+        ws = { six.unichr(i) : item for i, item in enumerate('0123456abtnvfr') }
         escaped = {bs, '"'}
 
         # Now we can tokenize our input and figure out what it's supposed to yield
