@@ -593,8 +593,8 @@ class chunk(object):
     @utils.multicase()
     @classmethod
     def remove(cls):
+        '''Remove the chunk containing the current address from its function.'''
         return cls.remove(ui.current.address())
-
     @utils.multicase(ea=six.integer_types)
     @classmethod
     def remove(cls, ea):
