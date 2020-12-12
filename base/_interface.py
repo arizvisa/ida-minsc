@@ -843,28 +843,30 @@ class node(object):
 
         # XXX: implement a parser for type_t in order to figure out idaapi.BT_COMPLEX types
         # return type_t
-        data = builtins.next(iterable)
-        base, flags, mods = six.byte2int(data) & idaapi.TYPE_BASE_MASK, six.byte2int(data) & idaapi.TYPE_FLAGS_MASK, six.byte2int(data) & idaapi.TYPE_MODIF_MASK
+        item = builtins.next(iterable)
+        data, base, flags, mods = bytearray([item]), item & idaapi.TYPE_BASE_MASK, item & idaapi.TYPE_FLAGS_MASK, item & idaapi.TYPE_MODIF_MASK
         if base == idaapi.BT_PTR:
-            data+= builtins.next(iterable)
+            data += bytearray([builtins.next(iterable)])
+
         elif base == idaapi.BT_COMPLEX and flags == 0x30:
             by = builtins.next(iterable)
-            skip, data = six.byte2int(by), data + by
+            skip, data = by, data + bytearray([by])
             while skip > 1:
-                data+= builtins.next(iterable)
+                data += bytearray([builtins.next(iterable)])
                 skip -= 1
+
         elif base in {idaapi.BT_ARRAY, idaapi.BT_FUNC, idaapi.BT_COMPLEX, idaapi.BT_BITFIELD}:
             lookup = { getattr(idaapi, name) : "idaapi.{:s}".format(name) for name in dir(idaapi) if name.startswith('BT_') }
             if base == idaapi.BT_COMPLEX:
-                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, six.byte2int(data), 2 + 2))
-            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, mods, six.byte2int(data), 2 + 2))
+                raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) where the flags ({:#x} are not equal to {:#x} are currently not supported. The flags and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, 0x30, mods, item, 2 + 2))
+            raise internal.exceptions.UnsupportedCapability(u"{:s}.sup_functype(\"{!s}\") : Calling conventions that return an {!s}({:d}) are currently not supported. The flags ({:#x}) and the modification flags ({:#x}) were extracted from the byte {:#{:d}x}.".format('.'.join([__name__, node.__name__]), sup.encode('hex'), lookup[base], base, flags, mods, item, 2 + 2))
 
         # append the return type
         res.append(data)
 
         # append the number of arguments
         by = builtins.next(iterable)
-        res.append(by)
+        res.append(bytearray([by]))
 
         # Everything else in the iterable is an array of type_t as found in "Type flags" in the SDK docs.
         ''.join(iterable)
