@@ -330,8 +330,7 @@ class structure_t(object):
         x, sid = idaapi.xrefblk_t(), self.id
 
         # grab first reference to structure
-        ok = x.first_to(sid, 0)
-        if not ok:
+        if not x.first_to(sid, 0):
             return []
 
         # collect the rest of its references
@@ -480,15 +479,14 @@ class structure_t(object):
 
         # now we can set the name of the structure
         oldname = idaapi.get_struc_name(self.id)
-        ok = idaapi.set_struc_name(self.id, ida_string)
-        if not ok:
+        if not idaapi.set_struc_name(self.id, ida_string):
             raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
 
         # verify that the name was actually assigned properly
         assigned = idaapi.get_struc_name(self.id) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
             logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
-        return ok
+        return assigned
 
     @property
     def comment(self, repeatable=True):
@@ -500,15 +498,14 @@ class structure_t(object):
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment for the structure to `value`.'''
         res = utils.string.to(value or '')
-        ok = idaapi.set_struc_cmt(self.id, res, repeatable)
-        if not ok:
+        if not idaapi.set_struc_cmt(self.id, res, repeatable):
             raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(info), utils.string.repr(self.name)))
 
         # verify that the comment was actually assigned
         assigned = idaapi.get_struc_cmt(self.id, repeatable)
         if utils.string.of(assigned) != utils.string.of(res):
             logging.info(u"{:s}({:#x}).comment : The comment ({:s}) that was assigned to the structure does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
-        return ok
+        return assigned
 
     @utils.multicase()
     def tag(self):
@@ -561,8 +558,7 @@ class structure_t(object):
     def size(self, size):
         '''Expand the structure to the new `size` that is specified.'''
         res = idaapi.get_struc_size(self.ptr)
-        ok = idaapi.expand_struc(self.ptr, 0, size - res, True)
-        if not ok:
+        if not idaapi.expand_struc(self.ptr, 0, size - res, True):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).size({:+d}) : Unable to resize structure \"{:s}\" from {:#x} bytes to {:#x} bytes.".format('.'.join([__name__, cls.__name__]), self.id, size, utils.string.escape(self.name, '"'), res, size))
         return res
@@ -839,8 +835,7 @@ def fragment(id, offset, size):
 @utils.multicase(structure=structure_t)
 def remove(structure):
     '''Remove the specified `structure` from the database.'''
-    ok = idaapi.del_struc(structure.ptr)
-    if not ok:
+    if not idaapi.del_struc(structure.ptr):
         raise E.StructureNotFoundError(u"{:s}.remove({!r}) : Unable to remove structure {:#x}.".format(__name__, structure, structure.id))
     return True
 @utils.multicase(name=six.string_types)
@@ -1589,15 +1584,14 @@ class member_t(object):
 
         # now we can set the name of the member at the specified offset
         oldname = self.name
-        ok = idaapi.set_member_name(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, ida_string)
-        if not ok:
+        if not idaapi.set_member_name(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, ida_string):
             raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
 
         # verify that the name was actually assigned properly
         assigned = idaapi.get_member_name(self.id) or ''
         if utils.string.of(assigned) != utils.string.of(ida_string):
             logging.info(u"{:s}({:#x}).name : The name ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(ida_string)))
-        return ok
+        return assigned
 
     @property
     def comment(self, repeatable=True):
@@ -1609,15 +1603,14 @@ class member_t(object):
     def comment(self, value, repeatable=True):
         '''Set the repeatable comment of the member to `value`.'''
         res = utils.string.to(value or '')
-        ok = idaapi.set_member_cmt(self.ptr, res, repeatable)
-        if not ok:
+        if not idaapi.set_member_cmt(self.ptr, res, repeatable):
             raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name)))
 
         # verify that the comment was actually assigned properly
         assigned = idaapi.get_member_cmt(self.id, repeatable)
         if utils.string.of(assigned) != utils.string.of(res):
             logging.info(u"{:s}({:#x}).comment : The comment ({:s}) that was assigned to the structure member does not match what was requested ({:s}).".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(utils.string.of(assigned)), utils.string.repr(res)))
-        return ok
+        return assigned
 
     @utils.multicase()
     def tag(self):
@@ -1703,8 +1696,7 @@ class member_t(object):
         # Guess the typeinfo for the current member. If we're unable to get the
         # typeinfo, then raise a critical exception because members need to have
         # types and it doesn't make sense for them to not.
-        ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr)
-        if not ok:
+        if not idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr):
             cls = self.__class__
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
 
@@ -1807,8 +1799,7 @@ class member_t(object):
 
         # otherwise, it's a structure..which means we need to specify the member to get refs for
         x = idaapi.xrefblk_t()
-        ok = x.first_to(mid, 0)
-        if not ok:
+        if not x.first_to(mid, 0):
             return []
 
         # collect all references available
