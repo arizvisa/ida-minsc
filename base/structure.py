@@ -1565,10 +1565,12 @@ class member_t(object):
         return self.ptr.eoff
     @property
     def realbounds(self):
+        '''Return the real boundaries of the member.'''
         ptr = self.ptr
         return interface.bounds_t(ptr.soff, ptr.eoff)
     @property
     def bounds(self):
+        '''Return the boundaries of the member.'''
         ptr, base = self.ptr, self.__parent.members.baseoffset
         return interface.bounds_t(ptr.soff, ptr.eoff).translate(base)
     @property
@@ -1756,7 +1758,7 @@ class member_t(object):
         else:
             set_member_tinfo = idaapi.set_member_tinfo
 
-        # Parse our into parameter into a tinfo_t for us, so that we can assign it t the
+        # Parse our into parameter into a tinfo_t for us, so that we can assign it to the
         # typeinfo for the member.
         ti = internal.declaration.parse(info)
         if ti is None:
