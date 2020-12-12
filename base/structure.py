@@ -577,16 +577,16 @@ class structure_t(object):
         '''Return the index of the structure.'''
         return idaapi.get_struc_idx(self.id)
     @index.setter
-    def index(self, idx):
+    def index(self, index):
         '''Set the index of the structure to `idx`.'''
         res = idaapi.get_struc_idx(self.id)
-        if not idaapi.set_struc_idx(self.ptr, idx):
+        if not idaapi.set_struc_idx(self.ptr, index):
             cls = self.__class__
-            raise E.DisassemblerError(u"{:s}({:#x}).index({:+d}) : Unable to modify the index of structure \"{:s}\" from {:d} to index {:d}.".format('.'.join([__name__, cls.__name__]), self.id, idx, utils.string.escape(self.name, '"'), res, idx))
+            raise E.DisassemblerError(u"{:s}({:#x}).index({:+d}) : Unable to modify the index of structure \"{:s}\" from {:d} to index {:d}.".format('.'.join([__name__, cls.__name__]), self.id, index, utils.string.escape(self.name, '"'), res, index))
 
         res = idaapi.get_struc_idx(self.id)
-        if res != idx:
-            logging.info(u"{:s}({:#x}).index({:+d}) : The index ({:d}) that the structure was moved to does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), self.id, idx, idx, res))
+        if res != index:
+            logging.info(u"{:s}({:#x}).index({:+d}) : The index ({:d}) that the structure was moved to does not match what was requested ({:d}).".format('.'.join([__name__, cls.__name__]), self.id, index, index, res))
         return res
 
     @property
@@ -1690,11 +1690,24 @@ class member_t(object):
         return res
     @type.setter
     def type(self, type):
-        '''Set the type of the member.'''
+        '''Set the type of the member to the provided `type`.'''
         flag, typeid, nbytes = interface.typemap.resolve(type)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
-        return idaapi.set_member_type(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, flag, opinfo, nbytes)
+        if not idaapi.set_member_type(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, flag, opinfo, nbytes):
+            raise E.DisassemblerError(u"{:s}({:#x}).type : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, utils.string.repr(self.name)))
+
+        newflag, newtypeid, newsize = self.flag, self.typeid, self.size
+        if newflag != flag:
+            logging.info(u"{:s}({:#x}).type : The provided flags ({:#x}) were incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, flags, newflags))
+
+        if newtypeid != typeid:
+            logging.info(u"{:s}({:#x}).type : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, typeid, newtypeid))
+
+        if newsize != nbytes:
+            logging.info(u"{:s}({:#x}).type : The provided size ({:+#x}) was incorrectly assigned as {:+#x}.".format('.'.join([__name__, cls.__name__]), self.id, nbytes, newsize))
+
+        return newflag, newtypeid, newsize
 
     @property
     def typeinfo(self):
