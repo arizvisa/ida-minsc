@@ -548,7 +548,7 @@ class character(object):
         # begin processing any input that is fed to us
         while True:
             ch = (yield)
-            n = six.byte2int(ch)
+            n = ord(ch)
 
             # check if character has an existing escape mapping
             if cls.mapQ(ch):
@@ -757,7 +757,7 @@ class string(object):
         """
         if isinstance(item, six.string_types):
             res = cls.escape(item, '\'')
-            if all(six.byte2int(ch) < 0x100 for ch in item):
+            if all(ord(ch) < 0x100 for ch in item):
                 return "'{:s}'".format(res)
             return u"u'{:s}'".format(res)
         elif isinstance(item, tuple):
