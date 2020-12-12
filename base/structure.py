@@ -1655,7 +1655,9 @@ class member_t(object):
         '''Set the tag identified by `key` to `value` for the member.'''
         state = self.tag()
         repeatable, res, state[key] = True, state.get(key, None), value
-        ok = idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable)
+        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name)))
         return res
     @utils.multicase(key=six.string_types, none=None.__class__)
     @utils.string.decorate_arguments('key')
@@ -1663,7 +1665,9 @@ class member_t(object):
         '''Removes the tag specified by `key` from the member.'''
         state = self.tag()
         repeatable, res, = True, state.pop(key)
-        ok = idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable)
+        if not idaapi.set_member_cmt(self.ptr, utils.string.to(internal.comment.encode(state)), repeatable):
+            cls = self.__class__
+            raise E.DisassemblerError(u"{:s}({:#x}).comment : Unable to assign the provided comment to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(self.name)))
         return res
 
     @property
@@ -1695,16 +1699,20 @@ class member_t(object):
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         if not idaapi.set_member_type(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, flag, opinfo, nbytes):
+            cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).type : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, utils.string.repr(self.name)))
 
-        newflag, newtypeid, newsize = self.flag, self.typeid, self.size
+        newflag, newtypeid, newsize = self.flag, self.typeid or idaapi.BADADDR, self.size
         if newflag != flag:
+            cls = self.__class__
             logging.info(u"{:s}({:#x}).type : The provided flags ({:#x}) were incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, flags, newflags))
 
         if newtypeid != typeid:
+            cls = self.__class__
             logging.info(u"{:s}({:#x}).type : The provided typeid ({:#x}) was incorrectly assigned as {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, typeid, newtypeid))
 
         if newsize != nbytes:
+            cls = self.__class__
             logging.info(u"{:s}({:#x}).type : The provided size ({:+#x}) was incorrectly assigned as {:+#x}.".format('.'.join([__name__, cls.__name__]), self.id, nbytes, newsize))
 
         return newflag, newtypeid, newsize
@@ -1717,7 +1725,8 @@ class member_t(object):
         # Guess the typeinfo for the current member. If we're unable to get the
         # typeinfo, then raise a critical exception because members need to have
         # types and it doesn't make sense for them to not.
-        if not idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr):
+        ok = idaapi.get_or_guess_member_tinfo2(self.ptr, ti) if idaapi.__version__ < 7.0 else idaapi.get_or_guess_member_tinfo(ti, self.ptr)
+        if not ok:
             cls = self.__class__
             raise E.MissingTypeOrAttribute(u"{:s}({:#x}).typeinfo : Unable to determine the type information for member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, self.name))
 
