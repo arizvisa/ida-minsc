@@ -497,6 +497,63 @@ class notepad(appwindow):
     __open__ = staticmethod(idaapi.open_notepad_window)
     __open_defaults__ = ()
 
+    @classmethod
+    def open(cls, *args):
+        '''Open or show the notepad window and return its ``QtWidgets.QPlainTextEdit`` widget.'''
+        widget = super(notepad, cls).open(*args)
+        children = (item for item in widget.children() if isinstance(item, PyQt5.QtWidgets.QPlainTextEdit))
+        result = builtins.next(children, None)
+        if result is None:
+            raise internal.exceptions.ItemNotFoundError(u"{:s}.open({!s}) : Unable to locate the QtWidgets.QPlainTextEdit widget.".format('.'.join([__name__, cls.__name__]), ', '.join(map(internal.utils.repr, args))))
+        return result
+
+    @classmethod
+    def close(cls):
+        '''Close or hide the notepad window.'''
+        editor = cls.open()
+        widget = editor.parent()
+        return widget.deleteLater()
+
+    @classmethod
+    def get(cls):
+        '''Return the string that is currently stored within the notepad window.'''
+        editor = cls.open()
+        return editor.toPlainText()
+
+    @internal.utils.multicase(string=six.string_types)
+    @classmethod
+    def set(cls, string):
+        '''Set the text that is currently stored within the notepad window to `string`.'''
+        editor = cls.open()
+        return editor.setPlainText(string)
+
+    @internal.utils.multicase(items=(builtins.list, builtins.tuple))
+    @classmethod
+    def set(cls, items):
+        '''Set each line that is currently stored within the notepad window to `items`.'''
+        return cls.set('\n'.join(items))
+
+    @internal.utils.multicase(string=six.string_types)
+    @classmethod
+    def append(cls, string):
+        '''Append the provided `string` to the current text that is stored within the notepad window.'''
+        editor = cls.open()
+        return editor.appendPlainText(string)
+
+    @internal.utils.multicase()
+    @classmethod
+    def cursor(cls):
+        '''Return the ``QtGui.QTextCursor`` used by the notepad window.'''
+        editor = cls.open()
+        return editor.textCursor()
+
+    @internal.utils.multicase()
+    @classmethod
+    def cursor(cls, cursor):
+        '''Set the ``QtGui.QTextCursor`` for the notepad window to `cursor`.'''
+        editor = cls.open()
+        return editor.setTextCursor(cursor)
+
 class timer(object):
     """
     This namespace is for registering a python callable to a timer in IDA.
