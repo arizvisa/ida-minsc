@@ -3617,12 +3617,12 @@ class type(object):
 
             res = type.flags(ea, idaapi.DT_TYPE)
             if res != FF_STRUCT:
-                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join([__name__, 'type', 'structure']), ea, FF_STRUCT, res))
+                raise E.MissingTypeOrAttribute(u"{:s}.id({:#x}) : The type at specified address is not an FF_STRUCT({:#x}) and is instead {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, FF_STRUCT, res))
 
             ti, F = idaapi.opinfo_t(), type.flags(ea)
             res = idaapi.get_opinfo(ea, 0, F, ti) if idaapi.__version__ < 7.0 else idaapi.get_opinfo(ti, ea, 0, F)
             if not res:
-                raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to `idaapi.get_opinfo()` failed at {:#x}.".format('.'.join([__name__, 'type', 'structure']), ea, ea))
+                raise E.DisassemblerError(u"{:s}.id({:#x}) : The call to `idaapi.get_opinfo()` failed at {:#x}.".format('.'.join([__name__, 'type', cls.__name__]), ea, ea))
             return ti.tid
 
         @utils.multicase()
@@ -4200,7 +4200,7 @@ class marks(object):
             '''Return the index of the next available mark slot.'''
             res = builtins.next((i for i in six.moves.range(cls.MAX_SLOT_COUNT) if idaapi.get_marked_pos(i) == idaapi.BADADDR), None)
             if res is None:
-                raise OverflowError("{:s}.free_slotindex() : No free slots available for mark.".format('.'.join([__name__, 'bookmarks', cls.__name__])))
+                raise OverflowError("{:s}.free_slotindex() : No free slots available for mark.".format('.'.join([__name__, 'marks', cls.__name__])))
             return res
 
         @classmethod
