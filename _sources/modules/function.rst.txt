@@ -127,7 +127,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the color from
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: color(func, rgb)
    
@@ -142,7 +142,7 @@ functions and aliases. For more information on this, please see
    Remove the color for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: comment(\*\*repeatable)
    
@@ -172,7 +172,7 @@ functions and aliases. For more information on this, please see
    Remove the comment for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: comment(func, string, \*\*repeatable)
@@ -194,7 +194,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the comment from
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: contains()
@@ -251,7 +251,7 @@ functions and aliases. For more information on this, please see
    Remove the custom-name from the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(string, \*suffix, \*\*flags)
@@ -269,7 +269,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the name for
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(func, string, \*suffix, \*\*flags)
@@ -437,7 +437,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: tag(func, key, none)
    
@@ -447,7 +447,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: tags()
    
@@ -680,7 +680,7 @@ Some examples of this functionality can be::
    Removes the color of the basic block at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: block\.color(ea)
    
@@ -710,7 +710,7 @@ Some examples of this functionality can be::
    :param ea: the address of the basic block to remove the color from
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: block\.color(bounds, none)
    
@@ -719,7 +719,7 @@ Some examples of this functionality can be::
    :param bounds: the boundaries of the basic block to remove the color from
    :type bounds: tuple
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: block\.color(bb, none)
    
@@ -728,7 +728,7 @@ Some examples of this functionality can be::
    :param bb: the basic block to remove the color from
    :type bb: idaapi.BasicBlock
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: block\.color(ea, rgb, \*\*frame)
    
@@ -1122,7 +1122,7 @@ Some examples of this namespace's usage::
    :param start: the address of the basic block to start from
    :type start: int or long
    :param exits: the addresses of basic blocks to stop at
-   :type exits: intlong or list or tuple or set
+   :type exits: int or long or list or tuple or set
    
 .. py:function:: blocks\.subgraph(func, start, exits)
    
@@ -1134,7 +1134,7 @@ Some examples of this namespace's usage::
    :param start: the address of the basic block to start from
    :type start: int or long
    :param exits: the addresses of basic blocks to stop at
-   :type exits: intlong or list or tuple or set
+   :type exits: int or long or list or tuple or set
    
 .. _ns-function-chunk:
 
@@ -1660,14 +1660,14 @@ Some simple ways of getting information about a function::
    Remove the typeinfo for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: type(func)
    
    Return the typeinfo for the function ``func`` as a :py:obj:`idaapi.tinfo_t`.
    
    :param func: the function to get the typeinfo for
-   :type func: intlong or idaapi.func_t
+   :type func: int or long or idaapi.func_t
    
 .. py:function:: type(func, info)
    
@@ -1691,7 +1691,7 @@ Some simple ways of getting information about a function::
    
    :param func:
    :param none:
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: type\.convention()
    

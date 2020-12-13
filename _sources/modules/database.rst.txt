@@ -40,7 +40,7 @@ functions and aliases. For more information on this, please see
    Remove the color from the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: color(ea)
    
@@ -56,7 +56,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: color(ea, rgb)
    
@@ -96,7 +96,7 @@ functions and aliases. For more information on this, please see
    Remove the comment at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: comment(ea, string, \*\*repeatable)
@@ -120,7 +120,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: disassemble(\*\*options)
@@ -180,7 +180,7 @@ functions and aliases. For more information on this, please see
    Remove the mark at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: mark(ea)
    
@@ -203,7 +203,7 @@ functions and aliases. For more information on this, please see
    :param ea: the address of an existing mark
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: mark(ea, description)
    
@@ -244,7 +244,7 @@ functions and aliases. For more information on this, please see
    Removes the name at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when setting the name
    
 .. py:function:: name(ea, string, \*suffix, \*\*flags)
@@ -269,7 +269,7 @@ functions and aliases. For more information on this, please see
    :param ea: an address in the database
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    :param \*\*flags: any number of :py:obj:`idaapi.SN_\*` flags to use when removing the name
    
 .. py:function:: read()
@@ -387,7 +387,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: tag(ea, key, none)
    
@@ -398,7 +398,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: tags()
    
@@ -1997,7 +1997,7 @@ To add extra comments, one can do this like::
    Delete the prefixed comment at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: extra\.prefix(ea)
    
@@ -2022,7 +2022,7 @@ To add extra comments, one can do this like::
    :param ea: the address containing a prefix comment
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: extra\.preinsert(ea, count)
    
@@ -2060,7 +2060,7 @@ To add extra comments, one can do this like::
    Delete the suffixed comment at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: extra\.suffix(ea)
    
@@ -2085,7 +2085,7 @@ To add extra comments, one can do this like::
    :param ea: the address containing a suffix comment
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. _ns-database-functions:
 
@@ -3660,7 +3660,7 @@ Some examples of using this namespace can be::
    Remove the typeinfo from the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: type(info)
    
@@ -3684,7 +3684,7 @@ Some examples of using this namespace can be::
    
    :param ea: an address in the database
    :param none: the value :py:obj:`None`
-   :type none: None.__class__
+   :type none: None
    
 .. py:function:: type(ea, info)
    
