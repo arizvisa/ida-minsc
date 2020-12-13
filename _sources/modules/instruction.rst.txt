@@ -57,17 +57,6 @@ functions and aliases. For more information on this, please see
    :param ea: the address of an instruction
    :type ea: int or long
    
-.. py:function:: feature()
-   
-   Returns the feature bitmask of the instruction at the current address.
-   
-.. py:function:: feature(ea)
-   
-   Return the feature bitmask for the instruction at the address ``ea``.
-   
-   :param ea: the address of an instruction
-   :type ea: int or long
-   
 .. py:function:: mnemonic()
    
    Returns the mnemonic of the instruction at the current address.
@@ -696,11 +685,26 @@ functions and aliases. For more information on this, please see
    :param ea: the address in the database to fetch the :py:obj:`idaapi.refinfo_t` from
    :type ea: int or long
    
+.. py:function:: ops_register(\*\*modifiers)
+   
+   Yields the index of each operand in the instruction at the current address which uses a register.
+   
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
+   
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
+   
+.. py:function:: ops_register(ea, \*\*modifiers)
+   
+   Yields the index of each operand in the instruction at the address ``ea`` which uses a register.
+   
+   Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
+   
+   :param ea: the address of an instruction
+   :param \*\*modifiers: if ``write`` is specified, then only return operands that write to any registers. if ``read`` is specified then do the same but for operands that read from them.
+   
 .. py:function:: ops_register(reg, \*regs, \*\*modifiers)
    
    Yields the index of each operand in the instruction at the current address that uses ``reg`` or any one of the registers in ``regs``.
-   
-   If the keyword ``write`` is true, then only return the result if it's writing to the register.
    
    Aliases: :py:func:`instruction.ops_regs<ops_register>`, :py:func:`instruction.ops_reg<ops_register>`
    
@@ -1052,6 +1056,32 @@ Some examples of using this namespace are::
     > print instruction.type.is_call(ea)
     > print instruction.type.is_branch(ea)
 
+.. py:function:: type\.feature()
+   
+   Returns the feature bitmask of the instruction at the current address.
+   
+   Aliases: :py:func:`instruction.feature<type\.feature>`
+   
+.. py:function:: type\.feature(ea)
+   
+   Return the feature bitmask for the instruction at the address ``ea``.
+   
+   Aliases: :py:func:`instruction.feature<type\.feature>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   
+.. py:function:: type\.feature(ea, mask)
+   
+   Return the feature bitmask for the instruction at the address ``ea`` masked with ``mask``.
+   
+   Aliases: :py:func:`instruction.feature<type\.feature>`
+   
+   :param ea: the address of an instruction
+   :type ea: int or long
+   :param mask: a bitmask used to select specific bits from the instruction feature
+   :type mask: int or long
+   
 .. py:function:: type\.is_branch()
    
    Returns true if the current instruction is any kind of branch.

@@ -127,7 +127,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the color from
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(func, rgb)
    
@@ -142,7 +142,7 @@ functions and aliases. For more information on this, please see
    Remove the color for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: comment(\*\*repeatable)
    
@@ -172,7 +172,7 @@ functions and aliases. For more information on this, please see
    Remove the comment for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: comment(func, string, \*\*repeatable)
@@ -194,7 +194,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the comment from
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*repeatable: whether the repeatable comment should be removed instead of the non-repeatable one
    
 .. py:function:: contains()
@@ -215,22 +215,6 @@ functions and aliases. For more information on this, please see
    :param func: the function to check the address against
    :param ea: an address in the database to check
    :type ea: int or long
-   
-.. py:function:: convention()
-   
-   Return the calling convention of the current function.
-   
-   Aliases: :py:func:`function.cc<convention>`
-   
-.. py:function:: convention(func)
-   
-   Return the calling convention of the function ``func``.
-   
-   The integer returned corresponds to one of the :py:obj:`idaapi.CM_CC_\*` constants.
-   
-   Aliases: :py:func:`function.cc<convention>`
-   
-   :param func: the function to return the calling convention for
    
 .. py:function:: down()
    
@@ -267,7 +251,7 @@ functions and aliases. For more information on this, please see
    Remove the custom-name from the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(string, \*suffix, \*\*flags)
@@ -285,7 +269,7 @@ functions and aliases. For more information on this, please see
    
    :param func: the function to remove the name for
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    :param \*\*flags: any extra flags to use when removing the name
    
 .. py:function:: name(func, string, \*suffix, \*\*flags)
@@ -453,7 +437,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tag(func, key, none)
    
@@ -463,7 +447,7 @@ functions and aliases. For more information on this, please see
    :param key: a string representing the tag name to remove
    :type key: str
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: tags()
    
@@ -487,11 +471,11 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: within()
    
-   Return true if the current address is within a function.
+   Return if the current address is within a function.
    
 .. py:function:: within(ea)
    
-   Return true if the address ``ea`` is within a function.
+   Return if the address ``ea`` is within a function.
    
    :param ea: the address to check for function membership
    :type ea: int or long
@@ -696,7 +680,7 @@ Some examples of this functionality can be::
    Removes the color of the basic block at the current address.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(ea)
    
@@ -726,7 +710,7 @@ Some examples of this functionality can be::
    :param ea: the address of the basic block to remove the color from
    :type ea: int or long
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(bounds, none)
    
@@ -735,7 +719,7 @@ Some examples of this functionality can be::
    :param bounds: the boundaries of the basic block to remove the color from
    :type bounds: tuple
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(bb, none)
    
@@ -744,7 +728,7 @@ Some examples of this functionality can be::
    :param bb: the basic block to remove the color from
    :type bb: idaapi.BasicBlock
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: block\.color(ea, rgb, \*\*frame)
    
@@ -1063,7 +1047,7 @@ Some examples of this namespace's usage::
    Return each basic block contained within the specified ``bounds``.
    
    :param bounds: the boundaries to use when constraining the returned list of basic blocks
-   :type bounds: interface.bounds_t
+   :type bounds: tuple
    
 .. py:function:: blocks(left, right)
    
@@ -1182,7 +1166,7 @@ The functions in this namespace can be used as::
    
 .. py:function:: chunk\.add(start, end)
    
-   Add the chunk ``start`` to ``end`` to the current function.
+   Add the chunk starting at the address ``start`` and terminating at ``end`` to the current function.
    
    Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
@@ -1191,9 +1175,18 @@ The functions in this namespace can be used as::
    :param end: the ending address of the chunk
    :type end: int or long
    
+.. py:function:: chunk\.add(bounds)
+   
+   Add the chunk specified by ``bounds`` to the current function.
+   
+   Aliases: :py:func:`function.add_chunk<chunk\.add>`
+   
+   :param bounds: the boundaries of the chunk to add
+   :type bounds: tuple
+   
 .. py:function:: chunk\.add(func, start, end)
    
-   Add the chunk ``start`` to ``end`` to the function ``func``.
+   Add the chunk starting at the address ``start`` and terminating at ``end`` to the function ``func``.
    
    Aliases: :py:func:`function.add_chunk<chunk\.add>`
    
@@ -1202,6 +1195,16 @@ The functions in this namespace can be used as::
    :type start: int or long
    :param end: the ending address of the chunk
    :type end: int or long
+   
+.. py:function:: chunk\.add(func, bounds)
+   
+   Add the chunk specified by ``bounds`` to the function ``func``.
+   
+   Aliases: :py:func:`function.add_chunk<chunk\.add>`
+   
+   :param func: the function to add the chunk to
+   :param bounds: the boundaries of the chunk to add
+   :type bounds: tuple
    
 .. py:function:: chunk\.assign(ea)
    
@@ -1260,10 +1263,33 @@ The functions in this namespace can be used as::
    
    Iterate through all the instructions for the function chunk containing the address :py:obj:`ea`.
    
-   :param ea:
+   :param ea: the address belonging to the function chunk to iterate through
    :type ea: int or long
    
+.. py:function:: chunk\.register(reg, \*regs, \*\*modifiers)
+   
+   Yield each ``(address, opnum, state)`` within the function chunk containing the current address which uses ``reg`` or any one of the registers in ``regs``.
+   
+   :param reg: a register of some kind
+   :type reg: str or register_t
+   :param \*regs: any other registers to match for
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   
+.. py:function:: chunk\.register(ea, reg, \*regs, \*\*modifiers)
+   
+   Yield each ``(address, opnum, state)`` within the function chunk containing the address ``ea`` which uses ``reg`` or any one of the registers in ``regs``.
+   
+   If the keyword ``write`` is True, then only return the result if it's writing to the register.
+   
+   :param ea: the address belonging to the function chunk to identify registers in
+   :param reg: a register of some kind
+   :type reg: str or register_t
+   :param \*regs: any other registers to match for
+   :param \*\*modifiers: if ``write`` or ``read`` is true, then only return addresses where the specified registers are written to or read from (respectively)
+   
 .. py:function:: chunk\.remove()
+   
+   Remove the chunk containing the current address from its function.
    
    Aliases: :py:func:`function.remove_chunk<chunk\.remove>`
    
@@ -1541,6 +1567,16 @@ Some ways to get this information can be::
 
     > print function.frame.lvars.size()
 
+.. py:function:: frame\.lvars()
+   
+   Yield each frame member of the current function.
+   
+.. py:function:: frame\.lvars(func)
+   
+   Yield each frame member of the function ``func``.
+   
+   :param func: the function containing the local variables to return
+   
 .. py:function:: frame\.lvars\.size()
    
    Returns the size of the local variables for the current function.
@@ -1568,6 +1604,16 @@ An example of using this namespace::
 
     > print function.frame.regs.size(ea)
 
+.. py:function:: frame\.regs()
+   
+   Yield each saved register frame of the current function.
+   
+.. py:function:: frame\.regs(func)
+   
+   Yield each saved register frame of the function ``func``.
+   
+   :param func: the function containing the registers to return
+   
 .. py:function:: frame\.regs\.size()
    
    Returns the number of bytes occupied by the saved registers in the current function.
@@ -1614,7 +1660,7 @@ Some simple ways of getting information about a function::
    Remove the typeinfo for the current function.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: type(func)
    
@@ -1645,17 +1691,33 @@ Some simple ways of getting information about a function::
    
    :param func:
    :param none:
-   :type none: None
+   :type none: None.__class__
+   
+.. py:function:: type\.convention()
+   
+   Return the calling convention of the current function.
+   
+   Aliases: :py:func:`function.cc<type\.convention>`, :py:func:`function.convention<type\.convention>`, :py:func:`function.type.cc<type\.convention>`
+   
+.. py:function:: type\.convention(func)
+   
+   Return the calling convention of the function ``func``.
+   
+   The integer returned corresponds to one of the :py:obj:`idaapi.CM_CC_\*` constants.
+   
+   Aliases: :py:func:`function.cc<type\.convention>`, :py:func:`function.convention<type\.convention>`, :py:func:`function.type.cc<type\.convention>`
+   
+   :param func: the function to return the calling convention for
    
 .. py:function:: type\.has_frameptr()
    
-   Return true if the current function uses a frame pointer (register).
+   Return if the current function uses a frame pointer (register).
    
    Aliases: :py:func:`function.type.frameptrQ<type\.has_frameptr>`
    
 .. py:function:: type\.has_frameptr(func)
    
-   Return true if the function ``func`` uses a frame pointer (register).
+   Return if the function ``func`` uses a frame pointer (register).
    
    Aliases: :py:func:`function.type.frameptrQ<type\.has_frameptr>`
    
@@ -1663,13 +1725,13 @@ Some simple ways of getting information about a function::
    
 .. py:function:: type\.has_name()
    
-   Return true if the current function has a user-defined name.
+   Return if the current function has a user-defined name.
    
    Aliases: :py:func:`function.type.nameQ<type\.has_name>`
    
 .. py:function:: type\.has_name(func)
    
-   Return true if the function ``func`` has a user-defined name.
+   Return if the function ``func`` has a user-defined name.
    
    Aliases: :py:func:`function.type.nameQ<type\.has_name>`
    
@@ -1691,13 +1753,13 @@ Some simple ways of getting information about a function::
    
 .. py:function:: type\.has_return()
    
-   Return true if the current function returns.
+   Return if the current function returns.
    
    Aliases: :py:func:`function.type.returnQ<type\.has_return>`
    
 .. py:function:: type\.has_return(func)
    
-   Return true if the function ``func`` returns.
+   Return if the function ``func`` returns.
    
    Aliases: :py:func:`function.type.returnQ<type\.has_return>`
    
@@ -1733,13 +1795,13 @@ Some simple ways of getting information about a function::
    
 .. py:function:: type\.is_library()
    
-   Return true if the current function is considered a library function.
+   Return if the current function is considered a library function.
    
    Aliases: :py:func:`function.type.libraryQ<type\.is_library>`
    
 .. py:function:: type\.is_library(func)
    
-   Return true if the function ``func`` is considered a library function.
+   Return if the function ``func`` is considered a library function.
    
    Aliases: :py:func:`function.type.libraryQ<type\.is_library>`
    
@@ -1761,13 +1823,13 @@ Some simple ways of getting information about a function::
    
 .. py:function:: type\.is_thunk()
    
-   Return true if the current function is considered a code thunk.
+   Return if the current function was determined to be a code thunk.
    
    Aliases: :py:func:`function.type.thunkQ<type\.is_thunk>`
    
 .. py:function:: type\.is_thunk(func)
    
-   Return true if the function ``func`` is considered a code thunk.
+   Return if the function ``func`` was determined to be a code thunk.
    
    Aliases: :py:func:`function.type.thunkQ<type\.is_thunk>`
    

@@ -38,6 +38,20 @@ The functions that are available in this module use multicased
 functions and aliases. For more information on this, please see
 :ref:`multicase-aliases` and :ref:`multicase-functions`.
 
+.. py:function:: bits(enum)
+   
+   Return the number of bits for the enumeration ``enum``.
+   
+   :param enum: the enumeration to return the width of
+   
+.. py:function:: bits(enum, width)
+   
+   Set the number of bits for the enumeration ``enum`` to ``width``.
+   
+   :param enum: the enumeration to set the width for
+   :param width: the number of bits to set the enumeration width to
+   :type width: int or long
+   
 .. py:function:: by(index)
    
    Return the identifier for the enumeration at the specified ``index``.
@@ -201,16 +215,16 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: size(enum)
    
-   Return the number of bits for the enumeration ``enum``.
+   Return the number of bytes for the enumeration ``enum``.
    
    :param enum: the enumeration to return the width of
    
 .. py:function:: size(enum, width)
    
-   Set the number of bits for the enumeration ``enum`` to ``width``.
+   Set the number of bytes for the enumeration ``enum`` to ``width``.
    
    :param enum: the enumeration to set the width for
-   :param width: the number of bits to set the enumeration width to
+   :param width: the number of bytes to set the enumeration width to
    :type width: int or long
    
 .. py:function:: values(enum)
@@ -344,6 +358,8 @@ Some examples of how to use this namespace can be::
 .. py:function:: member\.parent(mid)
    
    Return the id of the enumeration that owns the member ``mid``.
+   
+   Aliases: :py:func:`enumeration.member.owner<member\.parent>`
    
    :param mid: the identifier of the member to return the enumeration for
    

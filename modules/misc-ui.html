@@ -843,6 +843,94 @@ segment, clipboard, widget, or even the current window in use.</p>
 <span id="ns-ui-notepad"></span><h3>3.2.1.2.14. ui.notepad<a class="headerlink" href="#ui-notepad" title="Permalink to this headline">¶</a></h3>
 <p>This namespace is for interacting with the Notepad window.</p>
 <p>Bases: <a class="reference internal" href="#ns-ui-appwindow"><span class="std std-ref">ui.appwindow</span></a></p>
+<dl class="function">
+<dt id="ui.notepad.append">
+<code class="descclassname">notepad.</code><code class="descname">append</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.notepad.append" title="Permalink to this definition">¶</a></dt>
+<dd><p>Append the provided <code class="docutils literal notranslate"><span class="pre">string</span></code> to the current text that is stored within the notepad window.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> – the text to append to the contents of the notepad window</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.notepad.close">
+<code class="descclassname">notepad.</code><code class="descname">close</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.notepad.close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Close or hide the notepad window.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.notepad.cursor">
+<code class="descclassname">notepad.</code><code class="descname">cursor</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.notepad.cursor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">QtGui.QTextCursor</span></code> used by the notepad window.</p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">notepad.</code><code class="descname">cursor</code><span class="sig-paren">(</span><em>cursor</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the <code class="xref py py-obj docutils literal notranslate"><span class="pre">QtGui.QTextCursor</span></code> for the notepad window to <code class="docutils literal notranslate"><span class="pre">cursor</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>cursor</strong> – the <code class="docutils literal notranslate"><span class="pre">QtGui.QTextCursor</span></code> to assign to the notepad window</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.notepad.get">
+<code class="descclassname">notepad.</code><code class="descname">get</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ui.notepad.get" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the string that is currently stored within the notepad window.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.notepad.open">
+<code class="descclassname">notepad.</code><code class="descname">open</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.notepad.open" title="Permalink to this definition">¶</a></dt>
+<dd><p>Open or show the notepad window and return its <code class="xref py py-obj docutils literal notranslate"><span class="pre">QtWidgets.QPlainTextEdit</span></code> widget.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>*args</strong> – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="ui.notepad.set">
+<code class="descclassname">notepad.</code><code class="descname">set</code><span class="sig-paren">(</span><em>string</em><span class="sig-paren">)</span><a class="headerlink" href="#ui.notepad.set" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the text that is currently stored within the notepad window to <code class="docutils literal notranslate"><span class="pre">string</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>string</strong> – the string to assign to the contents of the notepad window</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">notepad.</code><code class="descname">set</code><span class="sig-paren">(</span><em>items</em><span class="sig-paren">)</span></dt>
+<dd><p>Set each line that is currently stored within the notepad window to <code class="docutils literal notranslate"><span class="pre">items</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>items</strong> – the list to assign to each row of the notepad window</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </div>
 <div class="section" id="ui-segments">
 <span id="ns-ui-segments"></span><h3>3.2.1.2.15. ui.segments<a class="headerlink" href="#ui-segments" title="Permalink to this headline">¶</a></h3>

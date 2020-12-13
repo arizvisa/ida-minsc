@@ -124,6 +124,16 @@ functions and aliases. For more information on this, please see
    :type cmt: str
    :param \*\*repeatable: whether the comment should be repeatable or not
    
+.. py:function:: comment(structure, none, \*\*repeatable)
+   
+   Remove the comment from the specified ``structure``.
+   
+   :param structure: the :py:obj:`structure_t` to remove the comment from
+   :type structure: structure_t
+   :param none: the value :py:obj:`None`
+   :type none: None.__class__
+   :param \*\*repeatable: whether the removed comment should be the repeatable one
+   
 .. py:function:: comment(id, cmt, \*\*repeatable)
    
    Set the comment of the structure identified by ``id`` to ``cmt``.
@@ -135,6 +145,16 @@ functions and aliases. For more information on this, please see
    :param cmt: the comment to apply
    :type cmt: str
    :param \*\*repeatable: whether the comment should be repeatable or not
+   
+.. py:function:: comment(id, none, \*\*repeatable)
+   
+   Remove the comment from the structure identified by ``id``.
+   
+   :param id: the identifier of the structure
+   :type id: int or long
+   :param none: the value :py:obj:`None`
+   :type none: None.__class__
+   :param \*\*repeatable: whether the removed comment should be the repeatable one
    
 .. py:function:: fragment(structure, offset, size)
    
@@ -377,6 +397,10 @@ member_t
    method, :py:obj:`refs` will allow one to enumerate everything in the
    database that references said member.
    
+   .. py:attribute:: bounds
+   
+      :param getter: Return the boundaries of the member.
+   
    .. py:attribute:: comment
    
    The comment of this ``member_t``.
@@ -430,13 +454,17 @@ member_t
    
    .. py:attribute:: parent
    
-   The ``structure_t`` that owns this ``member_t``.
       :param getter: Return the structure_t that owns the member.
    
    .. py:attribute:: ptr
    
    The :py:class:`idaapi.member_t` that this ``member_t`` wraps.
       :param getter: Return the pointer of the :py:obj:`idaapi.member_t`.
+   
+   .. py:attribute:: realbounds
+   
+   The ``structure_t`` that owns this ``member_t``.
+      :param getter: Return the real boundaries of the member.
    
    .. py:attribute:: realoffset
    
@@ -457,7 +485,7 @@ member_t
    
    The pythonic type of this ``member_t``.
       :param getter: Return the type of the member in its pythonic form.
-      :param setter: Set the type of the member.
+      :param setter: Set the type of the member to the provided ``type``.
       :param type: the pythonic type to set the member type to
    
    .. py:attribute:: typeid
@@ -504,7 +532,7 @@ member_t
       :param key: a string representing the tag name
       :type key: str
       :param none: the value :py:obj:`None`
-      :type none: None
+      :type none: None.__class__
       
 *********
 members_t
@@ -741,7 +769,7 @@ structure_t
    The index of this ``structure_t`` within the IDA's structure list.
       :param getter: Return the index of the structure.
       :param setter: Set the index of the structure to ``idx``.
-      :param idx: the new index to move the structure to
+      :param index: the new index to move the structure to
    
    .. py:attribute:: members
    
@@ -830,7 +858,7 @@ structure_t
       :param key: a string representing the tag name
       :type key: str
       :param none: the value :py:obj:`None`
-      :type none: None
+      :type none: None.__class__
       
    .. py:method:: up(self)
       

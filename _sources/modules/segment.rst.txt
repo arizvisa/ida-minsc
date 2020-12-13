@@ -136,7 +136,7 @@ functions and aliases. For more information on this, please see
    Clear the color of the current segment.
    
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(segment, none)
    
@@ -144,7 +144,7 @@ functions and aliases. For more information on this, please see
    
    :param segment: an identifier used to describe a segment
    :param none: the value :py:obj:`None`
-   :type none: None
+   :type none: None.__class__
    
 .. py:function:: color(segment, rgb)
    

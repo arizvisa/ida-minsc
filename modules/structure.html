@@ -261,6 +261,25 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
+<code class="descclassname">structure.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>structure</em>, <em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment from the specified <code class="docutils literal notranslate"><span class="pre">structure</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>structure</strong> (<a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><em>structure_t</em></a>) – the <a class="reference internal" href="#structure.structure_t" title="structure.structure_t"><code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code></a> to remove the comment from</li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**repeatable</strong> – whether the removed comment should be the repeatable one</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
 <code class="descclassname">structure.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>id</em>, <em>cmt</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
 <dd><p>Set the comment of the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code> to <code class="docutils literal notranslate"><span class="pre">cmt</span></code>.</p>
 <p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, set the repeatable comment.</p>
@@ -272,6 +291,25 @@ functions and aliases. For more information on this, please see
 <li><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the structure</li>
 <li><strong>cmt</strong> (<em>str</em>) – the comment to apply</li>
 <li><strong>**repeatable</strong> – whether the comment should be repeatable or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">structure.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>id</em>, <em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment from the structure identified by <code class="docutils literal notranslate"><span class="pre">id</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>id</strong> (<em>int</em><em> or </em><em>long</em>) – the identifier of the structure</li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**repeatable</strong> – whether the removed comment should be the repeatable one</li>
 </ul>
 </td>
 </tr>
@@ -710,6 +748,19 @@ member similar to the database or a function’s contents. Another
 method, <a class="reference internal" href="#structure.member_t.refs" title="structure.member_t.refs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">refs</span></code></a> will allow one to enumerate everything in the
 database that references said member.</p>
 <dl class="attribute">
+<dt id="structure.member_t.bounds">
+<code class="descname">bounds</code><a class="headerlink" href="#structure.member_t.bounds" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Return the boundaries of the member.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="attribute">
 <dt id="structure.member_t.comment">
 <code class="descname">comment</code><a class="headerlink" href="#structure.member_t.comment" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
@@ -879,20 +930,16 @@ database that references said member.</p>
 <dl class="attribute">
 <dt id="structure.member_t.parent">
 <code class="descname">parent</code><a class="headerlink" href="#structure.member_t.parent" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="docutils">
-<dt>The <code class="docutils literal notranslate"><span class="pre">structure_t</span></code> that owns this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
-<dd><table class="first last docutils field-list" frame="void" rules="none">
+<dd><table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the structure_t that owns the member.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>getter</strong> – Return the structure_t that owns the member.</td>
 </tr>
 </tbody>
 </table>
-</dd>
-</dl>
+</dd></dl>
+
 <dl class="attribute">
 <dt id="structure.member_t.ptr">
 <code class="descname">ptr</code><a class="headerlink" href="#structure.member_t.ptr" title="Permalink to this definition">¶</a></dt>
@@ -905,6 +952,23 @@ database that references said member.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the pointer of the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.member_t</span></code>.</td>
+</tr>
+</tbody>
+</table>
+</dd>
+</dl>
+<dl class="attribute">
+<dt id="structure.member_t.realbounds">
+<code class="descname">realbounds</code><a class="headerlink" href="#structure.member_t.realbounds" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="docutils">
+<dt>The <code class="docutils literal notranslate"><span class="pre">structure_t</span></code> that owns this <code class="docutils literal notranslate"><span class="pre">member_t</span></code>.</dt>
+<dd><table class="first last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the real boundaries of the member.</td>
 </tr>
 </tbody>
 </table>
@@ -974,7 +1038,7 @@ database that references said member.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">param getter:</th><td class="field-body">Return the type of the member in its pythonic form.</td>
 </tr>
-<tr class="field-even field"><th class="field-name">param setter:</th><td class="field-body">Set the type of the member.</td>
+<tr class="field-even field"><th class="field-name">param setter:</th><td class="field-body">Set the type of the member to the provided <code class="docutils literal notranslate"><span class="pre">type</span></code>.</td>
 </tr>
 <tr class="field-odd field"><th class="field-name">param type:</th><td class="field-body">the pythonic type to set the member type to</td>
 </tr>
@@ -1073,7 +1137,7 @@ If <code class="docutils literal notranslate"><span class="pre">opnum</span></co
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>key</strong> (<em>str</em>) – a string representing the tag name</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>
@@ -1543,7 +1607,7 @@ already existing one.</p>
 </tr>
 <tr class="field-even field"><th class="field-name">param setter:</th><td class="field-body">Set the index of the structure to <code class="docutils literal notranslate"><span class="pre">idx</span></code>.</td>
 </tr>
-<tr class="field-odd field"><th class="field-name">param idx:</th><td class="field-body">the new index to move the structure to</td>
+<tr class="field-odd field"><th class="field-name">param index:</th><td class="field-body">the new index to move the structure to</td>
 </tr>
 </tbody>
 </table>
@@ -1758,7 +1822,7 @@ already existing one.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>key</strong> (<em>str</em>) – a string representing the tag name</li>
-<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>none</strong> (<em>None.__class__</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
 </ul>
 </td>
 </tr>

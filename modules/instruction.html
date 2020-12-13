@@ -113,26 +113,6 @@ functions and aliases. For more information on this, please see
 </dd></dl>
 
 <dl class="function">
-<dt id="instruction.feature">
-<code class="descclassname">instruction.</code><code class="descname">feature</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.feature" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns the feature bitmask of the instruction at the current address.</p>
-</dd></dl>
-
-<dl class="function">
-<dt>
-<code class="descclassname">instruction.</code><code class="descname">feature</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the feature bitmask for the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
 <dt id="instruction.mnemonic">
 <code class="descclassname">instruction.</code><code class="descname">mnemonic</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.mnemonic" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the mnemonic of the instruction at the current address.</p>
@@ -1220,9 +1200,42 @@ whether the operand is being read from, written to, or modified (both).</p>
 
 <dl class="function">
 <dt id="instruction.ops_register">
-<code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.ops_register" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>**modifiers</em><span class="sig-paren">)</span><a class="headerlink" href="#instruction.ops_register" title="Permalink to this definition">¶</a></dt>
+<dd><p>Yields the index of each operand in the instruction at the current address which uses a register.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to any registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>ea</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
+<dd><p>Yields the index of each operand in the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> which uses a register.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> – the address of an instruction</li>
+<li><strong>**modifiers</strong> – if <code class="docutils literal notranslate"><span class="pre">write</span></code> is specified, then only return operands that write to any registers. if <code class="docutils literal notranslate"><span class="pre">read</span></code> is specified then do the same but for operands that read from them.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">instruction.</code><code class="descname">ops_register</code><span class="sig-paren">(</span><em>reg</em>, <em>*regs</em>, <em>**modifiers</em><span class="sig-paren">)</span></dt>
 <dd><p>Yields the index of each operand in the instruction at the current address that uses <code class="docutils literal notranslate"><span class="pre">reg</span></code> or any one of the registers in <code class="docutils literal notranslate"><span class="pre">regs</span></code>.</p>
-<p>If the keyword <code class="docutils literal notranslate"><span class="pre">write</span></code> is true, then only return the result if it’s writing to the register.</p>
 <p>Aliases: <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_regs</span></code></a>, <a class="reference internal" href="#instruction.ops_register" title="instruction.ops_register"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.ops_reg</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1714,6 +1727,47 @@ order to recursively disassemble code witin the database.</p>
 <span class="o">&gt;</span> <span class="nb">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_branch</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
+<dl class="function">
+<dt id="instruction.type.feature">
+<code class="descclassname">type.</code><code class="descname">feature</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.feature" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the feature bitmask of the instruction at the current address.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.feature" title="instruction.type.feature"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.feature</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">feature</code><span class="sig-paren">(</span><em>ea</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the feature bitmask for the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.feature" title="instruction.type.feature"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.feature</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">type.</code><code class="descname">feature</code><span class="sig-paren">(</span><em>ea</em>, <em>mask</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the feature bitmask for the instruction at the address <code class="docutils literal notranslate"><span class="pre">ea</span></code> masked with <code class="docutils literal notranslate"><span class="pre">mask</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#instruction.type.feature" title="instruction.type.feature"><code class="xref py py-func docutils literal notranslate"><span class="pre">instruction.feature</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>ea</strong> (<em>int</em><em> or </em><em>long</em>) – the address of an instruction</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – a bitmask used to select specific bits from the instruction feature</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="function">
 <dt id="instruction.type.is_branch">
 <code class="descclassname">type.</code><code class="descname">is_branch</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#instruction.type.is_branch" title="Permalink to this definition">¶</a></dt>
