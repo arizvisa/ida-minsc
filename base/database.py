@@ -4372,7 +4372,7 @@ class extra(object):
             res = (sup.get(ea, base + i, type=bytes) for i in builtins.range(count))
 
             # remove the null-terminator if there is one
-            res = (row[:-1] if row.endswith(b'\0') else row for row in res)
+            res = (row.rstrip(b'\0') for row in res)
 
             # fetch them from IDA and join them with newlines
             return '\n'.join(map(utils.string.of, res))
@@ -4420,8 +4420,8 @@ class extra(object):
             count = cls.__count__(ea, base)
             if count is None: return None
 
-            # grab the extra commenta from the database
-            iterable = (idaapi.get_extra_cmt(ea, base + i) or b'' for i in builtins.range(count))
+            # grab the extra comments from the database
+            iterable = (idaapi.get_extra_cmt(ea, base + i) or '' for i in builtins.range(count))
 
             # convert them back into Python and join them with a newline
             iterable = (utils.string.of(item) for item in iterable)
