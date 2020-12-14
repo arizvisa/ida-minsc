@@ -1086,6 +1086,15 @@ def make_ida_not_suck_cocks(nw_code):
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
 
+    ## ensure the database.config namespace is initialized as it's
+    ## necessary and used by the processor detection.
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_init', database.config.__init_info_structure__, -100)
+    elif idaapi.__version__ >= 6.9:
+        ui.hook.idp.add('init', database.config.__init_info_structure__, -100)
+    else:
+        idaapi.__notification__.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
+
     ## just some debugging notification hooks
     #[ ui.hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
     #[ ui.hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
