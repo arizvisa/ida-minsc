@@ -65,7 +65,31 @@ class config(object):
     for determining the type of the binary are also included.
     """
 
+    # cache the default value for the structure
     info = idaapi.get_inf_structure()
+
+    @classmethod
+    def __init_info_structure__(cls, idp_modname):
+        information = idaapi.get_inf_structure()
+        if information:
+            logging.debug(u"{:s}.__init_info_structure__({!s}) : Successfully fetched and cached information structure for database.".format('.'.join([__name__, cls.__name__]), utils.string.escape(idp_modname, '"')))
+
+            # Display summary of the database and what it's used for.
+            bits = "{:d}-bit".format(64 if information.is_64bit() else 32 if information.is_32bit() else 16)
+            byteorder = "{:s}-endian".format('big' if information.is_be() else 'little')
+            mode = 'kernelspace' if information.is_kernel_mode() else 'userspace'
+            format = 'library' if information.is_dll() else 'binary'
+            logging.warning("Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s} {mode:s} {format:s}.".format('.'.join([information.__class__.__module__, information.__class__.__name__]), tag=information.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=information.version))
+
+        else:
+            logging.fatal(u"{:s}.__init_info_structure__({!s}) : Unknown error while trying to get information structure for database.".format('.'.join([__name__, cls.__name__]), utils.string.escape(idp_modname, '"')))
+        cls.info = information
+
+    @classmethod
+    def __nw_init_info_structure__(cls, nw_code, is_old_database):
+        logging.debug(u"{:s}.__nw_init_info_structure__({!s}) : Received notification to initialize information structure for database.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, [nw_code, is_old_database]))))
+        idp_modname = idaapi.get_idp_name()
+        return cls.__init_into_structure__(idp_modname)
 
     @classmethod
     def filename(cls):
