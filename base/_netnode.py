@@ -29,7 +29,7 @@ class netnode(object):
         if not hasattr(idaapi, 'new_netnode'):
             import _idaapi as _ida_netnode
 
-    new = _ida_netnode.new_netnode
+    new = get = root = _ida_netnode.new_netnode
     delete = _ida_netnode.delete_netnode
     start = _ida_netnode.netnode_start
     end = _ida_netnode.netnode_end
@@ -117,7 +117,7 @@ class utils(object):
     @classmethod
     def range(cls):
         '''Return the bounds of each netnode (nodeidx_t) within the database.'''
-        this = netnode.new()
+        this = netnode.root()
         ok, start = netnode.start(this), netnode.index(this)
         if not ok: raise internal.exceptions.NetNodeNotFoundError(u"{:s}.range() : Unable to find first node.".format('.'.join([__name__, cls.__name__])))
         ok, end = netnode.end(this), netnode.index(this)
@@ -128,34 +128,34 @@ class utils(object):
     def renumerate(cls):
         '''Iterate through each netnode in the database in reverse order, and yield the (nodeidx_t, netnode*) for each item found.'''
         start, end = cls.range()
-        this = netnode.new()
+        this = netnode.root()
         ok = netnode.end(this)
         if not ok:
             raise internal.exceptions.NetNodeNotFoundError(u"{:s}.renumerate() : Unable to find the end node.".format('.'.join([__name__, cls.__name__])))
 
-        yield end, netnode.new(end)
+        yield end, netnode.get(end)
         while end != start:
             ok = netnode.prev(this)
             if not ok: break
             end = netnode.index(this)
-            yield end, netnode.new(end)
+            yield end, netnode.get(end)
         return
 
     @classmethod
     def fenumerate(cls):
         '''Iterate through each netnode in the database in order, and yield the (nodeidx_t, netnode*) for each item found.'''
         start, end = cls.range()
-        this = netnode.new()
+        this = netnode.root()
         ok = netnode.start(this)
         if not ok:
             raise internal.exceptions.NetNodeNotFoundError(u"{:s}.fenumerate() : Unable to find the start node.".format('.'.join([__name__, cls.__name__])))
 
-        yield start, netnode.new(start)
+        yield start, netnode.get(start)
         while start != end:
             ok = netnode.next(this)
             if not ok: break
             start = netnode.index(this)
-            yield start, netnode.new(start)
+            yield start, netnode.get(start)
         return
 
     @classmethod
@@ -263,15 +263,15 @@ def new(name):
 def get(name):
     '''Get (or create) a netnode with the given `name`, and return its identifier.'''
     if isinstance(name, six.integer_types):
-        node = netnode.new(name)
+        node = netnode.get(name)
         return netnode.index(node)
     res = internal.utils.string.to(name)
-    node = netnode.new(res, len(res), False)
+    node = netnode.get(res, len(res))
     return netnode.index(node)
 
 def remove(nodeidx):
     '''Remove the netnode with the identifier `nodeidx`.'''
-    node = netnode.new(nodeidx)
+    node = netnode.get(nodeidx)
     return netnode.kill(node)
 
 ### node name
@@ -282,13 +282,13 @@ class name(object):
     @classmethod
     def get(cls, nodeidx):
         '''Return the name of the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         res = netnode.name(node)
         return internal.utils.string.of(res)
     @classmethod
     def set(cls, nodeidx, string):
         '''Set the name of the netnode identified by `nodeidx` to `string`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         res = internal.utils.string.to(string)
         return netnode.rename(node, res)
 
@@ -300,13 +300,13 @@ class value(object):
     @classmethod
     def exists(cls, nodeidx):
         '''Return whether the node identified by `nodeidx` has a value associated with it.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.value_exists(node)
 
     @classmethod
     def get(cls, nodeidx, type=None):
         '''Return the value for the netnode identified by `nodeidx` casted to the provided `type`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         if not netnode.value_exists(node):
             return None
 
@@ -327,7 +327,7 @@ class value(object):
     @classmethod
     def set(cls, nodeidx, value):
         '''Set the value for the netnode identified by `nodeidx` to the provided `value`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         if isinstance(value, memoryview):
             return netnode.set(nodeidx, value.tobytes())
         elif isinstance(value, bytes):
@@ -341,7 +341,7 @@ class value(object):
     @classmethod
     def remove(cls, nodeidx):
         '''Remove the value for the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.delvalue(node)
 
     @classmethod
@@ -363,7 +363,7 @@ class blob(object):
 
         If an offset is provided as `start`, then return the bytes from the specified offset.
         """
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         sz = netnode.blobsize(node, start, tag)
         res = netnode.getblob(node, start, tag)
         return None if res is None else res[:sz]
@@ -374,7 +374,7 @@ class blob(object):
 
         If an offset is provided as `start`, then store the provided `value` at the given offset.
         """
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.setblob(node, value.tobytes() if isinstance(value, memoryview) else value, start, tag)
 
     @classmethod
@@ -383,7 +383,7 @@ class blob(object):
 
         If an offset is provided as `start`, then remove the data at the given offset.
         """
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.delblob(node, start, tag)
 
     @classmethod
@@ -392,7 +392,7 @@ class blob(object):
 
         If an offset is provided as `start`, then return the size from the given offset.
         """
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.blobsize(node, start, tag)
 
     @classmethod
@@ -426,25 +426,25 @@ class alt(object):
     @classmethod
     def get(cls, nodeidx, index):
         '''Return the integer at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.altval(node, index)
 
     @classmethod
     def set(cls, nodeidx, index, value):
         '''Assign the integer `value` at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.altset(node, index, value)
 
     @classmethod
     def remove(cls, nodeidx, index):
         '''Remove the integer from the specified `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.altdel(node, index)
 
     @classmethod
     def fiter(cls, nodeidx):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         for index, value in utils.falt(node):
             yield index, value
         return
@@ -452,7 +452,7 @@ class alt(object):
     @classmethod
     def riter(cls, nodeidx):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         for index, value in utils.ralt(node):
             yield index, value
         return
@@ -472,7 +472,7 @@ class sup(object):
     """
     This namespace is used for interacting with the sparse array stored
     within a given netnode. This sparse array is used to store bytes,
-    and is referred to by IDA as an "supval".
+    and is referred to by IDA as a "supval".
     """
 
     MAX_SIZE = 0x400
@@ -480,7 +480,7 @@ class sup(object):
     @classmethod
     def get(cls, nodeidx, index, type=None):
         '''Return the value at the `index` of the "supval" array belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         if type in {None}:
             return netnode.supval(node, index)
         elif issubclass(type, memoryview):
@@ -495,19 +495,19 @@ class sup(object):
     @classmethod
     def set(cls, nodeidx, index, value):
         '''Assign the provided `value` to the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.supset(node, index, value.tobytes() if isinstance(value, memoryview) else value)
 
     @classmethod
     def remove(cls, nodeidx, index):
         '''Remove the value at the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.supdel(node, index)
 
     @classmethod
     def fiter(cls, nodeidx):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         for index, _ in utils.fsup(node):
             yield index
         return
@@ -515,7 +515,7 @@ class sup(object):
     @classmethod
     def riter(cls, nodeidx):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         for index, _ in utils.rsup(node):
             yield index
         return
@@ -542,7 +542,7 @@ class hash(object):
     @classmethod
     def get(cls, nodeidx, key, type=None):
         '''Return the value for the provided `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         if type in {None}:
             return netnode.hashval(node, key)
         elif issubclass(type, memoryview):
@@ -560,7 +560,7 @@ class hash(object):
     @classmethod
     def set(cls, nodeidx, key, value):
         '''Assign the provided `value` to the specified `key` for the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         # in my testing the type really doesn't matter
         if isinstance(value, memoryview):
             return netnode.hashset(node, key, value.tobytes())
@@ -575,13 +575,13 @@ class hash(object):
     @classmethod
     def remove(cls, nodeidx, key):
         '''Remove the value assigned to the specified `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         return netnode.hashdel(node, key)
 
     @classmethod
     def fiter(cls, nodeidx):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         for key, _ in utils.fhash(node):
             yield key
         return
@@ -589,7 +589,7 @@ class hash(object):
     @classmethod
     def riter(cls, nodeidx):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
-        node = netnode.new(nodeidx)
+        node = netnode.get(nodeidx)
         for key, _ in utils.rhash(node):
             yield key
         return
