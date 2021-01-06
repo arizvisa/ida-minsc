@@ -195,7 +195,7 @@ class utils(object):
         return
     @classmethod
     def ralt(cls, node):
-        for item in cls.valriter(node, netnode.altfirst, netnode.altprev, netnode.altnext, netnode.altval):
+        for item in cls.valriter(node, netnode.altfirst, netnode.altlast, netnode.altprev, netnode.altval):
             yield item
         return
 
@@ -206,7 +206,7 @@ class utils(object):
         return
     @classmethod
     def rsup(cls, node):
-        for item in cls.valriter(node, netnode.supfirst, netnode.supprev, netnode.supnext, netnode.supval):
+        for item in cls.valriter(node, netnode.supfirst, netnode.suplast, netnode.supprev, netnode.supval):
             yield item
         return
 
@@ -217,7 +217,7 @@ class utils(object):
         return
     @classmethod
     def rhash(cls, node):
-        for item in cls.hriter(node, netnode.hashfirst, netnode.hashprev, netnode.hashnext, netnode.hashval):
+        for item in cls.hriter(node, netnode.hashfirst, netnode.hashlast, netnode.hashprev, netnode.hashval):
             yield item
         return
 
@@ -228,7 +228,7 @@ class utils(object):
         return
     @classmethod
     def rchar(cls, node):
-        for item in cls.valriter(node, netnode.charfirst, netnode.charprev, netnode.charnext, netnode.charval):
+        for item in cls.valriter(node, netnode.charfirst, netnode.charlast, netnode.charprev, netnode.charval):
             yield item
         return
 
