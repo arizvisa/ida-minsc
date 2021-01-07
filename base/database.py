@@ -3107,7 +3107,7 @@ class type(object):
         ti = idaapi.tinfo_t()
 
         # Try and guess the typeinfo for the given address
-        res = idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
+        res = idaapi.guess_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
 
         # If we failed, then we'll try and hack around it using idaapi.print_type.
         if res != idaapi.GUESS_FUNC_OK:
