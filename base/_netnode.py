@@ -184,22 +184,40 @@ class utils(object):
     def hfiter(cls, node, first, last, next, val):
         '''Iterate through all of the hash values for a netnode in order, and yield the (item, value) for each item that was found.'''
         start, end = first(node), last(node)
-        if val(node, start) is None: return
-        yield start, val(node, start)
+
+        # If the start key is None, and it's the same as the end key, then we
+        # need to verify that there's no value stored for the empty key. If
+        # there's no value for the empty key, then we can be sure that there's
+        # no keys to iterate through and thus we can leave.
+        if start is None and start == end and val(node, start or '') is None:
+            return
+
+        # Otherwise we need to start at the first item and continue fetching
+        # the next key until we end up at the last one.
+        yield start or '', val(node, start or '')
         while start != end:
-            start = next(node, start)
-            yield start, val(node, start)
+            start = next(node, start or '')
+            yield start or '', val(node, start or '')
         return
 
     @classmethod
     def hriter(cls, node, first, last, prev, val):
         '''Iterate through all of the hash values for a netnode in reverse order, and yield the (item, value) for each item that was found.'''
         start, end = first(node), last(node)
-        if val(node, start) is None: return
-        yield end, val(node, end)
+
+        # If the end key is None, and it's the same as the start key, then we
+        # need to verify that there's no value stored for the empty key. If
+        # there's no value for the empty key, then we can be sure that there's
+        # no keys to iterate through and thus we can leave.
+        if end is None and start == end and val(node, end or '') is None:
+            return
+
+        # Otherwise we need to start at the last item and continue fetching the
+        # previous key until we end up at the first one.
+        yield end or '', val(node, end or '')
         while end != start:
-            end = prev(node, end)
-            yield end, val(node, end)
+            end = prev(node, end or '')
+            yield end or '', val(node, end or '')
         return
 
     @classmethod
@@ -549,7 +567,7 @@ class hash(object):
             res = netnode.hashval(node, key)
             return res and memoryview(res)
         elif issubclass(type, bytes):
-            res = netnode.hashstr_buf(node, key)
+            res = netnode.hashval(node, key)
             return res and bytes(res)
         elif issubclass(type, six.string_types):
             return netnode.hashstr(node, key)
@@ -565,7 +583,7 @@ class hash(object):
         if isinstance(value, memoryview):
             return netnode.hashset(node, key, value.tobytes())
         elif isinstance(value, bytes):
-            return netnode.hashset_buf(node, key, value)
+            return netnode.hashset(node, key, value)
         elif isinstance(value, six.string_types):
             return netnode.hashset_buf(node, key, value)
         elif isinstance(value, six.integer_types):
@@ -605,7 +623,7 @@ class hash(object):
             l1, l2 = 0, 2
 
         for index, key in enumerate(cls.fiter(nodeidx)):
-            value = "{:<{:d}s} : default={!r}, memoryview={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, None), cls.get(nodeidx, key, memoryview), cls.get(nodeidx, key, bytes), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
+            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, None), cls.get(nodeidx, key, bytes), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
             res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, key, l1, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
