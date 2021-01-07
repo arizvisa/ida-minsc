@@ -185,12 +185,15 @@ class utils(object):
         '''Iterate through all of the hash values for a netnode in order, and yield the (item, value) for each item that was found.'''
         start, end = first(node), last(node)
 
-        # if start is not defined, its the same as end, and there's no value
-        # for the empty string...then there's no keys defined and we can leave.
+        # If the start key is None, and it's the same as the end key, then we
+        # need to verify that there's no value stored for the empty key. If
+        # there's no value for the empty key, then we can be sure that there's
+        # no keys to iterate through and thus we can leave.
         if start is None and start == end and val(node, start or '') is None:
             return
 
-        # otherwise, we start at the first item and continue on till the end.
+        # Otherwise we need to start at the first item and continue fetching
+        # the next key until we end up at the last one.
         yield start or '', val(node, start or '')
         while start != end:
             start = next(node, start or '')
@@ -202,12 +205,15 @@ class utils(object):
         '''Iterate through all of the hash values for a netnode in reverse order, and yield the (item, value) for each item that was found.'''
         start, end = first(node), last(node)
 
-        # if end is not defined, its the same as start, and there's no value
-        # for the empty string...then there's no keys defined and we can leave.
+        # If the end key is None, and it's the same as the start key, then we
+        # need to verify that there's no value stored for the empty key. If
+        # there's no value for the empty key, then we can be sure that there's
+        # no keys to iterate through and thus we can leave.
         if end is None and start == end and val(node, end or '') is None:
             return
 
-        # otherwise, we start at the last item and continue on till the beginning.
+        # Otherwise we need to start at the last item and continue fetching the
+        # previous key until we end up at the first one.
         yield end or '', val(node, end or '')
         while end != start:
             end = prev(node, end or '')
