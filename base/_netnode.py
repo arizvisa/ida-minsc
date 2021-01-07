@@ -184,22 +184,34 @@ class utils(object):
     def hfiter(cls, node, first, last, next, val):
         '''Iterate through all of the hash values for a netnode in order, and yield the (item, value) for each item that was found.'''
         start, end = first(node), last(node)
-        if val(node, start) is None: return
-        yield start, val(node, start)
+
+        # if start is not defined, its the same as end, and there's no value
+        # for the empty string...then there's no keys defined and we can leave.
+        if start is None and start == end and val(node, start or '') is None:
+            return
+
+        # otherwise, we start at the first item and continue on till the end.
+        yield start or '', val(node, start or '')
         while start != end:
-            start = next(node, start)
-            yield start, val(node, start)
+            start = next(node, start or '')
+            yield start or '', val(node, start or '')
         return
 
     @classmethod
     def hriter(cls, node, first, last, prev, val):
         '''Iterate through all of the hash values for a netnode in reverse order, and yield the (item, value) for each item that was found.'''
         start, end = first(node), last(node)
-        if val(node, end) is None: return
-        yield end, val(node, end)
+
+        # if end is not defined, its the same as start, and there's no value
+        # for the empty string...then there's no keys defined and we can leave.
+        if end is None and start == end and val(node, end or '') is None:
+            return
+
+        # otherwise, we start at the last item and continue on till the beginning.
+        yield end or '', val(node, end or '')
         while end != start:
-            end = prev(node, end)
-            yield end, val(node, end)
+            end = prev(node, end or '')
+            yield end or '', val(node, end or '')
         return
 
     @classmethod
