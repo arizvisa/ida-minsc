@@ -195,7 +195,7 @@ class utils(object):
     def hriter(cls, node, first, last, prev, val):
         '''Iterate through all of the hash values for a netnode in reverse order, and yield the (item, value) for each item that was found.'''
         start, end = first(node), last(node)
-        if val(node, start) is None: return
+        if val(node, end) is None: return
         yield end, val(node, end)
         while end != start:
             end = prev(node, end)
