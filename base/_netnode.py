@@ -561,7 +561,7 @@ class hash(object):
             res = netnode.hashval(node, key)
             return res and memoryview(res)
         elif issubclass(type, bytes):
-            res = netnode.hashstr_buf(node, key)
+            res = netnode.hashval(node, key)
             return res and bytes(res)
         elif issubclass(type, six.string_types):
             return netnode.hashstr(node, key)
@@ -577,7 +577,7 @@ class hash(object):
         if isinstance(value, memoryview):
             return netnode.hashset(node, key, value.tobytes())
         elif isinstance(value, bytes):
-            return netnode.hashset_buf(node, key, value)
+            return netnode.hashset(node, key, value)
         elif isinstance(value, six.string_types):
             return netnode.hashset_buf(node, key, value)
         elif isinstance(value, six.integer_types):
