@@ -1485,7 +1485,15 @@ class member_t(object):
             cls = self.__class__
             logging.info(u"{:s}({:#x}) : Creating member for structure ({:s}) at offset {:+#x} named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, parentname, ofs, utils.string.escape(name, '"'), cmtt or cmtf or ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, res)
+
+        # now that we know our parent exists, assign both that and our
+        # index that we deserialized.
         self.__parent__ = parent = __instance__(identifier, offset=0)
+        self.__index__ = index
+
+        # update both of the member's comments prior to fixing its type.
+        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtt), True)
+        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtf), False)
 
         # extract the attributes of the member
         flag, mytype, nbytes = t
@@ -1499,7 +1507,7 @@ class member_t(object):
         res = utils.string.to(name)
         mem = idaapi.add_struc_member(parent.ptr, res, ofs, flag, opinfo, nbytes)
 
-        # FIXME: handle these errors properly
+        # FIXME: handle these naming errors properly
         cls = self.__class__
 
         # duplicate name
@@ -1525,13 +1533,6 @@ class member_t(object):
         elif mem != idaapi.STRUC_ERROR_MEMBER_OK:
             logging.warning(u"{:s}({:#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mem, utils.string.escape(fullname, '"')))
 
-        # assign some of our internal attributes
-        self.__index__ = index
-        self.__parent__ = parent
-
-        # and update the members comments
-        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtt), True)
-        idaapi.set_member_cmt(self.ptr, utils.string.to(cmtf), False)
         return
 
     # read-only properties
