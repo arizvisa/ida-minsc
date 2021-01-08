@@ -89,7 +89,7 @@ class config(object):
     def __nw_init_info_structure__(cls, nw_code, is_old_database):
         logging.debug(u"{:s}.__nw_init_info_structure__({!s}) : Received notification to initialize information structure for database.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, [nw_code, is_old_database]))))
         idp_modname = idaapi.get_idp_name()
-        return cls.__init_into_structure__(idp_modname)
+        return cls.__init_info_structure__(idp_modname)
 
     @classmethod
     def filename(cls):
