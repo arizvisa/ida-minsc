@@ -2150,6 +2150,19 @@ class type(object):
 
     @utils.multicase()
     @classmethod
+    def has_frame(cls):
+        '''Return if the current function has a frame allocated to it.'''
+        return cls.has_frame(ui.current.function())
+    @utils.multicase()
+    @classmethod
+    def has_frame(cls, func):
+        '''Return if the function `func` has a frame allocated to it.'''
+        fn = by(func)
+        return fn.frame != idaapi.BADADDR
+    frameQ = utils.alias(has_frame, 'type')
+
+    @utils.multicase()
+    @classmethod
     def has_frameptr(cls):
         '''Return if the current function uses a frame pointer (register).'''
         return cls.has_frameptr(ui.current.function())
