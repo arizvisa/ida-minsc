@@ -111,12 +111,20 @@ class config(object):
         res = os.path.split(res)
         return os.path.splitext(res[1])[0]
 
+    @utils.multicase()
     @classmethod
     def path(cls):
-        '''Return the full path to the directory containing the database.'''
+        '''Return the absolute path to the directory containing the database.'''
         res = cls.idb()
         path, _ = os.path.split(res)
         return path
+    @utils.multicase(pathname=six.string_types)
+    @classmethod
+    def path(cls, pathname, *components):
+        '''Return an absolute path composed of the provided `pathname` and any additional `components` relative to the directory containing the database.'''
+        res = cls.idb()
+        path, _ = os.path.split(res)
+        return os.path.join(path, pathname, *components)
 
     @classmethod
     def baseaddress(cls):
