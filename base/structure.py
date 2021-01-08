@@ -907,19 +907,20 @@ class members_t(object):
         > result = st.members.by(offset=0x2a)
 
     """
-    __slots__ = ('__parent', 'baseoffset')
+    __slots__ = ('__parent__', 'baseoffset')
 
     # members state
     @property
     def parent(self):
         '''Return the ``structure_t`` that owns this ``members_t``.'''
-        return self.__parent
+        return self.__parent__
     @property
     def ptr(self):
         '''Return the pointer to the ``idaapi.member_t`` that contains all the members.'''
-        return self.__parent.ptr.members
+        parent = self.parent
+        return parent.ptr.members
     def __init__(self, parent, baseoffset=0):
-        self.__parent = parent
+        self.__parent__ = parent
         self.baseoffset = baseoffset
 
     def __getstate__(self):
@@ -938,13 +939,14 @@ class members_t(object):
 
         # assign the properties for our new member using the instance we figured out
         self.baseoffset = baseoffset
-        self.__parent = __instance__(identifier, offset=baseoffset)
+        self.__parent__ = __instance__(identifier, offset=baseoffset)
         return
 
     # fetching members
     def __len__(self):
         '''Return the number of members within the structure.'''
-        return 0 if self.parent.ptr is None else self.parent.ptr.memqty
+        parent = self.parent
+        return 0 if parent.ptr is None else parent.ptr.memqty
     def __iter__(self):
         '''Yield all the members within the structure.'''
         for idx in range(len(self)):
@@ -952,35 +954,37 @@ class members_t(object):
         return
     def __getitem__(self, index):
         '''Return the member at the specified `index`.'''
+        parent = self.parent
         if isinstance(index, six.integer_types):
-            index = self.parent.ptr.memqty + index if index < 0 else index
-            res = member_t(self.parent, index) if index >= 0 and index < self.parent.ptr.memqty else None
+            index = parent.ptr.memqty + index if index < 0 else index
+            res = member_t(parent, index) if 0 <= index < parent.ptr.memqty else None
         elif isinstance(index, six.string_types):
             res = self.by_name(index)
         elif isinstance(index, slice):
-            sliceable = [self[idx] for idx in range(self.parent.ptr.memqty)]
+            sliceable = [self[idx] for idx in range(parent.ptr.memqty)]
             res = sliceable[index]
         else:
             cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).members.__getitem__({!r}) : An invalid type ({!r}) was specified for the index.".format('.'.join([__name__, cls.__name__]), self.parent.id, index, index.__class__))
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.__getitem__({!r}) : An invalid type ({!s}) was specified for the index.".format('.'.join([__name__, cls.__name__]), parent.id, index, index.__class__))
 
         if res is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({!r}) : Unable to find the member that was requested.".format('.'.join([__name__, cls.__name__]), self.parent.id, index))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.__getitem__({!r}) : Unable to find the member that was requested.".format('.'.join([__name__, cls.__name__]), parent.id, index))
         return res
 
     def index(self, member):
         '''Return the index of the specified `member`.'''
+        parent = self.parent
         if not hasattr(member, 'id'):
             cls = self.__class__
-            raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!r}) was specified for the member to search for.".format('.'.join([__name__, cls.__name__]), self.parent.id, member, member.__class__))
+            raise E.InvalidParameterError(u"{:s}({:#x}).members.index({!r}) : An invalid type ({!s}) was specified for the member to search for.".format('.'.join([__name__, cls.__name__]), parent.id, member, member.__class__))
 
-        for i in range(self.parent.ptr.memqty):
+        for i in range(parent.ptr.memqty):
             if member.id == self[i].id:
                 return i
             continue
         cls = self.__class__
-        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member is not in the members list.".format('.'.join([__name__, cls.__name__]), self.parent.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member)))
+        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member is not in the members list.".format('.'.join([__name__, cls.__name__]), parent.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member)))
 
     __member_matcher = utils.matcher()
     __member_matcher.boolean('regex', re.search, 'name')
@@ -1042,19 +1046,20 @@ class members_t(object):
     def by(self, **type):
         '''Return the member that matches the keyword specified by `type`.'''
         searchstring = utils.string.kwargs(type)
+        parent = self.parent
 
         listable = [item for item in self.iterate(**type)]
         if len(listable) > 1:
             cls = self.__class__
             messages = ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in listable)
             [ logging.info(msg) for msg in messages ]
-            logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.parent.id, searchstring, len(listable), listable[0].index, listable[0].offset, listable[0].size, utils.string.escape(listable[0].fullname, '"'), utils.string.escape("{!s}".format(listable[0].typeinfo.dstr()).replace(' *', '*'), '"')))
+            logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), parent.id, searchstring, len(listable), listable[0].index, listable[0].offset, listable[0].size, utils.string.escape(listable[0].fullname, '"'), utils.string.escape("{!s}".format(listable[0].typeinfo.dstr()).replace(' *', '*'), '"')))
 
         iterable = (item for item in listable)
         res = next(iterable, None)
         if res is None:
             cls = self.__class__
-            raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), self.parent.id, searchstring))
+            raise E.SearchResultsError(u"{:s}({:#x}).members.by({:s}) : Found 0 matching results.".format('.'.join([__name__, cls.__name__]), parent.id, searchstring))
         return res
     @utils.multicase(name=six.string_types)
     @utils.string.decorate_arguments('name')
@@ -1070,12 +1075,13 @@ class members_t(object):
     def by_name(self, name):
         '''Return the member with the specified `name`.'''
         res = utils.string.to(name)
+        parent = self.parent
 
         # grab the member_t of the structure by its name
-        mem = idaapi.get_member_by_name(self.parent.ptr, res)
+        mem = idaapi.get_member_by_name(parent.ptr, res)
         if mem is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_name({!r}) : Unable to find member with requested name.".format('.'.join([__name__, cls.__name__]), self.parent.id, name))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_name({!r}) : Unable to find member with requested name.".format('.'.join([__name__, cls.__name__]), parent.id, name))
 
         # figure out the index of the member so we can return the member_t we've cached
         index = self.index(mem)
@@ -1086,13 +1092,14 @@ class members_t(object):
     def by_fullname(self, fullname):
         '''Return the member with the specified `fullname`.'''
         res = utils.string.to(fullname)
+        parent = self.parent
 
         # grab the member_t of the structure by its fullname
         member = idaapi.get_member_by_fullname(res)
         mem, _ = (None, None) if member is None else member
         if mem is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_fullname({!r}) : Unable to find member with full name.".format('.'.join([__name__, cls.__name__]), self.parent.id, fullname))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_fullname({!r}) : Unable to find member with full name.".format('.'.join([__name__, cls.__name__]), parent.id, fullname))
 
         # figure out the index of the member so we can return the member_t we've cached
         index = self.index(mem)
@@ -1101,28 +1108,29 @@ class members_t(object):
 
     def by_offset(self, offset):
         '''Return the member at the specified `offset` from the base offset of the structure.'''
+        parent = self.parent
 
         # Start out by getting our bounds, and translating them to our relative
         # offset.
-        min, max = map(lambda offset: offset + self.baseoffset, [idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)])
+        min, max = map(functools.partial(operator.add, self.baseoffset), [idaapi.get_struc_first_offset(parent.ptr), idaapi.get_struc_last_offset(parent.ptr)])
 
         # Guard against a potential OverflowError that would be raised by SWIG's typechecking
         if self.baseoffset > max:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), parent.id, offset, offset))
 
         # Look for the very last member so we can confirm our bounds.
-        mptr = idaapi.get_member(self.parent.ptr, max - self.baseoffset)
+        mptr = idaapi.get_member(parent.ptr, max - self.baseoffset)
         if mptr is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), parent.id, offset, offset))
 
         # Get that member's size, so that way we can really confirm that this
         # offset isn't pointing to anything.
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max + msize):
             cls = self.__class__
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, min, max + msize))
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join([__name__, cls.__name__]), parent.id, offset, min, max + msize))
 
         # Chain to the realoffset implementation.. This is just a wrapper.
         return self.by_realoffset(offset - self.baseoffset)
@@ -1130,31 +1138,34 @@ class members_t(object):
 
     def by_realoffset(self, offset):
         '''Return the member at the specified `offset` of the structure.'''
-        min, max = idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)
+        parent = self.parent
+
+        # Start by getting our bounds.
+        min, max = idaapi.get_struc_first_offset(parent.ptr), idaapi.get_struc_last_offset(parent.ptr)
 
         # Guard against a potential OverflowError that would be raised by SWIG's typechecking
         if max < 0:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), parent.id, offset, offset))
 
         # Look for the very last member so we can confirm our bounds.
-        mptr = idaapi.get_member(self.parent.ptr, max)
+        mptr = idaapi.get_member(parent.ptr, max)
         if mptr is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), parent.id, offset, offset))
 
         # Get that member's size, so that way we can really confirm that this
         # offset isn't pointing to anything.
         msize = idaapi.get_member_size(mptr)
         if (offset < min) or (offset >= max + msize):
             cls = self.__class__
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, min, max + msize))
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join([__name__, cls.__name__]), parent.id, offset, min, max + msize))
 
         # Now we can get a pointer to an actual member
-        mem = idaapi.get_member(self.parent.ptr, offset)
+        mem = idaapi.get_member(parent.ptr, offset)
         if mem is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), parent.id, offset, offset))
 
         # And then search for it in our structure to give back to the user
         index = self.index(mem)
@@ -1163,10 +1174,13 @@ class members_t(object):
 
     def by_identifier(self, id):
         '''Return the member in the structure that has the specified `id`.'''
+        parent = self.parent
+
+        # get the member from the id we were given
         res = idaapi.get_member_by_id(id)
         if res is None:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_id({:#x}) : Unable to find member with specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), self.parent.id, id, id))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_id({:#x}) : Unable to find member with specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), parent.id, id, id))
 
         # unpack the member out of the result
         mem, fn, st = res
@@ -1244,10 +1258,14 @@ class members_t(object):
 
     def near_offset(self, offset):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
-        min, max = map(lambda sz: sz + self.baseoffset, [idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)])
+        parent = self.parent
+
+        # Start out by getting our bounds, and translating them to our relative
+        # offset.
+        min, max = map(functools.partial(operator.add, self.baseoffset), [idaapi.get_struc_first_offset(parent.ptr), idaapi.get_struc_last_offset(parent.ptr)])
         if (offset < min) or (offset >= max):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.near_offset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, min, max))
+            logging.info(u"{:s}({:#x}).members.near_offset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), parent.id, offset, min, max))
 
         # Chain to the realoffset implementation.. This is just a wrapper.
         return self.near_realoffset(offset - self.baseoffset)
@@ -1255,14 +1273,17 @@ class members_t(object):
 
     def near_realoffset(self, offset):
         '''Return the member nearest to the specified `offset`.'''
-        min, max = idaapi.get_struc_first_offset(self.parent.ptr), idaapi.get_struc_last_offset(self.parent.ptr)
+        parent = self.parent
+
+        # Start by getting our bounds.
+        min, max = idaapi.get_struc_first_offset(parent.ptr), idaapi.get_struc_last_offset(parent.ptr)
         if (offset < min) or (offset >= max):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), self.parent.id, offset, min, max))
+            logging.info(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), parent.id, offset, min, max))
 
         # Try and find the exact offset, because if we can..then we don't need
         # to execute the rest of this function.
-        mem = idaapi.get_member(self.parent.ptr, offset)
+        mem = idaapi.get_member(parent.ptr, offset)
         if mem:
             index = self.index(mem)
             return self[index]
@@ -1271,7 +1292,7 @@ class members_t(object):
         # to search through in here. So just raise an exception and bail.
         if not len(self):
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Unable to find member near offset.".format('.'.join([__name__, cls.__name__]), self.parent.id, offset))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Unable to find member near offset.".format('.'.join([__name__, cls.__name__]), parent.id, offset))
 
         # We couldn't find the member, so now we'll try and search for the
         # member that is nearest..
@@ -1435,12 +1456,12 @@ class member_t(object):
     method, ``refs`` will allow one to enumerate everything in the
     database that references said member.
     """
-    __slots__ = ('__parent', '__index')
+    __slots__ = ('__parent__', '__index__')
 
     def __init__(self, parent, index):
         '''Create a member_t for the field in the structure `parent` at `index`.'''
-        self.__index = index
-        self.__parent = parent
+        self.__index__ = index
+        self.__parent__ = parent
 
     def __getstate__(self):
         t = (self.flag, None if self.typeid is None else __instance__(self.typeid), self.size)
@@ -1451,8 +1472,8 @@ class member_t(object):
         res = (utils.string.of(cmt) for cmt in [cmtt, cmtf])
 
         # now we can return them
-        ofs = self.offset - self.__parent.members.baseoffset
-        return (self.__parent.name, self.__index, self.name, tuple(res), ofs, t)
+        ofs = self.offset - self.__parent__.members.baseoffset
+        return (self.__parent__.name, self.__index__, self.name, tuple(res), ofs, t)
     def __setstate__(self, state):
         parentname, index, name, (cmtt, cmtf), ofs, t = state
         fullname = '.'.join([parentname, name])
@@ -1464,7 +1485,7 @@ class member_t(object):
             cls = self.__class__
             logging.info(u"{:s}({:#x}) : Creating member for structure ({:s}) at offset {:+#x} named \"{:s}\" with the comment {!r}.".format('.'.join([__name__, cls.__name__]), identifier, parentname, ofs, utils.string.escape(name, '"'), cmtt or cmtf or ''))
             identifier = idaapi.add_struc(idaapi.BADADDR, res)
-        self.__parent = parent = __instance__(identifier, offset=0)
+        self.__parent__ = parent = __instance__(identifier, offset=0)
 
         # extract the attributes of the member
         flag, mytype, nbytes = t
@@ -1489,21 +1510,24 @@ class member_t(object):
                 idaapi.set_member_name(parent.ptr, ofs, utils.string.to(newname))
             else:
                 logging.info(u"{:s}({:#x}): Field at {:+#x} of structure ({:s}) contains the same name \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, ofs, parentname, utils.string.escape(name, '"')))
+
         # duplicate field
         elif mem == idaapi.STRUC_ERROR_MEMBER_OFFSET:
             logging.info(u"{:s}({:#x}): Already existing field found at {:+#x} of structure ({:s}). Overwriting with \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, ofs, parentname, utils.string.escape(name, '"')))
             idaapi.set_member_type(parent.ptr, ofs, flag, opinfo, nbytes)
             idaapi.set_member_name(parent.ptr, ofs, res)
+
         # invalid size
         elif mem == idaapi.STRUC_ERROR_MEMBER_SIZE:
             logging.warning(u"{:s}({:#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mem, utils.string.escape(fullname, '"')))
+
         # unknown
         elif mem != idaapi.STRUC_ERROR_MEMBER_OK:
             logging.warning(u"{:s}({:#x}): Error code {:#x} returned while trying to create member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mem, utils.string.escape(fullname, '"')))
 
         # assign some of our internal attributes
-        self.__index = index
-        self.__parent = parent
+        self.__index__ = index
+        self.__parent__ = parent
 
         # and update the members comments
         idaapi.set_member_cmt(self.ptr, utils.string.to(cmtt), True)
@@ -1514,7 +1538,8 @@ class member_t(object):
     @property
     def ptr(self):
         '''Return the pointer of the ``idaapi.member_t``.'''
-        return self.__parent.ptr.get_member(self.__index)
+        parent = self.parent
+        return parent.ptr.get_member(self.__index__)
     @property
     def id(self):
         '''Return the identifier of the member.'''
@@ -1530,11 +1555,11 @@ class member_t(object):
     @property
     def offset(self):
         '''Return the offset of the member.'''
-        return self.ptr.get_soff() + self.__parent.members.baseoffset
+        return self.ptr.get_soff() + self.parent.members.baseoffset
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
-        m = idaapi.get_member(self.__parent.ptr, self.offset - self.__parent.members.baseoffset)
+        m = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
         return 0 if m is None else m.flag
     @property
     def fullname(self):
@@ -1554,7 +1579,7 @@ class member_t(object):
     @property
     def index(self):
         '''Return the index of the member.'''
-        return self.__index
+        return self.__index__
     @property
     def left(self):
         '''Return the beginning offset of the member.'''
@@ -1571,12 +1596,12 @@ class member_t(object):
     @property
     def bounds(self):
         '''Return the boundaries of the member.'''
-        ptr, base = self.ptr, self.__parent.members.baseoffset
+        ptr, base = self.ptr, self.parent.members.baseoffset
         return interface.bounds_t(ptr.soff, ptr.eoff).translate(base)
     @property
     def parent(self):
         '''Return the structure_t that owns the member.'''
-        return self.__parent
+        return self.__parent__
 
     # read/write properties
     @property
@@ -1603,7 +1628,7 @@ class member_t(object):
 
         # now we can set the name of the member at the specified offset
         oldname = self.name
-        if not idaapi.set_member_name(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, ida_string):
+        if not idaapi.set_member_name(self.parent.ptr, self.offset - self.parent.members.baseoffset, ida_string):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).name : Unable to assign the specified name ({:s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.repr(ida_string), utils.string.repr(oldname)))
 
@@ -1688,7 +1713,7 @@ class member_t(object):
     @property
     def dt_type(self):
         '''Return the `dt_type` attribute of the member.'''
-        m = idaapi.get_member(self.__parent.ptr, self.offset - self.__parent.members.baseoffset)
+        m = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
         if m is None:
             return 0
         flag = m.flag & idaapi.DT_TYPE
@@ -1713,7 +1738,7 @@ class member_t(object):
         flag, typeid, nbytes = interface.typemap.resolve(type)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
-        if not idaapi.set_member_type(self.__parent.ptr, self.offset - self.__parent.members.baseoffset, flag, opinfo, nbytes):
+        if not idaapi.set_member_type(self.parent.ptr, self.offset - self.parent.members.baseoffset, flag, opinfo, nbytes):
             cls = self.__class__
             raise E.DisassemblerError(u"{:s}({:#x}).type({!s}) : Unable to assign the provided type ({!s}) to the structure member {:s}.".format('.'.join([__name__, cls.__name__]), self.id, type, type, utils.string.repr(self.name)))
 
@@ -1821,7 +1846,7 @@ class member_t(object):
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
         # if structure is a frame..
-        if interface.node.is_identifier(self.__parent.id) and internal.netnode.name.get(self.__parent.id).startswith('$ '):
+        if interface.node.is_identifier(self.parent.id) and internal.netnode.name.get(self.parent.id).startswith('$ '):
             name, mptr = self.fullname, self.ptr
             sptr = idaapi.get_sptr(mptr)
 
@@ -1888,7 +1913,7 @@ class member_t(object):
             # check if we found any ops that point directly to this member
             if any(listable):
                 iterable = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in listable)
-                iterable = (idx for idx, (_, ids) in iterable if self.__parent.id in ids)    # sanity
+                iterable = (idx for idx, (_, ids) in iterable if self.parent.id in ids)    # sanity
                 res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in iterable)
 
             # otherwise our reference is implicitly pointing to our member, so
