@@ -76,9 +76,17 @@ class config(object):
 
             # Display summary of the database and what it's used for.
             bits = "{:d}-bit".format(64 if information.is_64bit() else 32 if information.is_32bit() else 16)
-            byteorder = "{:s}-endian".format('big' if information.lflags & idaapi.LFLG_MSF else 'little')
-            mode = 'kernelspace' if information.lflags & idaapi.LFLG_KERNMODE else 'userspace'
             format = 'library' if information.lflags & idaapi.LFLG_IS_DLL else 'binary'
+
+            if idaapi.__version__ < 7.0:
+                byteorder = "{:s}-endian".format('big' if idaapi.cvar.inf.mf else 'little')
+            else:
+                byteorder = "{:s}-endian".format('big' if information.lflags & idaapi.LFLG_MSF else 'little')
+
+            if idaapi.__version__ >= 7.0:
+                mode = ' kernelspace' if information.lflags & idaapi.LFLG_KERNMODE else ' userspace'
+            else:
+                mode = ''
             logging.warning("Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s} {mode:s} {format:s}.".format('.'.join([information.__class__.__module__, information.__class__.__name__]), tag=information.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=information.version))
 
         else:
@@ -137,6 +145,14 @@ class config(object):
             return True if cls.info.lflags & idaapi.LFLG_IS_DLL else False
         raise E.UnsupportedVersion(u"{:s}.is_sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
     sharedobject = is_shared = sharedQ = utils.alias(is_sharedobject, 'config')
+
+    @classmethod
+    def is_kernelspace(cls):
+        '''Returns whether the database is using a kernelmode address space or not.'''
+        if idaapi.__version__ >= 7.0:
+            return True if cls.info.lflags & idaapi.LFLG_KERNMODE else False
+        raise E.UnsupportedVersion(u"{:s}.is_kernelspace() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+    kernelspaceQ = utils.alias(is_kernelspace, 'config')
 
     @classmethod
     def changes(cls):
