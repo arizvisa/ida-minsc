@@ -203,7 +203,7 @@ def customnames():
     # FIXME: first delete all the custom names '__name__' tag
     left, right = db.config.bounds()
     for ea in db.address.iterate(left, right):
-        ctx = internal.comment.globals if not func.within(ea) or func.address(ea) == ea else internal.comment.contents
+        ctx = internal.comment.contents if func.within(ea) and func.address(ea) != ea else internal.comment.globals
         if db.type.has_customname(ea):
             ctx.inc(ea, '__name__')
         continue
@@ -230,10 +230,8 @@ def everything():
 def erase_globals():
     '''Erase the cache defined for all of the global tags in the database.'''
     n = internal.comment.tagging.node()
-    res = internal.netnode.hash.fiter(n), internal.netnode.alt.fiter(n), internal.netnode.sup.fiter(n)
-    res = map(list, res)
+    hashes, alts, sups = res = [list(items) for items in [internal.netnode.hash.fiter(n), internal.netnode.alt.fiter(n), internal.netnode.sup.fiter(n)]]
     total = sum(map(len, res))
-    hashes, alts, sups = res
 
     yield total
 
@@ -267,7 +265,7 @@ def erase_contents():
 def erase():
     '''Erase the current cache from the database.'''
     iter1, iter2 = erase_contents(), erase_globals()
-    total = sum(map(next, (iter1, iter2)))
+    total = sum(map(next, [iter1, iter2]))
 
     current = 0
     for idx, ea in iter1:
