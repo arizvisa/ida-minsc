@@ -87,7 +87,7 @@ class config(object):
                 mode = ' kernelspace' if information.lflags & idaapi.LFLG_KERNMODE else ' userspace'
             else:
                 mode = ''
-            logging.warning("Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s} {mode:s} {format:s}.".format('.'.join([information.__class__.__module__, information.__class__.__name__]), tag=information.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=information.version))
+            logging.warning("Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s}{mode:s} {format:s}.".format('.'.join([information.__class__.__module__, information.__class__.__name__]), tag=information.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=information.version))
 
         else:
             logging.fatal(u"{:s}.__init_info_structure__({!s}) : Unknown error while trying to get information structure for database.".format('.'.join([__name__, cls.__name__]), utils.string.escape(idp_modname, '"')))
