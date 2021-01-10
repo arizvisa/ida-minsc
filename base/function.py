@@ -2047,7 +2047,7 @@ class type(object):
         # Guess the type information for the function ahead of time because
         # they should _always_ have type information associated with them.
         ti = idaapi.tinfo_t()
-        if idaapi.GUESS_FUNC_FAILED == idaapi.guess_tinfo(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea):
+        if idaapi.GUESS_FUNC_FAILED == idaapi.guess_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea):
             logging.info(u"{:s}({:#x}) : Ignoring failure ({:d}) when trying to determine `idaapi.tinfo_t()` for the specified function.".format('.'.join([__name__, cls.__name__]), idaapi.GUESS_FUNC_FAILED, ea))
 
         # If we can find a proper typeinfo then use that, otherwise return

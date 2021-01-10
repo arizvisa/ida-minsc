@@ -76,9 +76,17 @@ class config(object):
 
             # Display summary of the database and what it's used for.
             bits = "{:d}-bit".format(64 if information.is_64bit() else 32 if information.is_32bit() else 16)
-            byteorder = "{:s}-endian".format('big' if information.is_be() else 'little')
-            mode = 'kernelspace' if information.is_kernel_mode() else 'userspace'
-            format = 'library' if information.is_dll() else 'binary'
+            format = 'library' if information.lflags & idaapi.LFLG_IS_DLL else 'binary'
+
+            if idaapi.__version__ < 7.0:
+                byteorder = "{:s}-endian".format('big' if idaapi.cvar.inf.mf else 'little')
+            else:
+                byteorder = "{:s}-endian".format('big' if information.lflags & idaapi.LFLG_MSF else 'little')
+
+            if idaapi.__version__ >= 7.0:
+                mode = ' kernelspace' if information.lflags & idaapi.LFLG_KERNMODE else ' userspace'
+            else:
+                mode = ''
             logging.warning("Initialized {tag!s} database v{version:d} for {bits:s} {byteorder:s} {mode:s} {format:s}.".format('.'.join([information.__class__.__module__, information.__class__.__name__]), tag=information.tag, bits=bits, byteorder=byteorder, mode=mode, format=format, version=information.version))
 
         else:
@@ -89,7 +97,7 @@ class config(object):
     def __nw_init_info_structure__(cls, nw_code, is_old_database):
         logging.debug(u"{:s}.__nw_init_info_structure__({!s}) : Received notification to initialize information structure for database.".format('.'.join([__name__, cls.__name__]), ', '.join(map("{!r}".format, [nw_code, is_old_database]))))
         idp_modname = idaapi.get_idp_name()
-        return cls.__init_into_structure__(idp_modname)
+        return cls.__init_info_structure__(idp_modname)
 
     @classmethod
     def filename(cls):
@@ -139,12 +147,20 @@ class config(object):
         raise E.UnsupportedVersion(u"{:s}.readonly() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
 
     @classmethod
-    def sharedobject(cls):
+    def is_sharedobject(cls):
         '''Returns whether the database is a shared-object or not.'''
         if idaapi.__version__ >= 7.0:
-            return cls.info.is_dll()
-        raise E.UnsupportedVersion(u"{:s}.sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
-    is_sharedobject = sharedQ = sharedobject
+            return True if cls.info.lflags & idaapi.LFLG_IS_DLL else False
+        raise E.UnsupportedVersion(u"{:s}.is_sharedobject() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+    sharedobject = is_shared = sharedQ = utils.alias(is_sharedobject, 'config')
+
+    @classmethod
+    def is_kernelspace(cls):
+        '''Returns whether the database is using a kernelmode address space or not.'''
+        if idaapi.__version__ >= 7.0:
+            return True if cls.info.lflags & idaapi.LFLG_KERNMODE else False
+        raise E.UnsupportedVersion(u"{:s}.is_kernelspace() : This function is only supported on versions of IDA 7.0 and newer.".format('.'.join([__name__, cls.__name__])))
+    kernelspaceQ = utils.alias(is_kernelspace, 'config')
 
     @classmethod
     def changes(cls):
@@ -205,7 +221,7 @@ class config(object):
         if idaapi.__version__ < 7.0:
             res = idaapi.cvar.inf.mf
             return 'big' if res else 'little'
-        return 'big' if cls.info.is_be() else 'little'
+        return 'big' if cls.info.lflags & idaapi.LFLG_MSF else 'little'
 
     @classmethod
     def main(cls):
