@@ -304,7 +304,7 @@ class functions(object):
 
     """
     __matcher__ = utils.matcher()
-    __matcher__.boolean('name', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry()), utils.fcompose(function.by, function.name))
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), utils.fcompose(function.by, function.name))
     __matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(function.by, function.name))
     __matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), utils.fcompose(function.by, function.name, operator.methodcaller('lower')))
     __matcher__.predicate('predicate', function.by)
@@ -697,7 +697,7 @@ class names(object):
     """
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', idaapi.get_nlist_ea), __matcher__.mapping('ea', idaapi.get_nlist_ea)
-    __matcher__.boolean('name', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry()), utils.fcompose(idaapi.get_nlist_name, utils.string.of))
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), utils.fcompose(idaapi.get_nlist_name, utils.string.of))
     __matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(idaapi.get_nlist_name, utils.string.of))
     __matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), utils.fcompose(idaapi.get_nlist_name, utils.string.of))
     __matcher__.predicate('predicate', idaapi.get_nlist_ea)
@@ -1288,7 +1288,7 @@ class entries(object):
     __matcher__.boolean('less', operator.ge, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
     __matcher__.boolean('le', operator.ge, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
     __matcher__.boolean('lt', operator.gt, utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry))
-    __matcher__.boolean('name', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry()), utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
     __matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
     __matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal)
@@ -1913,7 +1913,7 @@ class imports(object):
 
     __matcher__ = utils.matcher()
     __matcher__.mapping('address', utils.first), __matcher__.mapping('ea', utils.first)
-    __matcher__.boolean('name', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry()), utils.fcompose(utils.second, __formats__.__func__))
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), utils.fcompose(utils.second, __formats__.__func__))
     __matcher__.boolean('fullname', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(utils.second, __formatl__.__func__))
     __matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(utils.second, __formats__.__func__))
     __matcher__.boolean('module', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(utils.second, utils.first))
