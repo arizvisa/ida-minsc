@@ -432,21 +432,24 @@ class matcher(object):
 
     def __init__(self):
         self.__predicate__ = {}
-    def __attrib__(self, *attribute):
-        if not attribute:
-            return lambda n: n
-        res = [(operator.attrgetter(a) if isinstance(a, six.string_types) else a) for a in attribute]
-        return lambda o: tuple(x(o) for x in res) if len(res) > 1 else res[0](o)
+    def __attrib__(self, *attributes):
+        if not attributes:
+            return lambda item: item
+        res = [(operator.attrgetter(callable_or_attribute) if isinstance(callable_or_attribute, six.string_types) else callable_or_attribute) for callable_or_attribute in attributes]
+        return lambda object: tuple(F(object) for F in res) if len(res) > 1 else res[0](object)
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda v: fcompose(attr, functools.partial(functools.partial(operator.eq, v)))
+        self.__predicate__[type] = lambda target: fcompose(attr, functools.partial(functools.partial(operator.eq, target)))
     def mapping(self, type, function, *attribute):
         attr = self.__attrib__(*attribute)
         mapper = fcompose(attr, function)
-        self.__predicate__[type] = lambda v: fcompose(mapper, functools.partial(operator.eq, v))
+        self.__predicate__[type] = lambda target: fcompose(mapper, functools.partial(operator.eq, target))
     def boolean(self, type, function, *attribute):
         attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda v: fcompose(attr, functools.partial(function, v))
+        self.__predicate__[type] = lambda target: fcompose(attr, functools.partial(function, target))
+    def combinator(self, type, function, *attribute):
+        attr = self.__attrib__(*attribute)
+        self.__predicate__[type] = lambda target: fcompose(attr, function(target))
     def predicate(self, type, *attribute):
         attr = self.__attrib__(*attribute)
         self.__predicate__[type] = functools.partial(fcompose, attr)
