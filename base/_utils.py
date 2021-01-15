@@ -436,7 +436,7 @@ class matcher(object):
         if not attributes:
             return lambda item: item
         res = [(operator.attrgetter(callable_or_attribute) if isinstance(callable_or_attribute, six.string_types) else callable_or_attribute) for callable_or_attribute in attributes]
-        return fcompose(*res) if len(res) > 0 else res[0]
+        return fcompose(*res) if len(res) > 1 else res[0]
     def attribute(self, type, *attribute):
         attr = self.__attrib__(*attribute)
         self.__predicate__[type] = lambda target: fcompose(attr, functools.partial(functools.partial(operator.eq, target)))
