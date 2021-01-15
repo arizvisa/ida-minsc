@@ -76,7 +76,7 @@ __matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), 'na
 __matcher__.mapping('index', idaapi.get_struc_idx, 'id')
 __matcher__.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
 __matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), 'name')
-__matcher__.boolean('name', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(operator.methodcaller('lower'), utils.fpartial(utils.fpartial, operator.eq)), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry()), 'name')
+__matcher__.boolean('name', lambda name, item: item.lower() == name.lower(), 'name')
 __matcher__.attribute('size', 'size')
 __matcher__.boolean('greater', operator.le, 'size'), __matcher__.boolean('ge', operator.le, 'size')
 __matcher__.boolean('gt', operator.lt, 'size')
