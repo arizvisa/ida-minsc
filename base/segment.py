@@ -48,12 +48,12 @@ import idaapi
 
 ## enumerating
 __matcher__ = utils.matcher()
-__matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
+__matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
 __matcher__.attribute('index', 'index')
 __matcher__.attribute('identifier', 'name'), __matcher__.attribute('id', 'name')
 __matcher__.attribute('selector', 'sel')
-__matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
-__matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
+__matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
+__matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
 if idaapi.__version__ < 7.0:
     __matcher__.boolean('greater', operator.le, 'endEA')
     __matcher__.boolean('gt', operator.lt, 'endEA')
