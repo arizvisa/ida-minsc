@@ -217,9 +217,9 @@ def repr(enum):
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
-__matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), utils.fcompose(idaapi.get_enum_name, utils.string.of))
-__matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), utils.fcompose(idaapi.get_enum_name, utils.string.of))
-__matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), utils.fcompose(idaapi.get_enum_name, utils.string.of))
+__matcher__.boolean('regex', utils.fpartial(re.search, flags=re.IGNORECASE), idaapi.get_enum_name, utils.string.of)
+__matcher__.boolean('like', utils.fcompose(utils.fbox, utils.fpartial(utils.izip, [utils.fcompose(fnmatch.translate, utils.frpartial(re.compile, re.IGNORECASE), operator.attrgetter('match')), operator.methodcaller('lower')]), utils.fpartial(utils.imap, utils.fcompose(utils.funbox(utils.fapply), utils.fcurry())), utils.funbox(utils.fapply), utils.fcurry(), builtins.bool), idaapi.get_enum_name, utils.string.of)
+__matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_enum_name, utils.string.of)
 __matcher__.attribute('id')
 __matcher__.attribute('identifier')
 __matcher__.predicate('pred')
