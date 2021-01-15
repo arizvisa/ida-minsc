@@ -449,7 +449,7 @@ class matcher(object):
         self.__predicate__[type] = lambda target: fcompose(attr, functools.partial(function, target))
     def combinator(self, type, function, *attribute):
         attr = self.__attrib__(*attribute)
-        self.__predicate__[type] = lambda target: fcompose(attr, function(target))
+        self.__predicate__[type] = fcompose(function, functools.partial(fcompose, attr))
     def predicate(self, type, *attribute):
         attr = self.__attrib__(*attribute)
         self.__predicate__[type] = functools.partial(fcompose, attr)
