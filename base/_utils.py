@@ -87,9 +87,9 @@ def fcatch(f, *a, **k):
 # boolean inversion of the result of a function
 fcomplement = fnot = frpartial(fcompose, operator.not_)
 # converts a list to an iterator, or an iterator to a list
-ilist, liter = fcompose(builtins.list, builtins.iter), fcompose(builtins.iter, builtins.list)
+ilist, liter = fcompose(builtins.iter, builtins.list), fcompose(builtins.list, builtins.iter)
 # converts a tuple to an iterator, or an iterator to a tuple
-ituple, titer = fcompose(builtins.tuple, builtins.iter), fcompose(builtins.iter, builtins.tuple)
+ituple, titer = fcompose(builtins.iter, builtins.tuple), fcompose(builtins.tuple, builtins.iter)
 # take `count` number of elements from an iterator
 itake = lambda count: fcompose(builtins.iter, fmap(*[builtins.next] * count), builtins.tuple)
 # get the `nth` element from an iterator
