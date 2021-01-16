@@ -48,12 +48,12 @@ import idaapi
 
 ## enumerating
 __matcher__ = utils.matcher()
-__matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
+__matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
 __matcher__.attribute('index', 'index')
 __matcher__.attribute('identifier', 'name'), __matcher__.attribute('id', 'name')
 __matcher__.attribute('selector', 'sel')
-__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
-__matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of))
+__matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
+__matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_segm_name if hasattr(idaapi, 'get_segm_name') else idaapi.get_true_segm_name, utils.string.of)
 if idaapi.__version__ < 7.0:
     __matcher__.boolean('greater', operator.le, 'endEA')
     __matcher__.boolean('gt', operator.lt, 'endEA')

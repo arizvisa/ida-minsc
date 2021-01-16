@@ -72,11 +72,11 @@ def __instance__(identifier, **options):
     return res
 
 __matcher__ = utils.matcher()
-__matcher__.boolean('regex', re.search, 'name')
+__matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
 __matcher__.mapping('index', idaapi.get_struc_idx, 'id')
 __matcher__.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
-__matcher__.boolean('like', lambda pattern, attribute: fnmatch.fnmatch(attribute, pattern), 'name')
-__matcher__.boolean('name', operator.eq, 'name')
+__matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
+__matcher__.boolean('name', lambda name, item: item.lower() == name.lower(), 'name')
 __matcher__.attribute('size', 'size')
 __matcher__.boolean('greater', operator.le, 'size'), __matcher__.boolean('ge', operator.le, 'size')
 __matcher__.boolean('gt', operator.lt, 'size')
@@ -987,15 +987,15 @@ class members_t(object):
         raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member is not in the members list.".format('.'.join([__name__, cls.__name__]), parent.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member)))
 
     __member_matcher = utils.matcher()
-    __member_matcher.boolean('regex', re.search, 'name')
+    __member_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
     __member_matcher.attribute('index', 'index')
     __member_matcher.attribute('identifier', 'id'), __matcher__.attribute('id', 'id')
     __member_matcher.attribute('offset', 'offset')
-    __member_matcher.boolean('name', lambda pattern, attribute: fnmatch.fnmatch(attribute, pattern), 'name')
-    __member_matcher.boolean('like', lambda pattern, attribute: fnmatch.fnmatch(attribute, pattern), 'name')
-    __member_matcher.boolean('fullname', lambda pattern, attribute: fnmatch.fnmatch(attribute, pattern), 'fullname')
-    __member_matcher.boolean('comment', lambda pattern, attribute: fnmatch.fnmatch(attribute, pattern), 'comment')
-    __member_matcher.boolean('comments', lambda pattern, attribute: fnmatch.fnmatch(attribute, pattern), 'comments')
+    __member_matcher.boolean('name', lambda name, item: item.lower() == name.lower(), 'name')
+    __member_matcher.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
+    __member_matcher.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'fullname')
+    __member_matcher.combinator('comment', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, utils.fdefault(''))), 'comment')
+    __member_matcher.combinator('comments', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match'), utils.fpartial(utils.fcompose, utils.fdefault(''))), 'comment')
     __member_matcher.boolean('greater', operator.le, lambda member: member.offset + member.size)
     __member_matcher.boolean('ge', operator.le, lambda member: member.offset + member.size)
     __member_matcher.boolean('gt', operator.lt, lambda member: member.offset + member.size)
@@ -1038,7 +1038,7 @@ class members_t(object):
         maxtypeinfo = max(builtins.map(utils.fcompose(operator.attrgetter('typeinfo'), "{!s}".format, operator.methodcaller('replace', ' *', '*'), len), res) if res else [0])
 
         for m in res:
-            six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {:{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), int(maxtypeinfo), utils.string.repr(m.name), int(maxname), m.type, int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
+            six.print_(u"[{:{:d}d}] {:>{:d}x}:{:<+#{:d}x} {:>{:d}s} {:<{:d}s} {:<{:d}s} (flag={:x},dt_type={:x}{:s}){:s}".format(m.index, maxindex, m.offset, int(maxoffset), m.size, maxsize, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), int(maxtypeinfo), utils.string.repr(m.name), int(maxname), utils.string.repr(m.type), int(maxtype), m.flag, m.dt_type, '' if m.typeid is None else ",typeid={:x}".format(m.typeid), u" // {!s}".format(m.tag() if '\n' in m.comment else m.comment) if m.comment else ''))
         return
 
     @utils.multicase()
@@ -1051,7 +1051,7 @@ class members_t(object):
         listable = [item for item in self.iterate(**type)]
         if len(listable) > 1:
             cls = self.__class__
-            messages = ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), m.type)) for m in listable)
+            messages = ((u"[{:d}] {:x}{:+#x} {:s} '{:s}' {!r}".format(m.index, m.offset, m.size, "{!s}".format(m.typeinfo.dstr()).replace(' *', '*'), utils.string.escape(m.name, '\''), utils.string.repr(m.type))) for m in listable)
             [ logging.info(msg) for msg in messages ]
             logging.warning(u"{:s}({:#x}).members.by({:s}) : Found {:d} matching results. Returning the member at index {:d} offset {:x}{:+#x} with the name \"{:s}\" and typeinfo \"{:s}\".".format('.'.join([__name__, cls.__name__]), parent.id, searchstring, len(listable), listable[0].index, listable[0].offset, listable[0].size, utils.string.escape(listable[0].fullname, '"'), utils.string.escape("{!s}".format(listable[0].typeinfo.dstr()).replace(' *', '*'), '"')))
 

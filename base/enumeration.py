@@ -217,9 +217,9 @@ def repr(enum):
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
-__matcher__.boolean('regex', re.search, utils.fcompose(idaapi.get_enum_name, utils.string.of))
-__matcher__.boolean('like', lambda v, n: fnmatch.fnmatch(n, v), utils.fcompose(idaapi.get_enum_name, utils.string.of))
-__matcher__.boolean('name', operator.eq, utils.fcompose(idaapi.get_enum_name, utils.string.of))
+__matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
+__matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
+__matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_enum_name, utils.string.of)
 __matcher__.attribute('id')
 __matcher__.attribute('identifier')
 __matcher__.predicate('pred')
