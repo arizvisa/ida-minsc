@@ -1917,7 +1917,7 @@ class imports(object):
     __matcher__.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, __formatl__.__func__)
     __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, __formats__.__func__)
     __matcher__.combinator('module', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, utils.first)
-    __matcher__.mapping('ordinal', utils.fcompose(utils.second, utils.funbox(lambda m, n, o: o)))
+    __matcher__.mapping('ordinal', utils.fcompose(utils.second, utils.funbox(lambda module, name, ordinal: ordinal)))
     __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, __format__.__func__)
     __matcher__.predicate('predicate', lambda item: item)
     __matcher__.predicate('pred', lambda item: item)
