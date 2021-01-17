@@ -914,6 +914,11 @@ class keyboard(object):
         else:
             res = None
 
+        # Verify that the user gave us a callable to use to avoid mapping a
+        # useless type to the specified keyboard combination.
+        if not builtins.callable(callable):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.map({!s}, {!r}) : Unable to map the non-callable value {!r} to the hotkey combination {!s}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
+
         # Define a closure that calls the user's callable as it seems that IDA's
         # hotkey functionality doesn't deal too well when the same callable is
         # mapped to different hotkeys.
