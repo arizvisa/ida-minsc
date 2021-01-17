@@ -1493,7 +1493,6 @@ class switch_t(object):
 def xiterate(ea, start, next):
     '''Utility function for iterating through idaapi's xrefs from `start` to `end`.'''
     getflags = idaapi.getFlags if idaapi.__version__ < 7.0 else idaapi.get_flags
-    ea = ea if getflags(ea) & idaapi.FF_DATA else idaapi.prev_head(ea, 0)
 
     addr = start(ea)
     while addr != idaapi.BADADDR:
