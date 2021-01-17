@@ -749,7 +749,7 @@ class keyboard(object):
     @classmethod
     def __of_key__(cls, key):
         '''Convert the normalized hotkey tuple in `key` into a format that IDA can comprehend.'''
-        Separators = {'-', '+', '_'}
+        Separators = {'-', '+'}
         Modifiers = {'ctrl', 'shift', 'alt'}
 
         # Validate the type of our parameter
