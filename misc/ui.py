@@ -19,7 +19,7 @@ window that they wish to expose to the user.
 """
 
 import six, builtins
-import sys, os, time, functools
+import sys, os, time, functools, inspect
 import logging
 
 import idaapi, internal
@@ -816,12 +816,22 @@ class keyboard(object):
     @classmethod
     def list(cls):
         '''Display the current list of keyboard combinations that are mapped along with the callable each one is attached to.'''
-        maxkey, maxinfo = 0, 0
+        maxkey, maxtype, maxinfo = 0, 0, 0
 
         results = []
         for mapping, (capsule, closure) in cls.__cache__.items():
             key = cls.__of_key__(mapping)
             information = internal.utils.multicase.prototype(closure)
+
+            # Figure out the type of the callable that is mapped.
+            if inspect.ismethod(closure):
+                ftype = 'method'
+            elif inspect.isbuiltin(closure):
+                ftype = 'builtin'
+            elif inspect.isfunction(closure):
+                ftype = 'anonymous' if closure.__name__ == '<lambda>' else 'function'
+            else:
+                ftype = 'callable'
 
             # Now we can figure out the documentation for the closure that was stored.
             documentation = closure.__doc__ or ''
@@ -835,9 +845,10 @@ class keyboard(object):
             # Calculate our maximum column widths inline
             maxkey = max(maxkey, len(key))
             maxinfo = max(maxinfo, len(information))
+            maxtype = max(maxtype, len(ftype))
 
             # Append each column to our results
-            results.append((key, information, comment))
+            results.append((key, ftype, information, comment))
 
         # If we didn't aggregate any results, then raise an exception as there's nothing to do.
         if not results:
@@ -845,8 +856,8 @@ class keyboard(object):
 
         # Now we can output what was mapped to the user.
         six.print_(u"Found the following{:s} key combination{:s}:".format(" {:d}".format(len(results)) if len(results) > 1 else '', '' if len(results) == 1 else 's'))
-        for key, info, comment in results:
-            six.print_(u"Key: {:>{:d}s} -> {:<{:d}s}{:s}".format(key, maxkey, info, maxinfo, " // {:s}".format(comment) if comment else ''))
+        for key, ftype, info, comment in results:
+            six.print_(u"Key: {:>{:d}s} -> {:s}:{:<{:d}s}{:s}".format(key, maxkey, ftype, info, maxinfo, " // {:s}".format(comment) if comment else ''))
         return
 
     @classmethod
