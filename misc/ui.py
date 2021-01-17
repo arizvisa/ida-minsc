@@ -19,7 +19,7 @@ window that they wish to expose to the user.
 """
 
 import six, builtins
-import sys, os, time, functools
+import sys, os, time, functools, inspect
 import logging
 
 import idaapi, internal
@@ -749,7 +749,7 @@ class keyboard(object):
     @classmethod
     def __of_key__(cls, key):
         '''Convert the normalized hotkey tuple in `key` into a format that IDA can comprehend.'''
-        Separators = {'-', '+', '_'}
+        Separators = {'-', '+'}
         Modifiers = {'ctrl', 'shift', 'alt'}
 
         # Validate the type of our parameter
@@ -770,12 +770,24 @@ class keyboard(object):
         Separators = {'-', '+', '_'}
         Modifiers = {'ctrl', 'shift', 'alt'}
 
-        # First check to see if we were given a tuple. If so, then we might've
-        # been given a valid hotkey. However, we still need to validate this. So,
-        # to do that we'll concatenate each component together back into a string
+        # First check to see if we were given a tuple or list. If so, then we might
+        # have been given a valid hotkey. However, we still need to validate this.
+        # So, to do that we'll concatenate each component together back into a string
         # and then recurse so we can validate using the same logic.
-        if isinstance(hotkey, tuple):
-            modifiers, key = hotkey
+        if isinstance(hotkey, (tuple, list, set)):
+            try:
+                # If we were mistakenly given a set, then we need to reformat it.
+                if isinstance(hotkey, set):
+                    raise ValueError
+
+                modifiers, key = hotkey
+
+            # If the tuple we received was of an invalid format, then extract the
+            # modifiers that we can from it, and try again.
+            except ValueError:
+                modifiers = tuple(item for item in hotkey if item.lower() in Modifiers)
+                key = ''.join(item for item in hotkey if item.lower() not in Modifiers)
+
             separator = next(item for item in Separators)
 
             components = [item for item in modifiers] + [key]
@@ -814,6 +826,74 @@ class keyboard(object):
     __cache__ = {}
 
     @classmethod
+    def list(cls):
+        '''Display the current list of keyboard combinations that are mapped along with the callable each one is attached to.'''
+        maxkey, maxtype, maxinfo = 0, 0, 0
+
+        results = []
+        for mapping, (capsule, closure) in cls.__cache__.items():
+            key = cls.__of_key__(mapping)
+
+            # Check if we were passed a class so we can figure out how to
+            # extract the signature.
+            cons = ['__init__', '__new__']
+            if inspect.isclass(closure):
+                available = (item for item in cons if hasattr(closure, item))
+                attribute = next((item for item in available if inspect.ismethod(getattr(closure, item))), None)
+                callable = getattr(closure, attribute) if attribute else None
+                information = '.'.join([closure.__name__, internal.utils.multicase.prototype(callable)]) if attribute else "{:s}(...)".format(closure.__name__)
+            else:
+                information = internal.utils.multicase.prototype(closure)
+
+            # Figure out the type of the callable that is mapped.
+            if inspect.isclass(closure):
+                ftype = 'class'
+            elif inspect.ismethod(closure):
+                ftype = 'method'
+            elif inspect.isbuiltin(closure):
+                ftype = 'builtin'
+            elif inspect.isfunction(closure):
+                ftype = 'anonymous' if closure.__name__ in {'<lambda>'} else 'function'
+            else:
+                ftype = 'callable'
+
+            # Figure out if there's any class-information associated with the closure
+            if inspect.ismethod(closure):
+                klass = closure.im_self.__class__ if closure.im_self else closure.im_class
+                clsinfo = klass.__name__ if getattr(klass, '__module__', '__main__') in {'__main__'} else '.'.join([klass.__module__, klass.__name__])
+            elif inspect.isclass(closure) or isinstance(closure, object):
+                clsinfo = '' if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
+            else:
+                clsinfo = None if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
+
+            # Now we can figure out the documentation for the closure that was stored.
+            documentation = closure.__doc__ or ''
+            if documentation:
+                filtered = [item.strip() for item in documentation.split('\n') if item.strip()]
+                header = next((item for item in filtered), '')
+                comment = "{:s}...".format(header) if header and len(filtered) > 1 else header
+            else:
+                comment = ''
+
+            # Calculate our maximum column widths inline
+            maxkey = max(maxkey, len(key))
+            maxinfo = max(maxinfo, len('.'.join([clsinfo, information]) if clsinfo else information))
+            maxtype = max(maxtype, len(ftype))
+
+            # Append each column to our results
+            results.append((key, ftype, clsinfo, information, comment))
+
+        # If we didn't aggregate any results, then raise an exception as there's nothing to do.
+        if not results:
+            raise internal.exceptions.SearchResultsError(u"{:s}.list() : Found 0 key combinations mapped.".format('.'.join([__name__, cls.__name__])))
+
+        # Now we can output what was mapped to the user.
+        six.print_(u"Found the following{:s} key combination{:s}:".format(" {:d}".format(len(results)) if len(results) > 1 else '', '' if len(results) == 1 else 's'))
+        for key, ftype, clsinfo, info, comment in results:
+            six.print_(u"Key: {:>{:d}s} -> {:<{:d}s}{:s}".format(key, maxkey, "{:s}:{:s}".format(ftype, '.'.join([clsinfo, info]) if clsinfo else info), maxtype + 1 + maxinfo, " // {:s}".format(comment) if comment else ''))
+        return
+
+    @classmethod
     def map(cls, key, callable):
         """Map the specified `key` combination to a python `callable` in IDA.
 
@@ -845,6 +925,11 @@ class keyboard(object):
         # If the user is mapping a new key, then there's no callable to return.
         else:
             res = None
+
+        # Verify that the user gave us a callable to use to avoid mapping a
+        # useless type to the specified keyboard combination.
+        if not builtins.callable(callable):
+            raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.map({!s}, {!r}) : Unable to map the non-callable value {!r} to the hotkey combination {!s}.".format('.'.join([__name__, cls.__name__]), internal.utils.string.repr(key), callable, callable, internal.utils.string.repr(keystring)))
 
         # Define a closure that calls the user's callable as it seems that IDA's
         # hotkey functionality doesn't deal too well when the same callable is
