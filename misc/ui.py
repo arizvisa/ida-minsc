@@ -782,14 +782,18 @@ class keyboard(object):
 
                 modifiers, key = hotkey
 
+                # If modifiers is not of the correct type, then still need to reformat.
+                if not isinstance(modifiers, (tuple, list, set)):
+                    raise ValueError
+
             # If the tuple we received was of an invalid format, then extract the
             # modifiers that we can from it, and try again.
             except ValueError:
                 modifiers = tuple(item for item in hotkey if item.lower() in Modifiers)
                 key = ''.join(item for item in hotkey if item.lower() not in Modifiers)
 
+            # Grab a separator, and join all our components together with it.
             separator = next(item for item in Separators)
-
             components = [item for item in modifiers] + [key]
             return cls.__normalize_key__(separator.join(components))
 
