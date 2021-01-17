@@ -821,17 +821,38 @@ class keyboard(object):
         results = []
         for mapping, (capsule, closure) in cls.__cache__.items():
             key = cls.__of_key__(mapping)
-            information = internal.utils.multicase.prototype(closure)
+
+            # Check if we were passed a class so we can figure out how to
+            # extract the signature.
+            cons = ['__init__', '__new__']
+            if inspect.isclass(closure):
+                available = (item for item in cons if hasattr(closure, item))
+                attribute = next((item for item in available if inspect.ismethod(getattr(closure, item))), None)
+                callable = getattr(closure, attribute) if attribute else None
+                information = '.'.join([closure.__name__, internal.utils.multicase.prototype(callable)]) if attribute else "{:s}(...)".format(closure.__name__)
+            else:
+                information = internal.utils.multicase.prototype(closure)
 
             # Figure out the type of the callable that is mapped.
-            if inspect.ismethod(closure):
+            if inspect.isclass(closure):
+                ftype = 'class'
+            elif inspect.ismethod(closure):
                 ftype = 'method'
             elif inspect.isbuiltin(closure):
                 ftype = 'builtin'
             elif inspect.isfunction(closure):
-                ftype = 'anonymous' if closure.__name__ == '<lambda>' else 'function'
+                ftype = 'anonymous' if closure.__name__ in {'<lambda>'} else 'function'
             else:
                 ftype = 'callable'
+
+            # Figure out if there's any class-information associated with the closure
+            if inspect.ismethod(closure):
+                klass = closure.im_self.__class__ if closure.im_self else closure.im_class
+                clsinfo = klass.__name__ if getattr(klass, '__module__', '__main__') in {'__main__'} else '.'.join([klass.__module__, klass.__name__])
+            elif inspect.isclass(closure) or isinstance(closure, object):
+                clsinfo = '' if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
+            else:
+                clsinfo = None if getattr(closure, '__module__', '__main__') in {'__main__'} else closure.__module__
 
             # Now we can figure out the documentation for the closure that was stored.
             documentation = closure.__doc__ or ''
@@ -844,11 +865,11 @@ class keyboard(object):
 
             # Calculate our maximum column widths inline
             maxkey = max(maxkey, len(key))
-            maxinfo = max(maxinfo, len(information))
+            maxinfo = max(maxinfo, len('.'.join([clsinfo, information]) if clsinfo else information))
             maxtype = max(maxtype, len(ftype))
 
             # Append each column to our results
-            results.append((key, ftype, information, comment))
+            results.append((key, ftype, clsinfo, information, comment))
 
         # If we didn't aggregate any results, then raise an exception as there's nothing to do.
         if not results:
@@ -856,8 +877,8 @@ class keyboard(object):
 
         # Now we can output what was mapped to the user.
         six.print_(u"Found the following{:s} key combination{:s}:".format(" {:d}".format(len(results)) if len(results) > 1 else '', '' if len(results) == 1 else 's'))
-        for key, ftype, info, comment in results:
-            six.print_(u"Key: {:>{:d}s} -> {:s}:{:<{:d}s}{:s}".format(key, maxkey, ftype, info, maxinfo, " // {:s}".format(comment) if comment else ''))
+        for key, ftype, clsinfo, info, comment in results:
+            six.print_(u"Key: {:>{:d}s} -> {:<{:d}s}{:s}".format(key, maxkey, "{:s}:{:s}".format(ftype, '.'.join([clsinfo, info]) if clsinfo else info), maxtype + 1 + maxinfo, " // {:s}".format(comment) if comment else ''))
         return
 
     @classmethod
