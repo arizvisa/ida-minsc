@@ -770,12 +770,24 @@ class keyboard(object):
         Separators = {'-', '+', '_'}
         Modifiers = {'ctrl', 'shift', 'alt'}
 
-        # First check to see if we were given a tuple. If so, then we might've
-        # been given a valid hotkey. However, we still need to validate this. So,
-        # to do that we'll concatenate each component together back into a string
+        # First check to see if we were given a tuple or list. If so, then we might
+        # have been given a valid hotkey. However, we still need to validate this.
+        # So, to do that we'll concatenate each component together back into a string
         # and then recurse so we can validate using the same logic.
-        if isinstance(hotkey, tuple):
-            modifiers, key = hotkey
+        if isinstance(hotkey, (tuple, list, set)):
+            try:
+                # If we were mistakenly given a set, then we need to reformat it.
+                if isinstance(hotkey, set):
+                    raise ValueError
+
+                modifiers, key = hotkey
+
+            # If the tuple we received was of an invalid format, then extract the
+            # modifiers that we can from it, and try again.
+            except ValueError:
+                modifiers = tuple(item for item in hotkey if item.lower() in Modifiers)
+                key = ''.join(item for item in hotkey if item.lower() not in Modifiers)
+
             separator = next(item for item in Separators)
 
             components = [item for item in modifiers] + [key]
