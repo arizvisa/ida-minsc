@@ -814,6 +814,42 @@ class keyboard(object):
     __cache__ = {}
 
     @classmethod
+    def list(cls):
+        '''Display the current list of keyboard combinations that are mapped along with the callable each one is attached to.'''
+        maxkey, maxinfo = 0, 0
+
+        results = []
+        for mapping, (capsule, closure) in cls.__cache__.items():
+            key = cls.__of_key__(mapping)
+            information = internal.utils.multicase.prototype(closure)
+
+            # Now we can figure out the documentation for the closure that was stored.
+            documentation = closure.__doc__ or ''
+            if documentation:
+                filtered = [item.strip() for item in documentation.split('\n') if item.strip()]
+                header = next((item for item in filtered), '')
+                comment = "{:s}...".format(header) if header and len(filtered) > 1 else header
+            else:
+                comment = ''
+
+            # Calculate our maximum column widths inline
+            maxkey = max(maxkey, len(key))
+            maxinfo = max(maxinfo, len(information))
+
+            # Append each column to our results
+            results.append((key, information, comment))
+
+        # If we didn't aggregate any results, then raise an exception as there's nothing to do.
+        if not results:
+            raise internal.exceptions.SearchResultsError(u"{:s}.list() : Found 0 key combinations mapped.".format('.'.join([__name__, cls.__name__])))
+
+        # Now we can output what was mapped to the user.
+        six.print_(u"Found the following{:s} key combination{:s}:".format(" {:d}".format(len(results)) if len(results) > 1 else '', '' if len(results) == 1 else 's'))
+        for key, info, comment in results:
+            six.print_(u"Key: {:>{:d}s} -> {:<{:d}s}{:s}".format(key, maxkey, info, maxinfo, " // {:s}".format(comment) if comment else ''))
+        return
+
+    @classmethod
     def map(cls, key, callable):
         """Map the specified `key` combination to a python `callable` in IDA.
 
