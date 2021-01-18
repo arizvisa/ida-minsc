@@ -5751,7 +5751,7 @@ class get(object):
             # idaapi.DT_TYPE to a length. This way we can manually read the
             # elements of the array into a list that we can return to the user.
             lnumerics = {
-                idaapi.FF_BYTE : 1,
+                idaapi.FF_BYTE : 1, idaapi.FF_ALIGN : 1,
                 idaapi.FF_WORD : 2,
                 idaapi.FF_DWORD if hasattr(idaapi, 'FF_DWORD') else idaapi.FF_DWRD : 4,
                 idaapi.FF_FLOAT : 4,
