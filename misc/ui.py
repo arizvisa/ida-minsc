@@ -600,7 +600,8 @@ class navigation(object):
     @classmethod
     def set(cls, ea):
         '''Set the auto-analysis address on the navigation bar to `ea`.'''
-        return cls.__set__(ea)
+        result, _ = ea, cls.__set__(ea)
+        return result
 
     @classmethod
     def auto(cls, ea, **type):
@@ -608,7 +609,8 @@ class navigation(object):
 
         If `type` is specified, then update using the specified auto-analysis type.
         """
-        return cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
+        result, _ = ea, cls.__auto__(ea, type.get('type', idaapi.AU_NONE))
+        return result
 
     @classmethod
     def unknown(cls, ea): return cls.auto(ea, type=idaapi.AU_UNK)
