@@ -906,11 +906,9 @@ def set_func_start(pfn, new_start):
     the function that was changed. Then we can update the reference count for
     any globals that were tagged by moving them into the function's tagcache.
     """
-    global State
-    if State != state.ready: return
 
-    # new_start has removed addresses from function
-    # replace contents with globals
+    # if new_start has removed addresses from function, then we need to transform
+    # all contents tags into globals tags
     if interface.range.start(pfn) > new_start:
         for ea in database.address.iterate(new_start, database.address.prev(interface.range.start(pfn))):
             for k in database.tag(ea):
@@ -920,8 +918,8 @@ def set_func_start(pfn, new_start):
             continue
         return
 
-    # new_start has added addresses to function
-    # replace globals with contents
+    # if new_start has added addresses to function, then we need to transform all
+    # its global tags into contents tags
     elif interface.range.start(pfn) < new_start:
         for ea in database.address.iterate(interface.range.start(pfn), database.address.prev(new_start)):
             for k in database.tag(ea):
@@ -939,10 +937,9 @@ def set_func_end(pfn, new_end):
     end of the function that was changed. Then we can update the reference count
     for any globals that were tagged by moving them into the function's tagcache.
     """
-    global State
-    if State != state.ready: return
-    # new_end has added addresses to function
-    # replace globals with contents
+
+    # if new_end has added addresses to function, then we need to transform
+    # all globals tags into contents tags
     if new_end > interface.range.end(pfn):
         for ea in database.address.iterate(interface.range.end(pfn), database.address.prev(new_end)):
             for k in database.tag(ea):
@@ -952,8 +949,8 @@ def set_func_end(pfn, new_end):
             continue
         return
 
-    # new_end has removed addresses from function
-    # replace contents with globals
+    # if new_end has removed addresses from function, then we need to transform
+    # all contents tags into globals tags
     elif new_end < interface.range.end(pfn):
         for ea in database.address.iterate(new_end, database.address.prev(interface.range.end(pfn))):
             for k in database.tag(ea):
