@@ -23,7 +23,7 @@ def reference(ea, **module):
     If the string `module` is specified, then use it as the module name instead of the database filename.
     """
     module = module.get('module', db.filename())
-    return '{:s}+{:x}'.format(module, db.offset(ea))
+    return '{:s}+{:x}'.format(module.replace(' ', ''), db.offset(ea))
 
 def label(ea):
     '''Return a label for the given address `ea`.'''
@@ -136,7 +136,7 @@ def breakpoints(f=None, **kwargs):
         ofs, commands = db.offset(ea), []
 
         # create the command that emits the current label
-        label_t = string.Template(r'.printf "$label -- $note\n"' if t.has_key('') else r'.printf "$label\n"')
+        label_t = string.Template(r'.printf "$label -- $note\n"' if operator.contains(t, '') else r'.printf "$label\n"')
         commands.append(label_t.safe_substitute(label=label(ea), note=t.get('', '')))
 
         # append the commands to execute when encountering the given breakpoint
