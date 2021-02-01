@@ -861,8 +861,6 @@ def add_func(pfn):
     from global tags to function tags. This iterates through each chunk belonging
     to the function and does exactly that.
     """
-    global State
-    if State != state.ready: return
 
     # convert all globals into contents
     for l, r in function.chunks(pfn):
@@ -884,8 +882,6 @@ def del_func(pfn):
     and then increasing it for the database. Afterwards we simply remove the
     reference count cache for the function.
     """
-    global State
-    if State != state.ready: return
 
     # convert all contents into globals
     for l, r in function.chunks(pfn):
