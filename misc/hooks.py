@@ -779,8 +779,6 @@ def func_tail_appended(pfn, tail):
     We simply iterate through the new chunk, decrease all of its tags in the
     global context, and increase their reference within the function context.
     """
-    global State
-    if State != state.ready: return
     # tail = func_t
     for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
@@ -796,8 +794,6 @@ def removing_func_tail(pfn, tail):
     We simply iterate through the old chunk, decrease all of its tags in the
     function context, and increase their reference within the global context.
     """
-    global State
-    if State != state.ready: return
     # tail = range_t
     for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
@@ -813,8 +809,6 @@ def func_tail_removed(pfn, ea):
     We simply iterate through the old chunk, decrease all of its tags in the
     function context, and increase their reference within the global context.
     """
-    global State
-    if State != state.ready: return
 
     # first we'll grab the addresses from our refs
     listable = internal.comment.contents.address(ea, target=interface.range.start(pfn))
@@ -849,8 +843,6 @@ def tail_owner_changed(tail, owner_func):
     function's context.
     """
     # XXX: this is for older versions of IDA
-    global State
-    if State != state.ready: return
 
     # this is easy as we just need to walk through tail and add it
     # to owner_func
