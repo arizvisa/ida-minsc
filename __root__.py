@@ -77,9 +77,9 @@ h, top, go, goof = database.h, func.top, database.go, database.go_offset
 
 ## other useful things that we can grab from other modules
 
-# snag the custom exceptions that we use
+# snag the custom exceptions that we use while excluding any modules
 exceptions = __import__('internal').exceptions
-locals().update({name : item for name, item in exceptions.__dict__.items() if not name.startswith('_')})
+locals().update({name : item for name, item in exceptions.__dict__.items() if not isinstance(item, exceptions.__class__)})
 del(exceptions)
 
 # snag the fake utilities module to share some things with the user...
