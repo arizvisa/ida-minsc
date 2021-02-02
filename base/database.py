@@ -2188,14 +2188,16 @@ class address(object):
         left, right = config.bounds()
 
         if start == end: return
-        op = operator.lt if start < end else operator.ge
+        op = operator.le if start < end else operator.ge
 
+        res = start
         try:
-            res = start
-            while res not in {idaapi.BADADDR, None} and left <= res < right and op(res, end):
+            while res not in {idaapi.BADADDR, None} and op(res, end):
                 yield res
                 res = step(res)
-        except E.OutOfBoundsError: pass
+        except E.OutOfBoundsError:
+            pass
+        return
     @utils.multicase(bounds=tuple)
     @classmethod
     def iterate(cls, bounds):
