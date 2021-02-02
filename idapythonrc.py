@@ -225,7 +225,7 @@ del(subdir)
 __root__ = imp.load_source('__root__', os.path.join(root, '__root__.py'))
 
 # empty out IDAPython's namespace so that we can replace it
-map(globals().pop, {symbol for symbol in globals().copy() if not symbol.startswith('__')})
+[globals().pop(symbol) for symbol in globals().copy() if not symbol.startswith('__')]
 
 # re-populate with a default namespace and remove our variable that contained it
 globals().update({symbol : value for symbol, value in __root__.__dict__.items() if not symbol.startswith('__')})
