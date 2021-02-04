@@ -779,8 +779,6 @@ def func_tail_appended(pfn, tail):
     We simply iterate through the new chunk, decrease all of its tags in the
     global context, and increase their reference within the function context.
     """
-    global State
-    if State != state.ready: return
     # tail = func_t
     for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
@@ -796,8 +794,6 @@ def removing_func_tail(pfn, tail):
     We simply iterate through the old chunk, decrease all of its tags in the
     function context, and increase their reference within the global context.
     """
-    global State
-    if State != state.ready: return
     # tail = range_t
     for ea in database.address.iterate(interface.range.bounds(tail)):
         for k in database.tag(ea):
@@ -813,8 +809,6 @@ def func_tail_removed(pfn, ea):
     We simply iterate through the old chunk, decrease all of its tags in the
     function context, and increase their reference within the global context.
     """
-    global State
-    if State != state.ready: return
 
     # first we'll grab the addresses from our refs
     listable = internal.comment.contents.address(ea, target=interface.range.start(pfn))
@@ -849,8 +843,6 @@ def tail_owner_changed(tail, owner_func):
     function's context.
     """
     # XXX: this is for older versions of IDA
-    global State
-    if State != state.ready: return
 
     # this is easy as we just need to walk through tail and add it
     # to owner_func
@@ -869,8 +861,6 @@ def add_func(pfn):
     from global tags to function tags. This iterates through each chunk belonging
     to the function and does exactly that.
     """
-    global State
-    if State != state.ready: return
 
     # convert all globals into contents
     for l, r in function.chunks(pfn):
@@ -892,8 +882,6 @@ def del_func(pfn):
     and then increasing it for the database. Afterwards we simply remove the
     reference count cache for the function.
     """
-    global State
-    if State != state.ready: return
 
     # convert all contents into globals
     for l, r in function.chunks(pfn):
@@ -918,11 +906,9 @@ def set_func_start(pfn, new_start):
     the function that was changed. Then we can update the reference count for
     any globals that were tagged by moving them into the function's tagcache.
     """
-    global State
-    if State != state.ready: return
 
-    # new_start has removed addresses from function
-    # replace contents with globals
+    # if new_start has removed addresses from function, then we need to transform
+    # all contents tags into globals tags
     if interface.range.start(pfn) > new_start:
         for ea in database.address.iterate(new_start, database.address.prev(interface.range.start(pfn))):
             for k in database.tag(ea):
@@ -932,8 +918,8 @@ def set_func_start(pfn, new_start):
             continue
         return
 
-    # new_start has added addresses to function
-    # replace globals with contents
+    # if new_start has added addresses to function, then we need to transform all
+    # its global tags into contents tags
     elif interface.range.start(pfn) < new_start:
         for ea in database.address.iterate(interface.range.start(pfn), database.address.prev(new_start)):
             for k in database.tag(ea):
@@ -951,10 +937,9 @@ def set_func_end(pfn, new_end):
     end of the function that was changed. Then we can update the reference count
     for any globals that were tagged by moving them into the function's tagcache.
     """
-    global State
-    if State != state.ready: return
-    # new_end has added addresses to function
-    # replace globals with contents
+
+    # if new_end has added addresses to function, then we need to transform
+    # all globals tags into contents tags
     if new_end > interface.range.end(pfn):
         for ea in database.address.iterate(interface.range.end(pfn), database.address.prev(new_end)):
             for k in database.tag(ea):
@@ -964,8 +949,8 @@ def set_func_end(pfn, new_end):
             continue
         return
 
-    # new_end has removed addresses from function
-    # replace contents with globals
+    # if new_end has removed addresses from function, then we need to transform
+    # all contents tags into globals tags
     elif new_end < interface.range.end(pfn):
         for ea in database.address.iterate(new_end, database.address.prev(interface.range.end(pfn))):
             for k in database.tag(ea):
