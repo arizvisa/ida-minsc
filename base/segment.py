@@ -104,14 +104,14 @@ def list(**type):
         listable.append(seg)
 
     # Collect the maximum sizes for everything from the first pass
-    cindex = math.ceil(math.log(maxindex or 1) / math.log(10))
-    caddr = math.ceil(math.log(maxaddr or 1) / math.log(16))
-    csize = math.ceil(math.log(maxsize or 1) / math.log(16))
+    Fdigits = lambda number, base: math.floor(1. + math.log(number or 1) / math.log(base))
+    cindex = Fdigits(maxindex, 10)
+    caddr, csize = (Fdigits(item, 16) for item in [maxaddr, maxsize])
 
     # List all the fields for each segment that we've aggregated
     for seg in listable:
         comment, _ = idaapi.get_segment_cmt(seg, 0) or idaapi.get_segment_cmt(seg, 1), ui.navigation.set(interface.range.start(seg))
-        six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, int(cindex), interface.range.start(seg), 2+int(caddr), interface.range.end(seg), 2+int(caddr), seg.size(), 3+int(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
+        six.print_(u"[{:{:d}d}] {:#0{:d}x}<>{:#0{:d}x} : {:<+#{:d}x} : {:>{:d}s} : sel:{:04x} flags:{:02x}{:s}".format(seg.index, math.trunc(cindex), interface.range.start(seg), 2 + math.trunc(caddr), interface.range.end(seg), 2 + math.trunc(caddr), seg.size(), 3 + math.trunc(csize), utils.string.of(get_segment_name(seg)), maxname, seg.sel, seg.flags, u"// {:s}".format(utils.string.of(comment)) if comment else ''))
     return
 
 ## searching
@@ -165,10 +165,10 @@ def by(**type):
     listable = [item for item in __iterate__(**type)]
     if len(listable) > 1:
         maxaddr = max(builtins.map(interface.range.end, listable) if listable else [1])
-        caddr = math.ceil(math.log(maxaddr) / math.log(16))
-        messages = ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), int(caddr), interface.range.end(seg), int(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable)
+        caddr = math.floor(1. + math.log(maxaddr or 1) / math.log(16))
+        messages = ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), math.trunc(caddr), interface.range.end(seg), math.trunc(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable)
         [ logging.info(msg) for msg in messages ]
-        logging.warning(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), int(caddr), interface.range.end(listable[0]), int(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
+        logging.warning(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), math.trunc(caddr), interface.range.end(listable[0]), math.trunc(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
 
     iterable = (item for item in listable)
     res = builtins.next(iterable, None)
