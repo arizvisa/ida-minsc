@@ -805,7 +805,7 @@ class node(object):
     @staticmethod
     def is_identifier(identifier):
         '''Return truth if the specified `identifier` is valid.'''
-        bits = math.trunc(math.ceil(math.log(idaapi.BADADDR) / math.log(2.0))) - 8
+        bits = math.trunc(math.floor(1 + math.log(idaapi.BADADDR) / math.log(2.0))) - 8
         highbyte = 0xff << bits
         return identifier & highbyte == highbyte
 
