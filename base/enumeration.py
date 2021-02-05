@@ -199,7 +199,7 @@ def bits(enum):
 def bits(enum, width):
     '''Set the number of bits for the enumeration `enum` to `width`.'''
     res = math.trunc(math.ceil(width / 8.0))
-    return size(enum, int(res))
+    return size(enum, math.trunc(res))
 
 def mask(enum):
     '''Return the bitmask for the enumeration `enum`.'''
@@ -254,13 +254,13 @@ def list(**type):
     maxindex = max(builtins.map(idaapi.get_enum_idx, res) if res else [1])
     maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) if res else [0])
     maxsize = max(builtins.map(size, res) if res else [0])
-    cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0/math.log(8)), math.ceil), res) if res else [database.config.bits() / 4.0])
-    except: cmask = 0
+    cindex = math.floor(1 + math.log(maxindex or 1) / math.log(10))
+    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0 / math.log(16)), functools.partial(operator.add, 1.), math.floor), res) if res else [database.config.bits() / 4.0])
+    except Exception: cmask = 0
 
     for item in res:
         name = idaapi.get_enum_name(item)
-        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(item), int(cindex), utils.string.of(name), maxname, mask(item), int(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
+        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<#{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(item), math.trunc(cindex), utils.string.of(name), maxname, mask(item), 2 + math.trunc(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
     return
 
 ## members
