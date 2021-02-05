@@ -379,14 +379,17 @@ class functions(object):
         # Set some reasonable defaults here
         maxentry = config.bounds()[0]
         maxaddr = minaddr = 0
-        maxname = chunks = marks = blocks = exits = 0
+        maxname = maxunmangled = chunks = marks = blocks = exits = 0
         lvars = avars = 0
 
         # First pass through the list to grab the maximum lengths of the different fields
         for ea in cls.iterate(**type):
             func, _ = function.by(ea), ui.navigation.procedure(ea)
             maxentry = max(ea, maxentry)
-            maxname = max(len(function.name(func)), maxname)
+
+            unmangled, realname = function.name(func), name(ea)
+            maxname = max(len(unmangled), maxname)
+            maxunmangled = max(len(unmangled), maxunmangled) if not internal.declaration.mangledQ(realname) else maxunmangled
 
             res = [item for item in function.chunks(func)]
             maxaddr, minaddr = max(max(map(operator.itemgetter(-1), res)), maxaddr), max(max(map(operator.itemgetter(0), res)), minaddr)
@@ -401,35 +404,35 @@ class functions(object):
 
             listable.append(ea)
 
-        # Collect the maximum sizes for everything from the first pass
-        cindex = math.ceil(math.log(len(listable) or 1)/math.log(10)) if listable else 1
-        try: cmaxoffset = math.floor(math.log(offset(maxentry)) or 1)/math.log(16)
-        except: cmaxoffset = 0
-        cmaxentry = math.floor(math.log(maxentry or 1)/math.log(16))
-        cmaxaddr = math.floor(math.log(maxaddr or 1)/math.log(16))
-        cminaddr = math.floor(math.log(minaddr or 1)/math.log(16))
-        cchunks = math.floor(math.log(chunks or 1)/math.log(10)) if chunks else 1
-        cblocks = math.floor(math.log(blocks or 1)/math.log(10)) if blocks else 1
-        cexits = math.floor(math.log(exits or 1)/math.log(10)) if exits else 1
-        cavars = math.floor(math.log(avars or 1)/math.log(10)) if avars else 1
-        clvars = math.floor(math.log(lvars or 1)/math.log(10)) if lvars else 1
-        cmarks = math.floor(math.log(marks or 1)/math.log(10)) if marks else 1
+        # Collect the number of digits for everything from the first pass
+        Fdigits = lambda number, base: math.floor(1 + math.log(number or 1) / math.log(base))
+        cindex = Fdigits(len(listable), 10) if listable else 1
+        try: cmaxoffset = Fdigits(offset(maxentry), 16)
+        except E.OutOfBoundsError: cmaxoffset = 0
+        cmaxentry, cmaxaddr, cminaddr = (Fdigits(item, 16) for item in [maxentry, maxaddr, minaddr])
+        cchunks = Fdigits(chunks, 10) if chunks else 1
+        cblocks = Fdigits(blocks, 10) if blocks else 1
+        cexits = Fdigits(exits, 10) if exits else 1
+        cavars = Fdigits(avars, 10) if avars else 1
+        clvars = Fdigits(lvars, 10) if lvars else 1
+        cmarks = Fdigits(marks, 10) if marks else 1
 
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
             func, _ = function.by(ea), ui.navigation.procedure(ea)
+            unmangled, realname = function.name(func), name(ea)
             res = [item for item in function.chunks(func)]
             six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} {:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
-                index, int(cindex),
-                offset(ea), int(cmaxoffset),
-                min(map(operator.itemgetter(0), res)), int(cminaddr), max(map(operator.itemgetter(-1), res)), int(cmaxaddr),
-                int(cchunks) * ' ', len(res),
-                function.name(func), int(maxname),
-                len(builtins.list(favars(func))) if func.frsize else 0, 1 + int(cavars),
-                len(builtins.list(flvars(func))), 1 + int(clvars),
-                len(builtins.list(function.blocks(func))), 1 + int(cblocks),
-                len(builtins.list(function.bottom(func))), 1 + int(cexits),
-                '' if idaapi.__version__ < 7.0 else " marks:{:<{:d}d}".format(len(builtins.list(function.marks(func))), 1 + int(cmarks))
+                index, math.trunc(cindex),
+                offset(ea), math.trunc(cmaxoffset),
+                min(map(operator.itemgetter(0), res)), math.trunc(cminaddr), max(map(operator.itemgetter(-1), res)), math.trunc(cmaxaddr),
+                math.trunc(cchunks) * ' ', len(res),
+                unmangled, math.trunc(maxname if internal.declaration.mangledQ(realname) else maxunmangled),
+                len(builtins.list(favars(func))) if func.frsize else 0, 1 + math.trunc(cavars),
+                len(builtins.list(flvars(func))), 1 + math.trunc(clvars),
+                len(builtins.list(function.blocks(func))), 1 + math.trunc(cblocks),
+                len(builtins.list(function.bottom(func))), 1 + math.trunc(cexits),
+                '' if idaapi.__version__ < 7.0 else " marks:{:<{:d}d}".format(len(builtins.list(function.marks(func))), 1 + math.trunc(cmarks))
             ))
         return
 
@@ -766,14 +769,27 @@ class names(object):
             listable.append(index)
 
         # Collect the sizes from our first pass
-        cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-        caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
+        Fdigits = lambda number, base: math.floor(1 + math.log(number or 1) / math.log(base))
+        cindex, caddr = Fdigits(maxindex, 10), Fdigits(maxaddr, 16)
 
         # List all the fields of each name that was found
         for index in listable:
             ea, name = idaapi.get_nlist_ea(index), idaapi.get_nlist_name(index)
             ui.navigation.set(ea)
-            six.print_(u"[{:>{:d}d}] {:#0{:d}x} {:s}".format(index, int(cindex), ea, int(caddr), utils.string.of(name)))
+
+            # If there isn't any type information or it's included in the name, then
+            # we can render it as-is.
+            if name.startswith('?') or not t(ea):
+                demangled = internal.declaration.demangle(name)
+                six.print_(u"[{:>{:d}d}] {:#0{:d}x} {:s}{:s}".format(index, math.trunc(cindex), ea, math.trunc(caddr), utils.string.of(demangled), " ({:s})".format(name) if demangled != name else ''))
+
+            # Otherwise, prefix the name with the type information that we were able
+            # to extract from the specified address.
+            else:
+                description = t(ea)
+                demangled = internal.declaration.demangle(name)
+                six.print_(u"[{:>{:d}d}] {:#0{:d}x} {!s} {:s}{:s}".format(index, math.trunc(cindex), ea, math.trunc(caddr), description, utils.string.of(demangled), " ({:s})".format(name) if demangled != name else ''))
+            continue
         return
 
     @utils.multicase(string=six.string_types)
@@ -1414,15 +1430,18 @@ class entries(object):
             listable.append(index)
 
         # Collect the maximum sizes for everything from the first pass
-        cindex = math.ceil(math.log(maxindex or 1)/math.log(10))
-        caddr = math.ceil(math.log(maxaddr or 1)/math.log(16))
-        cordinal = math.ceil(math.log(maxordinal or 1)/math.log(16))
+        Fdigits = lambda number, base: math.floor(1 + math.log(number or 1) / math.log(base))
+        cindex = Fdigits(maxindex, 10)
+        caddr, cordinal = (Fdigits(item, 16) for item in [maxaddr, maxordinal])
 
         # List all the fields from everything that matched
         for index in listable:
             ordinal = cls.__entryordinal__(index)
             ea = idaapi.get_entry(ordinal)
-            six.print_(u"[{:{:d}d}] {:<#{:d}x} : {:s}{:s}".format(index, int(cindex), ea, 2 + int(caddr), '' if ea == ordinal else "({:#{:d}x}) ".format(ordinal, 2 + int(cindex)), cls.__entryname__(index)))
+            realname = cls.__entryname__(index)
+            scope, unmangled = internal.declaration.extract.scope(realname), internal.declaration.demangle(realname) if internal.declaration.mangledQ(realname) else realname
+            without_scope = unmangled[len("{:s}: ".format(scope)):] if scope else unmangled
+            six.print_(u"[{:{:d}d}] {:<#{:d}x} : {:s}{:s}".format(index, math.trunc(cindex), ea, 2 + math.trunc(caddr), "{:<{:d}s} ".format('()' if ea == ordinal else "({:#x})".format(ordinal), 2 + 2 + math.trunc(cindex)), without_scope))
         return
 
     @utils.multicase(string=six.string_types)
@@ -2048,26 +2067,50 @@ class imports(object):
         listable = []
 
         # Set some reasonable defaults
-        maxaddr = maxmodule = cordinal = 0
+        maxaddr = maxmodule = cordinal = maxname = 0
         has_ordinal = False
 
         # Perform the first pass through our listable grabbing our field lengths
         for ea, (module, name, ordinal) in cls.iterate(**type):
             maxaddr = max(ea, maxaddr)
-            maxmodule = max(len(module or ''), maxmodule)
-            cordinal = max(len("{:d}".format(ordinal)), cordinal)
+            maxname = max(len(name or ''), maxname)
+
+            # Figure out the module with the longest name and store its length
+            # whilst including the ordinal length.
+            if len(module or '') > maxmodule:
+                maxmodule, cordinal = len(module or ''), len("<{:d}>".format(ordinal))
             has_ordinal = has_ordinal or ordinal > 0
 
+            # Save the item we just iterated through so we don't have to go
+            # through it again.
             listable.append((ea, (module, name, ordinal)))
 
-        # Collect the maximum sizes for the lengths from the first pass
-        caddr = math.floor(math.log(maxaddr or 1)/math.log(16))
+        # Collect the number of digits for the maximum address extracted from the first pass
+        caddr = math.floor(1. + math.log(maxaddr or 1) / math.log(16))
 
         # List all the fields of every import that was matched
+        prefix = '__imp_'
         for ea, (module, name, ordinal) in listable:
             ui.navigation.set(ea)
             moduleordinal = "{:s}{:s}".format(module or '', "<{:d}>".format(ordinal) if has_ordinal else '')
-            six.print_(u"{:<#0{:d}x} : {:s}{:s}".format(ea, 2 + int(caddr), "{:>{:d}s} ".format(moduleordinal, maxmodule + cordinal) if module else ' ' * (1 + maxmodule + cordinal), name))
+
+            address_s = "{:<#0{:d}x}".format(ea, 2 + math.trunc(caddr))
+            module_s = "{:>{:d}s}".format(moduleordinal if module else '', maxmodule + (cordinal if has_ordinal else 0))
+
+            # Clean up the demangled name by culling out the scope and any other declarations
+            name = name[len(prefix):] if name.startswith(prefix) else name
+            demangled = internal.declaration.demangle(name)
+            scope = internal.declaration.extract.scope(name)
+            without_scope = demangled[len("{:s}: ".format(scope)):] if scope else demangled
+
+            # If the name isn't demangled, then we can just output it as-is.
+            if demangled == name:
+                six.print_(u"{:s} : {:s} : {:s}".format(address_s, module_s, name))
+
+            # Otherwise we need to output the name that we tampered with.
+            else:
+                six.print_(u"{:s} : {:s} : {:s}".format(address_s, module_s, without_scope))
+            continue
         return
 
     @utils.multicase(string=six.string_types)
