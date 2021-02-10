@@ -18,11 +18,11 @@ import idaapi
 
 __all__ = ['fbox','funbox','fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
 
-### functional programming primitives (FIXME: probably better to document these with examples)
+### functional programming combinators (FIXME: probably better to document these with examples)
 
-# box any specified arguments
-fbox = fpack = lambda *a: a
-# return a closure that executes `f` with the arguments unboxed.
+# return a closure that executes `F` with the arguments boxed and concatenated.
+fbox = fpack = lambda F, *a, **k: lambda *ap, **kp: F(a + ap, **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
+# return a closure that executes `F` with the arguments concatenated and unboxed
 funbox = funpack = lambda F, *a, **k: lambda *ap, **kp: F(*(a + functools.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return the first argument
 fcar = lambda *a: a[:1][0]
@@ -52,7 +52,7 @@ fdefault = lambda default: lambda object: object or default
 first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
 # return a closure that executes a list of functions one after another from left-to-right
 fcompose = lambda *F: functools.reduce(lambda F1, F2: lambda *a: F1(F2(*a)), builtins.reversed(F))
-# return a closure that executes function `f` whilst discarding any extra arguments
+# return a closure that executes function `F` whilst discarding any extra arguments
 fdiscard = lambda F: lambda *a, **k: F()
 # return a closure that executes function `crit` and then returns/executes `f` or `t` based on whether or not it's successful.
 fcondition = lambda crit: lambda t, f: \
