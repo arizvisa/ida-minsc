@@ -37,7 +37,7 @@ fgetitem = fitem = lambda item, *default: lambda object: default[0] if default a
 # return a closure that will set a particular element on an object.
 fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, item, value) or object
 # return a closure that will remove a particular element from an object and return the modified object
-fdelitem = lambda item: fcompose(fmap(fidentity, frpartial(operator.delitem, item)), builtins.iter, builtins.next)
+fdelitem = lambda *items: fcompose(fmap(fidentity, *[frpartial(operator.delitem, item) for item in items]), builtins.iter, builtins.next)
 # return a closure that will check if its argument has an `attribute`.
 fhasattr = fattributeQ = lambda attribute: frpartial(builtins.hasattr, attribute)
 # return a closure that will get a particular attribute from an object.
