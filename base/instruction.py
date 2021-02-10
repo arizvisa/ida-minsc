@@ -1483,7 +1483,7 @@ class operand_types:
         if op.type in {idaapi.o_mem, idaapi.o_far, idaapi.o_near, idaapi.o_displ}:
             seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
             return op.addr
-        optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
+        optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_far', idaapi.o_far), ('idaapi.o_near', idaapi.o_near)])
         raise E.InvalidTypeOrValueError(u"{:s}.address({:#x}, {!r}) : Expected operand type `{:s}` or `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype[0], optype[1], op.type))
 
     @__optype__.define(idaapi.PLFM_386, idaapi.o_idpspec0)
@@ -1577,7 +1577,7 @@ class operand_types:
             offset = op.addr
 
         else:
-            optype = map(utils.funbox("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
+            optype = map(utils.funpack("{:s}({:d})".format), [('idaapi.o_mem', idaapi.o_mem), ('idaapi.o_displ', idaapi.o_displ), ('idaapi.o_phrase', idaapi.o_phrase)])
             raise E.InvalidTypeOrValueError(u"{:s}.phrase({:#x}, {!r}) : Expected operand type {:s}, {:s}, or {:s} but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype[0], optype[1], optype[2], op.type))
 
         # if arch == x64, then index += 8
