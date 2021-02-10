@@ -204,8 +204,8 @@ def bits(enum, width):
 def mask(enum):
     '''Return the bitmask for the enumeration `enum`.'''
     eid = by(enum)
-    res = size(eid)
-    return 2**res-1 if res > 0 else idaapi.BADADDR
+    res = bits(eid)
+    return 2 ** res - 1
 
 def repr(enum):
     '''Return a printable summary of the enumeration `enum`.'''
@@ -213,7 +213,7 @@ def repr(enum):
     w, cmt = 2 * size(eid), comment(enum, repeatable=True) or comment(enum, repeatable=False)
     res = [(member.name(item), member.value(item), member.mask(item), member.comment(item, repeatable=True) or member.comment(item, repeatable=False)) for item in members.iterate(eid)]
     aligned = max([len(item) for item, _, _, _ in res] if res else [0])
-    return "<type 'enum'> {:s}{:s}\n".format(name(eid), " // {:s}".format(cmt) if cmt else '') + '\n'.join("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=w+2, align=aligned) + (" // {:s}".format(comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res))
+    return "<type 'enum'> {:s}{:s}\n".format(name(eid), " // {:s}".format(cmt) if cmt else '') + '\n'.join("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=2 + w, align=aligned) + (" // {:s}".format(comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res))
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
@@ -255,12 +255,12 @@ def list(**type):
     maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) if res else [0])
     maxsize = max(builtins.map(size, res) if res else [0])
     cindex = math.floor(1 + math.log(maxindex or 1) / math.log(10))
-    try: cmask = max(builtins.map(utils.fcompose(mask, utils.fcondition(utils.fpartial(operator.eq, 0))(utils.fconstant(1), utils.fidentity), math.log, functools.partial(operator.mul, 1.0 / math.log(16)), functools.partial(operator.add, 1.), math.floor), res) if res else [database.config.bits() / 4.0])
+    try: cmask = max(len("{:x}".format(mask(item))) for item in res) if res else database.config.bits() / 4.0
     except Exception: cmask = 0
 
     for item in res:
         name = idaapi.get_enum_name(item)
-        six.print_(u"[{:{:d}d}] {:>{:d}s} & {:<#{:d}x} ({:d} members){:s}".format(idaapi.get_enum_idx(item), math.trunc(cindex), utils.string.of(name), maxname, mask(item), 2 + math.trunc(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
+        six.print_(u"{:<{:d}s} {:>{:d}s} & {:<#{:d}x} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, mask(item), 2 + math.trunc(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
     return
 
 ## members
@@ -427,10 +427,10 @@ class members(object):
         # FIXME: make this consistent with every other .list using the matcher class
         eid = by(enum)
         listable = [item for item in cls.iterate(eid)]
-        maxindex = max(builtins.map(utils.first, enumerate(listable)) if listable else [1])
+        maxindex = max(len("[{:d}]".format(index)) for index, _ in enumerate(listable)) if listable else 1
         maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), listable) if listable else [1])
         for i, mid in enumerate(listable):
-             six.print_(u"[{:d}] 0x{:>0{:d}x} {:s}".format(i, member.value(mid), maxvalue, member.name(mid)))
+             six.print_(u"{:<{:d}s} {:#0{:d}x} {:s}".format("[{:d}]".format(i), maxindex, member.value(mid), 2 + maxvalue, member.name(mid)))
         return
 
 class member(object):
