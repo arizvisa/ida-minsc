@@ -1738,7 +1738,7 @@ class architecture_t(object):
 
     def promote(self, register, size=None):
         '''Promote the specified `register` to its next larger `size`.'''
-        parent = internal.utils.fcompose(operator.attrgetter('__parent__'), internal.utils.fbox, functools.partial(filter, None), iter, next)
+        parent = internal.utils.fcompose(operator.attrgetter('__parent__'), (lambda *items: items), functools.partial(filter, None), iter, next)
         try:
             if size is None:
                 return parent(register)
