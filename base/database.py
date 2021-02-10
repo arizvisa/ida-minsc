@@ -1356,11 +1356,11 @@ class entries(object):
         iterable = (Ftransform(item) for item in builtins.range(idaapi.get_entry_qty()))
 
         # Iterate through each (address, index) looking for the matching address.
-        Fcrit = utils.fcompose(utils.first, functools.partial(operator.eq, ea))
+        Fcrit = utils.fcompose(operator.itemgetter(0), functools.partial(operator.eq, ea))
         filterable = (item for item in iterable if Fcrit(item))
 
         # Return the index of the address that matched.
-        iterable = (utils.second(item) for item in filterable)
+        iterable = (index for _, index in filterable)
         return builtins.next(iterable, None)
 
     @classmethod
@@ -1931,16 +1931,16 @@ class imports(object):
     __format__ = __formatl__
 
     __matcher__ = utils.matcher()
-    __matcher__.mapping('address', utils.first), __matcher__.mapping('ea', utils.first)
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), utils.second, __formats__.__func__)
-    __matcher__.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, __formatl__.__func__)
-    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, __formats__.__func__)
-    __matcher__.combinator('module', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, utils.first)
-    __matcher__.mapping('ordinal', utils.fcompose(utils.second, utils.funbox(lambda module, name, ordinal: ordinal)))
-    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), utils.second, __format__.__func__)
+    __matcher__.mapping('address', operator.itemgetter(0)), __matcher__.mapping('ea', operator.itemgetter(0))
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), operator.itemgetter(1), __formats__.__func__)
+    __matcher__.combinator('fullname', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __formatl__.__func__)
+    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __formats__.__func__)
+    __matcher__.combinator('module', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), operator.itemgetter(0))
+    __matcher__.mapping('ordinal', utils.fcompose(operator.itemgetter(1), operator.itemgetter(-1)))
+    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), operator.itemgetter(1), __format__.__func__)
     __matcher__.predicate('predicate', lambda item: item)
     __matcher__.predicate('pred', lambda item: item)
-    __matcher__.mapping('index', utils.first)
+    __matcher__.mapping('index', operator.itemgetter(0))
 
     @classmethod
     def __iterate__(cls):
@@ -1951,7 +1951,7 @@ class imports(object):
         for idx in builtins.range(idaapi.get_import_module_qty()):
             module = idaapi.get_import_module_name(idx)
             listable = []
-            idaapi.enum_import_names(idx, utils.fcompose(utils.fbox, listable.append, utils.fconstant(True)))
+            idaapi.enum_import_names(idx, utils.fcompose(lambda *items: items, listable.append, utils.fconstant(True)))
             for ea, name, ordinal in listable:
                 ui.navigation.set(ea)
                 realmodule, realname = cls.__symbol__((module, name, ordinal))
@@ -1986,10 +1986,11 @@ class imports(object):
     def at(cls, ea):
         '''Return the import at the address `ea`.'''
         ea = interface.address.inside(ea)
-        Fcrit = utils.fcompose(utils.first, functools.partial(operator.eq, ea))
+        Fcrit = utils.fcompose(operator.itemgetter(0), functools.partial(operator.eq, ea))
         iterable = (item for item in cls.__iterate__() if Fcrit(item))
         try:
-            return utils.second(builtins.next(iterable))
+            _, item = builtins.next(iterable)
+            return item
         except StopIteration:
             pass
         raise E.MissingTypeOrAttribute(u"{:s}.at({:#x}) : Unable to determine import at specified address.".format('.'.join([__name__, cls.__name__]), ea))
@@ -2130,7 +2131,7 @@ class imports(object):
         if len(listable) > 1:
             messages = (u"{:x} {:s}<{:d}> {:s}".format(ea, module, ordinal, name) for ea, (module, name, ordinal) in listable)
             [ logging.info(msg) for msg in messages ]
-            f = utils.fcompose(utils.second, cls.__formatl__)
+            f = utils.fcompose(operator.itemgetter(1), cls.__formatl__)
             logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first import \"{:s}\".".format('.'.join([__name__, cls.__name__]), query_s, len(listable), utils.string.escape(f(listable[0]), '"')))
 
         iterable = (item for item in listable)
