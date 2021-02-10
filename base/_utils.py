@@ -21,39 +21,39 @@ __all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fget
 ### functional programming combinators (FIXME: probably better to document these with examples)
 
 # return a closure that executes `F` with the arguments boxed and concatenated.
-fpack = lambda F, *a, **k: lambda *ap, **kp: F(a + ap, **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
-# return a closure that executes `F` with the arguments concatenated and unboxed
+fpack = lambda F, *a, **k: lambda *ap, **kp: F(a + ap, **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
+# return a closure that executes `F` with all of its arguments concatenated and unboxed.
 funpack = lambda F, *a, **k: lambda *ap, **kp: F(*(a + functools.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
-# return the first argument
-fcar = lambda *a: a[:1][0]
-# return the rest of the arguments
-fcdr = lambda *a: a[1:]
+# return a closure that executes `F` with only its first argument.
+fcar = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap[:1]), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
+# return a closure that executes `F` with all of it arguments but the first.
+fcdr = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap[1:]), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that will check that `object` is an instance of `type`.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item `key`.
 fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), builtins.iter, builtins.next, fpartial(operator.eq, None))
-# return a closure that will get a particular element from an object
+# return a closure that will get a particular element from an object.
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
-# return a closure that will set a particular element on an object
+# return a closure that will set a particular element on an object.
 fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, item, value) or object
 # return a closure that will check if its argument has an `attribute`.
 fhasattr = fattributeQ = lambda attribute: frpartial(builtins.hasattr, attribute)
-# return a closure that will get a particular attribute from an object
+# return a closure that will get a particular attribute from an object.
 fgetattr = fattribute = lambda attribute, *default: lambda object: getattr(object, attribute, *default)
-# return a closure that will set a particular attribute on an object
+# return a closure that will set a particular attribute on an object.
 fsetattr = fsetattribute = lambda attribute: lambda value: lambda object: builtins.setattr(object, attribute, value) or object
 # return a closure that always returns `object`.
 fconstant = fconst = falways = lambda object: lambda *a, **k: object
-# a closure that returns its argument always
+# a closure that returns its argument always.
 fidentity = lambda object: object
 # a closure that returns a default value if its object is false-y
 fdefault = lambda default: lambda object: object or default
 # return the first, second, or third item of a box.
 first, second, third, last = operator.itemgetter(0), operator.itemgetter(1), operator.itemgetter(2), operator.itemgetter(-1)
-# return a closure that executes a list of functions one after another from left-to-right
-fcompose = lambda *F: functools.reduce(lambda F1, F2: lambda *a: F1(F2(*a)), builtins.reversed(F))
-# return a closure that executes function `F` whilst discarding any extra arguments
-fdiscard = lambda F: lambda *a, **k: F()
+# return a closure that executes a list of functions one after another from left-to-right.
+fcompose = lambda *Fa: functools.reduce(lambda F1, F2: lambda *a: F1(F2(*a)), builtins.reversed(Fa))
+# return a closure that executes function `F` whilst discarding any arguments passed to it.
+fdiscard = lambda F, *a, **k: lambda *ap, **kp: F(*a, **k)
 # return a closure that executes function `crit` and then returns/executes `f` or `t` based on whether or not it's successful.
 fcondition = lambda crit: lambda t, f: \
     lambda *a, **k: (t(*a, **k) if builtins.callable(t) else t) if crit(*a, **k) else (f(*a, **k) if builtins.callable(f) else f)
