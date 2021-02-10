@@ -16,7 +16,7 @@ import sys, heapq, collections, array, math
 import internal
 import idaapi
 
-__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
+__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fdelitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
 
 ### functional programming combinators (FIXME: probably better to document these with examples)
 
@@ -36,6 +36,8 @@ fhasitem = fitemQ = lambda key: frpartial(operator.contains, key)
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
 # return a closure that will set a particular element on an object.
 fsetitem = lambda item: lambda value: lambda object: operator.setitem(object, item, value) or object
+# return a closure that will remove a particular element from an object and return the modified object
+fdelitem = lambda item: fcompose(fmap(fidentity, frpartial(operator.delitem, item)), builtins.iter, builtins.next)
 # return a closure that will check if its argument has an `attribute`.
 fhasattr = fattributeQ = lambda attribute: frpartial(builtins.hasattr, attribute)
 # return a closure that will get a particular attribute from an object.
