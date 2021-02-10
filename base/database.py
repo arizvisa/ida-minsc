@@ -422,10 +422,10 @@ class functions(object):
             func, _ = function.by(ea), ui.navigation.procedure(ea)
             unmangled, realname = function.name(func), name(ea)
             res = [item for item in function.chunks(func)]
-            six.print_(u"[{:>{:d}d}] {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x} {:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
-                index, math.trunc(cindex),
-                offset(ea), math.trunc(cmaxoffset),
-                min(map(operator.itemgetter(0), res)), math.trunc(cminaddr), max(map(operator.itemgetter(-1), res)), math.trunc(cmaxaddr),
+            six.print_(u"{:<{:d}s} {:+#0{:d}x} : {:#0{:d}x}<>{:#0{:d}x}{:s}({:d}) : {:<{:d}s} : args:{:<{:d}d} lvars:{:<{:d}d} blocks:{:<{:d}d} exits:{:<{:d}d}{:s}".format(
+                "[{:d}]".format(index), 2 + math.trunc(cindex),
+                offset(ea), 3 + math.trunc(cmaxoffset),
+                min(map(operator.itemgetter(0), res)), 2 + math.trunc(cminaddr), max(map(operator.itemgetter(-1), res)), 2 + math.trunc(cmaxaddr),
                 math.trunc(cchunks) * ' ', len(res),
                 unmangled, math.trunc(maxname if internal.declaration.mangledQ(realname) else maxunmangled),
                 len(builtins.list(favars(func))) if func.frsize else 0, 1 + math.trunc(cavars),
@@ -1441,7 +1441,7 @@ class entries(object):
             realname = cls.__entryname__(index)
             scope, unmangled = internal.declaration.extract.scope(realname), internal.declaration.demangle(realname) if internal.declaration.mangledQ(realname) else realname
             without_scope = unmangled[len("{:s}: ".format(scope)):] if scope else unmangled
-            six.print_(u"[{:{:d}d}] {:<#{:d}x} : {:s}{:s}".format(index, math.trunc(cindex), ea, 2 + math.trunc(caddr), "{:<{:d}s} ".format('()' if ea == ordinal else "({:#x})".format(ordinal), 2 + 2 + math.trunc(cindex)), without_scope))
+            six.print_(u"{:<{:d}s} {:<#{:d}x} : {:s}{:s}".format("[{:d}]".format(index), 2 + math.trunc(cindex), ea, 2 + math.trunc(caddr), "{:<{:d}s} ".format('()' if ea == ordinal else "({:#x})".format(ordinal), 2 + 2 + math.trunc(cindex)), without_scope))
         return
 
     @utils.multicase(string=six.string_types)
