@@ -31,7 +31,7 @@ fcdr = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap[1:]), **{ key : value for
 # return a closure that will check that `object` is an instance of `type`.
 finstance = lambda *type: frpartial(builtins.isinstance, type)
 # return a closure that will check if its argument has an item `key`.
-fhasitem = fitemQ = lambda key: fcompose(fcatch(frpartial(operator.getitem, key)), builtins.iter, builtins.next, fpartial(operator.eq, None))
+fhasitem = fitemQ = lambda key: frpartial(operator.contains, key)
 # return a closure that will get a particular element from an object.
 fgetitem = fitem = lambda item, *default: lambda object: default[0] if default and item not in object else object[item]
 # return a closure that will set a particular element on an object.
