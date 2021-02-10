@@ -16,14 +16,14 @@ import sys, heapq, collections, array, math
 import internal
 import idaapi
 
-__all__ = ['fbox','funbox','fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
+__all__ = ['fpack','funpack','fcar','fcdr','finstance','fhasitem','fitemQ','fgetitem','fitem','fsetitem','fhasattr','fattributeQ','fgetattr','fattribute','fsetattr','fsetattribute','fconstant','fdefault','fidentity','first','second','third','last','fcompose','fdiscard','fcondition','fmap','flazy','fpartial','fapply','fcurry','frpartial','freverse','fcatch','fcomplement','fnot','ilist','liter','ituple','titer','itake','iget','islice','imap','ifilter','ichain','izip','lslice','lmap','lfilter','lzip','count']
 
 ### functional programming combinators (FIXME: probably better to document these with examples)
 
 # return a closure that executes `F` with the arguments boxed and concatenated.
-fbox = fpack = lambda F, *a, **k: lambda *ap, **kp: F(a + ap, **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
+fpack = lambda F, *a, **k: lambda *ap, **kp: F(a + ap, **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
 # return a closure that executes `F` with the arguments concatenated and unboxed
-funbox = funpack = lambda F, *a, **k: lambda *ap, **kp: F(*(a + functools.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
+funpack = lambda F, *a, **k: lambda *ap, **kp: F(*(a + functools.reduce(operator.add, builtins.map(builtins.tuple, ap), ())), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return the first argument
 fcar = lambda *a: a[:1][0]
 # return the rest of the arguments
@@ -66,18 +66,18 @@ def flazy(F, *a, **k):
     sortedtuple, state = fcompose(builtins.sorted, builtins.tuple), {}
     def lazy(*ap, **kp):
         A, K = a + ap, sortedtuple(builtins.tuple(k.items()) + builtins.tuple(kp.items()))
-        return state[(A, K)] if (A, K) in state else state.setdefault((A, K), F(*A, **{ key : value for key, value in itertools.chain(k.items(), kp.items())}))
+        return state[(A, K)] if (A, K) in state else state.setdefault((A, K), F(*A, **{ key : value for key, value in itertools.chain(k.items(), kp.items()) }))
     return lazy
 # return a closure with the function's arglist partially applied
 fpartial = functools.partial
 # return a closure that applies the provided arguments to the function `F`.
-fapply = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
+fapply = lambda F, *a, **k: lambda *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that will use the specified arguments to call the provided function.
-fcurry = lambda *a, **k: lambda F, *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
+fcurry = lambda *a, **k: lambda F, *ap, **kp: F(*(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that applies the initial arglist to the end of function `F`.
-frpartial = lambda F, *a, **k: lambda *ap, **kp: F(*(ap + builtins.tuple(builtins.reversed(a))), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
+frpartial = lambda F, *a, **k: lambda *ap, **kp: F(*(ap + builtins.tuple(builtins.reversed(a))), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that applies the arglist to function `F` in reverse.
-freverse = lambda F, *a, **k: lambda *ap, **kp: F(*builtins.reversed(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items())})
+freverse = lambda F, *a, **k: lambda *ap, **kp: F(*builtins.reversed(a + ap), **{ key : value for key, value in itertools.chain(k.items(), kp.items()) })
 # return a closure that executes function `F` and includes the caught exception (or None) as the first element in the boxed result.
 def fcatch(F, *a, **k):
     def fcatch(*a, **k):
