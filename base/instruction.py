@@ -1092,6 +1092,8 @@ def op_refinfo(opnum):
 def op_refinfo(ea, opnum):
     '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     ri = idaapi.refinfo_t()
+    if idaapi.__version__ < 7.0:
+        return ri if idaapi.get_refinfo(ea, opnum, ri) else None
     return ri if idaapi.get_refinfo(ri, ea, opnum) else None
 
 @utils.multicase(opnum=six.integer_types)
