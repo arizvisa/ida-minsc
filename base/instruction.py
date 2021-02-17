@@ -818,7 +818,7 @@ def op_structure(ea, opnum):
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Unable to locate a structure offset in operand {:d} according to flags ({:#x}).".format(__name__, ea, opnum, opnum, F))
 
     # We pretty much have to do this ourselves because idaapi.get_stroff_path
-    # will always only return the structure associatd with the member..
+    # will always only return the structure associated with the member..
     delta, path = idaapi.sval_pointer(), idaapi.tid_array(2)
     delta.assign(0)
     count = idaapi.get_stroff_path(ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
@@ -1092,7 +1092,8 @@ def op_refinfo(opnum):
 def op_refinfo(ea, opnum):
     '''Return the ``idaapi.refinfo_t`` for the operand `opnum` belonging to the instruction at the address `ea`.'''
     ri = idaapi.refinfo_t()
-    return ri if idaapi.get_refinfo(ri, ea, opnum) else None
+    ok = idaapi.get_refinfo(ea, opnum, ri) if idaapi.__version__ < 7.0 else idaapi.get_refinfo(ri, ea, opnum)
+    return ri if ok else None
 
 @utils.multicase(opnum=six.integer_types)
 def op_refs(opnum):
@@ -1198,7 +1199,7 @@ def op_refs(ea, opnum):
             ops = ((idx, internal.netnode.sup.get(ea, 0xf + idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
             ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in ops)
             ops = (idx for idx, (_, ids) in ops if st.id in ids)
-            res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
+            res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
         res = res
 
     # FIXME: is this supposed to execute if ok == T? or not?
