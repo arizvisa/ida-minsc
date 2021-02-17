@@ -5677,7 +5677,7 @@ class get(object):
             elif size == 8:
                 return cls.double(ea, **byteorder)
             elif size > 8:
-                logging.warning(u"{:s}({:#x}) : Demoting size ({:+d}) for floating-point number at {:#x} down to largest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'get', cls.__name__]), size, ea, 8))
+                logging.warning(u"{:s}({:#x}) : Demoting size ({:+d}) for floating-point number at {:#x} down to largest available IEEE-754 number ({:+d}).".format('.'.join([__name__, 'get', cls.__name__]), ea, size, ea, 8))
                 return cls.double(ea, **byteorder)
             raise E.InvalidTypeOrValueError(u"{:s}({:#x}) : Unable to determine the type of floating-point number for the item's size ({:+#x}).".format('.'.join([__name__, 'get', cls.__name__]), ea, size))
 
