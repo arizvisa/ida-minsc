@@ -1619,7 +1619,7 @@ class operand_types:
         '''Operand type decoder for returning a memory displacement on either the AArch32 or AArch64 architectures.'''
         global architecture
         Rn = architecture.by_index(op.reg)
-        return armops.immediatephrase(Rn, op.addr)
+        return armops.immediatephrase(Rn, idaapi.as_signed(op.addr))
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_mem)
     def memory(ea, op):
