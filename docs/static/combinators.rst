@@ -47,58 +47,88 @@ string when undefined::
 Combinators
 -----------
 
-.. py:function:: fbox(\*args)
-
-   Given any number of ``args``, box them into a tuple.
-
-   :param \*args: any number of objects to box as a tuple
-   :return: a tuple containing the arguments that were boxed
-
-.. py:function:: funbox(callable, \*initial_args, \*\*initial_kwargs)(\*boxed_args, \*\*boxed_kwargs)
+.. py:function:: fpack(callable, \*initial_args, \*\*initial_kwargs))(\*packed_args, \*\*packed_kwargs)
 
    Given a ``callable``, return a closure that when called with arguments
-   will expand (unbox) them before applying them to the ``callable``.
+   will pack (box) them before applying them to the ``callable`` as its first
+   parameter. Any keyword arguments will be merged together when executing
+   the ``callable``.
 
-   :param callable: the function whose closure will call
+   :param callable: the function which will be called by the returned closure
+   :type callable: `function`
+   :param \*initial_args: any default arguments to prefix the parameter that is passed to the ``callable`` with
+   :param \*\*initial_kwargs: any default keyword arguments to pass to the ``callable``
+   :param \*packed_args: any number of arguments which are packed and then concatenated together
+   :param \*\*packed_kwargs: any extra keyword arguments to apply to the callable
+
+.. py:function:: funpack(callable, \*initial_args, \*\*initial_kwargs)(\*packed_args, \*\*packed_kwargs)
+
+   Given a ``callable``, return a closure that when called with arguments
+   will unpack (unbox) them before applying them to the ``callable`` as
+   its parameters. Any keyword arguments will be merged together when
+   executing the ``callable``.
+
+   :param callable: the function which will be called by the returned closure
    :type callable: `function`
    :param \*initial_args: any default arguments to initially pass to the ``callable``
    :param \*\*initial_kwargs: any default keyword arguments to initially pass to the ``callable``
-   :param \*boxed_args: any number of arguments which are unboxed and concatenated together
-   :param \*\*boxed_kwargs: any extra keyword arguments to apply to the callable
+   :param \*packed_args: any number of arguments which are unpacked and then concatenated together
+   :param \*\*packed_kwargs: any extra keyword arguments to apply to the callable
 
-.. py:function:: fcar(\*args)
+.. py:function:: fcar(callable, \*initial_args, \*\*initial_kwargs))(\*args, \*\*kwargs)
 
-   Given any number of ``args``, return only the first parameter. This is similar
-   to the ``car`` function found in programming languages from the LISP family.
+   Given a ``callable``, return a closure that when called with arguments will
+   only use the first element from ``args`` parameter appended to the provided
+   ``initial_args``. Any keyword arguments will be merged together when executing
+   the ``callable``. This is similar to the ``car`` function found in programming
+   languages from the LISP family.
 
-   :param \*args: any number of arguments to return the first element from.
+   :param callable: the function which will be called by the returned closure
+   :type callable: `function`
+   :param \*initial_args: any default arguments to prefix the parameter that is passed to the ``callable`` with
+   :param \*\*initial_kwargs: any default keyword arguments to pass to the ``callable``
+   :param \*args: any number of arguments from which to use only the first one
+   :param \*\*kwargs: any extra keyword arguments to apply to the callable
 
-.. py:function:: fcdr(\*args)
+.. py:function:: fcdr(callable, \*initial_args, \*\*initial_kwargs))(\*args, \*\*kwargs)
 
-   Given any number of ``args``, return all except the first parameter. This is
-   similar to the ``cdr`` function found in programming languages from the LISP
-   family.
+   Given a ``callable``, return a closure that when called with arguments will
+   use all except the first element from ``args`` parameter and append it to
+   the end of the provided ``initial_args``. Any keyword arguments will be merged
+   together when executing the ``callable``. This is similar to the ``cdr`` function
+   found in programming languages from the LISP family.
 
-   :param \*args: any number of arguments to return the last elements from.
+   :param callable: the function which will be called by the returned closure
+   :type callable: `function`
+   :param \*initial_args: any default arguments to prefix the parameter that is passed to the ``callable`` with
+   :param \*\*initial_kwargs: any default keyword arguments to pass to the ``callable``
+   :param \*args: any number of arguments from which to use only the first one
+   :param \*\*kwargs: any extra keyword arguments to apply to the callable
 
 .. py:function:: finstance(type)(object)
 
-   Given a ``type``, return a closure that will return true or false
-   depending on whether ``object`` is an instance of that ``type``.
+   Given a ``type``, return a closure that will return either :py:const`True`
+   or :py:const:`False` based on whether ``object`` is an instance of the
+   provided ``type``.
 
    :param type: any kind of python type
    :type type: `type`
    :param object: any kind of python object to test
+   :return: whether the object is an instance of the requested type or not
+   :rtype: :py:class:`bool`
 
 .. py:function:: fhasitem(item)(object)
 
    Given an ``item``, return a closure that will return true or false
-   based on whether or not ``object`` contains it.
+   based on whether or not ``object`` contains it via the "contains"
+   operator.
 
    Aliases: ``fitemQ``
 
    :param item: any kind of python object
    :param object: any kind of python object to test membership with
+   :return: whether the object has the requested item or not
+   :rtype: :py:class:`bool`
 
 .. py:function:: fgetitem(item, \*default)(object)
 
@@ -108,31 +138,45 @@ Combinators
 
    Aliases: ``fitem``
 
-   :param item: any kind of python object to pass to :py:func:`operator.getitem`.
+   :param item: any kind of python object to pass as the key to the :py:func:`operator.getitem` function
    :param object: any kind of python object to return an item from
    :param \*default: an item returned by default if the ``object``
                      does not contain the specified ``item``
+   :return: the item that was requested
 
 .. py:function:: fsetitem(item)(value)(object)
 
    Assign the given ``value`` to the specified ``item`` of the provided
-   ``object`` when called.
+   ``object`` when called and then return the modified ``object``.
 
-   :param item: any kind of python object to pass to :py:func:`operator.setitem`.
-   :param value: the value to assign to the python object as used by :py:func:`operator.setitem`.
-   :param object: any kind of python object to assign the item into.
+   :param item: any kind of python object to pass as the key to the :py:func:`operator.setitem` function
+   :param value: the value to assign to the python object as used by :py:func:`operator.setitem`
+   :param object: any kind of python object to assign the item into
+   :return: the object that was modified
+
+.. py:function:: fdelitem(\*items)(object)
+
+   Return a closure that when called with a particular ``object``, will
+   remove the designated ``items`` from it prior to returning the modified
+   ``object``.
+
+   :param \*items: any number of python objects to pass as keys to the :py:func:`operator.delitem` function
+   :param object: any kind of python object to remove the items from
+   :return: the object that was modified
 
 .. py:function:: fhasattr(attribute)(object)
 
    Given an ``attribute`` as a string, return a closure that will return
-   true or false based on whether or not ``object`` has the specified
-   ``attribute``.
+   :py:const:`True` or :py:const:`False` based on whether or not ``object``
+   has the specified ``attribute``.
 
    Aliases: ``fattributeQ``
 
    :param attribute: the attribute to check for
    :type attribute: `str`
    :param object: any kind of python object to test
+   :return: whether the object has the requested attribute or not
+   :rtype: :py:class:`bool`
 
 .. py:function:: fgetattr(attribute, \*default)(object)
 
@@ -147,17 +191,19 @@ Combinators
    :param object: any kind of python object to return an attribute from
    :param \*default: an attribute returned by default if the ``object``
                      does not contain with specified ``attribute``
+   :return: the requested attribute
 
 .. py:function:: fsetattr(attribute)(value)(object)
 
    Assign the given ``value`` to the specified ``attribute`` of the
-   provided ``object`` when called.
+   provided ``object`` when called and return the ``object``.
 
    Aliases: ``fsetattribute``
 
    :param attribute: an attribute on the ``object`` to assign.
    :param value: the value to assign to the python object as used by :py:func:`builtins.setattr`.
    :param object: any kind of python object to assign the attribute on.
+   :return: the object that was modified
 
 .. py:function:: fconstant(object)
 
@@ -166,6 +212,7 @@ Combinators
    Aliases: ``fconst``, ``falways``
 
    :param object: any kind of python object to return
+   :return: a closure that returns the object
 
 .. py:function:: fidentity(object)
 
@@ -173,6 +220,7 @@ Combinators
    and is typically used to ignore transforming an object.
 
    :param object: any kind of python object to return
+   :return: the object
 
 .. py:function:: fdefault(default)(object)
 
@@ -181,6 +229,7 @@ Combinators
 
    :param default: the default object to return
    :param object: any kind of python object to check
+   :return: the object if it is defined, otherwise the value for default
 
 .. py:function:: fcompose(\*callables)(object)
 
@@ -190,12 +239,16 @@ Combinators
    :param \*callables: a number of callables that each take one parameter
    :param object: any kind of python object to transform
 
-.. py:function:: fdiscard(callable)(\*args, \*\*kwargs)
+.. py:function:: fdiscard(callable, \*initial_args, \*\*initial_kwargs)(\*args, \*\*kwargs)
 
-   Given a ``callable``, return a closure that will call it with no
-   parameters whilst discarding any that were passed to it.
+   Given a ``callable`` and any ``initial_args`` or ``initial_kwargs``,
+   return a closure that will call it with only those parameters whilst
+   discarding any parameters that were passed to the returned closure.
 
    :param callable: a callable to execute
+   :type callable: `function`
+   :param \*initial_args: any default arguments to pass as parameters to the ``callable``
+   :param \*\*initial_kwargs: any default keyword arguments to pass as parameters to the ``callable``
    :param \*args: any number of arguments that get discarded
    :param \*\*kwargs: any kind of keyword arguments that get discarded
 
@@ -219,8 +272,8 @@ Combinators
 .. py:function:: fmap(\*callables)(object)
 
    Given a number of ``callables``, return a closure that executes them
-   synchronously against ``object`` returning a tuple containing the
-   result of each callable.
+   synchronously against ``object`` returning a tuple composed of the
+   results of each callable.
 
    :param \*callables: any number of callables to execute for each desired
                        result returned
@@ -284,7 +337,7 @@ Combinators
 
    Given a ``callable``, the arguments ``reverse_args``, and
    the keyword arguments ``reverse_kwargs``, return a closure that
-   will apply these to the ``callable`` backwards. If ``args``
+   will apply these to the ``callable`` in reverse. If ``args``
    or ``kwargs`` is provided, then apply these to the front of
    the ``callable``.
 
@@ -301,7 +354,7 @@ Combinators
    keyword arguments ``reverse_kwargs``, return a closure which applies
    these to the end of the ``callable``. If ``extra_args`` or
    ``extra_kwargs`` is provided, then continue to apply these to the
-   ``callable`` but backwards.
+   ``callable`` but in reverse.
 
    :param callable: the callable to apply the arguments to
    :type callable: `function`
@@ -317,9 +370,10 @@ Combinators
    keyword arguments ``initial_kwargs`` combined with ``kwargs``.
 
    This closure will wrap the result of ``callable`` so that the
-   second element of the tuple will be the result, and the first element will
-   be the exception object if one was raised. If one wasn't raised, then the
-   first element will be the value :py:obj:`None`.
+   second element of the returned tuple will be the result, and the
+   first element will be the exception object if one was raised. If
+   an exception was not raised, then the first element will be the
+   value :py:const:`None`, and the second will be the original result.
 
    :param callable: the callable to catch an exception in
    :type callable: `function`
@@ -332,7 +386,7 @@ Combinators
 
    Given a ``callable``, the arguments ``initial_args``, and the
    keyword arguments ``initial_kwargs``, return a closure that will
-   invert the result (`not`) returned from the ``callable``.
+   invert the result (`not`) prior to returning it.
 
    Aliases: ``fnot``
 
@@ -345,50 +399,59 @@ Combinators
 
 .. py:function:: first(listable)
 
-   Given a ``listable`` python object, return its first element.
+   Given a ``listable`` object, return the first element in its sequence.
 
    :param listable: any kind of list-like object
    :type listable: `list` or `tuple`
+   :return: the first element from the iterable
 
 .. py:function:: second(iterable)
 
-   Given a ``listable`` python object, return its second element.
+   Given a ``listable`` object, return the second element in its sequence.
 
    :param listable: any kind of list-like object
    :type listable: `list` or `tuple`
+   :return: the second element from the iterable
 
 .. py:function:: third(iterable)
 
-   Given a ``listable`` python object, return the third element.
+   Given a ``listable`` object, return the third element in its sequence.
 
    :param listable: any kind of list-like object
    :type listable: `list` or `tuple`
+   :return: the third element from the iterable
 
 .. py:function:: last(iterable)
 
-   Given a ``listable`` python object, return its last element.
+   Given a ``listable`` object, return the last element in its sequence.
 
    :param listable: any kind of list-like object
    :type listable: `list` or `tuple`
+   :return: the last element from the iterable
 
 .. py:function:: ilist(iterable)
 
-   Given a ``iterable`` python object, return it as a list.
+   Given an ``iterable`` object, return it as a :py:class:`list`.
 
    :param iterable: any kind of iterable object
+   :return: the items from the iterator
+   :rtype: :py:class:`list`
 
 .. py:function:: liter(listable)
 
-   Given a ``listable`` python object, return it as an iterable..
+   Given a ``listable`` object, return it as an iterable.
 
    :param listable: any kind of list-like object
    :type listable: `list` or `tuple`
+   :return: an iterator composed of the items from the list
 
 .. py:function:: ituple(iterable)
 
-   Given a ``iterable`` python object, return it as a tuple.
+   Given an ``iterable`` object, return it as a :py:class:`tuple`.
 
    :param iterable: any kind of iterable object
+   :return: the items from the iterator
+   :rtype: :py:class:`tuple`
 
 .. py:function:: titer(tuple)
 
@@ -396,68 +459,156 @@ Combinators
 
    :param tuple: any kind of python tuple
    :type tuple: `tuple`
+   :return: an iterator composed of the items from the tuple
 
 .. py:function:: itake(count)(iterable)
 
    Given an integer ``count``, return a closure that will consume
    that number of elements from the provided ``iterable`` and
-   return them as a tuple.
+   return them as a :py:class:`tuple`.
 
    :param count: a number of elements to consume
-   :type count: `int` or `long`
+   :type count: :py:class:`int` or :py:class:`long`
    :param iterable: an iterable to consume
+   :return: the items that were selected
+   :rtype: :py:class:`tuple`
 
-.. py:function:: iget(count)(iterable)
+.. py:function:: iget(index)(iterable)
 
-   Given an integer ``count``, return a closure that will consume
-   that number of elements from the provided ``iterable`` and
-   return the last one.
+   Given an integer ``index``, return a closure that will consume
+   the required number of elements from the provided ``iterable``
+   in order to return the element at the requested index.
 
    :param count: a number of elements to consume
-   :type count: `int` or `long`
+   :type count: :py:class:`int` or :py:class:`long`
    :param iterable: an iterable to consume values from
+   :return: the item at the requested index
+
+.. py:function:: islice(iterable, stop)
+.. py:function:: islice(iterable, start, stop[, step])
+
+   Given an ``iterable``, return an iterator which yields the
+   selected values from ``start`` to ``stop``. If ``step`` is
+   provided, then use its value as the number of values to skip
+   when yielding values. This is similar to using the :py:func:`operator.getitem`
+   function with the :py:class:`slice` class for iterators.
+
+   :param iterable: an iterable to transform results from
+   :param start: the index to start at
+   :type start: :py:class:`int` or :py:class:`long`
+   :param stop: the index to stop at
+   :type stop: :py:class:`int` or :py:class:`long`
+   :param step: the number of values to skip
+   :type step: :py:class:`int` or :py:class:`long`
+   :return: the selected items as an iterator
 
 .. py:function:: imap(callable, iterable)
 
    Execute the provided ``callable`` against all of the elements in
    ``iterable`` returning an iterator containing the transformed
-   results. This is similar to :py:func:`map` but for iterables.
+   results. This is similar to :py:func:`map` and is the same
+   as the :py:func:`itertools.imap` function from Python 2.x.
 
    :param callable: a callable python object that transforms its argument
    :type callable: `function`
    :param iterable: an iterable to transform results from
+   :return: the transformed items as an iterator
 
 .. py:function:: ifilter(crit, iterable)
 
    Yield each value from ``iterable`` that the callable ``crit``
-   returns true for. This is similar to :py:func:`filter` but for iterables.
+   returns :py:const:`True` for. This is similar to :py:func:`filter`
+   and is the same as the :py:func:`itertools.ifilter` function from
+   Python 2.x.
 
-   :param crit: a callable python object that returns true or false based on its
-                argument
+   :param crit: a callable python object that returns :py:const:`True` or
+                :py:const:`False` based on its argument
    :type crit: `function`
    :param iterable: an iterable to critique
+   :return: the filtered items as an iterator
 
 .. py:function:: ichain(\*iterables)
 
-   Given a variable number of ``iterables``, combine them all
-   into a single iterator. This is the same as :py:func:`itertools.chain`.
+   Given a variable number of ``iterables``, concatenate all of them into
+   a single iterator. This is the same as the :py:func:`itertools.chain`.
+   function.
 
    :param \*iterables: any number of iterators
+   :return: an iterator composed of all of the provided iterators executed in sequence
 
 .. py:function:: izip(\*iterables)
 
    Given any number of ``iterables``, return them as an iterator that
-   yields a tuple for each element that an individual iterator would return.
-   This is similar to :py:func:`zip`, and is the same as :py:func:`itertools.izip`.
+   yields a tuple for each element passed as positional arguments to
+   the function. This is similar to :py:func:`zip`, and is the same
+   as the :py:func:`itertools.izip` function from Python 2.x.
 
    :param \*iterables: any number of iterators
+   :return: the items from each iterator zipped together
+
+.. py:function:: lslice(iterable, stop)
+.. py:function:: lslice(iterable, start, stop[, step])
+
+   Given an ``iterable``, return a :py:class:`list` containing the
+   selected values from ``start`` to ``stop``. If ``step`` is
+   provided, then use its value as the number of values to skip when
+   returning values. This is similar to the :py:func:`operator.getitem`
+   function being used on lists with the :py:class:`slice` class.
+
+   :param iterable: an iterable to transform results from
+   :param start: the index to start at
+   :type start: :py:class:`int` or :py:class:`long`
+   :param stop: the index to stop at
+   :type stop: :py:class:`int` or :py:class:`long`
+   :param step: the number of values to skip
+   :type step: :py:class:`int` or :py:class:`long`
+   :return: the selected list of items
+   :rtype: :py:class:`list`
+
+.. py:function:: lmap(callable, iterable)
+
+   Execute the provided ``callable`` against all of the elements in
+   ``iterable`` returning a :py:class:`list` containing the transformed
+   results.  This is similar to :py:func:`map` function from Python 2.x.
+
+   :param callable: a callable python object that transforms its argument
+   :type callable: `function`
+   :param iterable: an iterable to transform results from
+   :return: the transformed list of items
+   :rtype: :py:class:`list`
+
+.. py:function:: lfilter(crit, iterable)
+
+   Return a :py:class:`list` containing each value from ``iterable`` that
+   the callable ``crit`` returns :py:const:`True` for. This is similar to
+   the :py:func:`filter` function from Python 2.x.
+
+   :param crit: a callable python object that returns :py:const:`True` or
+                :py:const:`False` based on its argument
+   :type crit: `function`
+   :param iterable: an iterable to critique
+   :return: the filtered list of items
+   :rtype: :py:class:`list`
+
+.. py:function:: lzip(\*iterables)
+
+   Given any number of ``iterables``, return them as a :py:class:`list`
+   composed of :py:class:`tuple` objects for each element passed as
+   positional arguments to the function. This is similar to the :py:func:`zip`
+   function from Python 2.x.
+
+   :param \*iterables: any number of iterators
+   :return: the items from each iterator zipped together
+   :rtype: :py:class:`list` of :py:class:`tuple`
 
 .. py:function:: count(iterable)
 
-   Given an ``iterable``, return the number of elements that it contains.
+   Given an ``iterable``, return the number of items that it contains.
 
    Note: This is done by consuming values from ``iterable`` which will
    modify its state. If the state of the iterator wishes to be retained, one
    can either re-create it, or make a copy of it using :py:func:`itertools.tee`.
 
    :param iterable: an iterator to count the elements of
+   :return: the number of items that were found
+   :rtype: :py:class:`int` or :py:class:`long`
