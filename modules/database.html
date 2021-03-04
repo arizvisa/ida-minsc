@@ -2943,7 +2943,6 @@ for determining the type of the binary are also included.</p>
 <dt id="database.config.filename">
 <code class="descclassname">config.</code><code class="descname">filename</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.filename" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the filename that the database was built from.</p>
-<p>Aliases: <a class="reference internal" href="#database.config.filename" title="database.config.filename"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.filename</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -2951,6 +2950,19 @@ for determining the type of the binary are also included.</p>
 <code class="descclassname">config.</code><code class="descname">idb</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.idb" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the full path to the database.</p>
 <p>Aliases: <a class="reference internal" href="#database.config.idb" title="database.config.idb"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.idb</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.config.is_kernelspace">
+<code class="descclassname">config.</code><code class="descname">is_kernelspace</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.is_kernelspace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns whether the database is using a kernelmode address space or not.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="database.config.is_sharedobject">
+<code class="descclassname">config.</code><code class="descname">is_sharedobject</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.is_sharedobject" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns whether the database is a shared-object or not.</p>
+<p>Aliases: <a class="reference internal" href="#database.config.is_sharedobject" title="database.config.is_sharedobject"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.config.sharedQ</span></code></a>, <a class="reference internal" href="#database.config.is_sharedobject" title="database.config.is_sharedobject"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.config.is_sharedobject</span></code></a></p>
 </dd></dl>
 
 <dl class="function">
@@ -2974,8 +2986,26 @@ for determining the type of the binary are also included.</p>
 <dl class="function">
 <dt id="database.config.path">
 <code class="descclassname">config.</code><code class="descname">path</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.path" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the full path to the directory containing the database.</p>
+<dd><p>Return the absolute path to the directory containing the database.</p>
 <p>Aliases: <a class="reference internal" href="#database.config.path" title="database.config.path"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.path</span></code></a></p>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">config.</code><code class="descname">path</code><span class="sig-paren">(</span><em>pathname</em>, <em>*components</em><span class="sig-paren">)</span></dt>
+<dd><p>Return an absolute path composed of the provided <code class="docutils literal notranslate"><span class="pre">pathname</span></code> and any additional <code class="docutils literal notranslate"><span class="pre">components</span></code> relative to the directory containing the database.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>pathname</strong> (<em>str</em>) – </li>
+<li><strong>*components</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="function">
@@ -2988,13 +3018,6 @@ for determining the type of the binary are also included.</p>
 <dt id="database.config.readonly">
 <code class="descclassname">config.</code><code class="descname">readonly</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.readonly" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns whether the database is read-only or not.</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="database.config.sharedobject">
-<code class="descclassname">config.</code><code class="descname">sharedobject</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#database.config.sharedobject" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns whether the database is a shared-object or not.</p>
-<p>Aliases: <a class="reference internal" href="#database.config.sharedobject" title="database.config.sharedobject"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.config.sharedQ</span></code></a>, <a class="reference internal" href="#database.config.sharedobject" title="database.config.sharedobject"><code class="xref py py-func docutils literal notranslate"><span class="pre">database.config.is_sharedobject</span></code></a></p>
 </dd></dl>
 
 <dl class="function">

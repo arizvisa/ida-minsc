@@ -437,13 +437,17 @@
 </li>
       <li><a href="modules/database.html#database.config.idb">config.idb() (in module database)</a>
 </li>
+      <li><a href="modules/database.html#database.config.is_kernelspace">config.is_kernelspace() (in module database)</a>
+</li>
+      <li><a href="modules/database.html#database.config.is_sharedobject">config.is_sharedobject() (in module database)</a>
+</li>
       <li><a href="modules/database.html#database.config.main">config.main() (in module database)</a>
 </li>
       <li><a href="modules/database.html#database.config.margin">config.margin() (in module database)</a>
 </li>
       <li><a href="modules/database.html#database.config.module">config.module() (in module database)</a>
 </li>
-      <li><a href="modules/database.html#database.config.path">config.path() (in module database)</a>
+      <li><a href="modules/database.html#database.config.path">config.path() (in module database)</a>, <a href="modules/database.html#database.config.path">[1]</a>
 </li>
       <li><a href="modules/database.html#database.config.processor">config.processor() (in module database)</a>
 </li>
@@ -458,8 +462,6 @@
       <li><a href="modules/database.html#database.config.register.segmentbits">config.register.segmentbits() (in module database)</a>
 </li>
       <li><a href="modules/database.html#database.config.register.segments">config.register.segments() (in module database)</a>
-</li>
-      <li><a href="modules/database.html#database.config.sharedobject">config.sharedobject() (in module database)</a>
 </li>
       <li><a href="modules/database.html#database.config.type">config.type() (in module database)</a>
 </li>
@@ -603,8 +605,6 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="combinators.html#fapply">fapply() (built-in function)</a>
 </li>
-      <li><a href="combinators.html#fbox">fbox() (built-in function)</a>
-</li>
       <li><a href="combinators.html#fcar">fcar() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fcatch">fcatch() (built-in function)</a>
@@ -622,6 +622,8 @@
       <li><a href="combinators.html#fcurry">fcurry() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fdefault">fdefault() (built-in function)</a>
+</li>
+      <li><a href="combinators.html#fdelitem">fdelitem() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fdiscard">fdiscard() (built-in function)</a>
 </li>
@@ -651,13 +653,15 @@
 </li>
       <li><a href="modules/structure.html#structure.member_t.flag">flag (structure.member_t attribute)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/enumeration.html#enumeration.flags">flags() (in module enumeration)</a>, <a href="modules/enumeration.html#enumeration.flags">[1]</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="combinators.html#flazy">flazy() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fmap">fmap() (built-in function)</a>
+</li>
+      <li><a href="combinators.html#fpack">fpack() (built-in function)</a>
 </li>
       <li><a href="combinators.html#fpartial">fpartial() (built-in function)</a>
 </li>
@@ -693,8 +697,6 @@
 </li>
       <li><a href="modules/structure.html#structure.member_t.fullname">fullname (structure.member_t attribute)</a>
 </li>
-      <li><a href="combinators.html#funbox">funbox() (built-in function)</a>
-</li>
       <li><a href="modules/function.html#module-function">function (module)</a>
 </li>
       <li><a href="modules/database.html#database.functions">functions() (in module database)</a>
@@ -704,6 +706,8 @@
       <li><a href="modules/database.html#database.functions.list">functions.list() (in module database)</a>, <a href="modules/database.html#database.functions.list">[1]</a>
 </li>
       <li><a href="modules/database.html#database.functions.search">functions.search() (in module database)</a>, <a href="modules/database.html#database.functions.search">[1]</a>
+</li>
+      <li><a href="combinators.html#funpack">funpack() (built-in function)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -827,14 +831,14 @@
 </li>
       <li><a href="modules/database.html#database.imports.search">imports.search() (in module database)</a>, <a href="modules/database.html#database.imports.search">[1]</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/structure.html#structure.member_t.index">index (structure.member_t attribute)</a>
 
       <ul>
         <li><a href="modules/structure.html#structure.structure_t.index">(structure.structure_t attribute)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/structure.html#structure.index">index() (in module structure)</a>, <a href="modules/structure.html#structure.index">[1]</a>, <a href="modules/structure.html#structure.index">[2]</a>, <a href="modules/structure.html#structure.index">[3]</a>
 
       <ul>
@@ -854,6 +858,8 @@
       <li><a href="modules/instruction.html#instruction.intelops.SegmentOffset">intelops.SegmentOffset (class in instruction)</a>
 </li>
       <li><a href="modules/instruction.html#instruction.intelops.SegmentOffsetBaseIndexScale">intelops.SegmentOffsetBaseIndexScale (class in instruction)</a>
+</li>
+      <li><a href="combinators.html#islice">islice() (built-in function)</a>, <a href="combinators.html#islice">[1]</a>
 </li>
       <li><a href="combinators.html#itake">itake() (built-in function)</a>
 </li>
@@ -879,10 +885,12 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="modules/misc-ui.html#ui.keyboard.input">keyboard.input() (in module ui)</a>
 </li>
-      <li><a href="modules/misc-ui.html#ui.keyboard.map">keyboard.map() (in module ui)</a>
+      <li><a href="modules/misc-ui.html#ui.keyboard.list">keyboard.list() (in module ui)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/misc-ui.html#ui.keyboard.map">keyboard.map() (in module ui)</a>
+</li>
       <li><a href="modules/misc-ui.html#ui.keyboard.modifiers">keyboard.modifiers() (in module ui)</a>
 </li>
       <li><a href="modules/misc-ui.html#ui.keyboard.unmap">keyboard.unmap() (in module ui)</a>
@@ -896,6 +904,8 @@
       <li><a href="combinators.html#last">last() (built-in function)</a>
 </li>
       <li><a href="modules/structure.html#structure.member_t.left">left (structure.member_t attribute)</a>
+</li>
+      <li><a href="combinators.html#lfilter">lfilter() (built-in function)</a>
 </li>
       <li><a href="modules/enumeration.html#enumeration.list">list() (in module enumeration)</a>, <a href="modules/enumeration.html#enumeration.list">[1]</a>
 
@@ -913,11 +923,17 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="combinators.html#liter">liter() (built-in function)</a>
 </li>
+      <li><a href="combinators.html#lmap">lmap() (built-in function)</a>
+</li>
       <li><a href="modules/segment.html#segment.load">load() (in module segment)</a>
 </li>
       <li><a href="modules/custom-tags.html#tags.locationToAddress">locationToAddress() (in module tags)</a>
 </li>
+      <li><a href="combinators.html#lslice">lslice() (built-in function)</a>, <a href="combinators.html#lslice">[1]</a>
+</li>
       <li><a href="modules/custom-tags.html#tags.lvarNameQ">lvarNameQ() (in module tags)</a>
+</li>
+      <li><a href="combinators.html#lzip">lzip() (built-in function)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -1570,6 +1586,8 @@
       <li><a href="modules/database.html#database.type.has_customname">type.has_customname() (in module database)</a>, <a href="modules/database.html#database.type.has_customname">[1]</a>
 </li>
       <li><a href="modules/database.html#database.type.has_dummyname">type.has_dummyname() (in module database)</a>, <a href="modules/database.html#database.type.has_dummyname">[1]</a>
+</li>
+      <li><a href="modules/function.html#function.type.has_frame">type.has_frame() (in module function)</a>, <a href="modules/function.html#function.type.has_frame">[1]</a>
 </li>
       <li><a href="modules/function.html#function.type.has_frameptr">type.has_frameptr() (in module function)</a>, <a href="modules/function.html#function.type.has_frameptr">[1]</a>
 </li>

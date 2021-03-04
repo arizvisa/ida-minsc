@@ -1709,6 +1709,20 @@ Some simple ways of getting information about a function::
    
    :param func: the function to return the calling convention for
    
+.. py:function:: type\.has_frame()
+   
+   Return if the current function has a frame allocated to it.
+   
+   Aliases: :py:func:`function.type.frameQ<type\.has_frame>`
+   
+.. py:function:: type\.has_frame(func)
+   
+   Return if the function ``func`` has a frame allocated to it.
+   
+   Aliases: :py:func:`function.type.frameQ<type\.has_frame>`
+   
+   :param func:
+   
 .. py:function:: type\.has_frameptr()
    
    Return if the current function uses a frame pointer (register).

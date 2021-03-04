@@ -300,6 +300,10 @@ Base namespace for interacting with the keyboard input.
    
    Return the current keyboard input context.
    
+.. py:function:: keyboard\.list()
+   
+   Display the current list of keyboard combinations that are mapped along with the callable each one is attached to.
+   
 .. py:function:: keyboard\.map(key, callable)
    
    Map the specified ``key`` combination to a python ``callable`` in IDA.

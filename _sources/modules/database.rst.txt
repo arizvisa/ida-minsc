@@ -1655,13 +1655,21 @@ for determining the type of the binary are also included.
    
    Returns the filename that the database was built from.
    
-   Aliases: :py:func:`database.filename<config\.filename>`
-   
 .. py:function:: config\.idb()
    
    Return the full path to the database.
    
    Aliases: :py:func:`database.idb<config\.idb>`
+   
+.. py:function:: config\.is_kernelspace()
+   
+   Returns whether the database is using a kernelmode address space or not.
+   
+.. py:function:: config\.is_sharedobject()
+   
+   Returns whether the database is a shared-object or not.
+   
+   Aliases: :py:func:`database.config.sharedQ<config\.is_sharedobject>`, :py:func:`database.config.is_sharedobject<config\.is_sharedobject>`
    
 .. py:function:: config\.main()
    
@@ -1677,9 +1685,17 @@ for determining the type of the binary are also included.
    
 .. py:function:: config\.path()
    
-   Return the full path to the directory containing the database.
+   Return the absolute path to the directory containing the database.
    
    Aliases: :py:func:`database.path<config\.path>`
+   
+.. py:function:: config\.path(pathname, \*components)
+   
+   Return an absolute path composed of the provided ``pathname`` and any additional ``components`` relative to the directory containing the database.
+   
+   :param pathname:
+   :type pathname: str
+   :param \*components:
    
 .. py:function:: config\.processor()
    
@@ -1688,12 +1704,6 @@ for determining the type of the binary are also included.
 .. py:function:: config\.readonly()
    
    Returns whether the database is read-only or not.
-   
-.. py:function:: config\.sharedobject()
-   
-   Returns whether the database is a shared-object or not.
-   
-   Aliases: :py:func:`database.config.sharedQ<config\.sharedobject>`, :py:func:`database.config.is_sharedobject<config\.sharedobject>`
    
 .. py:function:: config\.type(typestr)
    
