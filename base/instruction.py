@@ -1251,10 +1251,10 @@ class type(object):
 
     Some examples of using this namespace are::
 
-        > print instruction.type.is_return(ea)
-        > print instruction.type.is_jxx(ea)
-        > print instruction.type.is_call(ea)
-        > print instruction.type.is_branch(ea)
+        > print( instruction.type.is_return(ea) )
+        > print( instruction.type.is_jxx(ea) )
+        > print( instruction.type.is_call(ea) )
+        > print( instruction.type.is_branch(ea) )
 
     """
     @utils.multicase()
