@@ -14,7 +14,7 @@ def nextMnemonic(ea, mnem, maxaddr=0xc0*0x1000000):
 
 def prevMnemonic(ea, mnem, minaddr=0):
     res = idc.print_insn_mnem(ea)
-    #print "%x -> %s"% (ea, res)
+    #print("%x -> %s"% (ea, res))
     if res == "": return idc.BADADDR
     if res == mnem: return ea
     return prevMnemonic( idc.prev_head(ea, minaddr), mnem, minaddr )
@@ -44,8 +44,8 @@ def resolveDispatcher(code):
     if majorFlag != 0:
         return majorAddress + (minor*0x10)
 
-    #print "%x"% getMinorDispatchTableAddress(majorAddress)
-    #print "resolved by 0x%x(%x)"% (majorAddress, minor)
+    #print("%x"% getMinorDispatchTableAddress(majorAddress))
+    #print("resolved by 0x%x(%x)"% (majorAddress, minor))
     return majorAddress
 
 def getDispatchCode(ea):
@@ -74,7 +74,7 @@ def nameDispatch(address):
         start, end = function.range(address)
 
     except ValueError:
-        print '%x making a function'% address
+        print('%x making a function'% address)
         function.make(address)
         start, end = function.range(address)
 
@@ -82,7 +82,7 @@ def nameDispatch(address):
         ea = FindLastAssignment(address, 'eax')
         code = getDispatchCode(ea)
     except ValueError:
-        print '%08x - Unable to find dispatch code'% address
+        print('%08x - Unable to find dispatch code'% address)
         return
 
     ofs = database.getoffset(start)

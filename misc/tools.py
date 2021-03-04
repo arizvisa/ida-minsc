@@ -27,9 +27,11 @@ def map(F, **kwargs):
     `(address, **kwargs)` or a `(index, address, **kwargs)`. Any
     keyword arguments are passed to `F` unmodified.
     """
-    f1 = lambda (idx, ea), **kwargs: F(ea, **kwargs)
-    f2 = lambda (idx, ea), **kwargs: F(idx, ea, **kwargs)
-    f = f1 if F.func_code.co_argcount == 1 else f2
+    f1 = lambda idx, ea, **kwargs: F(ea, **kwargs)
+    f2 = lambda idx, ea, **kwargs: F(idx, ea, **kwargs)
+    Ff = internal.utils.pycompat.method.function(F) if isinstance(F, types.MethodType) else F
+    Fc = internal.utils.pycompat.function.code(Ff)
+    f = f1 if internal.utils.pycompat.code.argcount(Fc) == 1 else f2
 
     result, all = [], database.functions()
     total = len(all)
@@ -39,7 +41,7 @@ def map(F, **kwargs):
             for i, ea in enumerate(all):
                 ui.navigation.set(ea)
                 six.print_("{:#x}: processing # {:d} of {:d} : {:s}".format(ea, 1 + i, total, func.name(ea)))
-                result.append( f((i, ea), **kwargs) )
+                result.append( f(i, ea, **kwargs) )
         except KeyboardInterrupt:
             six.print_("{:#x}: terminated at # {:d} of {:d} : {:s}".format(ea, 1 + i, total, func.name(ea)))
     return result

@@ -76,7 +76,7 @@ following to list all the functions in your database:
 Or to iterate through all the functions in the database, you can try:
 
     > for ea in database.functions():
-          print hex(ea)
+          print(hex(ea))
 
 Please refer to the documentation for more details on what this plugin makes
 available to you.
@@ -109,7 +109,7 @@ project.
 
 ## Thanks
 
-Thanks to a number of anonymous and non-anonymous people whom have helped the
-development of this plugin over the years.
+Thanks to a number of anonymous and non-anonymous people whom have helped with
+the development of this plugin over all of these years.
 
 [logo]: http://arizvisa.github.io/ida-minsc/_images/hamster.svg

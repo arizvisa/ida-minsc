@@ -948,11 +948,11 @@ class block(object):
         > B = function.block(ea)
         > bid = function.block.id()
         > c = function.block.color(ea, rgb)
-        > print function.block.before(ea)
-        > for ea in function.block.iterate(): print database.disasm(ea)
+        > print( function.block.before(ea) )
+        > for ea in function.block.iterate(): print( database.disasm(ea) )
         > for ea, op, st in function.block.register('eax', read=1): ...
-        > print function.block.read().encode('hex')
-        > print function.block.disasm(ea)
+        > print( function.block.read().encode('hex') )
+        > print( function.block.disasm(ea) )
 
     """
     @utils.multicase()
@@ -1438,8 +1438,8 @@ class frame(object):
 
     Some ways of using this can be::
 
-        > print function.frame()
-        > print hex(function.frame.id(ea))
+        > print( function.frame() )
+        > print( hex(function.frame.id(ea)) )
         > sp = function.frame.delta(ea)
 
     """
@@ -1529,8 +1529,8 @@ class frame(object):
 
         Some ways of using this are::
 
-            > print function.frame.args(f)
-            > print function.frame.args.size(ea)
+            > print( function.frame.args(f) )
+            > print( function.frame.args.size(ea) )
 
         """
 
@@ -1602,7 +1602,7 @@ class frame(object):
 
         Some ways to get this information can be::
 
-            > print function.frame.lvars.size()
+            > print( function.frame.lvars.size() )
 
         """
         @utils.multicase()
@@ -1644,7 +1644,7 @@ class frame(object):
 
         An example of using this namespace::
 
-            > print function.frame.regs.size(ea)
+            > print( function.frame.regs.size(ea) )
 
         """
 
@@ -2023,7 +2023,7 @@ class type(object):
 
     Some simple ways of getting information about a function::
 
-        > print function.type.has_noframe()
+        > print( function.type.has_noframe() )
         > for ea in filter(function.type.is_library, database.functions()): ...
 
     """
