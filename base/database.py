@@ -3159,9 +3159,9 @@ class type(object):
 
     Some examples of using this namespace can be::
 
-        > print database.type.size(ea)
-        > print database.type.is_initialized(ea)
-        > print database.type.is_data(ea)
+        > print( database.type.size(ea) )
+        > print( database.type.is_initialized(ea) )
+        > print( database.type.is_data(ea) )
         > length = database.t.array.length(ea)
         > st = database.t.structure(ea)
 
@@ -3606,10 +3606,10 @@ class type(object):
         Some examples of using this namespace can be::
 
             > type, length = database.t.array()
-            > print database.t.array.size(ea)
-            > print database.t.array.member(ea)
-            > print database.t.array.element(ea)
-            > print database.t.array.length(ea)
+            > print( database.t.array.size(ea) )
+            > print( database.t.array.member(ea) )
+            > print( database.t.array.element(ea) )
+            > print( database.t.array.length(ea) )
 
         """
         @utils.multicase()
@@ -3700,7 +3700,7 @@ class type(object):
         Some of the ways to use this namespace are::
 
             > st = database.t.struct()
-            > print database.t.struct.size()
+            > print( database.t.struct.size() )
             > st = structure.by(database.t.id(ea))
 
         """
@@ -3828,7 +3828,7 @@ class xref(object):
 
     Some ways to utilize this namespace can be::
 
-        > print database.x.up()
+        > print( database.x.up() )
         > for ea in database.x.down(): ...
         > for ea in database.x.cu(ea): ...
         > ok = database.x.add_code(ea, target)
@@ -6167,7 +6167,7 @@ class get(object):
         This namespace can be used as in the following example::
 
             > sw = database.get.switch(ea)
-            > print sw
+            > print( sw )
 
         """
         @classmethod
