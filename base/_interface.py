@@ -813,8 +813,8 @@ class node(object):
     @staticmethod
     def is_identifier(identifier):
         '''Return truth if the specified `identifier` is valid.'''
-        bits = math.trunc(math.floor(1 + math.log(idaapi.BADADDR) / math.log(2.0))) - 8
-        highbyte = 0xff << bits
+        bits = math.trunc(math.log(idaapi.BADADDR) / math.log(2.0)) - 8
+        highbyte = 0xff * pow(2, bits)
         return identifier & highbyte == highbyte
 
     @staticmethod
@@ -889,7 +889,9 @@ class node(object):
         This string is typically found in a supval[0xF+opnum] of the instruction.
         """
         le = functools.partial(functools.reduce, lambda agg, by: (agg * 0x100) | by)
-        ror = lambda n, shift, bits: (n>>shift) | ((n & 2**shift - 1) << (bits - shift))
+
+        # jspelman. he's everywhere.
+        ror = lambda n, shift, bits: (n>>shift) | ((n & pow(2, shift) - 1) << (bits - shift))
 
         # 16-bit
         # 0001 9ac1 -- _SYSTEMTIME
@@ -1812,6 +1814,23 @@ class bounds_t(namedtypedtuple):
         '''Return the size of the ``bounds_t``.'''
         left, right = self
         return right - left if left < right else left - right
+
+    @property
+    def top(self):
+        '''Return the minimum address for the current boundary.'''
+        left, right = self
+        return min(left, right)
+
+    @property
+    def bottom(self):
+        '''Return the maximum address for the current boundary.'''
+        left, right = self
+        return max(left, right)
+
+    def range(self):
+        '''Return the current boundary casted to a native ``idaapi.range_t`` type.'''
+        left, right = self
+        return idaapi.range_t(left, right)
 
     def translate(self, offset):
         '''Return an instance of the class with its boundaries translated by the provided `offset`.'''
