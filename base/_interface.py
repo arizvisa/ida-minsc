@@ -444,8 +444,6 @@ class priorityhook(prioritybase):
 
         def ev_set_idp_options(self, keyword, value_type, value, idb_loaded):
             cls = self.__class__
-            supercls = super(cls, self)
-            supermethod = getattr(supercls, name)
             if value_type == idaapi.IDPOPT_STR:     # string constant (char*)
                 res = idaapi.uchar_array(1 + len(value))
                 for index, item in enumerate(bytearray(value + b'\0')):
@@ -470,11 +468,34 @@ class priorityhook(prioritybase):
                 pvalue = res
             else:
                 raise ValueError("ev_set_idp_options_hook({!r}, {:d}, {:d}, {!s}) : Unknown value_type ({:d}) passed to ev_set_idp_options hook".format(keyword, value_type, value, idb_loaded, value_type))
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
             return supermethod(keyword, value_type, pvalue, idb_loaded)
 
-        # patch-methods because IDAPython is fucking stupid
-        if idaapi.__version__ == 7.5 and name == 'ev_set_idp_options':
-            return ev_set_idp_options
+        def compiler_changed(self, adjust_inf_fields):
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            return supermethod(adjust_inf_fields)
+
+        def renamed(self, ea, new_name, local_name, old_name):
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            return supermethod(ea, new_name, local_name or None, old_name)
+
+        # patch-methods because SWIG+IDAPython is fucking stupid
+
+        if idaapi.__version__ >= 7.5:
+            if name in {'ev_set_idp_options'}:
+                return ev_set_idp_options
+
+        if idaapi.__version__ >= 7.6:
+            if name in {'compiler_changed'}:
+                return compiler_changed
+            elif name in {'renamed'}:
+                return renamed
+
         return method
 
     def remove(self):
