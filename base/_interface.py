@@ -1550,7 +1550,7 @@ def addressOfRuntimeOrStatic(func):
         try:
             database.imports.at(ea)
         except internal.exceptions.MissingTypeOrAttribute:
-            raise internal.exceptions.FunctionNotFoundError(u"{:s}.addressOfRuntimeOrStatic({#x}) : Unable to locate function by address.".format(cls.__name__, ea))
+            raise internal.exceptions.FunctionNotFoundError(u"addressOfRuntimeOrStatic({:#x}) : Unable to locate function by address.".format(ea))
 
         # ok, we found a mis-defined import
         return True, func
