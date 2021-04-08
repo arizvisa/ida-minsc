@@ -769,6 +769,34 @@ def extra_cmt_changed(ea, line_idx, cmt):
         continue
     return
 
+### individual tags
+def item_color_changed(ea, color):
+    '''This hook is for when a color is applied to an address.'''
+
+    # First make sure it's not an identifier, as if it is then we
+    # need to terminate early because the tag cache doesn't care
+    # about this stuff.
+    if interface.node.is_identifier(ea):
+        return
+
+    # Now we need to distinguish between a content or global tag so
+    # that we can look it up to see if we need to remove it or add it.
+    ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
+
+    # FIXME: we need to figure out if the color is being changed,
+    #        updated, or removed. since there's no way to determine
+    #        this accurately, we just assume that any color is going
+    #        to increase the reference count.
+
+    # If the color was restored, then we need to decrease its ref.
+    if color in {idaapi.COLOR_DEFAULT}:
+        ctx.dec(ea, '__color__')
+
+    # The color is being applied, so we can just increase its reference.
+    else:
+        ctx.inc(ea, '__color__')
+    return
+
 ### function scope
 def thunk_func_created(pfn):
     pass
@@ -1079,6 +1107,10 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('init', database.config.__init_info_structure__, -100)
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
+
+    ## keep track of individual tags like colors and type info
+    if idaapi.__version__ >= 7.2:
+        ui.hook.idb.add('item_color_changed', item_color_changed, 0)
 
     ## just some debugging notification hooks
     #[ ui.hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
