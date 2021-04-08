@@ -49,6 +49,30 @@ def fetch_contents(fn):
             for name in items:
                 addr[ea] = addr.get(ea, 0) + 1
                 tags[name] = tags.get(name, 0) + 1
+
+            # check if there's any extra comments so we can explicitly add those too.
+            eprefix = db.extra.__get_prefix__(ea)
+            if eprefix is not None:
+                addr[ea] = addr.get(ea, 0) + 1
+                tags['__extra_prefix__'] = tags.get('__extra_prefix__', 0) + 1
+
+            esuffix = db.extra.__get_suffix__(ea)
+            if esuffix is not None:
+                addr[ea] = addr.get(ea, 0) + 1
+                tags['__extra_suffix__'] = tags.get('__extra_suffix__', 0) + 1
+
+            # if there's any colors, then we need to do those.
+            col = db.color(ea)
+            if col is not None:
+                addr[ea] = addr.get(ea, 0) + 1
+                tags['__color__'] = tags.get('__color__', 0) + 1
+
+            # finally if there's any names that're part of this global,
+            # then we add them too.
+            aname = db.name(ea)
+            if aname and db.type.flags(ea, idaapi.FF_NAME):
+                addr[ea] = addr.get(ea, 0) + 1
+                tags['__name__'] = tags.get('__name__', 0) + 1
             continue
         continue
     return func.address(fn), addr, tags
