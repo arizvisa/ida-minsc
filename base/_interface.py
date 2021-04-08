@@ -368,14 +368,14 @@ class prioritybase(object):
         res = ["{!s}".format(cls)]
 
         # First gather all our enabled hooks.
-        for target in self.enabled:
+        for target in sorted(self.enabled):
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
             res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items)))
 
         # Now we can append all the disabled ones.
-        for target in self.disabled:
+        for target in sorted(self.disabled):
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
@@ -454,6 +454,7 @@ class prioritybase(object):
         # from our cache.
         else:
             self.__cache__.pop(target, [])
+            self.__disabled.discard(target)
 
         return True if found else False
 
@@ -673,7 +674,7 @@ class priorityhook(prioritybase):
         hType = hObject.__class__
         hName = hType.__name__
         if not self.available:
-            return "Hooks for {:s}: {:s}".format(hName, 'No hooks have been added')
+            return "Hooks for {:s}: {:s}".format(hName, 'No hooks have been added.')
         res, items = "Hooks for {:s}:".format(hName), super(priorityhook, self).__repr__().split('\n')
         return '\n'.join([res] + items[1:])
 
@@ -708,6 +709,12 @@ class prioritynotification(prioritybase):
             raise ValueError("{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, notification))
 
         return super(prioritynotification, self).apply(notification)
+
+    def __repr__(self):
+        if not self.available:
+            return "Notification events: {:s}".format('No hooks have been added.')
+        res, items = 'Notification events:', super(prioritynotification, self).__repr__().split('\n')
+        return '\n'.join([res] + items[1:])
 
 class address(object):
     """
