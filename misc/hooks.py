@@ -33,7 +33,12 @@ def greeting():
     six.print_('-' * barrier)
 
 ### comment hooks
-class commentbase(object):
+class changebase(object):
+    """
+    This base class is for dealing with 2-part events where one part is the
+    "changing" event which is dispatched before any changes are made, and the
+    second part is the "changed" event which happens after they've been completed.
+    """
     @classmethod
     def database_init(cls, idp_modname):
         if hasattr(cls, 'event'):
@@ -51,7 +56,12 @@ class commentbase(object):
         global State
         return State == state.ready
 
-class address(commentbase):
+class address(changebase):
+    """
+    This class handles 2-part events that are used to modify comments at an arbitrary
+    address. This address will either be a contents tag if it's within the boundaries
+    of a function, or a globals tag if it's just some arbitrary address.
+    """
     @classmethod
     def get_func_extern(cls, ea):
         """Return the function at the given address and whether the address is a function populated by the rtld (an external).
@@ -261,7 +271,13 @@ class address(commentbase):
         # and then leave because this should've updated things properly.
         return
 
-class globals(commentbase):
+class globals(changebase):
+    """
+    This class handles 2-part events that are used to modify comments for a particular
+    range. In most cases this should be a function comment, or a chunk associated
+    with a function, but just to be certain we check the start_ea of the range
+    to determine whether we update the global or content tag cache.
+    """
     @classmethod
     def _update_refs(cls, fn, old, new):
         oldkeys, newkeys = ({item for item in content.keys()} for content in [old, new])
