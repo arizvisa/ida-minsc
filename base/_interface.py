@@ -323,7 +323,7 @@ class prioritybase(object):
                 yield "**{:s}".format(starstar)
             return
 
-        # Render the callable as something readable
+        # Render the callable as something readable.
         def repr_callable(object, pycompat=internal.utils.pycompat):
 
             # If a method is passed to us, then we need to extract all
@@ -336,13 +336,13 @@ class prioritybase(object):
                 None if isinstance(object, staticmethod) else next(iterable)
                 return '.'.join([module, cls.__name__, name]), tuple(iterable)
 
-            # If our object is a function-type, then it's easy to grab
+            # If our object is a function-type, then it's easy to grab.
             elif isinstance(object, types.FunctionType):
                 module, name = object.__module__, pycompat.function.name(object)
                 iterable = parameters(object)
                 return '.'.join([module, name]), tuple(iterable)
 
-            # If it's still callable, then this is likely a class
+            # If it's still callable, then this is likely a class.
             elif callable(object):
                 symbols, module, name = object.__dict__, object.__module__, object.__name__
                 cons = symbols.get('__init__', symbols.get('__new__', None))
@@ -353,24 +353,33 @@ class prioritybase(object):
             # Otherwise, we have no idea what it is...
             return "{!r}".format(object), None
 
+        # Unpack a prioritytuple into its components so we can describe it.
+        def repr_prioritytuple(tuple):
+            priority, callable = tuple
+            name, args = repr_callable(callable)
+            return priority, name, args
+
         # If there aren't any targets available, then return immediately.
         if not self.available:
             return '\n'.join(["{!s}".format(cls), "...No targets are being used...".format(cls)])
 
-        alignment, res = max(len("{!s}".format(target)) for target in self.available), []
-        res.append("{!s}".format(cls))
+        alignment_enabled = max(len("{!s}".format(target)) for target in self.enabled) if self.enabled else 0
+        alignment_disabled = max(len("{!s} (disabled)".format(target)) for target in self.disabled) if self.disabled else 0
+        res = ["{!s}".format(cls)]
 
         # First gather all our enabled hooks.
         for target in self.enabled:
-            hooks = self.get(target)
-            items = [name if args is None else "{:s}({:s})".format(name, ', '.join(args)) for name, args in map(repr_callable, hooks)]
-            res.append("{:<{:d}s} : ({:d}) {!s}".format("{!s}".format(target), alignment, len(items), ', '.join(items)))
+            items = self.__cache__[target]
+            hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
+            items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
+            res.append("{:<{:d}s} : {!s}".format("{!s}".format(target), alignment_enabled, ' '.join(items)))
 
         # Now we can append all the disabled ones.
         for target in self.disabled:
-            hooks = self.get(target)
-            items = [name if args is None else "{:s}({:s})".format(name, ', '.join(args)) for name, args in map(repr_callable, hooks)]
-            res.append("{:<{:d}s} : (disabled) {!s}".format("{!s}".format(target), alignment, ', '.join(items)))
+            items = self.__cache__[target]
+            hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
+            items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
+            res.append("{:<{:d}s} : {!s}".format("{!s} (disabled)".format(target), alignment_disabled, ' '.join(items)))
 
         # And then return it to the caller.
         return '\n'.join(res)
