@@ -298,6 +298,82 @@ class prioritybase(object):
     def available(self):
         '''Return all of the available targets that can be either enabled or disabled.'''
         return {item for item in self.__cache__}
+    @property
+    def disabled(self):
+        '''Return all of the available targets that are currently disabled.'''
+        return {item for item in self.__disabled}
+    @property
+    def enabled(self):
+        '''Return all of the available targets that are currently enabled.'''
+        return self.available - self.disabled
+
+    def __repr__(self):
+        cls = self.__class__
+
+        # Extract the parameters from a function. This is just a
+        # wrapper around utils.multicase.ex_args so we can extract
+        # the names.
+        def parameters(func):
+            args, defaults, (star, starstar) = internal.utils.multicase.ex_args(func)
+            for item in args:
+                yield "{:s}={!s}".format(item, defaults[item]) if item in defaults else item
+            if star:
+                yield "*{:s}".format(star)
+            if starstar:
+                yield "**{:s}".format(starstar)
+            return
+
+        # Render the callable as something readable
+        def repr_callable(object, pycompat=internal.utils.pycompat):
+
+            # If a method is passed to us, then we need to extract all
+            # of the relevant components that describe it.
+            if isinstance(object, (types.MethodType, staticmethod, classmethod)):
+                cls = pycompat.method.type(object)
+                func = pycompat.method.function(object)
+                module, name = func.__module__, pycompat.function.name(func)
+                iterable = parameters(func)
+                None if isinstance(object, staticmethod) else next(iterable)
+                return '.'.join([module, cls.__name__, name]), tuple(iterable)
+
+            # If our object is a function-type, then it's easy to grab
+            elif isinstance(object, types.FunctionType):
+                module, name = object.__module__, pycompat.function.name(object)
+                iterable = parameters(object)
+                return '.'.join([module, name]), tuple(iterable)
+
+            # If it's still callable, then this is likely a class
+            elif callable(object):
+                symbols, module, name = object.__dict__, object.__module__, object.__name__
+                cons = symbols.get('__init__', symbols.get('__new__', None))
+                iterable = parameters(cons) if cons else []
+                next(iterable)
+                return '.'.join([module, name]), tuple(iterable)
+
+            # Otherwise, we have no idea what it is...
+            return "{!r}".format(object), None
+
+        # If there aren't any targets available, then return immediately.
+        if not self.available:
+            return '\n'.join(["{!s}".format(cls), "...No targets are being used...".format(cls)])
+
+        alignment, res = max(len("{!s}".format(target)) for target in self.available), []
+        res.append("{!s}".format(cls))
+
+        # First gather all our enabled hooks.
+        for target in self.enabled:
+            hooks = self.get(target)
+            items = [name if args is None else "{:s}({:s})".format(name, ', '.join(args)) for name, args in map(repr_callable, hooks)]
+            res.append("{:<{:d}s} : ({:d}) {!s}".format("{!s}".format(target), alignment, len(items), ', '.join(items)))
+
+        # Now we can append all the disabled ones.
+        for target in self.disabled:
+            hooks = self.get(target)
+            items = [name if args is None else "{:s}({:s})".format(name, ', '.join(args)) for name, args in map(repr_callable, hooks)]
+            res.append("{:<{:d}s} : (disabled) {!s}".format("{!s}".format(target), alignment, ', '.join(items)))
+
+        # And then return it to the caller.
+        return '\n'.join(res)
 
     def enable(self, target):
         '''Enable any callables for the specified `target` that has been previously disabled.'''
@@ -581,6 +657,15 @@ class priorityhook(prioritybase):
             cls, method = self.__class__, '.'.join([self.object.__class__.__name__, name])
             raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
         return super(priorityhook, self).apply(name)
+
+    def __repr__(self):
+        hObject = self.object
+        hType = hObject.__class__
+        hName = hType.__name__
+        if not self.available:
+            return "Hooks for {:s}: {:s}".format(hName, 'No hooks have been added')
+        res, items = "Hooks for {:s}:".format(hName), super(priorityhook, self).__repr__().split('\n')
+        return '\n'.join([res] + items[1:])
 
 class prioritynotification(prioritybase):
     """
