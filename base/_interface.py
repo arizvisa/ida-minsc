@@ -363,8 +363,8 @@ class prioritybase(object):
         if not self.available:
             return '\n'.join(["{!s}".format(cls), "...No targets are being used...".format(cls)])
 
-        alignment_enabled = max(len("{!s}".format(target)) for target in self.enabled) if self.enabled else 0
-        alignment_disabled = max(len("{!s} (disabled)".format(target)) for target in self.disabled) if self.disabled else 0
+        alignment_enabled = max(len(self.__formatter__(target)) for target in self.enabled) if self.enabled else 0
+        alignment_disabled = max(len("{:s} (disabled)".format(self.__formatter__(target))) for target in self.disabled) if self.disabled else 0
         res = ["{!s}".format(cls)]
 
         # First gather all our enabled hooks.
@@ -372,14 +372,14 @@ class prioritybase(object):
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
-            res.append("{:<{:d}s} : {!s}".format("{!s}".format(target), alignment_enabled, ' '.join(items)))
+            res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items)))
 
         # Now we can append all the disabled ones.
         for target in self.disabled:
             items = self.__cache__[target]
             hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
             items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
-            res.append("{:<{:d}s} : {!s}".format("{!s} (disabled)".format(target), alignment_disabled, ' '.join(items)))
+            res.append("{:<{:d}s} : {!s}".format("{:s} (disabled)".format(self.__formatter__(target)), alignment_disabled, ' '.join(items)))
 
         # And then return it to the caller.
         return '\n'.join(res)
@@ -400,7 +400,7 @@ class prioritybase(object):
             logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__)))))
             return False
         if target in self.__disabled:
-            logging.warning(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
+            logging.warning(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
         self.__disabled.add(target)
         return True
@@ -588,7 +588,8 @@ class priorityhook(prioritybase):
         return self.object.unhook()
 
     def __formatter__(self, name):
-        return "\"{:s}.{:s}\"".format(self.__type__.__name__, name)
+        cls = self.__type__
+        return '.'.join([cls.__name__, name])
 
     def __hook(self):
         if not self.object.hook():
@@ -684,9 +685,11 @@ class prioritynotification(prioritybase):
     def __init__(self):
         super(prioritynotification, self).__init__()
         self.hook()
+        self.__lookup = { getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('NW_') }
 
     def __formatter__(self, notification):
-        return "notification ({:#x})".format(notification)
+        name = self.__lookup.get(notification, '')
+        return "{:s}({:#x})".format(name, notification) if name else "{:#x}".format(notification)
 
     def connect(self, notification, closure):
         '''Connect to the specified `notification` in order to execute any callables provided by the user.'''
