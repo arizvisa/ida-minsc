@@ -298,6 +298,91 @@ class prioritybase(object):
     def available(self):
         '''Return all of the available targets that can be either enabled or disabled.'''
         return {item for item in self.__cache__}
+    @property
+    def disabled(self):
+        '''Return all of the available targets that are currently disabled.'''
+        return {item for item in self.__disabled}
+    @property
+    def enabled(self):
+        '''Return all of the available targets that are currently enabled.'''
+        return self.available - self.disabled
+
+    def __repr__(self):
+        cls = self.__class__
+
+        # Extract the parameters from a function. This is just a
+        # wrapper around utils.multicase.ex_args so we can extract
+        # the names.
+        def parameters(func):
+            args, defaults, (star, starstar) = internal.utils.multicase.ex_args(func)
+            for item in args:
+                yield "{:s}={!s}".format(item, defaults[item]) if item in defaults else item
+            if star:
+                yield "*{:s}".format(star)
+            if starstar:
+                yield "**{:s}".format(starstar)
+            return
+
+        # Render the callable as something readable.
+        def repr_callable(object, pycompat=internal.utils.pycompat):
+
+            # If a method is passed to us, then we need to extract all
+            # of the relevant components that describe it.
+            if isinstance(object, (types.MethodType, staticmethod, classmethod)):
+                cls = pycompat.method.self(object)
+                func = pycompat.method.function(object)
+                module, name = func.__module__, pycompat.function.name(func)
+                iterable = parameters(func)
+                None if isinstance(object, staticmethod) else next(iterable)
+                return '.'.join([module, cls.__name__, name]), tuple(iterable)
+
+            # If our object is a function-type, then it's easy to grab.
+            elif isinstance(object, types.FunctionType):
+                module, name = object.__module__, pycompat.function.name(object)
+                iterable = parameters(object)
+                return '.'.join([module, name]), tuple(iterable)
+
+            # If it's still callable, then this is likely a class.
+            elif callable(object):
+                symbols, module, name = object.__dict__, object.__module__, object.__name__
+                cons = symbols.get('__init__', symbols.get('__new__', None))
+                iterable = parameters(cons) if cons else []
+                next(iterable)
+                return '.'.join([module, name]), tuple(iterable)
+
+            # Otherwise, we have no idea what it is...
+            return "{!r}".format(object), None
+
+        # Unpack a prioritytuple into its components so we can describe it.
+        def repr_prioritytuple(tuple):
+            priority, callable = tuple
+            name, args = repr_callable(callable)
+            return priority, name, args
+
+        # If there aren't any targets available, then return immediately.
+        if not self.available:
+            return '\n'.join(["{!s}".format(cls), "...No targets are being used...".format(cls)])
+
+        alignment_enabled = max(len(self.__formatter__(target)) for target in self.enabled) if self.enabled else 0
+        alignment_disabled = max(len("{:s} (disabled)".format(self.__formatter__(target))) for target in self.disabled) if self.disabled else 0
+        res = ["{!s}".format(cls)]
+
+        # First gather all our enabled hooks.
+        for target in sorted(self.enabled):
+            items = self.__cache__[target]
+            hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
+            items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
+            res.append("{:<{:d}s} : {!s}".format(self.__formatter__(target), alignment_enabled, ' '.join(items)))
+
+        # Now we can append all the disabled ones.
+        for target in sorted(self.disabled):
+            items = self.__cache__[target]
+            hooks = sorted([(priority, callable) for priority, callable in items], key=operator.itemgetter(0))
+            items = ["{description:s}[{:+d}]".format(priority, description=name if args is None else "{:s}({:s})".format(name, ', '.join(args))) for priority, name, args in map(repr_prioritytuple, hooks)]
+            res.append("{:<{:d}s} : {!s}".format("{:s} (disabled)".format(self.__formatter__(target)), alignment_disabled, ' '.join(items)))
+
+        # And then return it to the caller.
+        return '\n'.join(res)
 
     def enable(self, target):
         '''Enable any callables for the specified `target` that has been previously disabled.'''
@@ -315,7 +400,7 @@ class prioritybase(object):
             logging.fatal(u"{:s}.disable({!r}) : The requested {:s} does not exist. Available hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__cache__)))))
             return False
         if target in self.__disabled:
-            logging.warning(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target).capitalize(), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
+            logging.warning(u"{:s}.disable({!r}) : {:s} has already been disabled. Currently disabled hooks are: {:s}.".format('.'.join([__name__, cls.__name__]), target, self.__formatter__(target), "{{{:s}}}".format(', '.join(map("{!r}".format, self.__disabled)))))
             return False
         self.__disabled.add(target)
         return True
@@ -369,6 +454,7 @@ class prioritybase(object):
         # from our cache.
         else:
             self.__cache__.pop(target, [])
+            self.__disabled.discard(target)
 
         return True if found else False
 
@@ -503,7 +589,8 @@ class priorityhook(prioritybase):
         return self.object.unhook()
 
     def __formatter__(self, name):
-        return "\"{:s}.{:s}\"".format(self.__type__.__name__, name)
+        cls = self.__type__
+        return '.'.join([cls.__name__, name])
 
     def __hook(self):
         if not self.object.hook():
@@ -582,6 +669,15 @@ class priorityhook(prioritybase):
             raise NameError("{:s}.apply({!r}) : Unable to apply the specified hook due to the method ({:s}) being unavailable.".format('.'.join([__name__, cls.__name__]), name, method))
         return super(priorityhook, self).apply(name)
 
+    def __repr__(self):
+        hObject = self.object
+        hType = hObject.__class__
+        hName = hType.__name__
+        if not self.available:
+            return "Hooks for {:s}: {:s}".format(hName, 'No hooks have been added.')
+        res, items = "Hooks for {:s}:".format(hName), super(priorityhook, self).__repr__().split('\n')
+        return '\n'.join([res] + items[1:])
+
 class prioritynotification(prioritybase):
     """
     Helper class for allowing one to apply an arbitrary number of hooks to the
@@ -590,9 +686,11 @@ class prioritynotification(prioritybase):
     def __init__(self):
         super(prioritynotification, self).__init__()
         self.hook()
+        self.__lookup = { getattr(idaapi, name) : name for name in dir(idaapi) if name.startswith('NW_') }
 
     def __formatter__(self, notification):
-        return "notification ({:#x})".format(notification)
+        name = self.__lookup.get(notification, '')
+        return "{:s}({:#x})".format(name, notification) if name else "{:#x}".format(notification)
 
     def connect(self, notification, closure):
         '''Connect to the specified `notification` in order to execute any callables provided by the user.'''
@@ -611,6 +709,12 @@ class prioritynotification(prioritybase):
             raise ValueError("{:s}.apply({:#x}): Unable to apply the specified notification ({:#x}) due to the value being invalid.".format('.'.join([__name__, cls.__name__]), notification, notification))
 
         return super(prioritynotification, self).apply(notification)
+
+    def __repr__(self):
+        if not self.available:
+            return "Notification events: {:s}".format('No hooks have been added.')
+        res, items = 'Notification events:', super(prioritynotification, self).__repr__().split('\n')
+        return '\n'.join([res] + items[1:])
 
 class address(object):
     """
