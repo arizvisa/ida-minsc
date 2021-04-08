@@ -49,7 +49,12 @@ class commentbase(object):
     @classmethod
     def is_ready(cls):
         global State
-        return State == state.ready
+        return State in {state.ready}
+
+    @classmethod
+    def is_loaded(cls):
+        global State
+        return State in {state.loaded, state.ready}
 
 class address(commentbase):
     @classmethod
@@ -160,8 +165,8 @@ class address(commentbase):
 
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        if not cls.is_loaded():
+            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not loaded) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Grab our old comment, because we're going to submit this later to a coro
         logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
@@ -191,8 +196,8 @@ class address(commentbase):
 
     @classmethod
     def changed(cls, ea, repeatable_cmt):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        if not cls.is_loaded():
+            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not loaded) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Grab our new comment, because we're going to submit this later to our coro
         logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
@@ -349,8 +354,8 @@ class globals(commentbase):
 
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if not cls.is_loaded():
+            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not loaded) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
@@ -387,8 +392,8 @@ class globals(commentbase):
 
     @classmethod
     def changed(cls, cb, a, cmt, repeatable):
-        if not cls.is_ready():
-            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if not cls.is_loaded():
+            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not loaded) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
