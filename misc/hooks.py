@@ -480,9 +480,127 @@ class globals(changebase):
         # that should've been it, so we can now just leave
         return
 
+class typeinfo(changebase):
+    @classmethod
+    def changing(cls, ea, new_type, new_fname):
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (database not ready) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
+        logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Received typeinfo.changing for new_type ({!s}) and new_fname ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname))
+
+        # Extract the previous type information from the given address. If none
+        # was found, then just use empty strings because these are compared to the
+        # new values by the event.
+        ti = database.type(ea)
+        old_type, old_fname, _ = (b'', b'', None) if ti is None else ti.serialize()
+
+        # Pre-pack both of our tuples that we're going to send to the event.
+        original = (old_type, old_fname or b'')
+        new = (new_type or b'', new_fname or b'')
+
+        # First disable our hooks so that we can prevent re-entrancy issues.
+        [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
+
+        # Now we can use our coroutine to begin updating the typeinfo tag. We
+        # submit the previous values (prior to the typeinfo being changed) because
+        # the "changed" event (which will be dispatched afterwards) is responsible
+        # for performing the actual update of the cache.
+        try:
+            cls.event.send((ea, original, new))
+
+        # If we encounter a StopIteration while submitting the comment, then the
+        # coroutine has gone out of sync and we need to reinitialize it in order
+        # to regain control.
+        except StopIteration as E:
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)))
+            cls.event = cls._event(); next(cls.event)
+
+        # Last thing to do is to re-enable the hooks that we disabled and then leave.
+        finally:
+            [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
+        return
+
+    @classmethod
+    def changed(cls, ea, type, fnames):
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (database not ready) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
+        logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames))
+
+        # Take the data that IDA told us was written, and pack into a tuple so
+        # that we can send it to the event later.
+        new = (type or b'', fnames or b'')
+
+        # First disable our hooks so that we can prevent re-entrancy issues.
+        [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
+
+        # Now we can use our coroutine to update the typeinfo tag. As IDA was
+        # kind enough to provide the new values, we can just submit them to the
+        # coroutine.
+        try:
+            cls.event.send((ea, new))
+
+        # If we encounter a StopIteration while submitting the comment, then the
+        # coroutine has gone out of sync and we need to reinitialize it in order
+        # to regain control.
+        except StopIteration as E:
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)))
+            cls.event = cls._event(); next(cls.event)
+
+        # Last thing to do is to re-enable the hooks that we disabled and then leave.
+        finally:
+            [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
+        return
+
+    @classmethod
+    def _event(cls):
+        while True:
+            # Receive the changing_ti event...
+            ea, original, expected = (yield)
+
+            # All typeinfo are global tags unless they're being applied to an
+            # operand...which isn't handled by this class.
+            fn, ctx = idaapi.get_func(ea), internal.comment.globals
+
+            # First check if we need to remove the typeinfo that's stored at the
+            # given address.
+            old_type, old_fname = original
+            if old_type or old_fname:
+                ctx.dec(ea, '__typeinfo__')
+
+            # Wait until we get the ti_changed event...
+            new_ea, tidata = (yield)
+            fn, ctx = idaapi.get_func(ea), internal.comment.globals
+
+            # Verify that the typeinfo we're changing to is the exact same as given
+            # to use by both events. If they're not the same, then we need to make
+            # an assumption and that assumption is to take the values given to us
+            # by the changing_ti event.
+            if (ea, expected) != (new_ea, tidata):
+                logging.warning(u"{:s}.event() : Typeinfo events are out of sync for address ({:#x} != {:#x}) and typeinfo ({!r} != {!r}). Using the values from the previous event.".format('.'.join([__name__, cls.__name__]), ea, new_ea, bytes().join(expected), bytes().join(tidata)))
+            elif ea != new_ea:
+                logging.warning(u"{:s}.event() : Typeinfo events are out of sync for address ({:#x} != {:#x}). Using the address {:#x} from the previous event.".format('.'.join([__name__, cls.__name__]), ea, new_ea, ea))
+                new_ea = ea
+            elif expected != tidata:
+                logging.info(u"{:s}.event() : Typeinfo events are out of sync for address {:#x} due to typeinfo ({!r} != {!r}). Re-fetching the typeinfo for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(expected), bytes().join(tidata), new_ea))
+                tidata = database.type(ea)
+
+            # Okay, we now have the data that we need to compare in order to determine
+            # if we're removing typeinfo, adding it, or updating it. Since we
+            # already decremented the tag from the previous address, we really
+            # only need to determine if we need to add its reference back.
+            if any(tidata):
+                ctx.inc(new_ea, '__typeinfo__')
+                logging.debug(u"{:s}.event() : Updated typeinfo at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
+
+            # For the sake of debugging, log that we just removed the typeinfo
+            # from the current address.
+            else:
+                logging.debug(u"{:s}.event() : Removed typeinfo from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
+            continue
+        return
+
 ### database scope
 class state(object):
-    # database notification state
+    '''database notification state'''
     init = type('init', (object,), {})()
     loaded = type('loaded', (object,), {})()
     ready = type('ready', (object,), {})()
@@ -1128,6 +1246,11 @@ def make_ida_not_suck_cocks(nw_code):
     if idaapi.__version__ >= 7.2:
         ui.hook.idb.add('item_color_changed', item_color_changed, 0)
 
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_init', typeinfo.database_init, 0)
+        ui.hook.idb.add('changing_ti', typeinfo.changing, 0)
+        ui.hook.idb.add('ti_changed', typeinfo.changed, 0)
+
     ## just some debugging notification hooks
     #[ ui.hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
     #[ ui.hook.idp.add(item, notify(item), -100) for item in ['ev_newfile','ev_oldfile','ev_init','ev_term','ev_newprc','ev_newasm','ev_auto_queue_empty'] ]
@@ -1135,6 +1258,8 @@ def make_ida_not_suck_cocks(nw_code):
     #[ ui.hook.idp.add(item, notify(item), -100) for item in ['add_func','del_func','set_func_start','set_func_end'] ]
     #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
     #[ ui.hook.idb.add(item, notify(item), -100) for item in ['cmt_changed', 'changing_cmt', 'range_cmt_changed', 'changing_range_cmt'] ]
+    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['changing_ti', 'ti_changed', 'changing_op_type', 'op_type_changed'] ]
+    #[ ui.hook.idb.add(item, notify(item), -100op_type_changed for item in ['changing_op_ti', 'op_ti_changed'] ]
 
     ### ...and that's it for all the hooks, so give out our greeting
     return greeting()
