@@ -329,7 +329,7 @@ class prioritybase(object):
             # If a method is passed to us, then we need to extract all
             # of the relevant components that describe it.
             if isinstance(object, (types.MethodType, staticmethod, classmethod)):
-                cls = pycompat.method.type(object)
+                cls = pycompat.method.self(object)
                 func = pycompat.method.function(object)
                 module, name = func.__module__, pycompat.function.name(func)
                 iterable = parameters(func)
