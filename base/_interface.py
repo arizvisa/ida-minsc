@@ -570,7 +570,15 @@ class priorityhook(prioritybase):
             supermethod = getattr(supercls, name)
             return supermethod(ea, new_name, local_name or None, old_name)
 
-        # patch-methods because SWIG+IDAPython is fucking stupid
+        def saved(self, path):
+            cls = self.__class__
+            supercls = super(cls, self)
+            supermethod = getattr(supercls, name)
+            return supermethod(path)
+
+        # patch-methods because SWIG+IDAPython is fucking stupid and Ilfak keeps
+        # changing the damned hook parameters in the supermethod without updating
+        # the dispatchers of the hook.
 
         if idaapi.__version__ >= 7.5:
             if name in {'ev_set_idp_options'}:
@@ -581,6 +589,8 @@ class priorityhook(prioritybase):
                 return compiler_changed
             elif name in {'renamed'}:
                 return renamed
+            elif name in {'saved'}:
+                return saved
 
         return method
 
