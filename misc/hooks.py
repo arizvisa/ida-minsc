@@ -485,6 +485,8 @@ class typeinfo(changebase):
     def changing(cls, ea, new_type, new_fname):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (database not ready) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (not an address) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
         logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Received typeinfo.changing for new_type ({!s}) and new_fname ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname))
 
         # Extract the previous type information from the given address. If none
@@ -511,7 +513,7 @@ class typeinfo(changebase):
         # coroutine has gone out of sync and we need to reinitialize it in order
         # to regain control.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)))
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname)))
             cls.event = cls._event(); next(cls.event)
 
         # Last thing to do is to re-enable the hooks that we disabled and then leave.
@@ -523,6 +525,8 @@ class typeinfo(changebase):
     def changed(cls, ea, type, fnames):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (database not ready) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
         logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames))
 
         # Take the data that IDA told us was written, and pack into a tuple so
