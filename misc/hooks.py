@@ -33,7 +33,12 @@ def greeting():
     six.print_('-' * barrier)
 
 ### comment hooks
-class commentbase(object):
+class changebase(object):
+    """
+    This base class is for dealing with 2-part events where one part is the
+    "changing" event which is dispatched before any changes are made, and the
+    second part is the "changed" event which happens after they've been completed.
+    """
     @classmethod
     def database_init(cls, idp_modname):
         if hasattr(cls, 'event'):
@@ -51,7 +56,12 @@ class commentbase(object):
         global State
         return State == state.ready
 
-class address(commentbase):
+class address(changebase):
+    """
+    This class handles 2-part events that are used to modify comments at an arbitrary
+    address. This address will either be a contents tag if it's within the boundaries
+    of a function, or a globals tag if it's just some arbitrary address.
+    """
     @classmethod
     def get_func_extern(cls, ea):
         """Return the function at the given address and whether the address is a function populated by the rtld (an external).
@@ -261,7 +271,13 @@ class address(commentbase):
         # and then leave because this should've updated things properly.
         return
 
-class globals(commentbase):
+class globals(changebase):
+    """
+    This class handles 2-part events that are used to modify comments for a particular
+    range. In most cases this should be a function comment, or a chunk associated
+    with a function, but just to be certain we check the start_ea of the range
+    to determine whether we update the global or content tag cache.
+    """
     @classmethod
     def _update_refs(cls, fn, old, new):
         oldkeys, newkeys = ({item for item in content.keys()} for content in [old, new])
@@ -464,9 +480,169 @@ class globals(commentbase):
         # that should've been it, so we can now just leave
         return
 
+class typeinfo(changebase):
+    @classmethod
+    def changing(cls, ea, new_type, new_fname):
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (database not ready) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (not an address) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
+        logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Received typeinfo.changing for new_type ({!s}) and new_fname ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname))
+
+        # Extract the previous type information from the given address. If none
+        # was found, then just use empty strings because these are compared to the
+        # new values by the event.
+        ti = database.type(ea)
+        old_type, old_fname, _ = (b'', b'', None) if ti is None else ti.serialize()
+
+        # Pre-pack both of our tuples that we're going to send to the event.
+        original = (old_type, old_fname or b'')
+        new = (new_type or b'', new_fname or b'')
+
+        # First disable our hooks so that we can prevent re-entrancy issues.
+        [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
+
+        # Now we can use our coroutine to begin updating the typeinfo tag. We
+        # submit the previous values (prior to the typeinfo being changed) because
+        # the "changed" event (which will be dispatched afterwards) is responsible
+        # for performing the actual update of the cache.
+        try:
+            cls.event.send((ea, original, new))
+
+        # If we encounter a StopIteration while submitting the comment, then the
+        # coroutine has gone out of sync and we need to reinitialize it in order
+        # to regain control.
+        except StopIteration as E:
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname)))
+            cls.event = cls._event(); next(cls.event)
+
+        # Last thing to do is to re-enable the hooks that we disabled and then leave.
+        finally:
+            [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
+        return
+
+    @classmethod
+    def changed(cls, ea, type, fnames):
+        if not cls.is_ready():
+            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (database not ready) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
+        logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames))
+
+        # Take the data that IDA told us was written, and pack into a tuple so
+        # that we can send it to the event later.
+        new = (type or b'', fnames or b'')
+
+        # First disable our hooks so that we can prevent re-entrancy issues.
+        [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
+
+        # Now we can use our coroutine to update the typeinfo tag. As IDA was
+        # kind enough to provide the new values, we can just submit them to the
+        # coroutine.
+        try:
+            cls.event.send((ea, new))
+
+        # If we encounter a StopIteration while submitting the comment, then the
+        # coroutine has gone out of sync and we need to reinitialize it in order
+        # to regain control.
+        except StopIteration as E:
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)))
+            cls.event = cls._event(); next(cls.event)
+
+        # Last thing to do is to re-enable the hooks that we disabled and then leave.
+        finally:
+            [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
+        return
+
+    @classmethod
+    def _event(cls):
+        while True:
+            # All typeinfo are global tags unless they're being applied to an
+            # operand...which is never handled by this class.
+            ctx = internal.comment.globals
+
+            # Receive the changing_ti event...
+            ea, original, expected = (yield)
+
+            # First check if we need to remove the typeinfo that's stored at the
+            # given address. Afterwards we can unpack our original values.
+            if any(original):
+                ctx.dec(ea, '__typeinfo__')
+            old_type, old_fname = original
+
+            # Wait until we get the ti_changed event...
+            while True:
+                result = (yield)
+                try:
+                    new_ea, tidata = result
+
+                # IDA seems to have a bug that occurs post-analysis where a changing_ti
+                # event might not be followed by a ti_changed event. It seems that
+                # this only happens when the type is being removed, so if we get more
+                # than one tuple returned from our owner then we need to remove our
+                # old results, and then try again.
+                except ValueError:
+
+                    # If we encountered an unpaired event, then check if the event would've
+                    # actually applied any changes. If they have, then we need to let the
+                    # user know that something was lost.
+                    if original != expected:
+
+                        # If there was data that was expected to be written to the database
+                        # for the typeinfo at the given address, then let the user know.
+                        if any(expected):
+                            logging.debug(u"{:s}.event() : An unpaired event ({:s}) that sets the old type information ({!r}) for address {:#x} to {!r} was encountered. Discarding the event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea, bytes().join(expected)))
+
+                        # If there wasn't any data, then this address expected to have
+                        # its typeinfo cleared. We can recover from this because we've
+                        # already decremented the refcount for it.
+                        else:
+                            logging.debug(u"{:s}.event() : An unpaired event ({:s}) that clears the type information ({!r}) for address {:#x} was encountered. Attempting recovery.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea))
+
+                    # Receive the misplaced changing_ti event again, and then retry
+                    # looking for ti_changed...
+                    ea, original, expected = result
+                    if any(original):
+                        ctx.dec(ea, '__typeinfo__')
+                    old_type, old_fname = original
+
+                # If we unpacked our value successfully, then we can exit the
+                # ti_changed loop because we were able to recover and resynchronize.
+                else:
+                    break
+                continue
+
+            # Verify that the typeinfo we're changing to is the exact same as given
+            # to use by both events. If they're not the same, then we need to make
+            # an assumption and that assumption is to take the values given to us
+            # by the changing_ti event.
+            if (ea, expected) != (new_ea, tidata):
+                logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(tidata), 'changing_ti', 'ti_changed'))
+            elif ea != new_ea:
+                logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
+                new_ea = ea
+            elif expected != tidata:
+                logging.info(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was given by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
+                tidata = database.type(ea)
+
+            # Okay, we now have the data that we need to compare in order to determine
+            # if we're removing typeinfo, adding it, or updating it. Since we
+            # already decremented the tag from the previous address, we really
+            # only need to determine if we need to add its reference back.
+            if any(tidata):
+                ctx.inc(new_ea, '__typeinfo__')
+                logging.debug(u"{:s}.event() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
+
+            # For the sake of debugging, log that we just removed the typeinfo
+            # from the current address.
+            else:
+                logging.debug(u"{:s}.event() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
+            continue
+        return
+
 ### database scope
 class state(object):
-    # database notification state
+    '''database notification state'''
     init = type('init', (object,), {})()
     loaded = type('loaded', (object,), {})()
     ready = type('ready', (object,), {})()
@@ -739,34 +915,132 @@ def rename(ea, newname):
         logging.debug(u"{:s}.rename({:#x}, {!s}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
     return
 
-def extra_cmt_changed(ea, line_idx, cmt):
-    # FIXME: persist state for extra_cmts in order to determine what the original
-    #        value was before modification. IDA doesn't seem to have an
-    #        extra_cmt_changing event and instead calls this hook twice for every
-    #        insertion.
-    # XXX: this function is now busted in later versions of IDA because for some
-    #      reason, Ilfak, is now updating the extra comment prior to dispatching
-    #      this event. unfortunately, our tag cache doesn't allow us to identify
-    #      the actual number of tags that are at an address, so there's no way
-    #      to identify the actual change to the extra comment that the user made,
-    #      which totally fucks up the reference count. in the current
-    #      implementation, if we can't distinguish between the old and new extra
-    #      comments, then its simply a no-op. this is okay for now...
+class extra_cmt(object):
+    """
+    This class is pretty much just a namespace for finding information about the
+    extra comments in order to distinguish whether the comment is being added or
+    removed.
 
-    oldcmt = internal.netnode.sup.get(ea, line_idx, type=memoryview)
-    if oldcmt is not None: oldcmt = oldcmt.tobytes().rstrip(b'\0')
+    FIXME: This has an issue in that the tag cache is not properly cleaned up as
+           we're unable to distinguish whether an extra comment is being created
+           or just updated. Because of this, any update of an extra comment will
+           result in its reference being increased more than once which then makes
+           it impossible to remove without either completely removing and reapplying
+           the tags for the address or keeping track of all the extra comments in
+           a dictionary of some kind. If the latter is chosen, then we'd need to
+           query the entire database for both types of extra comments. If the
+           prior is chosen, then we'd need to implement the logic for all of the
+           implicit tags in order to zero them entirely prior to re-applying them
+           which would result in us losing track of the "__name__" tag.
+    """
+    MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV - idaapi.E_NEXT
+
+    @classmethod
+    def Fcount(cls, ea, base):
+        sup = internal.netnode.sup
+        for index in range(cls.MAX_ITEM_LINES):
+            row = sup.get(ea, base + index, type=memoryview)
+            if row is None: break
+        return index or None
+
+    @classmethod
+    def is_prefix(cls, line_idx):
+        return idaapi.E_PREV <= line_idx < idaapi.E_PREV + cls.MAX_ITEM_LINES
+
+    @classmethod
+    def is_suffix(cls, line_idx):
+        return idaapi.E_NEXT <= line_idx < idaapi.E_NEXT + cls.MAX_ITEM_LINES
+
+    @classmethod
+    def changed(cls, ea, line_idx, cmt):
+        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+
+        # Determine whether we'll be updating the contents or a global.
+        ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
+
+        # Figure out what the line_idx boundaries are so that we can use it to check
+        # whether there's an "extra" comment at the given address, or not.
+        if cls.is_prefix(line_idx):
+            base_idx, tag = idaapi.E_PREV, '__extra_prefix__'
+        elif cls.is_suffix(line_idx):
+            base_idx, tag = idaapi.E_NEXT, '__extra_suffix__'
+        else:
+            return logging.fatal(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Unable to determine type of extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, ea, line_idx))
+
+        # Check if this is not the first line_idx. If it isn't, then we can simply leave
+        # because all we care about is whether there's a comment here or not.
+        if line_idx not in {base_idx}:
+            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Exiting event for address {:#x} due to the index not pointing to the comment start ({:d} != {:d}).".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx, base_idx))
+
+        # Now we need to figure out whether we've added an extra_cmt, or removed it.
+        if cmt is None:
+            return ctx.dec(ea, tag)
+
+        # XXX: If an "extra" comment is updated more than once, then we unfortunately
+        #      lose track of the reference and it's permanently cached. There's nothing
+        #      we can really do here except for keep a complete state of all of the
+        #      extra comments that the user has created.
+        return ctx.inc(ea, tag)
+
+    @classmethod
+    def changed_multiple(cls, ea, line_idx, cmt):
+        """
+        This implementation is deprecated, but is being preserved as the logic that
+        it uses can be reused if the workaround methodology of zero'ing the refcount
+        for the entire address is applied.
+        """
+        # XXX: this function is now busted in later versions of IDA because for some
+        #      reason, Ilfak, is now updating the extra comment prior to dispatching
+        #      this event. unfortunately, our tag cache doesn't allow us to identify
+        #      the actual number of tags that are at an address, so there's no way
+        #      to identify the actual change to the extra comment that the user made,
+        #      which totally fucks up the reference count. with the current
+        #      implementation, if we can't distinguish between the old and new extra
+        #      comments, then it's simply a no-op. this is okay for now...
+
+        oldcmt = internal.netnode.sup.get(ea, line_idx, type=memoryview)
+        if oldcmt is not None: oldcmt = oldcmt.tobytes().rstrip(b'\0')
+        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for line {:d} with previous comment set to {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx, utils.string.repr(oldcmt)))
+        ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
+
+        MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV - idaapi.E_NEXT
+        prefix = (idaapi.E_PREV, idaapi.E_PREV + MAX_ITEM_LINES, '__extra_prefix__')
+        suffix = (idaapi.E_NEXT, idaapi.E_NEXT + MAX_ITEM_LINES, '__extra_suffix__')
+
+        for l, r, key in [prefix, suffix]:
+            if l <= line_idx < r:
+                if oldcmt is None and cmt is not None: ctx.inc(ea, key)
+                elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
+                logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}, oldcmt={!s}) : {:s} reference count at address for tag {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), utils.string.repr(oldcmt), 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', utils.string.repr(key)))
+            continue
+        return
+
+### individual tags
+def item_color_changed(ea, color):
+    '''This hook is for when a color is applied to an address.'''
+
+    # First make sure it's not an identifier, as if it is then we
+    # need to terminate early because the tag cache doesn't care
+    # about this stuff.
+    if interface.node.is_identifier(ea):
+        return
+
+    # Now we need to distinguish between a content or global tag so
+    # that we can look it up to see if we need to remove it or add it.
     ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
-    MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
-    prefix = (idaapi.E_PREV, idaapi.E_PREV+MAX_ITEM_LINES, '__extra_prefix__')
-    suffix = (idaapi.E_NEXT, idaapi.E_NEXT+MAX_ITEM_LINES, '__extra_suffix__')
+    # FIXME: we need to figure out if the color is being changed,
+    #        updated, or removed. since there's no way to determine
+    #        this accurately, we just assume that any color is going
+    #        to increase the reference count.
 
-    for l, r, key in [prefix, suffix]:
-        if l <= line_idx < r:
-            if oldcmt is None and cmt is not None: ctx.inc(ea, key)
-            elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
-            logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}, oldcmt={!s}) : {:s} reference count at address for tag {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), utils.string.repr(oldcmt), 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', utils.string.repr(key)))
-        continue
+    # If the color was restored, then we need to decrease its ref.
+    if color in {idaapi.COLOR_DEFAULT}:
+        ctx.dec(ea, '__color__')
+
+    # The color is being applied, so we can just increase its reference.
+    else:
+        ctx.inc(ea, '__color__')
     return
 
 ### function scope
@@ -970,8 +1244,10 @@ def make_ida_not_suck_cocks(nw_code):
     ## setup default integer types for the typemapper once the loader figures everything out
     if idaapi.__version__ >= 7.0:
         ui.hook.idp.add('ev_newprc', interface.typemap.__ev_newprc__, 0)
+
     elif idaapi.__version__ >= 6.9:
         ui.hook.idp.add('newprc', interface.typemap.__newprc__, 0)
+
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, interface.typemap.__nw_newprc__, -40)
 
@@ -997,8 +1273,10 @@ def make_ida_not_suck_cocks(nw_code):
     ## create the tagcache netnode when a database is created
     if idaapi.__version__ >= 7.0:
         ui.hook.idp.add('ev_init', comment.tagging.__init_tagcache__, -1)
+
     elif idaapi.__version__ >= 6.9:
         ui.hook.idp.add('init', comment.tagging.__init_tagcache__, -1)
+
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, comment.tagging.__nw_init_tagcache__, -40)
 
@@ -1008,34 +1286,32 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('ev_init', globals.database_init, 0)
         ui.hook.idb.add('changing_range_cmt', globals.changing, 0)
         ui.hook.idb.add('range_cmt_changed', globals.changed, 0)
+
     elif idaapi.__version__ >= 6.9:
         ui.hook.idp.add('init', address.database_init, 0)
         ui.hook.idp.add('init', globals.database_init, 0)
         ui.hook.idb.add('changing_area_cmt', globals.changing, 0)
         ui.hook.idb.add('area_cmt_changed', globals.changed, 0)
+
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, address.nw_database_init, -30)
         idaapi.__notification__.add(idaapi.NW_OPENIDB, globals.nw_database_init, -30)
         ui.hook.idb.add('area_cmt_changed', globals.old_changed, 0)
 
+    # hook the changing of a comment
     if idaapi.__version__ >= 6.9:
         ui.hook.idb.add('changing_cmt', address.changing, 0)
         ui.hook.idb.add('cmt_changed', address.changed, 0)
+
     else:
         ui.hook.idb.add('cmt_changed', address.old_changed, 0)
 
     ## hook naming and "extra" comments to support updating the implicit tags
     if idaapi.__version__ >= 7.0:
         ui.hook.idp.add('ev_rename', rename, 0)
+
     else:
         ui.hook.idp.add('rename', rename, 0)
-
-    if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('extra_cmt_changed', extra_cmt_changed, 0)
-    else:
-        # earlier versions of IDAPython don't expose anything about "extra" comments
-        # so we can't do anything here.
-        pass
 
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
@@ -1044,9 +1320,11 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idb.add('deleting_func', del_func, 0)
         ui.hook.idb.add('set_func_start', set_func_start, 0)
         ui.hook.idb.add('set_func_end', set_func_end, 0)
+
     elif idaapi.__version__ >= 6.9:
         ui.hook.idb.add('removing_func_tail', removing_func_tail, 0)
         [ ui.hook.idp.add(item.__name__, item, 0) for item in [add_func, del_func, set_func_start, set_func_end] ]
+
     else:
         ui.hook.idb.add('func_tail_removed', func_tail_removed, 0)
         ui.hook.idp.add('add_func', add_func, 0)
@@ -1058,6 +1336,7 @@ def make_ida_not_suck_cocks(nw_code):
     ## rebase the entire tagcache when the entire database is rebased.
     if idaapi.__version__ >= 6.9:
         ui.hook.idb.add('allsegs_moved', rebase, 0)
+
     else:
         ui.hook.idb.add('segm_start_changed', segm_start_changed, 0)
         ui.hook.idb.add('segm_end_changed', segm_end_changed, 0)
@@ -1066,8 +1345,10 @@ def make_ida_not_suck_cocks(nw_code):
     ## switch the instruction set when the processor is switched
     if idaapi.__version__ >= 7.0:
         ui.hook.idp.add('ev_newprc', instruction.__ev_newprc__, 0)
+
     elif idaapi.__version__ >= 6.9:
         ui.hook.idp.add('newprc', instruction.__newprc__, 0)
+
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, instruction.__nw_newprc__, -10)
 
@@ -1075,10 +1356,28 @@ def make_ida_not_suck_cocks(nw_code):
     ## necessary and used by the processor detection.
     if idaapi.__version__ >= 7.0:
         ui.hook.idp.add('ev_init', database.config.__init_info_structure__, -100)
+
     elif idaapi.__version__ >= 6.9:
         ui.hook.idp.add('init', database.config.__init_info_structure__, -100)
+
     else:
         idaapi.__notification__.add(idaapi.NW_OPENIDB, database.config.__nw_init_info_structure__, -30)
+
+    ## keep track of individual tags like colors and type info
+    if idaapi.__version__ >= 7.2:
+        ui.hook.idb.add('item_color_changed', item_color_changed, 0)
+
+    # anything earlier than v7.0 doesn't expose the "changing_ti" and "ti_changed"
+    # hooks, so there's no actual need to hook "init" to support v6.9.
+    if idaapi.__version__ >= 7.0:
+        ui.hook.idp.add('ev_init', typeinfo.database_init, 0)
+        ui.hook.idb.add('changing_ti', typeinfo.changing, 0)
+        ui.hook.idb.add('ti_changed', typeinfo.changed, 0)
+
+    # earlier versions of IDAPython don't expose anything about "extra" comments
+    # so we can't do anything here.
+    if idaapi.__version__ >= 6.9:
+        ui.hook.idb.add('extra_cmt_changed', extra_cmt.changed, 0)
 
     ## just some debugging notification hooks
     #[ ui.hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
@@ -1087,6 +1386,10 @@ def make_ida_not_suck_cocks(nw_code):
     #[ ui.hook.idp.add(item, notify(item), -100) for item in ['add_func','del_func','set_func_start','set_func_end'] ]
     #ui.hook.idb.add('allsegs_moved', notify('allsegs_moved'), -100)
     #[ ui.hook.idb.add(item, notify(item), -100) for item in ['cmt_changed', 'changing_cmt', 'range_cmt_changed', 'changing_range_cmt'] ]
+    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['changing_ti', 'ti_changed', 'changing_op_type', 'op_type_changed'] ]
+    #[ ui.hook.idb.add(item, notify(item), -100) for item in ['changing_op_ti', 'op_ti_changed'] ]
+    #ui.hook.idb.add('item_color_changed', notify(item), -100)
+    #ui.hook.idb.add('extra_cmt_changed', notify(item), -100)
 
     ### ...and that's it for all the hooks, so give out our greeting
     return greeting()
