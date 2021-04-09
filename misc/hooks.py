@@ -873,35 +873,105 @@ def rename(ea, newname):
         logging.debug(u"{:s}.rename({:#x}, {!s}) : Increasing reference count for tag {!r} at address due to a new name.".format(__name__, ea, utils.string.repr(newname), '__name__'))
     return
 
-def extra_cmt_changed(ea, line_idx, cmt):
-    # FIXME: persist state for extra_cmts in order to determine what the original
-    #        value was before modification. IDA doesn't seem to have an
-    #        extra_cmt_changing event and instead calls this hook twice for every
-    #        insertion.
-    # XXX: this function is now busted in later versions of IDA because for some
-    #      reason, Ilfak, is now updating the extra comment prior to dispatching
-    #      this event. unfortunately, our tag cache doesn't allow us to identify
-    #      the actual number of tags that are at an address, so there's no way
-    #      to identify the actual change to the extra comment that the user made,
-    #      which totally fucks up the reference count. in the current
-    #      implementation, if we can't distinguish between the old and new extra
-    #      comments, then its simply a no-op. this is okay for now...
+class extra_cmt(object):
+    """
+    This class is pretty much just a namespace for finding information about the
+    extra comments in order to distinguish whether the comment is being added or
+    removed.
 
-    oldcmt = internal.netnode.sup.get(ea, line_idx, type=memoryview)
-    if oldcmt is not None: oldcmt = oldcmt.tobytes().rstrip(b'\0')
-    ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
+    FIXME: This has an issue in that the tag cache is not properly cleaned up as
+           we're unable to distinguish whether an extra comment is being created
+           or just updated. Because of this, any update of an extra comment will
+           result in its reference being increased more than once which then makes
+           it impossible to remove without either completely removing and reapplying
+           the tags for the address or keeping track of all the extra comments in
+           a dictionary of some kind. If the latter is chosen, then we'd need to
+           query the entire database for both types of extra comments. If the
+           prior is chosen, then we'd need to implement the logic for all of the
+           implicit tags in order to zero them entirely prior to re-applying them
+           which would result in us losing track of the "__name__" tag.
+    """
+    MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV - idaapi.E_NEXT
 
-    MAX_ITEM_LINES = (idaapi.E_NEXT-idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV-idaapi.E_NEXT
-    prefix = (idaapi.E_PREV, idaapi.E_PREV+MAX_ITEM_LINES, '__extra_prefix__')
-    suffix = (idaapi.E_NEXT, idaapi.E_NEXT+MAX_ITEM_LINES, '__extra_suffix__')
+    @classmethod
+    def Fcount(cls, ea, base):
+        sup = internal.netnode.sup
+        for index in range(cls.MAX_ITEM_LINES):
+            row = sup.get(ea, base + index, type=memoryview)
+            if row is None: break
+        return index or None
 
-    for l, r, key in [prefix, suffix]:
-        if l <= line_idx < r:
-            if oldcmt is None and cmt is not None: ctx.inc(ea, key)
-            elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
-            logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}, oldcmt={!s}) : {:s} reference count at address for tag {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), utils.string.repr(oldcmt), 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', utils.string.repr(key)))
-        continue
-    return
+    @classmethod
+    def is_prefix(cls, line_idx):
+        return idaapi.E_PREV <= line_idx < idaapi.E_PREV + cls.MAX_ITEM_LINES
+
+    @classmethod
+    def is_suffix(cls, line_idx):
+        return idaapi.E_NEXT <= line_idx < idaapi.E_NEXT + cls.MAX_ITEM_LINES
+
+    @classmethod
+    def changed(cls, ea, line_idx, cmt):
+        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+
+        # Determine whether we'll be updating the contents or a global.
+        ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
+
+        # Figure out what the line_idx boundaries are so that we can use it to check
+        # whether there's an "extra" comment at the given address, or not.
+        if cls.is_prefix(line_idx):
+            base_idx, tag = idaapi.E_PREV, '__extra_prefix__'
+        elif cls.is_suffix(line_idx):
+            base_idx, tag = idaapi.E_NEXT, '__extra_suffix__'
+        else:
+            return logging.fatal(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Unable to determine type of extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, ea, line_idx))
+
+        # Check if this is not the first line_idx. If it isn't, then we can simply leave
+        # because all we care about is whether there's a comment here or not.
+        if line_idx not in {base_idx}:
+            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Exiting event for address {:#x} due to the index not pointing to the comment start ({:d} != {:d}).".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx, base_idx))
+
+        # Now we need to figure out whether we've added an extra_cmt, or removed it.
+        if cmt is None:
+            return ctx.dec(ea, tag)
+
+        # XXX: If an "extra" comment is updated more than once, then we unfortunately
+        #      lose track of the reference and it's permanently cached. There's nothing
+        #      we can really do here except for keep a complete state of all of the
+        #      extra comments that the user has created.
+        return ctx.inc(ea, tag)
+
+    @classmethod
+    def changed_multiple(cls, ea, line_idx, cmt):
+        """
+        This implementation is deprecated, but is being preserved as the logic that
+        it uses can be reused if the workaround methodology of zero'ing the refcount
+        for the entire address is applied.
+        """
+        # XXX: this function is now busted in later versions of IDA because for some
+        #      reason, Ilfak, is now updating the extra comment prior to dispatching
+        #      this event. unfortunately, our tag cache doesn't allow us to identify
+        #      the actual number of tags that are at an address, so there's no way
+        #      to identify the actual change to the extra comment that the user made,
+        #      which totally fucks up the reference count. with the current
+        #      implementation, if we can't distinguish between the old and new extra
+        #      comments, then it's simply a no-op. this is okay for now...
+
+        oldcmt = internal.netnode.sup.get(ea, line_idx, type=memoryview)
+        if oldcmt is not None: oldcmt = oldcmt.tobytes().rstrip(b'\0')
+        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for line {:d} with previous comment set to {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx, utils.string.repr(oldcmt)))
+        ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
+
+        MAX_ITEM_LINES = (idaapi.E_NEXT - idaapi.E_PREV) if idaapi.E_NEXT > idaapi.E_PREV else idaapi.E_PREV - idaapi.E_NEXT
+        prefix = (idaapi.E_PREV, idaapi.E_PREV + MAX_ITEM_LINES, '__extra_prefix__')
+        suffix = (idaapi.E_NEXT, idaapi.E_NEXT + MAX_ITEM_LINES, '__extra_suffix__')
+
+        for l, r, key in [prefix, suffix]:
+            if l <= line_idx < r:
+                if oldcmt is None and cmt is not None: ctx.inc(ea, key)
+                elif oldcmt is not None and cmt is None: ctx.dec(ea, key)
+                logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}, oldcmt={!s}) : {:s} reference count at address for tag {!s}.".format(__name__, ea, line_idx, utils.string.repr(cmt), utils.string.repr(oldcmt), 'Increasing' if oldcmt is None and cmt is not None else 'Decreasing' if oldcmt is not None and cmt is None else 'Doing nothing to', utils.string.repr(key)))
+            continue
+        return
 
 ### individual tags
 def item_color_changed(ea, color):
@@ -1192,13 +1262,6 @@ def make_ida_not_suck_cocks(nw_code):
     else:
         ui.hook.idp.add('rename', rename, 0)
 
-    if idaapi.__version__ >= 6.9:
-        ui.hook.idb.add('extra_cmt_changed', extra_cmt_changed, 0)
-    else:
-        # earlier versions of IDAPython don't expose anything about "extra" comments
-        # so we can't do anything here.
-        pass
-
     ## hook function transformations so we can shuffle their tags between types
     if idaapi.__version__ >= 7.0:
         ui.hook.idb.add('deleting_func_tail', removing_func_tail, 0)
@@ -1250,6 +1313,11 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idp.add('ev_init', typeinfo.database_init, 0)
         ui.hook.idb.add('changing_ti', typeinfo.changing, 0)
         ui.hook.idb.add('ti_changed', typeinfo.changed, 0)
+
+    # earlier versions of IDAPython don't expose anything about "extra" comments
+    # so we can't do anything here.
+    if idaapi.__version__ >= 6.9:
+        ui.hook.idb.add('extra_cmt_changed', extra_cmt.changed, 0)
 
     ## just some debugging notification hooks
     #[ ui.hook.ui.add(item, notify(item), -100) for item in ['range','idcstop','idcstart','suspend','resume','term','ready_to_run'] ]
