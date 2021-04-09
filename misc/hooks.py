@@ -557,22 +557,55 @@ class typeinfo(changebase):
     @classmethod
     def _event(cls):
         while True:
+            # All typeinfo are global tags unless they're being applied to an
+            # operand...which is never handled by this class.
+            ctx = internal.comment.globals
+
             # Receive the changing_ti event...
             ea, original, expected = (yield)
 
-            # All typeinfo are global tags unless they're being applied to an
-            # operand...which isn't handled by this class.
-            fn, ctx = idaapi.get_func(ea), internal.comment.globals
-
             # First check if we need to remove the typeinfo that's stored at the
-            # given address.
-            old_type, old_fname = original
-            if old_type or old_fname:
+            # given address. Afterwards we can unpack our original values.
+            if any(original):
                 ctx.dec(ea, '__typeinfo__')
+            old_type, old_fname = original
 
             # Wait until we get the ti_changed event...
-            new_ea, tidata = (yield)
-            fn, ctx = idaapi.get_func(ea), internal.comment.globals
+            while True:
+                result = (yield)
+                try:
+                    new_ea, tidata = result
+
+                # IDA seems to have a bug that occurs post-analysis where a changing_ti
+                # event might not be followed by a ti_changed event. It seems that
+                # this only happens when the type is being removed, so if we get more
+                # than one tuple returned from our owner then we need to remove our
+                # old results, and then try again.
+                except ValueError:
+
+                    # If there was data that was expected to be written to the database
+                    # for the typeinfo at the given address, then let the user know.
+                    if original != expected and any(expected):
+                        logging.info(u"{:s}.event() : An unpaired event ({:s}) that sets the old type info ({!r}) for address {:#x} to {!r} was encountered. Discarding the event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea, bytes().join(expected)))
+
+                    # If there wasn't any data, then this address expected to have
+                    # its typeinfo cleared. We can recover from this because we've
+                    # already decremented the refcount for it.
+                    elif original != expected:
+                        logging.info(u"{:s}.event() : An unpaired event ({:s}) that clears the type info ({!r}) for address {:#x} was encountered. Attempting recovery.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea))
+
+                    # Receive the misplaced changing_ti event again, and then retry
+                    # looking for ti_changed...
+                    ea, original, expected = result
+                    if any(original):
+                        ctx.dec(ea, '__typeinfo__')
+                    old_type, old_fname = original
+
+                # If we unpacked our value successfully, then we can exit the
+                # ti_changed loop because we were able to recover and resynchronize.
+                else:
+                    break
+                continue
 
             # Verify that the typeinfo we're changing to is the exact same as given
             # to use by both events. If they're not the same, then we need to make
