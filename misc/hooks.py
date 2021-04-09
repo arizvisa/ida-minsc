@@ -583,16 +583,21 @@ class typeinfo(changebase):
                 # old results, and then try again.
                 except ValueError:
 
-                    # If there was data that was expected to be written to the database
-                    # for the typeinfo at the given address, then let the user know.
-                    if original != expected and any(expected):
-                        logging.info(u"{:s}.event() : An unpaired event ({:s}) that sets the old type info ({!r}) for address {:#x} to {!r} was encountered. Discarding the event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea, bytes().join(expected)))
+                    # If we encountered an unpaired event, then check if the event would've
+                    # actually applied any changes. If they have, then we need to let the
+                    # user know that something was lost.
+                    if original != expected:
 
-                    # If there wasn't any data, then this address expected to have
-                    # its typeinfo cleared. We can recover from this because we've
-                    # already decremented the refcount for it.
-                    elif original != expected:
-                        logging.info(u"{:s}.event() : An unpaired event ({:s}) that clears the type info ({!r}) for address {:#x} was encountered. Attempting recovery.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea))
+                        # If there was data that was expected to be written to the database
+                        # for the typeinfo at the given address, then let the user know.
+                        if any(expected):
+                            logging.debug(u"{:s}.event() : An unpaired event ({:s}) that sets the old type information ({!r}) for address {:#x} to {!r} was encountered. Discarding the event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea, bytes().join(expected)))
+
+                        # If there wasn't any data, then this address expected to have
+                        # its typeinfo cleared. We can recover from this because we've
+                        # already decremented the refcount for it.
+                        else:
+                            logging.debug(u"{:s}.event() : An unpaired event ({:s}) that clears the type information ({!r}) for address {:#x} was encountered. Attempting recovery.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea))
 
                     # Receive the misplaced changing_ti event again, and then retry
                     # looking for ti_changed...
@@ -612,12 +617,12 @@ class typeinfo(changebase):
             # an assumption and that assumption is to take the values given to us
             # by the changing_ti event.
             if (ea, expected) != (new_ea, tidata):
-                logging.warning(u"{:s}.event() : Typeinfo events are out of sync for address ({:#x} != {:#x}) and typeinfo ({!r} != {!r}). Using the values from the previous event.".format('.'.join([__name__, cls.__name__]), ea, new_ea, bytes().join(expected), bytes().join(tidata)))
+                logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(tidata), 'changing_ti', 'ti_changed'))
             elif ea != new_ea:
-                logging.warning(u"{:s}.event() : Typeinfo events are out of sync for address ({:#x} != {:#x}). Using the address {:#x} from the previous event.".format('.'.join([__name__, cls.__name__]), ea, new_ea, ea))
+                logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
                 new_ea = ea
             elif expected != tidata:
-                logging.info(u"{:s}.event() : Typeinfo events are out of sync for address {:#x} due to typeinfo ({!r} != {!r}). Re-fetching the typeinfo for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(expected), bytes().join(tidata), new_ea))
+                logging.info(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was given by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
                 tidata = database.type(ea)
 
             # Okay, we now have the data that we need to compare in order to determine
@@ -626,12 +631,12 @@ class typeinfo(changebase):
             # only need to determine if we need to add its reference back.
             if any(tidata):
                 ctx.inc(new_ea, '__typeinfo__')
-                logging.debug(u"{:s}.event() : Updated typeinfo at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
+                logging.debug(u"{:s}.event() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
 
             # For the sake of debugging, log that we just removed the typeinfo
             # from the current address.
             else:
-                logging.debug(u"{:s}.event() : Removed typeinfo from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
+                logging.debug(u"{:s}.event() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
             continue
         return
 
