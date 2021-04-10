@@ -254,7 +254,7 @@ def list(**type):
     maxindex = max(builtins.map(idaapi.get_enum_idx, res) if res else [1])
     maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) if res else [0])
     maxsize = max(builtins.map(size, res) if res else [0])
-    cindex = math.floor(1 + math.log(maxindex or 1) / math.log(10))
+    cindex = math.floor(1 + math.log10(maxindex or 1))
     try: cmask = max(len("{:x}".format(mask(item))) for item in res) if res else database.config.bits() / 4.0
     except Exception: cmask = 0
 
