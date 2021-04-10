@@ -119,54 +119,52 @@ class address(changebase):
         return
 
     @classmethod
-    def _event(cls):
-        while True:
-            # cmt_changing event
-            ea, rpt, new = (yield)
-            old = utils.string.of(idaapi.get_cmt(ea, rpt))
-            f, o, n = idaapi.get_func(ea), internal.comment.decode(old), internal.comment.decode(new)
+    def updater(cls):
+        # cmt_changing event
+        ea, rpt, new = (yield)
+        old = utils.string.of(idaapi.get_cmt(ea, rpt))
+        f, o, n = idaapi.get_func(ea), internal.comment.decode(old), internal.comment.decode(new)
 
-            # update references before we update the comment
-            cls._update_refs(ea, o, n)
+        # update references before we update the comment
+        cls._update_refs(ea, o, n)
 
-            # wait for cmt_changed event
-            newea, nrpt, none = (yield)
+        # wait for cmt_changed event
+        newea, nrpt, none = (yield)
 
-            # now fix the comment the user typed
-            if (newea, nrpt, none) == (ea, rpt, None):
-                ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
+        # now fix the comment the user typed
+        if (newea, nrpt, none) == (ea, rpt, None):
+            ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
 
-                if (ncmt or '') != new:
-                    logging.warning(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+            if (ncmt or '') != new:
+                logging.warning(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                ## if the comment is of the correct format, then we can simply
-                ## write the comment to the given address
-                if internal.comment.check(new):
-                    idaapi.set_cmt(ea, utils.string.to(new), rpt)
+            ## if the comment is of the correct format, then we can simply
+            ## write the comment to the given address
+            if internal.comment.check(new):
+                idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
-                ## if there's a comment to set, then assign it to the requested
-                ## address
-                elif new:
-                    idaapi.set_cmt(ea, utils.string.to(new), rpt)
+            ## if there's a comment to set, then assign it to the requested
+            ## address
+            elif new:
+                idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
-                ## otherwise, we can just delete all the references at the address
-                else:
-                    cls._delete_refs(ea, n)
-                continue
+            ## otherwise, we can just delete all the references at the address
+            else:
+                cls._delete_refs(ea, n)
+            return
 
-            # if the changed event doesn't happen in the right order
-            logging.fatal(u"{:s}.event() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
+        # if the changed event doesn't happen in the right order
+        logging.fatal(u"{:s}.event() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
-            # delete the old comment
-            cls._delete_refs(ea, o)
-            idaapi.set_cmt(ea, '', rpt)
-            logging.warning(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
+        # delete the old comment
+        cls._delete_refs(ea, o)
+        idaapi.set_cmt(ea, '', rpt)
+        logging.warning(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
-            # new comment
-            new = utils.string.of(idaapi.get_cmt(newea, nrpt))
-            n = internal.comment.decode(new)
-            cls._create_refs(newea, n)
-        return
+        # new comment
+        new = utils.string.of(idaapi.get_cmt(newea, nrpt))
+        n = internal.comment.decode(new)
+        cls._create_refs(newea, n)
 
     @classmethod
     def changing(cls, ea, repeatable_cmt, newcmt):
@@ -190,7 +188,6 @@ class address(changebase):
         # with the hope that things are fixed.
         except StopIteration as E:
             logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt)))
-            cls.event = cls._event(); next(cls.event)
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
@@ -221,7 +218,6 @@ class address(changebase):
         # with the hope that things are fixed.
         except StopIteration as E:
             logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt))
-            cls.event = cls._event(); next(cls.event)
 
         # Re-enable our hooks that we had prior disabled
         finally:
@@ -311,57 +307,55 @@ class globals(changebase):
         return
 
     @classmethod
-    def _event(cls):
-        while True:
-            # cmt_changing event
-            ea, rpt, new = (yield)
-            fn = idaapi.get_func(ea)
-            old = utils.string.of(idaapi.get_func_cmt(fn, rpt))
-            o, n = internal.comment.decode(old), internal.comment.decode(new)
+    def updater(cls):
+        # cmt_changing event
+        ea, rpt, new = (yield)
+        fn = idaapi.get_func(ea)
+        old = utils.string.of(idaapi.get_func_cmt(fn, rpt))
+        o, n = internal.comment.decode(old), internal.comment.decode(new)
 
-            # update references before we update the comment
-            cls._update_refs(fn, o, n)
+        # update references before we update the comment
+        cls._update_refs(fn, o, n)
 
-            # wait for cmt_changed event
-            newea, nrpt, none = (yield)
+        # wait for cmt_changed event
+        newea, nrpt, none = (yield)
 
-            # now we can fix the user's new coment
-            if (newea, nrpt, none) == (ea, rpt, None):
-                ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
+        # now we can fix the user's new coment
+        if (newea, nrpt, none) == (ea, rpt, None):
+            ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
 
-                if (ncmt or '') != new:
-                    logging.warning(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
+            if (ncmt or '') != new:
+                logging.warning(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-                ## if the comment is correctly formatted as a tag, then we
-                ## can simply write the comment at the given address
-                if internal.comment.check(new):
-                    idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
+            ## if the comment is correctly formatted as a tag, then we
+            ## can simply write the comment at the given address
+            if internal.comment.check(new):
+                idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
 
-                ## if there's a comment to set, then assign it to the requested
-                ## function address
-                elif new:
-                    idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
+            ## if there's a comment to set, then assign it to the requested
+            ## function address
+            elif new:
+                idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
 
-                ## otherwise, there's no comment there and we need to delete
-                ## all references at the address
-                else:
-                    cls._delete_refs(fn, n)
-                continue
+            ## otherwise, there's no comment there and we need to delete
+            ## all references at the address
+            else:
+                cls._delete_refs(fn, n)
+            return
 
-            # if the changed event doesn't happen in the right order
-            logging.fatal(u"{:s}.event() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
+        # if the changed event doesn't happen in the right order
+        logging.fatal(u"{:s}.event() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
-            # delete the old comment
-            cls._delete_refs(fn, o)
-            idaapi.set_func_cmt(fn, '', rpt)
-            logging.warning(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
+        # delete the old comment
+        cls._delete_refs(fn, o)
+        idaapi.set_func_cmt(fn, '', rpt)
+        logging.warning(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
-            # new comment
-            newfn = idaapi.get_func(newea)
-            new = utils.string.of(idaapi.get_func_cmt(newfn, nrpt))
-            n = internal.comment.decode(new)
-            cls._create_refs(newfn, n)
-        return
+        # new comment
+        newfn = idaapi.get_func(newea)
+        new = utils.string.of(idaapi.get_func_cmt(newfn, nrpt))
+        n = internal.comment.decode(new)
+        cls._create_refs(newfn, n)
 
     @classmethod
     def changing(cls, cb, a, cmt, repeatable):
@@ -391,8 +385,7 @@ class globals(changebase):
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
-            cls.event = cls._event(); next(cls.event)
+            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
@@ -429,8 +422,7 @@ class globals(changebase):
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
         # with the hope that things are fixed.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable))
-            cls.event = cls._event(); next(cls.event)
+            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
@@ -482,6 +474,51 @@ class globals(changebase):
 
 class typeinfo(changebase):
     @classmethod
+    def updater(cls):
+        # All typeinfo are global tags unless they're being applied to an
+        # operand...which is never handled by this class.
+        ctx = internal.comment.globals
+
+        # Receive the changing_ti event...
+        ea, original, expected = (yield)
+
+        # First check if we need to remove the typeinfo that's stored at the
+        # given address. Afterwards we can unpack our original values.
+        if any(original):
+            ctx.dec(ea, '__typeinfo__')
+        old_type, old_fname = original
+
+        # Wait until we get the ti_changed event...
+        new_ea, tidata = (yield)
+
+        # Verify that the typeinfo we're changing to is the exact same as given
+        # to use by both events. If they're not the same, then we need to make
+        # an assumption and that assumption is to take the values given to us
+        # by the changing_ti event.
+        if (ea, expected) != (new_ea, tidata):
+            logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(tidata), 'changing_ti', 'ti_changed'))
+        elif ea != new_ea:
+            logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
+            new_ea = ea
+        elif expected != tidata:
+            logging.info(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was given by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
+            tidata = database.type(ea)
+
+        # Okay, we now have the data that we need to compare in order to determine
+        # if we're removing typeinfo, adding it, or updating it. Since we
+        # already decremented the tag from the previous address, we really
+        # only need to determine if we need to add its reference back.
+        if any(tidata):
+            ctx.inc(new_ea, '__typeinfo__')
+            logging.debug(u"{:s}.event() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
+
+        # For the sake of debugging, log that we just removed the typeinfo
+        # from the current address.
+        else:
+            logging.debug(u"{:s}.event() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
+        return
+
+    @classmethod
     def changing(cls, ea, new_type, new_fname):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (database not ready) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
@@ -513,8 +550,7 @@ class typeinfo(changebase):
         # coroutine has gone out of sync and we need to reinitialize it in order
         # to regain control.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname)))
-            cls.event = cls._event(); next(cls.event)
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname)), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled and then leave.
         finally:
@@ -547,97 +583,10 @@ class typeinfo(changebase):
         # to regain control.
         except StopIteration as E:
             logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)))
-            cls.event = cls._event(); next(cls.event)
 
         # Last thing to do is to re-enable the hooks that we disabled and then leave.
         finally:
             [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
-        return
-
-    @classmethod
-    def _event(cls):
-        while True:
-            # All typeinfo are global tags unless they're being applied to an
-            # operand...which is never handled by this class.
-            ctx = internal.comment.globals
-
-            # Receive the changing_ti event...
-            ea, original, expected = (yield)
-
-            # First check if we need to remove the typeinfo that's stored at the
-            # given address. Afterwards we can unpack our original values.
-            if any(original):
-                ctx.dec(ea, '__typeinfo__')
-            old_type, old_fname = original
-
-            # Wait until we get the ti_changed event...
-            while True:
-                result = (yield)
-                try:
-                    new_ea, tidata = result
-
-                # IDA seems to have a bug that occurs post-analysis where a changing_ti
-                # event might not be followed by a ti_changed event. It seems that
-                # this only happens when the type is being removed, so if we get more
-                # than one tuple returned from our owner then we need to remove our
-                # old results, and then try again.
-                except ValueError:
-
-                    # If we encountered an unpaired event, then check if the event would've
-                    # actually applied any changes. If they have, then we need to let the
-                    # user know that something was lost.
-                    if original != expected:
-
-                        # If there was data that was expected to be written to the database
-                        # for the typeinfo at the given address, then let the user know.
-                        if any(expected):
-                            logging.debug(u"{:s}.event() : An unpaired event ({:s}) that sets the old type information ({!r}) for address {:#x} to {!r} was encountered. Discarding the event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea, bytes().join(expected)))
-
-                        # If there wasn't any data, then this address expected to have
-                        # its typeinfo cleared. We can recover from this because we've
-                        # already decremented the refcount for it.
-                        else:
-                            logging.debug(u"{:s}.event() : An unpaired event ({:s}) that clears the type information ({!r}) for address {:#x} was encountered. Attempting recovery.".format('.'.join([__name__, cls.__name__]), 'changing_ti', bytes().join(original), ea))
-
-                    # Receive the misplaced changing_ti event again, and then retry
-                    # looking for ti_changed...
-                    ea, original, expected = result
-                    if any(original):
-                        ctx.dec(ea, '__typeinfo__')
-                    old_type, old_fname = original
-
-                # If we unpacked our value successfully, then we can exit the
-                # ti_changed loop because we were able to recover and resynchronize.
-                else:
-                    break
-                continue
-
-            # Verify that the typeinfo we're changing to is the exact same as given
-            # to use by both events. If they're not the same, then we need to make
-            # an assumption and that assumption is to take the values given to us
-            # by the changing_ti event.
-            if (ea, expected) != (new_ea, tidata):
-                logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) and type information ({!r} != {!r}) than what was given by the {:s} event. Using the values from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'ti_changed', ea, new_ea, bytes().join(expected), bytes().join(tidata), 'changing_ti', 'ti_changed'))
-            elif ea != new_ea:
-                logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
-                new_ea = ea
-            elif expected != tidata:
-                logging.info(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was given by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
-                tidata = database.type(ea)
-
-            # Okay, we now have the data that we need to compare in order to determine
-            # if we're removing typeinfo, adding it, or updating it. Since we
-            # already decremented the tag from the previous address, we really
-            # only need to determine if we need to add its reference back.
-            if any(tidata):
-                ctx.inc(new_ea, '__typeinfo__')
-                logging.debug(u"{:s}.event() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
-
-            # For the sake of debugging, log that we just removed the typeinfo
-            # from the current address.
-            else:
-                logging.debug(u"{:s}.event() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
-            continue
         return
 
 ### database scope
