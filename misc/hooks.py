@@ -71,8 +71,15 @@ class changingchanged(object):
     def new(cls, ea):
         '''This registers a new state for a given address that can later be fetched.'''
         states = cls.__states__
+
+        # If we're being asked to recreate the state for an address that is still
+        # incomplete, then warn the user about it. This will only happen when the
+        # "changing" event is called for the same address more than once without
+        # the "changed" event being used to complete it.
         if ea in states:
-            logging.warning(u"{:s}.new({:#x}) : Recreating the state for address {:#x} despite it being incomplete.".format('.'.join([__name__, cls.__name__]), ea, ea))
+            res = states.pop(ea)
+            logging.info(u"{:s}.new({:#x}) : Forcefully closing the state for address {:#x} by request.".format('.'.join([__name__, cls.__name__]), ea, ea))
+            res.close()
 
         # Define a closure that is responsible for keeping track
         # of a subclass' updater so that when it completes its
@@ -183,48 +190,59 @@ class address(changingchanged):
 
     @classmethod
     def updater(cls):
-        # cmt_changing event
+        # Receive the new comment and its type from the cmt_changing
+        # event. After receiving it, then we can use the address to
+        # figure out what the old comment was.
         ea, rpt, new = (yield)
         old = utils.string.of(idaapi.get_cmt(ea, rpt))
-        f, o, n = idaapi.get_func(ea), internal.comment.decode(old), internal.comment.decode(new)
 
-        # update references before we update the comment
+        # Decode the comments into their tags (dictionaries), and
+        # then update their references before we update the comment.
+        f, o, n = idaapi.get_func(ea), internal.comment.decode(old), internal.comment.decode(new)
         cls._update_refs(ea, o, n)
 
-        # wait for cmt_changed event
-        newea, nrpt, none = (yield)
+        # Wait for cmt_changed event...
+        try:
+            newea, nrpt, none = (yield)
 
-        # now fix the comment the user typed
+        # If we end up catching a GeneratorExit then that's because
+        # this event is being violently closed due to receiving a
+        # changing event more than once for the very same address.
+        except GeneratorExit:
+            logging.info(u"{:s}.event() : Terminating state due to explicit request from owner.".format('.'.join([__name__, cls.__name__])))
+            return logging.debug(u"{:s}.event() : The {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if repeatable_cmt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+
+        # Now to fix the comment the user typed.
         if (newea, nrpt, none) == (ea, rpt, None):
             ncmt = utils.string.of(idaapi.get_cmt(ea, rpt))
 
             if (ncmt or '') != new:
                 logging.warning(u"{:s}.event() : Comment from event at address {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-            ## if the comment is of the correct format, then we can simply
-            ## write the comment to the given address
+            # If the comment is of the correct format, then we can simply
+            # write the comment to the given address.
             if internal.comment.check(new):
                 idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
-            ## if there's a comment to set, then assign it to the requested
-            ## address
+            # If there's a comment to set, then assign it to the requested
+            # address.
             elif new:
                 idaapi.set_cmt(ea, utils.string.to(new), rpt)
 
-            ## otherwise, we can just delete all the references at the address
+            # Otherwise, we can just delete all the references at the address.
             else:
                 cls._delete_refs(ea, n)
             return
 
-        # if the changed event doesn't happen in the right order
+        # If the changed event doesn't happen in the right order.
         logging.fatal(u"{:s}.event() : Comment events are out of sync at address {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
-        # delete the old comment
+        # Delete the old comment and its references.
         cls._delete_refs(ea, o)
         idaapi.set_cmt(ea, '', rpt)
         logging.warning(u"{:s}.event() : Deleted comment at address {:#x} was {!s}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
-        # new comment
+        # Create the references for the new comment.
         new = utils.string.of(idaapi.get_cmt(newea, nrpt))
         n = internal.comment.decode(new)
         cls._create_refs(newea, n)
@@ -374,50 +392,58 @@ class globals(changingchanged):
 
     @classmethod
     def updater(cls):
-        # cmt_changing event
+        # Receive the new comment and its type from the cmt_changing
+        # event. After receiving it, then we can determine what function
+        # it's for and then get the function's comment.
         ea, rpt, new = (yield)
         fn = idaapi.get_func(ea)
         old = utils.string.of(idaapi.get_func_cmt(fn, rpt))
-        o, n = internal.comment.decode(old), internal.comment.decode(new)
 
-        # update references before we update the comment
+        # Decode the old and new function comment into their tags so
+        # that we can update their references before the comment.
+        o, n = internal.comment.decode(old), internal.comment.decode(new)
         cls._update_refs(fn, o, n)
 
-        # wait for cmt_changed event
-        newea, nrpt, none = (yield)
+        # Wait for cmt_changed event...
+        try:
+            newea, nrpt, none = (yield)
 
-        # now we can fix the user's new coment
+        except GeneratorExit:
+            logging.info(u"{:s}.event() : Terminating state due to explicit request from owner.".format('.'.join([__name__, cls.__name__])))
+            return logging.debug(u"{:s}.event() : The {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if repeatable_cmt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+
+        # Now we can fix the user's new comment.
         if (newea, nrpt, none) == (ea, rpt, None):
             ncmt = utils.string.of(idaapi.get_func_cmt(fn, rpt))
 
             if (ncmt or '') != new:
                 logging.warning(u"{:s}.event() : Comment from event for function {:#x} is different from database. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new), utils.string.repr(ncmt)))
 
-            ## if the comment is correctly formatted as a tag, then we
-            ## can simply write the comment at the given address
+            # If the comment is correctly formatted as a tag, then we
+            # can simply write the comment at the given address.
             if internal.comment.check(new):
                 idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
 
-            ## if there's a comment to set, then assign it to the requested
-            ## function address
+            # If there's a comment to set, then assign it to the requested
+            # function address.
             elif new:
                 idaapi.set_func_cmt(fn, utils.string.to(new), rpt)
 
-            ## otherwise, there's no comment there and we need to delete
-            ## all references at the address
+            # Otherwise, there's no comment there and we need to delete
+            # all references at the address.
             else:
                 cls._delete_refs(fn, n)
             return
 
-        # if the changed event doesn't happen in the right order
+        # If the changed event doesn't happen in the right order.
         logging.fatal(u"{:s}.event() : Comment events are out of sync for function {:#x}, updating tags from previous comment. Expected comment ({!s}) is different from current comment ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o), utils.string.repr(n)))
 
-        # delete the old comment
+        # Delete the old function comment and its references.
         cls._delete_refs(fn, o)
         idaapi.set_func_cmt(fn, '', rpt)
         logging.warning(u"{:s}.event() : Deleted comment for function {:#x} was ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(o)))
 
-        # new comment
+        # Create the references for the new function comment.
         newfn = idaapi.get_func(newea)
         new = utils.string.of(idaapi.get_func_cmt(newfn, nrpt))
         n = internal.comment.decode(new)
@@ -560,7 +586,15 @@ class typeinfo(changingchanged):
         old_type, old_fname = original
 
         # Wait until we get the ti_changed event...
-        new_ea, tidata = (yield)
+        try:
+            new_ea, tidata = (yield)
+
+        # If we end up catching a GeneratorExit then that's because
+        # this event is being violently closed due to receiving a
+        # changing event more than once for the very same address.
+        except GeneratorExit:
+            logging.info(u"{:s}.event() : Terminating state due to explicit request from owner.".format('.'.join([__name__, cls.__name__])))
+            return logging.debug(u"{:s}.event() : The type information at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(original), bytes().join(expected)))
 
         # Verify that the typeinfo we're changing to is the exact same as given
         # to use by both events. If they're not the same, then we need to make
