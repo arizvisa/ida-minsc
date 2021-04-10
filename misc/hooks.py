@@ -250,6 +250,8 @@ class address(changingchanged):
     def changing(cls, ea, repeatable_cmt, newcmt):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Construct our new state, and then grab our old comment. This is because
         # we're going to submit this to the state that we've constructed after we've
@@ -281,6 +283,8 @@ class address(changingchanged):
     def changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # Resume the state that was created by the changing event, and then grab
         # our new comment that we will later submit to it.
@@ -313,6 +317,8 @@ class address(changingchanged):
     def old_changed(cls, ea, repeatable_cmt):
         if not cls.is_ready():
             return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
         # first we'll grab our comment that the user updated
         logging.debug(u"{:s}.old_changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
@@ -451,6 +457,8 @@ class globals(changingchanged):
     def changing(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if interface.node.is_identifier(interface.range.start(a)):
+            return logging.debug(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changing event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
@@ -489,6 +497,8 @@ class globals(changingchanged):
     def changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if interface.node.is_identifier(interface.range.start(a)):
+            return logging.debug(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # First we'll check to see if this is an actual function comment by confirming
         # that we're in a function, and that our comment is not empty.
@@ -530,6 +540,8 @@ class globals(changingchanged):
     def old_changed(cls, cb, a, cmt, repeatable):
         if not cls.is_ready():
             return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
+        if interface.node.is_identifier(interface.range.start(a)):
+            return logging.debug(u"{:s}.old_changed({!s}, {:#x}, {!s}, {:d}) : Ignoring comment.changed event (not an address) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', interface.range.start(a)))
 
         # first thing to do is to identify whether we're in a function or not,
         # so we first grab the address from the area_t...
