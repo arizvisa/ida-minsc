@@ -33,7 +33,7 @@ def greeting():
     six.print_('-' * barrier)
 
 ### comment hooks
-class changebase(object):
+class changingchanged(object):
     """
     This base class is for dealing with 2-part events where one part is the
     "changing" event which is dispatched before any changes are made, and the
@@ -41,10 +41,7 @@ class changebase(object):
     """
     @classmethod
     def database_init(cls, idp_modname):
-        if hasattr(cls, 'event'):
-            return
-        cls.event = cls._event()
-        next(cls.event)
+        return cls.initialize()
 
     @classmethod
     def nw_database_init(cls, nw_code, is_old_database):
@@ -53,10 +50,76 @@ class changebase(object):
 
     @classmethod
     def is_ready(cls):
+        '''This is just a utility method for determining if a database is ready or not.'''
         global State
-        return State == state.ready
+        return State in {state.ready}
 
-class address(changebase):
+    @classmethod
+    def initialize(cls):
+        """
+        This method just initializes our states dictionary and should be
+        called prior to a database being loaded. This way any changing/changed
+        events will be able to be stored according to the address that they're
+        acting upon.
+        """
+        states = getattr(cls, '__states__', {})
+        if states:
+            logging.info(u"{:s}.init() : Resetting {:d} incomplete states due to re-initialization.".format('.'.join([__name__, cls.__name__]), len(states)))
+        cls.__states__ = {}
+
+    @classmethod
+    def new(cls, ea):
+        '''This registers a new state for a given address that can later be fetched.'''
+        states = cls.__states__
+        if ea in states:
+            logging.warning(u"{:s}.new({:#x}) : Recreating the state for address {:#x} despite it being incomplete.".format('.'.join([__name__, cls.__name__]), ea, ea))
+
+        # Define a closure that is responsible for keeping track
+        # of a subclass' updater so that when it completes its
+        # execution it can be removed from our states dictionary.
+        def consumer(ea, states, handler):
+            next(handler)
+
+            # Consume our handler until it's finished. When we
+            # leave this handler it should be safe to close.
+            try:
+                while True:
+                    handler.send((yield))
+            except StopIteration:
+                pass
+            finally:
+                handler.close()
+
+            # Consume anything and discard it until we're
+            # being closed and need to perform cleanup.
+            try:
+                while True:
+                    yield
+            except GeneratorExit:
+                states.pop(ea)
+            return
+
+        # Initialize a new consumer based on the class updater method,
+        # and then set off prior to storing it in our state dictionary.
+        coroutine = consumer(ea, states, cls.updater())
+        next(coroutine)
+        return states.setdefault(ea, coroutine)
+
+    @classmethod
+    def resume(cls, ea):
+        '''This will return the currently state that is stored for a particular address.'''
+        states = cls.__states__
+        if ea not in states:
+            logging.fatal(u"{:s}.resume({:#x}) : Unable to locate a current state for address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
+        return states[ea]
+
+    @classmethod
+    def updater(cls):
+        '''This coroutine is intended to be implemented by a user and is responsible for keeping track of the changes for a particular address.'''
+        raise NotImplementedError
+        (yield)
+
+class address(changingchanged):
     """
     This class handles 2-part events that are used to modify comments at an arbitrary
     address. This address will either be a contents tag if it's within the boundaries
@@ -171,9 +234,11 @@ class address(changebase):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Ignoring comment.changing event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
-        # Grab our old comment, because we're going to submit this later to a coro
+        # Construct our new state, and then grab our old comment. This is because
+        # we're going to submit this to the state that we've constructed after we've
+        # disabled the necessary events.
         logging.debug(u"{:s}.changing({:#x}, {:d}, {!s}) : Received comment.changing event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        oldcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
+        event, oldcmt = cls.new(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
         [ ui.hook.idb.disable(event) for event in ['changing_cmt', 'cmt_changed'] ]
@@ -181,7 +246,7 @@ class address(changebase):
         # Now we can use our coroutine to begin the comment update, so that
         # later, the "changed" event can do the actual update.
         try:
-            cls.event.send((ea, bool(repeatable_cmt), utils.string.of(newcmt)))
+            event.send((ea, bool(repeatable_cmt), utils.string.of(newcmt)))
 
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
@@ -201,9 +266,10 @@ class address(changebase):
         if not cls.is_ready():
             return logging.debug(u"{:s}.changed({:#x}, {:d}) : Ignoring comment.changed event (database not ready) for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
 
-        # Grab our new comment, because we're going to submit this later to our coro
+        # Resume the state that was created by the changing event, and then grab
+        # our new comment that we will later submit to it.
         logging.debug(u"{:s}.changed({:#x}, {:d}) : Received comment.changed event for a {:s} comment at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea))
-        newcmt = utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
+        event, newcmt = cls.resume(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
         [ ui.hook.idb.disable(event) for event in ['changing_cmt', 'cmt_changed'] ]
@@ -211,7 +277,7 @@ class address(changebase):
         # Now we can use our coroutine to update the comment state, so that the
         # coroutine will perform the final update.
         try:
-            cls.event.send((ea, bool(repeatable_cmt), None))
+            event.send((ea, bool(repeatable_cmt), None))
 
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
@@ -223,8 +289,9 @@ class address(changebase):
         finally:
             [ ui.hook.idb.enable(event) for event in ['changing_cmt', 'cmt_changed'] ]
 
-        # Updating the comment was complete, that should've been it.
-        return
+        # Updating the comment was complete, that should've been it and so we can
+        # just close our event since we're done.
+        event.close()
 
     @classmethod
     def old_changed(cls, ea, repeatable_cmt):
@@ -267,7 +334,7 @@ class address(changebase):
         # and then leave because this should've updated things properly.
         return
 
-class globals(changebase):
+class globals(changingchanged):
     """
     This class handles 2-part events that are used to modify comments for a particular
     range. In most cases this should be a function comment, or a chunk associated
@@ -369,8 +436,9 @@ class globals(changebase):
         if fn is None and not cmt:
             return
 
-        # Grab our old comment, because we're going to submit this later to a coro
-        oldcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
+        # Construct our new state and grab our old comment so that we can send the
+        # old comment to the state after we've disabled the necessary events.
+        event, oldcmt = cls.new(interface.range.start(a)), utils.string.of(idaapi.get_func_cmt(fn, repeatable))
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
         hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
@@ -379,7 +447,7 @@ class globals(changebase):
         # Now we can use our coroutine to begin the comment update, so that
         # later, the "changed" event can do the actual update.
         try:
-            cls.event.send((interface.range.start(fn), bool(repeatable), utils.string.of(cmt)))
+            event.send((interface.range.start(fn), bool(repeatable), utils.string.of(cmt)))
 
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
@@ -406,8 +474,11 @@ class globals(changebase):
         if fn is None and not cmt:
             return
 
-        # Grab our new comment, because we're going to submit this later to a coro
-        newcmt = utils.string.of(idaapi.get_func_cmt(fn, repeatable))
+        # Resume the state that was prior created by the changing event, and grab
+        # our new comment. As the state keeps track of the old comment and the new
+        # one we're going to send to it once we disable some events, it will know
+        # what to do.
+        event, newcmt = cls.resume(interface.range.start(a)), utils.string.of(idaapi.get_func_cmt(fn, repeatable))
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
         hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
@@ -416,7 +487,7 @@ class globals(changebase):
         # Now we can use our coroutine to update the comment state, so that the
         # coroutine will perform the final update.
         try:
-            cls.event.send((interface.range.start(fn), bool(repeatable), None))
+            event.send((interface.range.start(fn), bool(repeatable), None))
 
         # If a StopIteration was raised when submitting the comment to the
         # coroutine, then we somehow desynchronized. Re-initialize the coroutine
@@ -428,8 +499,9 @@ class globals(changebase):
         finally:
             [ ui.hook.idb.enable(event) for event in hooks ]
 
-        # We're done updating the comment, that should be it.
-        return
+        # We're done updating the comment and our state is done, so we can
+        # close it to release it from existence.
+        event.close()
 
     @classmethod
     def old_changed(cls, cb, a, cmt, repeatable):
@@ -472,7 +544,7 @@ class globals(changebase):
         # that should've been it, so we can now just leave
         return
 
-class typeinfo(changebase):
+class typeinfo(changingchanged):
     @classmethod
     def updater(cls):
         # All typeinfo are global tags unless they're being applied to an
@@ -532,9 +604,11 @@ class typeinfo(changebase):
         ti = database.type(ea)
         old_type, old_fname, _ = (b'', b'', None) if ti is None else ti.serialize()
 
-        # Pre-pack both of our tuples that we're going to send to the event.
-        original = (old_type, old_fname or b'')
-        new = (new_type or b'', new_fname or b'')
+        # Construct a new state for this address, and pre-pack both our tuple
+        # containing the original type information and the new type information so
+        # that we can submit both of them to the state once we disable the events.
+        event = cls.new(ea)
+        original, new = (old_type, old_fname or b''), (new_type or b'', new_fname or b'')
 
         # First disable our hooks so that we can prevent re-entrancy issues.
         [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
@@ -544,7 +618,7 @@ class typeinfo(changebase):
         # the "changed" event (which will be dispatched afterwards) is responsible
         # for performing the actual update of the cache.
         try:
-            cls.event.send((ea, original, new))
+            event.send((ea, original, new))
 
         # If we encounter a StopIteration while submitting the comment, then the
         # coroutine has gone out of sync and we need to reinitialize it in order
@@ -565,9 +639,11 @@ class typeinfo(changebase):
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
         logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames))
 
-        # Take the data that IDA told us was written, and pack into a tuple so
-        # that we can send it to the event later.
-        new = (type or b'', fnames or b'')
+        # Resume the state for the current address, and then take the data from
+        # our parameters (which IDA is telling us was just written) and pack
+        # them into a tuple. This way we can send them to the state after we
+        # disable the necessary hooks to prevent re-entrancy.
+        event, new = cls.resume(ea), (type or b'', fnames or b'')
 
         # First disable our hooks so that we can prevent re-entrancy issues.
         [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
@@ -576,7 +652,7 @@ class typeinfo(changebase):
         # kind enough to provide the new values, we can just submit them to the
         # coroutine.
         try:
-            cls.event.send((ea, new))
+            event.send((ea, new))
 
         # If we encounter a StopIteration while submitting the comment, then the
         # coroutine has gone out of sync and we need to reinitialize it in order
@@ -584,10 +660,12 @@ class typeinfo(changebase):
         except StopIteration as E:
             logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)))
 
-        # Last thing to do is to re-enable the hooks that we disabled and then leave.
+        # Last thing to do is to re-enable the hooks that we disabled and then
+        # close our state since we're done with it and there shouldn't be
+        # anything left to do for this address.
         finally:
             [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
-        return
+        event.close()
 
 ### database scope
 class state(object):
