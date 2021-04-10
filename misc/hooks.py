@@ -64,7 +64,7 @@ class changingchanged(object):
         """
         states = getattr(cls, '__states__', {})
         if states:
-            logging.info(u"{:s}.init() : Resetting {:d} incomplete states due to re-initialization.".format('.'.join([__name__, cls.__name__]), len(states)))
+            logging.info(u"{:s}.init() : Removing {:d} incomplete states due to re-initialization of database.".format('.'.join([__name__, cls.__name__]), len(states)))
         cls.__states__ = {}
 
     @classmethod
@@ -116,9 +116,9 @@ class changingchanged(object):
     def resume(cls, ea):
         '''This will return the currently state that is stored for a particular address.'''
         states = cls.__states__
-        if ea not in states:
-            logging.fatal(u"{:s}.resume({:#x}) : Unable to locate a current state for address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
-        return states[ea]
+        if ea in states:
+            return states[ea]
+        raise E.AddressNotFoundError(u"{:s}.resume({:#x}) : Unable to locate a currently available state for address {:#x}.".format('.'.join([__name__, cls.__name__]), ea, ea))
 
     @classmethod
     def updater(cls):
@@ -209,8 +209,7 @@ class address(changingchanged):
         # this event is being violently closed due to receiving a
         # changing event more than once for the very same address.
         except GeneratorExit:
-            logging.info(u"{:s}.event() : Terminating state due to explicit request from owner.".format('.'.join([__name__, cls.__name__])))
-            return logging.debug(u"{:s}.event() : The {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if repeatable_cmt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            return logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
 
         # Now to fix the comment the user typed.
         if (newea, nrpt, none) == (ea, rpt, None):
@@ -269,7 +268,7 @@ class address(changingchanged):
         # If a StopIteration was raised when submitting the comment to the coroutine,
         # then something failed and we need to let the user know about it.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt)), exc_info=True)
+            logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Abandoning {:s} comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt), 'repeatable' if repeatable_cmt else 'non-repeatable', ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
@@ -300,7 +299,7 @@ class address(changingchanged):
         # coroutine, then we something bugged out and we need to let the user
         # know about it.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt), exc_info=True)
+            logging.fatal(u"{:s}.changed({:#x}, {:d}) : Abandoning update of {:s} comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, 'repeatable' if repeatable_cmt else 'non-repeatable', ea), exc_info=True)
 
         # Re-enable our hooks that we had prior disabled
         finally:
@@ -409,8 +408,7 @@ class globals(changingchanged):
             newea, nrpt, none = (yield)
 
         except GeneratorExit:
-            logging.info(u"{:s}.event() : Terminating state due to explicit request from owner.".format('.'.join([__name__, cls.__name__])))
-            return logging.debug(u"{:s}.event() : The {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if repeatable_cmt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            return logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
 
         # Now we can fix the user's new comment.
         if (newea, nrpt, none) == (ea, rpt, None):
@@ -478,7 +476,7 @@ class globals(changingchanged):
         # coroutine, then something terrible has happened and we need to let
         # the user know what's up.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable), exc_info=True)
+            logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Abandoning {:s} function comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
@@ -518,7 +516,7 @@ class globals(changingchanged):
         # coroutine, then we something terrible has happend that the user will
         # likely need to know about.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable), exc_info=True)
+            logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Abandoning update of {:s} function comment at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable, 'repeatable' if repeatable else 'non-repeatable', ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
@@ -593,8 +591,7 @@ class typeinfo(changingchanged):
         # this event is being violently closed due to receiving a
         # changing event more than once for the very same address.
         except GeneratorExit:
-            logging.info(u"{:s}.event() : Terminating state due to explicit request from owner.".format('.'.join([__name__, cls.__name__])))
-            return logging.debug(u"{:s}.event() : The type information at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(original), bytes().join(expected)))
+            return logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the type information at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(original), bytes().join(expected)))
 
         # Verify that the typeinfo we're changing to is the exact same as given
         # to use by both events. If they're not the same, then we need to make
@@ -606,7 +603,7 @@ class typeinfo(changingchanged):
             logging.warning(u"{:s}.event() : The {:s} event has a different address ({:#x} != {:#x}) than what was given by the {:s} event. Using the address {:#x} from the {:s} event.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, new_ea, 'ti_changed', ea, 'changing_ti'))
             new_ea = ea
         elif expected != tidata:
-            logging.info(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was given by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
+            logging.warning(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was received by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
             tidata = database.type(ea)
 
         # Okay, we now have the data that we need to compare in order to determine
@@ -656,7 +653,7 @@ class typeinfo(changingchanged):
         # If we encounter a StopIteration while submitting the comment, then the
         # coroutine has gone out of control and we need to let the user know.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname)), exc_info=True)
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Abandoning type information at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled and then leave.
         finally:
@@ -689,7 +686,7 @@ class typeinfo(changingchanged):
         # If we encounter a StopIteration while submitting the comment, then the
         # coroutine has terminated unexpectedly which is a pretty critical issue.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)), exc_info=True)
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Abandoning update of type information at {:#x} due to unexpected termination of event handler.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), ea), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled and then
         # close our state since we're done with it and there shouldn't be
