@@ -248,11 +248,10 @@ class address(changingchanged):
         try:
             event.send((ea, bool(repeatable_cmt), utils.string.of(newcmt)))
 
-        # If a StopIteration was raised when submitting the comment to the
-        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
-        # with the hope that things are fixed.
+        # If a StopIteration was raised when submitting the comment to the coroutine,
+        # then something failed and we need to let the user know about it.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt)))
+            logging.fatal(u"{:s}.changing({:#x}, {:d}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt, utils.string.repr(newcmt)), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
@@ -280,10 +279,10 @@ class address(changingchanged):
             event.send((ea, bool(repeatable_cmt), None))
 
         # If a StopIteration was raised when submitting the comment to the
-        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
-        # with the hope that things are fixed.
+        # coroutine, then we something bugged out and we need to let the user
+        # know about it.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt))
+            logging.fatal(u"{:s}.changed({:#x}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, repeatable_cmt), exc_info=True)
 
         # Re-enable our hooks that we had prior disabled
         finally:
@@ -450,8 +449,8 @@ class globals(changingchanged):
             event.send((interface.range.start(fn), bool(repeatable), utils.string.of(cmt)))
 
         # If a StopIteration was raised when submitting the comment to the
-        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
-        # with the hope that things are fixed.
+        # coroutine, then something terrible has happened and we need to let
+        # the user know what's up.
         except StopIteration as E:
             logging.fatal(u"{:s}.changing({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable), exc_info=True)
 
@@ -490,8 +489,8 @@ class globals(changingchanged):
             event.send((interface.range.start(fn), bool(repeatable), None))
 
         # If a StopIteration was raised when submitting the comment to the
-        # coroutine, then we somehow desynchronized. Re-initialize the coroutine
-        # with the hope that things are fixed.
+        # coroutine, then we something terrible has happend that the user will
+        # likely need to know about.
         except StopIteration as E:
             logging.fatal(u"{:s}.changed({!s}, {:#x}, {!s}, {:d}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), utils.string.repr(cb), interface.range.start(a), utils.string.repr(cmt), repeatable), exc_info=True)
 
@@ -621,8 +620,7 @@ class typeinfo(changingchanged):
             event.send((ea, original, new))
 
         # If we encounter a StopIteration while submitting the comment, then the
-        # coroutine has gone out of sync and we need to reinitialize it in order
-        # to regain control.
+        # coroutine has gone out of control and we need to let the user know.
         except StopIteration as E:
             logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname)), exc_info=True)
 
@@ -655,10 +653,9 @@ class typeinfo(changingchanged):
             event.send((ea, new))
 
         # If we encounter a StopIteration while submitting the comment, then the
-        # coroutine has gone out of sync and we need to reinitialize it in order
-        # to regain control.
+        # coroutine has terminated unexpectedly which is a pretty critical issue.
         except StopIteration as E:
-            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)))
+            logging.fatal(u"{:s}.changed({:#x}, {!s}, {!s}) : Unexpected termination of event handler. Re-instantiating it.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames)), exc_info=True)
 
         # Last thing to do is to re-enable the hooks that we disabled and then
         # close our state since we're done with it and there shouldn't be
@@ -855,7 +852,7 @@ def __rebase_function(old, new, size, iterable):
             state = internal.comment.contents._read(offset + old, offset + old)
 
         except E.FunctionNotFoundError:
-            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Unable to transform non-function address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new))
+            logging.fatal(u"{:s}.rebase({:#x}, {:#x}, {:-#x}, {!r}) : Unable to transform non-function address {:#x} -> {:#x}.".format(__name__, old, new, size, iterable, offset + old, offset + new), exc_info=True)
             state = None
 
         if state is None: continue
