@@ -948,9 +948,9 @@ class node(object):
     @staticmethod
     def is_identifier(identifier):
         '''Return truth if the specified `identifier` is valid.'''
-        bits = math.trunc(math.log(idaapi.BADADDR) / math.log(2.0)) - 8
-        highbyte = 0xff * pow(2, bits)
-        return identifier & highbyte == highbyte
+        bits = math.floor(1 + math.log(idaapi.BADADDR) / math.log(2.))
+        mask = 0xff * pow(2, math.trunc(bits) - 8)
+        return identifier & mask == mask
 
     @staticmethod
     def sup_functype(sup):
