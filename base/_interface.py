@@ -469,7 +469,7 @@ class prioritybase(object):
             # Iterate through our priorityqueue extracting each callable and
             # executing it with the parameters we received
             hookq = self.__cache__[target][:]
-            for priority, callable in heapq.nsmallest(len(hookq), hookq):
+            for priority, callable in heapq.nsmallest(len(hookq), hookq, key=operator.attrgetter('priority')):
                 logging.debug(u"{:s}.closure({:s}) : Dispatching parameters ({:s}) to callback ({!s}) with priority ({:+d})".format('.'.join([__name__, self.__class__.__name__]), ', '.join(map("{!r}".format, parameters)), ', '.join(map("{!r}".format, parameters)), callable, priority))
 
                 try:
