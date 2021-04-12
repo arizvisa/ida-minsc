@@ -793,12 +793,11 @@ def op_structure(ea, opnum):
 
         # First we grab our frame, and then find the starting member by its id.
         frame = function.frame(fn)
-        m = frame.members.by_identifier(m.id)
+        member = frame.members.by_identifier(m.id)
 
-        # Figure out the real offset into the member so that we can figure
-        # out which members we need to snag.
-        realoffset = offset - m.offset + m.realoffset
-        path, position = m.parent.members.__walk_to_realoffset__(realoffset)
+        # Use the real offset of the member so that we can figure out how
+        # which members of the the structure are part of our path.
+        path, position = member.parent.members.__walk_to_realoffset__(member.realoffset)
 
         # If we got a list as a result, then we encountered an array which
         # requires us to return a list and include the offset.
