@@ -514,7 +514,7 @@ def op_number(ea, opnum):
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
-    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+    res, max = operand(ea, opnum), pow(2, op_bits(ea, opnum))
 
     # If this is an immediate value, then we can treat it normally.
     if res.type in {idaapi.o_imm}:
@@ -523,7 +523,7 @@ def op_number(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
     integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
@@ -544,7 +544,7 @@ def op_character(ea, opnum):
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
-    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+    res, max = operand(ea, opnum), pow(2, op_bits(ea, opnum))
 
     # If this is an immediate value, then we can treat it normally.
     if res.type in {idaapi.o_imm}:
@@ -554,7 +554,7 @@ def op_character(ea, opnum):
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
     else:
-        maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+        maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
         integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
         # Now we can use the value transformed if the operand has an inverted sign
@@ -590,7 +590,7 @@ def op_binary(ea, opnum):
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
-    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+    res, max = operand(ea, opnum), pow(2, op_bits(ea, opnum))
 
     # If this is an immediate value, then we can treat it normally.
     if res.type in {idaapi.o_imm}:
@@ -599,7 +599,7 @@ def op_binary(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
     integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
@@ -620,7 +620,7 @@ def op_octal(ea, opnum):
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
-    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+    res, max = operand(ea, opnum), pow(2, op_bits(ea, opnum))
 
     # If this is an immediate value, then we can treat it normally.
     if res.type in {idaapi.o_imm}:
@@ -629,7 +629,7 @@ def op_octal(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
     integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
@@ -650,7 +650,7 @@ def op_decimal(ea, opnum):
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
-    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+    res, max = operand(ea, opnum), pow(2, op_bits(ea, opnum))
 
     # If this is an immediate value, then we can treat it normally.
     if res.type in {idaapi.o_imm}:
@@ -659,7 +659,7 @@ def op_decimal(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
     integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
@@ -680,7 +680,7 @@ def op_hexadecimal(ea, opnum):
 
     # Extract the operand's op_t and its maximum value, as we'll use this to
     # transform the value if necessary.
-    res, max = operand(ea, opnum), 2 ** op_bits(ea, opnum)
+    res, max = operand(ea, opnum), pow(2, op_bits(ea, opnum))
 
     # If this is an immediate value, then we can treat it normally.
     if res.type in {idaapi.o_imm}:
@@ -689,7 +689,7 @@ def op_hexadecimal(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
     integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
@@ -772,12 +772,12 @@ def op_structure(ea, opnum):
 
     # Figure out the offset for the structure member if it's an immediate value
     if op.type in {idaapi.o_imm}:
-        max = 2 ** op_bits(ea, opnum)
+        max = pow(2, op_bits(ea, opnum))
         offset = op.value & (max - 1)
 
     # Otherwise, this could be a signed operand and it needs to be converted.
     else:
-        max = math.trunc(2 ** math.ceil(math.log(idaapi.BADADDR, 2)))
+        max = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
         offset = (op.addr - max) if op.addr & (max // 2) else op.addr
 
     # Check to see if this is a stack variable, because we'll need to
@@ -1468,10 +1468,10 @@ class operand_types:
             bits = 8 * get_dtype_size(get_dtype_attribute(op))
 
             # figure out the sign flag
-            sf, res = 2 ** (bits - 1), op.value
+            sf, res = pow(2, bits - 1), op.value
 
             # if op.value has its sign inverted, then signify it otherwise just use it
-            return -2 ** bits + res if interface.node.alt_opinverted(ea, op.n) else res & (2 ** bits - 1)
+            return pow(-2, bits) + res if interface.node.alt_opinverted(ea, op.n) else res & (pow(2, bits) - 1)
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
         raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype, op.type))
 
@@ -1597,9 +1597,9 @@ class operand_types:
         seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
         global architecture
-        sf, dt = 2 ** (bits - 1), dtype_by_size(database.config.bits() // 8)
+        sf, dt = pow(2, bits - 1), dtype_by_size(database.config.bits() // 8)
 
-        inverted, regular = offset & (2 ** bits - 1) if offset & sf else -2 ** bits + offset, -2 ** bits + offset if offset & sf else offset & (sf - 1)
+        inverted, regular = offset & (pow(2, bits) - 1) if offset & sf else pow(-2, bits) + offset, pow(-2, bits) + offset if offset & sf else offset & (sf - 1)
         res = inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
         return intelops.OffsetBaseIndexScale(*res)
 
