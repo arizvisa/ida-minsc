@@ -353,8 +353,8 @@ class multicase(object):
                 # verify that it actually matches the entry
                 if current == (tuple(t.get(_, None) for _ in a[1]), a[3]):
                     # yuuup, update it.
-                    cache[i] = (priority, (func, t_args, argtuple))
-                    res.__doc__ = cls.document(func.__name__, [n for _, n in cache])
+                    cache[i] = priority_tuple(priority, (func, t_args, argtuple))
+                    res.__doc__ = cls.document(func.__name__, [item for _, item in cache])
                     return cons(res)
                 continue
 
@@ -499,7 +499,7 @@ class multicase(object):
         '''Create a new wrapper that will determine the correct function to call.'''
         # define the wrapper...
         def F(*arguments, **keywords):
-            heap = [res for _, res in heapq.nsmallest(len(cache), cache)]
+            heap = [res for _, res in heapq.nsmallest(len(cache), cache, key=operator.attrgetter('priority'))]
             f, (a, w, k) = cls.match((arguments[:], keywords), heap)
             return f(*arguments, **keywords)
             #return f(*(arguments + tuple(w)), **keywords)
