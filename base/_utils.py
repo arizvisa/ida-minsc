@@ -1072,8 +1072,12 @@ class wrap(object):
             if (operand or 0) < 0x00000100:
                 return bytes(bytearray([opcode, operand or 0]))
 
-            msb = math.trunc(math.ceil(math.log(operand, 2)))
-            operands = [ 0xff & operand // 2 ** shift for shift in range(0, min(32, msb), 8) ]
+            # We clamp the operands' maximum length to 4 bytes (32-bits) because
+            # that is the most that python's runtime supports. When calculating
+            # the MSB, we have to hack up the math because Python's imprecision
+            # has a significant influence on the logarithm result.
+            msb = math.ceil(math.log(operand or 1, 2))
+            operands = [ 0xff & operand // pow(2, shift) for shift in range(0, min(32, msb), 8) ]
 
             iterable = itertools.chain(([ext, item] for item in operands[:-1]), ([opcode, item] for item in operands[-1:]))
             return bytes(bytearray(itertools.chain(*iterable)))
@@ -1557,12 +1561,12 @@ def float_of_integer(integer, mantissa_bits, exponent_bits, sign_bits):
         raise ValueError("The total number of bits for the components ({:d}) does not correspond to the size ({:d}) of the integer.".format(sum(components), 8 * size))
 
     # Build the masks we will use to compose a floating-point number
-    fraction_shift, exponent_shift, sign_shift = (2 ** item for item in shifts)
-    bias = (2 ** exponent_bits) // 2 - 1
+    fraction_shift, exponent_shift, sign_shift = (pow(2, item) for item in shifts)
+    bias = pow(2, exponent_bits) // 2 - 1
 
-    fraction_mask = fraction_shift * (2 ** fraction_bits - 1)
-    exponent_mask = exponent_shift * (2 ** exponent_bits - 1)
-    sign_mask = sign_shift * (2 ** sign_bits - 1)
+    fraction_mask = fraction_shift * (pow(2, fraction_bits) - 1)
+    exponent_mask = exponent_shift * (pow(2, exponent_bits) - 1)
+    sign_mask = sign_shift * (pow(2, sign_bits) - 1)
 
     # Now to decode our components...
     mantissa = (integer & fraction_mask) // fraction_shift
@@ -1570,16 +1574,16 @@ def float_of_integer(integer, mantissa_bits, exponent_bits, sign_bits):
     sign = (integer & sign_mask) // sign_shift
 
     # ...and then convert it into a float
-    if exponent > 0 and exponent < 2 ** exponent_bits - 1:
+    if exponent > 0 and exponent < pow(2, exponent_bits) - 1:
         s = -1 if sign else +1
         e = exponent - bias
-        m = 1.0 + float(mantissa) / (2 ** fraction_bits)
+        m = 1.0 + float(mantissa) / pow(2, fraction_bits)
         return math.ldexp(math.copysign(m, s), e)
 
     # Check if we need to return any special constants
-    if exponent == 2 ** exponent_bits - 1 and mantissa == 0:
+    if exponent == pow(2, exponent_bits) - 1 and mantissa == 0:
         return float('-inf') if sign else float('+inf')
-    elif exponent in {0, 2 ** fraction_bits - 1} and mantissa != 0:
+    elif exponent in {0, pow(2, fraction_bits) - 1} and mantissa != 0:
         return float('-nan') if sign else float('+nan')
     elif exponent == 0 and mantissa == 0:
         return float('-0') if sign else float('+0')
@@ -1593,13 +1597,13 @@ def float_to_integer(float, mantissa_bits, exponent_bits, sign_bits):
 
     Each of the sizes are to be provided as the number of bits used to represent that component.
     """
-    exponentbias = (2 ** exponent_bits) // 2 - 1
+    exponentbias = pow(2, exponent_bits) // 2 - 1
 
     # Figure out what type of floating-point number this is
     if math.isnan(float):
-        sign, exponent, mantissa = 0, 2 ** exponent_bits - 1, ~0
+        sign, exponent, mantissa = 0, pow(2, exponent_bits) - 1, ~0
     elif math.isinf(float):
-        sign, exponent, mantissa = 1 if float < 0 else 0, 2 ** exponent_bits - 1, 0
+        sign, exponent, mantissa = 1 if float < 0 else 0, pow(2, exponent_bits) - 1, 0
     elif float == 0.0 and math.atan2(float, float) < 0.0:
         sign, exponent, mantissa = 1, 0, 0
     elif float == 0.0 and math.atan2(float, float) == 0.0:
@@ -1616,7 +1620,7 @@ def float_to_integer(float, mantissa_bits, exponent_bits, sign_bits):
         m = abs(m) * 2.0 - 1.0 if exponent else abs(m)
 
         # Finally we need to convert the fractional mantissa into an integer
-        mantissa = math.trunc(m * (2 ** mantissa_bits))
+        mantissa = math.trunc(m * pow(2, mantissa_bits))
 
     # Calculate the shift and mask for each component of the encoded float
     components = [mantissa_bits, exponent_bits, sign_bits]
@@ -1624,8 +1628,8 @@ def float_to_integer(float, mantissa_bits, exponent_bits, sign_bits):
     for cb in components:
         shifts.append(position)
         position += cb
-    mantissa_shift, exponent_shift, sign_shift = (2 ** item for item in shifts)
-    mantissa_mask, exponent_mask, sign_mask = (2 ** item - 1 for item in components)
+    mantissa_shift, exponent_shift, sign_shift = (pow(2, item) for item in shifts)
+    mantissa_mask, exponent_mask, sign_mask = (pow(2, item) - 1 for item in components)
 
     # Now to store each component into an integer that we can return
     res = 0
