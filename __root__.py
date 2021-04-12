@@ -26,8 +26,8 @@ def __version__():
     major, minor = map(int, res.split('.', 2))
     minor = int("{:<02d}".format(minor))
     if minor > 0:
-        count = math.floor(1 + math.log10(minor))
-        return major, minor, float(major) + minor / pow(10, count)
+        count = 1 + math.floor(math.log10(minor))
+        return major, minor, float(major) + minor * pow(10, -count)
     return major, minor, float(major)
 
 ## inject the version info into idaapi

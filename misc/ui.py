@@ -446,9 +446,10 @@ class strings(appwindow):
         else:
             res = [idaapi.STRTYPE_TERMCHR, idaapi.STRTYPE_PASCAL, idaapi.STRTYPE_LEN2, idaapi.STRTYPE_C_16, idaapi.STRTYPE_LEN4, idaapi.STRTYPE_LEN2_16, idaapi.STRTYPE_LEN4_16]
 
-        config.strtypes = functools.reduce(lambda t, c: t | (2**c), res, 0)
+        config.strtypes = functools.reduce(lambda result, item: result | pow(2, item), res, 0)
         if not idaapi.set_strlist_options(config):
             raise internal.exceptions.DisassemblerError(u"{:s}.__on_openidb__({:#x}, {:b}) : Unable to set the default options for the string list.".format('.'.join([__name__, cls.__name__]), code, is_old_database))
+        return
         #assert idaapi.build_strlist(config.ea1, config.ea2), "{:#x}:{:#x}".format(config.ea1, config.ea2)
 
     @classmethod

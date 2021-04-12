@@ -948,7 +948,7 @@ class node(object):
     @staticmethod
     def is_identifier(identifier):
         '''Return truth if the specified `identifier` is valid.'''
-        bits = math.floor(1 + math.log(idaapi.BADADDR) / math.log(2.))
+        bits = math.ceil(math.log(idaapi.BADADDR, 2.))  # this doesn't work on all bases due to python precision
         mask = 0xff * pow(2, math.trunc(bits) - 8)
         return identifier & mask == mask
 
