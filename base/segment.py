@@ -108,7 +108,7 @@ def list(**type):
     # the resulting number of digits will vary depending on what base is
     # actually being used when calculating the logarithm.
     cindex = 1 + math.floor(math.log10(maxindex or 1))
-    caddr, csize = map(math.ceil, (math.log(item or 1, 16) for item in [maxaddr, maxsize]))  # ceiling only works for powers of 16
+    caddr, csize = map(math.ceil, (math.log(item or 1, 16) for item in [maxaddr, maxsize]))  # taking the ceiling only works for powers of 2
 
     # List all the fields for each segment that we've aggregated
     for seg in listable:
