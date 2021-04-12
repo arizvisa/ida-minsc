@@ -405,17 +405,18 @@ class functions(object):
             listable.append(ea)
 
         # Collect the number of digits for everything from the first pass
-        Fdigits = lambda number, base: math.floor(1 + math.log(number or 1) / math.log(base))
-        cindex = Fdigits(len(listable), 10) if listable else 1
-        try: cmaxoffset = Fdigits(offset(maxentry), 16)
+        Fdigits2 = lambda number, base: math.ceil(math.log(number or 1, base))
+        Fdigits10 = lambda number: 1 + math.floor(math.log10(number or 1))
+        cindex = Fdigits10(len(listable)) if listable else 1
+        try: cmaxoffset = Fdigits2(offset(maxentry), 16)
         except E.OutOfBoundsError: cmaxoffset = 0
-        cmaxentry, cmaxaddr, cminaddr = (Fdigits(item, 16) for item in [maxentry, maxaddr, minaddr])
-        cchunks = Fdigits(chunks, 10) if chunks else 1
-        cblocks = Fdigits(blocks, 10) if blocks else 1
-        cexits = Fdigits(exits, 10) if exits else 1
-        cavars = Fdigits(avars, 10) if avars else 1
-        clvars = Fdigits(lvars, 10) if lvars else 1
-        cmarks = Fdigits(marks, 10) if marks else 1
+        cmaxentry, cmaxaddr, cminaddr = (Fdigits2(item, 16) for item in [maxentry, maxaddr, minaddr])
+        cchunks = Fdigits10(chunks) if chunks else 1
+        cblocks = Fdigits10(blocks) if blocks else 1
+        cexits = Fdigits10(exits) if exits else 1
+        cavars = Fdigits10(avars) if avars else 1
+        clvars = Fdigits10(lvars) if lvars else 1
+        cmarks = Fdigits10(marks) if marks else 1
 
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
@@ -769,8 +770,9 @@ class names(object):
             listable.append(index)
 
         # Collect the sizes from our first pass
-        Fdigits = lambda number, base: math.floor(1 + math.log(number or 1) / math.log(base))
-        cindex, caddr = Fdigits(maxindex, 10), Fdigits(maxaddr, 16)
+        Fdigits2 = lambda number, base: math.ceil(math.log(number or 1, base))
+        Fdigits10 = lambda number: 1 + math.floor(math.log10(number or 1))
+        cindex, caddr = Fdigits10(maxindex), Fdigits2(maxaddr, 16)
 
         # List all the fields of each name that was found
         for index in listable:
@@ -1430,9 +1432,10 @@ class entries(object):
             listable.append(index)
 
         # Collect the maximum sizes for everything from the first pass
-        Fdigits = lambda number, base: math.floor(1 + math.log(number or 1) / math.log(base))
-        cindex = Fdigits(maxindex, 10)
-        caddr, cordinal = (Fdigits(item, 16) for item in [maxaddr, maxordinal])
+        Fdigits2 = lambda number, base: math.ceil(math.log(number or 1, base))
+        Fdigits10 = lambda number: 1 + math.floor(math.log10(number or 1))
+        cindex = Fdigits10(maxindex)
+        caddr, cordinal = (Fdigits2(item, 16) for item in [maxaddr, maxordinal])
 
         # List all the fields from everything that matched
         for index in listable:
@@ -2087,7 +2090,7 @@ class imports(object):
             listable.append((ea, (module, name, ordinal)))
 
         # Collect the number of digits for the maximum address extracted from the first pass
-        caddr = math.floor(1. + math.log(maxaddr or 1) / math.log(16))
+        caddr = math.ceil(math.log(maxaddr or 1, 16))
 
         # List all the fields of every import that was matched
         prefix = '__imp_'
@@ -4026,7 +4029,7 @@ class xref(object):
         ea, target = interface.address.head(ea, target)
 
         isCall = builtins.next((reftype[k] for k in ['call', 'is_call', 'isCall', 'iscall', 'callQ'] if k in reftype), None)
-        if abs(target - ea) > 2**(config.bits() // 2):
+        if abs(target - ea) > pow(2, config.bits() // 2):
             flowtype = idaapi.fl_CF if isCall else idaapi.fl_JF
         else:
             flowtype = idaapi.fl_CN if isCall else idaapi.fl_JN
@@ -4905,13 +4908,13 @@ class set(object):
         # grab the aligment out of the kwarg
         if any(k in alignment for k in ['align', 'alignment']):
             align = builtins.next((alignment[k] for k in ['align', 'alignment'] if k in alignment))
-            e = math.trunc(math.log(align) / math.log(2))
+            e = math.ceil(math.log(align or 1, 2))
 
         # or we again...just figure it out via brute force
         else:
             e, target = 13, ea + size
             while e > 0:
-                if target & (2**e-1) == 0:
+                if target & (pow(2, e) - 1) == 0:
                     break
                 e -= 1
 
@@ -5493,10 +5496,10 @@ class get(object):
 
         The default value of `byteorder` is the same as specified by the database architecture.
         """
-        bits = size*8
-        sf = (2**bits)>>1
+        bits = 8 * size
+        sf = pow(2, bits) >> 1
         res = cls.unsigned(ea, size, **byteorder)
-        return (res - (2**bits)) if res&sf else res
+        return (res - pow(2, bits)) if res & sf else res
 
     class integer(object):
         """
