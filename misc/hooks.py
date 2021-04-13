@@ -638,11 +638,19 @@ class typeinfo(changingchanged):
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (database not ready) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
         if interface.node.is_identifier(ea):
             return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (not an address) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
-        logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Received typeinfo.changing for new_type ({!s}) and new_fname ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname))
+
+        # Verify that the address is within our database boundaries because IDA
+        # can actually create "extra" comments outside of the database.
+        try:
+            ea = interface.address.within(ea)
+        except E.OutOfBoundsError:
+            return logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Ignoring typeinfo.changing event (not a valid address) with new type ({!s}) and new name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname, ea))
 
         # Extract the previous type information from the given address. If none
         # was found, then just use empty strings because these are compared to the
         # new values by the event.
+        logging.debug(u"{:s}.changing({:#x}, {!s}, {!s}) : Received typeinfo.changing for new_type ({!s}) and new_fname ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(new_type), utils.string.repr(new_fname), new_type, new_fname))
+
         ti = database.type(ea)
         old_type, old_fname, _ = (b'', b'', None) if ti is None else ti.serialize()
 
@@ -678,12 +686,19 @@ class typeinfo(changingchanged):
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (database not ready) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
         if interface.node.is_identifier(ea):
             return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not an address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
-        logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames))
+
+        # Verify that the address is within our database boundaries because IDA
+        # can actually create "extra" comments outside of the database.
+        try:
+            ea = interface.address.within(ea)
+        except E.OutOfBoundsError:
+            return logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Ignoring typeinfo.changed event (not a valid address) with type ({!s}) and name ({!s}) at {:#x}.".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames, ea))
 
         # Resume the state for the current address, and then take the data from
         # our parameters (which IDA is telling us was just written) and pack
         # them into a tuple. This way we can send them to the state after we
         # disable the necessary hooks to prevent re-entrancy.
+        logging.debug(u"{:s}.changed({:#x}, {!s}, {!s}) : Received typeinfo.changed event with type ({!s}) and name ({!s}).".format('.'.join([__name__, cls.__name__]), ea, utils.string.repr(type), utils.string.repr(fnames), type, fnames))
         event, new = cls.resume(ea), (type or b'', fnames or b'')
 
         # First disable our hooks so that we can prevent re-entrancy issues.
@@ -1020,13 +1035,19 @@ class extra_cmt(object):
 
     @classmethod
     def changed(cls, ea, line_idx, cmt):
-
         # Check that we're not an identifier, because these aren't being cached.
         if interface.node.is_identifier(ea):
             return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not an address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
-        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+
+        # Verify that the address is within our database boundaries because IDA
+        # can actually create "extra" comments outside of the database.
+        try:
+            ea = interface.address.within(ea)
+        except E.OutOfBoundsError:
+            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not a valid address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
 
         # Determine whether we'll be updating the contents or a global.
+        logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
         ctx = internal.comment.contents if idaapi.get_func(ea) else internal.comment.globals
 
         # Figure out what the line_idx boundaries are so that we can use it to check
@@ -1065,6 +1086,13 @@ class extra_cmt(object):
         # caching these.
         if interface.node.is_identifier(ea):
             return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not an address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+
+        # Verify that the address is within our database boundaries because IDA
+        # can actually create "extra" comments outside of the database.
+        try:
+            ea = interface.address.within(ea)
+        except E.OutOfBoundsError:
+            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not a valid address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
 
         # XXX: this function is now busted in later versions of IDA because for some
         #      reason, Ilfak, is now updating the extra comment prior to dispatching
