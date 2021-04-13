@@ -1020,6 +1020,10 @@ class extra_cmt(object):
 
     @classmethod
     def changed(cls, ea, line_idx, cmt):
+
+        # Check that we're not an identifier, because these aren't being cached.
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not an address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
         logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Processing event at address {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
 
         # Determine whether we'll be updating the contents or a global.
@@ -1056,6 +1060,12 @@ class extra_cmt(object):
         it uses can be reused if the workaround methodology of zero'ing the refcount
         for the entire address is applied.
         """
+
+        # First check that we're not an identifier, because we don't care about
+        # caching these.
+        if interface.node.is_identifier(ea):
+            return logging.debug(u"{:s}.extra_cmt_changed({:#x}, {:d}, {!s}) : Ignoring comment.changed event (not an address) for extra comment at {:#x} for index {:d}.".format(__name__, ea, line_idx, utils.string.repr(cmt), ea, line_idx))
+
         # XXX: this function is now busted in later versions of IDA because for some
         #      reason, Ilfak, is now updating the extra comment prior to dispatching
         #      this event. unfortunately, our tag cache doesn't allow us to identify
