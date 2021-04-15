@@ -209,7 +209,8 @@ class address(changingchanged):
         # this event is being violently closed due to receiving a
         # changing event more than once for the very same address.
         except GeneratorExit:
-            return logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            return
 
         # Now to fix the comment the user typed.
         if (newea, nrpt, none) == (ea, rpt, None):
@@ -414,7 +415,8 @@ class globals(changingchanged):
             newea, nrpt, none = (yield)
 
         except GeneratorExit:
-            return logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the {:s} function comment at {:#x} was being changed from {!s} to {!s}.".format('.'.join([__name__, cls.__name__]), 'repeatable' if rpt else 'non-repeatable', ea, utils.string.repr(old), utils.string.repr(new)))
+            return
 
         # Now we can fix the user's new comment.
         if (newea, nrpt, none) == (ea, rpt, None):
@@ -603,7 +605,8 @@ class typeinfo(changingchanged):
         # this event is being violently closed due to receiving a
         # changing event more than once for the very same address.
         except GeneratorExit:
-            return logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the type information at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(original), bytes().join(expected)))
+            logging.debug(u"{:s}.event() : Terminating state due to explicit request from owner while the type information at {:#x} was being changed from {!r} to {!r}.".format('.'.join([__name__, cls.__name__]), ea, bytes().join(original), bytes().join(expected)))
+            return
 
         # Verify that the typeinfo we're changing to is the exact same as given
         # to use by both events. If they're not the same, then we need to make
