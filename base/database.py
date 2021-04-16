@@ -3179,7 +3179,12 @@ class type(object):
         '''Return the typeinfo at the address `ea` as an ``idaapi.tinfo_t``.'''
         ti = idaapi.tinfo_t()
 
-        # Try and guess the typeinfo for the given address
+        # First try and get the actual typeinfo for the given address. If it
+        # actually worked, then we can just return it as-is.
+        if idaapi.get_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.get_tinfo(ti, ea):
+            return ti
+
+        # Otherwise we'll and guess the typeinfo for the same address.
         res = idaapi.guess_tinfo2(ea, ti) if idaapi.__version__ < 7.0 else idaapi.guess_tinfo(ti, ea)
 
         # If we failed, then we'll try and hack around it using idaapi.print_type.
