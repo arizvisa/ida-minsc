@@ -102,7 +102,7 @@ def by(**type):
 
     listable = [item for item in iterate(**type)]
     if len(listable) > 1:
-        messages = (u"[{:d}] {:s} & {:#x} ({:d} members){:s}".format(idaapi.get_enum_idx(item), idaapi.get_enum_name(item), mask(item), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else '') for i, item in enumerate(listable))
+        messages = (u"[{:d}] {:s}{:s} ({:d} members){:s}".format(idaapi.get_enum_idx(item), idaapi.get_enum_name(item), u" & {:#x}".format(mask(item)) if bitfield(item) else u'', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else '') for i, item in enumerate(listable))
         [ logging.info(msg) for msg in messages ]
         logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(listable), listable[0]))
 
@@ -218,6 +218,20 @@ def mask(enum):
     res = bits(eid)
     return pow(2, res) - 1
 
+@utils.multicase()
+def bitfield(enum):
+    '''Return whether the enumeration identified by `enum` is a bitfield or not.'''
+    eid = by(enum)
+    return idaapi.is_bf(eid)
+@utils.multicase(boolean=(six.integer_types, bool))
+def bitfield(enum, boolean):
+    '''Toggle the bitfield setting of the enumeration `enum` depending on the value of `boolean`.'''
+    eid = by(enum)
+    res, ok = idaapi.is_bf(eid), idaapi.set_enum_bf(eid, True if boolean else False)
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.bitfield({!r}, {!s}) : Unable to set the bitfield flag for the specified enumeration ({:#x}) to {!s}.".format(__name__, enum, boolean, eid, boolean))
+    return res
+
 def repr(enum):
     '''Return a printable summary of the enumeration `enum`.'''
     eid = by(enum)
@@ -231,6 +245,7 @@ __matcher__.attribute('index', idaapi.get_enum_idx)
 __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
 __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_enum_name, utils.string.of)
 __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_enum_name, utils.string.of)
+__matcher__.boolean('bitfield', operator.eq, bitfield)
 __matcher__.attribute('id')
 __matcher__.attribute('identifier')
 __matcher__.predicate('pred')
@@ -268,10 +283,15 @@ def list(**type):
     cindex = 1 + math.floor(math.log10(maxindex or 1))
     try: cmask = max(len("{:x}".format(mask(item))) for item in res) if res else database.config.bits() / 4.0
     except Exception: cmask = 0
+    has_bitfield = any(map(bitfield, res)) if res else False
 
     for item in res:
-        name = idaapi.get_enum_name(item)
-        six.print_(u"{:<{:d}s} {:>{:d}s} & {:<#{:d}x} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, mask(item), 2 + math.trunc(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
+        name, bitfieldQ = idaapi.get_enum_name(item), bitfield(item)
+        if bitfieldQ:
+            six.print_(u"{:<{:d}s} {:>{:d}s} & {:<#{:d}x} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, mask(item), 2 + math.trunc(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
+        else:
+            six.print_(u"{:<{:d}s} {:>{:d}s}{:s} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, ' '*(3 + 2 + math.trunc(cmask)) if has_bitfield else '', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
+        continue
     return
 
 ## members
@@ -310,10 +330,10 @@ class members(object):
     def add(cls, enum, name, value, **bitmask):
         """Add an enumeration member `name` with the specified `value` to the enumeration `enum`.
 
-        If the int, `bitmask`, is specified then used it as the bitmask for the enumeration.
+        If the integral, `bitmask`, is specified then use it as the bitmask for the enumeration.
         """
         eid = by(enum)
-        bmask = bitmask.get('bitmask', idaapi.BADADDR & mask(eid))
+        bmask = bitmask.get('bitmask', idaapi.DEFMASK)
 
         fullname = interface.tuplename(name) if isinstance(name, tuple) else name
         string = utils.string.to(fullname)
@@ -384,14 +404,112 @@ class members(object):
         return mid
 
     @classmethod
-    def by_value(cls, enum, value):
-        '''Return the member identifier for the member of the enumeration `enum` with the specified `value`.'''
-        eid = by(enum)
-        bmask = idaapi.BADADDR & mask(eid)
-        res, _ = idaapi.get_first_serial_enum_member(eid, value, bmask)
-        if res == idaapi.BADADDR:
-            raise E.MemberNotFoundError(u"{:s}.by_value({!r}, {:#x}) : Unable to locate a member in the enumeration ({:#x}) with the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, eid, value))
-        return res
+    def by_value(cls, enum, value, **filters):
+        """Return the member identifier for the member of the enumeration `enum` with the specified `value`.
+
+        If the integrals, `bitmask` or `serial`, is specified then use them to filter the returned enumeration members.
+        """
+        eid  = by(enum)
+        bitfieldQ = bitfield(eid)
+
+        # First we need to figure out if this is a bitfield, because if
+        # it is..then we need to figure out what masks it might be in.
+        if bitfieldQ:
+            items = []
+
+            # Fetch the very first bitmask and then append it to our list.
+            item = idaapi.get_first_bmask(eid)
+            items.append(idaapi.DEFMASK if item == idaapi.BADADDR else item)
+
+            # Now we can continue fetching and yielding the masks until
+            # we get to an idaapi.BADADDR or the end. Then we're done.
+            while item not in {idaapi.BADADDR, idaapi.get_last_bmask(eid)}:
+                item = idaapi.get_next_bmask(eid, item)
+                items.append(item)
+
+            # Save what we just collected.
+            results = items
+
+        # Otherwise, there's only one mask to search through, the DEFMASK.
+        else:
+            results = [idaapi.DEFMASK]
+
+        # Now that we have all the masks, we need to figure out all of the
+        # serial numbers for the desired value throughout all our masks.
+        available = []
+        for mask in results:
+
+            # We start by getting the first serial number for the value
+            # and mask. If we get a BADNODE, then we know it's not in this
+            # mask and can skip to the next one.
+            first = item, cid = mid, _ = idaapi.get_first_serial_enum_member(eid, value, mask)
+            if item == idaapi.BADNODE:
+                continue
+            available.append((item, mask, cid))
+
+            # Now we can get the id and serial number for the last value
+            # and mask. If it matches to the first, then we can add it to
+            # our results and proceed to the next mask continuing our search.
+            last = idaapi.get_last_serial_enum_member(eid, value, mask)
+            if first == last:
+                continue
+
+            # Otherwise, we need continue through all of the serials for
+            # the value and add every single one of them before continuing.
+            while [item, cid] != idaapi.get_last_serial_enum_member(eid, value, mask):
+                item, cid = idaapi.get_next_serial_enum_member(mid, cid) if idaapi.__version__ < 7.0 else idaapi.get_next_serial_enum_member(cid, mid)
+                if item == idaapi.BADNODE:
+                    break
+                available.append((item, mask, cid))
+            continue
+
+        # We should now have a list of all possible values in our results,
+        # and we need to figure out whether we need to filter them. If it's
+        # a bitfield, then we need to filter them according to the mask the
+        # user has given us. If they haven't given us one, then we'll still
+        # just process what we have because we might've actually found it.
+        bitmask = filters.get('bitmask', idaapi.DEFMASK)
+        if bitfieldQ and 'bitmask' in filters:
+            filtered = [(item, mask, cid) for item, mask, cid in available if mask in {bitmask}]
+
+        # Otherwise we just take everything from the matched so that way we
+        # can do filter for the serial if the caller gave it to us.
+        else:
+            filtered = [(item, mask, cid) for item, mask, cid in available]
+
+        # Next we need to check to see if the user gave us a serial to filter
+        # our results. So we check our parameters, and then gather our results.
+        serial = filters.get('serial', 0)
+        if 'serial' in filters:
+            results = [(item, mask, cid) for item, mask, cid in filtered if cid in {serial}]
+
+        # Otherwise we now have our results ready to return to the caller.
+        else:
+            results = filtered[:]
+
+        # If our results are empty, then we were unable to find what the user
+        # was looking for and thus we need to let them know what's up.
+        if not results:
+            raise E.MemberNotFoundError(u"{:s}.by_value({!r}, {:#x}{:s}) : Unable to locate a member in the enumeration ({:#x}) with the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+
+        # If we found more than one result, then we need to grab all the fields
+        # that we plan on emitting so that we can just let the user know what
+        # was found when raising our exception.
+        elif len(results) > 1:
+            iterable = ((mid, mask, cid, utils.string.of(idaapi.get_bmask_name(eid, mask)) or u'', utils.string.of(idaapi.get_enum_member_name(mid)) or u'') for mid, mask, cid in results)
+            spec = u"[{serial:d}] {name!s} {value:#0{:d}x} & {mask:s}".format if bitfieldQ else u"[{serial:d}] {name!s} {value:#0{:d}x}".format
+            formatter = utils.fpartial(spec, 2 + 2 * size(eid))
+            messages = (formatter(serial=cid, name=name, mask=u"{:s}({:#0{:d}x})".format(maskname, mask, 2 + 2 * size(eid)) if maskname else u"{:#0{:d}x}".format(mask, 2 + 2 * size(eid)), value=idaapi.get_enum_member_value(mid)) for mid, mask, cid, maskname, name in iterable)
+            logging.fatal(u"{:s}.by_value({!r}, {:#x}{:s}) : Multiple members with varying bitmask or serial were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+            [ logging.warning(msg) for msg in messages ]
+            if bitfieldQ:
+                raise E.MemberNotFoundError(u"{:s}.by_value({!r}, {:#x}{:s}) : Multiple members with varying bitmask or serial were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+            raise E.MemberNotFoundError(u"{:s}.by_value({!r}, {:#x}{:s}) : Multiple members with different serial numbers were found in the enumeration ({:#x}) for the specified value ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, value, u", {:s}".format(utils.string.kwargs(filters)) if filters else u'', eid, value))
+
+        # Otherwise there was only one item found, so we just need to unpack it.
+        res, = results
+        mid, _, _ = res
+        return mid
     byvalue = utils.alias(by_value, 'members')
 
     @classmethod
@@ -403,7 +521,7 @@ class members(object):
             if name == member.name(mid):
                 return mid
             continue
-        return
+        raise E.MemberNotFoundError(u"{:s}.by_name({!r}, {!s}) : Unable to locate a member in the enumeration ({:#x}) with the specified name ({!s}).".format('.'.join([__name__, cls.__name__]), enum, utils.string.repr(name), eid, utils.string.repr(name)))
     byname = utils.alias(by_name, 'members')
 
     @utils.multicase(n=six.integer_types)
@@ -423,32 +541,73 @@ class members(object):
 
     @classmethod
     def __iterate__(cls, eid):
-        '''Iterate through all the members of the enumeration identified by `eid`.'''
-        bmask = idaapi.BADADDR & mask(eid)
+        '''Iterate through all the members of the enumeration identified by `eid` and yield their values.'''
 
-        # Fetch the first enumeration member, and then yield it
-        # if there was no error while fetching it.
-        item = idaapi.get_first_enum_member(eid, bmask)
-        if item == idaapi.BADADDR:
+        # First define a closure that iterates through all of the bitmasks
+        # inside a particular enumeration. We always yield the first mask
+        # because if it's not a bitfield, then the mask is idaapi.DEFMASK.
+        def masks(eid):
+            bmask = idaapi.get_first_bmask(eid)
+            yield idaapi.DEFMASK if bmask == idaapi.BADADDR else bmask
+
+            # Now we can continue fetching and yielding the masks until
+            # we get to an idaapi.BADADDR. That way we'll know we're done.
+            while bmask != idaapi.get_last_bmask(eid):
+                bmask = idaapi.get_next_bmask(eid, bmask)
+                yield bmask
             return
-        yield item
 
-        # Continue fetching and yielding members until we get
-        # to the very last one of the enumeration.
-        while item != idaapi.get_last_enum_member(eid, bmask):
-            item = idaapi.get_next_enum_member(eid, item, bmask)
-            yield item
+        # Now we need to define a closure that iterates through all of the
+        # values for the masks inside an enumeration. This is because IDA
+        # gives us values, and we need to conver these values to identifiers.
+        def values(eid, bitmask):
+
+            # We start with the first enumeration member (or value), and
+            # then yield it if there was no error while fetching it. If
+            # there was, then we just continue onto the next mask.
+            value = idaapi.get_first_enum_member(eid, bitmask)
+            if value == idaapi.BADADDR:
+                return
+            yield value
+
+            # Continue fetching and yielding values until we get to the
+            # very last one of the enumeration.
+            while value != idaapi.get_last_enum_member(eid, bitmask):
+                value = idaapi.get_next_enum_member(eid, value, bitmask)
+                yield value
+            return
+
+        # Now we need to iterate through all of the masks, feeding them
+        # to our "values" closure. Then with the values we can iterate
+        # through all of the serials, and use that to get each identifier.
+        for bitmask in masks(eid):
+            for value in values(eid, bitmask):
+
+                # Start out with the first serial for the member. We compare
+                # this against idaapi.BADNODE in order to determine if there
+                # was nothing found and we need to continue to the next value.
+                item, cid = mid, _ = idaapi.get_first_serial_enum_member(eid, value, bitmask)
+                if item == idaapi.BADNODE:
+                    continue
+                yield mid
+
+                # Now we should be able to loop until we get to the last serial
+                # number while yielding each valid identifier that we receive.
+                while [item, cid] != idaapi.get_last_serial_enum_member(eid, value, bitmask):
+                    item, cid = idaapi.get_next_serial_enum_member(mid, cid) if idaapi.__version__ < 7.0 else idaapi.get_next_serial_enum_member(cid, mid)
+                    if item == idaapi.BADNODE:
+                        break
+                    yield item
+                continue
+            continue
         return
 
     @classmethod
     def iterate(cls, enum):
         '''Iterate through all ids of each member associated with the enumeration `enum`.'''
         eid = by(enum)
-        bmask = idaapi.BADADDR & mask(eid)
-        for value in cls.__iterate__(eid):
-            res, _ = idaapi.get_first_serial_enum_member(eid, value, bmask)
-            # XXX: what does get_next_serial_enum_member and the rest do?
-            yield res
+        for item in cls.__iterate__(eid):
+            yield item
         return
 
     @classmethod
@@ -459,8 +618,21 @@ class members(object):
         listable = [item for item in cls.iterate(eid)]
         maxindex = max(len("[{:d}]".format(index)) for index, _ in enumerate(listable)) if listable else 1
         maxvalue = max(builtins.map(utils.fcompose(member.value, "{:#x}".format, len), listable) if listable else [1])
+        maxname = max(builtins.map(utils.fcompose(member.name, len), listable) if listable else [0])
+        maxbname = max([len(utils.string.of(idaapi.get_bmask_name(eid, mask)) if idaapi.get_bmask_name(eid, mask) else u'') for mask in builtins.map(member.mask, listable)] if listable else [0])
+        masksize = 2 * size(eid)
+
+        # If this enumeration is a bitfield, then we need to consider the mask of
+        # each enumeration member when writing them to the output.
+        if bitfield(eid):
+            for i, mid in enumerate(listable):
+                bname = utils.string.of(idaapi.get_bmask_name(eid, member.mask(mid))) or u''
+                six.print_(u"{:<{:d}s} {:<{:d}s} {:#0{:d}x} & {:s}".format("[{:d}]".format(i), maxindex, member.name(mid), maxname, member.value(mid), maxvalue, u"{:s}({:#0{:d}x})".format(bname, member.mask(mid), 2 + masksize) if bname else "{:#0{:d}x}".format(member.mask(mid), 2 + masksize)))
+            return
+
+        # Otherwise this isn't a bitfield, and we don't need to worry about the mask.
         for i, mid in enumerate(listable):
-             six.print_(u"{:<{:d}s} {:#0{:d}x} {:s}".format("[{:d}]".format(i), maxindex, member.value(mid), 2 + maxvalue, member.name(mid)))
+             six.print_(u"{:<{:d}s} {:<{:d}s} {:#0{:d}x}".format("[{:d}]".format(i), maxindex, member.name(mid), maxname, member.value(mid), maxvalue))
         return
 
 class member(object):
@@ -607,7 +779,8 @@ class member(object):
         """
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid))
-        bmask = bitmask.get('bitmask', idaapi.BADADDR & cls.mask(mid))
+
+        bmask = bitmask.get('bitmask', idaapi.DEFMASK)
         res, ok = idaapi.get_enum_member_value(mid), idaapi.set_enum_member_value(mid, value, bmask)
         if not ok:
             raise E.DisassemblerError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to set the value for the specified member ({:#x}) to {:#x}{:s}.".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid, value, u" & {:#x}".format(bmask) if bmask else u''))
