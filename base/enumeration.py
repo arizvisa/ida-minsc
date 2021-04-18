@@ -58,14 +58,31 @@ def count():
 
 @utils.multicase()
 def flags(enum):
-    '''Return the flags for the enumeration `enum`.'''
+    '''Return the flags for the enumeration identified by `enum`.'''
     eid = by(enum)
     return idaapi.get_enum_flag(eid)
-@utils.multicase(mask=six.integer_types)
-def flags(enum, mask):
-    '''Return the flags for the enumeration `enum` and masked with `mask`.'''
+@utils.multicase(flags=six.integer_types)
+def flags(enum, flags):
+    '''Set the flags for the enumeration `enum` to the value specified by `flags`.'''
     eid = by(enum)
-    return idaapi.get_enum_flag(eid) & mask
+    res, ok = idaapi.get_enum_flag(eid), idaapi.set_enum_flag(eid, flags)
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.flags({!r}, {:#x}) : Unable to set the flags for the specified enumeration ({:#x}) to {:#x}.".format(__name__, enum, flags, eid, flags))
+    return res
+
+@utils.multicase()
+def index(enum):
+    '''Return the index in the enumeration list for the enumeration identified by `enum`.'''
+    eid = by(enum)
+    return idaapi.get_enum_idx(eid)
+@utils.multicase(index=six.integer_types)
+def index(enum, index):
+    '''Set the position in the enumeration list for the enumeration `enum` to the specified `index`.'''
+    eid = by(enum)
+    res, ok = idaapi.get_enum_idx(eid), idaapi.set_enum_idx(eid, index)
+    if not ok:
+        raise E.DisassemblerError(u"{:s}.index({!r}, {:d}) : Unable to set the index for the specified enumeration ({:#x}) to {:#x}.".format(__name__, enum, index, eid, index))
+    return res
 
 @utils.string.decorate_arguments('name')
 def by_name(name):
