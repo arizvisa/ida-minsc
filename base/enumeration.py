@@ -49,7 +49,7 @@ import idaapi
 def has(enum):
     '''Return truth if the enumeration `enum` exists within the database.'''
     ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL = -1, -3, -5, -8
-    alts = {idaapi.BADADDR & uval for uval in [ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL]}
+    alts = {idaapi.BADADDR & uval for uval in [ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL]}
     return interface.node.is_identifier(enum) and all(internal.netnode.alt.has(enum, idx) for idx in alts)
 
 def count():
@@ -154,13 +154,13 @@ def search(**type):
     return by(**type)
 
 def names(enum):
-    '''Return a list of all the names belonging to the enumeration `enum`.'''
-    return [member.name(item) for item in members.iterate(enum)]
+    '''Return a set of all of the names belonging to the enumeration `enum`.'''
+    return {item for item in members.names(enum)}
 keys = utils.alias(names)
 
 def values(enum):
-    '''Return a list of all the values belonging to the enumeration `enum`.'''
-    return [member.value(item) for item in members.iterate(enum)]
+    '''Return a set of all of the values belonging to the enumeration `enum`.'''
+    return {item for item in members.values(enum)}
 
 ## creation/deletion
 @utils.string.decorate_arguments('name')
@@ -375,10 +375,22 @@ class members(object):
     """
 
     def __new__(cls, enum):
-        '''Yield the name of each member from the enumeration `enum`.'''
+        """Yield the name, and value of each member from the enumeration `enum`.
+
+        If the enumeration `enum` is a bitfield, then yield each member's name, value, and bitmask.
+        """
         eid = by(enum)
         for mid in cls.iterate(eid):
-            yield member.name(mid)
+
+            # If this enumeration is a bitfield, then we need to yield the name,
+            # value, and bitmask for each member that's being returned.
+            if bitfield(eid):
+                yield member.name(mid), member.value(mid), member.mask(mid)
+
+            # If it's just a regular enumeration, then we can just return the name and value.
+            else:
+                yield member.name(mid), member.value(mid)
+            continue
         return
 
     ## scope
@@ -431,8 +443,13 @@ class members(object):
 
     @classmethod
     def values(cls, enum):
-        '''Return a set of all the values belonging to the enumeration `enum`.'''
+        """Return a set of all the values belonging to the enumeration `enum`.
+
+        If the enumeration is a bitfield, then each item in the result is the value and its bitmask.
+        """
         eid = by(enum)
+        if bitfield(eid):
+            return { (member.value(mid), member.mask(mid)) for mid in cls.iterate(eid) }
         return { member.value(mid) for mid in cls.iterate(eid) }
 
     @classmethod
