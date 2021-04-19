@@ -48,9 +48,9 @@ import idaapi
 
 def has(enum):
     '''Return truth if the enumeration `enum` exists within the database.'''
-    alts = {idaapi.BADADDR - item for item in [7, 4, 2]}
-    available = {idx for idx, _ in internal.netnode.alt.fiter(enum)}
-    return interface.node.is_identifier(enum) and available & alts == alts
+    ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL = -1, -3, -5, -8
+    alts = {idaapi.BADADDR & uval for uval in [ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL]}
+    return interface.node.is_identifier(enum) and all(internal.netnode.alt.has(enum, idx) for idx in alts)
 
 def count():
     '''Return the total number of enumerations in the database.'''
@@ -65,6 +65,12 @@ def flags(enum):
 def flags(enum, flags):
     '''Set the flags for the enumeration `enum` to the value specified by `flags`.'''
     eid = by(enum)
+
+    # Define some flags that we may later allow the user to set explicitly.
+    ENUM_FLAGS_IS_BF, ENUM_FLAGS_HIDDEN, = 0x00000001, 0x00000002,
+    ENUM_FLAGS_FROMTIL, ENUM_FLAGS_WIDTH = 0x00000004, 0x00000038
+
+    # Fetch the previous flag, and assign the new ones.
     res, ok = idaapi.get_enum_flag(eid), idaapi.set_enum_flag(eid, flags)
     if not ok:
         raise E.DisassemblerError(u"{:s}.flags({!r}, {:#x}) : Unable to set the flags for the specified enumeration ({:#x}) to {:#x}.".format(__name__, enum, flags, eid, flags))
@@ -102,10 +108,17 @@ def by_index(index):
     return res
 byindex = utils.alias(by_index)
 
+def by_identifier(eid):
+    '''Return the identifier for the enumeration using the specified `eid`.'''
+    if not has(eid):
+        raise E.EnumerationNotFoundError(u"{:s}.by_identifier({!s}) : Unable to locate the enumeration with the specified identifier ({:#x}).".format(__name__, eid, eid))
+    return eid
+byidentifier = utils.alias(by_identifier)
+
 @utils.multicase(index=six.integer_types)
 def by(index):
     '''Return the identifier for the enumeration at the specified `index`.'''
-    return index if interface.node.is_identifier(index) else by_index(index)
+    return by_identifier(index) if interface.node.is_identifier(index) else by_index(index)
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def by(name):
@@ -699,8 +712,17 @@ class member(object):
     @classmethod
     def parent(cls, mid):
         '''Return the id of the enumeration that owns the member `mid`.'''
+        CONST_ENUM = -2
         return idaapi.get_enum_member_enum(mid)
     owner = utils.alias(parent, 'member')
+
+    @classmethod
+    def by(cls, mid):
+        '''Return the enumeration member as specified by the provided `mid`.'''
+        if not interface.node.is_identifier(mid):
+            raise E.MemberNotFoundError(u"{:s}.by({!s}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+        eid = cls.parent(mid)
+        return members.by_identifier(eid, mid)
 
     @utils.multicase(mid=six.integer_types)
     @classmethod
@@ -806,6 +828,7 @@ class member(object):
         '''Return the value of the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.value({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+        CONST_VALUE = -3
         return idaapi.get_enum_member_value(mid)
     @utils.multicase()
     @classmethod
@@ -846,6 +869,7 @@ class member(object):
         '''Return the serial of the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.serial({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+        CONST_SERIAL = -7
         return idaapi.get_enum_member_serial(mid)
     @utils.multicase()
     @classmethod
@@ -861,6 +885,7 @@ class member(object):
         '''Return the bitmask for the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.mask({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
+        CONST_BMASK = -6
         return idaapi.get_enum_member_bmask(mid)
     @utils.multicase()
     @classmethod
