@@ -248,14 +248,41 @@ def bitfield(enum, boolean):
     if not ok:
         raise E.DisassemblerError(u"{:s}.bitfield({!r}, {!s}) : Unable to set the bitfield flag for the specified enumeration ({:#x}) to {!s}.".format(__name__, enum, boolean, eid, boolean))
     return res
+bitflag = utils.alias(bitfield)
 
 def repr(enum):
     '''Return a printable summary of the enumeration `enum`.'''
     eid = by(enum)
     w, cmt = 2 * size(eid), comment(enum, repeatable=True) or comment(enum, repeatable=False)
-    res = [(member.name(item), member.value(item), member.mask(item), member.comment(item, repeatable=True) or member.comment(item, repeatable=False)) for item in members.iterate(eid)]
-    aligned = max([len(item) for item, _, _, _ in res] if res else [0])
-    return "<type 'enum'> {:s}{:s}\n".format(name(eid), " // {:s}".format(cmt) if cmt else '') + '\n'.join("[{:d}] {:<{align}s} : {:#0{width}x} & {:#0{width}x}".format(i, name, value, bmask, width=2 + w, align=aligned) + (" // {:s}".format(comment) if comment else '') for i,(name,value,bmask,comment) in enumerate(res))
+    items = [(member.name(item), member.value(item), member.mask(item), member.comment(item, repeatable=True) or member.comment(item, repeatable=False)) for item in members.iterate(eid)]
+
+    # Figure out the padding for each component belonging to a member of the
+    # enumeration in order to keep them aligned properly when displaying them.
+    maxindex = max(len("[{:d}]".format(index)) for index, _ in enumerate(items)) if items else 1
+    maxname = max(len(name) for name, _, _, _ in items) if items else 0
+    maxvalue = max(len("{:#{:d}x}".format(value, 2 + w)) for name, value, mask, _ in items) if items else 1
+    maxbname = max(len(utils.string.of(idaapi.get_bmask_name(eid, mask)) if idaapi.get_bmask_name(eid, mask) else u'') for name, value, mask, _ in items) if items else 0
+
+    # If the enumeration is a bitfield, then make sure to include the bitmask and
+    # its name if one was defined.
+    if bitfield(eid):
+        iterable = (u"{:<{alignindex:d}s} {:<{alignname}s} : {:#0{alignvalue}x} & {:<{alignmask:d}s}".format(u"[{:d}]".format(i), name, value, u"{:s}({:#0{:d}x})".format(utils.string.of(idaapi.get_bmask_name(eid, bmask)), bmask, maxvalue) if utils.string.of(idaapi.get_bmask_name(eid, bmask)) else u"{:#0{:d}x}".format(bmask, maxvalue), alignindex=maxindex, alignname=maxname, alignvalue=maxvalue, alignmask=(maxbname + 2 if maxbname else 0) + maxvalue) + (u" // {:s}".format(comment) if comment else u'') for i, (name, value, bmask, comment) in enumerate(items))
+
+    # Otherwise, we just need to emit each member with its comment added to the end.
+    else:
+        iterable = (u"{:<{alignindex:d}s} {:<{alignname}s} : {:#0{alignvalue}x}".format(u"[{:d}]".format(i), name, value, alignindex=maxindex, alignname=maxname, alignvalue=maxvalue) + (u" // {:s}".format(comment) if comment else u'') for i, (name, value, bmask, comment) in enumerate(items))
+
+    # Return our newline-joined result to the caller. If it's a bitfield, then we need
+    # to include the length for " & " in the calculation. Then, if the mask has a name,
+    # then we also need to include the length for "()" in the resulting calculation.
+    description = u"<type 'enum'> {:s}".format(name(eid))
+    padding_mask = maxindex + 1 + maxname + 3 + maxvalue + 3 + maxvalue + (maxbname + 2 if maxbname else 0)
+    padding_enum = maxindex + 1 + maxname + 3 + maxvalue
+
+    # Now that we've figured out our header, format it and then join it together with
+    # each item belonging to the enumeration/bitfield.
+    header = "{:<{padding}s}{:s}".format(description, u" // {:s}".format(cmt) if cmt else u'', padding=padding_mask if bitfield(eid) else padding_enum)
+    return u'\n'.join(itertools.chain([header], iterable))
 
 __matcher__ = utils.matcher()
 __matcher__.attribute('index', idaapi.get_enum_idx)
