@@ -35,6 +35,11 @@ class netnode(object):
     end = _ida_netnode.netnode_end
     index = _ida_netnode.netnode_index
     kill = _ida_netnode.netnode_kill
+
+    # these apis exist in 5.6 of the sdk, but there's
+    # definitely a chance that they're not in IDAPython.
+    exist, exist_name = _ida_netnode.exist, _ida_netnode.netnode_exist
+
     long_value = _ida_netnode.netnode_long_value
     next = _ida_netnode.netnode_next
     prev = _ida_netnode.netnode_prev
@@ -278,6 +283,14 @@ def new(name):
     node = netnode.new(res, len(res), True)
     return netnode.index(node)
 
+def has(name):
+    '''Return whether the netnode with the given `name` exists in the database or not.'''
+    if isinstance(name, six.integer_types):
+        node = netnode.get(name)
+        return netnode.exist(node)
+    res = internal.utils.string.to(name)
+    return netnode.exist_name(res)
+
 def get(name):
     '''Get (or create) a netnode with the given `name`, and return its identifier.'''
     if isinstance(name, six.integer_types):
@@ -297,6 +310,13 @@ class name(object):
     """
     This namespace is used to interact with the naming information for a given netnode.
     """
+
+    @classmethod
+    def has(cls, nodeidx):
+        '''Return whether the node identified by `nodeidx` has a name associated with it.'''
+        node = netnode.get(nodeidx)
+        res = netnode.name(node)
+        return res is not None
     @classmethod
     def get(cls, nodeidx):
         '''Return the name of the netnode identified by `nodeidx`.'''
@@ -315,11 +335,13 @@ class value(object):
     """
     This namespace is used to interact with the value for a given netnode.
     """
+
     @classmethod
-    def exists(cls, nodeidx):
+    def has(cls, nodeidx):
         '''Return whether the node identified by `nodeidx` has a value associated with it.'''
         node = netnode.get(nodeidx)
         return netnode.value_exists(node)
+    exists = internal.utils.alias(has, 'value')
 
     @classmethod
     def get(cls, nodeidx, type=None):
@@ -365,7 +387,7 @@ class value(object):
     @classmethod
     def repr(cls, nodeidx):
         '''Display the value for the netnode identified by `nodeidx`.'''
-        if not cls.exists(nodeidx):
+        if not cls.has(nodeidx):
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any value.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
         res, string, value = cls.get(nodeidx), cls.get(nodeidx, type=bytes), cls.get(nodeidx, type=int)
         return "{!r} {!r} {:#x}".format(res, string, value)
@@ -375,6 +397,13 @@ class blob(object):
     """
     This namespace is used to interact with the blob assigned to a given netnode.
     """
+    @classmethod
+    def has(cls, nodeidx, tag):
+        '''Return whether the node identified by `nodeidx` has a blob associated with it.'''
+        node = netnode.get(nodeidx)
+        res = netnode.blobsize(node, 0, tag)
+        return res > 0
+
     @classmethod
     def get(cls, nodeidx, tag, start=0):
         """Return the blob stored in `tag` for the netnode identified by `nodeidx`.
@@ -442,6 +471,11 @@ class alt(object):
     """
 
     @classmethod
+    def has(cls, nodeidx, index):
+        '''Return whether the netnode identified by `nodeidx` has an "altval" for the specified `index`.'''
+        return any(index == idx for idx, item in cls.fiter(nodeidx))
+
+    @classmethod
     def get(cls, nodeidx, index):
         '''Return the integer at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
@@ -494,6 +528,11 @@ class sup(object):
     """
 
     MAX_SIZE = 0x400
+
+    @classmethod
+    def has(cls, nodeidx, index):
+        '''Return whether the netnode identified by `nodeidx` has a "supval" for the specified `index`.'''
+        return any(index == item for item in cls.fiter(nodeidx))
 
     @classmethod
     def get(cls, nodeidx, index, type=None):
@@ -557,6 +596,12 @@ class hash(object):
     maximum length of 510, and is used to store bytes of a maximum
     length of 1024. IDA refers to this dictionary as a "hashval".
     """
+
+    @classmethod
+    def has(cls, nodeidx, key):
+        '''Return whether the netnode identified by `nodeidx` has a "hashval" for the specified `key`.'''
+        return any(key == item for item in cls.fiter(nodeidx))
+
     @classmethod
     def get(cls, nodeidx, key, type=None):
         '''Return the value for the provided `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
