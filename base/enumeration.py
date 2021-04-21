@@ -132,7 +132,7 @@ def by(**type):
 
     listable = [item for item in iterate(**type)]
     if len(listable) > 1:
-        messages = (u"[{:d}] {:s}{:s} ({:d} members){:s}".format(idaapi.get_enum_idx(item), idaapi.get_enum_name(item), u" & {:#x}".format(mask(item)) if bitfield(item) else u'', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else '') for i, item in enumerate(listable))
+        messages = (u"[{:d}] {:s}{:s} ({:d} members){:s}".format(idaapi.get_enum_idx(item), idaapi.get_enum_name(item), u" & {:#x}".format(mask(item)) if bitfield(item) else u'', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else u'') for i, item in enumerate(listable))
         [ logging.info(msg) for msg in messages ]
         logging.warning(u"{:s}.search({:s}) : Found {:d} matching results. Returning the first enumeration {:#x}.".format(__name__, searchstring, len(listable), listable[0]))
 
@@ -217,6 +217,10 @@ def comment(enum, comment, **repeatable):
         adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
         raise E.DisassemblerError(u"{:s}.comment({!r}, {!s}{:s}) : Unable to set the {:s}comment for the specified enumeration ({:#x}) to {!s}.".format(__name__, enum, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', eid, utils.string.repr(comment)))
     return utils.string.of(res)
+@utils.multicase(none=None.__class__)
+def comment(enum, none, **repeatable):
+    '''Remove the comment from the enumeration `enum`.'''
+    return comment(enum, none or u'', **repeatable)
 
 @utils.multicase()
 def size(enum):
@@ -345,9 +349,9 @@ def list(**type):
     for item in res:
         name, bitfieldQ = idaapi.get_enum_name(item), bitfield(item)
         if bitfieldQ:
-            six.print_(u"{:<{:d}s} {:>{:d}s} & {:<#{:d}x} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, mask(item), 2 + math.trunc(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
+            six.print_(u"{:<{:d}s} {:>{:d}s} & {:<#{:d}x} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, mask(item), 2 + math.trunc(cmask), len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else u''))
         else:
-            six.print_(u"{:<{:d}s} {:>{:d}s}{:s} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, ' '*(3 + 2 + math.trunc(cmask)) if has_bitfield else '', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else ''))
+            six.print_(u"{:<{:d}s} {:>{:d}s}{:s} ({:d} members){:s}".format("[{:d}]".format(idaapi.get_enum_idx(item)), 2 + math.trunc(cindex), utils.string.of(name), maxname, ' '*(3 + 2 + math.trunc(cmask)) if has_bitfield else u'', len(builtins.list(members(item))), u" // {:s}".format(comment(item)) if comment(item) else u''))
         continue
     return
 
@@ -416,7 +420,7 @@ class members(object):
 
     @classmethod
     @utils.multicase()
-    def remove(cls, eid):
+    def remove(cls, enum):
         '''Remove the specified `member` of the enumeration `enum`.'''
         eid = by(enum)
         mid = cls.by(eid, member)
@@ -487,22 +491,9 @@ class members(object):
         bitfieldQ = bitfield(eid)
 
         # First we need to figure out if this is a bitfield, because if
-        # it is..then we need to figure out what masks it might be in.
+        # it is..then we need to figure out the masks to filter by.
         if bitfieldQ:
-            items = []
-
-            # Fetch the very first bitmask and then append it to our list.
-            item = idaapi.get_first_bmask(eid)
-            items.append(idaapi.DEFMASK if item == idaapi.BADADDR else item)
-
-            # Now we can continue fetching and yielding the masks until
-            # we get to an idaapi.BADADDR or the end. Then we're done.
-            while item not in {idaapi.BADADDR, idaapi.get_last_bmask(eid)}:
-                item = idaapi.get_next_bmask(eid, item)
-                items.append(item)
-
-            # Save what we just collected.
-            results = items
+            results = [item for _, item in masks(eid)]
 
         # Otherwise, there's only one mask to search through, the DEFMASK.
         else:
@@ -617,21 +608,7 @@ class members(object):
     def __iterate__(cls, eid):
         '''Iterate through all the members of the enumeration identified by `eid` and yield their values.'''
 
-        # First define a closure that iterates through all of the bitmasks
-        # inside a particular enumeration. We always yield the first mask
-        # because if it's not a bitfield, then the mask is idaapi.DEFMASK.
-        def masks(eid):
-            bmask = idaapi.get_first_bmask(eid)
-            yield idaapi.DEFMASK if bmask == idaapi.BADADDR else bmask
-
-            # Now we can continue fetching and yielding the masks until
-            # we get to an idaapi.BADADDR. That way we'll know we're done.
-            while bmask != idaapi.get_last_bmask(eid):
-                bmask = idaapi.get_next_bmask(eid, bmask)
-                yield bmask
-            return
-
-        # Now we need to define a closure that iterates through all of the
+        # First we need to define a closure that iterates through all of the
         # values for the masks inside an enumeration. This is because IDA
         # gives us values, and we need to conver these values to identifiers.
         def values(eid, bitmask):
@@ -654,7 +631,7 @@ class members(object):
         # Now we need to iterate through all of the masks, feeding them
         # to our "values" closure. Then with the values we can iterate
         # through all of the serials, and use that to get each identifier.
-        for bitmask in masks(eid):
+        for bitmask in masks.iterate(eid):
             for value in values(eid, bitmask):
 
                 # Start out with the first serial for the member. We compare
@@ -701,12 +678,14 @@ class members(object):
         if bitfield(eid):
             for i, mid in enumerate(listable):
                 bname = utils.string.of(idaapi.get_bmask_name(eid, member.mask(mid))) or u''
-                six.print_(u"{:<{:d}s} {:<{:d}s} {:#0{:d}x} & {:s}".format("[{:d}]".format(i), maxindex, member.name(mid), maxname, member.value(mid), maxvalue, u"{:s}({:#0{:d}x})".format(bname, member.mask(mid), 2 + masksize) if bname else "{:#0{:d}x}".format(member.mask(mid), 2 + masksize)))
+                cmt = member.comment(eid, mid, repeatable=True) or member.comment(eid, mid, repeatable=False)
+                six.print_(u"{:<{:d}s} {:<{:d}s} {:#0{:d}x} & {:s}".format("[{:d}]".format(i), maxindex, member.name(mid), maxname, member.value(mid), maxvalue, u"{:s}({:#0{:d}x})".format(bname, member.mask(mid), 2 + masksize) if bname else "{:#0{:d}x}".format(member.mask(mid), 2 + masksize)) + (u" // {:s}".format(cmt) if cmt else u''))
             return
 
         # Otherwise this isn't a bitfield, and we don't need to worry about the mask.
         for i, mid in enumerate(listable):
-             six.print_(u"{:<{:d}s} {:<{:d}s} {:#0{:d}x}".format("[{:d}]".format(i), maxindex, member.name(mid), maxname, member.value(mid), maxvalue))
+            cmt = member.comment(eid, mid, repeatable=True) or member.comment(eid, mid, repeatable=False)
+            six.print_(u"{:<{:d}s} {:<{:d}s} {:#0{:d}x}".format("[{:d}]".format(i), maxindex, member.name(mid), maxname, member.value(mid), maxvalue) + (u" // {:s}".format(cmt) if cmt else u''))
         return
 
 class member(object):
@@ -829,7 +808,6 @@ class member(object):
             adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
             raise E.DisassemblerError(u"{:s}.comment({:#x}, {!s}{:s})) : Unable to set the {:s}comment for the specified member ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), mid, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', mid, utils.string.repr(comment)))
         return utils.string.of(res)
-
     @utils.multicase(comment=six.string_types)
     @classmethod
     @utils.string.decorate_arguments('comment')
@@ -838,6 +816,11 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.comment(mid, comment, **repeatable)
+    @utils.multicase(none=None.__class__)
+    @classmethod
+    def comment(cls, enum, member, none, **repeatable):
+        '''Remove the comment from the `member` belonging to the enumeration `enum`.'''
+        return cls.comment(enum, member, none or u'', **repeatable)
 
     @utils.multicase(mid=six.integer_types)
     @classmethod
@@ -911,3 +894,131 @@ class member(object):
         eid = by(enum)
         mid = members.by(eid, member)
         return cls.mask(mid)
+
+class masks(object):
+    """
+    This namespace allows one to interact with a masks that are within
+    an enumeration with its "bitfield" flag set. This is a very basic
+    namespace that provides some minor utilities to deal with the
+    naming of the bitmasks in an enumeration.
+
+    Some examples of how to use this namespace can be::
+
+        > values = enum.masks('example_enumeration')
+        > ok = enum.masks.has(eid, 'mask_name')
+        > mask = enum.masks.by(eid, 'mask_name')
+        > mask = enum.masks.by(eid, 0x1234)
+
+    """
+    def __new__(cls, enum):
+        '''Iterate through all of the masks belonging to the enumeration `enum` and yield their name and value.'''
+        eid = by(enum)
+        for mask in cls.iterate(eid):
+            yield cls.name(eid, mask), mask
+        return
+
+    @classmethod
+    def has(cls, enum, mask):
+        '''Return whether the enumeration `enum` uses the specified `mask`.'''
+        eid = by(enum)
+        return any(item == mask for item in cls.iterate(eid))
+
+    @classmethod
+    def __iterate__(cls, eid):
+        '''Iterate through all of the masks available in the enumeration identified by `eid` and yield their values.'''
+        bmask = idaapi.get_first_bmask(eid)
+        yield idaapi.DEFMASK if bmask == idaapi.BADADDR else bmask
+
+        # Now we can continue fetching and yielding the masks until
+        # we get to an idaapi.BADADDR. That way we'll know we're done.
+        while bmask != idaapi.get_last_bmask(eid):
+            bmask = idaapi.get_next_bmask(eid, bmask)
+            yield bmask
+        return
+
+    @classmethod
+    def iterate(cls, enum):
+        '''Iterate through all of the masks belonging to the enumeration `enum`.'''
+        eid = by(enum)
+        for item in cls.__iterate__(eid):
+            yield item
+        return
+
+    @utils.multicase(mask=six.integer_types)
+    @classmethod
+    def name(cls, enum, mask):
+        '''Return the name for the given `mask` belonging to the enumeration `enum`.'''
+        eid = by(enum)
+        res = idaapi.get_bmask_name(eid, mask)
+        if res is None:
+            raise E.DisassemblerError(u"{:s}.name({!r}, {:#x}) : Unable to get the name for the requested mask ({:#0{:d}x}) from the enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, mask, mask, 2 + 2 * size(eid), eid))
+        return utils.string.of(res) or ''
+    @utils.multicase(mask=six.integer_types, name=(six.string_types, tuple))
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def name(cls, enum, mask, name):
+        '''Set the name for the `mask` belonging to the enumeration `enum` to the provided `name`.'''
+        eid = by(enum)
+        fullname = interface.tuplename(*name) if isinstance(name, tuple) else name
+        string = utils.string.to(fullname)
+        res, ok = idaapi.get_bmask_name(eid, mask), idaapi.set_bmask_name(eid, mask, string)
+        if not ok:
+            raise E.DisassemblerError(u"{:s}.name({!r}, {:#x}, {!s}) : Unable to rename the mask ({:#x}) for the specified enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), enum, mask, utils.string.repr(name), 2 + 2 * size(eid), eid, utils.string.repr(fullname)))
+        return utils.string.of(res)
+    @utils.multicase(mask=six.integer_types, name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name', 'suffix')
+    def name(cls, enum, mask, name, *suffix):
+        '''Set the name for the `mask` belonging to the enumeration `enum` to the provided `name`.'''
+        eid = by(enum)
+        fullname = (name,) + suffix
+        return cls.name(eid, mask, fullname)
+
+    @utils.multicase(mask=six.integer_types)
+    @classmethod
+    def comment(cls, enum, mask, **repeatable):
+        """Return the comment for the `mask` belonging to the enumeration `enum`.
+
+        If the bool `repeatable` is specified, then return the repeatable comment.
+        """
+        eid = by(enum)
+        res = idaapi.get_bmask_cmt(eid, mask, repeatable.get('repeatable', True))
+        return utils.string.of(res)
+    @utils.multicase(mask=six.integer_types, comment=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('comment')
+    def comment(cls, enum, mask, comment, **repeatable):
+        """Set the comment for the `mask` belonging to the enumeration `enum` to `comment`.
+
+        If the bool `repeatable` is specified, then set the repeatable comment.
+        """
+        eid = by(enum)
+        string = utils.string.to(comment)
+        res, ok = idaapi.get_bmask_cmt(eid, mask, repeatable.get('repeatable', True)), idaapi.set_bmask_cmt(eid, mask, string, repeatable.get('repeatable', True))
+        if not ok:
+            adjective = (u'repeatable' if repeatable.get('repeatable', True) else u'non-repeatable') if repeatable else u''
+            raise E.DisassemblerError(u"{:s}.comment({!r}, {:#x}, {!s}, {:s}) : Unable to set the {:s}comment for the specified mask ({:#0{:d}x}) from the enumeration ({:#x}) to {!s}.".format('.'.join([__name__, cls.__name__]), enum, mask, utils.string.repr(comment), u", {:s}".format(utils.string.kwargs(repeatable)) if repeatable else u'', u" {:s}".format(adjective) if adjective else u'', mask, 2 + 2 * size(eid), eid, utils.string.repr(comment)))
+        return utils.string.of(res)
+    @utils.multicase(mask=six.integer_types, none=None.__class__)
+    @classmethod
+    def comment(cls, enum, mask, none, **repeatable):
+        '''Remove the comment for the `mask` belonging to the enumeration `enum`.'''
+        return cls.comment(enum, mask, none or u'', **repeatable)
+
+    @classmethod
+    def list(cls, enum):
+        '''List all the masks belonging to the enumeration identified by `enum`.'''
+        eid = by(enum)
+        listable = [item for item in cls.iterate(eid)]
+
+        maxindex = max(len("[{:d}]".format(index)) for index, _ in enumerate(listable)) if listable else 1
+        maxname = max(len(cls.name(eid, mask)) for mask in listable) if listable else 0
+        maxmask = max(listable) if listable else 1
+        masksize = 2 * size(eid) if size(eid) else math.ceil(math.log(maxmask or 1, 16))
+
+        for i, mask in enumerate(listable):
+            padding = 3 + maxname
+            cmt = cls.comment(eid, mask, repeatable=True) or cls.comment(eid, mask, repeatable=False)
+            item = u"{:<{:d}s} {:#0{:d}x}{:s}".format("[{:d}]".format(i), maxindex, mask, 2 + masksize, " : {:<{:d}s}".format(cls.name(eid, mask), maxname) if idaapi.get_bmask_name(eid, mask) else ' ' * padding)
+            six.print_(item + (u" // {:s}".format(cmt) if cmt else u''))
+        return
