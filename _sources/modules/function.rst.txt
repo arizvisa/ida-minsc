@@ -508,11 +508,11 @@ Some examples of this functionality can be::
     > B = function.block(ea)
     > bid = function.block.id()
     > c = function.block.color(ea, rgb)
-    > print function.block.before(ea)
-    > for ea in function.block.iterate(): print database.disasm(ea)
+    > print( function.block.before(ea) )
+    > for ea in function.block.iterate(): print( database.disasm(ea) )
     > for ea, op, st in function.block.register('eax', read=1): ...
-    > print function.block.read().encode('hex')
-    > print function.block.disasm(ea)
+    > print( function.block.read().encode('hex') )
+    > print( function.block.disasm(ea) )
 
 .. py:function:: block()
    
@@ -1415,8 +1415,8 @@ function.
 
 Some ways of using this can be::
 
-    > print function.frame()
-    > print hex(function.frame.id(ea))
+    > print( function.frame() )
+    > print( hex(function.frame.id(ea)) )
     > sp = function.frame.delta(ea)
 
 .. py:function:: frame()
@@ -1523,8 +1523,8 @@ supported.
 
 Some ways of using this are::
 
-    > print function.frame.args(f)
-    > print function.frame.args.size(ea)
+    > print( function.frame.args(f) )
+    > print( function.frame.args.size(ea) )
 
 .. py:function:: frame\.args()
    
@@ -1565,7 +1565,7 @@ defined within a function's frame.
 
 Some ways to get this information can be::
 
-    > print function.frame.lvars.size()
+    > print( function.frame.lvars.size() )
 
 .. py:function:: frame\.lvars()
    
@@ -1602,7 +1602,7 @@ are saved when a function constructs its frame.
 
 An example of using this namespace::
 
-    > print function.frame.regs.size(ea)
+    > print( function.frame.regs.size(ea) )
 
 .. py:function:: frame\.regs()
    
@@ -1641,7 +1641,7 @@ one to filter functions according to their particular attributes.
 
 Some simple ways of getting information about a function::
 
-    > print function.type.has_noframe()
+    > print( function.type.has_noframe() )
     > for ea in filter(function.type.is_library, database.functions()): ...
 
 .. py:function:: type()

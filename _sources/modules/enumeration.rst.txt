@@ -38,6 +38,20 @@ The functions that are available in this module use multicased
 functions and aliases. For more information on this, please see
 :ref:`multicase-aliases` and :ref:`multicase-functions`.
 
+.. py:function:: bitfield(enum)
+   
+   Return whether the enumeration identified by ``enum`` is a bitfield or not.
+   
+   :param enum: the enumeration to return the bitfield flag for
+   
+.. py:function:: bitfield(enum, boolean)
+   
+   Toggle the bitfield setting of the enumeration ``enum`` depending on the value of ``boolean``.
+   
+   :param enum: the enumeration to set the bitfield flag for
+   :param boolean: whether to set the flag or clear it
+   :type boolean: int or long or bool
+   
 .. py:function:: bits(enum)
    
    Return the number of bits for the enumeration ``enum``.
@@ -71,6 +85,14 @@ functions and aliases. For more information on this, please see
    Return the identifier for the first enumeration matching the keyword specified by ``type``.
    
    :param \*\*type: any keyword that can be used to filter enumerations with
+   
+.. py:function:: by_identifier(eid)
+   
+   Return the identifier for the enumeration using the specified ``eid``.
+   
+   Aliases: :py:func:`enumeration.byidentifier<by_identifier>`
+   
+   :param eid: the identifier of the enumeration to return
    
 .. py:function:: by_index(index)
    
@@ -108,6 +130,15 @@ functions and aliases. For more information on this, please see
    :type comment: str
    :param \*\*repeatable: whether the comment should be repeatable or not
    
+.. py:function:: comment(enum, none, \*\*repeatable)
+   
+   Remove the comment from the enumeration ``enum``.
+   
+   :param enum:
+   :param none:
+   :type none: None
+   :param \*\*repeatable:
+   
 .. py:function:: count()
    
    Return the total number of enumerations in the database.
@@ -122,23 +153,37 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: flags(enum)
    
-   Return the flags for the enumeration ``enum``.
+   Return the flags for the enumeration identified by ``enum``.
    
    :param enum: the enumeration to return the flags for
    
-.. py:function:: flags(enum, mask)
+.. py:function:: flags(enum, flags)
    
-   Return the flags for the enumeration ``enum`` and masked with ``mask``.
+   Set the flags for the enumeration ``enum`` to the value specified by ``flags``.
    
    :param enum: the enumeration to return the flags for
-   :param mask: the bit mask to apply to the flags
-   :type mask: int or long
+   :param flags: the flags to apply to the enumeration
+   :type flags: int or long
    
 .. py:function:: has(enum)
    
    Return truth if the enumeration ``enum`` exists within the database.
    
    :param enum: the enumeration identifier to check
+   
+.. py:function:: index(enum)
+   
+   Return the index in the enumeration list for the enumeration identified by ``enum``.
+   
+   :param enum: the enumeration to return the index of
+   
+.. py:function:: index(enum, index)
+   
+   Set the position in the enumeration list for the enumeration ``enum`` to the specified ``index``.
+   
+   :param enum: the enumeration to set the index for
+   :param index: the index to change the enumeration to
+   :type index: int or long
    
 .. py:function:: iterate(\*\*type)
    
@@ -181,7 +226,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: names(enum)
    
-   Return a list of all the names belonging to the enumeration ``enum``.
+   Return a set of all of the names belonging to the enumeration ``enum``.
    
    :param enum: the enumeration to return the names for
    
@@ -229,7 +274,7 @@ functions and aliases. For more information on this, please see
    
 .. py:function:: values(enum)
    
-   Return a list of all the values belonging to the enumeration ``enum``.
+   Return a set of all of the values belonging to the enumeration ``enum``.
    
    :param enum: the enumeration to return the values of
    
@@ -244,6 +289,113 @@ information on namespaces. For more information on multicase
 functions or aliases, please see :ref:`multicase-functions` or
 :ref:`multicase-aliases`.
 
+.. _ns-enumeration-masks:
+
+*****************
+enumeration.masks
+*****************
+
+This namespace allows one to interact with a masks that are within
+an enumeration with its "bitfield" flag set. This is a very basic
+namespace that provides some minor utilities to deal with the
+naming of the bitmasks in an enumeration.
+
+Some examples of how to use this namespace can be::
+
+    > values = enum.masks('example_enumeration')
+    > ok = enum.masks.has(eid, 'mask_name')
+    > mask = enum.masks.by(eid, 'mask_name')
+    > mask = enum.masks.by(eid, 0x1234)
+
+.. py:function:: masks(enum)
+   
+   Iterate through all of the masks belonging to the enumeration ``enum`` and yield their name and value.
+   
+   :param enum: the enumeration to return the masks of
+   
+.. py:function:: masks\.comment(enum, mask, \*\*repeatable)
+   
+   Return the comment for the ``mask`` belonging to the enumeration ``enum``.
+   
+   If the bool ``repeatable`` is specified, then return the repeatable comment.
+   
+   :param enum: the enumeration to fetch a mask comment from
+   :param mask: the mask to fetch the comment from
+   :type mask: int or long
+   :param \*\*repeatable: whether to return the repeatable comment or not
+   
+.. py:function:: masks\.comment(enum, mask, comment, \*\*repeatable)
+   
+   Set the comment for the ``mask`` belonging to the enumeration ``enum`` to ``comment``.
+   
+   If the bool ``repeatable`` is specified, then set the repeatable comment.
+   
+   :param enum: the enumeration containing the mask to set the comment for
+   :param mask: the mask to set the comment of
+   :type mask: int or long
+   :param comment: the comment to assign to the mask
+   :type comment: str
+   :param \*\*repeatable: whether to set the repeatable comment or not
+   
+.. py:function:: masks\.comment(enum, mask, none, \*\*repeatable)
+   
+   Remove the comment for the ``mask`` belonging to the enumeration ``enum``.
+   
+   :param enum: the enumeration containing the mask to clear the comment of
+   :param mask: the mask to clear the comment of
+   :type mask: int or long
+   :param none: the value :py:obj:`None`
+   :type none: None
+   :param \*\*repeatable: whether to clear the repeatable comment or not
+   
+.. py:function:: masks\.has(enum, mask)
+   
+   Return whether the enumeration ``enum`` uses the specified ``mask``.
+   
+   :param enum: the enumeration to check the masks of
+   :param mask: the bitmask to confirm
+   
+.. py:function:: masks\.iterate(enum)
+   
+   Iterate through all of the masks belonging to the enumeration ``enum``.
+   
+   :param enum: the enumeration to iterate through through the masks of
+   
+.. py:function:: masks\.list(enum)
+   
+   List all the masks belonging to the enumeration identified by ``enum``.
+   
+   :param enum: the enumeration containing the masks to list
+   
+.. py:function:: masks\.name(enum, mask)
+   
+   Return the name for the given ``mask`` belonging to the enumeration ``enum``.
+   
+   :param enum: the enumeration containing the mask to fetch
+   :param mask: the mask to return the name of
+   :type mask: int or long
+   
+.. py:function:: masks\.name(enum, mask, name)
+   
+   Set the name for the ``mask`` belonging to the enumeration ``enum`` to the provided ``name``.
+   
+   :param enum: the enumeration containing the mask to rename
+   :param mask: the mask to set the name of
+   :type mask: int or long
+   :param name: the name to use when renaming the mask
+   :type name: str or tuple
+   
+.. py:function:: masks\.name(enum, mask, name, \*suffix)
+   
+   Set the name for the ``mask`` belonging to the enumeration ``enum`` to the provided ``name``.
+   
+   :param enum: the enumeration containing the mask to rename
+   :param mask: the mask to set the name of
+   :type mask: int or long
+   :param name: the name to use when renaming the mask
+   :type name: str
+   :param \*suffix: any other strings to append to the name
+   
 .. _ns-enumeration-member:
 
 ******************
@@ -264,6 +416,12 @@ Some examples of how to use this namespace can be::
     > oldcomment = enum.member.comment(mid, 'This is an example comment')
     > ok = enum.member.remove(mid)
 
+.. py:function:: member\.by(mid)
+   
+   Return the enumeration member as specified by the provided ``mid``.
+   
+   :param mid: the identifier of the member to return
+   
 .. py:function:: member\.comment(mid, \*\*repeatable)
    
    Return the comment for the enumeration member ``mid``.
@@ -303,6 +461,16 @@ Some examples of how to use this namespace can be::
    :param comment: the comment to apply
    :type comment: str
    :param \*\*repeatable: whether the returned comment should be repeatable or not
+   
+.. py:function:: member\.comment(enum, member, none, \*\*repeatable)
+   
+   Remove the comment from the ``member`` belonging to the enumeration ``enum``.
+   
+   :param enum:
+   :param member:
+   :param none:
+   :type none: None
+   :param \*\*repeatable:
    
 .. py:function:: member\.mask(mid)
    
@@ -455,7 +623,9 @@ Some examples of using this namespace are::
 
 .. py:function:: members(enum)
    
-   Yield the name of each member from the enumeration ``enum``.
+   Yield the name, and value of each member from the enumeration ``enum``.
+   
+   If the enumeration ``enum`` is a bitfield, then yield each member's name, value, and bitmask.
    
    :param enum: the enumeration to yield the names for
    
@@ -463,7 +633,7 @@ Some examples of using this namespace are::
    
    Add an enumeration member ``name`` with the specified ``value`` to the enumeration ``enum``.
    
-   If the int, ``bitmask``, is specified then used it as the bitmask for the enumeration.
+   If the integral, ``bitmask``, is specified then use it as the bitmask for the enumeration.
    
    Aliases: :py:func:`enumeration.member.new<members\.add>`, :py:func:`enumeration.member.create<members\.add>`
    
@@ -480,13 +650,13 @@ Some examples of using this namespace are::
    :param n: an index or an identifier of the enumeration to return
    :type n: int or long
    
-.. py:function:: members\.by(enum, member)
+.. py:function:: members\.by(enum, name)
    
-   Return the member with the given ``name`` belonging to ``enum``.
+   Return the member of the enumeration ``enum`` with the given ``name``.
    
    :param enum: the enumeration to return a member for
-   :param member: the name of the member to return
-   :type member: str
+   :param name: the name of the member to return
+   :type name: str
    
 .. py:function:: members\.by_identifier(enum, mid)
    
@@ -511,14 +681,17 @@ Some examples of using this namespace are::
    :param enum: the enumeration to return a member for
    :param name: the name of the enumeration member to return
    
-.. py:function:: members\.by_value(enum, value)
+.. py:function:: members\.by_value(enum, value, \*\*filters)
    
    Return the member identifier for the member of the enumeration ``enum`` with the specified ``value``.
+   
+   If the integrals, ``bitmask`` or ``serial``, is specified then use them to filter the returned enumeration members.
    
    Aliases: :py:func:`enumeration.member.byvalue<members\.by_value>`
    
    :param enum: the enumeration to return a member for
    :param value: the value of the enumeration member to return
+   :param \*\*filters: the filters to use when choosing the enumeration member
    
 .. py:function:: members\.iterate(enum)
    
@@ -544,6 +717,13 @@ Some examples of using this namespace are::
    
    :param enum: the enumeration to return the names for
    
+.. py:function:: members\.remove(mid)
+   
+   Remove the member identified by ``mid`` from the enumeration that owns it.
+   
+   :param mid:
+   :type mid: int or long
+   
 .. py:function:: members\.remove(enum, member)
    
    Remove the specified ``member`` of the enumeration ``enum``.
@@ -554,6 +734,8 @@ Some examples of using this namespace are::
 .. py:function:: members\.values(enum)
    
    Return a set of all the values belonging to the enumeration ``enum``.
+   
+   If the enumeration is a bitfield, then each item in the result is the value and its bitmask.
    
    :param enum: the enumeration to return the values of
    

@@ -2635,7 +2635,7 @@ an :py:obj:`idaapi.switch_info_t`.
 This namespace can be used as in the following example::
 
     > sw = database.get.switch(ea)
-    > print sw
+    > print( sw )
 
 .. py:function:: get\.switch()
    
@@ -3648,9 +3648,9 @@ specified address.
 
 Some examples of using this namespace can be::
 
-    > print database.type.size(ea)
-    > print database.type.is_initialized(ea)
-    > print database.type.is_data(ea)
+    > print( database.type.size(ea) )
+    > print( database.type.is_initialized(ea) )
+    > print( database.type.is_data(ea) )
     > length = database.t.array.length(ea)
     > st = database.t.structure(ea)
 
@@ -4150,10 +4150,10 @@ as a list ``[size, count]``.
 Some examples of using this namespace can be::
 
     > type, length = database.t.array()
-    > print database.t.array.size(ea)
-    > print database.t.array.member(ea)
-    > print database.t.array.element(ea)
-    > print database.t.array.length(ea)
+    > print( database.t.array.size(ea) )
+    > print( database.t.array.member(ea) )
+    > print( database.t.array.element(ea) )
+    > print( database.t.array.length(ea) )
 
 .. py:function:: type\.array()
    
@@ -4229,7 +4229,7 @@ will return the :py:obj:`structure_t` at the given address.
 Some of the ways to use this namespace are::
 
     > st = database.t.struct()
-    > print database.t.struct.size()
+    > print( database.t.struct.size() )
     > st = structure.by(database.t.id(ea))
 
 .. py:function:: type\.structure()
@@ -4298,7 +4298,7 @@ also aliased as globals. Some of these are:
 
 Some ways to utilize this namespace can be::
 
-    > print database.x.up()
+    > print( database.x.up() )
     > for ea in database.x.down(): ...
     > for ea in database.x.cu(ea): ...
     > ok = database.x.add_code(ea, target)

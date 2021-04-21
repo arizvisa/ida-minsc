@@ -661,19 +661,17 @@ ui.widget
 
 This namespace is for selecting a specific or particular widget.
 
-.. py:function:: widget((x,y))
+.. py:function:: widget(xy)
    
-   Return the widget at the specified ``x`` and ``y`` coordinate.
+   Return the widget at the specified (``x``, ``y``) coordinate within the ``xy`` tuple.
    
-   :param x: the X coordinate of the widget
-   :param y: the Y coordinate of the widget
+   :param xy: a tuple composed of the X and Y coordinates of a widget
    
-.. py:function:: widget\.at((x,y))
+.. py:function:: widget\.at(xy)
    
-   Return the widget at the specified ``x`` and ``y`` coordinate.
+   Return the widget at the specified (``x``, ``y``) coordinate within the ``xy`` tuple.
    
-   :param x: the X coordinate of the widget
-   :param y: the Y coordinate of the widget
+   :param xy: a tuple composed of the X and Y coordinates of a widget
    
 .. py:function:: widget\.form(twidget)
    

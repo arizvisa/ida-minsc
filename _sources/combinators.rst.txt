@@ -507,7 +507,8 @@ Combinators
    Execute the provided ``callable`` against all of the elements in
    ``iterable`` returning an iterator containing the transformed
    results. This is similar to :py:func:`map` and is the same
-   as the :py:func:`itertools.imap` function from Python 2.x.
+   as the :py:func:`itertools.imap` function from Python 2.x, or the
+   regular :py:func:`map` function from Python 3.x.
 
    :param callable: a callable python object that transforms its argument
    :type callable: `function`
@@ -519,7 +520,7 @@ Combinators
    Yield each value from ``iterable`` that the callable ``crit``
    returns :py:const:`True` for. This is similar to :py:func:`filter`
    and is the same as the :py:func:`itertools.ifilter` function from
-   Python 2.x.
+   Python 2.x, or the regular :py:func:`filter` function from Python 3.x.
 
    :param crit: a callable python object that returns :py:const:`True` or
                 :py:const:`False` based on its argument
@@ -541,7 +542,8 @@ Combinators
    Given any number of ``iterables``, return them as an iterator that
    yields a tuple for each element passed as positional arguments to
    the function. This is similar to :py:func:`zip`, and is the same
-   as the :py:func:`itertools.izip` function from Python 2.x.
+   as the :py:func:`itertools.izip` function from Python 2.x, or the
+   regular :py:func:`zip` function from Python 3.x.
 
    :param \*iterables: any number of iterators
    :return: the items from each iterator zipped together
@@ -569,7 +571,9 @@ Combinators
 
    Execute the provided ``callable`` against all of the elements in
    ``iterable`` returning a :py:class:`list` containing the transformed
-   results.  This is similar to :py:func:`map` function from Python 2.x.
+   results.  This is similar to :py:func:`map` function from Python 2.x,
+   or using the :py:func:`map` function from Python 3.x and iterating
+   through the result as a :py:class:`list`.
 
    :param callable: a callable python object that transforms its argument
    :type callable: `function`
@@ -581,7 +585,8 @@ Combinators
 
    Return a :py:class:`list` containing each value from ``iterable`` that
    the callable ``crit`` returns :py:const:`True` for. This is similar to
-   the :py:func:`filter` function from Python 2.x.
+   the :py:func:`filter` function from Python 2.x, or using the :py:func:`filter`
+   function from Python 3.x and iterating through the result as a :py:class:`list`.
 
    :param crit: a callable python object that returns :py:const:`True` or
                 :py:const:`False` based on its argument
@@ -595,7 +600,8 @@ Combinators
    Given any number of ``iterables``, return them as a :py:class:`list`
    composed of :py:class:`tuple` objects for each element passed as
    positional arguments to the function. This is similar to the :py:func:`zip`
-   function from Python 2.x.
+   function from Python 2.x, or the :py:func:`zip` function from Python 3.x and
+   iterating through the reuslt as a :py:class:`list`.
 
    :param \*iterables: any number of iterators
    :return: the items from each iterator zipped together

@@ -984,11 +984,11 @@ namespace.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">B</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">bid</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">()</span>
 <span class="o">&gt;</span> <span class="n">c</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">color</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">rgb</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">before</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">iterate</span><span class="p">():</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">before</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">iterate</span><span class="p">():</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">st</span> <span class="ow">in</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s1">&#39;eax&#39;</span><span class="p">,</span> <span class="n">read</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span> <span class="o">...</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;hex&#39;</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s1">&#39;hex&#39;</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">block</span><span class="o">.</span><span class="n">disasm</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -2588,8 +2588,8 @@ function’s frame. By default, this namespace will return a
 <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> representing the frame belonging to the specified
 function.</p>
 <p>Some ways of using this can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="nb">hex</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">id</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="p">()</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="nb">hex</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">id</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span> <span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">sp</span> <span class="o">=</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">delta</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -2749,8 +2749,8 @@ each argument as a tuple containing the <code class="docutils literal notranslat
 <p>At the moment, register-based calling conventions are not
 supported.</p>
 <p>Some ways of using this are:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -2803,7 +2803,7 @@ supported.</p>
 <p>This namespace provides information about the local variables
 defined within a function’s frame.</p>
 <p>Some ways to get this information can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">lvars</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">lvars</span><span class="o">.</span><span class="n">size</span><span class="p">()</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -2854,7 +2854,7 @@ defined within a function’s frame.</p>
 <p>This namespace provides information about the registers that
 are saved when a function constructs its frame.</p>
 <p>An example of using this namespace:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">regs</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">frame</span><span class="o">.</span><span class="n">regs</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -2908,7 +2908,7 @@ specified function. This allows one to get any attributes that IDA
 or a user has applied to a function within the database. This alows
 one to filter functions according to their particular attributes.</p>
 <p>Some simple ways of getting information about a function:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">has_noframe</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">has_noframe</span><span class="p">()</span> <span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="nb">filter</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_library</span><span class="p">,</span> <span class="n">database</span><span class="o">.</span><span class="n">functions</span><span class="p">()):</span> <span class="o">...</span>
 </pre></div>
 </div>

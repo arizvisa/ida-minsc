@@ -953,7 +953,8 @@ function with the <code class="xref py py-class docutils literal notranslate"><s
 <dd><p>Execute the provided <code class="docutils literal notranslate"><span class="pre">callable</span></code> against all of the elements in
 <code class="docutils literal notranslate"><span class="pre">iterable</span></code> returning an iterator containing the transformed
 results. This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">map()</span></code> and is the same
-as the <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.imap()</span></code> function from Python 2.x.</p>
+as the <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.imap()</span></code> function from Python 2.x, or the
+regular <code class="xref py py-func docutils literal notranslate"><span class="pre">map()</span></code> function from Python 3.x.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -977,7 +978,7 @@ as the <code class="xref py py-func docutils literal notranslate"><span class="p
 <dd><p>Yield each value from <code class="docutils literal notranslate"><span class="pre">iterable</span></code> that the callable <code class="docutils literal notranslate"><span class="pre">crit</span></code>
 returns <code class="xref py py-const docutils literal notranslate"><span class="pre">True</span></code> for. This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">filter()</span></code>
 and is the same as the <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.ifilter()</span></code> function from
-Python 2.x.</p>
+Python 2.x, or the regular <code class="xref py py-func docutils literal notranslate"><span class="pre">filter()</span></code> function from Python 3.x.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1020,7 +1021,8 @@ function.</p>
 <dd><p>Given any number of <code class="docutils literal notranslate"><span class="pre">iterables</span></code>, return them as an iterator that
 yields a tuple for each element passed as positional arguments to
 the function. This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">zip()</span></code>, and is the same
-as the <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.izip()</span></code> function from Python 2.x.</p>
+as the <code class="xref py py-func docutils literal notranslate"><span class="pre">itertools.izip()</span></code> function from Python 2.x, or the
+regular <code class="xref py py-func docutils literal notranslate"><span class="pre">zip()</span></code> function from Python 3.x.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1073,7 +1075,9 @@ function being used on lists with the <code class="xref py py-class docutils lit
 <code class="descname">lmap</code><span class="sig-paren">(</span><em>callable</em>, <em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#lmap" title="Permalink to this definition">¶</a></dt>
 <dd><p>Execute the provided <code class="docutils literal notranslate"><span class="pre">callable</span></code> against all of the elements in
 <code class="docutils literal notranslate"><span class="pre">iterable</span></code> returning a <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> containing the transformed
-results.  This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">map()</span></code> function from Python 2.x.</p>
+results.  This is similar to <code class="xref py py-func docutils literal notranslate"><span class="pre">map()</span></code> function from Python 2.x,
+or using the <code class="xref py py-func docutils literal notranslate"><span class="pre">map()</span></code> function from Python 3.x and iterating
+through the result as a <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1099,7 +1103,8 @@ results.  This is similar to <code class="xref py py-func docutils literal notra
 <code class="descname">lfilter</code><span class="sig-paren">(</span><em>crit</em>, <em>iterable</em><span class="sig-paren">)</span><a class="headerlink" href="#lfilter" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return a <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code> containing each value from <code class="docutils literal notranslate"><span class="pre">iterable</span></code> that
 the callable <code class="docutils literal notranslate"><span class="pre">crit</span></code> returns <code class="xref py py-const docutils literal notranslate"><span class="pre">True</span></code> for. This is similar to
-the <code class="xref py py-func docutils literal notranslate"><span class="pre">filter()</span></code> function from Python 2.x.</p>
+the <code class="xref py py-func docutils literal notranslate"><span class="pre">filter()</span></code> function from Python 2.x, or using the <code class="xref py py-func docutils literal notranslate"><span class="pre">filter()</span></code>
+function from Python 3.x and iterating through the result as a <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1127,7 +1132,8 @@ the <code class="xref py py-func docutils literal notranslate"><span class="pre"
 <dd><p>Given any number of <code class="docutils literal notranslate"><span class="pre">iterables</span></code>, return them as a <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>
 composed of <code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code> objects for each element passed as
 positional arguments to the function. This is similar to the <code class="xref py py-func docutils literal notranslate"><span class="pre">zip()</span></code>
-function from Python 2.x.</p>
+function from Python 2.x, or the <code class="xref py py-func docutils literal notranslate"><span class="pre">zip()</span></code> function from Python 3.x and
+iterating through the reuslt as a <code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />

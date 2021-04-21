@@ -1051,10 +1051,10 @@ This namespace is also aliased as :py:obj:`instruction.t`.
 
 Some examples of using this namespace are::
 
-    > print instruction.type.is_return(ea)
-    > print instruction.type.is_jxx(ea)
-    > print instruction.type.is_call(ea)
-    > print instruction.type.is_branch(ea)
+    > print( instruction.type.is_return(ea) )
+    > print( instruction.type.is_jxx(ea) )
+    > print( instruction.type.is_call(ea) )
+    > print( instruction.type.is_branch(ea) )
 
 .. py:function:: type\.feature()
    

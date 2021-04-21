@@ -1721,10 +1721,10 @@ or if it should add the instruction’s operand to its queue in
 order to recursively disassemble code witin the database.</p>
 <p>This namespace is also aliased as <code class="xref py py-obj docutils literal notranslate"><span class="pre">instruction.t</span></code>.</p>
 <p>Some examples of using this namespace are:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_return</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_jxx</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_branch</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_return</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_jxx</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_call</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">instruction</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_branch</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">

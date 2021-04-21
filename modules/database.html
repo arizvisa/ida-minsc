@@ -4631,7 +4631,7 @@ return a class that allows one to query the different attributes of
 an <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.switch_info_t</span></code>.</p>
 <p>This namespace can be used as in the following example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">sw</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">get</span><span class="o">.</span><span class="n">switch</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">sw</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">sw</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -6272,9 +6272,9 @@ different locations within the database.</p>
 <p>By default, this namespace will return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">idaapi.DT_TYPE</span></code> of the
 specified address.</p>
 <p>Some examples of using this namespace can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_data</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">type</span><span class="o">.</span><span class="n">is_data</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">length</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">structure</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
 </pre></div>
@@ -7048,10 +7048,10 @@ will return the array’s element type and its number of elements
 as a list <code class="docutils literal notranslate"><span class="pre">[size,</span> <span class="pre">count]</span></code>.</p>
 <p>Some examples of using this namespace can be:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">type</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">member</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">element</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">member</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">element</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">length</span><span class="p">(</span><span class="n">ea</span><span class="p">)</span> <span class="p">)</span>
 </pre></div>
 </div>
 <dl class="function">
@@ -7165,7 +7165,7 @@ that is defined within the database. By default this namespace
 will return the <code class="xref py py-obj docutils literal notranslate"><span class="pre">structure_t</span></code> at the given address.</p>
 <p>Some of the ways to use this namespace are:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">struct</span><span class="p">()</span>
-<span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">struct</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+<span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">struct</span><span class="o">.</span><span class="n">size</span><span class="p">()</span> <span class="p">)</span>
 <span class="o">&gt;</span> <span class="n">st</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="n">database</span><span class="o">.</span><span class="n">t</span><span class="o">.</span><span class="n">id</span><span class="p">(</span><span class="n">ea</span><span class="p">))</span>
 </pre></div>
 </div>
@@ -7254,7 +7254,7 @@ also aliased as globals. Some of these are:</p>
 <li><code class="xref py py-obj docutils literal notranslate"><span class="pre">database.cxdown</span></code> - Return all the code references that an address references</li>
 </ul>
 <p>Some ways to utilize this namespace can be:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">up</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="nb">print</span><span class="p">(</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">up</span><span class="p">()</span> <span class="p">)</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">down</span><span class="p">():</span> <span class="o">...</span>
 <span class="o">&gt;</span> <span class="k">for</span> <span class="n">ea</span> <span class="ow">in</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">cu</span><span class="p">(</span><span class="n">ea</span><span class="p">):</span> <span class="o">...</span>
 <span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">database</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">add_code</span><span class="p">(</span><span class="n">ea</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>

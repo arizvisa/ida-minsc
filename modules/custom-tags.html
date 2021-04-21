@@ -158,17 +158,15 @@ tag name was specified, this mapping will be used to rename the tags
 before actually writing them back into the database.</p>
 <dl class="function">
 <dt id="tags.apply">
-<code class="descclassname">tags.</code><code class="descname">apply</code><span class="sig-paren">(</span><em>(Globals</em>, <em>Contents</em>, <em>Frames)</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply" title="Permalink to this definition">¶</a></dt>
-<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> back into the database.</p>
+<code class="descclassname">tags.</code><code class="descname">apply</code><span class="sig-paren">(</span><em>Globals_Contents_Frames</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> from the <code class="docutils literal notranslate"><span class="pre">Globals_Contents_Frames</span></code> tuple back into the database.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>Globals</strong> – the globals tags that were read</li>
-<li><strong>Contents</strong> – the contents tags that were read</li>
-<li><strong>Frames</strong> – the frame members that were read</li>
-<li><strong>**tagmap</strong> – a dictionary used to map the original tags with before applying them to the database</li>
+<li><strong>Globals_Contents_Frames</strong> – a tuple composed of the global tags, contents tags, and frame members that were read</li>
+<li><strong>**tagmap</strong> – a dictionary used to translate the original tag names with before applying them to the database</li>
 </ul>
 </td>
 </tr>
@@ -214,17 +212,15 @@ before actually writing them back into the database.</p>
 
 <dl class="function">
 <dt id="tags.apply.everything">
-<code class="descclassname">apply.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>(Globals</em>, <em>Contents</em>, <em>Frames)</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.everything" title="Permalink to this definition">¶</a></dt>
-<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> back into the database.</p>
+<code class="descclassname">apply.</code><code class="descname">everything</code><span class="sig-paren">(</span><em>Globals_Contents_Frames</em>, <em>**tagmap</em><span class="sig-paren">)</span><a class="headerlink" href="#tags.apply.everything" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply the tags in the argument <code class="docutils literal notranslate"><span class="pre">(Globals,</span> <span class="pre">Contents,</span> <span class="pre">Frames)</span></code> from the <code class="docutils literal notranslate"><span class="pre">Globals_Contents_Frames</span></code> tuple back into the database.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>Globals</strong> – the globals tags to apply</li>
-<li><strong>Contents</strong> – the contents tags to apply</li>
-<li><strong>Frames</strong> – the frame members to apply</li>
-<li><strong>**tagmap</strong> – a dictionary used to map the original tags with before applying them to the database</li>
+<li><strong>Globals_Contents_Frames</strong> – a tuple composed of the global tags, contents tags, and frame members that are to be applied</li>
+<li><strong>**tagmap</strong> – a dictionary used to translate the original tag names with before applying them to the database</li>
 </ul>
 </td>
 </tr>

@@ -88,6 +88,38 @@ as follows:</p>
 functions and aliases. For more information on this, please see
 <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a> and <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a>.</p>
 <dl class="function">
+<dt id="enumeration.bitfield">
+<code class="descclassname">enumeration.</code><code class="descname">bitfield</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.bitfield" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the enumeration identified by <code class="docutils literal notranslate"><span class="pre">enum</span></code> is a bitfield or not.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration to return the bitfield flag for</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">enumeration.</code><code class="descname">bitfield</code><span class="sig-paren">(</span><em>enum</em>, <em>boolean</em><span class="sig-paren">)</span></dt>
+<dd><p>Toggle the bitfield setting of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> depending on the value of <code class="docutils literal notranslate"><span class="pre">boolean</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to set the bitfield flag for</li>
+<li><strong>boolean</strong> (<em>int</em><em> or </em><em>long</em><em> or </em><em>bool</em>) – whether to set the flag or clear it</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="enumeration.bits">
 <code class="descclassname">enumeration.</code><code class="descname">bits</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.bits" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the number of bits for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
@@ -156,6 +188,21 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**type</strong> – any keyword that can be used to filter enumerations with</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.by_identifier">
+<code class="descclassname">enumeration.</code><code class="descname">by_identifier</code><span class="sig-paren">(</span><em>eid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.by_identifier" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the identifier for the enumeration using the specified <code class="docutils literal notranslate"><span class="pre">eid</span></code>.</p>
+<p>Aliases: <a class="reference internal" href="#enumeration.by_identifier" title="enumeration.by_identifier"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.byidentifier</span></code></a></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>eid</strong> – the identifier of the enumeration to return</td>
 </tr>
 </tbody>
 </table>
@@ -231,6 +278,25 @@ functions and aliases. For more information on this, please see
 </dd></dl>
 
 <dl class="function">
+<dt>
+<code class="descclassname">enumeration.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment from the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – </li>
+<li><strong>none</strong> (<em>None</em>) – </li>
+<li><strong>**repeatable</strong> – </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="enumeration.count">
 <code class="descclassname">enumeration.</code><code class="descname">count</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.count" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the total number of enumerations in the database.</p>
@@ -254,7 +320,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.flags">
 <code class="descclassname">enumeration.</code><code class="descname">flags</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.flags" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the flags for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return the flags for the enumeration identified by <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -267,15 +333,15 @@ functions and aliases. For more information on this, please see
 
 <dl class="function">
 <dt>
-<code class="descclassname">enumeration.</code><code class="descname">flags</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the flags for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> and masked with <code class="docutils literal notranslate"><span class="pre">mask</span></code>.</p>
+<code class="descclassname">enumeration.</code><code class="descname">flags</code><span class="sig-paren">(</span><em>enum</em>, <em>flags</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the flags for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to the value specified by <code class="docutils literal notranslate"><span class="pre">flags</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>enum</strong> – the enumeration to return the flags for</li>
-<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – the bit mask to apply to the flags</li>
+<li><strong>flags</strong> (<em>int</em><em> or </em><em>long</em>) – the flags to apply to the enumeration</li>
 </ul>
 </td>
 </tr>
@@ -292,6 +358,38 @@ functions and aliases. For more information on this, please see
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration identifier to check</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.index">
+<code class="descclassname">enumeration.</code><code class="descname">index</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.index" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the index in the enumeration list for the enumeration identified by <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration to return the index of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">enumeration.</code><code class="descname">index</code><span class="sig-paren">(</span><em>enum</em>, <em>index</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the position in the enumeration list for the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to the specified <code class="docutils literal notranslate"><span class="pre">index</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to set the index for</li>
+<li><strong>index</strong> (<em>int</em><em> or </em><em>long</em>) – the index to change the enumeration to</li>
+</ul>
+</td>
 </tr>
 </tbody>
 </table>
@@ -388,7 +486,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.names">
 <code class="descclassname">enumeration.</code><code class="descname">names</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.names" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a list of all the names belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a set of all of the names belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -495,7 +593,7 @@ functions and aliases. For more information on this, please see
 <dl class="function">
 <dt id="enumeration.values">
 <code class="descclassname">enumeration.</code><code class="descname">values</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.values" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return a list of all the values belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Return a set of all of the values belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -515,8 +613,200 @@ concept. Please see <a class="reference internal" href="../multicase.html#multic
 information on namespaces. For more information on multicase
 functions or aliases, please see <a class="reference internal" href="../multicase.html#multicase-functions"><span class="std std-ref">Multicased functions</span></a> or
 <a class="reference internal" href="../multicase.html#multicase-aliases"><span class="std std-ref">Aliases</span></a>.</p>
+<div class="section" id="enumeration-masks">
+<span id="ns-enumeration-masks"></span><h3>3.1.2.2.1. enumeration.masks<a class="headerlink" href="#enumeration-masks" title="Permalink to this headline">¶</a></h3>
+<p>This namespace allows one to interact with a masks that are within
+an enumeration with its “bitfield” flag set. This is a very basic
+namespace that provides some minor utilities to deal with the
+naming of the bitmasks in an enumeration.</p>
+<p>Some examples of how to use this namespace can be:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="n">values</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">masks</span><span class="p">(</span><span class="s1">&#39;example_enumeration&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">masks</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="s1">&#39;mask_name&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">mask</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">masks</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="s1">&#39;mask_name&#39;</span><span class="p">)</span>
+<span class="o">&gt;</span> <span class="n">mask</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">masks</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="n">eid</span><span class="p">,</span> <span class="mh">0x1234</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="function">
+<dt id="enumeration.masks">
+<code class="descclassname">enumeration.</code><code class="descname">masks</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.masks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the masks belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> and yield their name and value.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration to return the masks of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.masks.comment">
+<code class="descclassname">masks.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em>, <em>**repeatable</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.masks.comment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the comment for the <code class="docutils literal notranslate"><span class="pre">mask</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then return the repeatable comment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to fetch a mask comment from</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – the mask to fetch the comment from</li>
+<li><strong>**repeatable</strong> – whether to return the repeatable comment or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">masks.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em>, <em>comment</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the comment for the <code class="docutils literal notranslate"><span class="pre">mask</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to <code class="docutils literal notranslate"><span class="pre">comment</span></code>.</p>
+<p>If the bool <code class="docutils literal notranslate"><span class="pre">repeatable</span></code> is specified, then set the repeatable comment.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the mask to set the comment for</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – the mask to set the comment of</li>
+<li><strong>comment</strong> (<em>str</em>) – the comment to assign to the mask</li>
+<li><strong>**repeatable</strong> – whether to set the repeatable comment or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">masks.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em>, <em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment for the <code class="docutils literal notranslate"><span class="pre">mask</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the mask to clear the comment of</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – the mask to clear the comment of</li>
+<li><strong>none</strong> (<em>None</em>) – the value <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></li>
+<li><strong>**repeatable</strong> – whether to clear the repeatable comment or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.masks.has">
+<code class="descclassname">masks.</code><code class="descname">has</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.masks.has" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return whether the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> uses the specified <code class="docutils literal notranslate"><span class="pre">mask</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration to check the masks of</li>
+<li><strong>mask</strong> – the bitmask to confirm</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.masks.iterate">
+<code class="descclassname">masks.</code><code class="descname">iterate</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.masks.iterate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate through all of the masks belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration to iterate through through the masks of</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.masks.list">
+<code class="descclassname">masks.</code><code class="descname">list</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.masks.list" title="Permalink to this definition">¶</a></dt>
+<dd><p>List all the masks belonging to the enumeration identified by <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>enum</strong> – the enumeration containing the masks to list</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="enumeration.masks.name">
+<code class="descclassname">masks.</code><code class="descname">name</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.masks.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the name for the given <code class="docutils literal notranslate"><span class="pre">mask</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the mask to fetch</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – the mask to return the name of</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">masks.</code><code class="descname">name</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em>, <em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the name for the <code class="docutils literal notranslate"><span class="pre">mask</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to the provided <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the mask to rename</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – the mask to set the name of</li>
+<li><strong>name</strong> (<em>str</em><em> or </em><em>tuple</em>) – the name to use when renaming the mask</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">masks.</code><code class="descname">name</code><span class="sig-paren">(</span><em>enum</em>, <em>mask</em>, <em>name</em>, <em>*suffix</em><span class="sig-paren">)</span></dt>
+<dd><p>Set the name for the <code class="docutils literal notranslate"><span class="pre">mask</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> to the provided <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – the enumeration containing the mask to rename</li>
+<li><strong>mask</strong> (<em>int</em><em> or </em><em>long</em>) – the mask to set the name of</li>
+<li><strong>name</strong> (<em>str</em>) – the name to use when renaming the mask</li>
+<li><strong>*suffix</strong> – any other strings to append to the name</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
 <div class="section" id="enumeration-member">
-<span id="ns-enumeration-member"></span><h3>3.1.2.2.1. enumeration.member<a class="headerlink" href="#enumeration-member" title="Permalink to this headline">¶</a></h3>
+<span id="ns-enumeration-member"></span><h3>3.1.2.2.2. enumeration.member<a class="headerlink" href="#enumeration-member" title="Permalink to this headline">¶</a></h3>
 <p>This namespace allows one to interact with a member belonging
 to an enumeration once the enumeration’s id has been determined.
 This allows one to modify the property of any one of an
@@ -530,6 +820,20 @@ enumeration’s members.</p>
 <span class="o">&gt;</span> <span class="n">ok</span> <span class="o">=</span> <span class="n">enum</span><span class="o">.</span><span class="n">member</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
 </pre></div>
 </div>
+<dl class="function">
+<dt id="enumeration.member.by">
+<code class="descclassname">member.</code><code class="descname">by</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the enumeration member as specified by the provided <code class="docutils literal notranslate"><span class="pre">mid</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> – the identifier of the member to return</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 <dl class="function">
 <dt id="enumeration.member.comment">
 <code class="descclassname">member.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>mid</em>, <em>**repeatable</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.member.comment" title="Permalink to this definition">¶</a></dt>
@@ -601,6 +905,26 @@ enumeration’s members.</p>
 <li><strong>member</strong> – the member to set the comment for</li>
 <li><strong>comment</strong> (<em>str</em>) – the comment to apply</li>
 <li><strong>**repeatable</strong> – whether the returned comment should be repeatable or not</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">member.</code><code class="descname">comment</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em>, <em>none</em>, <em>**repeatable</em><span class="sig-paren">)</span></dt>
+<dd><p>Remove the comment from the <code class="docutils literal notranslate"><span class="pre">member</span></code> belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>enum</strong> – </li>
+<li><strong>member</strong> – </li>
+<li><strong>none</strong> (<em>None</em>) – </li>
+<li><strong>**repeatable</strong> – </li>
 </ul>
 </td>
 </tr>
@@ -866,7 +1190,7 @@ enumeration’s members.</p>
 
 </div>
 <div class="section" id="enumeration-members">
-<span id="ns-enumeration-members"></span><h3>3.1.2.2.2. enumeration.members<a class="headerlink" href="#enumeration-members" title="Permalink to this headline">¶</a></h3>
+<span id="ns-enumeration-members"></span><h3>3.1.2.2.3. enumeration.members<a class="headerlink" href="#enumeration-members" title="Permalink to this headline">¶</a></h3>
 <p>This namespace allows one to interact with the members belonging
 to an enumeration once the enumeration’s id has been determined.
 This allows one to iterate through all of its members or add
@@ -886,7 +1210,8 @@ members of an enumeration.</p>
 <dl class="function">
 <dt id="enumeration.members">
 <code class="descclassname">enumeration.</code><code class="descname">members</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members" title="Permalink to this definition">¶</a></dt>
-<dd><p>Yield the name of each member from the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<dd><p>Yield the name, and value of each member from the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>If the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> is a bitfield, then yield each member’s name, value, and bitmask.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -901,7 +1226,7 @@ members of an enumeration.</p>
 <dt id="enumeration.members.add">
 <code class="descclassname">members.</code><code class="descname">add</code><span class="sig-paren">(</span><em>enum</em>, <em>name</em>, <em>value</em>, <em>**bitmask</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.add" title="Permalink to this definition">¶</a></dt>
 <dd><p>Add an enumeration member <code class="docutils literal notranslate"><span class="pre">name</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">value</span></code> to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
-<p>If the int, <code class="docutils literal notranslate"><span class="pre">bitmask</span></code>, is specified then used it as the bitmask for the enumeration.</p>
+<p>If the integral, <code class="docutils literal notranslate"><span class="pre">bitmask</span></code>, is specified then use it as the bitmask for the enumeration.</p>
 <p>Aliases: <a class="reference internal" href="#enumeration.members.add" title="enumeration.members.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.new</span></code></a>, <a class="reference internal" href="#enumeration.members.add" title="enumeration.members.add"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.create</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -939,15 +1264,15 @@ members of an enumeration.</p>
 
 <dl class="function">
 <dt>
-<code class="descclassname">members.</code><code class="descname">by</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
-<dd><p>Return the member with the given <code class="docutils literal notranslate"><span class="pre">name</span></code> belonging to <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<code class="descclassname">members.</code><code class="descname">by</code><span class="sig-paren">(</span><em>enum</em>, <em>name</em><span class="sig-paren">)</span></dt>
+<dd><p>Return the member of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> with the given <code class="docutils literal notranslate"><span class="pre">name</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>enum</strong> – the enumeration to return a member for</li>
-<li><strong>member</strong> (<em>str</em>) – the name of the member to return</li>
+<li><strong>name</strong> (<em>str</em>) – the name of the member to return</li>
 </ul>
 </td>
 </tr>
@@ -1012,8 +1337,9 @@ members of an enumeration.</p>
 
 <dl class="function">
 <dt id="enumeration.members.by_value">
-<code class="descclassname">members.</code><code class="descname">by_value</code><span class="sig-paren">(</span><em>enum</em>, <em>value</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.by_value" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">members.</code><code class="descname">by_value</code><span class="sig-paren">(</span><em>enum</em>, <em>value</em>, <em>**filters</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.by_value" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the member identifier for the member of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code> with the specified <code class="docutils literal notranslate"><span class="pre">value</span></code>.</p>
+<p>If the integrals, <code class="docutils literal notranslate"><span class="pre">bitmask</span></code> or <code class="docutils literal notranslate"><span class="pre">serial</span></code>, is specified then use them to filter the returned enumeration members.</p>
 <p>Aliases: <a class="reference internal" href="#enumeration.members.by_value" title="enumeration.members.by_value"><code class="xref py py-func docutils literal notranslate"><span class="pre">enumeration.member.byvalue</span></code></a></p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1022,6 +1348,7 @@ members of an enumeration.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>enum</strong> – the enumeration to return a member for</li>
 <li><strong>value</strong> – the value of the enumeration member to return</li>
+<li><strong>**filters</strong> – the filters to use when choosing the enumeration member</li>
 </ul>
 </td>
 </tr>
@@ -1087,7 +1414,21 @@ members of an enumeration.</p>
 
 <dl class="function">
 <dt id="enumeration.members.remove">
-<code class="descclassname">members.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.remove" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">members.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>mid</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.remove" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the member identified by <code class="docutils literal notranslate"><span class="pre">mid</span></code> from the enumeration that owns it.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mid</strong> (<em>int</em><em> or </em><em>long</em>) – </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descclassname">members.</code><code class="descname">remove</code><span class="sig-paren">(</span><em>enum</em>, <em>member</em><span class="sig-paren">)</span></dt>
 <dd><p>Remove the specified <code class="docutils literal notranslate"><span class="pre">member</span></code> of the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1107,6 +1448,7 @@ members of an enumeration.</p>
 <dt id="enumeration.members.values">
 <code class="descclassname">members.</code><code class="descname">values</code><span class="sig-paren">(</span><em>enum</em><span class="sig-paren">)</span><a class="headerlink" href="#enumeration.members.values" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return a set of all the values belonging to the enumeration <code class="docutils literal notranslate"><span class="pre">enum</span></code>.</p>
+<p>If the enumeration is a bitfield, then each item in the result is the value and its bitmask.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -1148,8 +1490,9 @@ members of an enumeration.</p>
 <li><a class="reference internal" href="#">3.1.2. enumeration – Enumeration module</a><ul>
 <li><a class="reference internal" href="#function-list">3.1.2.1. Function list</a></li>
 <li><a class="reference internal" href="#namespace-list">3.1.2.2. Namespace list</a><ul>
-<li><a class="reference internal" href="#enumeration-member">3.1.2.2.1. enumeration.member</a></li>
-<li><a class="reference internal" href="#enumeration-members">3.1.2.2.2. enumeration.members</a></li>
+<li><a class="reference internal" href="#enumeration-masks">3.1.2.2.1. enumeration.masks</a></li>
+<li><a class="reference internal" href="#enumeration-member">3.1.2.2.2. enumeration.member</a></li>
+<li><a class="reference internal" href="#enumeration-members">3.1.2.2.3. enumeration.members</a></li>
 </ul>
 </li>
 </ul>

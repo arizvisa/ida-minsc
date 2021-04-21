@@ -86,14 +86,12 @@ keyword arguments which represent a mapping for the tag names. When a
 tag name was specified, this mapping will be used to rename the tags
 before actually writing them back into the database.
 
-.. py:function:: apply((Globals,Contents,Frames), \*\*tagmap)
+.. py:function:: apply(Globals_Contents_Frames, \*\*tagmap)
    
-   Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.
+   Apply the tags in the argument ``(Globals, Contents, Frames)`` from the ``Globals_Contents_Frames`` tuple back into the database.
    
-   :param Globals: the globals tags that were read
-   :param Contents: the contents tags that were read
-   :param Frames: the frame members that were read
-   :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
+   :param Globals_Contents_Frames: a tuple composed of the global tags, contents tags, and frame members that were read
+   :param \*\*tagmap: a dictionary used to translate the original tag names with before applying them to the database
    
 .. py:function:: apply\.content(Contents, \*\*tagmap)
    
@@ -109,14 +107,12 @@ before actually writing them back into the database.
    :param Contents: the contents tags to apply
    :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
    
-.. py:function:: apply\.everything((Globals,Contents,Frames), \*\*tagmap)
+.. py:function:: apply\.everything(Globals_Contents_Frames, \*\*tagmap)
    
-   Apply the tags in the argument ``(Globals, Contents, Frames)`` back into the database.
+   Apply the tags in the argument ``(Globals, Contents, Frames)`` from the ``Globals_Contents_Frames`` tuple back into the database.
    
-   :param Globals: the globals tags to apply
-   :param Contents: the contents tags to apply
-   :param Frames: the frame members to apply
-   :param \*\*tagmap: a dictionary used to map the original tags with before applying them to the database
+   :param Globals_Contents_Frames: a tuple composed of the global tags, contents tags, and frame members that are to be applied
+   :param \*\*tagmap: a dictionary used to translate the original tag names with before applying them to the database
    
 .. py:function:: apply\.frame(ea, frame, \*\*tagmap)
    
