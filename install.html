@@ -67,13 +67,14 @@ they have created during their reversing project.</p>
 <div class="section" id="software-requirements">
 <h2>1.1. Software Requirements<a class="headerlink" href="#software-requirements" title="Permalink to this headline">¶</a></h2>
 <p>This plugin requires IDA Pro to be installed along with the IDAPython plugin
-for the Python 2.x series. IDA versions 6.8 up to 7.5.200619 (SP2) are
-supported. The installation steps described within this document assume that
-you’re not using the bundled Python instance and have instead installed a
-Python 2.x interpreter separately. If you have specified the usage of the
-Python 3.x for the IDAPython plugin at the time of installation, please
-review the <a class="reference internal" href="#downgrading-the-idapython-version-to-python-2-x">Downgrading the IDAPython version to Python 2.x</a> section for
-your platform.</p>
+IDA versions 6.8 up to 7.6.210319 are supported. Both versions of the Python
+interpreter, the Python 2.x series, and the Python 3.x series are supported.
+The installation steps described within this document assume that you’re not
+using the bundled Python instance and have instead installed a Python interpreter
+separately. Despite the support for both Python 2.x and Python 3.x series, if you
+have specified the usage of the Python 3.x for the IDAPython plugin and want
+to change it, please review the <a class="reference internal" href="#downgrading-the-idapython-version-to-python-2-x">Downgrading the IDAPython version to Python 2.x</a>
+section for your platform.</p>
 </div>
 <div class="section" id="installing-the-actual-plugin">
 <h2>1.2. Installing the actual plugin<a class="headerlink" href="#installing-the-actual-plugin" title="Permalink to this headline">¶</a></h2>
@@ -267,15 +268,18 @@ they need done whilst reversing their target.</p>
 <span id="install-downgrade"></span><h2>1.4. Downgrading the IDAPython version to Python 2.x<a class="headerlink" href="#downgrading-the-idapython-version-to-python-2-x" title="Permalink to this headline">¶</a></h2>
 <p>The Python 2.x series has since been deprecated due to the compatibility-breaking
 changes that have been introduced with the Python 3.x series [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">1</span></a>].
-Due to this, when installing later versions of IDAPython, the installer will let
-you choose which version of Python to use [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">2</span></a>]. After
-choosing your version of Python and completing the install, IDAPython will appear
-to be locked to that particular version without doing a complete re-install. If
-you have chosen Python 3.x, then the IDA-minsc plugin will not be able to work
-with your setup until you switch your version to Python 2.x.</p>
-<p>This however, does not mean that you are stuck as there are a couple of avenues
-that you can take in order to temporarily switch the interpreter that IDAPython
-uses between either the Python 2.x or Python 3.x series [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">3</span></a>].</p>
+However, the user may still wish to use plugins or modules that only exist within
+the Python 2.x series. As a result of this deprecation, when installing later
+versions of IDAPython, the installer will let you choose which version of Python
+to use [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">2</span></a>]. After choosing your version of Python
+and completing the installation process, IDAPython will appear to be locked to
+that particular version without doing a complete re-install.</p>
+<p>If you have chosen Python 3.x, then some desired plugins might not work with
+your setup, or some modules might not be available until you switch your Python
+interpreter. This however does not affect any part of the IDA-minsc plugin, and
+the choice of choosing a Python version is left completely up to the user. To
+temporary switch the interpreter that IDAPython uses, IDA provides a couple of
+avenues that a user can take [<a class="reference internal" href="#downgrading-references"><span class="std std-ref">3</span></a>].</p>
 <div class="section" id="earlier-versions-of-idapython">
 <h3>1.4.1. Earlier versions of IDAPython<a class="headerlink" href="#earlier-versions-of-idapython" title="Permalink to this headline">¶</a></h3>
 <p>When installing IDA Pro, all of the available plugins that are currently installed
@@ -357,7 +361,7 @@ plugin, the user must rename the filename suffix of the currently enabled
 IDAPython plugin (which would be Python 3.x if explicitly chosen during the
 install process) to its disabled version effectively disabling it.</p>
 <p>Once the Python 3.x version of the IDAPython plugin has been disabled, then
-the Python 2.x version can enabled by doing the opposite and renaming the
+the Python 2.x version can be enabled by doing the opposite and renaming the
 file from its disabled version to its enabled version.</p>
 <table border="1" class="docutils">
 <colgroup>
@@ -456,8 +460,7 @@ particular “<code class="docutils literal notranslate"><span class="pre">pytho
 <p>The name of this conditional file is “<code class="docutils literal notranslate"><span class="pre">use_python</span></code>”. If a file with this name
 is found by IDAPython under the “<code class="docutils literal notranslate"><span class="pre">python</span></code>” subdirectory as “<code class="docutils literal notranslate"><span class="pre">python/use_python2</span></code>”,
 the Python 3.x version of the IDAPython plugin will refuse to load thus resulting
-in only the Python 2.x version of the plugin loading which will satisfy the
-Python 2.x version requirement of the IDA-minsc plugin.</p>
+in only the Python 2.x version of the IDAPython plugin loading.</p>
 <p>The following table loosely describes the path where IDA Pro may be installed on
 the platform, and the filename that must be created in order to prevent the Python
 3.x version of the IDAPython plugin from loading.</p>
@@ -509,7 +512,8 @@ code by typing it into the input box:</p>
 </div>
 <p>Examining the major version of the named tuple that has been returned shows that
 the Python 2.x version of the IDAPython plugin is currently being used. At this
-point, the user may resume the general installation of the IDA-minsc plugin.</p>
+point, the user may continue to use the IDA-minsc plugin with whatever other
+plugins or modules that are now available.</p>
 <p class="rubric" id="downgrading-references">References</p>
 <ol class="arabic simple">
 <li><a class="reference external" href="https://blog.python.org/2011/03/recent-discussion-on-python-dev.html">Deprecations between Python 2.7 and 3.x – https://blog.python.org/2011/03/recent-discussion-on-python-dev.html</a></li>
