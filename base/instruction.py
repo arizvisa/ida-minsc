@@ -1012,13 +1012,62 @@ def op_enumeration(ea, opnum):
 
     # After verifying that there's definitely an enumeration at the address, we
     # can ask for the enumeration identifier to figure out the actual member.
-    E, _ = idaapi.get_enum_id(ea, opnum)
-    if E == idaapi.BADNODE:
+    eid, cid = idaapi.get_enum_id(ea, opnum)
+    if eid == idaapi.BADNODE:
         raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}) : Unable to get enumeration identifier for operand {:d} with flags {:#x}.".format(__name__, ea, opnum, opnum, F))
 
-    # Grab the operand value and use it to return the member identifier for the enumeration
-    res = op(ea, opnum)
-    return idaapi.get_enum_member(E, res, -1, 0)
+    # After grabbing the member, lets grab the actual value that we're going to
+    # need to process the member identifier out of.
+    value, bits, signed = op(ea, opnum), op_bits(ea, opnum), interface.node.alt_opinverted(ea, opnum)
+
+    # If this enumeration is a bitfield, then we need to figure out all the masks
+    # that this operand uses. If it's not, then we have a single mask which is
+    # idaapi.DEFMASK.
+    if enumeration.bitfield(eid):
+        masks = [mask for mask in enumeration.masks.iterate(eid)]
+    else:
+        masks = [idaapi.DEFMASK]
+
+    # Now we iterate through all of the masks and attempt to get the enumeration member.
+    # We need to apply the mask to our value in order to properly support bitfields.
+    res, ok = [], True
+    for mask in masks:
+        item = value & mask
+
+        # Attempt to get the member using the value that we masked away. We first
+        # try fetching it with the signed value as when IDA applies an enumeration
+        # to an operand, it seems to discard the OP_REPR altval. If that didn't
+        # work, then we fall back to using the unsigned version of the operand value.
+        mid = idaapi.get_enum_member(eid, -idaapi.as_signed(item) if signed else idaapi.as_signed(item), cid, mask)
+        if mid == idaapi.BADNODE:
+            mid = idaapi.get_enum_member(eid, -item if signed else +item, cid, mask)
+
+        # If that still didn't work, then this is an error and we need to warn the
+        # user about it.
+        if mid == idaapi.BADNODE:
+            ok, sz = False, 2 * enumeration.size(eid) if enumeration.size(eid) else math.ceil(math.log(max(masks), 16))
+            logging.warn(u"{:s}.op_enumeration({:#x}, {:d}) : No enumeration member was found for the value ({:s}) in the enumeration ({:#x}) at operand {:d}.".format(__name__, ea, opnum, "{:#0{:d}x} & {:#0{:d}x}".format(item, 2 + sz, mask, 2 + sz) if enumeration.bitfield(eid) else "{:#0{:d}x}".format(item, 2 + sz), eid, opnum))
+
+        # Otherwise, add it to our results and continue onto the next mask.
+        else:
+            res.append(mid)
+        continue
+
+    # If we found everything without any errors, then return our results to
+    # the caller. If it was a bitfield, then we return a tuple. Otherwise,
+    # the enumeration member identifier should be more than enough.
+    if ok:
+        return builtins.tuple(res) if enumeration.bitfield(eid) else res[0]
+
+    # If we did get something but we missed a value for one of the masks,
+    # then this result is incomplete, but still okay to return.
+    elif res:
+        return builtins.tuple(res) if enumeration.bitfield(eid) else res[0]
+
+    # Otherwise, we didn't find anything and there was an error trying to
+    # get an enumeration member. This is worth an exception for the caller
+    # to figure out what to do with.
+    raise E.DisassemblerError(u"{:s}.op_enumeration({:#x}, {:d}) : Unable to get any members for the enumeration ({:#x}) at operand {:d}.".format(__name__, ea, opnum, eid, opnum))
 @utils.multicase(opnum=six.integer_types, name=six.string_types)
 @utils.string.decorate_arguments('name')
 def op_enumeration(opnum, name):
@@ -1470,7 +1519,7 @@ class operand_types:
             sf, res = pow(2, bits - 1), op.value
 
             # if op.value has its sign inverted, then signify it otherwise just use it
-            return pow(-2, bits) + res if interface.node.alt_opinverted(ea, op.n) else res & (pow(2, bits) - 1)
+            return idaapi.as_signed(res, bits) if interface.node.alt_opinverted(ea, op.n) else res & (pow(2, bits) - 1)
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
         raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype, op.type))
 
