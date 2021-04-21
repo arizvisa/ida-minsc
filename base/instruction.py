@@ -1028,25 +1028,28 @@ def op_enumeration(ea, opnum):
     else:
         masks = [idaapi.DEFMASK]
 
-    # Now we iterate through all of the masks and attempt to get the enumeration member.
-    # We need to apply the mask to our value in order to properly support bitfields.
+    # Now we iterate through all of the masks and attempt to get the enumeration
+    # member. We need to figure out whether our value is signed so that we can
+    # invert it and then apply the mask to our value for bitfield support.
     res, ok = [], True
     for mask in masks:
-        item = value & mask
+        item = (~value + 1 if signed else value) & mask
 
         # Attempt to get the member using the value that we masked away. We first
-        # try fetching it with the signed value as when IDA applies an enumeration
-        # to an operand, it seems to discard the OP_REPR altval. If that didn't
-        # work, then we fall back to using the unsigned version of the operand value.
-        mid = idaapi.get_enum_member(eid, -idaapi.as_signed(item) if signed else idaapi.as_signed(item), cid, mask)
+        # try fetching it with the value we masked, and if that fails then we try
+        # again using the signed value. This is due to how IDA applies an enumeration
+        # to an operand in that it seems to discard the OP_REPR altval which forces
+        # us to have to figure out how the value is stored in the enumeration
+        # ourselves.
+        mid = idaapi.get_enum_member(eid, item, cid, mask)
         if mid == idaapi.BADNODE:
-            mid = idaapi.get_enum_member(eid, -item if signed else +item, cid, mask)
+            mid = idaapi.get_enum_member(eid, idaapi.as_signed(item, bits), cid, mask)
 
         # If that still didn't work, then this is an error and we need to warn the
         # user about it.
         if mid == idaapi.BADNODE:
-            ok, sz = False, 2 * enumeration.size(eid) if enumeration.size(eid) else math.ceil(math.log(max(masks), 16))
-            logging.warn(u"{:s}.op_enumeration({:#x}, {:d}) : No enumeration member was found for the value ({:s}) in the enumeration ({:#x}) at operand {:d}.".format(__name__, ea, opnum, "{:#0{:d}x} & {:#0{:d}x}".format(item, 2 + sz, mask, 2 + sz) if enumeration.bitfield(eid) else "{:#0{:d}x}".format(item, 2 + sz), eid, opnum))
+            ok, width = False, 2 * enumeration.size(eid) if enumeration.size(eid) else math.ceil(math.log(max(masks), 16))
+            logging.warn(u"{:s}.op_enumeration({:#x}, {:d}) : No enumeration member was found for the value ({:s}) in the enumeration ({:#x}) at operand {:d}.".format(__name__, ea, opnum, "{:#0{:d}x} & {:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width, mask, 3 + width if mask < 0 else 2 + width) if enumeration.bitfield(eid) else "{:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width), eid, opnum))
 
         # Otherwise, add it to our results and continue onto the next mask.
         else:
