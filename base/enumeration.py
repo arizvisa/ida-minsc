@@ -419,11 +419,10 @@ class members(object):
     new = create = utils.alias(add, 'members')
 
     @classmethod
-    @utils.multicase()
-    def remove(cls, enum):
-        '''Remove the specified `member` of the enumeration `enum`.'''
-        eid = by(enum)
-        mid = cls.by(eid, member)
+    @utils.multicase(mid=six.integer_types)
+    def remove(cls, mid):
+        '''Remove the member identified by `mid` from the enumeration that owns it.'''
+        eid = member.parent(mid)
         return member.remove(mid)
     @classmethod
     @utils.multicase()
