@@ -291,7 +291,7 @@ def makecall(ea=None, target=None):
 
     # FIXME: replace these crazy list comprehensions with something more comprehensible.
 #    result = ["{:s}={:s}".format(name, instruction.op_repr(ea, 0)) for name, ea in result]
-    result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea, 0), write=True), n) for n in instruction.ops_read(database.address.prevreg(ea, instruction.op_value(ea, 0), write=True))) if instruction.op_type(ea, 0) == 'reg' else instruction.op_repr(ea, 0)) for name, ea in result]
+    result = ["({:#x}){:s}={:s}".format(ea, name, ':'.join(instruction.op_repr(database.address.prevreg(ea, instruction.op_value(ea, 0), write=True), n) for n in instruction.opsi_read(database.address.prevreg(ea, instruction.op_value(ea, 0), write=True))) if instruction.op_type(ea, 0) == 'reg' else instruction.op_repr(ea, 0)) for name, ea in result]
 
     try:
         return "{:s}({:s})".format(internal.declaration.demangle(func.name(func.by_address(fn))), ','.join(result))
