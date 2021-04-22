@@ -935,6 +935,11 @@ def op_structure(ea, opnum):
 def op_structure(opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, [structure], **delta)
+@utils.multicase(opnum=six.integer_types, name=six.string_types)
+def op_structure(opnum, name, **delta):
+    '''Apply the structure with the specified `name` to the instruction operand `opnum` at the current address.'''
+    st = structure.by(name)
+    return op_structure(ui.current.address(), opnum, [st], **delta)
 @utils.multicase(opnum=six.integer_types, member=structure.member_t)
 def op_structure(opnum, member, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the current address.'''
@@ -947,6 +952,11 @@ def op_structure(opnum, path, **delta):
 def op_structure(ea, opnum, structure, **delta):
     '''Apply the specified `structure` to the instruction operand `opnum` at the address `ea`.'''
     return op_structure(ea, opnum, [structure], **delta)
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=six.string_types)
+def op_structure(ea, opnum, name, **delta):
+    '''Apply the structure with the specified `name` to the instruction operand `opnum` at the address `ea`.'''
+    st = structure.by(name)
+    return op_structure(ea, opnum, [st], **delta)
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, member=structure.member_t)
 def op_structure(ea, opnum, member, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
