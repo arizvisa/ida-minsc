@@ -341,7 +341,7 @@ def list(**type):
     maxindex = max(builtins.map(idaapi.get_enum_idx, res) if res else [1])
     maxname = max(builtins.map(utils.fcompose(idaapi.get_enum_name, len), res) if res else [0])
     maxsize = max(builtins.map(size, res) if res else [0])
-    cindex = 1 + math.floor(math.log10(maxindex or 1))
+    cindex = utils.string.digits(maxindex, 10)
     try: cmask = max(len("{:x}".format(mask(item))) for item in res) if res else database.config.bits() / 4.0
     except Exception: cmask = 0
     has_bitfield = any(map(bitfield, res)) if res else False
@@ -1013,7 +1013,7 @@ class masks(object):
         maxindex = max(len("[{:d}]".format(index)) for index, _ in enumerate(listable)) if listable else 1
         maxname = max(len(cls.name(eid, mask)) for mask in listable) if listable else 0
         maxmask = max(listable) if listable else 1
-        masksize = 2 * size(eid) if size(eid) else math.ceil(math.log(maxmask or 1, 16))
+        masksize = 2 * size(eid) if size(eid) else utils.string.digits(maxmask, 16)
 
         for i, mask in enumerate(listable):
             padding = 3 + maxname
