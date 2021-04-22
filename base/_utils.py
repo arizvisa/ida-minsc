@@ -1018,6 +1018,26 @@ class string(object):
         '''Given a list of argument names, decode them into unicode strings.'''
         return transform(cls.of, *names)
 
+    @classmethod
+    def digits(cls, number, base):
+        '''Return the number of characters used to represent the `number` of the specified `base`.'''
+        mantissa, maxpower2 = sys.float_info.mant_dig, 48
+
+        # These are combined with the mantissa and so the regular logarithm
+        # will likely be just enough to calculate it properly.
+        if base in {10}:
+            logarithm = math.log10(number or 1)
+            return 1 + math.floor(logarithm)
+
+        # These will only use the exponent field inside a floating point number
+        elif base in {2, 8, 16}:
+            logarithm = math.log(number or 1, base)
+            return math.ceil(logarithm)
+
+        # We don't support any other bases because the author doesn't feel like
+        # spending the time to figure out the correct math for this.
+        raise NotImplementedError(base)
+
 ### wrapping functions with another caller whilst preserving the wrapped function
 class wrap(object):
     """
