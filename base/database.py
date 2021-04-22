@@ -405,18 +405,16 @@ class functions(object):
             listable.append(ea)
 
         # Collect the number of digits for everything from the first pass
-        Fdigits2 = lambda number, base: math.ceil(math.log(number or 1, base))
-        Fdigits10 = lambda number: 1 + math.floor(math.log10(number or 1))
-        cindex = Fdigits10(len(listable)) if listable else 1
-        try: cmaxoffset = Fdigits2(offset(maxentry), 16)
+        cindex = utils.string.digits(len(listable), 10) if listable else 1
+        try: cmaxoffset = utils.string.digits(offset(maxentry), 16)
         except E.OutOfBoundsError: cmaxoffset = 0
-        cmaxentry, cmaxaddr, cminaddr = (Fdigits2(item, 16) for item in [maxentry, maxaddr, minaddr])
-        cchunks = Fdigits10(chunks) if chunks else 1
-        cblocks = Fdigits10(blocks) if blocks else 1
-        cexits = Fdigits10(exits) if exits else 1
-        cavars = Fdigits10(avars) if avars else 1
-        clvars = Fdigits10(lvars) if lvars else 1
-        cmarks = Fdigits10(marks) if marks else 1
+        cmaxentry, cmaxaddr, cminaddr = (utils.string.digits(item, 16) for item in [maxentry, maxaddr, minaddr])
+        cchunks = utils.string.digits(chunks, 10) if chunks else 1
+        cblocks = utils.string.digits(blocks, 10) if blocks else 1
+        cexits = utils.string.digits(exits, 10) if exits else 1
+        cavars = utils.string.digits(avars, 10) if avars else 1
+        clvars = utils.string.digits(lvars, 10) if lvars else 1
+        cmarks = utils.string.digits(marks, 10) if marks else 1
 
         # List all the fields of every single function that was matched
         for index, ea in enumerate(listable):
@@ -770,9 +768,7 @@ class names(object):
             listable.append(index)
 
         # Collect the sizes from our first pass
-        Fdigits2 = lambda number, base: math.ceil(math.log(number or 1, base))
-        Fdigits10 = lambda number: 1 + math.floor(math.log10(number or 1))
-        cindex, caddr = Fdigits10(maxindex), Fdigits2(maxaddr, 16)
+        cindex, caddr = utils.string.digits(maxindex, 10), utils.string.digits(maxaddr, 16)
 
         # List all the fields of each name that was found
         for index in listable:
@@ -1432,10 +1428,8 @@ class entries(object):
             listable.append(index)
 
         # Collect the maximum sizes for everything from the first pass
-        Fdigits2 = lambda number, base: math.ceil(math.log(number or 1, base))
-        Fdigits10 = lambda number: 1 + math.floor(math.log10(number or 1))
-        cindex = Fdigits10(maxindex)
-        caddr, cordinal = (Fdigits2(item, 16) for item in [maxaddr, maxordinal])
+        cindex = utils.string.digits(maxindex, 10)
+        caddr, cordinal = (utils.string.digits(item, 16) for item in [maxaddr, maxordinal])
 
         # List all the fields from everything that matched
         for index in listable:
@@ -2090,7 +2084,7 @@ class imports(object):
             listable.append((ea, (module, name, ordinal)))
 
         # Collect the number of digits for the maximum address extracted from the first pass
-        caddr = math.ceil(math.log(maxaddr or 1, 16))
+        caddr = utils.string.digits(maxaddr, 16)
 
         # List all the fields of every import that was matched
         prefix = '__imp_'
@@ -4913,7 +4907,7 @@ class set(object):
         # grab the aligment out of the kwarg
         if any(k in alignment for k in ['align', 'alignment']):
             align = builtins.next((alignment[k] for k in ['align', 'alignment'] if k in alignment))
-            e = math.ceil(math.log(align or 1, 2))
+            e = utils.string.digits(align, 2)
 
         # or we again...just figure it out via brute force
         else:
