@@ -1424,13 +1424,17 @@ class reftype_t(object):
     def __eq__(self, other):
         return self.__operator__(operator.eq, other)
     def __contains__(self, type):
-        if type.lower() == 'r':
-            return operator.contains(self.S, type.lower()) or operator.contains(self.S, 'w')
-        return operator.contains(self.S, type.lower())
+        if isinstance(type, six.integer_types):
+            res = self.F & type
+        else:
+            res = operator.contains(self.S, type.lower())
+        return True if res else False
     def __getitem__(self, type):
-        if type.lower() == 'r':
-            return operator.contains(self.S, type.lower()) or operator.contains(self.S, 'w')
-        return operator.contains(self.S, type.lower())
+        if isinstance(type, six.integer_types):
+            res = self.F & type
+        else:
+            res = operator.contains(self.S, type.lower())
+        return True if res else False
 
     def __iter__(self):
         for item in sorted(self.S):
@@ -1450,8 +1454,9 @@ class reftype_t(object):
         '''Convert an IDA reference type in `xrtype` to a ``reftype_t``.'''
         if not isinstance(xrtype, six.integer_types):
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.of_type({!r}) : Refusing coercion of a non-integral {!s} into the necessary type ({!s}).".format('.'.join([__name__, cls.__name__]), xrtype, xrtype.__class__, 'xrtype'))
-        res = cls.__mapper__.get(xrtype, '')
-        return cls(xrtype, (item for item in res))
+        items = cls.__mapper__.get(xrtype, '')
+        iterable = (item for item in items)
+        return cls(xrtype, iterable)
     of = of_type
 
     @classmethod
