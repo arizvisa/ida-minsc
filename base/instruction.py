@@ -307,54 +307,79 @@ def ops_state(ea):
 ops_state.read, ops_state.write = zip(*((getattr(idaapi, "CF_USE{:d}".format(1 + idx), 1 << (7 + idx)), getattr(idaapi, "CF_CHG{:d}".format(1 + idx), 1 << (1 + idx))) for idx in range(idaapi.UA_MAXOP)))
 
 @utils.multicase()
-def ops_read():
+def opsi_read():
     '''Returns the indices of any operands that are being read from by the instruction at the current address.'''
-    return ops_read(ui.current.address())
+    return opsi_read(ui.current.address())
 @utils.multicase(ea=six.integer_types)
-def ops_read(ea):
+def opsi_read(ea):
     '''Returns the indices of any operands that are being read from by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, state in enumerate(ops_state(ea)) if 'r' in state)
+@utils.multicase()
+def ops_read():
+    '''Return the operands that are being read from by the instruction at the current address.'''
+    return ops_read(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def ops_read(ea):
+    '''Return the operands that are being read from by the instruction at the current address.'''
+    return tuple(op(ea, index) for index in opsi_read(ea))
 
 @utils.multicase()
-def ops_write():
+def opsi_write():
     '''Returns the indices of the operands that are being written to by the instruction at the current address.'''
     return ops_write(ui.current.address())
 @utils.multicase(ea=six.integer_types)
-def ops_write(ea):
+def opsi_write(ea):
     '''Returns the indices of the operands that are being written to by the instruction at the address `ea`.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, state in enumerate(ops_state(ea)) if 'w' in state)
+@utils.multicase()
+def ops_write():
+    '''Return the operands that are being written to by the instruction at the current address.'''
+    return ops_write(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def ops_write(ea):
+    '''Return the operands that are being written to by the instruction at the current address.'''
+    return tuple(op(ea, index) for index in opsi_write(ea))
 
 @utils.multicase()
-def ops_constant():
+def opsi_constant():
     '''Return the indices of any operands in the current instruction that are constants.'''
     return ops_constant(ui.current.address())
 @utils.multicase(ea=six.integer_types)
-def ops_constant(ea):
+def opsi_constant(ea):
     '''Return the indices of any operands in the instruction at `ea` that are constants.'''
     ea = interface.address.inside(ea)
     return tuple(opnum for opnum, value in enumerate(ops_value(ea)) if isinstance(value, six.integer_types))
+opsi_const = utils.alias(opsi_constant)
+@utils.multicase()
+def ops_constant():
+    '''Return the operands that are being written to by the instruction at the current address.'''
+    return ops_constant(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def ops_constant(ea):
+    '''Return the operands that are being written to by the instruction at the current address.'''
+    return tuple(op(ea, index) for index in opsi_constant(ea))
 ops_const = utils.alias(ops_constant)
 
 @utils.multicase()
-def ops_register(**modifiers):
-    '''Yields the index of each operand in the instruction at the current address which uses a register.'''
+def opsi_register(**modifiers):
+    '''Returns the index of each operand in the instruction at the current address which uses a register.'''
     return ops_register(ui.current.address(), **modifiers)
-@utils.multicase()
-def ops_register(ea, **modifiers):
-    '''Yields the index of each operand in the instruction at the address `ea` which uses a register.'''
+@utils.multicase(ea=six.integer_types)
+def opsi_register(ea, **modifiers):
+    '''Returns the index of each operand in the instruction at the address `ea` which uses a register.'''
     ea = interface.address.inside(ea)
     iterops = interface.regmatch.modifier(**modifiers)
     fregisterQ = utils.fcompose(op, utils.fcondition(utils.finstance(interface.symbol_t))(utils.fcompose(utils.fattribute('symbols'), functools.partial(map, utils.finstance(interface.register_t)), any), utils.fconstant(False)))
     return tuple(filter(functools.partial(fregisterQ, ea), iterops(ea)))
 @utils.multicase(reg=(six.string_types, interface.register_t))
-def ops_register(reg, *regs, **modifiers):
-    '''Yields the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.'''
+def opsi_register(reg, *regs, **modifiers):
+    '''Returns the index of each operand in the instruction at the current address that uses `reg` or any one of the registers in `regs`.'''
     return ops_register(ui.current.address(), reg, *regs, **modifiers)
-@utils.multicase(reg=(six.string_types, interface.register_t))
-def ops_register(ea, reg, *regs, **modifiers):
-    """Yields the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
+@utils.multicase(ea=six.integer_types, reg=(six.string_types, interface.register_t))
+def opsi_register(ea, reg, *regs, **modifiers):
+    """Returns the index of each operand in the instruction at address `ea` that uses `reg` or any one of the registers in `regs`.
 
     If the keyword `write` is true, then only return the result if it's writing to the register.
     """
@@ -362,7 +387,28 @@ def ops_register(ea, reg, *regs, **modifiers):
     iterops = interface.regmatch.modifier(**modifiers)
     uses = interface.regmatch.use( (reg,) + regs )
     return tuple(filter(functools.partial(uses, ea), iterops(ea)))
-ops_reg = ops_regs = utils.alias(ops_register)
+opsi_regi = opsi_regs = opsi_registers = utils.alias(opsi_register)
+
+@utils.multicase()
+def ops_register(**modifiers):
+    '''Returns each register operand in the instruction at the current address.'''
+    return ops_register(ui.current.address())
+@utils.multicase(ea=six.integer_types)
+def ops_register(ea, **modifiers):
+    '''Returns each register operand in the instruction at the current address.'''
+    return tuple(op(ea, index) for index in opsi_register(ea, **modifiers))
+@utils.multicase(reg=(six.string_types, interface.register_t))
+def ops_register(reg, *regs, **modifiers):
+    '''Returns each register operand in the instruction at the current address that is `reg` or any one of the registers in `regs`.'''
+    return ops_register(ui.current.address(), reg, *regs, **modifiers)
+@utils.multicase(ea=six.integer_types, reg=(six.string_types, interface.register_t))
+def ops_register(ea, reg, *regs, **modifiers):
+    """Returns each register operand in the instruction at the address `ea` that is `reg` or any one of the registers in `regs`.'''
+
+    If the keyword `write` is true, then only return the result if it's writing to the register.
+    """
+    return tuple(op(ea, index) for index in opsi_register(ea, reg, *regs, **modifiers))
+ops_reg = ops_regs = ops_registers = utils.alias(ops_register)
 
 ## functions vs a specific operand of an insn
 @utils.multicase(opnum=six.integer_types)
