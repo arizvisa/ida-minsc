@@ -523,8 +523,9 @@ def op_number(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
-    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
+    bits = utils.string.digits(idaapi.BADADDR, 2)
+    maximum, flag = pow(2, bits), pow(2, bits - 1)
+    integer = (res.addr - maximum) if res.addr & flag else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
@@ -554,8 +555,9 @@ def op_character(ea, opnum):
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
     else:
-        maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
-        integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
+        bits = utils.string.digits(idaapi.BADADDR, 2)
+        maximum, flag = pow(2, bits), pow(2, bits - 1)
+        integer = (res.addr - maximum) if res.addr & flag else res.addr
 
         # Now we can use the value transformed if the operand has an inverted sign
         result = 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
@@ -599,8 +601,9 @@ def op_binary(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
-    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
+    bits = utils.string.digits(idaapi.BADADDR, 2)
+    maximum, flag = pow(2, bits), pow(2, bits - 1)
+    integer = (res.addr - maximum) if res.addr & flag else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
@@ -629,8 +632,9 @@ def op_octal(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
-    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
+    bits = utils.string.digits(idaapi.BADADDR, 2)
+    maximum, flag = pow(2, bits), pow(2, bits - 1)
+    integer = (res.addr - maximum) if res.addr & flag else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
@@ -659,8 +663,9 @@ def op_decimal(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
-    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
+    bits = utils.string.digits(idaapi.BADADDR, 2)
+    maximum, flag = pow(2, bits), pow(2, bits - 1)
+    integer = (res.addr - maximum) if res.addr & flag else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
@@ -689,8 +694,9 @@ def op_hexadecimal(ea, opnum):
 
     # If the signed-flag is set in our operand, then convert it into its actual
     # signed value.
-    maximum = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
-    integer = (res.addr - maximum) if res.addr & (maximum // 2) else res.addr
+    bits = utils.string.digits(idaapi.BADADDR, 2)
+    maximum, flag = pow(2, bits), pow(2, bits - 1)
+    integer = (res.addr - maximum) if res.addr & flag else res.addr
 
     # Now we can return the value transformed if the operand has an inverted sign
     return 0 if integer == 0 else (maximum + integer) if signed and integer < 0 else (integer - maximum) if signed else integer
@@ -772,13 +778,14 @@ def op_structure(ea, opnum):
 
     # Figure out the offset for the structure member if it's an immediate value
     if op.type in {idaapi.o_imm}:
-        max = pow(2, op_bits(ea, opnum))
-        offset = op.value & (max - 1)
+        maximum = pow(2, op_bits(ea, opnum))
+        offset = op.value & (maximum - 1)
 
     # Otherwise, this could be a signed operand and it needs to be converted.
     else:
-        max = pow(2, math.ceil(math.log(idaapi.BADADDR, 2.)))
-        offset = (op.addr - max) if op.addr & (max // 2) else op.addr
+        bits = utils.string.digits(idaapi.BADADDR, 2)
+        maximum, flag = pow(2, bits), pow(2, bits - 1)
+        offset = (op.addr - maximum) if op.addr & flag else op.addr
 
     # Check to see if this is a stack variable, because we'll need to
     # handle it differently if so.
@@ -1048,7 +1055,7 @@ def op_enumeration(ea, opnum):
         # If that still didn't work, then this is an error and we need to warn the
         # user about it.
         if mid == idaapi.BADNODE:
-            ok, width = False, 2 * enumeration.size(eid) if enumeration.size(eid) else math.ceil(math.log(max(masks), 16))
+            ok, width = False, 2 * enumeration.size(eid) if enumeration.size(eid) else utils.string.digits(max(masks), 16)
             logging.warn(u"{:s}.op_enumeration({:#x}, {:d}) : No enumeration member was found for the value ({:s}) in the enumeration ({:#x}) at operand {:d}.".format(__name__, ea, opnum, "{:#0{:d}x} & {:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width, mask, 3 + width if mask < 0 else 2 + width) if enumeration.bitfield(eid) else "{:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width), eid, opnum))
 
         # Otherwise, add it to our results and continue onto the next mask.
