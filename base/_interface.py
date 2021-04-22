@@ -1354,11 +1354,11 @@ class regmatch(object):
 
         # if `read` is specified, then only grab operand indexes that are read from
         if modifiers.get('read', False):
-            iterops = _instruction.ops_read
+            iterops = _instruction.opsi_read
 
         # if `write` is specified that only grab operand indexes that are written to
         if modifiers.get('write', False):
-            iterops = _instruction.ops_write
+            iterops = _instruction.opsi_write
         return iterops
 
 ## figure out the boundaries of sval_t
