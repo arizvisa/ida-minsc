@@ -107,8 +107,8 @@ def list(**type):
     # to use different algorithms as due to Python's issues with imprecision,
     # the resulting number of digits will vary depending on what base is
     # actually being used when calculating the logarithm.
-    cindex = 1 + math.floor(math.log10(maxindex or 1))
-    caddr, csize = map(math.ceil, (math.log(item or 1, 16) for item in [maxaddr, maxsize]))  # taking the ceiling only works for powers of 2
+    cindex = utils.string.digits(maxindex, 10)
+    caddr, csize = (utils.string.digits(item, 10) for item in [maxaddr, maxsize])
 
     # List all the fields for each segment that we've aggregated
     for seg in listable:
@@ -167,7 +167,7 @@ def by(**type):
     listable = [item for item in __iterate__(**type)]
     if len(listable) > 1:
         maxaddr = max(builtins.map(interface.range.end, listable) if listable else [1])
-        caddr = math.ceil(math.log(maxaddr or 1, 16))   # only works with powers of 16
+        caddr = utils.string.digits(maxaddr, 16)
         messages = ((u"[{:d}] {:0{:d}x}:{:0{:d}x} {:s} {:+#x} sel:{:04x} flags:{:02x}".format(seg.index, interface.range.start(seg), math.trunc(caddr), interface.range.end(seg), math.trunc(caddr), utils.string.of(get_segment_name(seg)), seg.size(), seg.sel, seg.flags)) for seg in listable)
         [ logging.info(msg) for msg in messages ]
         logging.warning(u"{:s}.by({:s}) : Found {:d} matching results. Returning the first segment at index {:d} from {:0{:d}x}<>{:0{:d}x} with the name {:s} and size {:+#x}.".format(__name__, searchstring, len(listable), listable[0].index, interface.range.start(listable[0]), math.trunc(caddr), interface.range.end(listable[0]), math.trunc(caddr), utils.string.of(get_segment_name(listable[0])), listable[0].size()))
