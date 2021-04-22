@@ -3798,6 +3798,68 @@ class type(object):
 
 t = type    # XXX: ns alias
 
+class types(object):
+    """
+    This namespace is for interacting with the local types that are
+    defined within the database. The functions within this namespace
+    can be used to create, query, or fetch the types that have been
+    defined.
+    """
+
+    @utils.multicase()
+    @classmethod
+    def __iterate__(cls):
+        til = idaapi.get_idati()
+        return cls.__iterate__(til)
+    @utils.multicase(library=idaapi.til_t)
+    @classmethod
+    def __iterate__(cls, library):
+        count = idaapi.get_ordinal_qty(library)
+        for ordinal in builtins.range(1, count):
+            yield ordinal
+        return
+
+    @utils.multicase()
+    @classmethod
+    def get(cls, ordinal):
+        til = idaapi.get_idati()
+        return cls.get(ordinal, til)
+    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+    @classmethod
+    def get(cls, ordinal, library):
+        if 0 < ordinal < idaapi.get_ordinal_qty(library):
+            parameters = idaapi.get_numbered_type(library, ordinal)
+            name = idaapi.get_numbered_type_name(library, ordinal)
+            return (name, parameters) if parameters else None
+        return None
+    @utils.multicase(name=six.string_types, library=idaapi.til_t)
+    @classmethod
+    def get(cls, name, library):
+        ordinal = idaapi.get_type_ordinal(library, name)
+        return cls.get(ordinal, library)
+
+    @utils.multicase(ordinal=six.integer_types)
+    @classmethod
+    def set(cls, ordinal, name, parameters):
+        til = idaapi.get_idati()
+        return cls.set(ordinal, name, parameters, til)
+    @utils.multicase(ordinal=six.integer_types, library=idaapi.til_t)
+    @classmethod
+    def set(cls, ordinal, name, parameters, library):
+        flags, count = idaapi.NTF_TYPE, 1 + idaapi.get_ordinal_qty(library)
+        if 0 < ordinal < count:
+            flags |= idaapi.NTF_REPLACE
+        elif 0 < ordinal:
+            new = idaapi.alloc_type_ordinals(library, ordinal - count)
+        else:
+            raise ValueError(ordinal)
+
+        ok = idaapi.set_numbered_type(library, ordinal, flags, name, *parameters)
+        if ok != idaapi.TERR_OK:
+            raise ValueError(ok)
+            return ok
+        return ok
+
 ## information about a given address
 size = utils.alias(type.size, 'type')
 is_code = utils.alias(type.is_code, 'type')
