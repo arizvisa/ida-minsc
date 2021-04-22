@@ -1021,7 +1021,9 @@ class string(object):
     @classmethod
     def digits(cls, number, base):
         '''Return the number of characters used to represent the `number` of the specified `base`.'''
-        mantissa, maxpower2 = sys.float_info.mant_dig, 48
+        fi = sys.float_info
+        mantissa, exponent = fi.mant_dig, fi.max_exp - fi.min_exp
+        maxpower2 = mantissa - sys.float_info.dig + math.floor(math.log(exponent, 2))
 
         # These are combined with the mantissa and so the regular logarithm
         # will likely be just enough to calculate it properly.
@@ -1029,10 +1031,20 @@ class string(object):
             logarithm = math.log10(number or 1)
             return 1 + math.floor(logarithm)
 
-        # These will only use the exponent field inside a floating point number
-        elif base in {2, 8, 16}:
+        # Otherwise, we check if it's an even number or not in order to determine
+        # that we need to use the base-less math.log implementation.
+        elif not math.remainder(base, 2):
             logarithm = math.log(number or 1, base)
-            return math.ceil(logarithm)
+
+            # This should only use the exponent field inside a floating point number
+            if number < pow(2, maxpower2):
+                return 1 + math.floor(logarithm)
+
+            # To deal with IEEE754's imprecision, we just use Python to format
+            # this number as a hexadecimal string and then use its length to
+            # figure out how many digits are needed for the desired base.
+            count = len("{:b}".format(number))
+            return count * 2 // base
 
         # We don't support any other bases because the author doesn't feel like
         # spending the time to figure out the correct math for this.
