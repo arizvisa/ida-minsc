@@ -397,6 +397,35 @@ class members(object):
             continue
         return
 
+    @utils.multicase(name=six.string_types)
+    @classmethod
+    @utils.string.decorate_arguments('name')
+    def has(cls, enum, name):
+        '''Return whether the enumeration `enum` contains a member with the specified `name`.'''
+        eid = by(enum)
+        try:
+            cls.by_name(eid, name)
+        except E.MemberNotFoundError:
+            return False
+        return True
+    @utils.multicase(value=six.integer_types)
+    @classmethod
+    def has(cls, enum, value, **bitmask):
+        """Return whether the enumeration `enum` contains a member with the specified `value`.
+
+        If an integral is provided for `bitmask` or `serial`, then only return true if the member is within the specified bitmask, or uses the provided serial.
+        """
+        eid = by(enum)
+        iterable = (mid for mid in cls.iterate(eid))
+        iterable = ((member.value(mid), member.mask(mid), member.serial(mid)) for mid in iterable)
+        for item, mask, cid in iterable:
+            if (item, mask) == (value, bitmask.get('bitmask', idaapi.DEFMASK)):
+                if bitmask['serial'] == cid if 'serial' in bitmask else True:
+                    return True
+                continue
+            continue
+        return False
+
     ## scope
     @classmethod
     @utils.string.decorate_arguments('name')
