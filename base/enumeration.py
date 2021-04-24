@@ -856,7 +856,6 @@ class member(object):
         '''Return the value of the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.value({:#x}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, mid))
-        CONST_VALUE = -3
         return idaapi.get_enum_member_value(mid)
     @utils.multicase()
     @classmethod
@@ -870,15 +869,44 @@ class member(object):
     def value(cls, mid, value, **bitmask):
         """Set the `value` for the enumeration `member` belonging to `enum`.
 
-        If the integer `bitmask` is specified, then use it as a bitmask. Otherwise assume all bits are set.
+        If the integer `bitmask` is specified, then use it as a bitmask for the bitfield. Otherwise assume all the available bits are set.
         """
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid))
+        eid = cls.parent(mid)
 
-        bmask = bitmask.get('bitmask', idaapi.DEFMASK)
-        res, ok = idaapi.get_enum_member_value(mid), idaapi.set_enum_member_value(mid, value, bmask)
+        # Figure out the actual altval index that contains the value we want to modify
+        CONST_VALUE, CONST_BMASK = -3, -6
+        altidx_value, altidx_bmask = (idaapi.as_signed(item, utils.string.digits(idaapi.BADADDR, 2)) & idaapi.BADADDR for item in [CONST_VALUE, CONST_BMASK])
+
+        # Calculate what the value is according to the mask that we were given, if we
+        # weren't given one, then steal it from its altval whilst falling back to the
+        # default mask if one wasn't found.
+        emask = pow(2, size(eid) * 8) - 1 if size(eid) else idaapi.DEFMASK
+        bmask = bitmask.get('bitmask', internal.netnode.alt.get(mid, altidx_bmask) - 1 if internal.netnode.alt.has(mid, altidx_bmask) else idaapi.DEFMASK)
+        altval_value, altval_bmask = emask & value & bmask, idaapi.BADADDR & emask & bmask
+
+        # Now we can grab the previous value, and then assign the new one. After the
+        # assignment, we can then just return our result and be good to go.
+        res, ok = idaapi.get_enum_member_value(mid), internal.netnode.alt.set(mid, altidx_value, altval_value)
         if not ok:
             raise E.DisassemblerError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to set the value for the specified member ({:#x}) to {:#x}{:s}.".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid, value, u" & {:#x}".format(bmask) if bmask else u''))
+
+        # If we're a bitfield, then we need to set the mask that we calculated too. We
+        # add one because it seems that IDA does that when writing to the altval.
+        if bitfield(eid):
+            ok = internal.netnode.alt.set(mid, altidx_bmask, 1 + altval_bmask)
+
+        # Otherwise, we're not a bitfield and so if it exists for some reason then we'll
+        # just remove it for the sake of completion.
+        else:
+            ok = internal.netnode.alt.remove(mid, altidx_bmask) if internal.netnode.alt.has(mid, altidx_bmask) else True
+
+        # Check that we were able to clear the bitmask for the enumberation member, and
+        # if so then we can return the previous enumeration value we fetched.
+        if not ok:
+            verb = 'set' if bitfield(eid) else 'clear'
+            raise E.DisassemblerError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to {:s} the bitmask at the altidx {:#x} for the specified member ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', verb, altidx_bmask, mid))
         return res
     @utils.multicase(value=six.integer_types)
     @classmethod
@@ -978,8 +1006,6 @@ class masks(object):
         '''Return the name for the given `mask` belonging to the enumeration `enum`.'''
         eid = by(enum)
         res = idaapi.get_bmask_name(eid, mask)
-        if res is None:
-            raise E.DisassemblerError(u"{:s}.name({!r}, {:#x}) : Unable to get the name for the requested mask ({:#0{:d}x}) from the enumeration ({:#x}).".format('.'.join([__name__, cls.__name__]), enum, mask, mask, 2 + 2 * size(eid), eid))
         return utils.string.of(res) or ''
     @utils.multicase(mask=six.integer_types, name=(six.string_types, tuple))
     @classmethod
