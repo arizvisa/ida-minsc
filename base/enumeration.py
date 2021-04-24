@@ -866,11 +866,8 @@ class member(object):
         return cls.value(mid)
     @utils.multicase(mid=six.integer_types, value=six.integer_types)
     @classmethod
-    def value(cls, mid, value, **bitmask):
-        """Set the `value` for the enumeration `member` belonging to `enum`.
-
-        If the integer `bitmask` is specified, then use it as a bitmask for the bitfield. Otherwise assume all the available bits are set.
-        """
+    def value(cls, mid, value):
+        '''Assign the integer specified by `value` to the enumeration member `mid`.'''
         if not interface.node.is_identifier(mid):
             raise E.MemberNotFoundError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to locate a member with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid))
         eid = cls.parent(mid)
@@ -879,45 +876,26 @@ class member(object):
         CONST_VALUE, CONST_BMASK = -3, -6
         altidx_value, altidx_bmask = (idaapi.as_signed(item, utils.string.digits(idaapi.BADADDR, 2)) & idaapi.BADADDR for item in [CONST_VALUE, CONST_BMASK])
 
-        # Calculate what the value is according to the mask that we were given, if we
-        # weren't given one, then steal it from its altval whilst falling back to the
-        # default mask if one wasn't found.
-        emask = pow(2, size(eid) * 8) - 1 if size(eid) else idaapi.DEFMASK
-        bmask = bitmask.get('bitmask', internal.netnode.alt.get(mid, altidx_bmask) - 1 if internal.netnode.alt.has(mid, altidx_bmask) else idaapi.DEFMASK)
-        altval_value, altval_bmask = emask & value & bmask, idaapi.BADADDR & emask & bmask
+        # Fetch the mask for the enumeration, and then for the actual member. We don't
+        # actually let the user modify the bitmask because it seems that IDA's bmask
+        # enumeration api doesn't work in the same way when an enumeration member's
+        # CONST_BMASK altval is modified.
+        emask, bmask = pow(2, size(eid) * 8) - 1 if size(eid) else idaapi.DEFMASK, internal.netnode.alt.get(mid, altidx_bmask) - 1 if internal.netnode.alt.has(mid, altidx_bmask) else idaapi.DEFMASK
+        altval_value = emask & value & bmask
 
         # Now we can grab the previous value, and then assign the new one. After the
         # assignment, we can then just return our result and be good to go.
         res, ok = idaapi.get_enum_member_value(mid), internal.netnode.alt.set(mid, altidx_value, altval_value)
         if not ok:
             raise E.DisassemblerError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to set the value for the specified member ({:#x}) to {:#x}{:s}.".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', mid, value, u" & {:#x}".format(bmask) if bmask else u''))
-
-        # If we're a bitfield, then we need to set the mask that we calculated too. We
-        # add one because it seems that IDA does that when writing to the altval.
-        if bitfield(eid):
-            ok = internal.netnode.alt.set(mid, altidx_bmask, 1 + altval_bmask)
-
-        # Otherwise, we're not a bitfield and so if it exists for some reason then we'll
-        # just remove it for the sake of completion.
-        else:
-            ok = internal.netnode.alt.remove(mid, altidx_bmask) if internal.netnode.alt.has(mid, altidx_bmask) else True
-
-        # Check that we were able to clear the bitmask for the enumberation member, and
-        # if so then we can return the previous enumeration value we fetched.
-        if not ok:
-            verb = 'set' if bitfield(eid) else 'clear'
-            raise E.DisassemblerError(u"{:s}.value({:#x}, {:#x}{:s}) : Unable to {:s} the bitmask at the altidx {:#x} for the specified member ({:#x}).".format('.'.join([__name__, cls.__name__]), mid, value, u", {:s}".format(utils.string.kwargs(bitmask)) if bitmask else u'', verb, altidx_bmask, mid))
         return res
     @utils.multicase(value=six.integer_types)
     @classmethod
     def value(cls, enum, member, value, **bitmask):
-        """Set the `value` for the enumeration `member` belonging to `enum`.
-
-        If the integer `bitmask` is specified, then use it as a bitmask. Otherwise assume all bits are set.
-        """
+        '''Set the `value` for the enumeration `member` belonging to `enum`.'''
         eid = by(enum)
         mid = members.by(eid, member)
-        return cls.value(mid, value, **bitmask)
+        return cls.value(mid, value)
 
     @utils.multicase(mid=six.integer_types)
     @classmethod
