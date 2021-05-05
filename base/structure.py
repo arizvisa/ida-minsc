@@ -440,13 +440,17 @@ class structure_t(object):
         return res
 
     @property
+    def ptr(self):
+        '''Return the pointer of the ``idaapi.struc_t``.'''
+        return idaapi.get_struc(self.id)
+    @property
     def id(self):
         '''Return the identifier of the structure.'''
         return self.__id__
     @property
-    def ptr(self):
-        '''Return the pointer of the ``idaapi.struc_t``.'''
-        return idaapi.get_struc(self.id)
+    def properties(self):
+        '''Return the properties for the current structure.'''
+        return self.ptr.props
     @property
     def members(self):
         '''Return the members belonging to the structure.'''
@@ -1609,6 +1613,10 @@ class member_t(object):
     def id(self):
         '''Return the identifier of the member.'''
         return self.ptr.id
+    @property
+    def properties(self):
+        '''Return the properties for the current member.'''
+        return self.ptr.props
     @property
     def size(self):
         '''Return the size of the member.'''
