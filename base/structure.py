@@ -226,6 +226,19 @@ by_id = byidentifier = byId = utils.alias(by_identifier)
 ## FIXME: need to add support for a union_t. add_struc takes another parameter
 ##        that defines whether a structure is a union or not.
 
+@utils.multicase(id=six.integer_types)
+def is_union(id):
+    '''Return whether the structure identified by `id` is a union or not.'''
+    structure = idaapi.get_struc(id)
+    return is_union(id)
+@utils.multicase()
+def is_union(structure):
+    '''Return whether the provided `structure` is defined as a union.'''
+    if isinstance(structure, structure_t):
+        return is_union(structure.ptr)
+    return structure.is_union()
+unionQ = isunion = utils.alias(is_union)
+
 ### structure_t abstraction
 class structure_t(object):
     """
@@ -775,37 +788,51 @@ def members(id):
     """
 
     st = idaapi.get_struc(id)
-    if not st:
-        # empty structure
-        return
 
-    size = idaapi.get_struc_size(st)
+    # If we couldn't get the structure, then blow up in the user's face.
+    if st is None:
+        raise E.StructureNotFoundError(u"{:s}.members({:#x}) : Unable to find the requested structure ({:#x}).".format(__name__, id, id))
 
-    # iterate through the number of members belonging to the struct
+    # Grab some attributes like the structure's size, and whether or not
+    # it's a union so that we can figure out each member's offset.
+    size, unionQ = idaapi.get_struc_size(st), st.is_union()
+
+    # Iterate through all of the member in the structure.
     offset = 0
     for i in range(st.memqty):
 
-        # grab the member and its size
+        # Grab the member and its properties.
         m = st.get_member(i)
-        ms = idaapi.get_member_size(m)
+        msize, munionQ = idaapi.get_member_size(m), m.props & idaapi.MF_UNIMEM
 
-        # grab the member's boundaries
-        left, right = m.soff, m.eoff
+        # Figure out the boundaries of the member. If our structure is a union,
+        # then the starting offset never changes since IDA dual-uses it as the
+        # member index.
+        left, right = offset if unionQ else m.soff, m.eoff
 
-        # if our offset doesn't match the beginning of the member, then
-        # this is padding that is undefined or unamed which we need to
-        # yield to the caller.
+        # If our current offset does not match the member's starting offset,
+        # then this is an empty field, or undefined. We yield this to the caller
+        # so that they know that there's some padding they need to know about.
         if offset < left:
             yield (offset, left - offset), (None, None, None)
             offset = left
 
-        # grab the member's attributes
+        # Grab the attributes about the member that we plan on yielding.
         iterable = (utils.string.of(cmt) for cmt in [idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1)])
         items = builtins.tuple(iterable)
 
-        # yield our current position and iterate to the next member
-        yield (offset, ms), items
-        offset += ms
+        # That was everything that our caller should care about, so we can
+        # just yield it and continue onto the next member.
+        yield (offset, msize), items
+
+        # If we're a union, then the offset just never changes. Continue onto
+        # the next member without updating it.
+        if unionQ:
+            continue
+
+        # Otherwise we're a regular member and we need to move onto the next
+        # offset in our structure.
+        offset += msize
     return
 
 @utils.multicase(structure=structure_t, offset=six.integer_types, size=six.integer_types)
@@ -827,25 +854,25 @@ def fragment(id, offset, size):
     comment whereas `repeatable` contains the member's `repeatable`
     comment.
     """
-    member = members(id)
+    iterable, unionQ = members(id), is_union(id)
 
     # seek
-    for item in member:
+    for item in iterable:
         (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
 
         left, right = m_offset, m_offset + m_size
         if (offset >= left) and (offset < right):
             yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
-            size -= m_size
+            size -= 0 if unionQ else m_size
             break
         continue
 
     # return
-    for item in member:
+    for item in iterable:
         if size > 0:
             (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
             yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
-            size -= m_size
+            size -= 0 if unionQ else m_size
         continue
     return
 
