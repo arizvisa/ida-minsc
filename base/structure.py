@@ -51,6 +51,21 @@ from internal import utils, interface, exceptions as E
 
 import idaapi
 
+@utils.multicase(id=six.integer_types)
+def has(id):
+    '''Return whether a structure with the specified `id` exists within the database.'''
+    return True if interface.node.is_identifier(id) and idaapi.get_struc(id) else False
+@utils.multicase(name=six.string_types)
+@utils.string.decorate_arguments('name')
+def has(name):
+    '''Return if a structure with the specified `name` exists within the database.'''
+    res = utils.string.to(name)
+    return has(idaapi.get_struc_id(res))
+@utils.multicase(structure=idaapi.struc_t)
+def has(structure):
+    '''Return whether the database includes the provided `structure`.'''
+    return has(structure.id)
+
 def __instance__(identifier, **options):
     '''Create a new instance of the structure identified by `identifier`.'''
     # check to see if the structure cache has been initialized
