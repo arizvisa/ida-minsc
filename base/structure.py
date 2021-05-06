@@ -1449,10 +1449,10 @@ class members_t(object):
         owner = self.owner
 
         # Start by getting our bounds.
-        minimum, maximum = idaapi.get_struc_first_offset(owner.ptr), idaapi.get_struc_last_offset(owner.ptr)
-        if (offset < minimum) or (offset >= maximum):
+        minimum, maximum = self.realbounds
+        if not (minimum <= offset < maximum):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
+            logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
 
         # Try and find the exact offset, because if we can..then we don't need
         # to execute the rest of this function.
@@ -1493,13 +1493,15 @@ class members_t(object):
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` at the end of the structure.'''
 
-        # If this structure is not a union, then we can calculate the offset
-        # to add the member at, and proceed as we were asked.
-        if not is_union(self.ptr):
-            offset = self.owner.size + self.baseoffset
-            return self.add(name, type, offset)
+        # If this structure is a union, then the offset is always 0.
+        if is_union(self.ptr):
+            return self.add(name, type, 0)
 
-        raise NotImplementedError
+        # Otherwise, it's not a union and so we'll just calculate
+        # the offset to add the member at, and proceed as asked.
+        offset = self.owner.size + self.baseoffset
+        return self.add(name, type, offset)
+
     @utils.multicase(name=(six.string_types, tuple), offset=six.integer_types)
     @utils.string.decorate_arguments('name')
     def add(self, name, type, offset):
@@ -1511,9 +1513,9 @@ class members_t(object):
 
         # Check if the user is trying to add a union, if so then we need to
         # raise an exception so the user doesn't try to do it again.
-        if self.ptr.is_union():
+        if self.ptr.is_union() and offset:
             cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to add a member at the given offset ({:#x}) due to structure being a union.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, offset))
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to add a member at a non-zero offset ({:#x}) due to the structure being a union.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, offset))
 
         # FIXME: handle .strtype (strings), .ec (enums), .cd (custom)
         opinfo = idaapi.opinfo_t()
@@ -1525,7 +1527,8 @@ class members_t(object):
             cls = self.__class__
             logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Name is undefined, defaulting to offset {:+#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, realoffset))
             name = 'v', realoffset
-        if isinstance(name, tuple):
+
+        if isinstance(name, builtins.tuple):
             name = interface.tuplename(*name)
 
         # try and add the structure memberb
@@ -1567,10 +1570,23 @@ class members_t(object):
     @utils.multicase()
     def remove(self, offset):
         '''Remove the member at `offset` from the structure.'''
-        return idaapi.del_struc_member(self.owner.ptr, offset - self.baseoffset)
+        items = [mptr for mptr in self.__members_at__(offset - self.baseoffset)]
+
+        # If there are no items at the requested offset, then we bail.
+        if not items:
+            cls = self.__class__
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), self.owner.id, offset, offset))
+
+        # If more than one item was found, then we also need to bail.
+        if len(items) > 1:
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.remove({:+#x}) : Refusing to remove more than {:d} member{:s} ({:d}) at offset {:#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, offset, 1, '' if len(items) == 1 else 's', len(items), offset))
+
+        # Now we know exactly what we can remove.
+        item, = items
+        return idaapi.del_struc_member(self.owner.ptr, item.soff)
     @utils.multicase()
     def remove(self, offset, size):
-        '''Remove all the members from the structure from `offset` up to `size`.'''
+        '''Remove all the members from the structure from the specified `offset` up to `size` bytes.'''
         res = offset - self.baseoffset
         return idaapi.del_struc_members(self.owner.ptr, res, res + size)
 
@@ -1771,8 +1787,8 @@ class member_t(object):
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
-        m = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
-        return 0 if m is None else m.flag
+        mptr = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
+        return 0 if mptr is None else mptr.flag
     @property
     def fullname(self):
         '''Return the fullname of the member.'''
@@ -1782,12 +1798,10 @@ class member_t(object):
     def typeid(self):
         '''Return the identifier of the type of the member.'''
         opinfo = idaapi.opinfo_t()
-        if idaapi.__version__ < 7.0:
-            res = idaapi.retrieve_member_info(self.ptr, opinfo)
-            return None if res is None else res.tid if res.tid != idaapi.BADADDR else None
-        else:
-            res = idaapi.retrieve_member_info(opinfo, self.ptr)
-        return None if opinfo.tid == idaapi.BADADDR else opinfo.tid
+        res = idaapi.retrieve_member_info(self.ptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, self.ptr)
+        if res:
+            return None if res.tid == idaapi.BADADDR else res.tid
+        return None
     @property
     def index(self):
         '''Return the index of the member.'''
@@ -1795,25 +1809,24 @@ class member_t(object):
     @property
     def left(self):
         '''Return the beginning offset of the member.'''
-        # FIXME
-        return self.ptr.soff
+        left, _ = self.bounds
+        return left
     @property
     def right(self):
         '''Return the ending offset of the member.'''
-        # FIXME
-        return self.ptr.eoff
+        _, right = self.bounds
+        return right
     @property
     def realbounds(self):
         '''Return the real boundaries of the member.'''
-        # FIXME
-        ptr = self.ptr
-        return interface.bounds_t(ptr.soff, ptr.eoff)
+        sptr, mptr = self.parent.ptr, self.ptr
+        return interface.bounds_t(0 if sptr.is_union() else mptr.soff, mptr.eoff)
     @property
     def bounds(self):
         '''Return the boundaries of the member.'''
-        # FIXME
-        ptr, base = self.ptr, self.parent.members.baseoffset
-        return interface.bounds_t(ptr.soff, ptr.eoff).translate(base)
+        parent = self.parent
+        bounds, base = self.realbounds, parent.members.baseoffset
+        return bounds.translate(base)
     @property
     def parent(self):
         '''Return the structure_t that owns the member.'''
