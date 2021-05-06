@@ -702,6 +702,16 @@ class structure_t(object):
             raise TypeError(member)
         return member in self.members
 
+    @property
+    def realbounds(self):
+        sptr = self.ptr
+        return interface.bounds_t(0, idaapi.get_struc_size(self.ptr))
+
+    @property
+    def bounds(self):
+        bounds, base = self.realbounds, self.members.baseoffset
+        return bounds.translate(base)
+
 @utils.multicase()
 def name(id):
     '''Return the name of the structure identified by `id`.'''
@@ -1160,7 +1170,7 @@ class members_t(object):
 
         # Start out by getting our bounds, and translating them to our relative
         # offset.
-        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), self.realbounds)
+        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), owner.realbounds)
 
         # Guard against a potential OverflowError that would be raised by SWIG's typechecking
         if not (minimum <= self.baseoffset < maximum):
@@ -1442,7 +1452,7 @@ class members_t(object):
         owner = self.owner
 
         # Start by getting our bounds.
-        minimum, maximum = self.realbounds
+        minimum, maximum = owner.realbounds
         if not (minimum <= offset < maximum):
             cls = self.__class__
             logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
