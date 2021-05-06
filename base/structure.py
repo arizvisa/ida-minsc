@@ -669,13 +669,13 @@ class structure_t(object):
 
     def __str__(self):
         '''Display the structure in a readable format.'''
-        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment or '', self.tag()
-        return "<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
+        return "<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __unicode__(self):
         '''Display the structure in a readable format.'''
-        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment or '', self.tag()
-        return u"<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
+        return u"<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __repr__(self):
         return u"{!s}".format(self)
@@ -1373,8 +1373,11 @@ class members_t(object):
         return self[index]
     by_id = byid = byidentifier = utils.alias(by_identifier, 'members_t')
 
-    def __walk_to_realoffset__(self, offset):
-        '''Descend into the structure collecting the fields to get to the specified `offset`.'''
+    def __walk_to_realoffset__(self, offset, filter=lambda sptr, items: items):
+        """Descend into the structure collecting the fields to get to the specified `offset`.
+
+        If a closure is passed as the `filter` parameter, then use the function to filter the members to use when descending into a structure.
+        """
         owner = self.owner
 
         # Grab the type information for a member, and convert it to
@@ -1401,18 +1404,25 @@ class members_t(object):
         # IDA will give us. We'll use this member to begin our descent.
         members = items or [self.near_realoffset(offset).ptr]
 
-        # If we received multiple members for this specific offset, then
-        # we need to do some special processing to figure out which member
-        # we're at.
-        if len(members) > 1:
-            iterable = (self.by_identifier(mptr.id) for mptr in members)
-            print('\n'.join(map(repr, iterable)))
-            raise NotImplementedError
+        # If we received multiple members for this specific offset, which
+        # should only happen if we're in a union, then we need to do some
+        # special processing in order to figure out which member we should
+        # use. We do this by using our filter parameter when we find more
+        # than one member in order to allow the caller to explicitly filter
+        # our discovered candidates.
+        F = filter or (lambda structure, items: items)
+        filtered = F(owner.ptr, members) if len(members) > 1 else members
+
+        # If we still do not have a single result after filtering, then
+        # we terminate our traversal here and return the offset that we
+        # were unable to do anything with.
+        if len(filtered) != 1:
+            return (), offset
 
         # Otherwise we found a single item, then we just need to know if
         # we need to continue recursing into something and what exactly
         # we're recursing into.
-        mptr, = members
+        mptr, = filtered
         mtype, moffset = dissolve(mptr), 0 if owner.ptr.is_union() else mptr.soff
 
         # If our member type is an array, then we need to do some things
@@ -1442,7 +1452,7 @@ class members_t(object):
             sptr = idaapi.get_sptr(mptr)
             if sptr:
                 st = __instance__(sptr.id, offset=self.baseoffset + moffset + res)
-                suffix, nextoffset = st.members.__walk_to_realoffset__(bytes)
+                suffix, nextoffset = st.members.__walk_to_realoffset__(bytes, filter=filter)
                 return prefix + [item for item in suffix], offset - (moffset + res + bytes - nextoffset)
 
             # We have no idea what type this is, so just bail.
@@ -1461,7 +1471,7 @@ class members_t(object):
         # offset. Afterwards, we then shift the relative offset back
         # into a real offset so that we can collect it in the result.
         st = __instance__(sptr.id, offset=self.baseoffset + moffset)
-        result, nextoffset = st.members.__walk_to_realoffset__(offset - moffset)
+        result, nextoffset = st.members.__walk_to_realoffset__(offset - moffset, filter=filter)
 
         # If we haven't encountered a list yet, then our prefix will
         # still be a tuple and we need to ensure it's the correct type.
