@@ -1172,8 +1172,9 @@ class members_t(object):
         # offset.
         minimum, maximum = map(functools.partial(operator.add, self.baseoffset), owner.realbounds)
 
-        # Guard against a potential OverflowError that would be raised by SWIG's typechecking
-        if not (minimum <= self.baseoffset < maximum):
+        # Make sure that the requested offset is within the boundaries of our
+        # structure, and bail if it isn't.
+        if not (minimum <= offset < maximum):
             cls = self.__class__
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset))
 
@@ -1188,9 +1189,10 @@ class members_t(object):
         """
         owner = self.owner
 
-        # If this is not a union, then this is simple because there's only one member
-        # at any given offset. IDAPython's api seems to also figure everything out for
-        # us and so we can just yield things and just return.
+        # If this structure is not a union, then this is simple because there'll
+        # be only one member at any given offset. It appears that IDAPython's api
+        # seems to figure everything out for us and so we can just use it to
+        # fetch the things we need to yield, and then return immediately after.
         if not owner.ptr.is_union():
             mptr = idaapi.get_member(owner.ptr, realoffset)
             if mptr:
@@ -1262,10 +1264,14 @@ class members_t(object):
         if len(items) > 1:
             cls = self.__class__
             iterable = (idaapi.get_member_fullname(mptr.id) for mptr in items)
-            logging.warning(u"{:s}({:#x}).members.by_realoffset({:+#x}) : The requested offset ({:#x}) contains more than one member ({:s}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset, ', '.join(map(utils.string.to, iterable))))
+            logging.warning(u"{:s}({:#x}).members.by_realoffset({:+#x}) : The specified offset ({:#x}) is currently occupied by more than one member ({:s}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset, ', '.join(map(utils.string.to, iterable))))
 
             # Grab the type information for each member so we can determine if the
-            # requested offset points at an array or a structure.
+            # requested offset points at an array or a structure. We also grab
+            # the operand information via the idaapi.retrieve_member_info api.
+            # If there's no operand information available, we use None as a
+            # placeholder. Fortunately, the api also returns None as failure so
+            # we can just blindly add its result to our list of candidates.
             candidates = []
             for mptr in items:
                 opinfo = idaapi.opinfo_t()
@@ -1380,9 +1386,9 @@ class members_t(object):
         """
         owner = self.owner
 
-        # Grab the type information for a member, and convert it to
-        # a pythonic type so that it's easy to determine the member's
-        # type and its size.
+        # Define a closure that grabs the type information for a particular
+        # member, and converts it to a pythonic-type. This way it's easier
+        # for us to determine both the member's type and its size.
         def dissolve(mptr):
             opinfo = idaapi.opinfo_t()
             res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
@@ -1508,7 +1514,7 @@ class members_t(object):
         minimum, maximum = owner.realbounds
         if not (minimum <= offset < maximum):
             cls = self.__class__
-            logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
+            logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset is not within the bounds ({:#x}<->{:#x}) of the structure and will result in returning the nearest member.".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
 
         # If there aren't any elements in the structure, then there's no members
         # to search through in here. So just raise an exception and bail.
@@ -1552,9 +1558,11 @@ class members_t(object):
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` at the end of the structure.'''
 
-        # If this structure is a union, then the offset is always 0.
+        # If this structure is a union, then the offset should always be 0.
+        # This means that when translated to our baseoffset, will always
+        # result in the baseoffset itself.
         if is_union(self.ptr):
-            return self.add(name, type, 0)
+            return self.add(name, type, self.baseoffset)
 
         # Otherwise, it's not a union and so we'll just calculate
         # the offset to add the member at, and proceed as asked.
@@ -1570,33 +1578,57 @@ class members_t(object):
         """
         flag, typeid, nbytes = interface.typemap.resolve(type)
 
-        # Check if the user is trying to add a union, if so then we need to
-        # raise an exception so the user doesn't try to do it again.
-        if self.ptr.is_union() and offset:
-            cls = self.__class__
-            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to add a member at a non-zero offset ({:#x}) due to the structure being a union.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, offset))
+        # If the member is being added to a union, then the offset doesn't
+        # matter because it's always zero. We need to check this however because
+        # we're aiming to be an "intuitive" piece of software.
+        if self.ptr.is_union():
+
+            # If the offset is zero, then maybe the user does know what they're
+            # doing, but they don't know that they need to use the base offset.
+            if offset == 0:
+                pass
+
+            # If the user really is trying to add a member with a non-zero offset
+            # to our union, then we need to warn the user so that they know not
+            # to do it again in the future.
+            elif offset != self.baseoffset:
+                cls = self.__class__
+                logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Corrected the invalid offset ({:#x}) being used when adding member ({!s}) to union \"{:s}\", and changed it to {:+#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, offset, name, self.owner.name, self.baseoffset))
+
+            # Now we can actually correct the offset they gave us.
+            offset = self.baseoffset
 
         # FIXME: handle .strtype (strings), .ec (enums), .cd (custom)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         realoffset = offset - self.baseoffset
 
-        # figure out some defaults for the member name
+        # If they didn't give us a name, then we figure out a default name
+        # using a sort-of hungarian notation as the prefix, and the field's
+        # offset as the suffix.
         if name is None:
             cls = self.__class__
             logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Name is undefined, defaulting to offset {:+#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, realoffset))
-            name = 'v', realoffset
+            name = 'field', realoffset
 
+        # If we were given a tuple, then we need to concatenate it into a string.
         if isinstance(name, builtins.tuple):
             name = interface.tuplename(*name)
 
-        # try and add the structure memberb
+        # Finally we can use IDAPython to add the structure member with the
+        # parameters that we were given and/or figured out.
         res = idaapi.add_struc_member(self.owner.ptr, utils.string.to(name), realoffset, flag, opinfo, nbytes)
+
+        # Now we can check whether the addition was succesful or not. If the
+        # addition didn't return an error code, then log the success in order
+        # to assist with debugging.
         if res == idaapi.STRUC_ERROR_MEMBER_OK:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, utils.string.escape(self.owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes))
+            logging.debug(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, utils.string.escape(self.owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes))
 
-        # we failed, so try figure out a good error message to inform the user with
+        # If we received a failure error code, then we convert the error code to
+        # an error message so that we can raise an exception that actually means
+        # something and enables the user to correct it.
         else:
             error = {
                 idaapi.STRUC_ERROR_MEMBER_NAME : 'Duplicate field name',
@@ -1608,14 +1640,18 @@ class members_t(object):
             cls = self.__class__
             raise e(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
 
-        # now we can fetch the member at the specified offset to return
-        mem = idaapi.get_member(self.owner.ptr, realoffset)
-        if mem is None:
+        # We added the member, but now we need to return it to the caller. Since
+        # all we get is an error code from IDAPython's api, we try and fetch the
+        # member that was just added by the offset it's supposed to be at.
+        mptr = idaapi.get_member(self.owner.ptr, realoffset)
+        if mptr is None:
             cls = self.__class__
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at offset {:s}{:+#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, utils.string.escape(name, '"'), realoffset, nbytes))
-        idx = self.index(mem)
 
-        # and then create a new instance of the member at our guessed index
+        # If we successfully grabbed the member, then we need to figure out its
+        # actual index in our structure. Then we can use the index to instantiate
+        # a member_t that we'll return back to the caller.
+        idx = self.index(mptr)
         return member_t(self.owner, idx)
 
     def pop(self, index):
@@ -1842,7 +1878,8 @@ class member_t(object):
     @property
     def offset(self):
         '''Return the offset of the member.'''
-        return self.realoffset + self.parent.members.baseoffset
+        parent = self.parent
+        return self.realoffset + parent.members.baseoffset
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
