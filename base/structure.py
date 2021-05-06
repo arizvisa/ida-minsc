@@ -1375,69 +1375,112 @@ class members_t(object):
 
     def __walk_to_realoffset__(self, offset):
         '''Descend into the structure collecting the fields to get to the specified `offset`.'''
-        try:
-            m = self.by_realoffset(offset)
+        owner = self.owner
 
-        # If we couldn't find the member, find the nearest one that IDA will
-        # give us. We'll use this member to begin our descent...
-        except (E.OutOfBoundsError, E.MemberNotFoundError):
-            m = self.near_realoffset(offset)
+        # Grab the type information for a member, and convert it to
+        # a pythonic type so that it's easy to determine the member's
+        # type and its size.
+        def dissolve(mptr):
+            opinfo = idaapi.opinfo_t()
+            res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+            tid = res.tid if res else idaapi.BADADDR
+            return interface.typemap.dissolve(mptr.flag, tid, idaapi.get_member_size(mptr))
 
-        # If we aren't looking at an array, then we can act normally by
-        # asking the structure what the next member is going to be.
-        if not isinstance(m.type, builtins.list):
-            st = m.type
+        # Start out by finding all of the members at our current offset.
+        items = []
+        for mptr in self.__members_at__(offset):
+            mleft, mright = 0 if owner.ptr.is_union() else mptr.soff, mptr.eoff
 
-            # If the member type is not a structure, then return the offset
-            # relative to the member that we first discovered as a tuple.
-            if not isinstance(st, structure_t):
-                prefix = m,
-                return prefix, offset - m.realoffset
+            # Check the offset is within our current member's boundaries, and
+            # add it to our list if it is so that we can count our results later.
+            if mleft <= offset < mright:
+                items.append(mptr)
+            continue
 
-            # If the member type is a structure, then we ask the structure for
-            # what field should be at its relative offset. We then shift the
-            # relative offset result back into a real offset so that we can
-            # aggregate it into the final result.
-            res, nextoffset = st.members.__walk_to_realoffset__(offset - m.realoffset)
+        # If we couldn't find a member, then just find the nearest one that
+        # IDA will give us. We'll use this member to begin our descent.
+        members = items or [self.near_realoffset(offset).ptr]
 
-            # If we haven't encountered an array yet, then we're still prefixing
-            # our results with a tuple, so make sure its the correct type.
-            if isinstance(res, builtins.tuple):
-                prefix = m,
+        # If we received multiple members for this specific offset, then
+        # we need to do some special processing to figure out which member
+        # we're at.
+        if len(members) > 1:
+            iterable = (self.by_identifier(mptr.id) for mptr in members)
+            print('\n'.join(map(repr, iterable)))
+            raise NotImplementedError
 
-            # Otherwise we've encountered an array and our result should be a list.
-            elif isinstance(res, builtins.list):
-                prefix = [m]
+        # Otherwise we found a single item, then we just need to know if
+        # we need to continue recursing into something and what exactly
+        # we're recursing into.
+        mptr, = members
+        mtype, moffset = dissolve(mptr), 0 if owner.ptr.is_union() else mptr.soff
 
-            else:
-                raise TypeError(res)
+        # If our member type is an array, then we need to do some things
+        # to try and figure out which index we're actually going to be
+        # at. Before that, we need to take our dissolved type and unpack it.
+        if isinstance(mtype, builtins.list):
+            item, length = mtype
+            _, size = (item, item.size) if isinstance(item, structure_t) else item
+            prefix = [self.by_identifier(item.id) for item in [mptr]]
 
-            # Concatenate our prefix to our results and return them to the caller
-            return prefix + res, m.realoffset + nextoffset
+            # We now need to do some calculations to figure out which index
+            # and byte offset that our requested offset is pointing to, and
+            # then we can actually calculate our real distance.
+            index, bytes = divmod(offset - moffset, size or 1)
+            res = index * size
 
-        # If the member type is actually an array, then we need to do some
-        # special processing to figure out where we're at. This logic converts
-        # the results that are returned as a list. This way the caller can
-        # distinguish whether an array was encountered, or just straight-up
-        # structure members.
-        st, count = m.type
-        _, size = (st, st.size) if isinstance(st, structure_t) else st
+            # If it's just an atomic type, then we can return the difference
+            # between our target offset and the member offset since it's up
+            # to the caller to figure out what the index actually means.
+            if isinstance(item, builtins.tuple):
+                return prefix, offset - moffset
 
-        # We need to do some calculations to figure out what offset into the
-        # array we are, and then use that to determine how far into a field
-        # our offset is.
-        arrayoffset = offset - m.realoffset
-        index, memberoffset = arrayoffset // (size or 1), arrayoffset % (size or 1)
+            # If our array type is a structure, we will need to recurse in
+            # order to figure out what the next field will be, and then we
+            # can adjust the returned offset so that it corresponds to the
+            # offset into the array.
+            sptr = idaapi.get_sptr(mptr)
+            if sptr:
+                st = __instance__(sptr.id, offset=self.baseoffset + moffset + res)
+                suffix, nextoffset = st.members.__walk_to_realoffset__(bytes)
+                return prefix + [item for item in suffix], offset - (moffset + res + bytes - nextoffset)
 
-        # If the type is a structure, then we can recurse to figure out the
-        # next field and where it is relative to us.
-        if isinstance(st, structure_t):
-            res, nextoffset = st.members.__walk_to_realoffset__(memberoffset)
-            return [m] + [item for item in res], arrayoffset - (memberoffset - nextoffset)
+            # We have no idea what type this is, so just bail.
+            raise TypeError(mptr, item)
 
-        # Any other type means we can just add it as an offset since we don't
-        # have any other way of representing these things.
-        return [m], arrayoffset
+        # Otherwise this is just a single type, and we need to check whether
+        # we handle it as a structure which requires us to recurse, or not
+        # which means we just return the offset relative to our member.)
+        sptr = idaapi.get_sptr(mptr)
+        if not sptr:
+            prefix = (self.by_identifier(item.id) for item in [mptr])
+            return builtins.tuple(prefix), offset - moffset
+
+        # Otherwise, the member type's a structure, so we need to
+        # recurse to figure out which field should be at the relative
+        # offset. Afterwards, we then shift the relative offset back
+        # into a real offset so that we can collect it in the result.
+        st = __instance__(sptr.id, offset=self.baseoffset + moffset)
+        result, nextoffset = st.members.__walk_to_realoffset__(offset - moffset)
+
+        # If we haven't encountered a list yet, then our prefix will
+        # still be a tuple and we need to ensure it's the correct type.
+        iterable = (self.by_identifier(item.id) for item in [mptr])
+        if isinstance(result, builtins.tuple):
+            prefix = builtins.tuple(iterable)
+
+        # If our result was a list, then we've encountered an array
+        # and we need to preserve its type.
+        elif isinstance(result, builtins.list):
+            prefix = builtins.list(iterable)
+
+        # Bail if we don't know what the type is.
+        else:
+            raise TypeError(result)
+
+        # Now we can concatenate our prefix to our current results,
+        # and then return what we've aggregated back to our caller.
+        return prefix + result, offset - (moffset + nextoffset)
 
     def near_offset(self, offset):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
