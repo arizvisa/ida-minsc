@@ -1160,7 +1160,7 @@ class members_t(object):
 
         # Start out by getting our bounds, and translating them to our relative
         # offset.
-        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), [0, idaapi.get_struc_size(owner.ptr)])
+        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), self.realbounds)
 
         # Guard against a potential OverflowError that would be raised by SWIG's typechecking
         if not (minimum <= self.baseoffset < maximum):
@@ -1433,14 +1433,7 @@ class members_t(object):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
         owner = self.owner
 
-        # Start out by getting our bounds, and translating them to our relative
-        # offset.
-        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), [idaapi.get_struc_first_offset(owner.ptr), idaapi.get_struc_last_offset(owner.ptr)])
-        if (offset < minimum) or (offset >= maximum):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.near_offset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
-
-        # Chain to the realoffset implementation.. This is just a wrapper.
+        # This was just a wrapper anyways...
         return self.near_realoffset(offset - self.baseoffset)
     near = nearoffset = utils.alias(near_offset, 'members_t')
 
@@ -1454,31 +1447,34 @@ class members_t(object):
             cls = self.__class__
             logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
 
-        # Try and find the exact offset, because if we can..then we don't need
-        # to execute the rest of this function.
-        mem = idaapi.get_member(owner.ptr, offset)
-        if mem:
-            index = self.index(mem)
-            return self[index]
-
         # If there aren't any elements in the structure, then there's no members
         # to search through in here. So just raise an exception and bail.
         if not len(self):
             cls = self.__class__
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Unable to find member near offset.".format('.'.join([__name__, cls.__name__]), owner.id, offset))
 
-        # We couldn't find the member, so now we'll try and search for the
-        # member that is nearest..
+        # Grab all of the members at the specified offset so we can determine
+        # if there's an exact member that can be found.
+        members = [mptr for mptr in self.__members_at__(offset)]
+
+        # If we found more than one member, then try and filter the exact one
+        # using the members_t.by_realoffset method.
+        if len(members):
+            return self.by_realoffset(offset)
+
+        # We couldn't find any members, so now we'll try and search for the
+        # member that is nearest to the offset that was requested.
         def recurse(offset, available):
             if len(available) == 1:
                 return available[0]
             index = len(available) // 2
             return recurse(offset, available[:index]) if offset <= available[index].realoffset else recurse(offset, available[index:])
 
-        # This should already be sorted for us..
+        # This should already be sorted for us, so descend into it looking
+        # for the nearest member.
         mem = recurse(offset, [item for item in self])
 
-        # Now we can return the member we found.
+        # Now we can return the exact member that was found.
         index = self.index(mem)
         return self[index]
 
