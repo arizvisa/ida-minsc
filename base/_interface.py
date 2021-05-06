@@ -196,7 +196,7 @@ class typemap(object):
         # figure out the structure's size. We also do an explicit check if the type-id
         # is a structure because in some cases, IDA will forget to set the FF_STRUCT
         # flag but still assign the structure type-id to a union member.
-        if (dt == FF_STRUCT and isinstance(typeid, six.integer_types)) or structure.has(typeid):
+        if (dt == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
             t = structure.by_identifier(typeid)
             sz = t.size
