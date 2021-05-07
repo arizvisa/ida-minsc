@@ -874,10 +874,8 @@ def op_structure(ea, opnum):
 
     # Figure out the offset for the structure member whether the operand
     # type is an immediate value or a memory reference type.
-    if op.type in {idaapi.o_imm}:
-        res = op.value
-    else:
-        res = op.addr
+    op = operand(ea, opnum)
+    res = op.value if op.type in {idaapi.o_imm} else op.addr
     offset = idaapi.as_signed(res, op_bits(ea, opnum))
 
     # Check to see if this is a stack variable, because we'll need to
@@ -897,19 +895,20 @@ def op_structure(ea, opnum):
 
         # Use the real offset of the member so that we can figure out which
         # members of the structure are actually part of the path.
-        path, position = member.parent.members.__walk_to_realoffset__(member.realoffset)
+        path, realdelta = member.parent.members.__walk_to_realoffset__(member.realoffset)
 
         # If we got a list as a result, then we encountered an array which
         # requires us to return a list and include the offset.
         if isinstance(path, builtins.list):
-            return path + [position]
+            return path + [realdelta]
 
         # Otherwise it's just a regular path, and we need to determine whether
         # to include the offset in the result or not.
         # Determine whether we need to include the offset in the result or not
-        if position > 0:
-            return path + (position,)
-        return tuple(path) if len(path) > 1 else path[0]
+        results = tuple(path)
+        if realdelta > 0:
+            return results + (realdelta,)
+        return tuple(results) if len(results) > 1 else results[0]
 
     # Otherwise, we have no idea what to do here since we need to know the opinfo_t
     # in order to determine what structure is there.
@@ -942,8 +941,8 @@ def op_structure(ea, opnum):
     # Our first member should always be the sptr identifier. Once we snag
     # that, then the rest of the identifiers need to be converted into
     # mptrs so that we can generate our filter.
-    sptr, items, moff = idaapi.get_struc(path.pop(0)), [], 0
-    for tid in path:
+    sptr, items, moffset = idaapi.get_struc(path.pop(0)), [], 0
+    for i, tid in enumerate(path):
         res = idaapi.get_member_by_id(tid)
 
         # If we couldn't find a member for the identifier, then warn the
@@ -956,27 +955,14 @@ def op_structure(ea, opnum):
         # simply collect the mptrs for each id, and update our member offset.
         mptr, fullname, msptr = res
         items.append(mptr)
-        moff += 0 if msptr.is_union() else mptr.soff
+        moffset += 0 if msptr.is_union() else mptr.soff
 
-    # Okay, now we can finally generate our filter function with our mptrs.
+    # Generate our filter function, and fetch the structure that we're going
+    # to use to walk our path with. This should then give us the actual path
+    # along with the real delta that we'll return rather than what IDA gave us.
+    st = structure.__instance__(sptr.id, offset=0)
     Ffilter = generate_filter(items)
-    items = [ idaapi.get_member_by_id(tid) for tid in path ]
-
-    # So we will now extract the value while adjusting for the delta.
-    op = operand(ea, opnum)
-    if op.type in {idaapi.o_phrase, idaapi.o_displ, idaapi.o_mem}:
-        res = op.addr
-    elif op.type in {idaapi.o_imm}:
-        res = op.value
-    else:
-        raise TypeError(op.type)
-    value = idaapi.as_signed(res, op_bits(ea, opnum))
-
-    # Then we can start at our sptr, and traverse to the real offset
-    # whilst using our filter function to narrow down through the
-    # _exact_ fields in the structure path.
-    st = structure.__instance__(sptr.id, offset=delta.value() - moff)
-    path, realdelta = st.members.__walk_to_realoffset__(value + moff + delta.value(), filter=Ffilter)
+    path, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
 
     # If we got a list, then we encountered an array and we need to make sure
     # that we return a list.
@@ -1076,12 +1062,7 @@ def op_structure(ea, opnum, sptr, path, **delta):
     # use it to calculate the delta between it and the actual member offset
     # that we'll collect when traversing the structure path.
     op = operand(ea, opnum)
-    if op.type in {idaapi.o_phrase, idaapi.o_displ, idaapi.o_mem}:
-        res = op.addr
-    elif op.type in {idaapi.o_imm}:
-        res = op.value
-    else:
-        raise TypeError(op.type)
+    res = op.value if op.type in {idaapi.o_imm} else op.addr
     value = idaapi.as_signed(res, op_bits(ea, opnum))
 
     # We have to start somewhere and our first element in the path should be a
