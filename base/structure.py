@@ -1472,10 +1472,9 @@ class members_t(object):
             prefix = (self.by_identifier(item.id) for item in [mptr])
             return builtins.tuple(prefix), offset - moffset
 
-        # Otherwise, the member type's a structure, so we need to
-        # recurse to figure out which field should be at the relative
-        # offset. Afterwards, we then shift the relative offset back
-        # into a real offset so that we can collect it in the result.
+        # Otherwise, the member type is a structure, and we'll need
+        # to recurse in order to figure out which field should be at
+        # the relative offset from the member.
         st = __instance__(sptr.id, offset=self.baseoffset + moffset)
         result, nextoffset = st.members.__walk_to_realoffset__(offset - moffset, filter=filter)
 
@@ -1496,7 +1495,7 @@ class members_t(object):
 
         # Now we can concatenate our prefix to our current results,
         # and then return what we've aggregated back to our caller.
-        return prefix + result, offset - (moffset + nextoffset)
+        return prefix + result, nextoffset
 
     def near_offset(self, offset):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
