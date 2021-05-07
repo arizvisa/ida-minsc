@@ -1405,10 +1405,7 @@ class members_t(object):
             if mleft <= offset < mright:
                 items.append(mptr)
             continue
-
-        # If we couldn't find a member, then just find the nearest one that
-        # IDA will give us. We'll use this member to begin our descent.
-        members = items or [self.near_realoffset(offset).ptr]
+        members = items
 
         # If we received multiple members for this specific offset, which
         # should only happen if we're in a union, then we need to do some
@@ -1420,10 +1417,11 @@ class members_t(object):
         filtered = F(owner.ptr, members) if len(members) > 1 else members
 
         # If we still do not have a single result after filtering, then
-        # we terminate our traversal here and return the offset that we
-        # were unable to do anything with.
+        # we terminate our traversal here with the nearest member, and
+        # include the offset that's relative to it.
         if len(filtered) != 1:
-            return (), offset
+            nearest = self.near_realoffset(offset)
+            return (nearest,), offset - nearest.realoffset
 
         # Otherwise we found a single item, then we just need to know if
         # we need to continue recursing into something and what exactly
@@ -1513,7 +1511,7 @@ class members_t(object):
         minimum, maximum = owner.realbounds
         if not (minimum <= offset < maximum):
             cls = self.__class__
-            logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset is not within the bounds ({:#x}<->{:#x}) of the structure and will result in returning the nearest member.".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
+            logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset ({:#x}) is not within the bounds ({:#x}<->{:#x}) of the structure and will result in returning the nearest member.".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset, minimum, maximum))
 
         # If there aren't any elements in the structure, then there's no members
         # to search through in here. So just raise an exception and bail.
