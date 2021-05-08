@@ -3,7 +3,7 @@ Structure module
 
 This module exposes a number of tools and defines some classes that
 can be used to interacting with the structures defined in the database.
-The classes defined by this module wrap IDA's structure API and expose
+The classes defined by this module wrap IDAPython's structure API and expose
 a simpler interface that can be used to perform various operations
 against a structure such as renaming or enumerating the structure's
 members.
@@ -50,6 +50,21 @@ import ui, internal
 from internal import utils, interface, exceptions as E
 
 import idaapi
+
+@utils.multicase(id=six.integer_types)
+def has(id):
+    '''Return whether a structure with the specified `id` exists within the database.'''
+    return True if interface.node.is_identifier(id) and idaapi.get_struc(id) else False
+@utils.multicase(name=six.string_types)
+@utils.string.decorate_arguments('name')
+def has(name):
+    '''Return if a structure with the specified `name` exists within the database.'''
+    res = utils.string.to(name)
+    return has(idaapi.get_struc_id(res))
+@utils.multicase(structure=idaapi.struc_t)
+def has(structure):
+    '''Return whether the database includes the provided `structure`.'''
+    return has(structure.id)
 
 def __instance__(identifier, **options):
     '''Create a new instance of the structure identified by `identifier`.'''
@@ -225,6 +240,19 @@ by_id = byidentifier = byId = utils.alias(by_identifier)
 
 ## FIXME: need to add support for a union_t. add_struc takes another parameter
 ##        that defines whether a structure is a union or not.
+
+@utils.multicase(id=six.integer_types)
+def is_union(id):
+    '''Return whether the structure identified by `id` is a union or not.'''
+    structure = idaapi.get_struc(id)
+    return is_union(id)
+@utils.multicase()
+def is_union(structure):
+    '''Return whether the provided `structure` is defined as a union.'''
+    if isinstance(structure, structure_t):
+        return is_union(structure.ptr)
+    return structure.is_union()
+unionQ = isunion = utils.alias(is_union)
 
 ### structure_t abstraction
 class structure_t(object):
@@ -412,13 +440,17 @@ class structure_t(object):
         return res
 
     @property
+    def ptr(self):
+        '''Return the pointer of the ``idaapi.struc_t``.'''
+        return idaapi.get_struc(self.id)
+    @property
     def id(self):
         '''Return the identifier of the structure.'''
         return self.__id__
     @property
-    def ptr(self):
-        '''Return the pointer of the ``idaapi.struc_t``.'''
-        return idaapi.get_struc(self.id)
+    def properties(self):
+        '''Return the properties for the current structure.'''
+        return self.ptr.props
     @property
     def members(self):
         '''Return the members belonging to the structure.'''
@@ -637,13 +669,13 @@ class structure_t(object):
 
     def __str__(self):
         '''Display the structure in a readable format.'''
-        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment or '', self.tag()
-        return "<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
+        return "<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __unicode__(self):
         '''Display the structure in a readable format.'''
-        name, offset, size, comment, tag = self.name, self.offset, self.size, self.comment or '', self.tag()
-        return u"<class 'structure' name={!s}{:s} size={:#x}>{:s}".format(utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
+        sptr, name, offset, size, comment, tag = self.ptr, self.name, self.offset, self.size, self.comment or '', self.tag()
+        return u"<class '{:s}' name={!s}{:s} size={:#x}>{:s}".format('union' if sptr.is_union() else 'structure', utils.string.repr(name), (" offset={:#x}".format(offset) if offset != 0 else ''), size, " // {!s}".format(utils.string.repr(tag) if '\n' in comment else utils.string.to(comment)) if comment else '')
 
     def __repr__(self):
         return u"{!s}".format(self)
@@ -669,6 +701,16 @@ class structure_t(object):
         if not isinstance(member, member_t):
             raise TypeError(member)
         return member in self.members
+
+    @property
+    def realbounds(self):
+        sptr = self.ptr
+        return interface.bounds_t(0, idaapi.get_struc_size(self.ptr))
+
+    @property
+    def bounds(self):
+        bounds, base = self.realbounds, self.members.baseoffset
+        return bounds.translate(base)
 
 @utils.multicase()
 def name(id):
@@ -775,37 +817,51 @@ def members(id):
     """
 
     st = idaapi.get_struc(id)
-    if not st:
-        # empty structure
-        return
 
-    size = idaapi.get_struc_size(st)
+    # If we couldn't get the structure, then blow up in the user's face.
+    if st is None:
+        raise E.StructureNotFoundError(u"{:s}.members({:#x}) : Unable to find the requested structure ({:#x}).".format(__name__, id, id))
 
-    # iterate through the number of members belonging to the struct
+    # Grab some attributes like the structure's size, and whether or not
+    # it's a union so that we can figure out each member's offset.
+    size, unionQ = idaapi.get_struc_size(st), st.is_union()
+
+    # Iterate through all of the member in the structure.
     offset = 0
     for i in range(st.memqty):
 
-        # grab the member and its size
+        # Grab the member and its properties.
         m = st.get_member(i)
-        ms = idaapi.get_member_size(m)
+        msize, munionQ = idaapi.get_member_size(m), m.props & idaapi.MF_UNIMEM
 
-        # grab the member's boundaries
-        left, right = m.soff, m.eoff
+        # Figure out the boundaries of the member. If our structure is a union,
+        # then the starting offset never changes since IDA dual-uses it as the
+        # member index.
+        left, right = offset if unionQ else m.soff, m.eoff
 
-        # if our offset doesn't match the beginning of the member, then
-        # this is padding that is undefined or unamed which we need to
-        # yield to the caller.
+        # If our current offset does not match the member's starting offset,
+        # then this is an empty field, or undefined. We yield this to the caller
+        # so that they know that there's some padding they need to know about.
         if offset < left:
             yield (offset, left - offset), (None, None, None)
             offset = left
 
-        # grab the member's attributes
+        # Grab the attributes about the member that we plan on yielding.
         iterable = (utils.string.of(cmt) for cmt in [idaapi.get_member_name(m.id), idaapi.get_member_cmt(m.id, 0), idaapi.get_member_cmt(m.id, 1)])
         items = builtins.tuple(iterable)
 
-        # yield our current position and iterate to the next member
-        yield (offset, ms), items
-        offset += ms
+        # That was everything that our caller should care about, so we can
+        # just yield it and continue onto the next member.
+        yield (offset, msize), items
+
+        # If we're a union, then the offset just never changes. Continue onto
+        # the next member without updating it.
+        if unionQ:
+            continue
+
+        # Otherwise we're a regular member and we need to move onto the next
+        # offset in our structure.
+        offset += msize
     return
 
 @utils.multicase(structure=structure_t, offset=six.integer_types, size=six.integer_types)
@@ -827,25 +883,25 @@ def fragment(id, offset, size):
     comment whereas `repeatable` contains the member's `repeatable`
     comment.
     """
-    member = members(id)
+    iterable, unionQ = members(id), is_union(id)
 
     # seek
-    for item in member:
+    for item in iterable:
         (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
 
         left, right = m_offset, m_offset + m_size
         if (offset >= left) and (offset < right):
             yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
-            size -= m_size
+            size -= 0 if unionQ else m_size
             break
         continue
 
     # return
-    for item in member:
+    for item in iterable:
         if size > 0:
             (m_offset, m_size), (m_name, m_cmt, m_rcmt) = item
             yield (m_offset, m_size), (m_name, m_cmt, m_rcmt)
-            size -= m_size
+            size -= 0 if unionQ else m_size
         continue
     return
 
@@ -914,11 +970,13 @@ class members_t(object):
     def owner(self):
         '''Return the owner ``structure_t`` for this ``members_t``.'''
         return self.__owner__
+
     @property
     def ptr(self):
         '''Return the pointer to the ``idaapi.member_t`` that contains all the members.'''
         owner = self.owner
         return owner.ptr.members
+
     def __init__(self, owner, baseoffset=0):
         self.__owner__ = owner
         self.baseoffset = baseoffset
@@ -1112,63 +1170,194 @@ class members_t(object):
 
         # Start out by getting our bounds, and translating them to our relative
         # offset.
-        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), [idaapi.get_struc_first_offset(owner.ptr), idaapi.get_struc_last_offset(owner.ptr)])
+        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), owner.realbounds)
 
-        # Guard against a potential OverflowError that would be raised by SWIG's typechecking
-        if self.baseoffset > maximum:
+        # Make sure that the requested offset is within the boundaries of our
+        # structure, and bail if it isn't.
+        if not (minimum <= offset < maximum):
             cls = self.__class__
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset))
-
-        # Look for the very last member so we can confirm our bounds.
-        mptr = idaapi.get_member(owner.ptr, maximum - self.baseoffset)
-        if mptr is None:
-            cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_offset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset))
-
-        # Get that member's size, so that way we can really confirm that this
-        # offset isn't pointing to anything.
-        msize = idaapi.get_member_size(mptr)
-        if (offset < minimum) or (offset >= maximum + msize):
-            cls = self.__class__
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_offset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum + msize))
 
         # Chain to the realoffset implementation.. This is just a wrapper.
         return self.by_realoffset(offset - self.baseoffset)
     byoffset = utils.alias(by_offset, 'members_t')
 
+    def __members_at__(self, realoffset):
+        """Yield all the members at the specified `realoffset` of the current structure.
+
+        This returns members whilst keeping in mind whether the structure is a union and may have more than one field at the same offset.
+        """
+        owner = self.owner
+
+        # If this structure is not a union, then this is simple because there'll
+        # be only one member at any given offset. It appears that IDAPython's api
+        # seems to figure everything out for us and so we can just use it to
+        # fetch the things we need to yield, and then return immediately after.
+        if not owner.ptr.is_union():
+            mptr = idaapi.get_member(owner.ptr, realoffset)
+            if mptr:
+                yield mptr
+            return
+
+        # Otherwise, start at the very first member index, and check that we actually
+        # have some members that we can iterate through.
+        index = idaapi.get_struc_first_offset(owner.ptr)
+        if index == idaapi.BADADDR:
+            return
+
+        # Now we can iterate through the union from the very first index while grabbing
+        # each member so that we can filter it according to its bounds and then discard
+        # anything that doesn't match.
+        while index != -1 and index <= idaapi.get_struc_last_offset(owner.ptr):
+            mptr = idaapi.get_member(owner.ptr, index)
+            if mptr is None:
+                cls = self.__class__
+                raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find union member at the specified index ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, realoffset, index))
+
+            # If the request offset is within the boundaries of our union member,
+            # then we're good and this matches what we were looking for.
+            if realoffset < mptr.eoff:
+                yield mptr
+
+            # Proceed to the next union member by asking IDAPython for the next index.
+            index = idaapi.get_struc_next_offset(owner.ptr, mptr.soff)
+        return
+
     def by_realoffset(self, offset):
         '''Return the member at the specified `offset` of the structure.'''
         owner = self.owner
+        FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
 
-        # Start by getting our bounds.
-        minimum, maximum = idaapi.get_struc_first_offset(owner.ptr), idaapi.get_struc_last_offset(owner.ptr)
-
-        # Guard against a potential OverflowError that would be raised by SWIG's typechecking
-        if maximum < 0:
+        # Start by getting our bounds which only requires us to know the structure's size
+        # regardless of whether or not it's a union. Just to be safe, we guard this against
+        # a potential OverflowError that would be raised by SWIG's type-checker.
+        minimum, maximum = 0, idaapi.get_struc_size(owner.ptr)
+        if maximum < minimum:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset))
+            raise E.DisassemblerError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Received an unexpected size ({:#x}) for the given structure ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.id, maximum, owner.id))
 
-        # Look for the very last member so we can confirm our bounds.
-        mptr = idaapi.get_member(owner.ptr, maximum)
-        if mptr is None:
+        if not (minimum <= offset < maximum):
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset))
+            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Requested offset ({:#x}) is not within the structure's boundaries ({:#x}<>{:#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset, minimum, minimum + maximum))
 
-        # Get that member's size, so that way we can really confirm that this
-        # offset isn't pointing to anything.
-        msize = idaapi.get_member_size(mptr)
-        if (offset < minimum) or (offset >= maximum + msize):
+        # Now we call our members_t.__members_at__ helper-method so that we can check the
+        # members that are returned to verify that they're within our search boundaries.
+        items, unionQ = [], owner.ptr.is_union
+        for mptr in self.__members_at__(offset):
+            mleft, mright = 0 if unionQ() else mptr.soff, mptr.eoff
+
+            # Check the offset is within our current member's boundaries, and add it to
+            # our list if it is so that we can count our results later.
+            if mleft <= offset < mright:
+                items.append(mptr)
+            continue
+
+        # If we didn't find any items, then we need to throw up an exception because
+        # we're unable to proceed any farther without any members to search through.
+        if not items:
             cls = self.__class__
-            raise E.OutOfBoundsError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Requested offset not within bounds {:#x}<>{:#x}.".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum + msize))
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at the specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset))
 
-        # Now we can get a pointer to an actual member
-        mem = idaapi.get_member(owner.ptr, offset)
-        if mem is None:
+        # If we found more than one result, then we need to warn the user about it
+        # because we're going to have to make a decision on their behalf. This really
+        # should only be happening when we're a union type.
+        if len(items) > 1:
             cls = self.__class__
-            raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_realoffset({:+#x}) : Unable to find member at specified offset ({:+#x}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset))
+            iterable = (idaapi.get_member_fullname(mptr.id) for mptr in items)
+            logging.warning(u"{:s}({:#x}).members.by_realoffset({:+#x}) : The specified offset ({:#x}) is currently occupied by more than one member ({:s}).".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset, ', '.join(map(utils.string.to, iterable))))
 
-        # And then search for it in our structure to give back to the user
-        index = self.index(mem)
+            # Grab the type information for each member so we can determine if the
+            # requested offset points at an array or a structure. We also grab
+            # the operand information via the idaapi.retrieve_member_info api.
+            # If there's no operand information available, we use None as a
+            # placeholder. Fortunately, the api also returns None as failure so
+            # we can just blindly add its result to our list of candidates.
+            candidates = []
+            for mptr in items:
+                opinfo = idaapi.opinfo_t()
+                res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+                candidates.append((mptr, mptr.flag, res, idaapi.get_member_size(mptr)))
+
+            # Now iterate through all of our candidates to see how we can narrow
+            # them down into the ones we want to select.
+            selected = []
+            for mptr, flags, opinfo, size in candidates:
+                dt = idaapi.as_uint32(flags & idaapi.DT_TYPE)
+                res = interface.typemap.dissolve(flags, opinfo, size)
+
+                # Adjust the offset so it points directly into the member.
+                realoffset = offset - (0 if unionQ() else mptr.soff)
+
+                # First we need to check to see if it's an array, because this
+                # might actually be an array of structures which we'll need to
+                # check the requested offset against.
+                if isinstance(res, builtins.list):
+                    type, length = res
+
+                    # If we received a tuple, then we can extract the member size
+                    # directly to see if it aligns properly.
+                    if isinstance(type, builtins.tuple):
+                        _, msize = type
+                        index, byte = divmod(realoffset, msize)
+
+                    # Otherwise this must be an array of structures, and we need
+                    # to extract its size to see if it aligns.
+                    elif isinstance(type, structure_t):
+                        msize = idaapi.get_struc_size(type.id)
+                        index, byte = divmod(realoffset, msize)
+
+                    # We have no idea what this is, which is a very unexpected
+                    # situation. So, we'll just raise an exception here so that
+                    # it can be debugged later.
+                    else:
+                        raise NotImplementedError(mptr.id, type, length)
+
+                    # Now that we have our index and byte offset, we can check
+                    # and see if it divided evenly into the member size. If so,
+                    # then we can push it to the front of the list. Otherwise,
+                    # it goes to the very very back.
+                    selected.append(mptr) if byte else selected.insert(0, mptr)
+
+                # Next we need to check if it's a structure, because if so then
+                # we need to find out if it directly aligns with a particular
+                # member.
+                elif isinstance(res, structure_t) and res.ptr.is_union():
+                    selected.append(mptr) if realoffset else selected.insert(0, mptr)
+
+                # Finally, check if it's a structure and our real offset points
+                # directly to a particular member. If it does, then this is
+                # a legitimate candidate.
+                elif isinstance(res, structure_t):
+                    mem = idaapi.get_member(sptr, realoffset)
+                    selected.append(mptr) if realoffset - mem.soff else selected.insert(0, mptr)
+
+                # If it's a tuple, then this only matches if we're pointing
+                # directly to the member.
+                elif isinstance(res, builtins.tuple):
+                    selected.append(mptr) if realoffset else selected.insert(0, mptr)
+
+                # Anything else and we have no idea what this is, so simply
+                # raise an exception so it can be debugger later.
+                else:
+                    raise NotImplementedError(mptr, res)
+                continue
+
+            # Now log the order of members that we've sorted out just in case
+            # this "algorithm" is totally busted and we want to figure out
+            # where it's busted.
+            iterable = ((mptr, idaapi.get_member_fullname(mptr.id)) for mptr in selected)
+            messages = (u"[{:d}] {:s} {:#x}{:+#x}".format(1 + i, fullname, mptr.soff, mptr.eoff) for i, (mptr, fullname) in enumerate(iterable))
+            [ logging.info(msg) for msg in messages ]
+
+            # Grab the first element from our sorted list, as that's the one
+            # that we're going to actually use.
+            items = selected[:1]
+
+        # Now we can extract the member from our list of results, and then
+        # figure out its index so that we can return it. Hopefully we found
+        # what the user was expecting.
+        member, = items
+        index = self.index(member)
         return self[index]
     byrealoffset = utils.alias(by_realoffset, 'members_t')
 
@@ -1190,84 +1379,127 @@ class members_t(object):
         return self[index]
     by_id = byid = byidentifier = utils.alias(by_identifier, 'members_t')
 
-    def __walk_to_realoffset__(self, offset):
-        '''Descend into the structure collecting the fields to get to the specified `offset`.'''
-        try:
-            m = self.by_realoffset(offset)
+    def __walk_to_realoffset__(self, offset, filter=lambda sptr, items: items):
+        """Descend into the structure collecting the fields to get to the specified `offset`.
 
-        # If we couldn't find the member, find the nearest one that IDA will
-        # give us. We'll use this member to begin our descent...
-        except (E.OutOfBoundsError, E.MemberNotFoundError):
-            m = self.near_realoffset(offset)
+        If a closure is passed as the `filter` parameter, then use the function to filter the members to use when descending into a structure.
+        """
+        owner = self.owner
 
-        # If we aren't looking at an array, then we can act normally by
-        # asking the structure what the next member is going to be.
-        if not isinstance(m.type, builtins.list):
-            st = m.type
+        # Define a closure that grabs the type information for a particular
+        # member, and converts it to a pythonic-type. This way it's easier
+        # for us to determine both the member's type and its size.
+        def dissolve(mptr):
+            opinfo = idaapi.opinfo_t()
+            res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
+            tid = res.tid if res else idaapi.BADADDR
+            return interface.typemap.dissolve(mptr.flag, tid, idaapi.get_member_size(mptr))
 
-            # If the member type is not a structure, then return the offset
-            # relative to the member that we first discovered as a tuple.
-            if not isinstance(st, structure_t):
-                prefix = m,
-                return prefix, offset - m.realoffset
+        # Start out by finding all of the members at our current offset.
+        items = []
+        for mptr in self.__members_at__(offset):
+            mleft, mright = 0 if owner.ptr.is_union() else mptr.soff, mptr.eoff
 
-            # If the member type is a structure, then we ask the structure for
-            # what field should be at its relative offset. We then shift the
-            # relative offset result back into a real offset so that we can
-            # aggregate it into the final result.
-            res, nextoffset = st.members.__walk_to_realoffset__(offset - m.realoffset)
+            # Check the offset is within our current member's boundaries, and
+            # add it to our list if it is so that we can count our results later.
+            if mleft <= offset < mright:
+                items.append(mptr)
+            continue
+        members = items
 
-            # If we haven't encountered an array yet, then we're still prefixing
-            # our results with a tuple, so make sure its the correct type.
-            if isinstance(res, builtins.tuple):
-                prefix = m,
+        # If we received multiple members for this specific offset, which
+        # should only happen if we're in a union, then we need to do some
+        # special processing in order to figure out which member we should
+        # use. We do this by using our filter parameter when we find more
+        # than one member in order to allow the caller to explicitly filter
+        # our discovered candidates.
+        F = filter or (lambda structure, items: items)
+        filtered = F(owner.ptr, members) if len(members) > 1 else members
 
-            # Otherwise we've encountered an array and our result should be a list.
-            elif isinstance(res, builtins.list):
-                prefix = [m]
+        # If we still do not have a single result after filtering, then
+        # we terminate our traversal here with the nearest member, and
+        # include the offset that's relative to it.
+        if len(filtered) != 1:
+            nearest = self.near_realoffset(offset)
+            return (nearest,), offset - nearest.realoffset
 
-            else:
-                raise TypeError(res)
+        # Otherwise we found a single item, then we just need to know if
+        # we need to continue recursing into something and what exactly
+        # we're recursing into.
+        mptr, = filtered
+        mtype, moffset = dissolve(mptr), 0 if owner.ptr.is_union() else mptr.soff
 
-            # Concatenate our prefix to our results and return them to the caller
-            return prefix + res, m.realoffset + nextoffset
+        # If our member type is an array, then we need to do some things
+        # to try and figure out which index we're actually going to be
+        # at. Before that, we need to take our dissolved type and unpack it.
+        if isinstance(mtype, builtins.list):
+            item, length = mtype
+            _, size = (item, item.size) if isinstance(item, structure_t) else item
+            prefix = [self.by_identifier(item.id) for item in [mptr]]
 
-        # If the member type is actually an array, then we need to do some
-        # special processing to figure out where we're at. This logic converts
-        # the results that are returned as a list. This way the caller can
-        # distinguish whether an array was encountered, or just straight-up
-        # structure members.
-        st, count = m.type
-        _, size = (st, st.size) if isinstance(st, structure_t) else st
+            # We now need to do some calculations to figure out which index
+            # and byte offset that our requested offset is pointing to, and
+            # then we can actually calculate our real distance.
+            index, bytes = divmod(offset - moffset, size or 1)
+            res = index * size
 
-        # We need to do some calculations to figure out what offset into the
-        # array we are, and then use that to determine how far into a field
-        # our offset is.
-        arrayoffset = offset - m.realoffset
-        index, memberoffset = arrayoffset // (size or 1), arrayoffset % (size or 1)
+            # If it's just an atomic type, then we can return the difference
+            # between our target offset and the member offset since it's up
+            # to the caller to figure out what the index actually means.
+            if isinstance(item, builtins.tuple):
+                return prefix, offset - moffset
 
-        # If the type is a structure, then we can recurse to figure out the
-        # next field and where it is relative to us.
-        if isinstance(st, structure_t):
-            res, nextoffset = st.members.__walk_to_realoffset__(memberoffset)
-            return [m] + [item for item in res], arrayoffset - (memberoffset - nextoffset)
+            # If our array type is a structure, we will need to recurse in
+            # order to figure out what the next field will be, and then we
+            # can adjust the returned offset so that it corresponds to the
+            # offset into the array.
+            sptr = idaapi.get_sptr(mptr)
+            if sptr:
+                st = __instance__(sptr.id, offset=self.baseoffset + moffset + res)
+                suffix, nextoffset = st.members.__walk_to_realoffset__(bytes, filter=filter)
+                return prefix + [item for item in suffix], offset - (moffset + res + bytes - nextoffset)
 
-        # Any other type means we can just add it as an offset since we don't
-        # have any other way of representing these things.
-        return [m], arrayoffset
+            # We have no idea what type this is, so just bail.
+            raise TypeError(mptr, item)
+
+        # Otherwise this is just a single type, and we need to check whether
+        # we handle it as a structure which requires us to recurse, or not
+        # which means we just return the offset relative to our member.)
+        sptr = idaapi.get_sptr(mptr)
+        if not sptr:
+            prefix = (self.by_identifier(item.id) for item in [mptr])
+            return builtins.tuple(prefix), offset - moffset
+
+        # Otherwise, the member type is a structure, and we'll need
+        # to recurse in order to figure out which field should be at
+        # the relative offset from the member.
+        st = __instance__(sptr.id, offset=self.baseoffset + moffset)
+        result, nextoffset = st.members.__walk_to_realoffset__(offset - moffset, filter=filter)
+
+        # If we haven't encountered a list yet, then our prefix will
+        # still be a tuple and we need to ensure it's the correct type.
+        iterable = (self.by_identifier(item.id) for item in [mptr])
+        if isinstance(result, builtins.tuple):
+            prefix = builtins.tuple(iterable)
+
+        # If our result was a list, then we've encountered an array
+        # and we need to preserve its type.
+        elif isinstance(result, builtins.list):
+            prefix = builtins.list(iterable)
+
+        # Bail if we don't know what the type is.
+        else:
+            raise TypeError(result)
+
+        # Now we can concatenate our prefix to our current results,
+        # and then return what we've aggregated back to our caller.
+        return prefix + result, nextoffset
 
     def near_offset(self, offset):
         '''Return the member nearest to the specified `offset` from the base offset of the structure.'''
         owner = self.owner
 
-        # Start out by getting our bounds, and translating them to our relative
-        # offset.
-        minimum, maximum = map(functools.partial(operator.add, self.baseoffset), [idaapi.get_struc_first_offset(owner.ptr), idaapi.get_struc_last_offset(owner.ptr)])
-        if (offset < minimum) or (offset >= maximum):
-            cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.near_offset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
-
-        # Chain to the realoffset implementation.. This is just a wrapper.
+        # This was just a wrapper anyways...
         return self.near_realoffset(offset - self.baseoffset)
     near = nearoffset = utils.alias(near_offset, 'members_t')
 
@@ -1276,17 +1508,10 @@ class members_t(object):
         owner = self.owner
 
         # Start by getting our bounds.
-        minimum, maximum = idaapi.get_struc_first_offset(owner.ptr), idaapi.get_struc_last_offset(owner.ptr)
-        if (offset < minimum) or (offset >= maximum):
+        minimum, maximum = owner.realbounds
+        if not (minimum <= offset < maximum):
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset not within bounds {:#x}<->{:#x}. Trying anyways..".format('.'.join([__name__, cls.__name__]), owner.id, offset, minimum, maximum))
-
-        # Try and find the exact offset, because if we can..then we don't need
-        # to execute the rest of this function.
-        mem = idaapi.get_member(owner.ptr, offset)
-        if mem:
-            index = self.index(mem)
-            return self[index]
+            logging.warning(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Requested offset ({:#x}) is not within the bounds ({:#x}<->{:#x}) of the structure and will result in returning the nearest member.".format('.'.join([__name__, cls.__name__]), owner.id, offset, offset, minimum, maximum))
 
         # If there aren't any elements in the structure, then there's no members
         # to search through in here. So just raise an exception and bail.
@@ -1294,18 +1519,28 @@ class members_t(object):
             cls = self.__class__
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.near_realoffset({:+#x}) : Unable to find member near offset.".format('.'.join([__name__, cls.__name__]), owner.id, offset))
 
-        # We couldn't find the member, so now we'll try and search for the
-        # member that is nearest..
+        # Grab all of the members at the specified offset so we can determine
+        # if there's an exact member that can be found.
+        members = [mptr for mptr in self.__members_at__(offset)]
+
+        # If we found more than one member, then try and filter the exact one
+        # using the members_t.by_realoffset method.
+        if len(members):
+            return self.by_realoffset(offset)
+
+        # We couldn't find any members, so now we'll try and search for the
+        # member that is nearest to the offset that was requested.
         def recurse(offset, available):
             if len(available) == 1:
                 return available[0]
             index = len(available) // 2
             return recurse(offset, available[:index]) if offset <= available[index].realoffset else recurse(offset, available[index:])
 
-        # This should already be sorted for us..
+        # This should already be sorted for us, so descend into it looking
+        # for the nearest member.
         mem = recurse(offset, [item for item in self])
 
-        # Now we can return the member we found.
+        # Now we can return the exact member that was found.
         index = self.index(mem)
         return self[index]
 
@@ -1314,14 +1549,23 @@ class members_t(object):
     @utils.string.decorate_arguments('name')
     def add(self, name):
         '''Append the specified member `name` with the default type at the end of the structure.'''
-        offset = self.owner.size + self.baseoffset
-        return self.add(name, int, offset)
+        return self.add(name, int)
     @utils.multicase(name=(six.string_types, tuple))
     @utils.string.decorate_arguments('name')
     def add(self, name, type):
         '''Append the specified member `name` with the given `type` at the end of the structure.'''
+
+        # If this structure is a union, then the offset should always be 0.
+        # This means that when translated to our baseoffset, will always
+        # result in the baseoffset itself.
+        if is_union(self.ptr):
+            return self.add(name, type, self.baseoffset)
+
+        # Otherwise, it's not a union and so we'll just calculate
+        # the offset to add the member at, and proceed as asked.
         offset = self.owner.size + self.baseoffset
         return self.add(name, type, offset)
+
     @utils.multicase(name=(six.string_types, tuple), offset=six.integer_types)
     @utils.string.decorate_arguments('name')
     def add(self, name, type, offset):
@@ -1331,26 +1575,57 @@ class members_t(object):
         """
         flag, typeid, nbytes = interface.typemap.resolve(type)
 
+        # If the member is being added to a union, then the offset doesn't
+        # matter because it's always zero. We need to check this however because
+        # we're aiming to be an "intuitive" piece of software.
+        if self.ptr.is_union():
+
+            # If the offset is zero, then maybe the user does know what they're
+            # doing, but they don't know that they need to use the base offset.
+            if offset == 0:
+                pass
+
+            # If the user really is trying to add a member with a non-zero offset
+            # to our union, then we need to warn the user so that they know not
+            # to do it again in the future.
+            elif offset != self.baseoffset:
+                cls = self.__class__
+                logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Corrected the invalid offset ({:#x}) being used when adding member ({!s}) to union \"{:s}\", and changed it to {:+#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, offset, name, self.owner.name, self.baseoffset))
+
+            # Now we can actually correct the offset they gave us.
+            offset = self.baseoffset
+
         # FIXME: handle .strtype (strings), .ec (enums), .cd (custom)
         opinfo = idaapi.opinfo_t()
         opinfo.tid = typeid
         realoffset = offset - self.baseoffset
 
-        # figure out some defaults for the member name
+        # If they didn't give us a name, then we figure out a default name
+        # using a sort-of hungarian notation as the prefix, and the field's
+        # offset as the suffix.
         if name is None:
             cls = self.__class__
             logging.warning(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Name is undefined, defaulting to offset {:+#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, realoffset))
-            name = 'v', realoffset
-        if isinstance(name, tuple):
+            name = 'field', realoffset
+
+        # If we were given a tuple, then we need to concatenate it into a string.
+        if isinstance(name, builtins.tuple):
             name = interface.tuplename(*name)
 
-        # try and add the structure memberb
+        # Finally we can use IDAPython to add the structure member with the
+        # parameters that we were given and/or figured out.
         res = idaapi.add_struc_member(self.owner.ptr, utils.string.to(name), realoffset, flag, opinfo, nbytes)
+
+        # Now we can check whether the addition was succesful or not. If the
+        # addition didn't return an error code, then log the success in order
+        # to assist with debugging.
         if res == idaapi.STRUC_ERROR_MEMBER_OK:
             cls = self.__class__
-            logging.info(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, utils.string.escape(self.owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes))
+            logging.debug(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `idaapi.add_struc_member(sptr=\"{:s}\", fieldname=\"{:s}\", offset={:+#x}, flag={:#x}, mt={:#x}, nbytes={:#x})` returned success.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, utils.string.escape(self.owner.name, '"'), utils.string.escape(name, '"'), realoffset, flag, typeid, nbytes))
 
-        # we failed, so try figure out a good error message to inform the user with
+        # If we received a failure error code, then we convert the error code to
+        # an error message so that we can raise an exception that actually means
+        # something and enables the user to correct it.
         else:
             error = {
                 idaapi.STRUC_ERROR_MEMBER_NAME : 'Duplicate field name',
@@ -1362,14 +1637,18 @@ class members_t(object):
             cls = self.__class__
             raise e(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : The api call to `{:s}` returned {:s}".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, callee, error.get(res, u"Error code {:#x}".format(res))))
 
-        # now we can fetch the member at the specified offset to return
-        mem = idaapi.get_member(self.owner.ptr, realoffset)
-        if mem is None:
+        # We added the member, but now we need to return it to the caller. Since
+        # all we get is an error code from IDAPython's api, we try and fetch the
+        # member that was just added by the offset it's supposed to be at.
+        mptr = idaapi.get_member(self.owner.ptr, realoffset)
+        if mptr is None:
             cls = self.__class__
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.add({!r}, {!s}, {:+#x}) : Unable to locate recently created member \"{:s}\" at offset {:s}{:+#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, name, type, offset, utils.string.escape(name, '"'), realoffset, nbytes))
-        idx = self.index(mem)
 
-        # and then create a new instance of the member at our guessed index
+        # If we successfully grabbed the member, then we need to figure out its
+        # actual index in our structure. Then we can use the index to instantiate
+        # a member_t that we'll return back to the caller.
+        idx = self.index(mptr)
         return member_t(self.owner, idx)
 
     def pop(self, index):
@@ -1383,10 +1662,23 @@ class members_t(object):
     @utils.multicase()
     def remove(self, offset):
         '''Remove the member at `offset` from the structure.'''
-        return idaapi.del_struc_member(self.owner.ptr, offset - self.baseoffset)
+        items = [mptr for mptr in self.__members_at__(offset - self.baseoffset)]
+
+        # If there are no items at the requested offset, then we bail.
+        if not items:
+            cls = self.__class__
+            raise E.MemberNotFoundError(u"{:s}({:#x}).members.remove({:+#x}) : Unable to find member at the specified offset ({:#x}).".format('.'.join([__name__, cls.__name__]), self.owner.id, offset, offset))
+
+        # If more than one item was found, then we also need to bail.
+        if len(items) > 1:
+            raise E.InvalidTypeOrValueError(u"{:s}({:#x}).members.remove({:+#x}) : Refusing to remove more than {:d} member{:s} ({:d}) at offset {:#x}.".format('.'.join([__name__, cls.__name__]), self.owner.id, offset, 1, '' if len(items) == 1 else 's', len(items), offset))
+
+        # Now we know exactly what we can remove.
+        item, = items
+        return idaapi.del_struc_member(self.owner.ptr, item.soff)
     @utils.multicase()
     def remove(self, offset, size):
-        '''Remove all the members from the structure from `offset` up to `size`.'''
+        '''Remove all the members from the structure from the specified `offset` up to `size` bytes.'''
         res = offset - self.baseoffset
         return idaapi.del_struc_members(self.owner.ptr, res, res + size)
 
@@ -1568,22 +1860,28 @@ class member_t(object):
         '''Return the identifier of the member.'''
         return self.ptr.id
     @property
+    def properties(self):
+        '''Return the properties for the current member.'''
+        return self.ptr.props
+    @property
     def size(self):
         '''Return the size of the member.'''
         return idaapi.get_member_size(self.ptr)
     @property
     def realoffset(self):
         '''Return the real offset of the member.'''
-        return self.ptr.get_soff()
+        parent, member = self.parent.ptr, self.ptr
+        return 0 if parent.is_union() else member.get_soff()
     @property
     def offset(self):
         '''Return the offset of the member.'''
-        return self.ptr.get_soff() + self.parent.members.baseoffset
+        parent = self.parent
+        return self.realoffset + parent.members.baseoffset
     @property
     def flag(self):
         '''Return the "flag" attribute of the member.'''
-        m = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
-        return 0 if m is None else m.flag
+        mptr = idaapi.get_member(self.parent.ptr, self.offset - self.parent.members.baseoffset)
+        return 0 if mptr is None else mptr.flag
     @property
     def fullname(self):
         '''Return the fullname of the member.'''
@@ -1593,12 +1891,10 @@ class member_t(object):
     def typeid(self):
         '''Return the identifier of the type of the member.'''
         opinfo = idaapi.opinfo_t()
-        if idaapi.__version__ < 7.0:
-            res = idaapi.retrieve_member_info(self.ptr, opinfo)
-            return None if res is None else res.tid if res.tid != idaapi.BADADDR else None
-        else:
-            res = idaapi.retrieve_member_info(opinfo, self.ptr)
-        return None if opinfo.tid == idaapi.BADADDR else opinfo.tid
+        res = idaapi.retrieve_member_info(self.ptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, self.ptr)
+        if res:
+            return None if res.tid == idaapi.BADADDR else res.tid
+        return None
     @property
     def index(self):
         '''Return the index of the member.'''
@@ -1606,21 +1902,24 @@ class member_t(object):
     @property
     def left(self):
         '''Return the beginning offset of the member.'''
-        return self.ptr.soff
+        left, _ = self.bounds
+        return left
     @property
     def right(self):
         '''Return the ending offset of the member.'''
-        return self.ptr.eoff
+        _, right = self.bounds
+        return right
     @property
     def realbounds(self):
         '''Return the real boundaries of the member.'''
-        ptr = self.ptr
-        return interface.bounds_t(ptr.soff, ptr.eoff)
+        sptr, mptr = self.parent.ptr, self.ptr
+        return interface.bounds_t(0 if sptr.is_union() else mptr.soff, mptr.eoff)
     @property
     def bounds(self):
         '''Return the boundaries of the member.'''
-        ptr, base = self.ptr, self.parent.members.baseoffset
-        return interface.bounds_t(ptr.soff, ptr.eoff).translate(base)
+        parent = self.parent
+        bounds, base = self.realbounds, parent.members.baseoffset
+        return bounds.translate(base)
     @property
     def parent(self):
         '''Return the structure_t that owns the member.'''

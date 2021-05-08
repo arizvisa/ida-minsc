@@ -16,7 +16,7 @@ import unicodedata as _unicodedata, string as _string, array as _array
 import ui, internal
 import idaapi
 
-class typemap:
+class typemap(object):
     """
     This namespace provides bidirectional conversion from IDA's types
     to something more pythonic. This namespace is actually pretty
@@ -71,8 +71,9 @@ class typemap:
     field within a structure.
     """
 
-    FF_MASKSIZE = 0xf0000000    # Mask that select's the flag's size
-    FF_MASK = 0xfff00000        # Mask that select's the flag's repr
+    FF_MASKSIZE = idaapi.as_uint32(idaapi.DT_TYPE)  # Mask that select's the flag's size
+    FF_MASK = FF_MASKSIZE | 0xfff00000              # Mask that select's the flag's repr
+
     # FIXME: In some cases FF_nOFF (where n is 0 or 1) does not actually
     #        get auto-treated as an pointer by ida. Instead, it appears to
     #        only get marked as an "offset" and rendered as an integer.
@@ -80,35 +81,8 @@ class typemap:
     # FIXME: Figure out how to update this to use/create an idaapi.tinfo_t()
     #        and also still remain backwards-compatible with the older idaapi.opinfo_t()
 
-    ## IDA 7.0 types
-    if idaapi.__version__ >= 7.0:
-        integermap = {
-            1:(idaapi.byte_flag(), -1),  2:(idaapi.word_flag(), -1),
-            4:(idaapi.dword_flag(), -1),  8:(idaapi.qword_flag(), -1), 10:(idaapi.tbyte_flag(), -1),
-            16:(idaapi.oword_flag(), -1),
-        }
-        if hasattr(idaapi, 'yword_flag'):
-            integermap[32] = getattr(idaapi, 'yword_flag')(), -1
-
-        decimalmap = {
-             4:(idaapi.float_flag(), -1),     8:(idaapi.double_flag(), -1),
-            10:(idaapi.packreal_flag(), -1), 12:(idaapi.packreal_flag(), -1),
-        }
-
-        stringmap = {
-            chr:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
-            str:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
-        }
-        if hasattr(builtins, 'unichr'):
-            stringmap.setdefault(builtins.unichr, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
-        if hasattr(builtins, 'unicode'):
-            stringmap.setdefault(builtins.unicode, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
-
-        ptrmap = { sz : (idaapi.off_flag() | flg, tid) for sz, (flg, tid) in integermap.items() }
-        nonemap = { None :(idaapi.align_flag(), -1) }
-
     ## IDA 6.95 types
-    else:
+    if idaapi.__version__ < 7.0:
         integermap = {
             1:(idaapi.byteflag(), -1),  2:(idaapi.wordflag(), -1),  3:(idaapi.tribyteflag(), -1),
             4:(idaapi.dwrdflag(), -1),  8:(idaapi.qwrdflag(), -1), 10:(idaapi.tbytflag(), -1),
@@ -135,7 +109,34 @@ class typemap:
         ptrmap = { sz : (idaapi.offflag() | flg, tid) for sz, (flg, tid) in integermap.items() }
         nonemap = { None :(idaapi.alignflag(), -1) }
 
-    # lookup table for type
+    ## IDA 7.0 types
+    else:
+        integermap = {
+            1:(idaapi.byte_flag(), -1),  2:(idaapi.word_flag(), -1),
+            4:(idaapi.dword_flag(), -1),  8:(idaapi.qword_flag(), -1), 10:(idaapi.tbyte_flag(), -1),
+            16:(idaapi.oword_flag(), -1),
+        }
+        if hasattr(idaapi, 'yword_flag'):
+            integermap[32] = getattr(idaapi, 'yword_flag')(), -1
+
+        decimalmap = {
+             4:(idaapi.float_flag(), -1),     8:(idaapi.double_flag(), -1),
+            10:(idaapi.packreal_flag(), -1), 12:(idaapi.packreal_flag(), -1),
+        }
+
+        stringmap = {
+            chr:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
+            str:(idaapi.strlit_flag(), idaapi.STRTYPE_C),
+        }
+        if hasattr(builtins, 'unichr'):
+            stringmap.setdefault(builtins.unichr, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
+        if hasattr(builtins, 'unicode'):
+            stringmap.setdefault(builtins.unicode, (idaapi.strlit_flag(), idaapi.STRTYPE_C_16))
+
+        ptrmap = { sz : (idaapi.off_flag() | flg, tid) for sz, (flg, tid) in integermap.items() }
+        nonemap = { None :(idaapi.align_flag(), -1) }
+
+    # Generate the lookup table for looking up the correct tables for a given type.
     typemap = {
         int:integermap, float:decimalmap,
         str:stringmap, chr:stringmap,
@@ -145,7 +146,8 @@ class typemap:
     if hasattr(builtins, 'unicode'): typemap.setdefault(builtins.unicode, stringmap)
     if hasattr(builtins, 'unichr'): typemap.setdefault(builtins.unichr, stringmap)
 
-    # inverted lookup table
+    # Invert our lookup tables so that we can find the correct python types for
+    # the IDAPython flags that are defined.
     inverted = {}
     for s, (f, _) in integermap.items():
         inverted[f & FF_MASKSIZE] = (int, s)
@@ -161,7 +163,7 @@ class typemap:
     #        have the flag set but aren't actually structures..
     inverted[idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU] = (int, 1)
 
-    # defaults
+    # Assign the default values for the processor that was selected for the database.
     @classmethod
     def __newprc__(cls, pnum):
         info = idaapi.get_inf_structure()
@@ -185,63 +187,109 @@ class typemap:
     @classmethod
     def dissolve(cls, flag, typeid, size):
         '''Convert the specified `flag`, `typeid`, and `size` into a pythonic type.'''
+        structure = sys.modules.get('structure', __import__('structure'))
         FF_STRUCT = idaapi.FF_STRUCT if hasattr(idaapi, 'FF_STRUCT') else idaapi.FF_STRU
         dt = flag & cls.FF_MASKSIZE
         sf = -1 if flag & idaapi.FF_SIGN == idaapi.FF_SIGN else +1
-        if dt == FF_STRUCT and isinstance(typeid, six.integer_types):
+
+        # Check if the dtype is a structure and our type-id is an integer so that we
+        # figure out the structure's size. We also do an explicit check if the type-id
+        # is a structure because in some cases, IDA will forget to set the FF_STRUCT
+        # flag but still assign the structure type-id to a union member.
+        if (dt == FF_STRUCT and isinstance(typeid, six.integer_types)) or (typeid is not None and structure.has(typeid)):
             # FIXME: figure out how to fix this recursive module dependency
-            t = sys.modules.get('structure', __import__('structure')).by_identifier(typeid)
+            t = structure.by_identifier(typeid)
             sz = t.size
             return t if sz == size else [t, size // sz]
+
+        # Verify that we actually have the datatype mapped and that we can look it up.
         if dt not in cls.inverted:
             raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.dissolve({!r}, {!r}, {!r}) : Unable to locate a pythonic type that matches the specified flag.".format('.'.join([__name__, cls.__name__]), dt, typeid, size))
 
+        # Now that we know the datatype exists, extract the actual type and the
+        # type's size from the inverted map that we previously created.
         t, sz = cls.inverted[dt]
-        # if the type and size are the same, then it's a string or pointer type
+
+        # If the datatype size is not an integer, then we need to calculate the
+        # size ourselves using the size parameter we were given and the element
+        # size of the datatype that we extracted from the flags.
         if not isinstance(sz, six.integer_types):
             count = size // idaapi.get_data_elsize(idaapi.BADADDR, dt, idaapi.opinfo_t())
             return [t, count] if count > 1 else t
-        # if the size matches, then we assume it's a single element
+
+        # If the size matches the datatype size, then this is a single element
+        # which we represent with a tuple composed of the python type, and the
+        # actual byte size of the datatype.
         elif sz == size:
-            return t, (sz*sf)
-        # otherwise it's an array
-        return [(t, sz*sf), size // sz]
+            return t, sz * sf
+
+        # At this point, the size does not match the datatype size which means
+        # that this is an array where each element is using the datatype. So,
+        # we need to return a list where the first element is the datatype with
+        # the element size, and the second element is the length of the array.
+        return [(t, sz * sf), size // sz]
 
     @classmethod
     def resolve(cls, pythonType):
         '''Convert the provided `pythonType` into IDA's `(flag, typeid, size)`.'''
+        structure = sys.modules.get('structure', __import__('structure'))
         struc_flag = idaapi.struflag if idaapi.__version__ < 7.0 else idaapi.stru_flag
 
         sz, count = None, 1
 
-        # figure out what format pythonType is in
+        # If we were given a pythonic-type that's a tuple, then we know that this
+        # is actually an atomic type that has its flag within our typemap. We'll
+        # first use the type the user gave us to find the actual table containg
+        # the sizes we want to look up, and then we extract the flag and typeid
+        # from the table that we determined.
         if isinstance(pythonType, ().__class__):
             (t, sz), count = pythonType, 1
             table = cls.typemap[t]
             flag, typeid = table[abs(sz) if t in {int, getattr(builtins, 'long', int), float, type} else t]
 
-        # an array, which requires us to recurse...
+        # If we were given a pythonic-type that's a list, then we know that this
+        # is an array of some kind. We extract the count from the second element
+        # of the list, but then we'll need to recurse into ourselves in order to
+        # figure out the actual flag, type-id, and size of the type that we were
+        # given by the first element of the list.
         elif isinstance(pythonType, [].__class__):
             res, count = pythonType
             flag, typeid, sz = cls.resolve(res)
 
-        # if it's a structure, pass it through.
-        # FIXME: figure out how to fix this recursive module dependency
-        elif isinstance(pythonType, sys.modules.get('structure', __import__('structure')).structure_t):
+        # If our pythonic-type is an actual structure_t, then obviously this
+        # type is representing a structure. We know how to create the structure
+        # flag, but we'll need to extract the type-id and the structure's size
+        # from the properties of the structure that we were given.
+        elif isinstance(pythonType, structure.structure_t):
             flag, typeid, sz = struc_flag(), pythonType.id, pythonType.size
 
-        # default size that we can lookup in the typemap table
+        # If our pythonic-type is an idaapi.struc_t, then we need to do
+        # pretty much the exact same thing that we did for the structure_t
+        # and extract both its type-id and size.
+        elif isinstance(pythonType, idaapi.struc_t):
+            flag, typeid, sz = struc_flag(), pythonType.id, idaapi.get_struc_size(pythonType)
+
+        # Anything else should be the default value that we're going to have to
+        # look up. We start by using the type to figure out the correct table,
+        # and then we grab the flags and type-id from the None key for the
+        # pythonType. This should give us the default type information for the
+        # current database and architecture.
         else:
             table = cls.typemap[pythonType]
             flag, typeid = table[None]
 
-            typeid = idaapi.BADADDR if typeid < 0 else typeid
-            opinfo = idaapi.opinfo_t()
+            # Construct an opinfo_t with the type-id that was returned, and then
+            # calculate the correct size for the value returned by our table.
+            opinfo, typeid = idaapi.opinfo_t(), idaapi.BADADDR if typeid < 0 else typeid
             opinfo.tid = typeid
             return flag, typeid, idaapi.get_data_elsize(idaapi.BADADDR, flag, opinfo)
 
+        # Now we can return the flags, type-id, and the total size that IDAPython
+        # uses when describing a type. We also check if our size is negative
+        # because then we'll need to update the flags with the FF_SIGN flag in
+        # order to describe the correct type requested by the user.
         typeid = idaapi.BADADDR if typeid < 0 else typeid
-        return flag|(idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz)*count
+        return flag | (idaapi.FF_SIGN if sz < 0 else 0), typeid, abs(sz) * count
 
 class prioritybase(object):
     result = type('result', (object,), {})
@@ -1699,7 +1747,7 @@ def addressOfRuntimeOrStatic(func):
     return False, ea
 
 ## internal enumerations that idapython missed
-class fc_block_type_t:
+class fc_block_type_t(object):
     """
     This namespace contains a number of internal enumerations for
     ``idaapi.FlowChart`` that were missed by IDAPython. This can
