@@ -1736,9 +1736,11 @@ class operand_types:
 
             # figure out the sign flag
             sf, res = pow(2, bits - 1), op.value
+            value = idaapi.as_signed(res, bits)
 
             # if op.value has its sign inverted, then signify it otherwise just use it
-            return idaapi.as_signed(res, bits) if interface.node.alt_opinverted(ea, op.n) else res & (pow(2, bits) - 1)
+            inverted, regular = value if value & sf else value - pow(-2, bits), pow(-2, bits) + value if value & sf else value & (sf - 1)
+            return value and inverted if interface.node.alt_opinverted(ea, op.n) else regular
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
         raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype, op.type))
 
@@ -1866,8 +1868,9 @@ class operand_types:
         global architecture
         sf, dt = pow(2, bits - 1), dtype_by_size(database.config.bits() // 8)
 
-        inverted, regular = offset & (pow(2, bits) - 1) if offset & sf else pow(-2, bits) + offset, pow(-2, bits) + offset if offset & sf else offset & (sf - 1)
-        res = inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
+        value = idaapi.as_signed(offset, bits)
+        inverted, regular = value & (pow(2, bits) - 1) if value & sf else value - pow(-2, bits), pow(-2, bits) + offset if offset & sf else offset & (sf - 1)
+        res = value and inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
         return intelops.OffsetBaseIndexScale(*res)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
