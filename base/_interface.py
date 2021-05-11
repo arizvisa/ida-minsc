@@ -1165,14 +1165,32 @@ class node(object):
 
         return id64(sup) if bit64Q else id32(sup)
 
+    @internal.utils.multicase(ea=six.integer_types)
+    @classmethod
+    def alt_aflags(cls, ea):
+        '''Return the additional flags for the instruction at the address `ea`.'''
+        NALT_AFLAGS = 8
+        return internal.netnode.alt.get(ea, NALT_AFLAGS)
+    @internal.utils.multicase(ea=six.integer_types, mask=six.integer_types)
+    @classmethod
+    def alt_aflags(cls, ea, mask):
+        '''Return the additional flags for the instruction at the address `ea` masked with the integer provided by `mask`.'''
+        return cls.alt_flags(ea) & mask
+    @internal.utils.multicase(ea=six.integer_types, mask=six.integer_types, value=six.integer_types)
+    @classmethod
+    def alt_aflags(cls, ea, mask, value):
+        '''Set the additional flags for the instruction at address `ea` using the provided `mask` and `value`.'''
+        NALT_AFLAGS = 8
+        result = internal.netnode.alt.get(ea, NALT_AFLAGS) & ~mask
+        return internal.netnode.alt.set(ea, NALT_AFLAGS, result | (value & mask))
+
     @classmethod
     def alt_opinverted(cls, ea, opnum):
         '''Return whether the operand `opnum` at the address `ea` has its sign inverted or not.'''
-        NALT_AFLAGS = 8
         AFL_SIGN0, AFL_SIGN1 = 0x100000, 0x200000
 
         # Grab the altval containing the additional flags for the given address.
-        altval = internal.netnode.alt.get(ea, NALT_AFLAGS)
+        altval = cls.alt_aflags(ea)
 
         # Verify that we were given an operand number that we support, and
         # mask our altval to return whether the specified operand has its
@@ -1190,11 +1208,10 @@ class node(object):
     @classmethod
     def alt_opnegated(cls, ea, opnum):
         '''Return whether the operand `opnum` at the address `ea` has its value negated or not.'''
-        NALT_AFLAGS = 8
         AFL_BNOT0, AFL_BNOT1 = 0x100, 0x200
 
         # Grab the altval containing the additional flags for the given address.
-        altval = internal.netnode.alt.get(ea, NALT_AFLAGS)
+        altval = cls.alt_aflags(ea)
 
         # Verify that we were given an operand number that we support, and
         # then check if out altval has the negation flag set or not.
