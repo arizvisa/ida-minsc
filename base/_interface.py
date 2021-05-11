@@ -1167,63 +1167,69 @@ class node(object):
 
     @internal.utils.multicase(ea=six.integer_types)
     @classmethod
-    def alt_aflags(cls, ea):
+    def aflags(cls, ea):
         '''Return the additional flags for the instruction at the address `ea`.'''
-        NALT_AFLAGS = 8
+        NALT_AFLAGS = getattr(idaapi, 'NALT_AFLAGS', 8)
+        if hasattr(idaapi, 'get_aflags'):
+            return idaapi.get_aflags(ea)
         return internal.netnode.alt.get(ea, NALT_AFLAGS)
     @internal.utils.multicase(ea=six.integer_types, mask=six.integer_types)
     @classmethod
-    def alt_aflags(cls, ea, mask):
+    def aflags(cls, ea, mask):
         '''Return the additional flags for the instruction at the address `ea` masked with the integer provided by `mask`.'''
-        return cls.alt_flags(ea) & mask
+        return cls.aflags(ea) & mask
     @internal.utils.multicase(ea=six.integer_types, mask=six.integer_types, value=six.integer_types)
     @classmethod
-    def alt_aflags(cls, ea, mask, value):
+    def aflags(cls, ea, mask, value):
         '''Set the additional flags for the instruction at address `ea` using the provided `mask` and `value`.'''
-        NALT_AFLAGS = 8
-        result = internal.netnode.alt.get(ea, NALT_AFLAGS) & ~mask
-        return internal.netnode.alt.set(ea, NALT_AFLAGS, result | (value & mask))
+        NALT_AFLAGS = getattr(idaapi, 'NALT_AFLAGS', 8)
+        result, flags = cls.aflags(ea, ~mask), value & mask
+        if hasattr(idaapi, 'set_aflags'):
+            return idaapi.set_aflags(ea, result | flags)
+        return internal.netnode.alt.set(ea, NALT_AFLAGS, result | flags)
 
     @classmethod
     def alt_opinverted(cls, ea, opnum):
         '''Return whether the operand `opnum` at the address `ea` has its sign inverted or not.'''
         AFL_SIGN0, AFL_SIGN1 = 0x100000, 0x200000
+        AFL_SIGNX = AFL_SIGN0 | AFL_SIGN1
 
         # Grab the altval containing the additional flags for the given address.
-        altval = cls.alt_aflags(ea)
+        result = cls.aflags(ea, AFL_SIGNX)
 
         # Verify that we were given an operand number that we support, and
         # mask our altval to return whether the specified operand has its
         # signed flag set.
         if opnum in {0, 1}:
             flag = AFL_SIGN1 if opnum else AFL_SIGN0
-            return altval & flag != 0
+            return result & flag == flag
 
         # If we were given an invalid operand number, then we have no idea
         # what the actual flag is and we need to warn the user about it. It
         # isn't critical though, as we can still return false.
-        logging.warning(u"{:s}.alt_opinverted({:#x}, {:d}) : Unable to return the additional flag for operand {:d} belonging to the specified instruction ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, opnum, ea))
+        logging.warning(u"{:s}.alt_opinverted({:#x}, {:d}) : Unable to determine the operand flag for the additional flags ({:#x}) belonging to the specified instruction ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, result, ea))
         return False
 
     @classmethod
     def alt_opnegated(cls, ea, opnum):
         '''Return whether the operand `opnum` at the address `ea` has its value negated or not.'''
         AFL_BNOT0, AFL_BNOT1 = 0x100, 0x200
+        AFL_BNOTX = AFL_BNOT0 | AFL_BNOT1
 
         # Grab the altval containing the additional flags for the given address.
-        altval = cls.alt_aflags(ea)
+        result = cls.aflags(ea, AFL_BNOTX)
 
         # Verify that we were given an operand number that we support, and
         # then check if out altval has the negation flag set or not.
         if opnum in {0, 1}:
-            flag = AFL_SIGN1 if opnum else AFL_SIGN0
-            return altval & flag != 0
+            flag = AFL_BNOT1 if opnum else AFL_BNOT0
+            return result & flag == flag
 
         # If we were given an invalid operand number, then we have no idea
         # what bits point to it, and so we need to warn the user. Similar to
         # the alt_opinverted function, though, this isn't critical and we
         # can just return False since you can only negate the first two operands.
-        logging.warning(u"{:s}.alt_opnegated({:#x}, {:d}) : Unable to return the additional flag for operand {:d} belonging to the specified instruction ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, opnum, ea))
+        logging.warning(u"{:s}.alt_opinverted({:#x}, {:d}) : Unable to determine the operand flag for the additional flags ({:#x}) belonging to the specified instruction ({:#x}).".format('.'.join([__name__, cls.__name__]), ea, opnum, result, ea))
         return False
 
 def tuplename(*names):
