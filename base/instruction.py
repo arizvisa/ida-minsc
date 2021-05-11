@@ -1375,13 +1375,13 @@ def op_refs(ea, opnum):
 
     # sanity: returns whether the operand has a local or global xref
     F = database.type.flags(inst.ea)
-    ok = idaapi.op_adds_xrefs(F, opnum) ## FIXME: on tag:arm, this returns T for some operands
+    ok = idaapi.op_adds_xrefs(F, opnum) ## FIXME: on tag:arm, this returns true for some operands
 
     # FIXME: gots to be a better way to determine operand representation
+    # FIXME: this is incorrect on ARM for the 2nd op in `ADD R7, SP, #0x430+lv_dest_41c`
     res = opinfo(inst.ea, opnum)
 
-    # FIXME: this is incorrect on ARM for the 2nd op in `ADD R7, SP, #0x430+lv_dest_41c`
-    # stkvar
+    ## operand contains references to a stkvar
     if ok and res is None:
         fn = idaapi.get_func(ea)
         if fn is None:
@@ -1406,19 +1406,37 @@ def op_refs(ea, opnum):
         idaapi.build_stkvar_xrefs(xl, fn, member)
         res = [ interface.opref_t(x.ea, int(x.opnum), interface.reftype_t.of(x.type)) for x in xl ]
         # FIXME: how do we handle the type for an LEA instruction which should include '&'...
+        return res
 
-    # enums
+    ## operand contains references to an enumeration member
     elif ok and enumeration.has(res.tid):
-        e = enumeration.by(res.tid)
-        # enums are defined in a altval at index 0xb+opnum
-        # the int points straight at the enumeration id
-        # FIXME: references to enums don't seem to work
-        raise E.UnsupportedCapability(u"{:s}.op_refs({:#x}, {:d}) : References are not implemented for enumeration types.".format(__name__, inst.ea, opnum))
+        eid, mid = res.tid, op_enumeration(ea, opnum)
+        NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
 
-    # struc member
+        # try and grab the first xref for the enumeration member we just snagged.
+        x = idaapi.xrefblk_t()
+        if not x.first_to(mid, idaapi.XREF_ALL):
+            fullname = '.'.join([enumeration.name(eid), enumeration.member.name(mid)])
+            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found for enumeration member {:s} ({:#x}).".format(__name__, inst.ea, opnum, fullname, m))
+            return []
+
+        # we got one and now we can loop to gather the rest of them.
+        refs = [(x.frm, x.iscode, x.type)]
+        while x.next_to():
+            refs.append((x.frm, x.iscode, x.type))
+
+        # now we need to iterate through all of our references so that we can
+        # try and figure out which operand numbers our enumeration is at.
+        res = []
+        for ea, _, t in refs:
+            ops = ((opnum, internal.netnode.alt.get(ea, altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(ea, altidx))
+            ops = (opnum for opnum, mid in ops if enumeration.member.parent(mid) == eid)
+            res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
+        return res
+
+    # operation contains references to a structure member
     elif ok and res.tid != idaapi.BADADDR:    # FIXME: is this right?
-        # structures are defined in a supval at index 0xf+opnum
-        # the supval has the format 0001c0xxxxxx where 'x' is the low 3 bytes of the structure id
+        NSUP_STROFF0, NSUP_STROFF1 = (getattr(idaapi, name, 0xf + idx) for idx, name in enumerate(['NSUP_STROFF0', 'NSUP_STROFF1']))
 
         # structure member xrefs (outside function)
         pathvar = idaapi.tid_array(1)
@@ -1452,31 +1470,9 @@ def op_refs(ea, opnum):
         # extract the references
         x = idaapi.xrefblk_t()
 
-        if not x.first_to(mem.id, 0):
+        if not x.first_to(mem.id, idaapi.XREF_ALL):
             fullname = idaapi.get_member_fullname(mem.id)
             logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
-
-        refs = [(x.frm, x.iscode, x.type)]
-        while x.next_to():
-            refs.append((x.frm, x.iscode, x.type))
-
-        # now figure out the operands if there are any
-        res = []
-        for ea, _, t in refs:
-            ops = ((idx, internal.netnode.sup.get(ea, 0xf + idx)) for idx in range(idaapi.UA_MAXOP) if internal.netnode.sup.get(ea, 0xf + idx) is not None)
-            ops = ((idx, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for idx, val in ops)
-            ops = (idx for idx, (_, ids) in ops if st.id in ids)
-            res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
-        res = res
-
-    # FIXME: is this supposed to execute if ok == T? or not?
-    # global
-    else:
-        # anything that's just a reference is a single-byte supval at index 0x9 + opnum
-        # 9 -- '\x02' -- offset to segment 2
-        gid = operand(inst.ea, opnum).value if operand(inst.ea, opnum).type in {idaapi.o_imm} else operand(inst.ea, opnum).addr
-        x = idaapi.xrefblk_t()
-        if not x.first_to(gid, 0):
             return []
 
         refs = [(x.frm, x.iscode, x.type)]
@@ -1486,15 +1482,42 @@ def op_refs(ea, opnum):
         # now figure out the operands if there are any
         res = []
         for ea, _, t in refs:
-            if ea == idaapi.BADADDR: continue
-            if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
-                ops = ((idx, operand(ea, idx).value if operand(ea, idx).type in {idaapi.o_imm} else operand(ea, idx).addr) for idx in range(ops_count(ea)))
-                ops = (idx for idx, val in ops if val == gid)
-                res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
-            else:
-                res.append( interface.ref_t(ea, None, interface.reftype_t.of(t)) )
-            continue
-        res = res
+            ops = ((opnum, internal.netnode.sup.get(ea, supidx)) for opnum, supidx in enumerate([NSUP_STROFF0, NSUP_STROFF1]) if internal.netnode.sup.has(ea, supidx))
+
+            # the supval has the format 0001c0xxxxxx where 'x' is the low 3 bytes of
+            # the structure id. we handle this inside interface.node.sup_opstruct.
+            ops = ((opnum, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for opnum, val in ops)
+            ops = (opnum for opnum, (_, ids) in ops if st.id in ids)
+            res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
+        return res
+
+    ## references for globals (is this soupposed to execute if okay is true? or not??)
+
+    # anything that's just a reference is a single-byte supval at index 0x9 + opnum
+    # 9 -- '\x02' -- offset to segment 2
+    gid = operand(inst.ea, opnum).value if operand(inst.ea, opnum).type in {idaapi.o_imm} else operand(inst.ea, opnum).addr
+
+    x = idaapi.xrefblk_t()
+    if not x.first_to(gid, idaapi.XREF_ALL):
+        name = database.name(gid)
+        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found to global \"{:s}\" ({:#x}).".format(__name__, inst.ea, opnum, utils.string.escape(name, '"'), gid))
+        return []
+
+    refs = [(x.frm, x.iscode, x.type)]
+    while x.next_to():
+        refs.append((x.frm, x.iscode, x.type))
+
+    # now figure out the operands if there are any
+    res = []
+    for ea, _, t in refs:
+        if ea == idaapi.BADADDR: continue
+        if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
+            ops = ((opnum, operand(ea, opnum).value if operand(ea, opnum).type in {idaapi.o_imm} else operand(ea, opnum).addr) for opnum in range(ops_count(ea)))
+            ops = (opnum for opnum, val in ops if val == gid)
+            res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
+        else:
+            res.append( interface.ref_t(ea, None, interface.reftype_t.of(t)) )
+        continue
     return res
 op_ref = utils.alias(op_refs)
 
