@@ -1369,64 +1369,89 @@ def op_refs(opnum):
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types)
 def op_refs(ea, opnum):
     '''Returns the `(address, opnum, type)` of all the instructions that reference the operand `opnum` for the instruction at `ea`.'''
-    inst = at(ea)
-    if opnum >= len(operands(ea)):
+    inst, ops = at(ea), operands(ea)
+    if len(ops) < opnum:
         raise E.InvalidTypeOrValueError(u"{:s}.op_refs({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
-    # sanity: returns whether the operand has a local or global xref
+    # Start out by doing sanity check so that we can determine whether
+    # the operand is referencing a local or a global. We grab both the
+    # operand info any the result from idaapi.op_adds_xrefs in order to
+    # distinguish the "type" of xrefs that are associated with an operand.
+    # This way we can distinguish structure members, enumeration members,
+    # locals, globals, etc.
     F = database.type.flags(inst.ea)
-    ok = idaapi.op_adds_xrefs(F, opnum) ## FIXME: on tag:arm, this returns true for some operands
+    info, has_xrefs = opinfo(inst.ea, opnum), idaapi.op_adds_xrefs(F, opnum)
 
-    # FIXME: gots to be a better way to determine operand representation
-    # FIXME: this is incorrect on ARM for the 2nd op in `ADD R7, SP, #0x430+lv_dest_41c`
-    res = opinfo(inst.ea, opnum)
-
-    ## operand contains references to a stkvar
-    if ok and res is None:
+    # If we have xrefs but no type information, then this operand has to
+    # be pointing to a local stack variable that is stored in the frame.
+    # This means that we need to be inside a function so that we can
+    # grab its frame and search through it.
+    if has_xrefs and info is None:
         fn = idaapi.get_func(ea)
         if fn is None:
             raise E.FunctionNotFoundError(u"{:s}.op_refs({:#x}, {:d}) : Unable to locate function for address {:#x}.".format(__name__, ea, opnum, ea))
 
+        # Use IDAPython's api to calculate the structure offset into the
+        # function's frame using the instruction operand.
         stkofs_ = idaapi.calc_stkvar_struc_offset(fn, inst.ea if idaapi.__version__ < 7.0 else inst, opnum)
 
-        # check that the stkofs_ from get_stkvar and calc_stkvar are the same
+        # For sanity, we're going to grab the actual value of the operand
+        # and use it to verify that the result from IDAPython is correct.
         op = operand(inst.ea, opnum)
+        sval = interface.sval_t(op.addr).value
 
-        res = interface.sval_t(op.addr).value
-        if idaapi.__version__ < 7.0:
-            member, stkofs = idaapi.get_stkvar(op, res)
-        else:
-            member, stkofs = idaapi.get_stkvar(inst, op, res)
+        # Now that we have the instruction operand's value, we can use
+        # it with IDAPython to check if it's actually a frame member.
+        res = idaapi.get_stkvar(op, sval) if idaapi.__version__ < 7.0 else idaapi.get_stkvar(inst, op, sval)
+        if res is None:
+            raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : The instruction operand's value ({:#x}) does not appear to point to a frame variable at the same offset ({:#x}).".format(__name__, inst.ea, opnum, sval.value, stkofs_))
 
+        # Now we have the actual frame member and the offset into the
+        # frame, and we can use it to validate against our expectation.
+        member, stkofs = res
         if stkofs != stkofs_:
-            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The stack offset for the instruction operand ({:#x}) does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
+            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The stack variable offset ({:#x}) for the instruction operand does not match what was expected ({:#x}).".format(__name__, inst.ea, opnum, stkofs, stkofs_))
 
-        # build the xrefs
+        # Finally we can instantiate an idaapi.xreflist_t, and call directly
+        # into the IDAPython api in order to let it build all of the
+        # xrefs for the operand.
         xl = idaapi.xreflist_t()
         idaapi.build_stkvar_xrefs(xl, fn, member)
-        res = [ interface.opref_t(x.ea, int(x.opnum), interface.reftype_t.of(x.type)) for x in xl ]
-        # FIXME: how do we handle the type for an LEA instruction which should include '&'...
-        return res
 
-    ## operand contains references to an enumeration member
-    elif ok and enumeration.has(res.tid):
-        eid, mid = res.tid, op_enumeration(ea, opnum)
+        # That should've created our xref list, so we can simply transform
+        # it directly into a list of interface.opref_t and return it.
+        # FIXME: the type for an LEA instruction should include an '&' in the
+        #        reftype_t, but in this case we explicitly trust the type.
+        return [ interface.opref_t(x.ea, int(x.opnum), interface.reftype_t.of(x.type)) for x in xl ]
+
+    # If we have xrefs and the operand has information associated with it, then
+    # we need to check if the type-id is an enumeration. If so, then the user is
+    # looking for references to an enumeration member. We start by grabbing both
+    # id for the enumeration and its member.
+    elif has_xrefs and info and enumeration.has(info.tid):
+        eid, mid = info.tid, op_enumeration(ea, opnum)
         NALT_ENUM0, NALT_ENUM1 = (getattr(idaapi, name, 0xb + idx) for idx, name in enumerate(['NALT_ENUM0', 'NALT_ENUM1']))
 
-        # try and grab the first xref for the enumeration member we just snagged.
-        x = idaapi.xrefblk_t()
-        if not x.first_to(mid, idaapi.XREF_ALL):
+        # Now we check to see if it has any xrefs that point directly to the id
+        # of the member. If not, then there's nothing to do here.
+        X = idaapi.xrefblk_t()
+        if not X.first_to(mid, idaapi.XREF_ALL):
             fullname = '.'.join([enumeration.name(eid), enumeration.member.name(mid)])
             logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found for enumeration member {:s} ({:#x}).".format(__name__, inst.ea, opnum, fullname, m))
             return []
 
-        # we got one and now we can loop to gather the rest of them.
-        refs = [(x.frm, x.iscode, x.type)]
-        while x.next_to():
-            refs.append((x.frm, x.iscode, x.type))
+        # As we were able to find one, we can just continue to iterate through
+        # the xrefblk_t while gathering all of the necessary properties into
+        # our list of references.
+        refs = [(X.frm, X.iscode, X.type)]
+        while X.next_to():
+            refs.append((X.frm, X.iscode, X.type))
 
-        # now we need to iterate through all of our references so that we can
-        # try and figure out which operand numbers our enumeration is at.
+        # After gathering all the xrefs into a list, we'll need to transform
+        # it into a list of internal.opref_t. In order to do that, we need to
+        # figure out which operand the member is in for each address. During
+        # this process, we also verify that the member is actually owned by
+        # the enumeration we extracted from our original operand information.
         res = []
         for ea, _, t in refs:
             ops = ((opnum, internal.netnode.alt.get(ea, altidx)) for opnum, altidx in enumerate([NALT_ENUM0, NALT_ENUM1]) if internal.netnode.alt.has(ea, altidx))
@@ -1434,8 +1459,10 @@ def op_refs(ea, opnum):
             res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
         return res
 
-    # operation contains references to a structure member
-    elif ok and res.tid != idaapi.BADADDR:    # FIXME: is this right?
+    # If the operand adds xrefs and there's operand information which contains
+    # and identifier that's definitely a structure, then this is obviously
+    # a structure path (or structure offset).
+    elif has_xrefs and info and structure.has(info.tid):
         NSUP_STROFF0, NSUP_STROFF1 = (getattr(idaapi, name, 0xf + idx) for idx, name in enumerate(['NSUP_STROFF0', 'NSUP_STROFF1']))
 
         # structure member xrefs (outside function)
@@ -1491,33 +1518,70 @@ def op_refs(ea, opnum):
             res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
         return res
 
-    ## references for globals (is this soupposed to execute if okay is true? or not??)
+    # Anything else should be just a regular global reference, and to figure this out
+    # we just grab the operand's value and work it out from there. The value at the
+    # supidx has some format which is documented as "complex reference information".
+    # In some cases, I've seen the byte 0x02 used to describe a pointer to a global
+    # that is within the second segment.
 
-    # anything that's just a reference is a single-byte supval at index 0x9 + opnum
-    # 9 -- '\x02' -- offset to segment 2
-    gid = operand(inst.ea, opnum).value if operand(inst.ea, opnum).type in {idaapi.o_imm} else operand(inst.ea, opnum).addr
+    # XXX: verify whether globals are supposed to add xrefs (has_xrefs) or not.
 
-    x = idaapi.xrefblk_t()
-    if not x.first_to(gid, idaapi.XREF_ALL):
-        name = database.name(gid)
-        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found to global \"{:s}\" ({:#x}).".format(__name__, inst.ea, opnum, utils.string.escape(name, '"'), gid))
+    attributes = ['NSUP_REF0', 'NSUP_REF1', 'NSUP_REF2', 'NSUP_REF3', 'NSUP_REF4', 'NSUP_REF5', 'NSUP_REF6', 'NSUP_REF7']
+    indices = [9, 10, 11, 21, 22, 23, 33, 34]
+    NSUP_REF0, NSUP_REF1, NSUP_REF2, NSUP_REF3, NSUP_REF4, NSUP_REF5, NSUP_REF6, NSUP_REF7 = (getattr(idaapi, name, supidx) for name, supidx in zip(attributes, indices))
+
+    # We start by grabbing the operand's value from the instruction.
+    value = operand(inst.ea, opnum).value if operand(inst.ea, opnum).type in {idaapi.o_imm} else operand(inst.ea, opnum).addr
+
+    # Now we can try to get all the xrefs from the address value that
+    # we extracted. If we couldn't grab anything, then just warn the
+    # user about it and return an empty list.
+    X = idaapi.xrefblk_t()
+    if not X.first_to(value, idaapi.XREF_ALL):
+        name = database.name(value)
+        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found to global \"{:s}\" ({:#x}).".format(__name__, inst.ea, opnum, utils.string.escape(name, '"'), value))
         return []
 
-    refs = [(x.frm, x.iscode, x.type)]
-    while x.next_to():
-        refs.append((x.frm, x.iscode, x.type))
+    # However, if we were able to find the first value, then we can
+    # proceed to gather the rest of them into a list of references.
+    refs = [(X.frm, X.iscode, X.type)]
+    while X.next_to():
+        refs.append((X.frm, X.iscode, X.type))
 
-    # now figure out the operands if there are any
+    # After gathering all of the references into our list, we need
+    # to iterate through all of them to figure out exactly what kind
+    # of data each reference is targetting.
     res = []
     for ea, _, t in refs:
-        if ea == idaapi.BADADDR: continue
+
+        # If we got a bad address, then simply skip over it because
+        # it's entirely not relevant.
+        if ea == idaapi.BADADDR:
+            continue
+
+        # Grab the flags for the address of the reference, and mask
+        # out everything but its type. If it's type tells us that
+        # it's pointing to something defined as code, then we'll
+        # need to figure out what operand is referencing it.
         if database.type.flags(ea, idaapi.MS_CLS) == idaapi.FF_CODE:
+
+            # We iterate through all of the operands in order to extract
+            # the value from each operand. This way we can verify that it's
+            # s actually the same value in our original instruction operand.
             ops = ((opnum, operand(ea, opnum).value if operand(ea, opnum).type in {idaapi.o_imm} else operand(ea, opnum).addr) for opnum in range(ops_count(ea)))
-            ops = (opnum for opnum, val in ops if val == gid)
-            res.extend( interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
+            ops = (opnum for opnum, val in ops if val == value)
+
+            # As that's been confirmed, we can now create the interface.opref_t
+            # with any of the instruction operands that we've determined.
+            iterable = (interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
+
+        # If the address of the reference wasn't actually a code
+        # type, then this is a data global which doesn't have an
+        # operand for us to search through.
         else:
-            res.append( interface.ref_t(ea, None, interface.reftype_t.of(t)) )
-        continue
+            ref = interface.ref_t(ea, None, interface.reftype_t.of(t))
+            iterable = (item for item in [ref])
+        res.extend(iterable)
     return res
 op_ref = utils.alias(op_refs)
 
