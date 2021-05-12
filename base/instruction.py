@@ -1079,6 +1079,11 @@ def op_structure(ea, opnum, sptr, path, **delta):
     res = op.value if op.type in {idaapi.o_imm} else op.addr
     value = idaapi.as_signed(res, op_bits(ea, opnum))
 
+    # If the operand type is not a valid type, then raise an exception so that
+    # we don't accidentally apply a structure to an invalid operand type.
+    if op.type not in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ, idaapi.o_imm}:
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, path, delta.get('delta', 0), opnum, ea, op.type))
+
     # We have to start somewhere and our first element in the path should be a
     # a member of the sptr we were given. So, now we begin to traverse through
     # all of the members in the path the user gave us so that we can figure out
