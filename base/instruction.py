@@ -1486,63 +1486,124 @@ def op_refs(ea, opnum):
         items = [path[idx] for idx in range(count)]
 
         # After we get the list of member ids, then we can use it to
-        # get the sptr that everything starts at, the path of all the
-        # members, and the mptr to find the references of.
+        # compose the path that we will later match against. We grab
+        # the first member (which is the structure id) so that later
+        # we can validate it against the sptr that we get from the
+        # idaapi.get_member_by_id api.
         sptr = idaapi.get_struc(items.pop(0))
-        items = [idaapi.get_member_by_id(item) for item in items if item]
-        members = [mptr for mptr, name, sptr in items]
+        mptrs = [idaapi.get_member_by_id(item) for item in items if item]
+        items = [(sptr, mptr) for mptr, _, sptr in mptrs]
 
-        # Take the member that we're supposed look find references to
-        # from the last member of our path.
-        if members:
-            mptr = members[-1]
+        # Grab the sptr from the first member and compare it against
+        # the first member that we got from idaapi.get_stroff_path.
+        if items:
+            target, _ = items[0]
+            if target.id != sptr.id:
+                raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : The structure id ({:#x}) in the determined path does not have ownership of the first member ({:#x}).".format(__name__, inst.ea, opnum, sptr.id, target.id))
+            members = items
 
-        # If there weren't any members in the path, then we need to
-        # rely on op_structure to identify the member to search. We
-        # need to figure out the last member, so we put in the effort
-        # to ensure it's a list, and to cull any offset that might
-        # be included.
+        # If IDAPython didn't return any members in the path, then we
+        # need to rely on op_structure to find the members we need to
+        # search for. As op_structure can return a number of arbitrary
+        # types, we need to normalize it into a list of members. This
+        # involves packing a single member into a list, and dropping
+        # off the integer for the delta at the very end.
         else:
             res = op_structure(inst.ea, opnum)
             items = [item for item in res] if isinstance(res, (builtins.list, builtins.tuple)) else [res]
             items.pop(-1) if isinstance(items[-1], six.integer_types) else items
-            members = [item.ptr for item in items]
-            mptr = items[-1].ptr
 
-        # FIXME: We need to iterate through all of the members to collect their
-        #        references before we filter them. Because we're only grabbing
-        #        the last one, we miss out on a number of addresses.
+            # Now we should have a list of structure.member_t, so all
+            # we need to do is grab their idaapi.struc_t and idaapi.member_t.
+            members = [(item.parent.ptr, item.ptr) for item in items]
 
-        # Now we check to see if it has any xrefs that point directly to the id
-        # of the member. If not, then there's nothing to do here.
-        X = idaapi.xrefblk_t()
-        if not X.first_to(mptr.id, idaapi.XREF_ALL):
-            fullname = idaapi.get_member_fullname(mptr.id)
-            logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references were found that were pointing to struct member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
-            return []
+        # Now we need to iterate through all of the members and collect their
+        # xref'd targets. These will all get filtered later, so we shouldn't
+        # have to worry about it too much.
+        refs = {item for item in []}
+        for sptr, mptr in members:
 
-        # If we were able to get a reference, then we can gather all of them
-        # into our list which we'll verify later.
-        refs = [(X.frm, X.iscode, X.type)]
-        while X.next_to():
-            refs.append((X.frm, X.iscode, X.type))
+            # Now we check to see if it has any xrefs that point directly to
+            # the id of the member. If not, then there's nothing to do here.
+            # First we need to check the first xref of the member. If there
+            # isn't anything, then we continue onto the next one.
+            X = idaapi.xrefblk_t()
+            if not X.first_to(mptr.id, idaapi.XREF_ALL):
+                fullname = idaapi.get_member_fullname(mptr.id)
+                logging.info(u"{:s}.op_refs({:#x}, {:d}) : No references were found for structure member \"{:s}\".".format(__name__, inst.ea, opnum, utils.string.escape(utils.string.of(fullname), '"')))
+                continue
 
-        # Now we can iterate through all of our references grabbing any
-        # operand that's referencing a structure offset. Afterwards, we
-        # use interface.node.sup_opstruct to extract the identifiers
-        # associated with the operand.
+            # If we were able to get an xref, then we can gather the rest of
+            # them into our list which we'll verify later.
+            items = [(X.frm, X.iscode, X.type)]
+            while X.next_to():
+                items.append((X.frm, X.iscode, X.type))
+
+            # Update our set with all of the references that we found for the
+            # current member, and then continue onto the next one.
+            refs.update(items)
+
+        # To verify that the operand is definitely referencing the caller's
+        # request, we need to iterate through all of the operands for every
+        # reference and gather their structure path. This path could be composed
+        # of frame variables or actual structure members, and we definitely
+        # need to check both.
         res = []
-        for ea, _, t in refs:
-            ops = ((opnum, internal.netnode.sup.get(ea, supidx)) for opnum, supidx in enumerate([NSUP_STROFF0, NSUP_STROFF1]) if internal.netnode.sup.has(ea, supidx))
-            ops = ((opnum, interface.node.sup_opstruct(val, idaapi.get_inf_structure().is_64bit())) for opnum, val in ops)
+        for ea, _, t in sorted(refs, key=operator.itemgetter(0)):
+            candidates = []
 
-            # To verify that the operand is definitely referencing what
-            # the caller has requested, we iterate through all of the ids
-            # for the operand and check that one of them is using the
-            # sptr that we started with. If so, then we can add this
-            # operand to our list of interface.reftype_t.
-            ops = (opnum for opnum, (_, ids) in ops if sptr.id in ids)
-            res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in ops)
+            # Start by gathering any structure candidates that may be referenced
+            # by our structure path.
+            for refop, supidx in enumerate([NSUP_STROFF0, NSUP_STROFF1]):
+                if internal.netnode.sup.has(ea, supidx):
+                    supval = internal.netnode.sup.get(ea, supidx)
+                    offset, ids = interface.node.sup_opstruct(supval, idaapi.get_inf_structure().is_64bit())
+                    candidates.append((refop, ids))
+                continue
+
+            # Next we need to check if there were any operands that actually
+            # point to stack variables so we can figure out their path and
+            # add them to our candidates list if necessary.
+            for refop, op in enumerate(operands(ea)):
+                if not idaapi.is_stkvar(database.type.flags(ea), refop):
+                    continue
+
+                # Use the instruction and the operand to figure out the
+                # member id of the frame that we need to descend into.
+                item = idaapi.get_stkvar(at(ea), op, op.value if op.type in {idaapi.o_imm} else op.addr)
+                if item is None:
+                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, inst.ea, opnum, refop, ea))
+                    continue
+                mptr, actval = item
+
+                # We have the mptr for the frame variable, so next we just need
+                # to get the sptr for it, and use it get its members_t. This way
+                # we can use the actual value to compose a path through it.
+                sptr = idaapi.get_sptr(mptr)
+                if sptr is None:
+                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, inst.ea, opnum, refop, ea))
+                    continue
+
+                # Instantiate a structure_t in order to grab its members_t. From
+                # this we can then use the actual value to carve a path straight
+                # through the member.
+                st = structure.__instance__(sptr.id)
+                path, delta = st.members.__walk_to_realoffset__(actval) # FIXME: wtf is the offset that we should use
+                ids = [sptr.id] + [item.ptr.id for item in path]
+                candidates.append((refop, ids))
+
+            # Now that we've gathered all of the relevant operand numbers
+            # and the structure ids for their paths, we need to do a final
+            # pass of them to filter the operands to include references for.
+            filtered, required = [], [item.id for item, _ in members[:1]] + [item.id for _, item in members[1:]]
+            for opnum, ids in candidates:
+
+                # If we don't have enough ids, then we only need match
+                # exactly what we have.
+                if all(item in ids for item in required[:len(ids)]):
+                    filtered.append(opnum)
+                continue
+            res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
         return res
 
     # Anything else should be just a regular global reference, and to figure this out
