@@ -238,14 +238,11 @@ def by_identifier(identifier, **options):
 
 by_id = byidentifier = byId = utils.alias(by_identifier)
 
-## FIXME: need to add support for a union_t. add_struc takes another parameter
-##        that defines whether a structure is a union or not.
-
 @utils.multicase(id=six.integer_types)
 def is_union(id):
     '''Return whether the structure identified by `id` is a union or not.'''
     structure = idaapi.get_struc(id)
-    return is_union(id)
+    return is_union(structure)
 @utils.multicase()
 def is_union(structure):
     '''Return whether the provided `structure` is defined as a union.'''
@@ -1042,7 +1039,7 @@ class members_t(object):
                 return i
             continue
         cls = self.__class__
-        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member is not in the members list.".format('.'.join([__name__, cls.__name__]), owner.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member)))
+        raise E.MemberNotFoundError(u"{:s}({:#x}).members.index({!s}) : The requested member ({!s}) is not in the members list.".format('.'.join([__name__, cls.__name__]), owner.id, "{:#x}".format(member.id) if isinstance(member, (member_t, idaapi.member_t)) else "{!r}".format(member), internal.netnode.name.get(member.id)))
 
     __members_matcher = utils.matcher()
     __members_matcher.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), 'name')
@@ -1276,14 +1273,14 @@ class members_t(object):
             for mptr in items:
                 opinfo = idaapi.opinfo_t()
                 res = idaapi.retrieve_member_info(mptr, opinfo) if idaapi.__version__ < 7.0 else idaapi.retrieve_member_info(opinfo, mptr)
-                candidates.append((mptr, mptr.flag, res, idaapi.get_member_size(mptr)))
+                candidates.append((mptr, mptr.flag, res and res.tid, idaapi.get_member_size(mptr)))
 
             # Now iterate through all of our candidates to see how we can narrow
             # them down into the ones we want to select.
             selected = []
-            for mptr, flags, opinfo, size in candidates:
+            for mptr, flags, tid, size in candidates:
                 dt = idaapi.as_uint32(flags & idaapi.DT_TYPE)
-                res = interface.typemap.dissolve(flags, opinfo, size)
+                res = interface.typemap.dissolve(flags, tid, size)
 
                 # Adjust the offset so it points directly into the member.
                 realoffset = offset - (0 if unionQ() else mptr.soff)
@@ -1328,7 +1325,7 @@ class members_t(object):
                 # directly to a particular member. If it does, then this is
                 # a legitimate candidate.
                 elif isinstance(res, structure_t):
-                    mem = idaapi.get_member(sptr, realoffset)
+                    mem = idaapi.get_member(res.ptr, realoffset)
                     selected.append(mptr) if realoffset - mem.soff else selected.insert(0, mptr)
 
                 # If it's a tuple, then this only matches if we're pointing
