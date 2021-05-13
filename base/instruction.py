@@ -1270,7 +1270,7 @@ def op_enumeration(ea, opnum):
         # user about it.
         if mid == idaapi.BADNODE:
             ok, width = False, 2 * enumeration.size(eid) if enumeration.size(eid) else utils.string.digits(max(masks), 16)
-            logging.warn(u"{:s}.op_enumeration({:#x}, {:d}) : No enumeration member was found for the value ({:s}) in the enumeration ({:#x}) at operand {:d}.".format(__name__, ea, opnum, "{:#0{:d}x} & {:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width, mask, 3 + width if mask < 0 else 2 + width) if enumeration.bitfield(eid) else "{:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width), eid, opnum))
+            logging.warn(u"{:s}.op_enumeration({:#x}, {:d}) : No enumeration member was found for the mask ({:s}) in the enumeration ({:#x}) at operand {:d}.".format(__name__, ea, opnum, "{:#0{:d}x} & {:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width, mask, 3 + width if mask < 0 else 2 + width) if enumeration.bitfield(eid) else "{:#0{:d}x}".format(item, 3 + width if item < 0 else 2 + width), eid, opnum))
 
         # Otherwise, add it to our results and continue onto the next mask.
         else:
@@ -1278,15 +1278,20 @@ def op_enumeration(ea, opnum):
         continue
 
     # If we found everything without any errors, then return our results to
-    # the caller. If it was a bitfield, then we return a tuple. Otherwise,
-    # the enumeration member identifier should be more than enough.
-    if ok:
-        return builtins.tuple(res) if enumeration.bitfield(eid) else res[0]
+    # the caller. If it was a bitfield, then we need to check if there's
+    # a single result, otherwise we return a tuple. If it was not a bitfield
+    # then the enumeration member identifier should be more than enough.
+    if ok and res:
+        if enumeration.bitfield(eid):
+            return builtins.tuple(res) if len(res) > 1 else res[0]
+        return res[0]
 
     # If we did get something but we missed a value for one of the masks,
     # then this result is incomplete, but still okay to return.
     elif res:
-        return builtins.tuple(res) if enumeration.bitfield(eid) else res[0]
+        if enumeration.bitfield(eid):
+            return builtins.tuple(res) if len(res) > 1 else res[0]
+        return res[0]
 
     # Otherwise, we didn't find anything and there was an error trying to
     # get an enumeration member. This is worth an exception for the caller
