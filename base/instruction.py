@@ -1919,13 +1919,20 @@ class operand_types:
         if op.type in {idaapi.o_imm, idaapi.o_phrase}:
             bits = 8 * get_dtype_size(get_dtype_attribute(op))
 
-            # figure out the sign flag
-            sf, res = pow(2, bits - 1), op.value
-            value = idaapi.as_signed(res, bits)
+            # Figure out the maximum operand size using the operand's type,
+            # and convert the value that was returned by IDAPython into its
+            # signed format so that we can figure out what to return.
+            maximum, value = pow(2, bits), op.value
+            res = idaapi.as_signed(value, bits)
 
-            # if op.value has its sign inverted, then signify it otherwise just use it
-            inverted, regular = value if value & sf else value - pow(-2, bits), pow(-2, bits) + value if value & sf else value & (sf - 1)
-            return value and inverted if interface.node.alt_opinverted(ea, op.n) else regular
+            # We need to always mask our operand's value to the maximum value
+            # supported by the operand. The "inverted" variation needs to be
+            # signed, but within our supported bitmask. So if the value is
+            # less than 0, then take it as-is. Otherwise if it's positive, then
+            # we need to shift it by 1-past the smallest possible value.
+            regular = res & (maximum - 1)
+            inverted = res if res < 0 else value - maximum
+            return res and inverted if interface.node.alt_opinverted(ea, op.n) else regular
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
         raise E.InvalidTypeOrValueError(u"{:s}.immediate({:#x}, {!r}) : Expected operand type `{:s}` but operand type {:d} was received.".format('.'.join([__name__, 'operand_types']), ea, op, optype, op.type))
 
@@ -2050,13 +2057,26 @@ class operand_types:
 
         seg, sel = (op.specval & 0xffff0000) >> 16, (op.specval & 0x0000ffff) >> 0
 
-        global architecture
-        sf, dt = pow(2, bits - 1), dtype_by_size(database.config.bits() // 8)
+        # Figure out the maximum value for the offset parse of the phrase which
+        # IDA seems to use the number of bits from the database to clamp. Then
+        # we can convert the value that we get from IDAPython into its signed
+        # form so that we can calculate the correct value for whatever variation
+        # we need to return.
+        maximum, dt = pow(2, bits), dtype_by_size(database.config.bits() // 8)
+        res = idaapi.as_signed(offset, bits)
 
-        value = idaapi.as_signed(offset, bits)
-        inverted, regular = value & (pow(2, bits) - 1) if value & sf else value - pow(-2, bits), pow(-2, bits) + offset if offset & sf else offset & (sf - 1)
-        res = value and inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
-        return intelops.OffsetBaseIndexScale(*res)
+        # Our regular offset needs to be masked within the maximum value as
+        # specified by the number of bits for the database's processor. The
+        # "inverted" variation also needs to satisfy the same constraints,
+        # but needs to be signed. If the value of the offset is less than
+        # 0, then we can take it as-is. Otherwise if it's positive, then we
+        # need to take the difference of it and 1-past the smallest value.
+        regular = res & (maximum - 1)
+        inverted = res if res < 0 else offset - maximum
+
+        global architecture
+        items = res and inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
+        return intelops.OffsetBaseIndexScale(*items)
 
     @__optype__.define(idaapi.PLFM_ARM, idaapi.o_phrase)
     def phrase(ea, op):
