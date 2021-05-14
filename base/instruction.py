@@ -2236,8 +2236,15 @@ class intelops:
         @property
         def symbols(self):
             '''Yield the `segment` register from the tuple if it is defined.'''
-            s, _ = self
-            if s is not None: yield s
+            segment, _ = self
+            if segment:
+                yield segment
+            return
+
+        def __repr__(self):
+            cls, fields = self.__class__, {'offset'}
+            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
+            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     class SegmentOffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -2259,10 +2266,19 @@ class intelops:
         @property
         def symbols(self):
             '''Yield the `segment`, `base`, and the `index` registers from the tuple if they are defined.'''
-            s, _, b, i, _ = self
-            if s is not None: yield s
-            if b is not None: yield b
-            if i is not None: yield i
+            segment, _, base, index, _ = self
+            if segment:
+                yield segment
+            if base:
+                yield base
+            if index:
+                yield index
+            return
+
+        def __repr__(self):
+            cls, fields = self.__class__, {'offset'}
+            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
+            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     class OffsetBaseIndexScale(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -2282,9 +2298,17 @@ class intelops:
         @property
         def symbols(self):
             '''Yield the `base`, and the `index` registers from the tuple if they are defined.'''
-            _, b, i, _ = self
-            if b is not None: yield b
-            if i is not None: yield i
+            _, base, index, _ = self
+            if base:
+                yield base
+            if index:
+                yield index
+            return
+
+        def __repr__(self):
+            cls, fields = self.__class__, {'offset'}
+            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
+            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
 ## arm operands
 class armops:
@@ -2314,8 +2338,8 @@ class armops:
         @property
         def symbols(self):
             '''Yield the `Rn` register from the tuple.'''
-            r, _, _ = self
-            yield r
+            register, _, _ = self
+            yield register
 
     class list(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -2330,8 +2354,10 @@ class armops:
         @property
         def symbols(self):
             '''Yield any of the registers within the `reglist` field belonging to the tuple.'''
-            res, = self
-            for r in res: yield r
+            list, = self
+            for regster in list:
+                yield register
+            return
 
     class immediatephrase(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -2352,8 +2378,13 @@ class armops:
         @property
         def symbols(self):
             '''Yield the `Rn` register from the tuple.'''
-            r, _ = self
-            yield r
+            register, _ = self
+            yield register
+
+        def __repr__(self):
+            cls, fields = self.__class__, {'offset'}
+            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
+            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     class registerphrase(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -2374,9 +2405,9 @@ class armops:
         @property
         def symbols(self):
             '''Yield the `Rn` and `Rm` registers from the tuple.'''
-            rn, rm = self
-            yield rn
-            yield rm
+            register_n, register_m = self
+            yield register_n
+            yield register_m
 
     class memory(interface.namedtypedtuple, interface.symbol_t):
         """
@@ -2393,6 +2424,11 @@ class armops:
             '''This operand type is not composed of any symbols.'''
             raise StopIteration
             yield   # so that this function is still treated as a generator
+
+        def __repr__(self):
+            cls, fields = self.__class__, {'address', 'value'}
+            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
+            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
 ## mips operands
 class mipsops:
@@ -2417,8 +2453,13 @@ class mipsops:
         @property
         def symbols(self):
             '''Yield the `Rn` register from this tuple.'''
-            r, _ = self
-            yield r
+            register, _ = self
+            yield register
+
+        def __repr__(self):
+            cls, fields = self.__class__, {'Offset'}
+            res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
+            return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
     class trap(interface.namedtypedtuple, interface.symbol_t):
         """
