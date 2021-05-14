@@ -819,8 +819,47 @@ def op_structure(opnum):
 def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
     F, op = database.type.flags(ea), operand(ea, opnum)
+
+    # First check if our operand is pointing to memory by checking the operand
+    # type. If it is, then the operand is not a structure offset and thus we'll
+    # need to figure the field being referenced by calculating the offset into
+    # the referenced structure ourselves.
+    if op.type in {idaapi.o_mem}:
+        address = database.address.head(op.addr)
+        t, count = database.type.array(address)
+        offset = op.addr - address
+
+        # Verify that the type as the given address is a structure
+        if not isinstance(t, structure.structure_t):
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not pointing to a structure.".format(__name__, ea, opnum, opnum))
+
+        # Figure out the index and the real offset into the structure,
+        # and then hand them off to the walk_to_realoffset method. From
+        # this value, we calculate the array member offset and then
+        # process it to get the actual path to return.
+        index, byte = divmod(offset, t.size)
+        path, realdelta = t.members.__walk_to_realoffset__(byte)
+        delta = index * t.size + realdelta
+
+        # If we received a list, then we can just return it with the delta.
+        if isinstance(path, builtins.list) or count > 1:
+            return [item for item in path] + [delta]
+
+        # Figure out whether we need to include the offset in the result.
+        results = tuple(path)
+        if delta > 0:
+            return results + (delta,)
+        return tuple(results) if len(results) > 1 else results[0]
+
+    # If the operand is an immediate value, then we need to extract the
+    # offset from the value property. Anything else should be a memory
+    # address that we'll calculate the offset into the structure from.
+    res = op.value if op.type in {idaapi.o_imm} else op.addr
+    offset = idaapi.as_signed(res, op_bits(ea, opnum))
+
+    # Verify that the operand is actually represented by a structure offset.
     if all(F & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not referencing a structure.".format(__name__, ea, opnum, opnum))
 
     # Whenever we're done figuring out the mptr path, we'll need to create a
     # filtering function using the path extracted from the operand so that we'll
@@ -872,14 +911,8 @@ def op_structure(ea, opnum):
             return res
         return filter
 
-    # Figure out the offset for the structure member whether the operand
-    # type is an immediate value or a memory reference type.
-    op = operand(ea, opnum)
-    res = op.value if op.type in {idaapi.o_imm} else op.addr
-    offset = idaapi.as_signed(res, op_bits(ea, opnum))
-
-    # Check to see if this is a stack variable, because we'll need to
-    # handle it differently if so.
+    # Start out by checking if the operand is a stack variable, because
+    # we'll need to handle it differently if so.
     if idaapi.is_stkvar(F, opnum) and function.within(ea):
         fn, insn = function.by(ea), at(ea)
 
@@ -904,7 +937,6 @@ def op_structure(ea, opnum):
 
         # Otherwise it's just a regular path, and we need to determine whether
         # to include the offset in the result or not.
-        # Determine whether we need to include the offset in the result or not
         results = tuple(path)
         if realdelta > 0:
             return results + (realdelta,)
