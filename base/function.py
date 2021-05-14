@@ -455,7 +455,8 @@ class chunks(object):
         for ea in cls.iterate(func):
             for opnum in iterops(ea):
                 if uses_register(ea, opnum):
-                    yield ea, opnum, instruction.op_state(ea, opnum)
+                    items = ea, opnum, instruction.op_state(ea, opnum)
+                    yield interface.opref_t(*items)
             continue
         return
 
@@ -520,7 +521,8 @@ class chunk(object):
 
         for ea in cls.iterate(ea):
             for opnum in filter(functools.partial(uses_register, ea), iterops(ea)):
-                yield ea, opnum, instruction.op_state(ea, opnum)
+                items = ea, opnum, instruction.op_state(ea, opnum)
+                yield interface.opref_t(*items)
             continue
         return
 
@@ -1350,7 +1352,8 @@ class block(object):
         for ea in cls.iterate(bb):
             for opnum in iterops(ea):
                 if uses_register(ea, opnum):
-                    yield ea, opnum, instruction.op_state(ea, opnum)
+                    items = ea, opnum, instruction.op_state(ea, opnum)
+                    yield interface.opref_t(*items)
                 continue
             continue
         return
