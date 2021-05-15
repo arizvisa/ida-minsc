@@ -1344,7 +1344,7 @@ class members_t(object):
                 # a legitimate candidate.
                 elif isinstance(res, structure_t):
                     mem = idaapi.get_member(res.ptr, realoffset)
-                    selected.append(mptr) if realoffset - mem.soff else selected.insert(0, mptr)
+                    selected.append(mptr) if mem and realoffset - mem.soff else selected.insert(0, mptr)
 
                 # If it's a tuple, then this only matches if we're pointing
                 # directly to the member.
