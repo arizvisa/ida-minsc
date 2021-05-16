@@ -1664,6 +1664,10 @@ def op_refs(ea, opnum):
             res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
         return res
 
+    # If our operand type is a register, then there's no structures here.
+    elif operand(inst.ea, opnum).type in {idaapi.o_reg}:
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} has a type ({:d}) that cannot contain a structure.".format(__name__, inst.ea, opnum, opnum, operand(inst.ea, opnum).type))
+
     # Anything else should be just a regular global reference, and to figure this out
     # we just grab the operand's value and work it out from there. The value at the
     # supidx has some format which is documented as "complex reference information".
