@@ -1601,9 +1601,15 @@ class ref_t(namedtypedtuple):
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, (six.integer_types, None.__class__), reftype_t)
 
+    @property
+    def ea(self):
+        '''Return the address field that is associated with the reference.'''
+        res, _, _ = self
+        return res
+
     def __repr__(self):
-        cls = self.__class__
-        res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in {'address'} else "{!s}").format(value)) for name, value in zip(self._fields, self))
+        cls, fields = self.__class__, {'address'}
+        res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
 class opref_t(ref_t):
@@ -1613,6 +1619,17 @@ class opref_t(ref_t):
     """
     _fields = ('address', 'opnum', 'reftype')
     _types = (six.integer_types, six.integer_types, reftype_t)
+
+    @property
+    def ea(self):
+        '''Return the address field that is associated with the operand being referenced.'''
+        res, _, _ = self
+        return res
+
+    def __repr__(self):
+        cls, fields = self.__class__, {'address'}
+        res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
+        return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
 # XXX: is .startea always guaranteed to point to an instruction that modifies
 #      the switch's register? if so, then we can use this to calculate the
