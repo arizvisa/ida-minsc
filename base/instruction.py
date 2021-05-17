@@ -1685,7 +1685,7 @@ def op_refs(ea, opnum):
         # of frame variables or actual structure members, and we definitely
         # need to check both.
         sptr, _ = members[0]
-        res, sid = [], sptr.id
+        result, sid = [], sptr.id
         for ea, _, t in sorted(refs, key=operator.itemgetter(0)):
             candidates = []
 
@@ -1710,7 +1710,8 @@ def op_refs(ea, opnum):
 
                     # Now we have the items, we need to grab their identifiers
                     # and then we can later test for them.
-                    candidates.append((refopnum, [sptr.id for sptr, _ in items[:1]] + [mptr.id for _, mptr in items[:]]))
+                    ids = [sptr.id for sptr, _ in items[:1]] + [mptr.id for _, mptr in items[:]]
+                    candidates.append((refopnum, {id for id in ids}))
                 continue
 
             # Next we need to check if there were any operands that actually
@@ -1742,21 +1743,32 @@ def op_refs(ea, opnum):
                 st = structure.__instance__(sptr.id)
                 path, delta = st.members.__walk_to_realoffset__(actval) # FIXME: wtf is the offset that we should use
                 ids = [sptr.id] + [member.ptr.id for member in path]
-                candidates.append((refopnum, ids))
+                candidates.append((refopnum, {id for id in ids}))
+
+            # If we didn't find any candidates, then that means this is a global
+            # so we need to figure out which operand it is.
+            if not candidates:
+                for refopnum, op in enumerate(operands(ea)):
+                    if op.type in {idaapi.o_mem}:
+                        result.append(interface.opref_t(ea, int(refopnum), op_state(ea, refopnum)))
+                    continue
+                continue
 
             # Now that we've gathered all of the relevant operand numbers
             # and the structure ids for their paths, we need to do a final
             # pass of them to filter the operands to include references for.
-            filtered, required = [], [mptr.id for _, mptr in members[:]]
-            for opnum, ids in candidates:
+            filtered, required = [], {mptr.id for _, mptr in members[:]}
+            for refopnum, ids in candidates:
 
-                # Check the end of the list of ids to see if it's reference
-                # the ids in our search.
-                if ids[-len(required):] == required:
-                    filtered.append(opnum)
+                # Check that the list of required identifiers is within our
+                # candidate identifiers. As each id is unique, this should
+                # support the case where IDA doesn't store the full structure
+                # offset path within the database.
+                if ids & required == required:
+                    filtered.append(refopnum)
                 continue
-            res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
-        return res
+            result.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
+        return result
 
     # If our operand type is a register, then there's no structures here.
     elif operand(inst.ea, opnum).type in {idaapi.o_reg}:
