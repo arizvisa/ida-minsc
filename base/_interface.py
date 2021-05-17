@@ -1612,7 +1612,7 @@ class ref_t(namedtypedtuple):
         res = ("{!s}={:s}".format(internal.utils.string.escape(name, ''), ("{:#x}" if name in fields else "{!s}").format(value)) for name, value in zip(self._fields, self))
         return "{:s}({:s})".format(cls.__name__, ', '.join(res))
 
-class opref_t(ref_t):
+class opref_t(namedtypedtuple):
     """
     This tuple is used to represent references that include an operand number
     and has the format `(address, opnum, reftype_t)`.
