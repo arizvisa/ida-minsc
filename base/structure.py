@@ -1431,10 +1431,15 @@ class members_t(object):
         F = filter or (lambda structure, items: items)
         filtered = F(owner.ptr, members) if len(members) > 1 else members
 
-        # If we still do not have a single result after filtering, then
-        # we terminate our traversal here with the nearest member, and
-        # include the offset that's relative to it.
-        if len(filtered) != 1:
+        # If we didn't get any members, then just return the delta amd
+        # terminate our traversal.
+        if not len(filtered):
+            return (), offset
+
+        # If we didn't get a single result after filtering, then we will
+        # terminate our traversal here with the nearest member, and include
+        # the offset that's relative to our findings.
+        if len(filtered) > 1:
             nearest = self.near_realoffset(offset)
             return (nearest,), offset - nearest.realoffset
 
