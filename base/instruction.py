@@ -1246,8 +1246,9 @@ def op_structure(ea, opnum, sptr, *path):
 
     # Now that we've carved an actual path through the structure and its
     # descendants, we can allocate the tid_array using the starting structure and
-    # adding each individual member to it.
-    length, (sptr, _) = 1 + len(results), results[0]
+    # adding each individual member to it. If we didn't get any members for our
+    # results, then that's okay since we still have the structure to start at.
+    length, (sptr, _) = 1 + len(results), results[0] if results else (st.ptr, None)
     tid = idaapi.tid_array(length)
     tid[0] = sptr.id
     for i, (sptr, mptr) in enumerate(results):
