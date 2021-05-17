@@ -173,14 +173,18 @@ def new(name, offset):
 @utils.multicase(name=six.string_types)
 @utils.string.decorate_arguments('name')
 def by(name, **options):
-    '''Return a structure by its name.'''
+    '''Return the structure with the given `name`.'''
     return by_name(name, **options)
 @utils.multicase(id=six.integer_types)
 def by(id, **options):
-    '''Return a structure by its index or id.'''
+    '''Return the structure with the specified `id` or index.'''
     if interface.node.is_identifier(id):
         return __instance__(id, **options)
     return by_index(id, **options)
+@utils.multicase(sptr=idaapi.struc_t)
+def by(sptr, **options):
+    '''Return the structure for the specified `sptr`.'''
+    return __instance__(sptr.id, **options)
 @utils.multicase()
 @utils.string.decorate_arguments('regex', 'like', 'name')
 def by(**type):
@@ -267,11 +271,25 @@ class structure_t(object):
     """
     __slots__ = ('__id__', '__members__')
 
-    def __init__(self, id, offset=0):
-        self.__id__ = id
+    def __init__(self, sptr, offset=0):
+        if not isinstance(sptr, (idaapi.struc_t, six.integer_types)):
+            cls = self.__class__
+            raise E.InvalidParameterError(u"{:s}({:#x}, offset={:+#x}) : Unable to instantiate a structure using the provided type ({!s}).".format('.'.join([__name__, cls.__name__]), sptr, offset, sptr))
+
+        # After validating the type of our parameter, extract the id
+        # and assign it to our slot. This will be how we reference
+        # the structure throughout this instance's lifetime.
+        self.__id__ = id = sptr.id if isinstance(sptr, idaapi.struc_t) else sptr
+
+        # Perform a sanity check by asking IDAPython to resolve the
+        # id to an idaapi.struc_t for us.
         if self.ptr is None:
             cls = self.__class__
             raise E.StructureNotFoundError(u"{:s}({:#x}, offset={:+#x}) : Unable to locate the structure with the specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), id, offset, id))
+
+        # If we were able to successfully snag an idaapi.struc_t, then
+        # the final thing we need to do is instantiate the members
+        # property so that users can interact with the structure.
         self.__members__ = members_t(self, baseoffset=offset)
 
     def up(self):
@@ -1326,7 +1344,7 @@ class members_t(object):
                 # a legitimate candidate.
                 elif isinstance(res, structure_t):
                     mem = idaapi.get_member(res.ptr, realoffset)
-                    selected.append(mptr) if realoffset - mem.soff else selected.insert(0, mptr)
+                    selected.append(mptr) if mem and realoffset - mem.soff else selected.insert(0, mptr)
 
                 # If it's a tuple, then this only matches if we're pointing
                 # directly to the member.
@@ -1413,10 +1431,15 @@ class members_t(object):
         F = filter or (lambda structure, items: items)
         filtered = F(owner.ptr, members) if len(members) > 1 else members
 
-        # If we still do not have a single result after filtering, then
-        # we terminate our traversal here with the nearest member, and
-        # include the offset that's relative to it.
-        if len(filtered) != 1:
+        # If we didn't get any members, then just return the delta amd
+        # terminate our traversal.
+        if not len(filtered):
+            return (), offset
+
+        # If we didn't get a single result after filtering, then we will
+        # terminate our traversal here with the nearest member, and include
+        # the offset that's relative to our findings.
+        if len(filtered) > 1:
             nearest = self.near_realoffset(offset)
             return (nearest,), offset - nearest.realoffset
 

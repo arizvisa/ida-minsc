@@ -819,8 +819,47 @@ def op_structure(opnum):
 def op_structure(ea, opnum):
     '''Return the structure and members for the operand `opnum` at the instruction `ea`.'''
     F, op = database.type.flags(ea), operand(ea, opnum)
+
+    # First check if our operand is pointing to memory by checking the operand
+    # type. If it is, then the operand is not a structure offset and thus we'll
+    # need to figure the field being referenced by calculating the offset into
+    # the referenced structure ourselves.
+    if op.type in {idaapi.o_mem}:
+        address = database.address.head(op.addr)
+        t, count = database.type.array(address)
+        offset = op.addr - address
+
+        # Verify that the type as the given address is a structure
+        if not isinstance(t, structure.structure_t):
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not pointing to a structure.".format(__name__, ea, opnum, opnum))
+
+        # Figure out the index and the real offset into the structure,
+        # and then hand them off to the walk_to_realoffset method. From
+        # this value, we calculate the array member offset and then
+        # process it to get the actual path to return.
+        index, byte = divmod(offset, t.size)
+        path, realdelta = t.members.__walk_to_realoffset__(byte)
+        delta = index * t.size + realdelta
+
+        # If we received a list, then we can just return it with the delta.
+        if isinstance(path, builtins.list) or count > 1:
+            return [item for item in path] + [delta]
+
+        # Figure out whether we need to include the offset in the result.
+        results = tuple(path)
+        if delta > 0:
+            return results + (delta,)
+        return tuple(results) if len(results) > 1 else results[0]
+
+    # If the operand is an immediate value, then we need to extract the
+    # offset from the value property. Anything else should be a memory
+    # address that we'll calculate the offset into the structure from.
+    res = op.value if op.type in {idaapi.o_imm} else op.addr
+    offset = idaapi.as_signed(res, op_bits(ea, opnum))
+
+    # Verify that the operand is actually represented by a structure offset.
     if all(F & ff != ff for ff in {idaapi.FF_STRUCT, idaapi.FF_0STRO, idaapi.FF_1STRO}):
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} is not referencing a structure.".format(__name__, ea, opnum, opnum))
 
     # Whenever we're done figuring out the mptr path, we'll need to create a
     # filtering function using the path extracted from the operand so that we'll
@@ -837,8 +876,7 @@ def op_structure(ea, opnum):
         # can still figure out the correct one to choose for each relevant path.
         table = {}
         for mptr in members:
-            fullname = idaapi.get_member_fullname(mptr.id)
-            sptr = idaapi.get_member_struc(fullname)
+            _, fullname, sptr = idaapi.get_member_by_id(mptr.id)
             table.setdefault(sptr.id, []).append(mptr.id)
 
         # Now we can define the closure that will be used to look through
@@ -847,7 +885,7 @@ def op_structure(ea, opnum):
         # returning all the members because we have no idea how to proceed.
         def filter(sptr, members, table=table):
             if sptr.id not in table:
-                return members
+                return []
 
             # Grab our list of choices from our table, and convert the list
             # of members into a set of ids so that we can quickly match them.
@@ -856,14 +894,14 @@ def op_structure(ea, opnum):
             # If there's no choices for the sptr available, then we need to
             # bail because things do not correspond to the user path.
             if len(choices) == 0:
-                return members
+                return []
 
             # Now we can check the user's choice to see if it's in our list
             # of members. If it isn't, then we also need to bail because
             # something is busted with the path that the user gave us.
             choice, tids = choices.pop(0), {item.id for item in members}
             if choice not in tids:
-                return members
+                return []
 
             # Things seem to be okay, so all we need to do is return the
             # list of mptrs that match the choice the user gave us and
@@ -872,14 +910,8 @@ def op_structure(ea, opnum):
             return res
         return filter
 
-    # Figure out the offset for the structure member whether the operand
-    # type is an immediate value or a memory reference type.
-    op = operand(ea, opnum)
-    res = op.value if op.type in {idaapi.o_imm} else op.addr
-    offset = idaapi.as_signed(res, op_bits(ea, opnum))
-
-    # Check to see if this is a stack variable, because we'll need to
-    # handle it differently if so.
+    # Start out by checking if the operand is a stack variable, because
+    # we'll need to handle it differently if so.
     if idaapi.is_stkvar(F, opnum) and function.within(ea):
         fn, insn = function.by(ea), at(ea)
 
@@ -904,7 +936,6 @@ def op_structure(ea, opnum):
 
         # Otherwise it's just a regular path, and we need to determine whether
         # to include the offset in the result or not.
-        # Determine whether we need to include the offset in the result or not
         results = tuple(path)
         if realdelta > 0:
             return results + (realdelta,)
@@ -918,7 +949,6 @@ def op_structure(ea, opnum):
     # Since IDAPython's get_stroff_path implementation doesn't recognize NULL,
     # we need to call it twice in order to get the size of needed array.
     delta, path = idaapi.sval_pointer(), idaapi.tid_array(idaapi.MAXSTRUCPATH)
-    delta.assign(0)
     count = idaapi.get_stroff_path(ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
     if not count:
         raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, ea, opnum, opnum))
@@ -927,7 +957,6 @@ def op_structure(ea, opnum):
     # with the correct length, and then use what IDA didn't store to fetch
     # the exact field.
     delta, path = idaapi.sval_pointer(), idaapi.tid_array(count)
-    delta.assign(0)
     res = idaapi.get_stroff_path(ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), ea, opnum)
     if res != count:
         raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The length ({:d}) for the structure path at operand {:d} changed ({:d}).".format(__name__, ea, count, opnum, opnum, res))
@@ -957,16 +986,39 @@ def op_structure(ea, opnum):
         items.append(mptr)
         moffset += 0 if mparent.is_union() else mptr.soff
 
+    # Now we need to check if the operand value is not a structure path, but
+    # rather the structure address or its size. This condition will only hold
+    # true if there's no items in the path, and the delta is empty. In this
+    # case, we just check whether the offset is 0 or the structure's size.
+    st = structure.__instance__(sptr.id, offset=-delta.value())
+    if not len(items) and delta.value() == 0 and offset in {0, st.size}:
+        return st
+
     # Generate our filter function, and fetch the structure that we're going
     # to use to walk our path with. This should then give us the actual path
     # along with the real delta that we'll return rather than what IDA gave us.
-    st = structure.__instance__(sptr.id, offset=delta.value() + offset - moffset)
     Ffilter = generate_filter(items)
-    path, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
+    res, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
+
+    # If we have some members in our items, but we couldn't figure anything out
+    # when walking it. Then this might be a union that
+    # If our item length is larger than our result path, then this might be
+    # a union with the delta pointing outside of it. This is a special case.
+    if len(res) < len(items):
+        assert len(items) - len(res) == 1
+        mfix = st.members.by_identifier(items[0].id)
+        path = (mfix,) + res if isinstance(res, builtins.tuple) else [mfix] + res
+
+    else:
+        path = res
+
+    # If our path is empty, then there's no members and this is just a structure.
+    if not path:
+        return (st, realdelta) if realdelta else st
 
     # If we got a list, then we encountered an array and we need to make sure
     # that we return a list with the delta.
-    if isinstance(path, builtins.list):
+    elif isinstance(path, builtins.list):
         return path + [realdelta]
 
     # Otherwise, we just got a regular member path. So we need to determine
@@ -977,100 +1029,88 @@ def op_structure(ea, opnum):
     return results if len(results) > 1 else results[0]
 
 @utils.multicase(opnum=six.integer_types, structure=structure.structure_t)
-def op_structure(opnum, structure, **delta):
-    '''Apply the specified `structure` to the instruction operand `opnum` at the current address.'''
-    sptr = structure.ptr
-    return op_structure(ui.current.address(), opnum, sptr, [], **delta)
+def op_structure(opnum, structure, *path, **delta):
+    '''Apply the specified `structure` along with any members in `path` to the instruction operand `opnum` at the current address.'''
+    sptr, deltapath = structure.ptr, [delta.get('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath))
 @utils.multicase(opnum=six.integer_types, sptr=idaapi.struc_t)
-def op_structure(opnum, sptr, **delta):
-    '''Apply the ``idaapi.struc_t` in `sptr` to the instruction operand `opnum` at the current address.'''
-    return op_structure(ui.current.address(), opnum, sptr, [], **delta)
+def op_structure(opnum, sptr, *path, **delta):
+    '''Apply the ``idaapi.struc_t` in `sptr` along with any members in `path` to the instruction operand `opnum` at the current address.'''
+    deltapath = [delta.get('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath))
 @utils.multicase(opnum=six.integer_types, name=six.string_types)
-def op_structure(opnum, name, **delta):
-    '''Apply the structure with the specified `name` to the instruction operand `opnum` at the current address.'''
-    sptr = structure.by(name).ptr
-    return op_structure(ui.current.address(), opnum, sptr, [], **delta)
+def op_structure(opnum, name, *path, **delta):
+    '''Apply the structure with the specified `name` and the members in `path` to the instruction operand `opnum` at the current address.'''
+    sptr, deltapath = structure.by(name).ptr, [delta.get('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain(path, deltapath))
 @utils.multicase(opnum=six.integer_types, member=structure.member_t)
-def op_structure(opnum, member, **delta):
+def op_structure(opnum, member, *path, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the current address.'''
-    sptr = member.parent.ptr
-    return op_structure(ui.current.address(), opnum, sptr, [member], **delta)
+    sptr, deltapath = member.parent.ptr, [delta.get('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain([member], path, deltapath))
+@utils.multicase(opnum=six.integer_types, mptr=idaapi.member_t)
+def op_structure(opnum, mptr, *path, **delta):
+    '''Apply the ``idaapi.member_t` in `mptr` to the instruction operand `opnum` at the current address.'''
+    _, _, sptr = idaapi.get_member_by_id(mptr.id)
+    deltapath = [delta.get('delta', 0)] if delta else []
+    return op_structure(ui.current.address(), opnum, sptr, *itertools.chain([mptr], path, deltapath))
 @utils.multicase(opnum=six.integer_types, path=(builtins.tuple, builtins.list))
 def op_structure(opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the current address.'''
     return op_structure(ui.current.address(), opnum, path, **delta)
+
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, structure=structure.structure_t)
-def op_structure(ea, opnum, structure, **delta):
-    '''Apply the specified `structure` to the instruction operand `opnum` at the address `ea`.'''
-    sptr = structure.ptr
-    return op_structure(ea, opnum, sptr, [], **delta)
+def op_structure(ea, opnum, structure, *path, **delta):
+    '''Apply the specified `structure` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
+    sptr, deltapath = structure.ptr, [delta.get('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, name=six.string_types)
-def op_structure(ea, opnum, name, **delta):
-    '''Apply the structure with the specified `name` to the instruction operand `opnum` at the address `ea`.'''
-    sptr = structure.by(name).ptr
-    return op_structure(ea, opnum, sptr, [], **delta)
+def op_structure(ea, opnum, name, *path, **delta):
+    '''Apply the structure with the specified `name` and any members in `path` to the instruction operand `opnum` at the address `ea`.'''
+    sptr, deltapath = structure.by(name).ptr, [delta.get('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain(path, deltapath))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, member=structure.member_t)
-def op_structure(ea, opnum, member, **delta):
+def op_structure(ea, opnum, member, *path, **delta):
     '''Apply the specified `member` to the instruction operand `opnum` at the address `ea`.'''
-    sptr = member.parent.ptr
-    return op_structure(ea, opnum, sptr, [member], **delta)
+    sptr, deltapath = member.parent.ptr, [delta.get('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain([member], path, deltapath))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, mptr=idaapi.member_t)
-def op_structure(ea, opnum, mptr, **delta):
+def op_structure(ea, opnum, mptr, *path, **delta):
     '''Apply the ``idaapi.member_t` in `mptr` to the instruction operand `opnum` at the address `ea`.'''
-    sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
-    return op_structure(ea, opnum, sptr, [mptr], **delta)
+    _, _, sptr = idaapi.get_member_by_id(mptr.id)
+    deltapath = [delta.get('delta', 0)] if delta else []
+    return op_structure(ea, opnum, sptr, *itertools.chain([mptr], path, deltapath))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(builtins.tuple, builtins.list))
 def op_structure(ea, opnum, path, **delta):
     '''Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.'''
-    items = [item for item in path]
+    items, deltapath = [item for item in path], [delta.get('delta', 0)] if delta else []
     member = items.pop(0) if len(items) else ''
     if isinstance(member, six.string_types):
-        sptr = structure.by(member).ptr
+        sptr, fullpath = structure.by(member).ptr, items
+    elif isinstance(member, idaapi.struc_t):
+        sptr, fullpath = structure.by(member.id), items
     elif isinstance(member, structure.structure_t):
-        sptr = member.ptr
+        sptr, fullpath = member.ptr, items
     elif isinstance(member, idaapi.member_t):
-        sptr = idaapi.get_member_struc(idaapi.get_member_fullname(member.id))
-        return op_structure(ea, opnum, sptr, [member] + items, **delta)
+        _,_, sptr = idaapi.get_member_by_id(member.id)
+        fullpath = [member] + items
     elif isinstance(member, structure.member_t):
-        sptr = member.parent.ptr
-        return op_structure(ea, opnum, sptr, [member] + items, **delta)
-    return op_structure(ea, opnum, sptr, items, **delta)
-@utils.multicase(ea=six.integer_types, opnum=six.integer_types, sptr=idaapi.struc_t, path=(builtins.tuple, builtins.list))
-def op_structure(ea, opnum, sptr, path, **delta):
-    """Apply the structure members in `path` to the instruction operand `opnum` at the address `ea`.
-
-    If the offset `delta` is specified, shift the structure by that amount.
-    """
+        sptr, fullpath = member.parent.ptr, [member] + items
+    else:
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:+d}) : Unable to determine the structure from the provided path due to the first member being of an unsupported type ({!s}).".format(__name__, ea, opnum, path, delta.get('delta', 0), member.__class__))
+    return op_structure(ea, opnum, sptr, *itertools.chain(fullpath, deltapath))
+@utils.multicase(ea=six.integer_types, opnum=six.integer_types, sptr=idaapi.struc_t)
+def op_structure(ea, opnum, sptr, *path):
+    '''Apply the structure identified by `sptr` along with the members in `path` to the instruction operand `opnum` at the address `ea`.'''
     ea = interface.address.inside(ea)
     if not database.type.is_code(ea):
-        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item type at requested address is not of a code type.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        raise E.InvalidTypeOrValueError(u"{:s}.op_structure({:#x}, {:d}, {!r}) : The requested address ({:#x}) is not defined as a code type.".format(__name__, ea, opnum, path, ea))
 
     # Convert the path to a list, and then validate it before we use it.
-    path = [item for item in path]
-    if any(not isinstance(m, (idaapi.member_t, structure.member_t, six.string_types, six.integer_types)) for m in path):
-        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : A member of an invalid type was specified.".format(__name__, ea, opnum, path, delta.get('delta', 0)))
-
-    # We crop all the elements in our path by snagging everything that's a non-
-    # integer, and then terminating before we encounter one. This should result
-    # in the very next element being an integer which we use if the length of
-    # our results is less than the given path. This culls the path down to only
-    # what we're capable of comprehending.
-    res = [item for item in itertools.takewhile(lambda item: not isinstance(item, six.integer_types), path)]
-    if len(res) < len(path):
-        res.append(path[len(res)])
-
-    # If the culled path length is still smaller than the user's path, then warn
-    # the user that we had to cull their list down to what we can understand
-    # before making a copy of the results and re-assigning them to the path.
-    if len(res) < len(path):
-        logging.warning(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Culling path down to {:d} elements due to an invalid type discovered in the structure path.".format(__name__, ea, opnum, path, delta.get('delta', 0), len(path) - len(res) + 1))
-    path = res[:]
-
-    # If the last element is an integer, then this element is actually the delta.
-    # So we move it to the right place, the delta keyword argument, so that the
-    # logic which follows can use it properly.
-    if path and isinstance(path[-1], six.integer_types):
-        delta['delta'] = delta.get('delta', 0) + path.pop(-1)
+    path, accepted = [item for item in path], (idaapi.member_t, structure.member_t, six.string_types, six.integer_types)
+    if any(not isinstance(item, accepted) for item in path):
+        index, item = next((index, item) for index, item in enumerate(path) if not isinstance(item, accepted))
+        raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The path member at index {:d} has a type ({!s}) that is not supported.".format(__name__, ea, opnum, sptr.id, path, index, item.__class__))
 
     # Now we need to examine our operand and stash it so that we can later
     # use it to calculate the delta between it and the actual member offset
@@ -1082,20 +1122,27 @@ def op_structure(ea, opnum, sptr, path, **delta):
     # If the operand type is not a valid type, then raise an exception so that
     # we don't accidentally apply a structure to an invalid operand type.
     if op.type not in {idaapi.o_mem, idaapi.o_phrase, idaapi.o_displ, idaapi.o_imm}:
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, path, delta.get('delta', 0), opnum, ea, op.type))
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply structure path to the operand ({:d}) for the instruction at {:#x} due to its type ({:d}).".format(__name__, ea, opnum, sptr.id, path, opnum, ea, op.type))
 
     # We have to start somewhere and our first element in the path should be a
     # a member of the sptr we were given. So, now we begin to traverse through
     # all of the members in the path the user gave us so that we can figure out
     # the user wanted and what mptrs and sptrs should be in that path.
-    st, offset, items = structure.__instance__(sptr.id), 0, []
+    st, offset, delta = structure.__instance__(sptr.id), 0, 0
+    items = []
     while path and sptr:
         item = path.pop(0)
+
+        # If we found an integer in the path, then just use it to adjust the
+        # delta and proceed through the rest of the path.
+        if isinstance(item, six.integer_types):
+            delta += item
+            continue
 
         # Members can be specified in all sorts of ways, so we need to check
         # what the user gave us. If we were given a string, then look up the
         # member by its name.
-        if isinstance(item, six.string_types):
+        elif isinstance(item, six.string_types):
             mptr = idaapi.get_member_by_name(sptr, utils.string.to(item))
 
         # If we were given a structure.member_t, then we can just take its
@@ -1107,21 +1154,30 @@ def op_structure(ea, opnum, sptr, path, **delta):
         elif isinstance(item, idaapi.member_t):
             mptr = item
 
-        # Anything else is not a member, and as such is an error.
+        # Anything else is not a supported type, and as such is an error.
         else:
-            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item {:d} ({!r}) in the specified path is of an unsupported type ({!s}).".format(__name__, ea, opnum, path, delta.get('delta', 0), len(items), item, item.__class__))
+            suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
+            suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
+            summary = itertools.chain(suggested, [item], path)
+            raise E.InvalidParameterError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The member ({!s}) at index {:d} of the suggested path is using an unsupported type ({!s}).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary], item, len(items), item.__class__))
 
         # If mptr is undefined, then that's it. We have to stop our traversal,
         # and warn the user about what happened.
         if mptr is None:
-            logging.warn(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item {:d} ({!r}) in the specified path was not found in the parent structure ({!s}).".format(__name__, ea, opnum, path, delta.get('delta', 0), len(items), item, utils.string.of(idaapi.get_struc_name(sptr.id))))
+            suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
+            suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
+            summary = itertools.chain(suggested, [item], path)
+            logging.warn(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The member ({!s}) at index {:d} of the suggested path was not found in the parent structure ({!s}).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary], item, len(items), utils.string.of(idaapi.get_struc_name(sptr.id))))
             break
 
         # We got an mptr, so now we can extract its owning sptr and verify that
         # it matches the structure that our path traversal is currently in.
-        res = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
+        _, _, res = idaapi.get_member_by_id(mptr.id)
         if res.id != sptr.id:
-            logging.warning(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Item {:d} ({!s}) in the specified path belongs to a structure ({:#x}) that is not contained by the expected structure ({:#x}).".format(__name__, ea, opnum, path, delta.get('delta', 0), len(items), utils.string.of(idaapi.get_member_fullname(mptr.id)), res.id, sptr.id))
+            suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
+            suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
+            summary = itertools.chain(suggested, [utils.string.of(idaapi.get_member_fullname(mptr.id))], path)
+            logging.warning(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : The member ({!s}) at index {:d} of the suggested path is using a structure ({:#x}) that is different from the expected structure ({:#x}).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary], utils.string.of(idaapi.get_member_fullname(mptr.id)), len(items), res.id, sptr.id))
         sptr = res
 
         # Now we can add the mptr to our list, and update the member offset that
@@ -1134,9 +1190,20 @@ def op_structure(ea, opnum, sptr, path, **delta):
         # structure, then our loop should stop here.
         sptr = idaapi.get_sptr(mptr)
 
+    # Consume the rest of the integers in the path so that we can finish
+    # updating the delta that the user suggested to us.
+    while path and isinstance(path[0], six.integer_types):
+        delta += path.pop(0)
+
     # Verify that our path is empty and that we successfully consumed everything.
     if len(path):
-        logging.warning(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : There was an error trying to traverse the path for the list of members (path will be incomplete).".format(__name__, ea, opnum, path, delta.get('delta', 0)))
+        suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
+        suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
+        summary = itertools.chain(suggested, path)
+        logging.warning(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : There was an error trying to traverse the path for the list of members (path will be truncated).".format(__name__, ea, opnum, st.ptr.id, [item for item in summary]))
+
+    # FIXME: figure out whether we really need to calculate the structure offset,
+    #        or we're just applying a reference or the structure size to the operand.
 
     # Now that we have the suggested path and thus the desired offset, we're
     # going to use it to generate a filter that we will use to determine the
@@ -1148,20 +1215,20 @@ def op_structure(ea, opnum, sptr, path, **delta):
 
     # Now we can define a closure that uses this table to get as close as we can
     # to what the user suggsted. If the path doesn't correspond, then we're
-    # forced to return all the members, and bailing, which lets it sort itself out.
+    # forced to return all the members and bailing, which sorts itself out.
     def filter(sptr, members, table=table):
         if sptr.id not in table:
-            return members
+            return []
 
         # Grab our choices and convert our candidates into identifiers.
         choices, candidates = table[sptr.id], {mptr.id for mptr in members}
         if len(choices) == 0:
-            return members
+            return []
 
         # Check that the choice the user gave us is in our list.
         choice, tids = choices.pop(0), {item.id for item in members}
         if choice not in tids:
-            return members
+            return []
 
         # We found a match and so we should be okay with returning it.
         res = [mptr for mptr in members if mptr.id == choice]
@@ -1173,23 +1240,23 @@ def op_structure(ea, opnum, sptr, path, **delta):
     # we were given, and then gather our results into mptr and sptrs. If our
     # offset and value are the same, then we don't need to adjust anything.
     res = 0 if offset == value else offset
-    rp, delta = st.members.__walk_to_realoffset__(res + value + delta.get('delta', 0), filter=filter)
-    items = [(item.parent.ptr, item.ptr) for item in rp]
-    moffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in items)
+    rp, realdelta = st.members.__walk_to_realoffset__(res + value + delta, filter=filter)
+    results = [(item.parent.ptr, item.ptr) for item in rp]
+    moffset = sum(0 if sptr.is_union() else mptr.soff for sptr, mptr in results)
 
     # Now that we've carved an actual path through the structure and its
     # descendants, we can allocate the tid_array using the starting structure and
     # adding each individual member to it.
-    length, (sptr, _) = 1 + len(items), items[0]
+    length, (sptr, _) = 1 + len(results), results[0]
     tid = idaapi.tid_array(length)
     tid[0] = sptr.id
-    for i, (sptr, mptr) in enumerate(items):
+    for i, (sptr, mptr) in enumerate(results):
         tid[i + 1] = mptr.id
 
     # Now we can apply our tid_array to the operand, and include our original
     # member offset from the path the user gave us so that way the user can
     # fetch it later if they so desire.
-    res = moffset - value + delta
+    res = moffset - value + realdelta
     if idaapi.__version__ < 7.0:
         ok = idaapi.op_stroff(ea, opnum, tid.cast(), length, res)
 
@@ -1201,7 +1268,11 @@ def op_structure(ea, opnum, sptr, path, **delta):
 
     # If we failed applying our structure, then we'll just raise an exception.
     if not ok:
-        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {!r}, delta={:d}) : Unable to apply the given structure path to the specified address ({:#x}).".format(__name__, ea, opnum, path, delta.get('delta', 0), ea))
+        suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
+        suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
+        resolved = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in results)
+        resolved = ('.'.join(map(utils.string.of, pair)) for pair in resolved)
+        raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}, {:#x}, {!r}) : Unable to apply the resolved structure path ({!r}) to the specified address ({:#x}).".format(__name__, ea, opnum, st.ptr.id, [item for item in suggested], [item for item in resolved], ea))
 
     # Otherwise, we can chain into our other case to return what was just applied.
     return op_structure(ea, opnum)
@@ -1383,6 +1454,76 @@ def op_refs(ea, opnum):
     if len(ops) < opnum:
         raise E.InvalidTypeOrValueError(u"{:s}.op_refs({:#x}, {:d}) : The specified operand number ({:d}) is larger than the number of operands ({:d}) for the instruction at address {:#x}.".format(__name__, ea, opnum, opnum, len(operands(ea)), ea))
 
+    # First we'll define the get_stroff_path function to get what IDA's
+    # suggestion and delta is for the path at a given operand.
+    def get_stroff_path(inst, opnum):
+        op = operand(inst.ea, opnum)
+
+        # Firstly, IDAPython's get_stroff_path api doesn't tell us how much
+        # space we need to allocate. So we need to allocate the maximum first,
+        # and only then will we know the count to actually use.
+        delta, path = idaapi.sval_pointer(), idaapi.tid_array(idaapi.MAXSTRUCPATH)
+        count = idaapi.get_stroff_path(inst.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), inst.ea, opnum)
+        if not count:
+            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, inst.ea, opnum, opnum))
+
+        # Now that we have the right length, we can use IDAPython to
+        # actually populate the tid_array here. Afterwards, we discard
+        # our array by converting it into a list.
+        delta, path = idaapi.sval_pointer(), idaapi.tid_array(count)
+        res = idaapi.get_stroff_path(inst.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), inst.ea, opnum)
+        if res != count:
+            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The length ({:d}) for the structure path at operand {:d} changed ({:d}).".format(__name__, inst.ea, count, opnum, opnum, res))
+        return delta.value(), [path[idx] for idx in range(count)]
+
+    # As the get_stroff_path function doesn't return a full path at all,
+    # we need to figure the path ourselves using it as a suggestion.
+    def calculate_stroff_path(offset, suggestion):
+        items = suggestion[:]
+
+        # After we get the list of member ids, then we can use it to
+        # compose the path that we will match against later. We grab
+        # the first member (which is the structure id) and convert it
+        # to a structure we that we have some place to start.
+        st = structure.__instance__(items.pop(0))
+        members = [idaapi.get_member_by_id(item) for item in items]
+        items = [(sptr, mptr) for mptr, _, sptr in members]
+
+        # Now we have a list of members, we format it into a dictionary
+        # so that we can look up the correct member for any given structure.
+        choices = {}
+        for sptr, mptr in items:
+            choices.setdefault(sptr.id, []).append(mptr)
+
+        # Now we can use the members we received to generate a closure
+        # that we'll use to figure out the correct members for the operand.
+        def Ffilter(parent, candidates, choices=choices):
+
+            # If the parent is not in our list of choices, then we leave
+            # because there's nothing we can do with this.
+            if parent.id not in choices:
+                return []
+
+            # Grab the list for the current parent and check to see if
+            # there's a member in our list that we can use. If so, then
+            # we can just return it as the only choice.
+            items = choices[parent.id]
+            if len(items):
+                return [items.pop(0)]
+
+            # If there wasn't anything found, then just return all our
+            # candidates because we're not sure how to proceed here.
+            return []
+
+        # Now we can fetch the delta and path for the requested offset,
+        # and then convert it into a list of sptrs and mptrs in order
+        # to return it to the caller.
+        path, delta = st.members.__walk_to_realoffset__(offset, filter=Ffilter)
+
+        # That was it, so we just need to convert the path into a list
+        # of sptrs and mptrs to return to the caller.
+        return delta, [(item.parent.ptr, item.ptr) for item in path]
+
     # Start out by doing sanity check so that we can determine whether
     # the operand is referencing a local or a global. We grab both the
     # operand info any the result from idaapi.op_adds_xrefs in order to
@@ -1474,56 +1615,41 @@ def op_refs(ea, opnum):
     # because for some reason there's absolutely nothing in it.
     elif has_xrefs and info:
         NSUP_STROFF0, NSUP_STROFF1 = (getattr(idaapi, name, 0xf + idx) for idx, name in enumerate(['NSUP_STROFF0', 'NSUP_STROFF1']))
+        op = ops[opnum]
 
-        # We need to ask IDA what the structure path for the request operand,
-        # however, IDAPython's idaapi.get_stroff_path api doesn't tell us
-        # how much space we need to allocate. So we need to allocate the
-        # maximum first, and only then will we know the count to actually use.
-        delta, path = idaapi.sval_pointer(), idaapi.tid_array(idaapi.MAXSTRUCPATH)
-        delta.assign(0)
-        count = idaapi.get_stroff_path(inst.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), inst.ea, opnum)
-        if not count:
-            raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} does not contain a structure.".format(__name__, inst.ea, opnum, opnum))
+        # First we need to get the structure path that IDA has stored at the
+        # operand, and then get the operand's value. This is because IDA
+        # isn't always guaranteed to return a proper path, and so we'll need
+        # to calculate the offset ourselves.
+        delta, items = get_stroff_path(inst, opnum)
 
-        # Now that we have the right length, we can use IDAPython to
-        # actually populate the tid_array here. Afterwards, we discard
-        # our array by converting it into a list.
-        delta, path = idaapi.sval_pointer(), idaapi.tid_array(count)
-        delta.assign(0)
-        res = idaapi.get_stroff_path(inst.ea, opnum, path.cast(), delta.cast()) if idaapi.__version__ < 7.0 else idaapi.get_stroff_path(path.cast(), delta.cast(), inst.ea, opnum)
-        if res != count:
-            raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The length ({:d}) for the structure path at operand {:d} changed ({:d}).".format(__name__, inst.ea, count, opnum, opnum, res))
-        items = [path[idx] for idx in range(count)]
+        # Now we should have the path and delta that IDA is suggesting is
+        # at the given operand, so now we'll need the operand's value so
+        # that we can use it to find the proper path through the structure.
+        res = op.value if op.type in {idaapi.o_imm} else op.addr
+        offset = idaapi.as_signed(res, op_bits(ea, opnum)) + delta
+        _, items = calculate_stroff_path(offset, items)
 
-        # After we get the list of member ids, then we can use it to
-        # compose the path that we will later match against. We grab
-        # the first member (which is the structure id) so that later
-        # we can validate it against the sptr that we get from the
-        # idaapi.get_member_by_id api.
-        sptr = idaapi.get_struc(items.pop(0))
-        mptrs = [idaapi.get_member_by_id(item) for item in items if item]
-        items = [(sptr, mptr) for mptr, _, sptr in mptrs]
-
-        # Grab the sptr from the first member and compare it against
-        # the first member that we got from idaapi.get_stroff_path.
+        # If we actually got some items, then we can assign it to members.
         if items:
-            target, _ = items[0]
-            if target.id != sptr.id:
-                raise E.DisassemblerError(u"{:s}.op_refs({:#x}, {:d}) : The structure id ({:#x}) in the determined path does not have ownership of the first member ({:#x}).".format(__name__, inst.ea, opnum, sptr.id, target.id))
             members = items
 
-        # If IDAPython didn't return any members in the path, then we
-        # need to rely on op_structure to find the members we need to
-        # search for. As op_structure can return a number of arbitrary
-        # types, we need to normalize it into a list of members. This
-        # involves packing a single member into a list, and dropping
-        # off the integer for the delta at the very end.
+        # If we couldn't figure out the path, then we'll just fall back
+        # to the op_structure implementation. This should give us the
+        # members that are being used at the operand.
         else:
             res = op_structure(inst.ea, opnum)
             items = [item for item in res] if isinstance(res, (builtins.list, builtins.tuple)) else [res]
             items.pop(-1) if isinstance(items[-1], six.integer_types) else items
 
-            # Now we should have a list of structure.member_t, so all
+            # If the result is a structure, then this is either a reference
+            # or a size. The easiest way to resolve this is to just grab
+            # all the code references from the structure_t itself, and filter
+            # them for any tuples.
+            if isinstance(res, structure.structure_t):
+                return [item for item in res.refs() if isinstance(item, builtins.tuple)]
+
+            # So, now we should have a list of structure.member_t and all
             # we need to do is grab their idaapi.struc_t and idaapi.member_t.
             members = [(item.parent.ptr, item.ptr) for item in items]
 
@@ -1558,31 +1684,48 @@ def op_refs(ea, opnum):
         # reference and gather their structure path. This path could be composed
         # of frame variables or actual structure members, and we definitely
         # need to check both.
-        res = []
+        sptr, _ = members[0]
+        result, sid = [], sptr.id
         for ea, _, t in sorted(refs, key=operator.itemgetter(0)):
             candidates = []
 
             # Start by gathering any structure candidates that may be referenced
             # by our structure path.
-            for refop, supidx in enumerate([NSUP_STROFF0, NSUP_STROFF1]):
+            for refopnum, supidx in enumerate([NSUP_STROFF0, NSUP_STROFF1]):
                 if internal.netnode.sup.has(ea, supidx):
-                    supval = internal.netnode.sup.get(ea, supidx)
-                    offset, ids = interface.node.sup_opstruct(supval, idaapi.get_inf_structure().is_64bit())
-                    candidates.append((refop, ids))
+                    delta, ids = get_stroff_path(at(ea), refopnum)
+
+                    # We'll need to rebuild the path to this member because again
+                    # IDA does not guarantee the full path will be stored. So,
+                    # extract the operand's value and use it to calculate all of
+                    # the ids for the operand.
+                    op = operand(ea, refopnum)
+                    offset = idaapi.as_signed(op.value if op.type in {idaapi.o_imm} else op.addr, 8 * op_size(ea, refopnum))
+                    _, items = calculate_stroff_path(offset + delta, ids)
+
+                    # If this path does not even include our structure inside it,
+                    # then we can just exclude it from our list of candidates.
+                    if sptr.id not in {sptr.id for sptr, _ in items}:
+                        continue
+
+                    # Now we have the items, we need to grab their identifiers
+                    # and then we can later test for them.
+                    ids = [sptr.id for sptr, _ in items[:1]] + [mptr.id for _, mptr in items[:]]
+                    candidates.append((refopnum, {id for id in ids}))
                 continue
 
             # Next we need to check if there were any operands that actually
             # point to stack variables so we can figure out their path and
             # add them to our candidates list if necessary.
-            for refop, op in enumerate(operands(ea)):
-                if not idaapi.is_stkvar(database.type.flags(ea), refop):
+            for refopnum, op in enumerate(operands(ea)):
+                if not idaapi.is_stkvar(database.type.flags(ea), refopnum):
                     continue
 
                 # Use the instruction and the operand to figure out the
                 # member id of the frame that we need to descend into.
                 item = idaapi.get_stkvar(at(ea), op, op.value if op.type in {idaapi.o_imm} else op.addr)
                 if item is None:
-                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, inst.ea, opnum, refop, ea))
+                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, inst.ea, opnum, refopnum, ea))
                     continue
                 mptr, actval = item
 
@@ -1591,7 +1734,7 @@ def op_refs(ea, opnum):
                 # we can use the actual value to compose a path through it.
                 sptr = idaapi.get_sptr(mptr)
                 if sptr is None:
-                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, inst.ea, opnum, refop, ea))
+                    logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, inst.ea, opnum, refopnum, ea))
                     continue
 
                 # Instantiate a structure_t in order to grab its members_t. From
@@ -1599,22 +1742,37 @@ def op_refs(ea, opnum):
                 # through the member.
                 st = structure.__instance__(sptr.id)
                 path, delta = st.members.__walk_to_realoffset__(actval) # FIXME: wtf is the offset that we should use
-                ids = [sptr.id] + [item.ptr.id for item in path]
-                candidates.append((refop, ids))
+                ids = [sptr.id] + [member.ptr.id for member in path]
+                candidates.append((refopnum, {id for id in ids}))
+
+            # If we didn't find any candidates, then that means this is a global
+            # so we need to figure out which operand it is.
+            if not candidates:
+                for refopnum, op in enumerate(operands(ea)):
+                    if op.type in {idaapi.o_mem}:
+                        result.append(interface.opref_t(ea, int(refopnum), op_state(ea, refopnum)))
+                    continue
+                continue
 
             # Now that we've gathered all of the relevant operand numbers
             # and the structure ids for their paths, we need to do a final
             # pass of them to filter the operands to include references for.
-            filtered, required = [], [item.id for item, _ in members[:1]] + [item.id for _, item in members[1:]]
-            for opnum, ids in candidates:
+            filtered, required = [], {mptr.id for _, mptr in members[:]}
+            for refopnum, ids in candidates:
 
-                # If we don't have enough ids, then we only need match
-                # exactly what we have.
-                if all(item in ids for item in required[:len(ids)]):
-                    filtered.append(opnum)
+                # Check that the list of required identifiers is within our
+                # candidate identifiers. As each id is unique, this should
+                # support the case where IDA doesn't store the full structure
+                # offset path within the database.
+                if ids & required == required:
+                    filtered.append(refopnum)
                 continue
-            res.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
-        return res
+            result.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
+        return result
+
+    # If our operand type is a register, then there's no structures here.
+    elif operand(inst.ea, opnum).type in {idaapi.o_reg}:
+        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} has a type ({:d}) that cannot contain a structure.".format(__name__, inst.ea, opnum, opnum, operand(inst.ea, opnum).type))
 
     # Anything else should be just a regular global reference, and to figure this out
     # we just grab the operand's value and work it out from there. The value at the
