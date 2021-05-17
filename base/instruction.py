@@ -1679,13 +1679,16 @@ def op_refs(ea, opnum):
             # current member, and then continue onto the next one.
             refs.update(items)
 
-        # To verify that the operand is definitely referencing the caller's
-        # request, we need to iterate through all of the operands for every
-        # reference and gather their structure path. This path could be composed
-        # of frame variables or actual structure members, and we definitely
-        # need to check both.
+        # To verify that an xref is definitely referencing the path we care
+        # about, we'll need to check the path for each operand belonging to
+        # every xref. We're going to use the structure in our path along with
+        # all of its members as a required constraint when filtering them.
         sptr, _ = members[0]
-        result, sid = [], sptr.id
+        required = {mptr.id for _, mptr in members}
+
+        # Now we can iterate through all our references and gather any operands
+        # as potential candidates that we'll filter later.
+        result = []
         for ea, _, t in sorted(refs, key=operator.itemgetter(0)):
             candidates = []
 
@@ -1732,24 +1735,44 @@ def op_refs(ea, opnum):
                 # We have the mptr for the frame variable, so next we just need
                 # to get the sptr for it, and use it get its members_t. This way
                 # we can use the actual value to compose a path through it.
-                sptr = idaapi.get_sptr(mptr)
-                if sptr is None:
+                msptr = idaapi.get_sptr(mptr)
+                if msptr is None:
                     logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The frame variable for the operand ({:d}) in the instruction at {:#x} is not a structure.".format(__name__, inst.ea, opnum, refopnum, ea))
                     continue
 
                 # Instantiate a structure_t in order to grab its members_t. From
                 # this we can then use the actual value to carve a path straight
                 # through the member.
-                st = structure.__instance__(sptr.id)
+                st = structure.__instance__(msptr.id)
                 path, delta = st.members.__walk_to_realoffset__(actval) # FIXME: wtf is the offset that we should use
-                ids = [sptr.id] + [member.ptr.id for member in path]
+                ids = [msptr.id] + [member.ptr.id for member in path]
                 candidates.append((refopnum, {id for id in ids}))
 
             # If we didn't find any candidates, then that means this is a global
-            # so we need to figure out which operand it is.
+            # so we need to figure out which operand it is. We'll iterate through
+            # all of them for this xref and filter it in one shot.
             if not candidates:
                 for refopnum, op in enumerate(operands(ea)):
-                    if op.type in {idaapi.o_mem}:
+                    if op.type not in {idaapi.o_mem}:
+                        continue
+
+                    # Make sure that the operand is actually pointing to a
+                    # structure. If it isn't, then this operand is not anything
+                    # that we really care about.
+                    if not database.type.is_structure(database.address.head(op.addr)):
+                        continue
+
+                    # Now we can trust the op_structure function to get all the
+                    # members for the given operand. We'll need to homogenize the
+                    # returned path, though, to a list of member_t.
+                    path = op_structure(ea, refopnum)
+                    items = [item for item in path] if isinstance(path, (builtins.list, builtins.tuple)) else [path]
+                    items.pop(-1) if isinstance(items[-1], six.integer_types) else items
+
+                    # Now we can grab all of the operand's ids and check them
+                    # against our required ids before adding them to our results.
+                    ids = {item.ptr.id for item in items}
+                    if ids & required == required:
                         result.append(interface.opref_t(ea, int(refopnum), op_state(ea, refopnum)))
                     continue
                 continue
@@ -1757,7 +1780,7 @@ def op_refs(ea, opnum):
             # Now that we've gathered all of the relevant operand numbers
             # and the structure ids for their paths, we need to do a final
             # pass of them to filter the operands to include references for.
-            filtered, required = [], {mptr.id for _, mptr in members[:]}
+            filtered = []
             for refopnum, ids in candidates:
 
                 # Check that the list of required identifiers is within our
