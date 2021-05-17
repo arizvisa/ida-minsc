@@ -919,26 +919,26 @@ def op_structure(ea, opnum):
         res = idaapi.get_stkvar(insn, op, offset)
         if not res:
             raise E.DisassemblerError(u"{:s}.op_structure({:#x}, {:d}) : The call to `idaapi.get_stkvar({!r}, {!r}, {:+#x})` returned an invalid stack variable.".format(__name__, ea, opnum, insn, op, offset))
-        m, actval = res
+        mptr, actval = res
 
         # First we grab our frame, and then find the starting member by its id.
         frame = function.frame(fn)
-        member = frame.members.by_identifier(m.id)
+        member = frame.members.by_identifier(mptr.id)
 
         # Use the real offset of the member so that we can figure out which
         # members of the structure are actually part of the path.
-        path, realdelta = member.parent.members.__walk_to_realoffset__(member.realoffset)
+        path, delta = member.parent.members.__walk_to_realoffset__(actval)
 
         # If we got a list as a result, then we encountered an array which
         # requires us to return a list and include the offset.
         if isinstance(path, builtins.list):
-            return path + [realdelta]
+            return path + [delta]
 
         # Otherwise it's just a regular path, and we need to determine whether
         # to include the offset in the result or not.
         results = tuple(path)
-        if realdelta > 0:
-            return results + (realdelta,)
+        if delta > 0:
+            return results + (delta,)
         return tuple(results) if len(results) > 1 else results[0]
 
     # Otherwise, we have no idea what to do here since we need to know the opinfo_t
