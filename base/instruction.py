@@ -1731,6 +1731,7 @@ def op_refs(ea, opnum):
                     logging.warning(u"{:s}.op_refs({:#x}, {:d}) : Error trying to get frame variable for the referenced operand ({:d}) of the instruction at {:#x}.".format(__name__, inst.ea, opnum, refopnum, ea))
                     continue
                 mptr, actval = item
+                offset = actval - mptr.soff
 
                 # We have the mptr for the frame variable, so next we just need
                 # to get the sptr for it, and use it get its members_t. This way
@@ -1744,7 +1745,7 @@ def op_refs(ea, opnum):
                 # this we can then use the actual value to carve a path straight
                 # through the member.
                 st = structure.__instance__(msptr.id)
-                path, delta = st.members.__walk_to_realoffset__(actval) # FIXME: wtf is the offset that we should use
+                path, delta = st.members.__walk_to_realoffset__(offset)
                 ids = [msptr.id] + [member.ptr.id for member in path]
                 candidates.append((refopnum, {id for id in ids}))
 
