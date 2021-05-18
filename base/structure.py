@@ -292,8 +292,8 @@ class structure_t(object):
         # property so that users can interact with the structure.
         self.__members__ = members_t(self, baseoffset=offset)
 
-    def up(self):
-        '''Return all the structure members and addresses that reference this specific structure.'''
+    def refs(self):
+        '''Return all the structure members and operand references which reference this specific structure.'''
         x, sid = idaapi.xrefblk_t(), self.id
 
         # grab first structure that references this one
@@ -368,7 +368,7 @@ class structure_t(object):
         # and that's it, so we're done.
         return refs
 
-    def refs(self):
+    def up(self):
         '''Return all structure or frame members within the database that reference this particular structure.'''
         x, sid = idaapi.xrefblk_t(), self.id
 
@@ -451,7 +451,6 @@ class structure_t(object):
             else:
                 res.append( interface.ref_t(ref, None, interface.reftype_t.of_action('*')) )   # using '*' to describe being applied to the an address
             continue
-
         return res
 
     @property
