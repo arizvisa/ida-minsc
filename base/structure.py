@@ -294,125 +294,133 @@ class structure_t(object):
 
     def refs(self):
         '''Return all the structure members and operand references which reference this specific structure.'''
-        x, sid = idaapi.xrefblk_t(), self.id
 
-        # grab first structure that references this one
-        ok = x.first_to(sid, 0)
-        if not ok or x.frm == idaapi.BADADDR:
-            return []
+        # First collect all of our identifiers referenced by this structure,
+        # whilst making sure to include all the members too.
+        items = [self.id] + [item.id for item in self.members]
 
-        # continue collecting all structures that references this one
-        res = [(x.frm, x.iscode, x.type)]
-        while x.next_to():
-            res.append((x.frm, x.iscode, x.type))
-
-        # walk through all references figuring out if its a structure member or an address
+        # Now we need to iterate through all of our members and grab references
+        # to those identifiers too.
         refs = []
-        for xrfrom, xriscode, xrtype in res:
-            # if it's an address, then just create a regular reference
-            if database.contains(xrfrom):
-                refs.append( interface.opref_t(xrfrom, xriscode, interface.reftype_t.of(xrtype)) )
+        for id in items:
+            X = idaapi.xrefblk_t()
+
+            # Grab the very first reference for the given id.
+            if not X.first_to(id, idaapi.XREF_ALL) or X.frm == idaapi.BADADDR:
                 continue
+            refs.append((X.frm, X.iscode, X.type))
 
-            # so it's not, which means this must be a member id
-            fullname = idaapi.get_member_fullname(xrfrom)
+            # Continue and grab the rest of the references too.
+            while X.next_to():
+                refs.append((X.frm, X.iscode, X.type))
+            continue
 
-            sptr = idaapi.get_member_struc(fullname)
-            if not sptr:
-                cls = self.__class__
-                logging.warning(u"{:s}({:#x}).up() : Unable to find structure from member name \"{:s}\" while trying to handle reference for {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, utils.string.escape(fullname, '"'), xrfrom))
-                continue
-
-            # we figured out the owner, so find the member with the ref, and add it.
-            st = __instance__(sptr.id)
-            refs.append(st.by_identifier(xrfrom))
-
-        # and that's it, so we're done.
-        return refs
-
-    def up(self):
-        '''Return all structure or frame members within the database that reference this particular structure.'''
-        x, sid = idaapi.xrefblk_t(), self.id
-
-        # grab first reference to structure
-        if not x.first_to(sid, 0):
-            return []
-
-        # collect the rest of its references
-        refs = [(x.frm, x.iscode, x.type)]
-        while x.next_to():
-            refs.append((x.frm, x.iscode, x.type))
-
-        # iterate through figuring out if sid is applied to an address or another structure
+        # That should've given us absolutely every reference related to this
+        # structure, so the last thing to do is to filter our list for references
+        # to addresses within the database.
         res = []
-        for ref, _, _ in refs:
+        for xrfrom, xriscode, xrtype in refs:
 
-            # structure (probably a frame member)
-            if interface.node.is_identifier(ref):
-                # get mptr and the member name
-                mpack = idaapi.get_member_by_id(ref)
-                if mpack is None:
-                    cls = self.__class__
-                    raise E.MemberNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, ref))
-                mptr, name, _ = mpack
+            # If the reference is an identifier, then it's not what we're looking
+            # for as this method only cares about database addresses.
+            if interface.node.is_identifier(xrfrom):
+                continue
 
-                # validate mptr and get the sptr from it
-                if not isinstance(mptr, idaapi.member_t):
-                    cls, name = self.__class__, idaapi.get_member_fullname(ref)
-                    raise E.InvalidTypeOrValueError(u"{:s}({:#x}).refs() : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mptr.__class__, internal.utils.string.escape(name, '"')))
-                sptr = idaapi.get_member_struc(name)
+            # We need to figure out whether this is code or not, because if so
+            # then this'll be ref'd by an operand and we'll need to figure it out.
+            if database.type.is_code(xrfrom):
 
-                # find out from mptr id if we're a function frame
-                frname, _ = name.split('.', 1)
-                frid = internal.netnode.get(frname)
-                ea = idaapi.get_func_by_frame(frid)
-
-                # if we were unable to get the function frame, then we must be
-                # referencing the member of another structure
-                if ea == idaapi.BADADDR:
-                    st = by_identifier(sptr.id)
-                    mem = st.members.by_identifier(mptr.id)
-                    res.append(mem)
-                    continue
-
-                # otherwise we're referencing a frame member, and we need to grab
-                # the frame for the given function
-                fr = idaapi.get_frame(ea)
-                if fr is None:
-                    cls = self.__class__
-                    raise E.MissingTypeOrAttribute(u"{:s}({:#x}).refs() : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), self.id, ea, mptr.id))
-
-                # and we also need the func_t
-                f = idaapi.get_func(ea)
-                if f is None:
-                    cls = self.__class__
-                    raise E.FunctionNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, mptr.id, ea))
-
-                # so we can instantiate the structure with the correct offset
-                # and then grab the member that was referenced
-                st = by_identifier(fr.id, offset=-f.frsize)
-                mem = st.members.by_identifier(mptr.id)
-                res.append(mem)
-
-            # otherwise we just got an address, so figure out if it was code
-            elif database.type.is_code(ref):
-
-                # iterate through all of its operands figuring out the opinfo for it
-                for opnum, _ in enumerate(instruction.operands(ref)):
-                    opinfo = instruction.opinfo(ref, opnum)
+                # Iterate through all of its operands and only care about the
+                # ones that have operand information for it.
+                for opnum, _ in enumerate(instruction.operands(xrfrom)):
+                    opinfo = instruction.opinfo(xrfrom, opnum)
                     if opinfo is None:
                         continue
 
-                    # check if we do have an opinfo.path, and our sid is contained in it
-                    if opinfo.path.len > 0 and operator.contains(opinfo.path.ids, sid):
-                        state = instruction.op_state(ref, opnum)
-                        res.append( interface.opref_t(ref, opnum, interface.reftype_t.of_action(state)) )   # using '*' to describe being applied to the an address
+                    # Verify that we have an opinfo.path and one of our ids is
+                    # contained within it.
+                    if opinfo.path.len > 0 and any(operator.contains(opinfo.path.ids, id) for id in items):
+                        state = instruction.op_state(xrfrom, opnum)
+                        item = interface.opref_t(xrfrom, opnum, interface.reftype_t.of_action(state))
+                        res.append(item)
                     continue
 
-            # anything else is data and we just need to add a reference in that case
+            # Anything else is data which doesn't have an operand associated with
+            # it, so we can just use the regular ref_t for this case. We use '*'
+            # for the reference type since this is being applied to an address.
             else:
-                res.append( interface.ref_t(ref, None, interface.reftype_t.of_action('*')) )   # using '*' to describe being applied to the an address
+                item = interface.ref_t(xrfrom, None, interface.reftype_t.of_action('*'))
+                res.append(item)
             continue
+        return res
+
+    def up(self):
+        '''Return all structure or frame members within the database that reference this particular structure.'''
+        X, sid = idaapi.xrefblk_t(), self.id
+
+        # Grab the first reference to the structure.
+        if not X.first_to(sid, idaapi.XREF_ALL):
+            return []
+
+        # Continue to grab all the rest of its references.
+        refs = [(X.frm, X.iscode, X.type)]
+        while X.next_to():
+            refs.append((X.frm, X.iscode, X.type))
+
+        # Iterate through each reference figuring out if our structure's id is
+        # applied to another structure type.
+        res = []
+        for ref, _, _ in refs:
+
+            # If the reference is not an identifier, then we don't care about it because
+            # it's pointing to code and the structure_t.refs method is for those refs.
+            if not interface.node.is_identifier(ref):
+                continue
+
+            # Get mptr, full member name, and sptr for the reference (which should
+            # totally be an identifier due to the previous conditional).
+            mpack = idaapi.get_member_by_id(ref)
+            if mpack is None:
+                cls = self.__class__
+                raise E.MemberNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, ref))
+            mptr, name, sptr = mpack
+
+            # Validate that the type of the mptr is what we're expecting.
+            if not isinstance(mptr, idaapi.member_t):
+                cls, name = self.__class__, idaapi.get_member_fullname(ref)
+                raise E.InvalidTypeOrValueError(u"{:s}({:#x}).refs() : Unexpected type {!s} returned for member \"{:s}\".".format('.'.join([__name__, cls.__name__]), self.id, mptr.__class__, internal.utils.string.escape(name, '"')))
+
+            # Figure out from mptr identifier if we're referencing a function frame.
+            frname, _ = name.split('.', 1)
+            frid = internal.netnode.get(frname)
+            ea = idaapi.get_func_by_frame(frid)
+
+            # If we were unable to get the function frame, then we must be
+            # referencing the member of another structure.
+            if ea == idaapi.BADADDR:
+                st = by_identifier(sptr.id)
+                mem = st.members.by_identifier(mptr.id)
+                res.append(mem)
+                continue
+
+            # Otherwise we're referencing a frame member, and we need to grab
+            # the frame for that function.
+            fr = idaapi.get_frame(ea)
+            if fr is None:
+                cls = self.__class__
+                raise E.MissingTypeOrAttribute(u"{:s}({:#x}).refs() : The function at {:#x} for frame member {:#x} does not have a frame.".format('.'.join([__name__, cls.__name__]), self.id, ea, mptr.id))
+
+            # We'll also need the idaapi.func_t for the function.
+            f = idaapi.get_func(ea)
+            if f is None:
+                cls = self.__class__
+                raise E.FunctionNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the function for frame member {:#x} by address {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, mptr.id, ea))
+
+            # So we can instantiate the structure with the correct offset
+            # and then grab the member that was being referenced.
+            st = by_identifier(fr.id, offset=-f.frsize)
+            mem = st.members.by_identifier(mptr.id)
+            res.append(mem)
         return res
 
     @property
@@ -2172,19 +2180,19 @@ class member_t(object):
             return res
 
         # otherwise, it's a structure..which means we need to specify the member to get refs for
-        x = idaapi.xrefblk_t()
-        if not x.first_to(mid, 0):
+        X = idaapi.xrefblk_t()
+        if not X.first_to(mid, idaapi.XREF_ALL):
             return []
 
         # collect all references available
-        refs = [(x.frm, x.iscode, x.type)]
-        while x.next_to():
-            refs.append((x.frm, x.iscode, x.type))
+        refs = [(X.frm, X.iscode, X.type)]
+        while X.next_to():
+            refs.append((X.frm, X.iscode, X.type))
 
         # collect all structure references that might reference us just in case
         # we need to verify that a globally defined address is using a structure
         # that contains our member
-        identifiers = { self.parent } | { member.parent for member in self.parent.refs() if isinstance(member, member_t) }
+        identifiers = { self.parent } | { member.parent for member in self.parent.up() if isinstance(member, member_t) }
         while True:
             current = identifiers.copy()
 
