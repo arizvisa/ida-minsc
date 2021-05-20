@@ -1033,7 +1033,7 @@ class string(object):
 
         # Otherwise, we check if it's an even number or not in order to determine
         # that we need to use the base-less math.log implementation.
-        elif not math.remainder(base, 2):
+        elif not operator.mod(base, 2):
             logarithm = math.log(number or 1, base)
 
             # This should only use the exponent field inside a floating point number
