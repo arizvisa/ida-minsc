@@ -261,7 +261,7 @@ class address(changingchanged):
         event, oldcmt = cls.new(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
-        [ ui.hook.idb.disable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+        [ ui.hook.idb.disable(item) for item in ['changing_cmt', 'cmt_changed'] ]
 
         # Now we can use our coroutine to begin the comment update, so that
         # later, the "changed" event can do the actual update.
@@ -275,7 +275,7 @@ class address(changingchanged):
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
-            [ ui.hook.idb.enable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+            [ ui.hook.idb.enable(item) for item in ['changing_cmt', 'cmt_changed'] ]
 
         # And then we can leave..
         return
@@ -293,7 +293,7 @@ class address(changingchanged):
         event, newcmt = cls.resume(ea), utils.string.of(idaapi.get_cmt(ea, repeatable_cmt))
 
         # First disable our hooks so that we can prevent re-entrancy issues
-        [ ui.hook.idb.disable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+        [ ui.hook.idb.disable(item) for item in ['changing_cmt', 'cmt_changed'] ]
 
         # Now we can use our coroutine to update the comment state, so that the
         # coroutine will perform the final update.
@@ -308,7 +308,7 @@ class address(changingchanged):
 
         # Re-enable our hooks that we had prior disabled
         finally:
-            [ ui.hook.idb.enable(event) for event in ['changing_cmt', 'cmt_changed'] ]
+            [ ui.hook.idb.enable(item) for item in ['changing_cmt', 'cmt_changed'] ]
 
         # Updating the comment was complete, that should've been it and so we can
         # just close our event since we're done.
@@ -475,7 +475,7 @@ class globals(changingchanged):
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
         hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
-        [ ui.hook.idb.disable(event) for event in hooks ]
+        [ ui.hook.idb.disable(item) for item in hooks ]
 
         # Now we can use our coroutine to begin the comment update, so that
         # later, the "changed" event can do the actual update.
@@ -490,7 +490,7 @@ class globals(changingchanged):
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
-            [ ui.hook.idb.enable(event) for event in hooks ]
+            [ ui.hook.idb.enable(item) for item in hooks ]
 
         # And then we're ready for the "changed" event
         return
@@ -517,7 +517,7 @@ class globals(changingchanged):
 
         # We need to disable our hooks so that we can prevent re-entrancy issues
         hooks = ['changing_area_cmt', 'area_cmt_changed'] if idaapi.__version__ < 7.0 else ['changing_range_cmt', 'range_cmt_changed']
-        [ ui.hook.idb.disable(event) for event in hooks ]
+        [ ui.hook.idb.disable(item) for item in hooks ]
 
         # Now we can use our coroutine to update the comment state, so that the
         # coroutine will perform the final update.
@@ -532,7 +532,7 @@ class globals(changingchanged):
 
         # Last thing to do is to re-enable the hooks that we disabled
         finally:
-            [ ui.hook.idb.enable(event) for event in hooks ]
+            [ ui.hook.idb.enable(item) for item in hooks ]
 
         # We're done updating the comment and our state is done, so we can
         # close it to release it from existence.
@@ -664,7 +664,7 @@ class typeinfo(changingchanged):
         original, new = (old_type, old_fname or b''), (new_type or b'', new_fname or b'')
 
         # First disable our hooks so that we can prevent re-entrancy issues.
-        [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
+        [ ui.hook.idb.disable(item) for item in ['changing_ti', 'ti_changed'] ]
 
         # Now we can use our coroutine to begin updating the typeinfo tag. We
         # submit the previous values (prior to the typeinfo being changed) because
@@ -680,7 +680,7 @@ class typeinfo(changingchanged):
 
         # Last thing to do is to re-enable the hooks that we disabled and then leave.
         finally:
-            [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
+            [ ui.hook.idb.enable(item) for item in ['changing_ti', 'ti_changed'] ]
         return
 
     @classmethod
@@ -705,7 +705,7 @@ class typeinfo(changingchanged):
         event, new = cls.resume(ea), (type or b'', fnames or b'')
 
         # First disable our hooks so that we can prevent re-entrancy issues.
-        [ ui.hook.idb.disable(event) for event in ['changing_ti', 'ti_changed'] ]
+        [ ui.hook.idb.disable(item) for item in ['changing_ti', 'ti_changed'] ]
 
         # Now we can use our coroutine to update the typeinfo tag. As IDA was
         # kind enough to provide the new values, we can just submit them to the
@@ -722,7 +722,7 @@ class typeinfo(changingchanged):
         # close our state since we're done with it and there shouldn't be
         # anything left to do for this address.
         finally:
-            [ ui.hook.idb.enable(event) for event in ['changing_ti', 'ti_changed'] ]
+            [ ui.hook.idb.enable(item) for item in ['changing_ti', 'ti_changed'] ]
         event.close()
 
 ### database scope
