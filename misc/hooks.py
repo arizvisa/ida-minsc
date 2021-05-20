@@ -619,7 +619,7 @@ class typeinfo(changingchanged):
             new_ea = ea
         elif expected != tidata:
             logging.warning(u"{:s}.event() : The {:s} event for address {:#x} has different type information ({!r} != {!r}) than what was received by the {:s} event. Re-fetching the type information for the address at {:#x}.".format('.'.join([__name__, cls.__name__]), 'changing_ti', ea, bytes().join(expected), bytes().join(tidata), 'ti_changed', new_ea))
-            tidata = database.type(ea)
+            tidata, _, _ = database.type(ea)
 
         # Okay, we now have the data that we need to compare in order to determine
         # if we're removing typeinfo, adding it, or updating it. Since we
@@ -630,7 +630,8 @@ class typeinfo(changingchanged):
             logging.debug(u"{:s}.event() : Updated the type information at address {:#x} and {:s} its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, 'kept' if original == tidata else 'increased', bytes().join(original), bytes().join(tidata)))
 
         # For the sake of debugging, log that we just removed the typeinfo
-        # from the current address.
+        # from the current address. We don't need to decrease our reference
+        # here because we did it already when we git our "changing" event.
         else:
             logging.debug(u"{:s}.event() : Removed the type information from address {:#x} and its reference ({!r} -> {!r}).".format('.'.join([__name__, cls.__name__]), new_ea, bytes().join(original), bytes().join(tidata)))
         return
@@ -1476,8 +1477,11 @@ def make_ida_not_suck_cocks(nw_code):
         ui.hook.idb.add('item_color_changed', item_color_changed, 0)
 
     # anything earlier than v7.0 doesn't expose the "changing_ti" and "ti_changed"
-    # hooks, so there's no actual need to hook "init" to support v6.9.
-    if idaapi.__version__ >= 7.0:
+    # hooks... plus, v7.1 doesn't pass us the correct type (idaapi.tinfo_t) as its
+    # parameter, instead opting for an idaapi.comp_t (compiler type) which is
+    # completely fucking useless to us. so if we're using 7.1 or earlier, then
+    # we completely skip the addition of the typeinfo hooks.
+    if idaapi.__version__ >= 7.2:
         ui.hook.idp.add('ev_init', typeinfo.database_init, 0)
         ui.hook.idb.add('changing_ti', typeinfo.changing, 0)
         ui.hook.idb.add('ti_changed', typeinfo.changed, 0)
