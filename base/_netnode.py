@@ -6,7 +6,7 @@ can be mindless when reading/writing/enumerating data out of a netnode.
 This is an internal module and is not expected to be used by the user.
 """
 
-import six
+import six, operator
 import idaapi
 
 import internal
@@ -38,7 +38,10 @@ class netnode(object):
 
     # these apis exist in 5.6 of the sdk, but there's
     # definitely a chance that they're not in IDAPython.
-    exist, exist_name = _ida_netnode.exist, _ida_netnode.netnode_exist
+    if idaapi.__version__ > 7.1:
+        exist, exist_name = _ida_netnode.exist, _ida_netnode.netnode_exist
+    else:
+        exist, exist_name = _ida_netnode.exist, internal.utils.fcompose(internal.utils.frpartial(_ida_netnode.new_netnode, False, 0), _ida_netnode.netnode_index, internal.utils.fpartial(operator.ne, idaapi.BADADDR))
 
     long_value = _ida_netnode.netnode_long_value
     next = _ida_netnode.netnode_next
