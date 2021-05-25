@@ -1647,8 +1647,8 @@ def op_refs(ea, opnum):
             # or a size. The easiest way to resolve this is to just grab
             # all the code references from the structure_t itself, and filter
             # them for any tuples.
-            if isinstance(res, structure.structure_t):
-                return [item for item in res.refs() if isinstance(item, builtins.tuple)]
+            if len(items) == 1 and isinstance(items[0], structure.structure_t):
+                return [item for item in items[0].refs() if isinstance(item, builtins.tuple)]
 
             # So, now we should have a list of structure.member_t and all
             # we need to do is grab their idaapi.struc_t and idaapi.member_t.
