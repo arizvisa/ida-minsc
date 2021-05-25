@@ -1302,9 +1302,9 @@ class entries(object):
     __matcher__.boolean('less', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('le', operator.ge, idaapi.get_entry_ordinal, idaapi.get_entry)
     __matcher__.boolean('lt', operator.gt, idaapi.get_entry_ordinal, idaapi.get_entry)
-    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of)
-    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of)
-    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of)
+    __matcher__.boolean('name', lambda name, item: name.lower() == item.lower(), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('like', utils.fcompose(fnmatch.translate, utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
+    __matcher__.combinator('regex', utils.fcompose(utils.fpartial(re.compile, flags=re.IGNORECASE), operator.attrgetter('match')), idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of)
     __matcher__.predicate('predicate', idaapi.get_entry_ordinal)
     __matcher__.predicate('pred', idaapi.get_entry_ordinal)
     __matcher__.boolean('index', operator.eq)
@@ -1369,7 +1369,7 @@ class entries(object):
         return None if res == idaapi.BADADDR else res
 
     # Returns the name of the entry point at the specified `index`.
-    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.string.of))
+    __entryname__ = staticmethod(utils.fcompose(idaapi.get_entry_ordinal, idaapi.get_entry_name, utils.fdefault(''), utils.string.of))
     # Returns the ordinal of the entry point at the specified `index`.
     __entryordinal__ = staticmethod(idaapi.get_entry_ordinal)
 
