@@ -1796,15 +1796,12 @@ def op_refs(ea, opnum):
             result.extend(interface.opref_t(ea, int(op), interface.reftype_t.of(t)) for op in filtered)
         return result
 
-    # If our operand type is a register, then there's no structures here.
-    elif operand(inst.ea, opnum).type in {idaapi.o_reg}:
-        raise E.MissingTypeOrAttribute(u"{:s}.op_structure({:#x}, {:d}) : Operand {:d} has a type ({:d}) that cannot contain a structure.".format(__name__, inst.ea, opnum, opnum, operand(inst.ea, opnum).type))
-
-    # Anything else should be just a regular global reference, and to figure this out
-    # we just grab the operand's value and work it out from there. The value at the
-    # supidx has some format which is documented as "complex reference information".
-    # In some cases, I've seen the byte 0x02 used to describe a pointer to a global
-    # that is within the second segment.
+    # Anything else should be just a regular global reference or an immediate,
+    # and to figure this out we just grab the operand's value and work it out
+    # from there. The value at the supidx has some format which is documented
+    # as "complex reference information". In some cases, I've seen the byte
+    # 0x02 used to describe a pointer to a global that is within the second
+    # segment. This might be worth noting in case we have to dig in there.
 
     # XXX: verify whether globals are supposed to add xrefs (has_xrefs) or not.
 
@@ -1820,8 +1817,7 @@ def op_refs(ea, opnum):
     # user about it and return an empty list.
     X = idaapi.xrefblk_t()
     if not X.first_to(value, idaapi.XREF_ALL):
-        name = database.name(value)
-        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : No references found to global \"{:s}\" ({:#x}).".format(__name__, inst.ea, opnum, utils.string.escape(name, '"'), value))
+        logging.warning(u"{:s}.op_refs({:#x}, {:d}) : The operand ({:d}) at the specified address ({:#x}) does not have any references.".format(__name__, inst.ea, opnum, opnum, inst.ea))
         return []
 
     # However, if we were able to find the first value, then we can
