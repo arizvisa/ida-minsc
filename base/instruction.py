@@ -1611,10 +1611,11 @@ def op_refs(ea, opnum):
             res.extend(interface.opref_t(ea, int(opnum), interface.reftype_t.of(t)) for opnum in ops)
         return res
 
-    # If the operand adds xrefs and there's operand information, then this
-    # is a structure. We don't actually have to test the operand information
-    # because for some reason there's absolutely nothing in it.
-    elif has_xrefs and info:
+    # If the operand adds xrefs, there's operand information, and the operand's
+    # type identifier is defined, then this is a structure. We don't actually
+    # have to test the operand information in detail because for some reason
+    # there's absolutely nothing in it.
+    elif has_xrefs and info and info.tid != idaapi.BADADDR:
         NSUP_STROFF0, NSUP_STROFF1 = (getattr(idaapi, name, 0xf + idx) for idx, name in enumerate(['NSUP_STROFF0', 'NSUP_STROFF1']))
         op = ops[opnum]
 
