@@ -877,6 +877,8 @@ def op_structure(ea, opnum):
         table = {}
         for mptr in members:
             _, fullname, sptr = idaapi.get_member_by_id(mptr.id)
+            if not interface.node.is_identifier(sptr.id):
+                sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
             table.setdefault(sptr.id, []).append(mptr.id)
 
         # Now we can define the closure that will be used to look through
@@ -983,6 +985,8 @@ def op_structure(ea, opnum):
         # Unpack the result that we got into their 3 components so that we
         # simply collect the mptrs for each id, and update our member offset.
         mptr, fullname, mparent = res
+        if not interface.node.is_identifier(mparent.id):
+            mparent = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
         items.append(mptr)
         moffset += 0 if mparent.is_union() else mptr.soff
 
@@ -1000,8 +1004,6 @@ def op_structure(ea, opnum):
     Ffilter = generate_filter(items)
     res, realdelta = st.members.__walk_to_realoffset__(offset + delta.value(), filter=Ffilter)
 
-    # If we have some members in our items, but we couldn't figure anything out
-    # when walking it. Then this might be a union that
     # If our item length is larger than our result path, then this might be
     # a union with the delta pointing outside of it. This is a special case.
     if len(res) < len(items):
@@ -1052,6 +1054,8 @@ def op_structure(opnum, member, *path, **delta):
 def op_structure(opnum, mptr, *path, **delta):
     '''Apply the ``idaapi.member_t` in `mptr` to the instruction operand `opnum` at the current address.'''
     _, _, sptr = idaapi.get_member_by_id(mptr.id)
+    if not interface.node.is_identifier(sptr.id):
+        sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
     deltapath = [delta.get('delta', 0)] if delta else []
     return op_structure(ui.current.address(), opnum, sptr, *itertools.chain([mptr], path, deltapath))
 @utils.multicase(opnum=six.integer_types, path=(builtins.tuple, builtins.list))
@@ -1078,6 +1082,8 @@ def op_structure(ea, opnum, member, *path, **delta):
 def op_structure(ea, opnum, mptr, *path, **delta):
     '''Apply the ``idaapi.member_t` in `mptr` to the instruction operand `opnum` at the address `ea`.'''
     _, _, sptr = idaapi.get_member_by_id(mptr.id)
+    if not interface.node.is_identifier(sptr.id):
+        sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
     deltapath = [delta.get('delta', 0)] if delta else []
     return op_structure(ea, opnum, sptr, *itertools.chain([mptr], path, deltapath))
 @utils.multicase(ea=six.integer_types, opnum=six.integer_types, path=(builtins.tuple, builtins.list))
@@ -1093,6 +1099,8 @@ def op_structure(ea, opnum, path, **delta):
         sptr, fullpath = member.ptr, items
     elif isinstance(member, idaapi.member_t):
         _,_, sptr = idaapi.get_member_by_id(member.id)
+        if not interface.node.is_identifier(sptr.id):
+            sptr = idaapi.get_member_struc(idaapi.get_member_fullname(member.id))
         fullpath = [member] + items
     elif isinstance(member, structure.member_t):
         sptr, fullpath = member.parent.ptr, [member] + items
@@ -1173,6 +1181,9 @@ def op_structure(ea, opnum, sptr, *path):
         # We got an mptr, so now we can extract its owning sptr and verify that
         # it matches the structure that our path traversal is currently in.
         _, _, res = idaapi.get_member_by_id(mptr.id)
+        if not interface.node.is_identifier(res.id):
+            res = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
+
         if res.id != sptr.id:
             suggested = ((idaapi.get_struc_name(sptr.id), idaapi.get_member_name(mptr.id)) for sptr, mptr in items)
             suggested = ('.'.join(map(utils.string.of, pair)) for pair in suggested)
@@ -1488,7 +1499,7 @@ def op_refs(ea, opnum):
         # to a structure we that we have some place to start.
         st = structure.__instance__(items.pop(0))
         members = [idaapi.get_member_by_id(item) for item in items]
-        items = [(sptr, mptr) for mptr, _, sptr in members]
+        items = [(sptr if interface.node.is_identifier(sptr.id) else idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id)), mptr) for mptr, _, sptr in members]
 
         # Now we have a list of members, we format it into a dictionary
         # so that we can look up the correct member for any given structure.
