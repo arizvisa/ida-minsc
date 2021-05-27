@@ -370,7 +370,10 @@ class structure_t(object):
             if mpack is None:
                 cls = self.__class__
                 raise E.MemberNotFoundError(u"{:s}({:#x}).refs() : Unable to locate the member identified by {:#x}.".format('.'.join([__name__, cls.__name__]), self.id, ref))
+
             mptr, name, sptr = mpack
+            if not interface.node.is_identifier(sptr.id):
+                sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
 
             # Validate that the type of the mptr is what we're expecting.
             if not isinstance(mptr, idaapi.member_t):
@@ -1356,10 +1359,12 @@ class members_t(object):
             raise E.MemberNotFoundError(u"{:s}({:#x}).members.by_id({:#x}) : Unable to find member with specified identifier ({:#x}).".format('.'.join([__name__, cls.__name__]), owner.ptr.id, id, id))
 
         # unpack the member out of the result
-        mem, fn, st = res
+        mptr, fullname, sptr = res
+        if not interface.node.is_identifier(sptr.id):
+            sptr = idaapi.get_member_struc(idaapi.get_member_fullname(mptr.id))
 
         # search through our members for the specified member
-        index = self.index(mem)
+        index = self.index(mptr)
         return self[index]
     by_id = byid = byidentifier = utils.alias(by_identifier, 'members_t')
 
