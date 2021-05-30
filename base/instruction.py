@@ -2116,12 +2116,13 @@ class operand_types:
             maximum, value = pow(2, bits), op.value
             res = idaapi.as_signed(value, bits)
 
-            # We need to always mask our operand's value to the maximum value
-            # supported by the operand. The "inverted" variation needs to be
-            # signed, but within our supported bitmask. So if the value is
-            # less than 0, then take it as-is. Otherwise if it's positive, then
-            # we need to shift it by 1-past the smallest possible value.
-            regular = res & (maximum - 1)
+            # Immediates appear to be handled differently from phrases, so if
+            # our operand is in regular form, then we always return it unsigned
+            # by masking it within the maximum operand value. If the operand is
+            # inverted, then we take the signed variation if it's less than 0.
+            # If it isn't, then we take the difference form the maximum in
+            # order to ensure it's signed.
+            regular = value & (maximum - 1)
             inverted = res if res < 0 else value - maximum
             return res and inverted if interface.node.alt_opinverted(ea, op.n) else regular
         optype = "{:s}({:d})".format('idaapi.o_imm', idaapi.o_imm)
@@ -2256,14 +2257,12 @@ class operand_types:
         maximum, dt = pow(2, bits), dtype_by_size(database.config.bits() // 8)
         res = idaapi.as_signed(offset, bits)
 
-        # Our regular offset needs to be masked within the maximum value as
-        # specified by the number of bits for the database's processor. The
-        # "inverted" variation also needs to satisfy the same constraints,
-        # but needs to be signed. If the value of the offset is less than
-        # 0, then we can take it as-is. Otherwise if it's positive, then we
-        # need to take the difference of it and 1-past the smallest value.
-        regular = res & (maximum - 1)
-        inverted = res if res < 0 else offset - maximum
+        # If our operand is defined as its regular form, then we either
+        # clamp it or take its signed value. This is because IDA appears to
+        # treat all SIB-encoded operands as a signed value. Likewise, if the
+        # operand is inverted, then we essentially swap these values.
+        regular = res if res < 0 else offset & (maximum - 1)
+        inverted = offset & (maximum - 1) if res < 0 else offset - maximum
 
         global architecture
         items = res and inverted if interface.node.alt_opinverted(ea, op.n) else regular, None if base is None else architecture.by_indextype(base, dt), None if index is None else architecture.by_indextype(index, dt), scale
