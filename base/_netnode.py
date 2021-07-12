@@ -36,12 +36,16 @@ class netnode(object):
     index = _ida_netnode.netnode_index
     kill = _ida_netnode.netnode_kill
 
-    # these apis exist in 5.6 of the sdk, but there's
-    # definitely a chance that they're not in IDAPython.
-    if idaapi.__version__ > 7.1:
-        exist, exist_name = _ida_netnode.exist, _ida_netnode.netnode_exist
+    # Although the following apis exist in 5.6 of the sdk, there's a chance that
+    # they're not actually available in IDAPython. To deal with that uncertainty,
+    # we'll explicitly check for it and assign if so, otherwise we have to use
+    # the _ida_netnode.new_netnode function with its "do_create" parameter set
+    # to false.
+    exist = _ida_netnode.exist
+    if hasattr(_ida_netnode, 'netnode_exist'):
+        exist_name = _ida_netnode.netnode_exist
     else:
-        exist, exist_name = _ida_netnode.exist, internal.utils.fcompose(internal.utils.frpartial(_ida_netnode.new_netnode, False, 0), _ida_netnode.netnode_index, internal.utils.fpartial(operator.ne, idaapi.BADADDR))
+        exist_name = internal.utils.fcompose(internal.utils.frpartial(_ida_netnode.new_netnode, False, 0), _ida_netnode.netnode_index, internal.utils.fpartial(operator.ne, idaapi.BADADDR))
 
     long_value = _ida_netnode.netnode_long_value
     next = _ida_netnode.netnode_next
