@@ -46,11 +46,17 @@ import idaapi
 # FIXME: complete this with more types similar to the 'structure' module.
 # FIXME: normalize the documentation.
 
+@utils.multicase(enum=six.integer_types)
 def has(enum):
-    '''Return truth if the enumeration `enum` exists within the database.'''
+    '''Return truth if an enumeration with the identifier `enum` exists within the database.'''
     ENUM_QTY_IDX, ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL = -1, -3, -5, -8
     alts = {idaapi.BADADDR & uval for uval in [ENUM_FLG_IDX, ENUM_FLAGS, ENUM_ORDINAL]}
     return interface.node.is_identifier(enum) and all(internal.netnode.alt.has(enum, idx) for idx in alts)
+@utils.multicase(name=six.string_types)
+def has(name):
+    '''Return truth if an enumeration with the specified `name` exists within the database.'''
+    string = utils.string.to(name)
+    return idaapi.get_enum(string) != idaapi.BADADDR
 
 def count():
     '''Return the total number of enumerations in the database.'''
