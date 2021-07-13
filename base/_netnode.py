@@ -543,59 +543,59 @@ class sup(object):
     MAX_SIZE = 0x400
 
     @classmethod
-    def has(cls, nodeidx, index):
+    def has(cls, nodeidx, index, tag=None):
         '''Return whether the netnode identified by `nodeidx` has a "supval" for the specified `index`.'''
-        return any(index == item for item in cls.fiter(nodeidx))
+        return any(index == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
-    def get(cls, nodeidx, index, type=None):
+    def get(cls, nodeidx, index, type=None, tag=None):
         '''Return the value at the `index` of the "supval" array belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
         node = netnode.get(nodeidx)
         if type in {None}:
-            return netnode.supval(node, index)
+            return netnode.supval(node, index, tag or netnode.suptag)
         elif issubclass(type, memoryview):
-            res = netnode.supval(node, index)
+            res = netnode.supval(node, index, tag or netnode.suptag)
             return res and memoryview(res)
         elif issubclass(type, bytes):
-            return netnode.supstr(node, index)
+            return netnode.supstr(node, index, tag or netnode.suptag)
         elif issubclass(type, six.string_types):
-            return netnode.supstr(node, index)
+            return netnode.supstr(node, index, tag or netnode.suptag)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {:#x}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's supval.".format('.'.join([__name__, cls.__name__]), nodeidx, index, type, type))
 
     @classmethod
-    def set(cls, nodeidx, index, value):
+    def set(cls, nodeidx, index, value, tag=None):
         '''Assign the provided `value` to the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.supset(node, index, value.tobytes() if isinstance(value, memoryview) else value)
+        return netnode.supset(node, index, value.tobytes() if isinstance(value, memoryview) else value, tag or netnode.suptag)
 
     @classmethod
-    def remove(cls, nodeidx, index):
+    def remove(cls, nodeidx, index, tag=None):
         '''Remove the value at the specified `index` of the "supval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.supdel(node, index)
+        return netnode.supdel(node, index, tag or netnode.suptag)
 
     @classmethod
-    def fiter(cls, nodeidx):
+    def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, _ in utils.fsup(node):
+        for index, _ in utils.fsup(node, tag=tag or netnode.suptag):
             yield index
         return
 
     @classmethod
-    def riter(cls, nodeidx):
+    def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "supval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, _ in utils.rsup(node):
+        for index, _ in utils.rsup(node, tag=tag or netnode.suptag):
             yield index
         return
 
     @classmethod
-    def repr(cls, nodeidx):
+    def repr(cls, nodeidx, tag=None):
         '''Display the "supval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
-        for index, item in enumerate(cls.fiter(nodeidx)):
-            value = cls.get(nodeidx, item)
+        for index, item in enumerate(cls.fiter(nodeidx, tag=tag)):
+            value = cls.get(nodeidx, item, tag=tag)
             res.append("[{:d}] {:x} : {!r}".format(index, item, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any supvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
