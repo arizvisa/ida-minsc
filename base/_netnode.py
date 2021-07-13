@@ -484,49 +484,49 @@ class alt(object):
     """
 
     @classmethod
-    def has(cls, nodeidx, index):
+    def has(cls, nodeidx, index, tag=None):
         '''Return whether the netnode identified by `nodeidx` has an "altval" for the specified `index`.'''
-        return any(index == idx for idx, item in cls.fiter(nodeidx))
+        return any(index == idx for idx, item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
-    def get(cls, nodeidx, index):
+    def get(cls, nodeidx, index, tag=None):
         '''Return the integer at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.altval(node, index)
+        return netnode.altval(node, index, tag or netnode.alttag)
 
     @classmethod
-    def set(cls, nodeidx, index, value):
+    def set(cls, nodeidx, index, value, tag=None):
         '''Assign the integer `value` at the `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.altset(node, index, value)
+        return netnode.altset(node, index, value, tag or netnode.alttag)
 
     @classmethod
-    def remove(cls, nodeidx, index):
+    def remove(cls, nodeidx, index, tag=None):
         '''Remove the integer from the specified `index` of the "altval" array belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.altdel(node, index)
+        return netnode.altdel(node, index, tag or netnode.alttag)
 
     @classmethod
-    def fiter(cls, nodeidx):
+    def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for index, value in utils.falt(node):
+        for index, value in utils.falt(node, tag=tag or netnode.alttag):
             yield index, value
         return
 
     @classmethod
-    def riter(cls, nodeidx):
+    def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "altval" array belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for index, value in utils.ralt(node):
+        for index, value in utils.ralt(node, tag=tag or netnode.alttag):
             yield index, value
         return
 
     @classmethod
-    def repr(cls, nodeidx):
+    def repr(cls, nodeidx, tag=None):
         '''Display the "altval" array belonging to the netnode identified by `nodeidx`.'''
         res = []
-        for index, value in cls.fiter(nodeidx):
+        for index, value in cls.fiter(nodeidx, tag=tag):
             res.append("{0:x} : {1:#x} ({1:d})".format(index, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any altvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
