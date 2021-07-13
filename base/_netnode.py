@@ -611,77 +611,77 @@ class hash(object):
     """
 
     @classmethod
-    def has(cls, nodeidx, key):
+    def has(cls, nodeidx, key, tag=None):
         '''Return whether the netnode identified by `nodeidx` has a "hashval" for the specified `key`.'''
-        return any(key == item for item in cls.fiter(nodeidx))
+        return any(key == item for item in cls.fiter(nodeidx, tag=tag))
 
     @classmethod
-    def get(cls, nodeidx, key, type=None):
+    def get(cls, nodeidx, key, type=None, tag=None):
         '''Return the value for the provided `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx` casted as the specified `type`.'''
         node = netnode.get(nodeidx)
         if type in {None}:
-            return netnode.hashval(node, key)
+            return netnode.hashval(node, key, tag or netnode.hashtag)
         elif issubclass(type, memoryview):
-            res = netnode.hashval(node, key)
+            res = netnode.hashval(node, key, tag or netnode.hashtag)
             return res and memoryview(res)
         elif issubclass(type, bytes):
-            res = netnode.hashval(node, key)
+            res = netnode.hashval(node, key, tag or netnode.hashtag)
             return res and bytes(res)
         elif issubclass(type, six.string_types):
-            return netnode.hashstr(node, key)
+            return netnode.hashstr(node, key, tag or netnode.hashtag)
         elif issubclass(type, six.integer_types):
-            return netnode.hashval_long(node, key)
+            return netnode.hashval_long(node, key, tag or netnode.hashtag)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.get({:#x}, {!r}, type={!r}) : An unsupported type ({!r}) was requested for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, type, type))
 
     @classmethod
-    def set(cls, nodeidx, key, value):
+    def set(cls, nodeidx, key, value, tag=None):
         '''Assign the provided `value` to the specified `key` for the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
         # in my testing the type really doesn't matter
         if isinstance(value, memoryview):
-            return netnode.hashset(node, key, value.tobytes())
+            return netnode.hashset(node, key, value.tobytes(), tag or netnode.hashtag)
         elif isinstance(value, bytes):
-            return netnode.hashset(node, key, value)
+            return netnode.hashset(node, key, value, tag or netnode.hashtag)
         elif isinstance(value, six.string_types):
-            return netnode.hashset_buf(node, key, value)
+            return netnode.hashset_buf(node, key, value, tag or netnode.hashtag)
         elif isinstance(value, six.integer_types):
-            return netnode.hashset_idx(node, key, value)
+            return netnode.hashset_idx(node, key, value, tag or netnode.hashtag)
         raise internal.exceptions.InvalidTypeOrValueError(u"{:s}.set({:#x}, {!r}, {!r}) : An unsupported type ({!r}) was specified for the netnode's hash.".format('.'.join([__name__, cls.__name__]), nodeidx, key, value, type(value)))
 
     @classmethod
-    def remove(cls, nodeidx, key):
+    def remove(cls, nodeidx, key, tag=None):
         '''Remove the value assigned to the specified `key` of the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         node = netnode.get(nodeidx)
-        return netnode.hashdel(node, key)
+        return netnode.hashdel(node, key, tag or netnode.hashtag)
 
     @classmethod
-    def fiter(cls, nodeidx):
+    def fiter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in order.'''
         node = netnode.get(nodeidx)
-        for key, _ in utils.fhash(node):
+        for key, _ in utils.fhash(node, tag=tag or netnode.hashtag):
             yield key
         return
 
     @classmethod
-    def riter(cls, nodeidx):
+    def riter(cls, nodeidx, tag=None):
         '''Iterate through all of the elements of the "hashval" dictionary belonging to the netnode identified by `nodeidx` in reverse order.'''
         node = netnode.get(nodeidx)
-        for key, _ in utils.rhash(node):
+        for key, _ in utils.rhash(node, tag=tag or netnode.hashtag):
             yield key
         return
 
     @classmethod
-    def repr(cls, nodeidx):
+    def repr(cls, nodeidx, tag=None):
         '''Display the "hashval" dictionary belonging to the netnode identified by `nodeidx`.'''
         res = []
         try:
-            l1 = max(len(key or '') for key in cls.fiter(nodeidx))
-            l2 = max(len("{!r}".format(cls.get(nodeidx, key))) for key in cls.fiter(nodeidx))
+            l1 = max(len(key or '') for key in cls.fiter(nodeidx, tag=tag))
+            l2 = max(len("{!r}".format(cls.get(nodeidx, key, tag=tag))) for key in cls.fiter(nodeidx, tag=tag))
         except ValueError:
             l1, l2 = 0, 2
 
-        for index, key in enumerate(cls.fiter(nodeidx)):
-            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key)), l2, cls.get(nodeidx, key, None), cls.get(nodeidx, key, bytes), cls.get(nodeidx, key, int), cls.get(nodeidx, key, int))
+        for index, key in enumerate(cls.fiter(nodeidx, tag=tag)):
+            value = "{:<{:d}s} : default={!r}, bytes={!r}, int={:#x}({:d})".format("{!r}".format(cls.get(nodeidx, key, tag=tag)), l2, cls.get(nodeidx, key, None, tag=tag), cls.get(nodeidx, key, bytes, tag=tag), cls.get(nodeidx, key, int, tag=tag), cls.get(nodeidx, key, int, tag=tag))
             res.append("[{:d}] {:<{:d}s} -> {:s}".format(index, key, l1, value))
         if not res:
             raise internal.exceptions.MissingTypeOrAttribute(u"{:s}.repr({:#x}) : The specified node ({:x}) does not have any hashvals.".format('.'.join([__name__, cls.__name__]), nodeidx, nodeidx))
