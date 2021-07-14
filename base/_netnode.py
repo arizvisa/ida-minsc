@@ -120,11 +120,11 @@ class netnode(object):
         altfirst = _ida_netnode.netnode_altfirst
         altnext = _ida_netnode.netnode_altnext
 
-    # default tags
+    # default tags (older versions of IDA use a char which we'll use as well)
     alttag = idaapi.atag
     suptag = idaapi.stag
     hashtag = idaapi.htag
-    chartag = 0x64
+    chartag = b'd' if idaapi.__version__ < 7.0 else 0x64    # found while reversing ida's shared library
 
 class utils(object):
     """
